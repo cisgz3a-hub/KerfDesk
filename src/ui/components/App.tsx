@@ -394,6 +394,28 @@ export function App() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         handleDelete();
+      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedIds.size > 0) {
+        e.preventDefault();
+        const step = e.shiftKey ? 0.1 : 1;
+        let dx = 0, dy = 0;
+        if (e.key === 'ArrowLeft') dx = -step;
+        if (e.key === 'ArrowRight') dx = step;
+        if (e.key === 'ArrowUp') dy = -step;
+        if (e.key === 'ArrowDown') dy = step;
+
+        const newScene = {
+          ...scene,
+          objects: scene.objects.map(o => {
+            if (!selectedIds.has(o.id)) return o;
+            return {
+              ...o,
+              transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+              _bounds: null, _worldTransform: null,
+            };
+          }),
+        };
+        handleSceneCommit(newScene);
+        return;
       } else if (e.key === 'Escape') {
         handleClearSelection();
       } else if (e.key === 't' || e.key === 'T') {
