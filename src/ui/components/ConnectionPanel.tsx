@@ -48,6 +48,7 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
   const [manualCmd, setManualCmd] = useState('');
   const [usingWebSerial, setUsingWebSerial] = useState(false);
   const [webJobRunning, setWebJobRunning] = useState(false);
+  const [jogStep, setJogStep] = useState(10);
   const controllerRef = useRef<GrblController | null>(null);
   const webSerialRef = useRef<WebSerialController | null>(null);
   const jobAbortRef = useRef(false);
@@ -364,42 +365,84 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
           ),
         ),
 
-        React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 8 } },
-          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
-            React.createElement('div'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X0 Y-10 F1000');
-              else void controllerRef.current?.jog(0, -10);
-            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↑'),
-            React.createElement('div'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X-10 Y0 F1000');
-              else void controllerRef.current?.jog(-10, 0);
-            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '←'),
-            React.createElement('button', {
-              onClick: async () => {
-                if (webSerialRef.current) {
-                  await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
-                  setMessages(prev => [...prev, '✓ Zero set at current position']);
-                } else {
-                  controllerRef.current?.send('G10 L20 P1 X0 Y0');
-                }
-              },
-              title: 'Set current position as X0 Y0',
-              style: { ...btnStyle('0, 212, 255'), padding: '6px', fontSize: 8, fontWeight: 700 },
-            }, 'ZERO'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X10 Y0 F1000');
-              else void controllerRef.current?.jog(10, 0);
-            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '→'),
-            React.createElement('div'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X0 Y10 F1000');
-              else void controllerRef.current?.jog(0, 10);
-            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↓'),
-            React.createElement('div'),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', marginBottom: 8 } },
+          React.createElement('div', { style: { display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 6 } },
+            ...[1, 10, 50].map(step =>
+              React.createElement('button', {
+                key: step,
+                onClick: () => setJogStep(step),
+                style: {
+                  padding: '3px 10px', fontSize: 10,
+                  background: jogStep === step ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+                  border: jogStep === step ? '1px solid #00d4ff' : '1px solid #252540',
+                  borderRadius: 4,
+                  color: jogStep === step ? '#00d4ff' : '#555570',
+                  cursor: 'pointer',
+                  fontFamily: "'JetBrains Mono', monospace",
+                },
+              }, `${step}mm`),
+            ),
           ),
-          React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
+          React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center' } },
+            React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
+              React.createElement('div'),
+              React.createElement('button', {
+                onClick: async () => {
+                  if (webSerialRef.current) {
+                    await webSerialRef.current.send(`$J=G91 Y-${jogStep} F1000`);
+                  } else {
+                    controllerRef.current?.jog(0, -jogStep);
+                  }
+                },
+                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
+              }, '↑'),
+              React.createElement('div'),
+              React.createElement('button', {
+                onClick: async () => {
+                  if (webSerialRef.current) {
+                    await webSerialRef.current.send(`$J=G91 X-${jogStep} F1000`);
+                  } else {
+                    controllerRef.current?.jog(-jogStep, 0);
+                  }
+                },
+                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
+              }, '←'),
+              React.createElement('button', {
+                onClick: async () => {
+                  if (webSerialRef.current) {
+                    await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
+                    setMessages(prev => [...prev, '✓ Zero set at current position']);
+                  } else {
+                    controllerRef.current?.send('G10 L20 P1 X0 Y0');
+                  }
+                },
+                title: 'Set current position as X0 Y0',
+                style: { ...btnStyle('0, 212, 255'), padding: '6px', fontSize: 8, fontWeight: 700 },
+              }, 'ZERO'),
+              React.createElement('button', {
+                onClick: async () => {
+                  if (webSerialRef.current) {
+                    await webSerialRef.current.send(`$J=G91 X${jogStep} F1000`);
+                  } else {
+                    controllerRef.current?.jog(jogStep, 0);
+                  }
+                },
+                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
+              }, '→'),
+              React.createElement('div'),
+              React.createElement('button', {
+                onClick: async () => {
+                  if (webSerialRef.current) {
+                    await webSerialRef.current.send(`$J=G91 Y${jogStep} F1000`);
+                  } else {
+                    controllerRef.current?.jog(0, jogStep);
+                  }
+                },
+                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
+              }, '↓'),
+              React.createElement('div'),
+            ),
+            React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
             React.createElement('button', {
               onClick: async () => {
                 if (webSerialRef.current) {
@@ -444,6 +487,7 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
               title: 'Home machine — requires limit switches',
               style: { ...btnStyle('136, 136, 170'), fontSize: 10, padding: '4px 10px' },
             }, 'Home'),
+            ),
           ),
         ),
 
