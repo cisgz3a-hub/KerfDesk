@@ -56,7 +56,7 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
     const oy = labelPad + (ch - labelPad - totalH * scale) / 2;
 
     // Draw axis labels
-    ctx.font = '9px ' + mono;
+    ctx.font = '10px ' + mono;
     ctx.fillStyle = '#555570';
 
     // Speed label (top)
@@ -81,10 +81,11 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
 
         // Compute power and speed for this cell
         const power = rows === 1 ? powerMin : powerMin + (r / (rows - 1)) * (powerMax - powerMin);
-        const speed = cols === 1 ? speedMin : speedMin + (c / (cols - 1)) * (speedMax - speedMin);
+        const speed = cols === 1 ? speedMax : speedMax - (c / (cols - 1)) * (speedMax - speedMin);
 
         // Color intensity based on power/speed ratio (higher power + lower speed = darker)
-        const intensity = (power / 100) * (1 - (speed - speedMin) / (speedMax - speedMin + 1) * 0.7);
+        const speedFactor = 1 - (speed - speedMin) / (speedMax - speedMin || 1);
+        const intensity = (power / 100) * (0.3 + speedFactor * 0.7);
         const gray = Math.round(255 * (1 - intensity));
 
         ctx.fillStyle = `rgb(${gray}, ${Math.round(gray * 0.7)}, ${Math.round(gray * 0.5)})`;
@@ -96,11 +97,11 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
     }
 
     // Column speed labels
-    ctx.font = '7px ' + mono;
+    ctx.font = '8px ' + mono;
     ctx.fillStyle = '#555570';
     ctx.textAlign = 'center';
     for (let c = 0; c < cols; c++) {
-      const speed = cols === 1 ? speedMin : speedMin + (c / (cols - 1)) * (speedMax - speedMin);
+      const speed = cols === 1 ? speedMax : speedMax - (c / (cols - 1)) * (speedMax - speedMin);
       const x = ox + c * (cellSize + spacing) * scale + cellSize * scale / 2;
       ctx.fillText(Math.round(speed).toString(), x, oy - 4);
     }
