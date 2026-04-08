@@ -70,6 +70,7 @@
   "dependencies": {
     "@xmldom/xmldom": "^0.9.9",
     "polygon-clipping": "^0.15.7",
+    "polygon-offset": "^0.3.2",
     "potrace-js": "^0.0.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

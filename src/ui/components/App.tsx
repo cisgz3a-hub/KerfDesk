@@ -43,6 +43,7 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
+import { offsetObject } from '../../geometry/OffsetPath';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -674,6 +675,43 @@ export function App() {
     setSelectedIds(new Set([newId]));
   }, [scene, selectedIds, handleSceneCommit]);
 
+  const handleOffset = useCallback((distance: number) => {
+    if (selectedIds.size === 0) return;
+
+    const newObjects: typeof scene.objects = [];
+
+    for (const obj of scene.objects) {
+      if (!selectedIds.has(obj.id)) continue;
+
+      const resultGeom = offsetObject(obj, distance);
+      if (!resultGeom) continue;
+
+      newObjects.push({
+        id: generateId(),
+        type: 'path',
+        name: `${distance > 0 ? 'Outset' : 'Inset'} ${Math.abs(distance)}mm`,
+        layerId: obj.layerId,
+        parentId: null,
+        transform: { ...IDENTITY_MATRIX },
+        geometry: resultGeom,
+        visible: true,
+        locked: false,
+        _bounds: null,
+        _worldTransform: null,
+      });
+    }
+
+    if (newObjects.length === 0) {
+      alert('Offset failed — shape may be too small or complex.');
+      return;
+    }
+
+    handleSceneCommit({
+      ...scene,
+      objects: [...scene.objects, ...newObjects],
+    });
+  }, [scene, selectedIds, handleSceneCommit]);
+
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
 
@@ -935,7 +973,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleOffset]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -1208,6 +1246,18 @@ export function App() {
         { label: 'Boolean Union', action: () => handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
         { label: 'Boolean Subtract', action: () => handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
         { label: 'Boolean Intersect', action: () => handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
+        { label: 'separator', action: () => {}, separator: true },
+        { label: 'Offset Outset (+1mm)', action: () => handleOffset(1), disabled: selectedIds.size === 0 },
+        { label: 'Offset Outset (+2mm)', action: () => handleOffset(2), disabled: selectedIds.size === 0 },
+        { label: 'Offset Inset (-1mm)', action: () => handleOffset(-1), disabled: selectedIds.size === 0 },
+        { label: 'Offset Inset (-2mm)', action: () => handleOffset(-2), disabled: selectedIds.size === 0 },
+        { label: 'Offset Custom...', action: () => {
+          const input = prompt('Offset distance in mm (positive = outset, negative = inset):', '1');
+          if (!input) return;
+          const dist = parseFloat(input);
+          if (Number.isNaN(dist) || dist === 0) return;
+          handleOffset(dist);
+        }, disabled: selectedIds.size === 0 },
         { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
