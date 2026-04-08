@@ -93,6 +93,7 @@ export function CanvasViewport({
   const lastClickTimeRef = useRef<number>(0);
   const lastClickIdRef = useRef<string>('');
   const spaceHeldRef = useRef(false);
+  const nodeTargetIdRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
 
   useEffect(() => {
@@ -166,12 +167,10 @@ export function CanvasViewport({
       }
     }
 
-    // Node editing overlay — all selected path/polygon objects
-    if (activeTool === 'node' && selectedIds.size > 0) {
-      for (const obj of scene.objects) {
-        if (!selectedIds.has(obj.id)) continue;
-        if (obj.geometry.type !== 'path' && obj.geometry.type !== 'polygon') continue;
-
+    // Node editing overlay — single targeted path/polygon
+    if (activeTool === 'node' && nodeTargetIdRef.current) {
+      const obj = scene.objects.find(o => o.id === nodeTargetIdRef.current);
+      if (obj && selectedIds.has(obj.id) && (obj.geometry.type === 'path' || obj.geometry.type === 'polygon')) {
         ctx.save();
         transform.applyToContext(ctx);
 
@@ -308,6 +307,13 @@ export function CanvasViewport({
   }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool]);
 
   useEffect(() => { render(); }, [render]);
+
+  useEffect(() => {
+    if (activeTool !== 'node') {
+      nodeTargetIdRef.current = null;
+    }
+    render();
+  }, [activeTool, render]);
 
   // ─── ANIMATION PLAYBACK ──────────────────────────────────────
 
@@ -563,9 +569,9 @@ export function CanvasViewport({
       }
     }
 
-    if (activeTool === 'node' && selectedIds.size > 0) {
-      const selectedObjs = scene.objects.filter(o => selectedIds.has(o.id));
-      for (const obj of selectedObjs) {
+    if (activeTool === 'node' && nodeTargetIdRef.current) {
+      const obj = scene.objects.find(o => o.id === nodeTargetIdRef.current);
+      if (obj) {
         const hitRadius = 6 / (viewport.zoom || 1);
         // Transform world point to object-local coordinates
         const localX = (worldPt.x - obj.transform.tx) / (obj.transform.a || 1);
@@ -989,6 +995,7 @@ export function CanvasViewport({
         let newSelection: ReadonlySet<string>;
 
         if (hit) {
+          const hitObj = scene.objects.find(o => o.id === hit.id);
           if (e.shiftKey) {
             const next = new Set(selectedIds);
             if (next.has(hit.id)) {
@@ -998,7 +1005,6 @@ export function CanvasViewport({
             }
             newSelection = next;
           } else {
-            const hitObj = scene.objects.find(o => o.id === hit.id);
             // Double-click selects individual object inside group
             // Single click selects entire group
             const now = Date.now();
@@ -1020,6 +1026,11 @@ export function CanvasViewport({
             }
           }
           onSelectionChange?.(newSelection);
+          // Set node target when using node tool
+          if (activeTool === 'node' && hitObj) {
+            nodeTargetIdRef.current = hitObj.id;
+          }
+          render();
         } else {
           // Don't deselect when using node tool — keep current selection for node editing
           if (activeTool === 'node' && selectedIds.size > 0) {
@@ -1031,7 +1042,7 @@ export function CanvasViewport({
       }
       clickStartRef.current = null;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render]);
 
   const handleFitView = useCallback(() => {
     const bounds = computeFitBounds(scene, simulation);
