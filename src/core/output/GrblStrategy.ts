@@ -1,0 +1,46 @@
+/**
+ * === FILE: /src/core/output/GrblStrategy.ts ===
+ * 
+ * Purpose:    GRBL-specific G-code generation strategy.
+ *             GRBL uses M4 for dynamic laser mode and S0-S1000 for power.
+ *             This is the most common controller for diode lasers.
+ * 
+ * Dependencies:
+ *   - /src/core/output/Output.ts
+ * Last updated: Phase 1, Step 1 — Foundation
+ */
+
+import { BaseGCodeStrategy, type OutputFormat, registerOutputStrategy } from './Output';
+
+export class GrblOutputStrategy extends BaseGCodeStrategy {
+  readonly formatId: OutputFormat = 'grbl';
+  readonly formatName = 'GRBL 1.1 (G-code)';
+
+  /**
+   * GRBL uses M4 for dynamic laser mode.
+   * M4 = laser power scales with speed during acceleration.
+   * This prevents burning during acceleration/deceleration.
+   * S value: 0-1000 (maps to 0-100% power).
+   */
+  encodeLaserOn(power: number): string {
+    return `M4 ${this.encodePowerValue(power)}`;
+  }
+
+  encodeLaserOff(): string {
+    return 'M5 S0';
+  }
+
+  /**
+   * GRBL S-value range: 0-1000 (configurable via $30)
+   * We use the default 1000 max.
+   */
+  encodePowerValue(power: number): string {
+    const sValue = Math.round(Math.max(0, Math.min(100, power)) * 10);
+    return `S${sValue}`;
+  }
+}
+
+// ─── REGISTER ────────────────────────────────────────────────────
+// Self-registering: importing this file adds GRBL to available strategies.
+
+registerOutputStrategy(new GrblOutputStrategy());

@@ -1,0 +1,1017 @@
+/**
+ * === FILE: /src/ui/components/CanvasViewport.tsx ===
+ *
+ * Purpose:    Orchestration-only React component. Owns no rendering
+ *             logic — delegates to SceneRenderer & SimulationRenderer.
+ *             Owns no coordinate math — delegates to Transform.
+ *             Only manages: canvas ref, viewport state, mouse events,
+ *             playback state, and calls the right renderer at the right time.
+ *
+ * Dependencies:
+ *   - /src/core/scene/Scene.ts
+ *   - /src/core/plan/Simulation.ts
+ *   - /src/ui/viewport.ts (Transform, ViewportState)
+ *   - /src/ui/renderers/SceneRenderer.ts
+ *   - /src/ui/renderers/SimulationRenderer.ts
+ * Last updated: Refactor — Transform, pure orchestration
+ */
+
+import React, { useRef, useEffect, useState, useCallback } from 'react';
+import { type Scene } from '../../core/scene/Scene';
+import { createRect, createEllipse, createLine } from '../../core/scene/SceneObject';
+import { moveObjects } from '../../core/scene/SceneOps';
+import { type SimulationResult } from '../../core/plan/Simulation';
+import {
+  type ViewportState,
+  DEFAULT_VIEWPORT,
+  Transform,
+  zoomAt,
+  wheelToZoomFactor,
+  pan,
+  fitToAABB,
+} from '../viewport';
+import { computeFitBounds, computeObjectBounds } from '../../geometry/bounds';
+import { aabbIntersects, type Matrix3x2 } from '../../core/types';
+import { hitTestPoint } from '../../geometry/hit-test';
+import { renderScene } from '../renderers/SceneRenderer';
+import {
+  renderSimulationPath,
+  renderLaserHead,
+  renderTrail,
+} from '../renderers/SimulationRenderer';
+import { createTextObject } from '../tools/TextTool';
+import { type ToolType } from './ToolBar';
+
+// ─── PROPS ───────────────────────────────────────────────────────
+
+interface CanvasViewportProps {
+  scene: Scene;
+  simulation?: SimulationResult | null;
+  width?: number;
+  height?: number;
+  selectedIds?: ReadonlySet<string>;
+  onSelectionChange?: (selectedIds: ReadonlySet<string>) => void;
+  /** Called during drag — for live preview. Parent updates scene state but NOT history. */
+  onSceneChange?: (scene: Scene) => void;
+  /** Called on drag end — for history. Parent pushes to history. */
+  onSceneCommit?: (scene: Scene) => void;
+  activeTool?: ToolType;
+}
+
+// ─── COMPONENT ───────────────────────────────────────────────────
+
+export function CanvasViewport({
+  scene,
+  simulation = null,
+  width = 800,
+  height = 600,
+  selectedIds = new Set() as ReadonlySet<string>,
+  onSelectionChange,
+  onSceneChange,
+  onSceneCommit,
+  activeTool = 'select',
+}: CanvasViewportProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState<{ x: number; y: number; vp: ViewportState } | null>(null);
+  const mouseWorldRef = useRef({ x: 0, y: 0 });
+  const [playbackTime, setPlaybackTime] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const animFrameRef = useRef(0);
+  const playStartRef = useRef(0);
+  const playOffsetRef = useRef(0);
+  const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // ─── RENDER LOOP ─────────────────────────────────────────────
+  // Pure orchestration: create transform, call renderers in order.
+
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    canvas.width = width;
+    canvas.height = height;
+
+    const transform = Transform.from(viewport);
+
+    // 1–4. Scene (bed, grid, origin, objects) + selection highlights
+    if (simulation && simulation.frames.length > 1) {
+      ctx.save();
+      ctx.globalAlpha = 0.15;
+      renderScene(ctx, scene, transform, width, height, selectedIds);
+      ctx.restore();
+    } else {
+      renderScene(ctx, scene, transform, width, height, selectedIds);
+    }
+
+    // Resize handles (single selection, world space)
+    if (selectedIds.size === 1) {
+      const sid = [...selectedIds][0];
+      const obj = scene.objects.find(o => o.id === sid);
+      if (obj && obj.visible && !obj.locked) {
+        const layer = scene.layers.find(l => l.id === obj.layerId);
+        if (layer && layer.visible && !layer.locked) {
+          const b = computeObjectBounds(obj);
+          const x1 = b.minX;
+          const y1 = b.minY;
+          const x2 = b.maxX;
+          const y2 = b.maxY;
+          const mx = (x1 + x2) / 2;
+          const my = (y1 + y2) / 2;
+          ctx.save();
+          transform.applyToContext(ctx);
+          const hSize = transform.screenPx(HANDLE_SIZE);
+          ctx.fillStyle = '#3b8beb';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = transform.screenPx(1);
+          const handlePositions = [
+            { x: x1, y: y1 }, { x: mx, y: y1 }, { x: x2, y: y1 },
+            { x: x2, y: my }, { x: x2, y: y2 }, { x: mx, y: y2 },
+            { x: x1, y: y2 }, { x: x1, y: my },
+          ];
+          for (const hp of handlePositions) {
+            ctx.fillRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
+            ctx.strokeRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
+          }
+          ctx.restore();
+        }
+      }
+    }
+
+    // Node editing overlay
+    if (activeTool === 'node' && selectedIds.size === 1) {
+      for (const obj of scene.objects) {
+        if (!selectedIds.has(obj.id)) continue;
+        if (obj.geometry.type !== 'path' && obj.geometry.type !== 'polygon') continue;
+
+        ctx.save();
+        transform.applyToContext(ctx);
+
+        // Apply object transform
+        const t = obj.transform;
+        ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
+
+        const nodeSize = transform.screenPx(5);
+
+        if (obj.geometry.type === 'path') {
+          const pathGeom = obj.geometry as any;
+          for (const sp of (pathGeom.subPaths || [])) {
+            for (const seg of sp.segments) {
+              if (seg.type === 'close') continue;
+              // Draw node point
+              ctx.fillStyle = '#2dd4a0';
+              ctx.strokeStyle = '#ffffff';
+              ctx.lineWidth = transform.screenPx(1);
+              ctx.fillRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
+              ctx.strokeRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
+
+              // Draw control point handles for curves
+              if (seg.type === 'cubic' && seg.cp1 && seg.cp2) {
+                ctx.strokeStyle = 'rgba(45, 212, 160, 0.5)';
+                ctx.lineWidth = transform.screenPx(1);
+                ctx.beginPath();
+                ctx.moveTo(seg.cp1.x, seg.cp1.y);
+                ctx.lineTo(seg.to.x, seg.to.y);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(seg.cp2.x, seg.cp2.y);
+                ctx.lineTo(seg.to.x, seg.to.y);
+                ctx.stroke();
+
+                // Control point diamonds
+                ctx.fillStyle = '#ff6b6b';
+                const cpSize = transform.screenPx(4);
+                ctx.fillRect(seg.cp1.x - cpSize / 2, seg.cp1.y - cpSize / 2, cpSize, cpSize);
+                ctx.fillRect(seg.cp2.x - cpSize / 2, seg.cp2.y - cpSize / 2, cpSize, cpSize);
+              }
+            }
+          }
+        } else if (obj.geometry.type === 'polygon') {
+          const polyGeom = obj.geometry as any;
+          for (const pt of (polyGeom.points || [])) {
+            ctx.fillStyle = '#2dd4a0';
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = transform.screenPx(1);
+            ctx.fillRect(pt.x - nodeSize / 2, pt.y - nodeSize / 2, nodeSize, nodeSize);
+            ctx.strokeRect(pt.x - nodeSize / 2, pt.y - nodeSize / 2, nodeSize, nodeSize);
+          }
+        }
+
+        ctx.restore();
+      }
+    }
+
+    // 5–6. Simulation overlay (in world space)
+    if (simulation && simulation.frames.length > 1) {
+      const visibleBounds = transform.getVisibleWorldBounds(width, height);
+      ctx.save();
+      transform.applyToContext(ctx);
+      renderSimulationPath(ctx, simulation, transform, playbackTime, visibleBounds);
+      renderTrail(ctx, simulation, transform, playbackTime, 0.5, visibleBounds);
+      renderLaserHead(ctx, simulation, transform, playbackTime);
+      ctx.restore();
+    }
+
+    // 8. Drawing preview (rubber band)
+    if (drawRef.current && drawRef.current.tool === activeTool) {
+      ctx.save();
+      transform.applyToContext(ctx);
+      const sx = drawRef.current.startWorldX;
+      const sy = drawRef.current.startWorldY;
+      const cx = drawRef.current.currentWorldX;
+      const cy = drawRef.current.currentWorldY;
+
+      ctx.strokeStyle = '#3b8beb';
+      ctx.lineWidth = transform.screenPx(1);
+      ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
+
+      if (activeTool === 'rect') {
+        const x = Math.min(sx, cx);
+        const y = Math.min(sy, cy);
+        ctx.strokeRect(x, y, Math.abs(cx - sx), Math.abs(cy - sy));
+      } else if (activeTool === 'ellipse') {
+        const x = Math.min(sx, cx);
+        const y = Math.min(sy, cy);
+        const w = Math.abs(cx - sx);
+        const h = Math.abs(cy - sy);
+        ctx.beginPath();
+        ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (activeTool === 'line') {
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(cx, cy);
+        ctx.stroke();
+      }
+
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // Marquee selection rectangle
+    if (marqueeRef.current) {
+      ctx.save();
+      transform.applyToContext(ctx);
+      const sx = marqueeRef.current.startWorldX;
+      const sy = marqueeRef.current.startWorldY;
+      const cx = marqueeRef.current.currentWorldX;
+      const cy = marqueeRef.current.currentWorldY;
+      const x = Math.min(sx, cx);
+      const y = Math.min(sy, cy);
+      const w = Math.abs(cx - sx);
+      const h = Math.abs(cy - sy);
+
+      ctx.fillStyle = 'rgba(59, 139, 235, 0.08)';
+      ctx.fillRect(x, y, w, h);
+      ctx.strokeStyle = '#3b8beb';
+      ctx.lineWidth = transform.screenPx(1);
+      ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    // 7. Screen-space overlay
+    renderOverlay(ctx, width, height, mouseWorldRef.current, viewport, scene.objects.length, selectedIds.size);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool]);
+
+  useEffect(() => { render(); }, [render]);
+
+  // ─── ANIMATION PLAYBACK ──────────────────────────────────────
+
+  useEffect(() => {
+    if (!isPlaying || !simulation) return;
+
+    playStartRef.current = performance.now();
+    playOffsetRef.current = playbackTime;
+
+    const animate = () => {
+      const elapsed = (performance.now() - playStartRef.current) / 1000;
+      const newTime = playOffsetRef.current + elapsed;
+
+      if (newTime >= simulation.totalTime) {
+        setPlaybackTime(simulation.totalTime);
+        setIsPlaying(false);
+        return;
+      }
+
+      setPlaybackTime(newTime);
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [isPlaying, simulation]);
+
+  // ─── MOUSE HANDLERS ──────────────────────────────────────────
+
+  // Interaction state machine:
+  //   idle → (mouseDown on empty)  → clickPending → (mouseUp < 3px) → select/clear
+  //   idle → (mouseDown on object) → clickPending → (mouseUp < 3px) → select object
+  //   idle → (mouseDown on object) → clickPending → (move > 3px)   → dragging → (mouseUp) → commit
+  //   idle → (alt+mouseDown)       → panning      → (mouseUp) → idle
+
+  const clickStartRef = useRef<{ sx: number; sy: number; worldX: number; worldY: number } | null>(null);
+  const dragRef = useRef<{
+    isDragging: boolean;
+    lastWorldX: number;
+    lastWorldY: number;
+    hitSelectedObject: boolean;  // Did mouseDown land on a selected object?
+    dragIds: ReadonlySet<string>;
+  } | null>(null);
+  const drawRef = useRef<{
+    tool: string;
+    startWorldX: number;
+    startWorldY: number;
+    currentWorldX: number;
+    currentWorldY: number;
+  } | null>(null);
+  const marqueeRef = useRef<{
+    startWorldX: number;
+    startWorldY: number;
+    currentWorldX: number;
+    currentWorldY: number;
+  } | null>(null);
+  const resizeRef = useRef<{
+    handle: string;
+    startX: number;
+    startY: number;
+    origBounds: { minX: number; minY: number; maxX: number; maxY: number };
+    objId: string;
+    origTransform: Matrix3x2;
+  } | null>(null);
+  const nodeDragRef = useRef<{
+    objId: string;
+    subPathIdx: number;
+    segIdx: number;
+    field: 'to' | 'cp1' | 'cp2';  // which point is being dragged
+    isPolygonPt: boolean;
+    ptIdx: number;
+  } | null>(null);
+
+  const HANDLE_SIZE = 8;
+
+  const getHandleAtPoint = useCallback((screenX: number, screenY: number, selectedObjs: typeof scene.objects) => {
+    if (selectedObjs.length !== 1) return null;
+    const obj = selectedObjs[0];
+    if (!obj.visible || obj.locked) return null;
+    const layer = scene.layers.find(l => l.id === obj.layerId);
+    if (!layer || !layer.visible || layer.locked) return null;
+
+    const bounds = computeObjectBounds(obj);
+    const bw = bounds.maxX - bounds.minX;
+    const bh = bounds.maxY - bounds.minY;
+    if (bw <= 0 || bh <= 0) return null;
+
+    const transform = Transform.from(viewport);
+
+    const corners = [
+      { name: 'nw', x: bounds.minX, y: bounds.minY },
+      { name: 'n', x: (bounds.minX + bounds.maxX) / 2, y: bounds.minY },
+      { name: 'ne', x: bounds.maxX, y: bounds.minY },
+      { name: 'e', x: bounds.maxX, y: (bounds.minY + bounds.maxY) / 2 },
+      { name: 'se', x: bounds.maxX, y: bounds.maxY },
+      { name: 's', x: (bounds.minX + bounds.maxX) / 2, y: bounds.maxY },
+      { name: 'sw', x: bounds.minX, y: bounds.maxY },
+      { name: 'w', x: bounds.minX, y: (bounds.minY + bounds.maxY) / 2 },
+    ];
+
+    for (const c of corners) {
+      const sp = transform.worldToScreen({ x: c.x, y: c.y });
+      if (Math.abs(screenX - sp.x) <= HANDLE_SIZE && Math.abs(screenY - sp.y) <= HANDLE_SIZE) {
+        return { handle: c.name, bounds, objId: obj.id, origTransform: { ...obj.transform } };
+      }
+    }
+    return null;
+  }, [scene, viewport]);
+
+  // Native wheel listener — must be non-passive for preventDefault to work.
+  // React synthetic onWheel is passive in Chrome 73+, making preventDefault a no-op.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      setViewport(vp => zoomAt(vp, sx, sy, wheelToZoomFactor(e.deltaY)));
+    };
+    canvas.addEventListener('wheel', handler, { passive: false });
+    return () => canvas.removeEventListener('wheel', handler);
+  }, []);
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Pan: middle button or Alt+left
+    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+      e.preventDefault();
+      setIsPanning(true);
+      setPanStart({ x: e.clientX, y: e.clientY, vp: viewport });
+      return;
+    }
+
+    if (e.button !== 0) return;
+
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const transform = Transform.from(viewport);
+    const worldPt = transform.screenToWorld({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+
+    if (activeTool === 'text') {
+      const text = prompt('Enter text:');
+      if (text && text.trim()) {
+        const layerId = scene.activeLayerId || scene.layers[0]?.id;
+        if (!layerId) return;
+        const textObj = createTextObject(text.trim(), worldPt.x, worldPt.y, layerId);
+        const newScene = {
+          ...scene,
+          objects: [...scene.objects, textObj],
+        };
+        onSceneCommit?.(newScene);
+        onSelectionChange?.(new Set([textObj.id]));
+      }
+      return;
+    }
+
+    if (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line') {
+      // Drawing tools: record start point
+      drawRef.current = { tool: activeTool, startWorldX: worldPt.x, startWorldY: worldPt.y, currentWorldX: worldPt.x, currentWorldY: worldPt.y };
+      return;
+    }
+
+    // Check for resize handle hit
+    if (selectedIds.size === 1) {
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
+      const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
+      const handleHit = getHandleAtPoint(sx, sy, selObjs);
+      if (handleHit) {
+        resizeRef.current = {
+          handle: handleHit.handle,
+          startX: worldPt.x,
+          startY: worldPt.y,
+          origBounds: handleHit.bounds,
+          objId: handleHit.objId,
+          origTransform: handleHit.origTransform,
+        };
+        dragRef.current = null;
+        clickStartRef.current = null;
+        e.preventDefault();
+        return;
+      }
+    }
+
+    if (activeTool === 'node' && selectedIds.size === 1) {
+      const obj = scene.objects.find(o => selectedIds.has(o.id));
+      if (obj) {
+        const hitRadius = 6 / (viewport.zoom || 1);
+        // Transform world point to object-local coordinates
+        const localX = (worldPt.x - obj.transform.tx) / (obj.transform.a || 1);
+        const localY = (worldPt.y - obj.transform.ty) / (obj.transform.d || 1);
+
+        if (obj.geometry.type === 'path') {
+          const pathGeom = obj.geometry as any;
+          for (let si = 0; si < (pathGeom.subPaths || []).length; si++) {
+            const sp = pathGeom.subPaths[si];
+            for (let gi = 0; gi < sp.segments.length; gi++) {
+              const seg = sp.segments[gi];
+              if (seg.type === 'close') continue;
+
+              // Check main point
+              if (Math.abs(seg.to.x - localX) < hitRadius && Math.abs(seg.to.y - localY) < hitRadius) {
+                nodeDragRef.current = { objId: obj.id, subPathIdx: si, segIdx: gi, field: 'to', isPolygonPt: false, ptIdx: 0 };
+                return;
+              }
+              // Check control points
+              if (seg.type === 'cubic') {
+                if (seg.cp1 && Math.abs(seg.cp1.x - localX) < hitRadius && Math.abs(seg.cp1.y - localY) < hitRadius) {
+                  nodeDragRef.current = { objId: obj.id, subPathIdx: si, segIdx: gi, field: 'cp1', isPolygonPt: false, ptIdx: 0 };
+                  return;
+                }
+                if (seg.cp2 && Math.abs(seg.cp2.x - localX) < hitRadius && Math.abs(seg.cp2.y - localY) < hitRadius) {
+                  nodeDragRef.current = { objId: obj.id, subPathIdx: si, segIdx: gi, field: 'cp2', isPolygonPt: false, ptIdx: 0 };
+                  return;
+                }
+              }
+            }
+          }
+        } else if (obj.geometry.type === 'polygon') {
+          const polyGeom = obj.geometry as any;
+          for (let pi = 0; pi < (polyGeom.points || []).length; pi++) {
+            const pt = polyGeom.points[pi];
+            if (Math.abs(pt.x - localX) < hitRadius && Math.abs(pt.y - localY) < hitRadius) {
+              nodeDragRef.current = { objId: obj.id, subPathIdx: 0, segIdx: 0, field: 'to', isPolygonPt: true, ptIdx: pi };
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Select tool: existing click/drag logic continues below
+    // Record click start for click-vs-drag detection
+    clickStartRef.current = {
+      sx: e.clientX,
+      sy: e.clientY,
+      worldX: worldPt.x,
+      worldY: worldPt.y,
+    };
+
+    // Hit test to determine if this is a potential drag
+    const tolerance = transform.screenPx(5);
+    const hit = hitTestPoint(worldPt, scene, tolerance);
+    const hitIsSelected = hit !== null && selectedIds.has(hit.id);
+
+    dragRef.current = {
+      isDragging: false,  // Not dragging yet — waiting for 3px threshold
+      lastWorldX: worldPt.x,
+      lastWorldY: worldPt.y,
+      hitSelectedObject: hitIsSelected,
+      dragIds: new Set(selectedIds),
+    };
+
+    // If clicking an unselected object (without shift), select it immediately
+    // so the drag moves the right thing
+    if (hit && !hitIsSelected && !e.shiftKey) {
+      const newSel = new Set([hit.id]);
+      onSelectionChange?.(newSel);
+      dragRef.current.hitSelectedObject = true;
+      dragRef.current.dragIds = newSel;
+    }
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+
+    const transform = Transform.from(viewport);
+    const world = transform.screenToWorld({
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top,
+    });
+    mouseWorldRef.current = world;
+
+    // Drawing preview: update current position for rubber band
+    if (drawRef.current && (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line')) {
+      drawRef.current.currentWorldX = world.x;
+      drawRef.current.currentWorldY = world.y;
+      render();
+    }
+
+    // Pan
+    if (isPanning && panStart) {
+      setViewport(pan(panStart.vp, e.clientX - panStart.x, e.clientY - panStart.y));
+      return;
+    }
+
+    // Resize handle dragging
+    if (resizeRef.current) {
+      const r = resizeRef.current;
+      const obj = scene.objects.find(o => o.id === r.objId);
+      if (!obj) {
+        resizeRef.current = null;
+        return;
+      }
+
+      const bounds = r.origBounds;
+      const bw = bounds.maxX - bounds.minX;
+      const bh = bounds.maxY - bounds.minY;
+      if (bw === 0 || bh === 0) return;
+
+      const dx = world.x - r.startX;
+      const dy = world.y - r.startY;
+
+      let scaleX = r.origTransform.a;
+      let scaleY = r.origTransform.d;
+      let tx = r.origTransform.tx;
+      let ty = r.origTransform.ty;
+
+      const handle = r.handle;
+
+      if (handle.includes('e')) {
+        const newW = bw * r.origTransform.a + dx;
+        scaleX = newW / bw;
+      }
+      if (handle.includes('w')) {
+        const newW = bw * r.origTransform.a - dx;
+        scaleX = newW / bw;
+        tx = r.origTransform.tx + dx;
+      }
+      if (handle.includes('s')) {
+        const newH = bh * r.origTransform.d + dy;
+        scaleY = newH / bh;
+      }
+      if (handle.includes('n')) {
+        const newH = bh * r.origTransform.d - dy;
+        scaleY = newH / bh;
+        ty = r.origTransform.ty + dy;
+      }
+
+      if (handle === 'nw' || handle === 'ne' || handle === 'sw' || handle === 'se') {
+        const avgScale = Math.max(Math.abs(scaleX), Math.abs(scaleY));
+        const signX = scaleX >= 0 ? 1 : -1;
+        const signY = scaleY >= 0 ? 1 : -1;
+        scaleX = avgScale * signX;
+        scaleY = avgScale * signY;
+
+        if (handle.includes('w')) {
+          tx = r.origTransform.tx + bw * r.origTransform.a - bw * scaleX;
+        }
+        if (handle.includes('n')) {
+          ty = r.origTransform.ty + bh * r.origTransform.d - bh * scaleY;
+        }
+      }
+
+      if (Math.abs(scaleX) < 0.01) scaleX = scaleX >= 0 ? 0.01 : -0.01;
+      if (Math.abs(scaleY) < 0.01) scaleY = scaleY >= 0 ? 0.01 : -0.01;
+
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o =>
+          o.id === r.objId
+            ? { ...o, transform: { ...o.transform, a: scaleX, d: scaleY, tx, ty }, _bounds: null, _worldTransform: null }
+            : o
+        ),
+      };
+      onSceneChange?.(newScene);
+      render();
+      return;
+    }
+
+    // Node dragging
+    if (nodeDragRef.current) {
+      const nd = nodeDragRef.current;
+      const obj = scene.objects.find(o => o.id === nd.objId);
+      if (!obj) { nodeDragRef.current = null; return; }
+
+      const localX = (world.x - obj.transform.tx) / (obj.transform.a || 1);
+      const localY = (world.y - obj.transform.ty) / (obj.transform.d || 1);
+
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o => {
+          if (o.id !== nd.objId) return o;
+
+          if (nd.isPolygonPt) {
+            const polyGeom = { ...(o.geometry as any) };
+            const newPoints = [...polyGeom.points];
+            newPoints[nd.ptIdx] = { x: localX, y: localY };
+            return { ...o, geometry: { ...polyGeom, points: newPoints }, _bounds: null, _worldTransform: null };
+          }
+
+          const pathGeom = { ...(o.geometry as any) };
+          const newSubPaths = pathGeom.subPaths.map((sp: any, si: number) => {
+            if (si !== nd.subPathIdx) return sp;
+            return {
+              ...sp,
+              segments: sp.segments.map((seg: any, gi: number) => {
+                if (gi !== nd.segIdx) return seg;
+                if (nd.field === 'to') return { ...seg, to: { x: localX, y: localY } };
+                if (nd.field === 'cp1') return { ...seg, cp1: { x: localX, y: localY } };
+                if (nd.field === 'cp2') return { ...seg, cp2: { x: localX, y: localY } };
+                return seg;
+              }),
+            };
+          });
+          return { ...o, geometry: { ...pathGeom, subPaths: newSubPaths }, _bounds: null, _worldTransform: null };
+        }),
+      };
+      onSceneChange?.(newScene);
+      render();
+      return;
+    }
+
+    // Drag detection: check threshold while click is pending
+    if (dragRef.current && !dragRef.current.isDragging && clickStartRef.current) {
+      const dx = e.clientX - clickStartRef.current.sx;
+      const dy = e.clientY - clickStartRef.current.sy;
+      const distSq = dx * dx + dy * dy;
+
+      if (distSq > 9) {
+        if (dragRef.current.hitSelectedObject && dragRef.current.dragIds.size > 0) {
+          dragRef.current.isDragging = true;
+          setIsDragging(true);
+          dragRef.current.lastWorldX = world.x;
+          dragRef.current.lastWorldY = world.y;
+          clickStartRef.current = null;
+        } else if (activeTool === 'select') {
+          // Dragging on empty space — start marquee selection
+          const startX = clickStartRef.current!.worldX;
+          const startY = clickStartRef.current!.worldY;
+          clickStartRef.current = null;
+          dragRef.current = null;
+          marqueeRef.current = {
+            startWorldX: startX,
+            startWorldY: startY,
+            currentWorldX: world.x,
+            currentWorldY: world.y,
+          };
+        } else {
+          clickStartRef.current = null;
+          dragRef.current = null;
+        }
+      }
+    }
+
+    // Drag movement: runs every mouseMove while drag is active
+    if (dragRef.current?.isDragging) {
+      const worldDx = world.x - dragRef.current.lastWorldX;
+      const worldDy = world.y - dragRef.current.lastWorldY;
+      dragRef.current.lastWorldX = world.x;
+      dragRef.current.lastWorldY = world.y;
+
+      if ((worldDx !== 0 || worldDy !== 0) && onSceneChange) {
+        onSceneChange(moveObjects(scene, dragRef.current.dragIds, worldDx, worldDy));
+      }
+    }
+
+    // Marquee selection tracking
+    if (marqueeRef.current) {
+      marqueeRef.current.currentWorldX = world.x;
+      marqueeRef.current.currentWorldY = world.y;
+      render();
+    }
+
+    const canvas = canvasRef.current;
+    if (canvas) {
+      if (activeTool === 'select' && selectedIds.size === 1 && !dragRef.current?.isDragging && !resizeRef.current) {
+        const sx = e.clientX - rect.left;
+        const sy = e.clientY - rect.top;
+        const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
+        const handleHit = getHandleAtPoint(sx, sy, selObjs);
+        if (handleHit) {
+          const cursors: Record<string, string> = {
+            nw: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize', se: 'nwse-resize',
+            n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+          };
+          canvas.style.cursor = cursors[handleHit.handle] || 'default';
+        } else {
+          canvas.style.cursor = '';
+        }
+      } else if (!isPanning && !dragRef.current?.isDragging) {
+        canvas.style.cursor = '';
+      }
+    }
+  }, [viewport, isPanning, panStart, scene, selectedIds, onSceneChange, activeTool, render, getHandleAtPoint]);
+
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    setIsPanning(false);
+    setPanStart(null);
+
+    // Drawing tool: create shape on mouseUp
+    if (drawRef.current && (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line')) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const transform = Transform.from(viewport);
+        const endWorld = transform.screenToWorld({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+
+        const x1 = Math.min(drawRef.current.startWorldX, endWorld.x);
+        const y1 = Math.min(drawRef.current.startWorldY, endWorld.y);
+        const x2 = Math.max(drawRef.current.startWorldX, endWorld.x);
+        const y2 = Math.max(drawRef.current.startWorldY, endWorld.y);
+        const w = x2 - x1;
+        const h = y2 - y1;
+
+        if (w > 0.5 || h > 0.5 || activeTool === 'line') {
+          const layerId = scene.activeLayerId || scene.layers[0]?.id;
+          let newObj: ReturnType<typeof createRect> | ReturnType<typeof createEllipse> | ReturnType<typeof createLine> | undefined;
+
+          if (layerId) {
+            if (activeTool === 'rect') {
+              newObj = createRect(layerId, x1, y1, w, h);
+            } else if (activeTool === 'ellipse') {
+              newObj = createEllipse(layerId, x1 + w / 2, y1 + h / 2, w / 2, h / 2);
+            } else if (activeTool === 'line') {
+              newObj = createLine(layerId, drawRef.current.startWorldX, drawRef.current.startWorldY, endWorld.x, endWorld.y);
+            }
+
+            if (newObj) {
+              const newScene = { ...scene, objects: [...scene.objects, newObj] };
+              onSceneChange?.(newScene);
+              onSceneCommit?.(newScene);
+              onSelectionChange?.(new Set([newObj.id]));
+            }
+          }
+        }
+      }
+      drawRef.current = null;
+      return;
+    }
+
+    const wasDragging = dragRef.current?.isDragging ?? false;
+    dragRef.current = null;
+    setIsDragging(false);
+
+    // Marquee selection: select objects within rectangle
+    if (marqueeRef.current) {
+      const mx1 = Math.min(marqueeRef.current.startWorldX, marqueeRef.current.currentWorldX);
+      const my1 = Math.min(marqueeRef.current.startWorldY, marqueeRef.current.currentWorldY);
+      const mx2 = Math.max(marqueeRef.current.startWorldX, marqueeRef.current.currentWorldX);
+      const my2 = Math.max(marqueeRef.current.startWorldY, marqueeRef.current.currentWorldY);
+      const marqueeBox = { minX: mx1, minY: my1, maxX: mx2, maxY: my2 };
+
+      const hits = new Set<string>();
+      for (const obj of scene.objects) {
+        if (!obj.visible || obj.locked) continue;
+        const layer = scene.layers.find(l => l.id === obj.layerId);
+        if (!layer || !layer.visible || layer.locked) continue;
+        const objBounds = computeObjectBounds(obj);
+        if (aabbIntersects(objBounds, marqueeBox)) {
+          hits.add(obj.id);
+        }
+      }
+
+      if (hits.size > 0) {
+        onSelectionChange?.(hits);
+      } else {
+        onSelectionChange?.(new Set());
+      }
+
+      marqueeRef.current = null;
+      return;
+    }
+
+    // Resize completion
+    if (resizeRef.current) {
+      onSceneCommit?.(scene);
+      resizeRef.current = null;
+      return;
+    }
+
+    // Node drag completion
+    if (nodeDragRef.current) {
+      onSceneCommit?.(scene);
+      nodeDragRef.current = null;
+      return;
+    }
+
+    // If was dragging: commit the final scene to history, then done
+    if (wasDragging) {
+      clickStartRef.current = null;
+      onSceneCommit?.(scene);  // Single history entry for entire drag
+      return;
+    }
+
+    // Click detection: mouseUp at roughly same position as mouseDown
+    if (clickStartRef.current && e.button === 0) {
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const transform = Transform.from(viewport);
+        const worldPt = transform.screenToWorld({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+        });
+        const tolerance = transform.screenPx(5);
+        const hit = hitTestPoint(worldPt, scene, tolerance);
+
+        let newSelection: ReadonlySet<string>;
+
+        if (hit) {
+          if (e.shiftKey) {
+            const next = new Set(selectedIds);
+            if (next.has(hit.id)) {
+              next.delete(hit.id);
+            } else {
+              next.add(hit.id);
+            }
+            newSelection = next;
+          } else {
+            newSelection = new Set([hit.id]);
+          }
+        } else {
+          newSelection = new Set();
+        }
+
+        onSelectionChange?.(newSelection);
+      }
+      clickStartRef.current = null;
+    }
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange]);
+
+  const handleFitView = useCallback(() => {
+    const bounds = computeFitBounds(scene, simulation);
+    setViewport(fitToAABB(bounds, width, height, 0.1));
+  }, [scene, simulation, width, height]);
+
+  // Fit to content on initial load and when scene/simulation changes
+  const didInitialFit = useRef(false);
+  useEffect(() => {
+    if (!didInitialFit.current) {
+      handleFitView();
+      didInitialFit.current = true;
+    }
+  }, [handleFitView]);
+
+  // ─── JSX ─────────────────────────────────────────────────────
+
+  const totalTime = simulation?.totalTime ?? 0;
+
+  return React.createElement('div', {
+    style: { position: 'relative', width: '100%', height: '100%', background: '#06060c' },
+  },
+    React.createElement('canvas', {
+      ref: canvasRef, width, height,
+      style: { display: 'block', cursor: isPanning ? 'grabbing' : isDragging ? 'move' : (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'text') ? 'crosshair' : 'default' },
+      onMouseDown: handleMouseDown,
+      onMouseMove: handleMouseMove,
+      onMouseUp: handleMouseUp,
+      onMouseLeave: handleMouseUp,
+      onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+    }),
+
+    simulation && React.createElement(PlaybackControls, {
+      isPlaying,
+      playbackTime,
+      totalTime,
+      onPlayPause: () => setIsPlaying(!isPlaying),
+      onScrub: (t: number) => { setPlaybackTime(t); setIsPlaying(false); },
+      onReset: () => { setPlaybackTime(0); setIsPlaying(false); },
+      onFitView: handleFitView,
+    }),
+  );
+}
+
+// ─── SCREEN-SPACE OVERLAY ────────────────────────────────────────
+
+function renderOverlay(
+  ctx: CanvasRenderingContext2D,
+  w: number,
+  h: number,
+  mouseWorld: { x: number; y: number },
+  viewport: ViewportState,
+  objectCount: number,
+  selectedCount: number
+): void {
+  ctx.fillStyle = '#0c0c18cc';
+  ctx.fillRect(0, h - 22, w, 22);
+
+  ctx.font = '10px monospace';
+  ctx.fillStyle = '#555580';
+  const selText = selectedCount > 0 ? `  |  Selected: ${selectedCount}` : '';
+  ctx.fillText(
+    `X: ${mouseWorld.x.toFixed(1)}mm  Y: ${mouseWorld.y.toFixed(1)}mm  |  Zoom: ${(viewport.zoom * 100).toFixed(0)}%  |  Objects: ${objectCount}${selText}`,
+    8, h - 7
+  );
+}
+
+// ─── PLAYBACK CONTROLS ──────────────────────────────────────────
+
+interface PlaybackControlsProps {
+  isPlaying: boolean;
+  playbackTime: number;
+  totalTime: number;
+  onPlayPause: () => void;
+  onScrub: (time: number) => void;
+  onReset: () => void;
+  onFitView: () => void;
+}
+
+function PlaybackControls({
+  isPlaying, playbackTime, totalTime,
+  onPlayPause, onScrub, onReset, onFitView,
+}: PlaybackControlsProps) {
+  const btnStyle = {
+    background: 'none', border: '1px solid #333', borderRadius: 3,
+    color: '#aaa', padding: '2px 8px', cursor: 'pointer', fontSize: 10,
+  };
+
+  return React.createElement('div', {
+    style: {
+      position: 'absolute' as const, bottom: 26, left: 8, right: 8,
+      display: 'flex', alignItems: 'center', gap: 8,
+      padding: '4px 8px', background: '#0c0c18ee', borderRadius: 4,
+      fontSize: 10, fontFamily: 'monospace', color: '#888',
+    },
+  },
+    React.createElement('button', { onClick: onPlayPause, style: btnStyle }, isPlaying ? '⏸' : '▶'),
+    React.createElement('span', { style: { color: '#e63e6d', minWidth: 48 } }, formatTime(playbackTime)),
+    React.createElement('input', {
+      type: 'range', min: 0, max: totalTime * 1000, value: playbackTime * 1000,
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => onScrub(Number(e.target.value) / 1000),
+      style: { flex: 1, accentColor: '#e63e6d' },
+    }),
+    React.createElement('span', null, formatTime(totalTime)),
+    React.createElement('button', { onClick: onReset, style: btnStyle }, '⏹'),
+    React.createElement('button', { onClick: onFitView, style: btnStyle }, 'Fit'),
+  );
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────
+
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  const ms = Math.floor((seconds * 10) % 10);
+  return `${m}:${s.toString().padStart(2, '0')}.${ms}`;
+}
