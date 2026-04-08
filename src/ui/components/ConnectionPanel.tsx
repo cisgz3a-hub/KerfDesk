@@ -74,10 +74,23 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
     if (!gcode || !webSerialRef.current) return;
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
 
-    setMessages(prev => [...prev, `Sending ${lines.length} commands to laser...`]);
+    setMessages(prev => [...prev, `Preparing laser...`]);
 
-    // Wait for GRBL to be ready (flush any startup messages)
+    // Wait for GRBL startup
     await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // Unlock if in alarm state
+    try {
+      await webSerialRef.current.sendAndWait('$X', 5000);
+      setMessages(prev => [...prev, '✓ Machine unlocked']);
+    } catch {
+      setMessages(prev => [...prev, 'Unlock timed out — continuing anyway']);
+    }
+
+    // Small delay after unlock
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    setMessages(prev => [...prev, `Sending ${lines.length} commands...`]);
 
     for (let i = 0; i < lines.length; i++) {
       try {
@@ -85,30 +98,28 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
         setProgress({ sent: i + 1, total: lines.length });
 
         if (response.startsWith('error:')) {
-          setMessages(prev => [...prev, `GRBL error on line ${i + 1}: ${response}`]);
-          const cont = confirm(`GRBL returned "${response}" on line ${i + 1}:\n${lines[i]}\n\nContinue anyway?`);
+          setMessages(prev => [...prev, `GRBL error on line ${i + 1}: ${response} — ${lines[i]}`]);
+          const cont = confirm(`GRBL error "${response}" on line ${i + 1}:\n${lines[i]}\n\nContinue?`);
           if (!cont) {
-            setMessages(prev => [...prev, 'Job stopped by user']);
+            // Turn off laser and stop
+            await webSerialRef.current.send('M5 S0');
+            setMessages(prev => [...prev, 'Job stopped. Laser off.']);
             setProgress(null);
             return;
           }
         }
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        setMessages(prev => [...prev, `Error: ${msg}`]);
-        alert(`Job failed at line ${i + 1}: ${msg}`);
+      } catch (e: any) {
+        // Turn off laser on failure
+        await webSerialRef.current.send('M5 S0').catch(() => {});
+        setMessages(prev => [...prev, `Error: ${e.message}`]);
+        alert(`Job failed at line ${i + 1}: ${e.message}\nLaser has been turned off.`);
         setProgress(null);
         return;
       }
     }
 
-    setMessages(prev => [...prev, 'Job complete!']);
+    setMessages(prev => [...prev, '✓ Job complete!']);
     setProgress(null);
-  };
-
-  const handleStartJobClick = async () => {
-    if (usingWebSerial) await handleSendJobReal();
-    else await handleSendJob();
   };
 
   const handleSendManual = async () => {
@@ -239,7 +250,7 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
             const connected = await ws.connect(115200);
             if (connected) {
               setUsingWebSerial(true);
-              setMessages(prev => [...prev, 'Real laser connected via Web Serial']);
+              setMessages(prev => [...prev, '✓ Web Serial connected — ready to send jobs']);
             } else {
               webSerialRef.current = null;
             }
@@ -300,10 +311,27 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
             React.createElement('div'),
           ),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$X');
-              else void controllerRef.current?.unlock();
-            }, style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
+            React.createElement('button', {
+              onClick: async () => {
+                if (webSerialRef.current) {
+                  await webSerialRef.current.sendAndWait('$X', 5000).catch(() => {});
+                  setMessages(prev => [...prev, '✓ Machine unlocked']);
+                }
+                controllerRef.current?.unlock();
+              },
+              style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '6px 12px' },
+            }, 'Unlock ($X)'),
+            React.createElement('button', {
+              onClick: async () => {
+                if (webSerialRef.current) {
+                  setMessages(prev => [...prev, 'Homing...']);
+                  await webSerialRef.current.sendAndWait('$H', 30000).catch(() => {});
+                  setMessages(prev => [...prev, '✓ Homing complete']);
+                }
+                controllerRef.current?.home();
+              },
+              style: { ...btnStyle('45, 212, 160'), fontSize: 10, padding: '6px 12px' },
+            }, 'Home ($H)'),
             React.createElement('button', { onClick: () => {
               if (usingWebSerial && webSerialRef.current) {
                 void webSerialRef.current.send('M4 S50');
@@ -315,10 +343,26 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
 
         React.createElement('div', { style: { display: 'flex', gap: 6 } },
           React.createElement('button', {
-            onClick: () => void handleStartJobClick(),
+            onClick: () => {
+              console.log('Start Job clicked', {
+                hasGcode: !!gcode,
+                gcodeLines: gcode?.split('\n').length,
+                hasWebSerial: !!webSerialRef.current,
+                hasSimulator: !!controllerRef.current,
+                connState,
+              });
+
+              if (webSerialRef.current && connState === 'connected') {
+                void handleSendJobReal();
+              } else if (controllerRef.current && connState === 'connected') {
+                void handleSendJob();
+              } else {
+                alert('Not connected. Connect to a laser or simulator first.');
+              }
+            },
             disabled: !gcode || isRunning,
             style: { ...btnStyle('45, 212, 160', !gcode || isRunning), flex: 1, fontWeight: 600 },
-          }, isRunning ? 'Running...' : 'Start Job'),
+          }, webSerialRef.current ? 'Start Job (USB)' : isRunning ? 'Running...' : 'Start Job (Sim)'),
           isRunning && !usingWebSerial && React.createElement('button', {
             onClick: () => controllerRef.current?.pause(),
             style: btnStyle('255, 212, 68'),
