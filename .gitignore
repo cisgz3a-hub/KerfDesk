@@ -1,6 +1,7 @@
 node_modules/
 dist/
 dist-electron/
+build/
 release/
 package-lock.json
 *.log

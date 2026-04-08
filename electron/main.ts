@@ -4,16 +4,17 @@ import * as fs from 'fs';
 
 let mainWindow: BrowserWindow | null = null;
 
-const isDev = !app.isPackaged;
+/** Dev: unpackaged app, or explicit --dev (Vite on localhost:3000) */
+const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
-    minWidth: 900,
+    minWidth: 1024,
     minHeight: 600,
     title: 'LaserForge',
-    backgroundColor: '#06060c',
+    backgroundColor: '#0a0a12',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -25,7 +26,7 @@ function createWindow() {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
-    mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
+    mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
   }
 
   mainWindow.on('closed', () => {
