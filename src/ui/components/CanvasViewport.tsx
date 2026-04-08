@@ -108,37 +108,46 @@ export function CanvasViewport({
       renderScene(ctx, scene, transform, width, height, selectedIds);
     }
 
-    // Resize handles (single selection, world space)
-    if (selectedIds.size === 1) {
-      const sid = [...selectedIds][0];
-      const obj = scene.objects.find(o => o.id === sid);
-      if (obj && obj.visible && !obj.locked) {
+    // Resize handles (union bounds of all selected, world space)
+    if (selectedIds.size >= 1) {
+      let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+      let any = false;
+      for (const obj of scene.objects) {
+        if (!selectedIds.has(obj.id)) continue;
+        if (!obj.visible || obj.locked) continue;
         const layer = scene.layers.find(l => l.id === obj.layerId);
-        if (layer && layer.visible && !layer.locked) {
-          const b = computeObjectBounds(obj);
-          const x1 = b.minX;
-          const y1 = b.minY;
-          const x2 = b.maxX;
-          const y2 = b.maxY;
-          const mx = (x1 + x2) / 2;
-          const my = (y1 + y2) / 2;
-          ctx.save();
-          transform.applyToContext(ctx);
-          const hSize = transform.screenPx(HANDLE_SIZE);
-          ctx.fillStyle = '#3b8beb';
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = transform.screenPx(1);
-          const handlePositions = [
-            { x: x1, y: y1 }, { x: mx, y: y1 }, { x: x2, y: y1 },
-            { x: x2, y: my }, { x: x2, y: y2 }, { x: mx, y: y2 },
-            { x: x1, y: y2 }, { x: x1, y: my },
-          ];
-          for (const hp of handlePositions) {
-            ctx.fillRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
-            ctx.strokeRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
-          }
-          ctx.restore();
+        if (!layer || !layer.visible || layer.locked) continue;
+        const b = computeObjectBounds(obj);
+        if (!b || b.minX > b.maxX) continue;
+        any = true;
+        gMinX = Math.min(gMinX, b.minX);
+        gMinY = Math.min(gMinY, b.minY);
+        gMaxX = Math.max(gMaxX, b.maxX);
+        gMaxY = Math.max(gMaxY, b.maxY);
+      }
+      if (any && isFinite(gMinX) && gMinX <= gMaxX) {
+        const x1 = gMinX;
+        const y1 = gMinY;
+        const x2 = gMaxX;
+        const y2 = gMaxY;
+        const mx = (x1 + x2) / 2;
+        const my = (y1 + y2) / 2;
+        ctx.save();
+        transform.applyToContext(ctx);
+        const hSize = transform.screenPx(HANDLE_SIZE);
+        ctx.fillStyle = '#3b8beb';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = transform.screenPx(1);
+        const handlePositions = [
+          { x: x1, y: y1 }, { x: mx, y: y1 }, { x: x2, y: y1 },
+          { x: x2, y: my }, { x: x2, y: y2 }, { x: mx, y: y2 },
+          { x: x1, y: y2 }, { x: x1, y: my },
+        ];
+        for (const hp of handlePositions) {
+          ctx.fillRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
+          ctx.strokeRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
         }
+        ctx.restore();
       }
     }
 
@@ -341,8 +350,10 @@ export function CanvasViewport({
     startX: number;
     startY: number;
     origBounds: { minX: number; minY: number; maxX: number; maxY: number };
-    objId: string;
-    origTransform: Matrix3x2;
+    selectedIds: Set<string>;
+    origTransforms: Map<string, Matrix3x2>;
+    anchorX: number;
+    anchorY: number;
   } | null>(null);
   const nodeDragRef = useRef<{
     objId: string;
@@ -356,34 +367,42 @@ export function CanvasViewport({
   const HANDLE_SIZE = 8;
 
   const getHandleAtPoint = useCallback((screenX: number, screenY: number, selectedObjs: typeof scene.objects) => {
-    if (selectedObjs.length !== 1) return null;
-    const obj = selectedObjs[0];
-    if (!obj.visible || obj.locked) return null;
-    const layer = scene.layers.find(l => l.id === obj.layerId);
-    if (!layer || !layer.visible || layer.locked) return null;
+    if (selectedObjs.length === 0) return null;
 
-    const bounds = computeObjectBounds(obj);
-    const bw = bounds.maxX - bounds.minX;
-    const bh = bounds.maxY - bounds.minY;
+    let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+    for (const obj of selectedObjs) {
+      if (!obj.visible || obj.locked) continue;
+      const layer = scene.layers.find(l => l.id === obj.layerId);
+      if (!layer || !layer.visible || layer.locked) continue;
+      const bounds = computeObjectBounds(obj);
+      if (!bounds || bounds.minX > bounds.maxX) continue;
+      gMinX = Math.min(gMinX, bounds.minX);
+      gMinY = Math.min(gMinY, bounds.minY);
+      gMaxX = Math.max(gMaxX, bounds.maxX);
+      gMaxY = Math.max(gMaxY, bounds.maxY);
+    }
+    if (!isFinite(gMinX) || gMinX > gMaxX) return null;
+
+    const bw = gMaxX - gMinX;
+    const bh = gMaxY - gMinY;
     if (bw <= 0 || bh <= 0) return null;
 
     const transform = Transform.from(viewport);
-
     const corners = [
-      { name: 'nw', x: bounds.minX, y: bounds.minY },
-      { name: 'n', x: (bounds.minX + bounds.maxX) / 2, y: bounds.minY },
-      { name: 'ne', x: bounds.maxX, y: bounds.minY },
-      { name: 'e', x: bounds.maxX, y: (bounds.minY + bounds.maxY) / 2 },
-      { name: 'se', x: bounds.maxX, y: bounds.maxY },
-      { name: 's', x: (bounds.minX + bounds.maxX) / 2, y: bounds.maxY },
-      { name: 'sw', x: bounds.minX, y: bounds.maxY },
-      { name: 'w', x: bounds.minX, y: (bounds.minY + bounds.maxY) / 2 },
+      { name: 'nw', x: gMinX, y: gMinY },
+      { name: 'n', x: (gMinX + gMaxX) / 2, y: gMinY },
+      { name: 'ne', x: gMaxX, y: gMinY },
+      { name: 'e', x: gMaxX, y: (gMinY + gMaxY) / 2 },
+      { name: 'se', x: gMaxX, y: gMaxY },
+      { name: 's', x: (gMinX + gMaxX) / 2, y: gMaxY },
+      { name: 'sw', x: gMinX, y: gMaxY },
+      { name: 'w', x: gMinX, y: (gMinY + gMaxY) / 2 },
     ];
 
     for (const c of corners) {
       const sp = transform.worldToScreen({ x: c.x, y: c.y });
       if (Math.abs(screenX - sp.x) <= HANDLE_SIZE && Math.abs(screenY - sp.y) <= HANDLE_SIZE) {
-        return { handle: c.name, bounds, objId: obj.id, origTransform: { ...obj.transform } };
+        return { handle: c.name, bounds: { minX: gMinX, minY: gMinY, maxX: gMaxX, maxY: gMaxY } };
       }
     }
     return null;
@@ -447,20 +466,46 @@ export function CanvasViewport({
       return;
     }
 
-    // Check for resize handle hit
-    if (selectedIds.size === 1) {
+    // Check for resize handle hit (union bounds of selection)
+    if (selectedIds.size >= 1) {
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
       const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
       const handleHit = getHandleAtPoint(sx, sy, selObjs);
       if (handleHit) {
+        let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
+        const origTransforms = new Map<string, Matrix3x2>();
+
+        for (const obj of scene.objects) {
+          if (!selectedIds.has(obj.id)) continue;
+          origTransforms.set(obj.id, { ...obj.transform });
+          const ob = computeObjectBounds(obj);
+          if (!ob) continue;
+          gMinX = Math.min(gMinX, ob.minX);
+          gMinY = Math.min(gMinY, ob.minY);
+          gMaxX = Math.max(gMaxX, ob.maxX);
+          gMaxY = Math.max(gMaxY, ob.maxY);
+        }
+
+        const handle = handleHit.handle;
+        let anchorX = (gMinX + gMaxX) / 2;
+        let anchorY = (gMinY + gMaxY) / 2;
+        if (handle.includes('e')) anchorX = gMinX;
+        if (handle.includes('w')) anchorX = gMaxX;
+        if (handle.includes('s')) anchorY = gMinY;
+        if (handle.includes('n')) anchorY = gMaxY;
+        if (handle === 'n' || handle === 's') anchorX = gMinX;
+        if (handle === 'e' || handle === 'w') anchorY = gMinY;
+
         resizeRef.current = {
-          handle: handleHit.handle,
+          handle,
           startX: worldPt.x,
           startY: worldPt.y,
-          origBounds: handleHit.bounds,
-          objId: handleHit.objId,
-          origTransform: handleHit.origTransform,
+          origBounds: { minX: gMinX, minY: gMinY, maxX: gMaxX, maxY: gMaxY },
+          selectedIds: new Set(selectedIds),
+          origTransforms,
+          anchorX,
+          anchorY,
         };
         dragRef.current = null;
         clickStartRef.current = null;
@@ -575,74 +620,57 @@ export function CanvasViewport({
     // Resize handle dragging
     if (resizeRef.current) {
       const r = resizeRef.current;
-      const obj = scene.objects.find(o => o.id === r.objId);
-      if (!obj) {
-        resizeRef.current = null;
-        return;
-      }
-
-      const bounds = r.origBounds;
-      const bw = bounds.maxX - bounds.minX;
-      const bh = bounds.maxY - bounds.minY;
-      if (bw === 0 || bh === 0) return;
-
       const dx = world.x - r.startX;
       const dy = world.y - r.startY;
-
-      let scaleX = r.origTransform.a;
-      let scaleY = r.origTransform.d;
-      let tx = r.origTransform.tx;
-      let ty = r.origTransform.ty;
-
       const handle = r.handle;
+      const origW = r.origBounds.maxX - r.origBounds.minX;
+      const origH = r.origBounds.maxY - r.origBounds.minY;
 
-      if (handle.includes('e')) {
-        const newW = bw * r.origTransform.a + dx;
-        scaleX = newW / bw;
-      }
-      if (handle.includes('w')) {
-        const newW = bw * r.origTransform.a - dx;
-        scaleX = newW / bw;
-        tx = r.origTransform.tx + dx;
-      }
-      if (handle.includes('s')) {
-        const newH = bh * r.origTransform.d + dy;
-        scaleY = newH / bh;
-      }
-      if (handle.includes('n')) {
-        const newH = bh * r.origTransform.d - dy;
-        scaleY = newH / bh;
-        ty = r.origTransform.ty + dy;
-      }
+      if (origW === 0 || origH === 0) return;
 
-      if (handle === 'nw' || handle === 'ne' || handle === 'sw' || handle === 'se') {
-        const avgScale = Math.max(Math.abs(scaleX), Math.abs(scaleY));
-        const signX = scaleX >= 0 ? 1 : -1;
-        const signY = scaleY >= 0 ? 1 : -1;
-        scaleX = avgScale * signX;
-        scaleY = avgScale * signY;
+      let sx = 1, sy = 1;
 
-        if (handle.includes('w')) {
-          tx = r.origTransform.tx + bw * r.origTransform.a - bw * scaleX;
-        }
-        if (handle.includes('n')) {
-          ty = r.origTransform.ty + bh * r.origTransform.d - bh * scaleY;
-        }
+      if (handle === 'se') {
+        sx = sy = Math.max(0.05, 1 + Math.max(dx / origW, dy / origH));
+      } else if (handle === 'nw') {
+        sx = sy = Math.max(0.05, 1 + Math.max(-dx / origW, -dy / origH));
+      } else if (handle === 'ne') {
+        sx = sy = Math.max(0.05, 1 + Math.max(dx / origW, -dy / origH));
+      } else if (handle === 'sw') {
+        sx = sy = Math.max(0.05, 1 + Math.max(-dx / origW, dy / origH));
+      } else if (handle === 'e') {
+        sx = Math.max(0.05, 1 + dx / origW);
+      } else if (handle === 'w') {
+        sx = Math.max(0.05, 1 - dx / origW);
+      } else if (handle === 's') {
+        sy = Math.max(0.05, 1 + dy / origH);
+      } else if (handle === 'n') {
+        sy = Math.max(0.05, 1 - dy / origH);
       }
 
-      if (Math.abs(scaleX) < 0.01) scaleX = scaleX >= 0 ? 0.01 : -0.01;
-      if (Math.abs(scaleY) < 0.01) scaleY = scaleY >= 0 ? 0.01 : -0.01;
+      const ax = r.anchorX;
+      const ay = r.anchorY;
 
       const newScene = {
         ...scene,
-        objects: scene.objects.map(o =>
-          o.id === r.objId
-            ? { ...o, transform: { ...o.transform, a: scaleX, d: scaleY, tx, ty }, _bounds: null, _worldTransform: null }
-            : o
-        ),
+        objects: scene.objects.map(o => {
+          if (!r.selectedIds.has(o.id)) return o;
+          const ot = r.origTransforms.get(o.id);
+          if (!ot) return o;
+
+          const newA = ot.a * sx;
+          const newD = ot.d * sy;
+          const newTx = ax + (ot.tx - ax) * sx;
+          const newTy = ay + (ot.ty - ay) * sy;
+
+          return {
+            ...o,
+            transform: { ...o.transform, a: newA, b: ot.b, c: ot.c, d: newD, tx: newTx, ty: newTy },
+            _bounds: null, _worldTransform: null,
+          };
+        }),
       };
       onSceneChange?.(newScene);
-      render();
       return;
     }
 
@@ -742,7 +770,7 @@ export function CanvasViewport({
 
     const canvas = canvasRef.current;
     if (canvas) {
-      if (activeTool === 'select' && selectedIds.size === 1 && !dragRef.current?.isDragging && !resizeRef.current) {
+      if (activeTool === 'select' && selectedIds.size >= 1 && !dragRef.current?.isDragging && !resizeRef.current) {
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
         const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
