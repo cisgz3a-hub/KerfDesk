@@ -30,13 +30,13 @@ const icons: Record<ToolType, React.ReactNode> = {
   ),
 };
 
-const TOOLS: { id: ToolType; title?: string }[] = [
-  { id: 'select' },
-  { id: 'node', title: 'Node Edit (N)' },
-  { id: 'rect' },
-  { id: 'ellipse' },
-  { id: 'line' },
-  { id: 'text' },
+const TOOLS: { id: ToolType; title: string }[] = [
+  { id: 'select', title: 'Select & move (V)' },
+  { id: 'node', title: 'Edit nodes (N)' },
+  { id: 'rect', title: 'Draw rectangle (R)' },
+  { id: 'ellipse', title: 'Draw ellipse (E)' },
+  { id: 'line', title: 'Draw line (L)' },
+  { id: 'text', title: 'Place text (T)' },
 ];
 
 export function ToolBar({ activeTool, onToolChange }: ToolBarProps) {

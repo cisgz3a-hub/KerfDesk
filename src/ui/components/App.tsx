@@ -168,6 +168,16 @@ export function App() {
   }, []);
 
   const historyRef = useRef<HistoryManager>(new HistoryManager());
+  const [historyAvail, setHistoryAvail] = useState({ canUndo: false, canRedo: false });
+
+  useEffect(() => {
+    const h = historyRef.current;
+    const sync = () => {
+      setHistoryAvail({ canUndo: h.canUndo(), canRedo: h.canRedo() });
+    };
+    sync();
+    return h.onChange(sync);
+  }, []);
 
   // Push initial scene on mount
   useEffect(() => {
@@ -828,6 +838,12 @@ export function App() {
       onMaterialSetup: () => setShowMaterialDialog(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
+      onUndo: handleUndo,
+      onRedo: handleRedo,
+      canUndo: historyAvail.canUndo,
+      canRedo: historyAvail.canRedo,
+      projectName: scene.metadata?.name,
+      onShowShortcuts: () => setShowShortcuts(true),
     }),
 
     React.createElement('div', {

@@ -43,6 +43,18 @@ import {
 import { createTextObject } from '../tools/TextTool';
 import { type ToolType } from './ToolBar';
 
+function defaultCursorForTool(activeTool: ToolType): string {
+  const cursors: Record<string, string> = {
+    select: 'default',
+    node: 'crosshair',
+    rect: 'crosshair',
+    ellipse: 'crosshair',
+    line: 'crosshair',
+    text: 'text',
+  };
+  return cursors[activeTool] || 'default';
+}
+
 const GRID_SNAP = 1; // mm — snap to 1mm grid. Set to 0 to disable.
 
 function snapToGrid(value: number, gridSize: number): number {
@@ -605,7 +617,7 @@ export function CanvasViewport({
       if (e.code === 'Space') {
         spaceHeldRef.current = false;
         const canvas = canvasRef.current;
-        if (canvas && !isPanningRef.current) canvas.style.cursor = '';
+        if (canvas && !isPanningRef.current) canvas.style.cursor = defaultCursorForTool(activeTool);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -614,7 +626,13 @@ export function CanvasViewport({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [activeTool]);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.style.cursor = defaultCursorForTool(activeTool);
+  }, [activeTool]);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Pan: middle mouse button OR spacebar + left click (Alt+left fallback)
@@ -1028,10 +1046,10 @@ export function CanvasViewport({
           };
           canvas.style.cursor = cursors[handleHit.handle] || 'default';
         } else {
-          canvas.style.cursor = '';
+          canvas.style.cursor = defaultCursorForTool(activeTool);
         }
       } else if (!isPanning && !dragRef.current?.isDragging) {
-        canvas.style.cursor = '';
+        canvas.style.cursor = defaultCursorForTool(activeTool);
       }
     }
   }, [viewport, isPanning, panStart, scene, selectedIds, onSceneChange, activeTool, render, getHandleAtPoint]);
@@ -1245,7 +1263,7 @@ export function CanvasViewport({
       ref: canvasRef, width, height,
       style: {
         display: 'block',
-        cursor: isPanning ? 'grabbing' : isDragging ? 'move' : (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'text') ? 'crosshair' : 'default',
+        cursor: isPanning ? 'grabbing' : isDragging ? 'move' : defaultCursorForTool(activeTool),
       },
       onMouseDown: handleMouseDown,
       onMouseMove: handleMouseMove,

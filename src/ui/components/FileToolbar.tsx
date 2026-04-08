@@ -42,6 +42,12 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onPreviewToggle?: () => void;
   previewMode?: boolean;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
+  projectName?: string;
+  onShowShortcuts?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -58,6 +64,12 @@ export function FileToolbar({
   onMaterialSetup,
   onPreviewToggle,
   previewMode = false,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
+  projectName,
+  onShowShortcuts,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -67,13 +79,16 @@ export function FileToolbar({
   // ─── NEW PROJECT ─────────────────────────────────────────────
 
   const handleNew = useCallback(() => {
+    if (scene.objects.length > 0) {
+      if (!confirm('Start a new project? Unsaved changes will be lost.')) return;
+    }
     const newScene = createScene(
       scene.canvas.width,
       scene.canvas.height,
       'Untitled'
     );
     onNewProject(newScene);
-  }, [scene.canvas.width, scene.canvas.height, onNewProject]);
+  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, onNewProject]);
 
   // ─── IMPORT SVG ──────────────────────────────────────────────
 
@@ -368,6 +383,8 @@ export function FileToolbar({
     fontWeight: 500,
   };
 
+  const btnBase = btnStyle;
+
   const sep = React.createElement('div', { style: { width: 1, height: 20, background: '#252540', margin: '0 4px', flexShrink: 0 } });
 
   return React.createElement('div', {
@@ -382,19 +399,58 @@ export function FileToolbar({
       flexWrap: 'wrap' as const,
     },
   },
-    React.createElement('button', { onClick: handleNew, style: btnStyle }, 'New'),
-    React.createElement('button', { onClick: handleOpenClick, style: btnStyle }, 'Open'),
-    React.createElement('button', { onClick: handleSave, style: btnStyle }, 'Save'),
+    React.createElement('span', {
+      title: 'Project name',
+      style: {
+        color: '#555570',
+        fontSize: 11,
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        fontStyle: 'italic' as const,
+        marginRight: 8,
+        maxWidth: 120,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap' as const,
+      },
+    }, projectName || 'Untitled'),
+    React.createElement('button', { onClick: handleNew, style: btnStyle, title: 'New project (clear canvas)' }, 'New'),
+    React.createElement('button', { onClick: handleOpenClick, style: btnStyle, title: 'Open saved project' }, 'Open'),
+    React.createElement('button', { onClick: handleSave, style: btnStyle, title: 'Save project (Ctrl+S)' }, 'Save'),
+    React.createElement('button', {
+      onClick: () => onUndo?.(),
+      disabled: !canUndo,
+      title: 'Undo (Ctrl+Z)',
+      style: {
+        ...btnBase,
+        opacity: canUndo ? 1 : 0.3,
+        cursor: canUndo ? 'pointer' : 'default',
+        fontSize: 14,
+        padding: '4px 8px',
+      },
+    }, '↩'),
+    React.createElement('button', {
+      onClick: () => onRedo?.(),
+      disabled: !canRedo,
+      title: 'Redo (Ctrl+Y)',
+      style: {
+        ...btnBase,
+        opacity: canRedo ? 1 : 0.3,
+        cursor: canRedo ? 'pointer' : 'default',
+        fontSize: 14,
+        padding: '4px 8px',
+      },
+    }, '↪'),
     sep,
-    React.createElement('button', { onClick: handleImportClick, style: btnStyle }, 'Import SVG'),
-    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle }, 'Import Image'),
-    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle }, 'Import DXF'),
+    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file' }, 'Import SVG'),
+    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving' }, 'Import Image'),
+    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file' }, 'Import DXF'),
     sep,
-    React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle }, 'G-code'),
-    React.createElement('button', { onClick: handleExportSvg, style: btnStyle }, 'Export SVG'),
+    React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser' }, 'G-code'),
+    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file' }, 'Export SVG'),
     sep,
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
+      title: 'Toggle burn preview — see how it will look on material',
       style: {
         padding: '5px 14px',
         background: previewMode ? 'rgba(45, 212, 160, 0.15)' : 'transparent',
@@ -418,12 +474,34 @@ export function FileToolbar({
         }
       },
     }, previewMode ? '● Preview' : '○ Preview'),
-    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
-    isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
+    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle, title: 'Simulate laser toolpath' }, 'Simulate'),
+    isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' }, title: 'Stop simulation' }, 'Stop Sim'),
     sep,
-    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
-    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
+    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size' }, 'Material'),
+    React.createElement('button', { onClick: handleBedSize, style: btnStyle, title: 'Change laser bed dimensions' }, 'Bed Size'),
+    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid' }, 'Material Test'),
+
+    React.createElement('div', { style: { flex: 1 } }),
+    React.createElement('button', {
+      onClick: () => onShowShortcuts?.(),
+      title: 'Keyboard shortcuts (?)',
+      style: {
+        padding: '4px 10px',
+        background: 'transparent',
+        border: '1px solid transparent',
+        borderRadius: 4,
+        color: '#555570',
+        fontSize: 13,
+        cursor: 'pointer',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (e.target as HTMLElement).style.color = '#8888aa';
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (e.target as HTMLElement).style.color = '#555570';
+      },
+    }, '?'),
 
     // Hidden file input for SVG import
     React.createElement('input', {
