@@ -179,22 +179,24 @@ export function CanvasViewport({
         const t = obj.transform;
         ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
 
-        const nodeSize = transform.screenPx(5);
+        const nodeSize = transform.screenPx(3);
 
         if (obj.geometry.type === 'path') {
           const pathGeom = obj.geometry as any;
           for (const sp of (pathGeom.subPaths || [])) {
             for (const seg of sp.segments) {
               if (seg.type === 'close') continue;
-              ctx.fillStyle = '#2dd4a0';
-              ctx.strokeStyle = '#ffffff';
-              ctx.lineWidth = transform.screenPx(1);
-              ctx.fillRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
-              ctx.strokeRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
+              ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.lineWidth = transform.screenPx(0.5);
+              ctx.beginPath();
+              ctx.arc(seg.to.x, seg.to.y, nodeSize, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.stroke();
 
               if (seg.type === 'cubic' && seg.cp1 && seg.cp2) {
-                ctx.strokeStyle = 'rgba(45, 212, 160, 0.5)';
-                ctx.lineWidth = transform.screenPx(1);
+                ctx.strokeStyle = 'rgba(45, 212, 160, 0.2)';
+                ctx.lineWidth = transform.screenPx(0.5);
                 ctx.beginPath();
                 ctx.moveTo(seg.cp1.x, seg.cp1.y);
                 ctx.lineTo(seg.to.x, seg.to.y);
@@ -204,21 +206,27 @@ export function CanvasViewport({
                 ctx.lineTo(seg.to.x, seg.to.y);
                 ctx.stroke();
 
-                ctx.fillStyle = '#ff6b6b';
-                const cpSize = transform.screenPx(4);
-                ctx.fillRect(seg.cp1.x - cpSize / 2, seg.cp1.y - cpSize / 2, cpSize, cpSize);
-                ctx.fillRect(seg.cp2.x - cpSize / 2, seg.cp2.y - cpSize / 2, cpSize, cpSize);
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
+                const cpSize = transform.screenPx(2);
+                ctx.beginPath();
+                ctx.arc(seg.cp1.x, seg.cp1.y, cpSize, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(seg.cp2.x, seg.cp2.y, cpSize, 0, Math.PI * 2);
+                ctx.fill();
               }
             }
           }
         } else if (obj.geometry.type === 'polygon') {
           const polyGeom = obj.geometry as any;
           for (const pt of (polyGeom.points || [])) {
-            ctx.fillStyle = '#2dd4a0';
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = transform.screenPx(1);
-            ctx.fillRect(pt.x - nodeSize / 2, pt.y - nodeSize / 2, nodeSize, nodeSize);
-            ctx.strokeRect(pt.x - nodeSize / 2, pt.y - nodeSize / 2, nodeSize, nodeSize);
+            ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = transform.screenPx(0.5);
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, nodeSize, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
           }
         }
 
