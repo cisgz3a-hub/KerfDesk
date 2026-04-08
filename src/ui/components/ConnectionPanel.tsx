@@ -75,24 +75,35 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
 
     setMessages(prev => [...prev, `Sending ${lines.length} commands to laser...`]);
-    jobAbortRef.current = false;
-    setWebJobRunning(true);
 
-    try {
-      for (let i = 0; i < lines.length; i++) {
-        if (jobAbortRef.current) break;
-        await webSerialRef.current.send(lines[i]);
+    // Wait for GRBL to be ready (flush any startup messages)
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    for (let i = 0; i < lines.length; i++) {
+      try {
+        const response = await webSerialRef.current.sendAndWait(lines[i], 30000);
         setProgress({ sent: i + 1, total: lines.length });
-        await new Promise(resolve => setTimeout(resolve, 20));
-      }
 
-      if (!jobAbortRef.current) {
-        setMessages(prev => [...prev, 'Job complete!']);
+        if (response.startsWith('error:')) {
+          setMessages(prev => [...prev, `GRBL error on line ${i + 1}: ${response}`]);
+          const cont = confirm(`GRBL returned "${response}" on line ${i + 1}:\n${lines[i]}\n\nContinue anyway?`);
+          if (!cont) {
+            setMessages(prev => [...prev, 'Job stopped by user']);
+            setProgress(null);
+            return;
+          }
+        }
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        setMessages(prev => [...prev, `Error: ${msg}`]);
+        alert(`Job failed at line ${i + 1}: ${msg}`);
+        setProgress(null);
+        return;
       }
-    } finally {
-      setWebJobRunning(false);
-      setProgress(null);
     }
+
+    setMessages(prev => [...prev, 'Job complete!']);
+    setProgress(null);
   };
 
   const handleStartJobClick = async () => {

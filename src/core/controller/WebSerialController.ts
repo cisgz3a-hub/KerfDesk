@@ -17,6 +17,7 @@ export class WebSerialController {
   private writer: WritableStreamDefaultWriter<Uint8Array> | null = null;
   private events: SerialEvents;
   private readLoopActive = false;
+  private responseResolvers: Array<(line: string) => void> = [];
 
   constructor(events: SerialEvents) {
     this.events = events;
@@ -110,6 +111,22 @@ export class WebSerialController {
     this.events.onMessage(`> ${command.trim()}`);
   }
 
+  async sendAndWait(command: string, timeoutMs: number = 10000): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.responseResolvers.shift();
+        reject(new Error(`Timeout waiting for response to: ${command}`));
+      }, timeoutMs);
+
+      this.responseResolvers.push((response: string) => {
+        clearTimeout(timer);
+        resolve(response);
+      });
+
+      void this.send(command);
+    });
+  }
+
   /** Read loop — continuously reads from serial port */
   private async startReadLoop(): Promise<void> {
     if (!this.reader) return;
@@ -119,19 +136,25 @@ export class WebSerialController {
     let buffer = '';
 
     try {
-      while (this.readLoopActive && this.reader) {
+      while (this.readLoopActive) {
         const { value, done } = await this.reader.read();
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
 
         const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        buffer = lines.pop() || '';
 
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed) {
             this.events.onMessage(trimmed);
+
+            // Resolve waiting command if ok or error
+            if (trimmed === 'ok' || trimmed.startsWith('error:')) {
+              const resolver = this.responseResolvers.shift();
+              if (resolver) resolver(trimmed);
+            }
           }
         }
       }
