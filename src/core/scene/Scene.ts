@@ -29,7 +29,7 @@ export interface Scene {
     units: Units;
   };
 
-  // Content
+  // Content — each Layer.settings includes passes (default 1), power, speed, mode; see Layer.LaserSettings
   layers: Layer[];
   objects: SceneObject[];
   material: {

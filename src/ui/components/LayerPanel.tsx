@@ -372,6 +372,30 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
           style: numberInputStyle,
         }),
       ),
+      React.createElement('div', { style: { marginTop: 6 } },
+        React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Passes'),
+        React.createElement('input', {
+          type: 'number',
+          value: activeLayer.settings.passes ?? 1,
+          min: 1,
+          max: 20,
+          style: numberInputStyle,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            const val = parseInt(e.target.value, 10) || 0;
+            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+              ...l,
+              settings: { ...l.settings, passes: val },
+            })));
+          },
+          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+            const val = Math.max(1, Math.min(20, parseInt(e.target.value, 10) || 1));
+            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+              ...l,
+              settings: { ...l.settings, passes: val },
+            })));
+          },
+        }),
+      ),
       React.createElement('label', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
         React.createElement('select', {

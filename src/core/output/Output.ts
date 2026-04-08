@@ -103,8 +103,14 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     lines.push(this.encodeHeader(job));
 
     for (const op of plan.operations) {
+      const srcOp = job.operations.find(o => o.id === op.operationId);
+      const passes = Math.max(1, srcOp?.settings.passes ?? 1);
       lines.push('');
-      lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
+      if (passes > 1) {
+        lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}/${passes}) ---`);
+      } else {
+        lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
+      }
 
       for (const move of op.moves) {
         lines.push(this.encodeMove(move));
