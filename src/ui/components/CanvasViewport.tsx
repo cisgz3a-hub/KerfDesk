@@ -951,7 +951,16 @@ export function CanvasViewport({
             }
             newSelection = next;
           } else {
-            newSelection = new Set([hit.id]);
+            const hitObj = scene.objects.find(o => o.id === hit.id);
+            if (hitObj?.parentId) {
+              newSelection = new Set(
+                scene.objects
+                  .filter(o => o.parentId === hitObj.parentId)
+                  .map(o => o.id)
+              );
+            } else {
+              newSelection = new Set([hit.id]);
+            }
           }
         } else {
           newSelection = new Set();

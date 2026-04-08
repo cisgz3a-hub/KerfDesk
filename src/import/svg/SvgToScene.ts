@@ -70,6 +70,14 @@ export function importSvgToScene(
     if (obj) objects.push(obj);
   }
 
+  // Group all imported objects together
+  if (objects.length > 1) {
+    const groupId = generateId();
+    for (const obj of objects) {
+      obj.parentId = groupId;
+    }
+  }
+
   return { ...scene, objects };
 }
 
@@ -122,6 +130,14 @@ export function importSvgIntoScene(
     );
 
     objects = applyTransformToObjects(objects, importTransform);
+  }
+
+  // Group all imported objects together
+  if (objects.length > 1) {
+    const groupId = generateId();
+    for (const obj of objects) {
+      obj.parentId = groupId;
+    }
   }
 
   return {
