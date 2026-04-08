@@ -152,7 +152,8 @@ export function renderSceneObjects(
   transform: Transform,
   canvasWidth: number,
   canvasHeight: number,
-  selectedIds?: ReadonlySet<string>
+  selectedIds?: ReadonlySet<string>,
+  previewMode: boolean = false
 ): void {
   const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
 
@@ -164,6 +165,86 @@ export function renderSceneObjects(
   const boundsCache = selectedIds && selectedIds.size > 0
     ? new Map<string, AABB>()
     : null;
+
+  // Preview mode: render as simulated burn result on material.
+  if (previewMode && scene.material) {
+    const mat = scene.material;
+
+    ctx.save();
+    ctx.fillStyle = mat.color || '#c4a882';
+    ctx.fillRect(mat.x, mat.y, mat.width, mat.height);
+
+    if (mat.type === 'wood') {
+      ctx.globalAlpha = 0.08;
+      ctx.strokeStyle = '#6B5335';
+      ctx.lineWidth = transform.screenPx(0.8);
+      for (let gy = mat.y; gy < mat.y + mat.height; gy += 2) {
+        const wobble = Math.sin(gy * 0.3) * 2 + Math.sin(gy * 0.7) * 0.5;
+        ctx.beginPath();
+        ctx.moveTo(mat.x, gy + wobble);
+        ctx.bezierCurveTo(
+          mat.x + mat.width * 0.3, gy + wobble * 1.2,
+          mat.x + mat.width * 0.7, gy + wobble * 0.8,
+          mat.x + mat.width, gy + wobble * 0.6
+        );
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+
+    for (const obj of scene.objects) {
+      if (!obj.visible) continue;
+      const layer = layerMap.get(obj.layerId);
+      if (!layer || !layer.visible) continue;
+      if (obj.geometry.type === 'image') continue;
+      const objBounds = computeObjectBounds(obj);
+      if (!aabbIntersects(objBounds, visibleBounds)) continue;
+
+      const mode = layer.settings.mode;
+      const power = layer.settings.power.max;
+      const intensity = Math.max(0, Math.min(1, power / 100));
+
+      ctx.save();
+      const t = obj.transform;
+      ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
+
+      if (mode === 'cut') {
+        ctx.strokeStyle = `rgba(30, 15, 5, ${0.7 + intensity * 0.3})`;
+        ctx.lineWidth = transform.screenPx(1.5);
+        ctx.shadowColor = 'rgba(20, 10, 0, 0.5)';
+        ctx.shadowBlur = transform.screenPx(2);
+        drawObjectPath(ctx, obj);
+        ctx.shadowBlur = 0;
+      } else if (mode === 'engrave' || mode === 'score') {
+        ctx.fillStyle = `rgba(40, 20, 5, ${intensity * 0.6})`;
+        ctx.strokeStyle = `rgba(30, 15, 5, ${intensity * 0.4})`;
+        ctx.lineWidth = transform.screenPx(mode === 'score' ? 0.8 : 0.3);
+        drawObjectFilled(ctx, obj, mode === 'engrave');
+      }
+
+      ctx.restore();
+    }
+
+    // Keep start marker visible in preview mode.
+    if (scene.startPosition) {
+      const sp = scene.startPosition;
+      const dotRadius = transform.screenPx(6);
+      const ringRadius = transform.screenPx(10);
+      ctx.strokeStyle = 'rgba(45, 212, 160, 0.3)';
+      ctx.lineWidth = transform.screenPx(1.5);
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, ringRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(45, 212, 160, 0.9)';
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, dotRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+    return;
+  }
 
   for (const obj of scene.objects) {
     const layer = layerMap.get(obj.layerId);
@@ -295,10 +376,11 @@ export function renderScene(
   transform: Transform,
   canvasWidth: number,
   canvasHeight: number,
-  selectedIds?: ReadonlySet<string>
+  selectedIds?: ReadonlySet<string>,
+  previewMode: boolean = false
 ): void {
   renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight);
-  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds);
+  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode);
 }
 
 // ─── BED ─────────────────────────────────────────────────────────
@@ -396,6 +478,53 @@ function renderObject(
   drawGeometry(ctx, obj.geometry, transform, isFill, obj);
 
   ctx.restore();
+}
+
+function drawObjectPath(ctx: CanvasRenderingContext2D, obj: SceneObject): void {
+  const geom = obj.geometry as any;
+  ctx.beginPath();
+
+  if (geom.type === 'rect') {
+    ctx.rect(geom.x, geom.y, geom.width, geom.height);
+  } else if (geom.type === 'ellipse') {
+    ctx.ellipse(geom.cx, geom.cy, geom.rx, geom.ry, 0, 0, Math.PI * 2);
+  } else if (geom.type === 'line') {
+    ctx.moveTo(geom.x1, geom.y1);
+    ctx.lineTo(geom.x2, geom.y2);
+  } else if (geom.type === 'path') {
+    for (const sp of (geom.subPaths || [])) {
+      for (const seg of sp.segments) {
+        if (seg.type === 'move') ctx.moveTo(seg.to.x, seg.to.y);
+        else if (seg.type === 'line') ctx.lineTo(seg.to.x, seg.to.y);
+        else if (seg.type === 'cubic') ctx.bezierCurveTo(seg.cp1.x, seg.cp1.y, seg.cp2.x, seg.cp2.y, seg.to.x, seg.to.y);
+        else if (seg.type === 'quadratic') ctx.quadraticCurveTo(seg.cp.x, seg.cp.y, seg.to.x, seg.to.y);
+        else if (seg.type === 'close') ctx.closePath();
+      }
+    }
+  } else if (geom.type === 'polygon') {
+    const pts = geom.points || [];
+    if (pts.length > 0) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      if (geom.closed) ctx.closePath();
+    }
+  } else if (geom.type === 'text') {
+    const fontSize = geom.fontSize || 10;
+    const bold = geom.bold ? 'bold ' : '';
+    const italic = geom.italic ? 'italic ' : '';
+    ctx.font = `${italic}${bold}${fontSize}px ${geom.fontFamily || 'Arial'}`;
+    ctx.fillStyle = ctx.strokeStyle as string;
+    ctx.textBaseline = 'top';
+    ctx.fillText(geom.text, 0, 0);
+    return;
+  }
+
+  ctx.stroke();
+}
+
+function drawObjectFilled(ctx: CanvasRenderingContext2D, obj: SceneObject, fill: boolean): void {
+  drawObjectPath(ctx, obj);
+  if (fill) ctx.fill();
 }
 
 // ─── GEOMETRY DISPATCH ───────────────────────────────────────────

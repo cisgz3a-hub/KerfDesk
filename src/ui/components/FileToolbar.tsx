@@ -40,6 +40,8 @@ interface FileToolbarProps {
   isSimulating?: boolean;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
+  onPreviewToggle?: () => void;
+  previewMode?: boolean;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -54,6 +56,8 @@ export function FileToolbar({
   isSimulating,
   onMaterialTest,
   onMaterialSetup,
+  onPreviewToggle,
+  previewMode = false,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -393,6 +397,31 @@ export function FileToolbar({
     React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
+    React.createElement('button', {
+      onClick: () => onPreviewToggle?.(),
+      style: {
+        padding: '5px 14px',
+        background: previewMode ? 'rgba(45, 212, 160, 0.15)' : 'transparent',
+        border: previewMode ? '1px solid #2dd4a0' : '1px solid transparent',
+        borderRadius: 4,
+        color: previewMode ? '#2dd4a0' : '#8888aa',
+        fontSize: '11px',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        cursor: 'pointer',
+        fontWeight: 600,
+        transition: 'all 0.15s ease',
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (!previewMode) {
+          (e.target as HTMLElement).style.color = '#2dd4a0';
+        }
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (!previewMode) {
+          (e.target as HTMLElement).style.color = '#8888aa';
+        }
+      },
+    }, previewMode ? '● Preview ON' : '○ Preview'),
 
     // Hidden file input for SVG import
     React.createElement('input', {

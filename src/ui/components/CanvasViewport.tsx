@@ -153,6 +153,7 @@ interface CanvasViewportProps {
   activeTool?: ToolType;
   onZoomChange?: (zoom: number) => void;
   actionsRef?: MutableRefObject<ViewportActions | null>;
+  previewMode?: boolean;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -169,6 +170,7 @@ export function CanvasViewport({
   activeTool = 'select',
   onZoomChange,
   actionsRef,
+  previewMode = false,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -245,7 +247,7 @@ export function CanvasViewport({
     if (simulation && simulation.frames.length > 1) {
       ctx.save();
       ctx.globalAlpha = 0.15;
-      renderScene(ctx, scene, transform, width, height, selectedIds);
+      renderScene(ctx, scene, transform, width, height, selectedIds, previewMode);
       ctx.restore();
       drawRulers(ctx, transform, width, height);
     } else {
@@ -254,7 +256,7 @@ export function CanvasViewport({
       drawRulers(ctx, transform, width, height);
       ctx.save();
       transform.applyToContext(ctx);
-      renderSceneObjects(ctx, scene, transform, width, height, selectedIds);
+      renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
     }
 
     // Resize handles (union bounds of all selected, world space)
@@ -437,7 +439,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode]);
 
   useEffect(() => { render(); }, [render]);
 

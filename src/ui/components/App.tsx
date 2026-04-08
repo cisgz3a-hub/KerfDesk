@@ -133,6 +133,7 @@ export function App() {
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState(false);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -760,6 +761,8 @@ export function App() {
       isSimulating: simulation !== null,
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
+      onPreviewToggle: () => setPreviewMode(p => !p),
+      previewMode,
     }),
 
     React.createElement('div', {
@@ -781,6 +784,7 @@ export function App() {
         onSceneCommit: handleSceneCommit,
         actionsRef: viewportActionsRef,
         onZoomChange: setZoomLevel,
+        previewMode,
       }),
       React.createElement('div', {
         style: {
