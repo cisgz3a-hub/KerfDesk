@@ -54,6 +54,29 @@ export function renderScene(
   // 3. Origin
   renderOrigin(ctx, transform);
 
+  // Center crosshair (bed center in scene/world space — already under transform)
+  const bedW = scene.canvas.width;
+  const bedH = scene.canvas.height;
+  const cxBed = bedW / 2;
+  const cyBed = bedH / 2;
+  const crossSize = 10;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(59, 139, 235, 0.4)';
+  ctx.lineWidth = transform.screenPx(1);
+  ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
+  // Horizontal line
+  ctx.beginPath();
+  ctx.moveTo(cxBed - crossSize, cyBed);
+  ctx.lineTo(cxBed + crossSize, cyBed);
+  ctx.stroke();
+  // Vertical line
+  ctx.beginPath();
+  ctx.moveTo(cxBed, cyBed - crossSize);
+  ctx.lineTo(cxBed, cyBed + crossSize);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
   // 4. Objects (with frustum culling)
   const layerMap = new Map<string, Layer>();
   for (const layer of scene.layers) {
