@@ -52,6 +52,16 @@ import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
 
+/** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
+function getSetupStorageKey(): string {
+  try {
+    if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
+      return 'laserforge_setup_complete_electron';
+    }
+  } catch { /* ignore */ }
+  return 'laserforge_setup_complete';
+}
+
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
   if (selected.length === 0) return scn;
@@ -160,7 +170,7 @@ export function App() {
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(() => {
     try {
-      return !localStorage.getItem('laserforge_setup_complete');
+      return !localStorage.getItem(getSetupStorageKey());
     } catch {
       return true;
     }
@@ -182,6 +192,18 @@ export function App() {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
+  }, []);
+
+  // Re-check setup after paint so Electron/localStorage is ready (avoids race with first launch).
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        if (!localStorage.getItem(getSetupStorageKey())) {
+          setShowWizard(true);
+        }
+      } catch { /* ignore */ }
+    });
+    return () => cancelAnimationFrame(id);
   }, []);
 
   const historyRef = useRef<HistoryManager>(new HistoryManager());
@@ -248,7 +270,7 @@ export function App() {
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
     setShowWizard(false);
-    try { localStorage.setItem('laserforge_setup_complete', 'true'); } catch { /* ignore */ }
+    try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
 
     // Apply wizard results to scene
     const matX = Math.round((result.bedWidth - result.materialWidth) / 2);
@@ -268,6 +290,11 @@ export function App() {
         name: result.materialName,
         color: result.materialColor,
       },
+      machine: {
+        name: result.machineName || 'Custom',
+        watts: result.machineWatts || '',
+        type: result.machineType || 'diode',
+      },
     };
     handleSceneCommit(newScene);
 
@@ -277,7 +304,7 @@ export function App() {
 
   const handleWizardSkip = useCallback(() => {
     setShowWizard(false);
-    try { localStorage.setItem('laserforge_setup_complete', 'true'); } catch { /* ignore */ }
+    try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
   }, []);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
@@ -1022,6 +1049,7 @@ export function App() {
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
       onConnect: handleConnect,
+      onSetup: () => setShowWizard(true),
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
       onPreviewToggle: () => setPreviewMode(p => !p),

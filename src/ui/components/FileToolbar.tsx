@@ -36,6 +36,7 @@ interface FileToolbarProps {
   /** Called when user clicks New — resets history instead of pushing. */
   onNewProject: (scene: Scene) => void;
   onConnect?: () => void;
+  onSetup?: () => void;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
   onPreviewToggle?: () => void;
@@ -56,6 +57,7 @@ export function FileToolbar({
   onSceneCommit,
   onNewProject,
   onConnect,
+  onSetup,
   onMaterialTest,
   onMaterialSetup,
   onPreviewToggle,
@@ -522,6 +524,7 @@ export function FileToolbar({
     }, previewMode ? '● Preview' : '○ Preview'),
     React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
     sep,
+    React.createElement('button', { onClick: () => onSetup?.(), style: btnStyle, title: 'Change laser machine and workspace settings', ...stdHover }, 'Setup'),
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 

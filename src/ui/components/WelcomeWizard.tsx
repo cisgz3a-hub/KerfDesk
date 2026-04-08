@@ -9,6 +9,9 @@ export interface WizardResult {
   materialWidth: number;
   materialHeight: number;
   materialThickness: number;
+  machineName?: string;
+  machineWatts?: string;
+  machineType?: string;
 }
 
 interface WelcomeWizardProps {
@@ -16,13 +19,24 @@ interface WelcomeWizardProps {
   onSkip: () => void;
 }
 
-const MACHINES = [
-  { name: 'Small Diode', icon: '🔹', w: 200, h: 200, desc: 'Atomstack, Ortur, etc.' },
-  { name: 'Medium Diode', icon: '🔷', w: 400, h: 400, desc: 'xTool D1, Sculpfun S30' },
-  { name: 'Large Diode', icon: '🟦', w: 800, h: 400, desc: 'Large format diode' },
-  { name: 'Small CO2', icon: '🔴', w: 300, h: 200, desc: 'K40, OMTech 40W' },
-  { name: 'Medium CO2', icon: '🟠', w: 500, h: 300, desc: 'OMTech 50-60W' },
-  { name: 'Large CO2', icon: '🟡', w: 700, h: 500, desc: '80-100W CO2' },
+type MachineKind = 'diode' | 'co2' | 'fiber';
+
+const MACHINES: {
+  name: string;
+  icon: string;
+  w: number;
+  h: number;
+  watts: string;
+  desc: string;
+  type: MachineKind;
+}[] = [
+  { name: 'Small Diode', icon: '🔹', w: 200, h: 200, watts: '5-10W', desc: 'Atomstack, Ortur, Sculpfun S9', type: 'diode' },
+  { name: 'Medium Diode', icon: '🔷', w: 400, h: 400, watts: '10-20W', desc: 'xTool D1 Pro, Sculpfun S30', type: 'diode' },
+  { name: 'Large Diode', icon: '🟦', w: 800, h: 400, watts: '20-40W', desc: 'Large format diode laser', type: 'diode' },
+  { name: 'Small CO2', icon: '🔴', w: 300, h: 200, watts: '40W', desc: 'K40, OMTech 40W', type: 'co2' },
+  { name: 'Medium CO2', icon: '🟠', w: 500, h: 300, watts: '50-60W', desc: 'OMTech 50W, 60W', type: 'co2' },
+  { name: 'Large CO2', icon: '🟡', w: 700, h: 500, watts: '80-130W', desc: '80W, 100W, 130W CO2', type: 'co2' },
+  { name: 'Fiber Laser', icon: '⚪', w: 110, h: 110, watts: '20-50W', desc: 'Metal marking, MOPA', type: 'fiber' },
 ];
 
 const MATERIALS = [
@@ -53,7 +67,10 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
   const [matW, setMatW] = useState(200);
   const [matH, setMatH] = useState(150);
   const [matThick, setMatThick] = useState(3);
-  const [customBed, setCustomBed] = useState(false);
+  const [customBed, setCustomBed] = useState(true);
+  const [machineName, setMachineName] = useState('Custom');
+  const [machineWatts, setMachineWatts] = useState('');
+  const [machineType, setMachineType] = useState<MachineKind>('diode');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
@@ -153,33 +170,37 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
             ...MACHINES.map(m =>
               React.createElement('div', {
                 key: m.name,
-                onClick: () => { setBedW(m.w); setBedH(m.h); setCustomBed(false); },
+                onClick: () => {
+                  setBedW(m.w); setBedH(m.h); setCustomBed(false);
+                  setMachineName(m.name); setMachineWatts(m.watts); setMachineType(m.type);
+                },
                 style: cardStyle(bedW === m.w && bedH === m.h && !customBed),
               },
                 React.createElement('div', { style: { fontSize: 24, marginBottom: 4 } }, m.icon),
                 React.createElement('div', { style: { color: bedW === m.w && bedH === m.h && !customBed ? '#00d4ff' : '#e0e0ec', fontSize: 12, fontWeight: 500 } }, m.name),
+                React.createElement('div', { style: { color: '#00d4ff', fontSize: 10, fontFamily: mono, marginTop: 2 } }, m.watts),
                 React.createElement('div', { style: { color: '#555570', fontSize: 9, marginTop: 2 } }, `${m.w}×${m.h}mm`),
                 React.createElement('div', { style: { color: '#444460', fontSize: 8, marginTop: 2 } }, m.desc),
               ),
             ),
           ),
           React.createElement('div', {
-            onClick: () => setCustomBed(true),
+            onClick: () => { setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
             style: { ...cardStyle(customBed), marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' },
           },
             React.createElement('span', { style: { color: customBed ? '#00d4ff' : '#8888aa', fontSize: 12 } }, 'Custom size:'),
             React.createElement('input', {
               type: 'number', value: bedW, min: 50, max: 2000,
-              onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); },
+              onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedW(parseInt(e.target.value) || 400); setCustomBed(true); },
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedW(parseInt(e.target.value) || 400); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
             }),
             React.createElement('span', { style: { color: '#555570' } }, '×'),
             React.createElement('input', {
               type: 'number', value: bedH, min: 50, max: 2000,
-              onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); },
+              onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedH(parseInt(e.target.value) || 300); setCustomBed(true); },
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedH(parseInt(e.target.value) || 300); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
             }),
             React.createElement('span', { style: { color: '#555570', fontSize: 11 } }, 'mm'),
           ),
@@ -255,6 +276,14 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           React.createElement('div', { style: { fontSize: 48, marginBottom: 12 } }, '✅'),
           React.createElement('h2', { style: { color: '#e0e0ec', fontSize: 20, fontWeight: 700, marginBottom: 12 } }, "You're ready!"),
           React.createElement('div', { style: { background: '#0a0a14', borderRadius: 8, padding: 16, textAlign: 'left' as const, maxWidth: 320, margin: '0 auto' } },
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Laser'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, machineName),
+            ),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Power'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, machineWatts || '—'),
+            ),
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
               React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Laser bed'),
               React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, `${bedW} × ${bedH} mm`),
@@ -350,7 +379,19 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
               },
             }, step === 0 ? "Let's go" : 'Next →')
           : React.createElement('button', {
-              onClick: () => onComplete({ bedWidth: bedW, bedHeight: bedH, materialType: matType, materialName: matName, materialColor: matColor, materialWidth: matW, materialHeight: matH, materialThickness: matThick }),
+              onClick: () => onComplete({
+                bedWidth: bedW,
+                bedHeight: bedH,
+                materialType: matType,
+                materialName: matName,
+                materialColor: matColor,
+                materialWidth: matW,
+                materialHeight: matH,
+                materialThickness: matThick,
+                machineName: machineName || 'Custom',
+                machineWatts: machineWatts || '',
+                machineType: machineType || 'diode',
+              }),
               style: {
                 padding: '8px 28px', background: 'rgba(45, 212, 160, 0.15)',
                 border: '1px solid #2dd4a0', borderRadius: 8,

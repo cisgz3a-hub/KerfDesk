@@ -51,6 +51,13 @@ export interface Scene {
     y: number;
   };
 
+  /** Selected machine from welcome setup (optional) */
+  machine?: {
+    name: string;
+    watts: string;
+    type: string; // 'diode' | 'co2' | 'fiber'
+  };
+
   // State (not saved to file, transient)
   selection: string[];       // Selected object IDs
   activeLayerId: string;     // Currently active layer
