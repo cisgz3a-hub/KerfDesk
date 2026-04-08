@@ -133,7 +133,11 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
             React.createElement('input', {
               type: 'number', value: width, min: 10, max: bedWidth, step: 1,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWidth(Math.max(10, Math.min(bedWidth, parseFloat(e.target.value) || 10))),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWidth(parseFloat(e.target.value) || 0),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseFloat(e.target.value) || 10;
+                setWidth(Math.max(10, Math.min(bedWidth, val)));
+              },
             }),
           ),
           React.createElement('div', { style: { flex: 1 } },
@@ -141,7 +145,11 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
             React.createElement('input', {
               type: 'number', value: height, min: 10, max: bedHeight, step: 1,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHeight(Math.max(10, Math.min(bedHeight, parseFloat(e.target.value) || 10))),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHeight(parseFloat(e.target.value) || 0),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseFloat(e.target.value) || 10;
+                setHeight(Math.max(10, Math.min(bedHeight, val)));
+              },
             }),
           ),
           React.createElement('div', { style: { flex: 1 } },
@@ -149,7 +157,11 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
             React.createElement('input', {
               type: 'number', value: thickness, min: 0.1, max: 50, step: 0.5,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setThickness(Math.max(0.1, parseFloat(e.target.value) || 0.1)),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setThickness(parseFloat(e.target.value) || 0),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseFloat(e.target.value) || 0.1;
+                setThickness(Math.max(0.1, Math.min(50, val)));
+              },
             }),
           ),
         ),

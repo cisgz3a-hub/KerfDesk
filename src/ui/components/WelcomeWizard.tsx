@@ -193,14 +193,34 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
               type: 'number', value: bedW, min: 50, max: 2000,
               onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedW(parseInt(e.target.value) || 400); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                setBedW(parseInt(e.target.value, 10) || 0);
+                setCustomBed(true);
+                setMachineName('Custom');
+                setMachineWatts('');
+                setMachineType('diode');
+              },
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseInt(e.target.value, 10) || 400;
+                setBedW(Math.max(50, Math.min(2000, val)));
+              },
             }),
             React.createElement('span', { style: { color: '#555570' } }, '×'),
             React.createElement('input', {
               type: 'number', value: bedH, min: 50, max: 2000,
               onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setBedH(parseInt(e.target.value) || 300); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                setBedH(parseInt(e.target.value, 10) || 0);
+                setCustomBed(true);
+                setMachineName('Custom');
+                setMachineWatts('');
+                setMachineType('diode');
+              },
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseInt(e.target.value, 10) || 300;
+                setBedH(Math.max(50, Math.min(2000, val)));
+              },
             }),
             React.createElement('span', { style: { color: '#555570', fontSize: 11 } }, 'mm'),
           ),
@@ -252,17 +272,32 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Width (mm)'),
               React.createElement('input', { type: 'number', value: matW, min: 10, max: bedW, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatW(parseInt(e.target.value) || 200) }),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatW(parseInt(e.target.value, 10) || 0),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                  const val = parseInt(e.target.value, 10) || 200;
+                  setMatW(Math.max(10, Math.min(bedW, val)));
+                },
+              }),
             ),
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Height (mm)'),
               React.createElement('input', { type: 'number', value: matH, min: 10, max: bedH, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatH(parseInt(e.target.value) || 150) }),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatH(parseInt(e.target.value, 10) || 0),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                  const val = parseInt(e.target.value, 10) || 150;
+                  setMatH(Math.max(10, Math.min(bedH, val)));
+                },
+              }),
             ),
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Thickness (mm)'),
               React.createElement('input', { type: 'number', value: matThick, min: 0.5, max: 30, step: 0.5, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatThick(parseFloat(e.target.value) || 3) }),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatThick(parseFloat(e.target.value) || 0),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                  const val = parseFloat(e.target.value) || 3;
+                  setMatThick(Math.max(0.5, Math.min(30, val)));
+                },
+              }),
             ),
           ),
 

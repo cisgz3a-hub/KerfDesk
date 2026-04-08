@@ -128,13 +128,18 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
     fontFamily: font,
   };
 
-  const field = (label: string, value: number, onChange: (v: number) => void, min: number, max: number, step: number = 1) =>
+  const field = (label: string, value: number, setValue: (v: number) => void, min: number, max: number, step: number = 1) =>
     React.createElement('div', { style: { flex: 1 } },
       React.createElement('div', { style: labelStyle }, label),
       React.createElement('input', {
         type: 'number', value, min, max, step,
         style: inputStyle,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) => onChange(Math.max(min, Math.min(max, parseFloat(e.target.value) || min))),
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setValue(parseFloat(e.target.value) || 0),
+        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+          const raw = parseFloat(e.target.value);
+          const val = Number.isFinite(raw) ? raw : min;
+          setValue(Math.max(min, Math.min(max, val)));
+        },
       }),
     );
 

@@ -302,7 +302,11 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
               }, '−'),
               React.createElement('input', {
                 type: 'number', value: cols, min: 1, max: 20,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setCols(Math.max(1, Math.min(20, parseInt(e.target.value) || 1))),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setCols(parseInt(e.target.value, 10) || 0),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                  const val = parseInt(e.target.value, 10) || 1;
+                  setCols(Math.max(1, Math.min(20, val)));
+                },
                 style: {
                   width: 44, textAlign: 'center' as const, padding: '4px 0',
                   background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -325,7 +329,11 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
               }, '−'),
               React.createElement('input', {
                 type: 'number', value: rows, min: 1, max: 20,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setRows(Math.max(1, Math.min(20, parseInt(e.target.value) || 1))),
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setRows(parseInt(e.target.value, 10) || 0),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                  const val = parseInt(e.target.value, 10) || 1;
+                  setRows(Math.max(1, Math.min(20, val)));
+                },
                 style: {
                   width: 44, textAlign: 'center' as const, padding: '4px 0',
                   background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -346,7 +354,11 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Spacing X (mm)'),
             React.createElement('input', {
               type: 'number', value: spacingX, min: 0, max: 100, step: 0.5,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleSpacingX(Math.max(0, parseFloat(e.target.value) || 0)),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleSpacingX(parseFloat(e.target.value) || 0),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseFloat(e.target.value) || 0;
+                handleSpacingX(Math.max(0, Math.min(100, val)));
+              },
               style: {
                 width: '100%', padding: '5px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -370,7 +382,11 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Spacing Y (mm)'),
             React.createElement('input', {
               type: 'number', value: spacingY, min: 0, max: 100, step: 0.5,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleSpacingY(Math.max(0, parseFloat(e.target.value) || 0)),
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => handleSpacingY(parseFloat(e.target.value) || 0),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                const val = parseFloat(e.target.value) || 0;
+                handleSpacingY(Math.max(0, Math.min(100, val)));
+              },
               style: {
                 width: '100%', padding: '5px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
