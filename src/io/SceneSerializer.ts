@@ -39,6 +39,7 @@ interface SerializedScene {
   layers: Layer[];
   objects: SceneObject[];
   material: Scene['material'];
+  startPosition: Scene['startPosition'];
   activeLayerId: string;
   metadata: Scene['metadata'];
 }
@@ -61,6 +62,7 @@ export function serializeScene(scene: Scene): string {
     layers: scene.layers,
     objects: scene.objects.map(stripObjectCache),
     material: scene.material,
+    startPosition: scene.startPosition,
     activeLayerId: scene.activeLayerId,
     metadata: {
       ...scene.metadata,
@@ -162,6 +164,7 @@ export function deserializeScene(json: string): Scene {
     layers: s.layers.map((l: any) => restoreLayerDefaults(l)),
     objects: s.objects.map((o: any) => restoreObjectDefaults(o)),
     material: s.material ?? null,
+    startPosition: s.startPosition ?? { x: 0, y: 0 },
     selection: [],              // Transient: always empty on load
     activeLayerId: s.activeLayerId || s.layers[0].id,
     metadata: {

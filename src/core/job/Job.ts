@@ -135,12 +135,13 @@ export interface Job {
     objectCount: number;
     layerCount: number;
     sourceProjectId: string;
+    startPosition: Point;
   };
 }
 
 // ─── FACTORY ─────────────────────────────────────────────────────
 
-export function createEmptyJob(name: string, sourceProjectId: string): Job {
+export function createEmptyJob(name: string, sourceProjectId: string, startPosition: Point = { x: 0, y: 0 }): Job {
   return {
     id: generateId(),
     name,
@@ -151,6 +152,7 @@ export function createEmptyJob(name: string, sourceProjectId: string): Job {
       objectCount: 0,
       layerCount: 0,
       sourceProjectId,
+      startPosition,
     },
   };
 }

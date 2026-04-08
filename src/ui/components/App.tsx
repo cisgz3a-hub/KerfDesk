@@ -833,6 +833,25 @@ export function App() {
       React.createElement('span', {}, scene.metadata.name || 'Untitled'),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
         React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
+        scene.material && (() => {
+          const mat = scene.material;
+          let outCount = 0;
+          for (const obj of scene.objects) {
+            if (!obj.visible) continue;
+            const b = computeObjectBounds(obj);
+            if (!b) continue;
+            if (b.minX < mat.x || b.minY < mat.y ||
+                b.maxX > mat.x + mat.width || b.maxY > mat.y + mat.height) {
+              outCount++;
+            }
+          }
+          if (outCount > 0) {
+            return React.createElement('span', {
+              style: { color: '#ff4466', fontSize: '10px', fontFamily: "'DM Sans', system-ui", display: 'flex', alignItems: 'center', gap: 3 },
+            }, `⚠ ${outCount} object${outCount > 1 ? 's' : ''} outside material`);
+          }
+          return null;
+        })(),
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
           React.createElement('button', {
             onClick: () => viewportActionsRef.current?.zoomOut(),
@@ -881,6 +900,22 @@ export function App() {
         { label: 'Align Bottom', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
         }, disabled: selectedIds.size === 0 },
+        { label: 'separator', action: () => {}, separator: true },
+        { label: 'Start: Material Top-Left', action: () => {
+          const mat = scene.material;
+          const x = mat ? mat.x : 0;
+          const y = mat ? mat.y : 0;
+          handleSceneCommit({ ...scene, startPosition: { x, y } });
+        }, disabled: false },
+        { label: 'Start: Material Center', action: () => {
+          const mat = scene.material;
+          const x = mat ? mat.x + mat.width / 2 : scene.canvas.width / 2;
+          const y = mat ? mat.y + mat.height / 2 : scene.canvas.height / 2;
+          handleSceneCommit({ ...scene, startPosition: { x, y } });
+        }, disabled: false },
+        { label: 'Start: Bed Origin (0,0)', action: () => {
+          handleSceneCommit({ ...scene, startPosition: { x: 0, y: 0 } });
+        }, disabled: false },
         { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
         { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
         ...scene.layers.map(l => ({

@@ -43,6 +43,12 @@ export interface Scene {
     color: string;          // display color
   } | null;
 
+  /** Laser start position */
+  startPosition: {
+    x: number;
+    y: number;
+  };
+
   // State (not saved to file, transient)
   selection: string[];       // Selected object IDs
   activeLayerId: string;     // Currently active layer
@@ -80,6 +86,7 @@ export function createScene(
     layers: [defaultLayer],
     objects: [],
     material: null,
+    startPosition: { x: 0, y: 0 },
     selection: [],
     activeLayerId: defaultLayer.id,
     metadata: {

@@ -30,7 +30,7 @@ import {
 // ─── MAIN COMPILER ───────────────────────────────────────────────
 
 export function compileJob(scene: Scene): Job {
-  const job = createEmptyJob(scene.metadata.name, scene.id);
+  const job = createEmptyJob(scene.metadata.name, scene.id, scene.startPosition);
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
 
   let totalObjects = 0;

@@ -179,6 +179,107 @@ export function renderSceneObjects(
     renderObject(ctx, obj, layer, transform);
   }
 
+  // Boundary warnings: highlight objects outside material
+  if (scene.material) {
+    const mat = scene.material;
+
+    for (const obj of scene.objects) {
+      if (!obj.visible) continue;
+      const layer = layerMap.get(obj.layerId);
+      if (!layer || !layer.visible) continue;
+
+      const bounds = computeObjectBounds(obj);
+      if (!bounds) continue;
+      if (!aabbIntersects(bounds, visibleBounds)) continue;
+
+      const outsideLeft = bounds.minX < mat.x;
+      const outsideTop = bounds.minY < mat.y;
+      const outsideRight = bounds.maxX > mat.x + mat.width;
+      const outsideBottom = bounds.maxY > mat.y + mat.height;
+
+      if (outsideLeft || outsideTop || outsideRight || outsideBottom) {
+        ctx.save();
+
+        ctx.strokeStyle = 'rgba(255, 68, 102, 0.6)';
+        ctx.lineWidth = transform.screenPx(2);
+        ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
+        ctx.strokeRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, bounds.maxY - bounds.minY);
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = 'rgba(255, 68, 102, 0.08)';
+
+        if (outsideLeft) {
+          ctx.fillRect(bounds.minX, bounds.minY, mat.x - bounds.minX, bounds.maxY - bounds.minY);
+        }
+        if (outsideRight) {
+          ctx.fillRect(mat.x + mat.width, bounds.minY, bounds.maxX - (mat.x + mat.width), bounds.maxY - bounds.minY);
+        }
+        if (outsideTop) {
+          ctx.fillRect(bounds.minX, bounds.minY, bounds.maxX - bounds.minX, mat.y - bounds.minY);
+        }
+        if (outsideBottom) {
+          ctx.fillRect(bounds.minX, mat.y + mat.height, bounds.maxX - bounds.minX, bounds.maxY - (mat.y + mat.height));
+        }
+
+        ctx.fillStyle = 'rgba(255, 68, 102, 0.7)';
+        ctx.font = `${transform.screenPx(12)}px system-ui`;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText('⚠', bounds.minX, bounds.minY - transform.screenPx(2));
+
+        ctx.restore();
+      }
+    }
+  }
+
+  // Draw start position indicator
+  if (scene.startPosition) {
+    const sp = scene.startPosition;
+    const dotRadius = transform.screenPx(6);
+    const ringRadius = transform.screenPx(10);
+
+    // Outer ring
+    ctx.strokeStyle = 'rgba(45, 212, 160, 0.3)';
+    ctx.lineWidth = transform.screenPx(1.5);
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, ringRadius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner filled dot
+    ctx.fillStyle = 'rgba(45, 212, 160, 0.9)';
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, dotRadius, 0, Math.PI * 2);
+    ctx.fill();
+
+    // White center
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y, transform.screenPx(2), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crosshair lines
+    ctx.strokeStyle = 'rgba(45, 212, 160, 0.25)';
+    ctx.lineWidth = transform.screenPx(0.5);
+    ctx.setLineDash([transform.screenPx(3), transform.screenPx(3)]);
+    const crossLen = transform.screenPx(20);
+    ctx.beginPath();
+    ctx.moveTo(sp.x - crossLen, sp.y);
+    ctx.lineTo(sp.x + crossLen, sp.y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(sp.x, sp.y - crossLen);
+    ctx.lineTo(sp.x, sp.y + crossLen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Label
+    ctx.fillStyle = 'rgba(45, 212, 160, 0.6)';
+    ctx.font = `${transform.screenPx(9)}px "DM Sans", system-ui, sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText('START', sp.x + transform.screenPx(10), sp.y - transform.screenPx(4));
+  }
+
   if (boundsCache && boundsCache.size > 0) {
     for (const [id, bounds] of boundsCache) {
       renderSelectionHighlight(ctx, bounds, transform);
