@@ -385,6 +385,42 @@ export function FileToolbar({
 
   const btnBase = btnStyle;
 
+  const stdText = String(theme.text.secondary);
+
+  const stdHover = {
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      const el = e.currentTarget;
+      if (el.disabled) return;
+      el.style.background = '#1a1a2e';
+      el.style.borderColor = '#333355';
+      el.style.color = '#e0e0ec';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      const el = e.currentTarget;
+      if (el.disabled) return;
+      el.style.background = 'transparent';
+      el.style.borderColor = 'transparent';
+      el.style.color = stdText;
+    },
+  };
+
+  const undoRedoHover = (enabled: boolean) => ({
+    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!enabled) return;
+      const el = e.currentTarget;
+      el.style.background = '#1a1a2e';
+      el.style.borderColor = '#333355';
+      el.style.color = '#e0e0ec';
+    },
+    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+      if (!enabled) return;
+      const el = e.currentTarget;
+      el.style.background = 'transparent';
+      el.style.borderColor = 'transparent';
+      el.style.color = stdText;
+    },
+  });
+
   const sep = React.createElement('div', { style: { width: 1, height: 20, background: '#252540', margin: '0 4px', flexShrink: 0 } });
 
   return React.createElement('div', {
@@ -413,9 +449,9 @@ export function FileToolbar({
         whiteSpace: 'nowrap' as const,
       },
     }, projectName || 'Untitled'),
-    React.createElement('button', { onClick: handleNew, style: btnStyle, title: 'New project (clear canvas)' }, 'New'),
-    React.createElement('button', { onClick: handleOpenClick, style: btnStyle, title: 'Open saved project' }, 'Open'),
-    React.createElement('button', { onClick: handleSave, style: btnStyle, title: 'Save project (Ctrl+S)' }, 'Save'),
+    React.createElement('button', { onClick: handleNew, style: btnStyle, title: 'New project (clear canvas)', ...stdHover }, 'New'),
+    React.createElement('button', { onClick: handleOpenClick, style: btnStyle, title: 'Open saved project', ...stdHover }, 'Open'),
+    React.createElement('button', { onClick: handleSave, style: btnStyle, title: 'Save project (Ctrl+S)', ...stdHover }, 'Save'),
     React.createElement('button', {
       onClick: () => onUndo?.(),
       disabled: !canUndo,
@@ -427,6 +463,7 @@ export function FileToolbar({
         fontSize: 14,
         padding: '4px 8px',
       },
+      ...undoRedoHover(!!canUndo),
     }, '↩'),
     React.createElement('button', {
       onClick: () => onRedo?.(),
@@ -439,14 +476,15 @@ export function FileToolbar({
         fontSize: 14,
         padding: '4px 8px',
       },
+      ...undoRedoHover(!!canRedo),
     }, '↪'),
     sep,
-    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file' }, 'Import SVG'),
-    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving' }, 'Import Image'),
-    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file' }, 'Import DXF'),
+    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file', ...stdHover }, 'Import SVG'),
+    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving', ...stdHover }, 'Import Image'),
+    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file', ...stdHover }, 'Import DXF'),
     sep,
-    React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser' }, 'G-code'),
-    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file' }, 'Export SVG'),
+    React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser', ...stdHover }, 'G-code'),
+    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file', ...stdHover }, 'Export SVG'),
     sep,
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
@@ -464,22 +502,52 @@ export function FileToolbar({
         transition: 'all 0.15s ease',
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!previewMode) {
-          (e.target as HTMLElement).style.color = '#2dd4a0';
+        const el = e.currentTarget;
+        if (previewMode) {
+          el.style.background = 'rgba(45, 212, 160, 0.22)';
+          el.style.borderColor = '#3de8b0';
+          el.style.color = '#4dffc0';
+        } else {
+          el.style.background = '#1a1a2e';
+          el.style.borderColor = '#333355';
+          el.style.color = '#2dd4a0';
         }
       },
       onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!previewMode) {
-          (e.target as HTMLElement).style.color = '#8888aa';
+        const el = e.currentTarget;
+        if (previewMode) {
+          el.style.background = 'rgba(45, 212, 160, 0.15)';
+          el.style.borderColor = '#2dd4a0';
+          el.style.color = '#2dd4a0';
+        } else {
+          el.style.background = 'transparent';
+          el.style.borderColor = 'transparent';
+          el.style.color = '#8888aa';
         }
       },
     }, previewMode ? '● Preview' : '○ Preview'),
-    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle, title: 'Simulate laser toolpath' }, 'Simulate'),
-    isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' }, title: 'Stop simulation' }, 'Stop Sim'),
+    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle, title: 'Simulate laser toolpath', ...stdHover }, 'Simulate'),
+    isSimulating && React.createElement('button', {
+      onClick: onStopSimulation,
+      title: 'Stop simulation',
+      style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        const el = e.currentTarget;
+        el.style.background = '#1a1a2e';
+        el.style.borderColor = '#333355';
+        el.style.color = '#ff8899';
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        const el = e.currentTarget;
+        el.style.background = 'transparent';
+        el.style.borderColor = '#e63e6d';
+        el.style.color = '#e63e6d';
+      },
+    }, 'Stop Sim'),
     sep,
-    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size' }, 'Material'),
-    React.createElement('button', { onClick: handleBedSize, style: btnStyle, title: 'Change laser bed dimensions' }, 'Bed Size'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid' }, 'Material Test'),
+    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
+    React.createElement('button', { onClick: handleBedSize, style: btnStyle, title: 'Change laser bed dimensions', ...stdHover }, 'Bed Size'),
+    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Material Test'),
 
     React.createElement('div', { style: { flex: 1 } }),
     React.createElement('button', {
@@ -496,10 +564,16 @@ export function FileToolbar({
         fontFamily: "'DM Sans', system-ui, sans-serif",
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        (e.target as HTMLElement).style.color = '#8888aa';
+        const el = e.currentTarget;
+        el.style.background = '#1a1a2e';
+        el.style.borderColor = '#333355';
+        el.style.color = '#e0e0ec';
       },
       onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        (e.target as HTMLElement).style.color = '#555570';
+        const el = e.currentTarget;
+        el.style.background = 'transparent';
+        el.style.borderColor = 'transparent';
+        el.style.color = '#555570';
       },
     }, '?'),
 
