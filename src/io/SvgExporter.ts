@@ -14,15 +14,24 @@ export function exportSceneToSvg(scene: Scene): string {
     if (!obj.visible) continue;
     if (obj.geometry.type === 'image') continue; // Skip raster images
 
+    // Use industry-standard colors for laser operations
+    const layerColorMap: Record<string, string> = {
+      cut: '#ff0000',      // Red = cut through
+      engrave: '#0000ff',  // Blue = engrave/raster
+      score: '#00ff00',    // Green = score/mark
+      image: '#000000',    // Black = image engrave
+    };
+
     const layer = scene.layers.find(l => l.id === obj.layerId);
-    const color = layer?.color || '#ffffff';
+    const mode = layer?.settings?.mode || 'cut';
+    const strokeColor = layerColorMap[mode] || '#000000';
     const t = obj.transform;
 
     const pathData = objectToSvgPath(obj);
     if (!pathData) continue;
 
     paths += `  <g transform="matrix(${t.a},${t.b},${t.c},${t.d},${t.tx},${t.ty})">\n`;
-    paths += `    <path d="${pathData}" fill="none" stroke="${color}" stroke-width="0.1"/>\n`;
+    paths += `    <path d="${pathData}" fill="none" stroke="${strokeColor}" stroke-width="0.1" data-layer="${mode}" data-power="${layer?.settings?.power?.max || 0}" data-speed="${layer?.settings?.speed || 0}"/>\n`;
     paths += `  </g>\n`;
   }
 
