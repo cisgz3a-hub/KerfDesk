@@ -1,7 +1,7 @@
 import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, createLayer } from '../../core/scene/Layer';
-import { MATERIAL_PRESETS, getPresetById } from '../../data/MaterialPresets';
+import { MATERIAL_PRESETS, getPresetSettings } from '../../core/materials/MaterialPresets';
 import { theme } from '../styles/theme';
 
 interface LayerPanelProps {
@@ -317,39 +317,67 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
     ),
     activeLayer && React.createElement('div', { style: settingsStyle },
       React.createElement('div', { style: layerSettingsHeaderStyle }, 'Layer Settings'),
-      React.createElement('div', { style: settingsLabelStyle }, 'Material Preset'),
-      React.createElement('select', {
-        style: selectStyle,
-        value: '',
-        onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-          const preset = getPresetById(e.target.value);
-          if (!preset || !activeLayer) return;
-          const mode = activeLayer.settings.mode as 'cut' | 'engrave' | 'score';
-          const modeSettings = preset.settings[mode] || preset.settings.cut;
-          const newScene = {
-            ...scene,
-            layers: scene.layers.map(l =>
+      React.createElement('div', { style: { marginTop: 6 } },
+        React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Material Preset'),
+        React.createElement('select', {
+          value: '',
+          style: selectStyle,
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const presetName = e.target.value;
+            if (!presetName || !activeLayer) return;
+
+            const machineType = scene.machine?.type || 'diode';
+            const settings = getPresetSettings(presetName, machineType);
+            if (!settings) return;
+
+            const mode = activeLayer.settings.mode;
+            const s = mode === 'cut' ? settings.cut : settings.engrave;
+
+            const newLayers = scene.layers.map(l =>
               l.id === activeLayer.id
                 ? {
                     ...l,
                     settings: {
                       ...l.settings,
-                      power: { ...l.settings.power, max: modeSettings.power },
-                      speed: modeSettings.speed,
-                      passes: modeSettings.passes,
+                      power: { ...l.settings.power, max: s.power },
+                      speed: s.speed,
+                      passes: 'passes' in s ? s.passes : l.settings.passes,
                     },
                   }
                 : l
-            ),
-          };
-          onSceneCommit(newScene);
+            );
+            onSceneCommit({ ...scene, layers: newLayers });
+          },
         },
-      },
-        React.createElement('option', { value: '' }, '— Select material —'),
-        ...MATERIAL_PRESETS.map(p =>
-          React.createElement('option', { key: p.id, value: p.id },
-            p.name + (p.notes ? ' ⚠' : '')
-          )
+          React.createElement('option', { value: '' }, '— Select material —'),
+          React.createElement('optgroup', { label: 'Wood' },
+            ...MATERIAL_PRESETS.filter(p => p.type === 'wood').map(p =>
+              React.createElement('option', { key: p.name, value: p.name }, p.name)
+            ),
+          ),
+          React.createElement('optgroup', { label: 'Acrylic' },
+            ...MATERIAL_PRESETS.filter(p => p.type === 'acrylic').map(p =>
+              React.createElement('option', { key: p.name, value: p.name }, p.name)
+            ),
+          ),
+          React.createElement('optgroup', { label: 'Leather' },
+            ...MATERIAL_PRESETS.filter(p => p.type === 'leather').map(p =>
+              React.createElement('option', { key: p.name, value: p.name }, p.name)
+            ),
+          ),
+          React.createElement('optgroup', { label: 'Paper' },
+            ...MATERIAL_PRESETS.filter(p => p.type === 'paper').map(p =>
+              React.createElement('option', { key: p.name, value: p.name }, p.name)
+            ),
+          ),
+          React.createElement('optgroup', { label: 'Fabric' },
+            ...MATERIAL_PRESETS.filter(p => p.type === 'fabric').map(p =>
+              React.createElement('option', { key: p.name, value: p.name }, p.name)
+            ),
+          ),
+        ),
+        React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 3 } },
+          `Settings for ${scene.machine?.type || 'diode'} laser. Run a material test to fine-tune.`,
         ),
       ),
       React.createElement('label', { style: fieldStyle },
