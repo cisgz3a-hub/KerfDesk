@@ -57,6 +57,11 @@ function makeOutput(gcode: string): Output {
   };
 }
 
+/** LaserController.sendJob expects string[]; Output carries joined text. */
+function outputToLines(output: Output): string[] {
+  return (output.text ?? '').split('\n');
+}
+
 // ─── TEST: CONNECTION ────────────────────────────────────────────
 
 async function testConnection() {
@@ -115,7 +120,7 @@ async function testSimpleStreaming() {
   const output = makeOutput(gcode);
 
   // Send job
-  ctrl.sendJob(output);
+  ctrl.sendJob(outputToLines(output));
   assert(ctrl.isJobRunning, 'Job is running after sendJob()');
 
   // Let all the async serial responses process
@@ -179,7 +184,7 @@ async function testBufferManagement() {
   );
   const output = makeOutput(longLines.join('\n'));
 
-  ctrl.sendJob(output);
+  ctrl.sendJob(outputToLines(output));
   await flush();
 
   // With 127-byte buffer and ~32 bytes per line,
@@ -283,7 +288,7 @@ async function testPauseResume() {
   const gcode = Array.from({ length: 20 }, (_, i) =>
     `G1 X${i * 10} Y${i * 5} F1000`
   ).join('\n');
-  ctrl.sendJob(makeOutput(gcode));
+  ctrl.sendJob(outputToLines(makeOutput(gcode)));
 
   // State should be 'run' immediately (synchronous)
   assert(ctrl.state.status === 'run', 'Job started → run state');
@@ -347,7 +352,7 @@ async function testErrorHandling() {
     'M2',
   ].join('\n');
 
-  ctrl.sendJob(makeOutput(gcode));
+  ctrl.sendJob(outputToLines(makeOutput(gcode)));
   await flush();
   await flush();
   await flush();
@@ -408,7 +413,7 @@ async function testDisconnectDuringJob() {
     `G1 X${i} Y${i} F1000`
   ).join('\n');
 
-  ctrl.sendJob(makeOutput(gcode));
+  ctrl.sendJob(outputToLines(makeOutput(gcode)));
   await flush();
 
   assert(ctrl.isJobRunning, 'Job is running');

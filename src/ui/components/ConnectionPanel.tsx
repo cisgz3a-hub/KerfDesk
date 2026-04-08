@@ -1,240 +1,189 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GrblController, type ConnectionState, type MachineStatus } from '../../core/controller/GrblController';
-import { WebSerialController } from '../../core/controller/WebSerialController';
+import { GrblController } from '../../controllers/grbl/GrblController';
+import { MockSerialPort } from '../../communication/SerialPort';
+import { WebSerialPort } from '../../communication/WebSerialPort';
+import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
-
-// Pre-flight check: scan G-code for coordinate range
-function checkGcodeBounds(gcodeText: string, bedW: number, bedH: number): { minX: number; minY: number; maxX: number; maxY: number; warnings: string[] } {
-  const lines = gcodeText.split('\n');
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  const warnings: string[] = [];
-
-  for (const line of lines) {
-    const xMatch = line.match(/X([-\d.]+)/);
-    const yMatch = line.match(/Y([-\d.]+)/);
-    if (xMatch) {
-      const x = parseFloat(xMatch[1]);
-      minX = Math.min(minX, x);
-      maxX = Math.max(maxX, x);
-    }
-    if (yMatch) {
-      const y = parseFloat(yMatch[1]);
-      minY = Math.min(minY, y);
-      maxY = Math.max(maxY, y);
-    }
-  }
-
-  if (minX < 0) warnings.push(`G-code has negative X coordinates (min: ${minX.toFixed(1)}mm)`);
-  if (minY < 0) warnings.push(`G-code has negative Y coordinates (min: ${minY.toFixed(1)}mm)`);
-  if (maxX > bedW) warnings.push(`G-code exceeds bed width (max X: ${maxX.toFixed(1)}mm, bed: ${bedW}mm)`);
-  if (maxY > bedH) warnings.push(`G-code exceeds bed height (max Y: ${maxY.toFixed(1)}mm, bed: ${bedH}mm)`);
-
-  return { minX, minY, maxX, maxY, warnings };
-}
 
 interface ConnectionPanelProps {
   gcode: string | null;
-  onClose: () => void;
   bedWidth: number;
   bedHeight: number;
   boundsMinX?: number;
   boundsMinY?: number;
   boundsMaxX?: number;
   boundsMaxY?: number;
+  onClose: () => void;
 }
 
-export function ConnectionPanel({
-  gcode,
-  onClose,
-  bedWidth,
-  bedHeight,
-  boundsMinX,
-  boundsMinY,
-  boundsMaxX,
-  boundsMaxY,
-}: ConnectionPanelProps) {
-  const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
-  const [selectedPort, setSelectedPort] = useState('');
-  const [connState, setConnState] = useState<ConnectionState>('disconnected');
-  const [status, setStatus] = useState<MachineStatus | null>(null);
+export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose }: ConnectionPanelProps) {
+  const [machineState, setMachineState] = useState<MachineState | null>(null);
+  const [progress, setProgress] = useState<JobProgress | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
-  const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
-  const [manualCmd, setManualCmd] = useState('');
-  const [usingWebSerial, setUsingWebSerial] = useState(false);
-  const [webJobRunning, setWebJobRunning] = useState(false);
+  const [isSimulator, setIsSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
+  const [manualCmd, setManualCmd] = useState('');
+
   const controllerRef = useRef<GrblController | null>(null);
-  const webSerialRef = useRef<WebSerialController | null>(null);
-  const jobAbortRef = useRef(false);
+  const portRef = useRef<WebSerialPort | MockSerialPort | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
 
+  // Initialize controller
   useEffect(() => {
-    const ctrl = new GrblController({
-      onConnectionChange: setConnState,
-      onStatusUpdate: setStatus,
-      onMessage: (msg) => setMessages(prev => [...prev.slice(-200), msg]),
-      onError: (err) => setMessages(prev => [...prev, `ERROR: ${err}`]),
-      onProgress: (sent, total) => setProgress({ sent, total }),
-      onJobComplete: () => setProgress(null),
-    });
-    controllerRef.current = ctrl;
-    ctrl.listPorts().then(setPorts);
+    const ctrl = new GrblController();
 
-    return () => {
-      void webSerialRef.current?.disconnect();
-      webSerialRef.current = null;
-      void ctrl.disconnect();
-    };
+    ctrl.onStateChange((state) => setMachineState({ ...state }));
+    ctrl.onProgress((prog) => setProgress({ ...prog }));
+    ctrl.onError((code, msg) => setMessages(prev => [...prev.slice(-200), `ERROR ${code}: ${msg}`]));
+    ctrl.onRawLine((line, dir) => setMessages(prev => [...prev.slice(-200), `${dir === 'tx' ? '>' : '<'} ${line}`]));
+
+    controllerRef.current = ctrl;
+
+    return () => { void ctrl.disconnect(); };
   }, []);
 
+  // Auto-scroll log
   useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
-    }
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
 
-  const handleConnect = async () => {
-    if (!selectedPort || !controllerRef.current) return;
-    setUsingWebSerial(false);
-    await controllerRef.current.connect(selectedPort);
+  const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
+  const isRunning = controllerRef.current?.isJobRunning || false;
+
+  // ─── Connection handlers ─────────────────────────────────
+
+  const connectSimulator = async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+
+    const mock = new MockSerialPort();
+    portRef.current = mock;
+    mock.open();
+    try {
+      await ctrl.connect(mock);
+      setIsSimulator(true);
+      setMessages(prev => [...prev, '✓ Simulator connected']);
+    } catch (e: any) {
+      setMessages(prev => [...prev, `Connection failed: ${e.message}`]);
+    }
+  };
+
+  const connectRealLaser = async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+
+    if (!WebSerialPort.isSupported()) {
+      setMessages(prev => [...prev, 'ERROR: Web Serial not supported in this browser']);
+      return;
+    }
+
+    const ws = new WebSerialPort();
+    portRef.current = ws;
+    try {
+      await ws.requestAndOpen(115200);
+      setMessages(prev => [...prev, 'Port opened, waiting for GRBL welcome...']);
+      await ctrl.connect(ws);
+      setIsSimulator(false);
+      setMessages(prev => [...prev, '✓ Real laser connected via USB']);
+    } catch (e: any) {
+      setMessages(prev => [...prev, `Connection failed: ${e.message}`]);
+    }
   };
 
   const handleDisconnect = async () => {
-    if (webSerialRef.current) {
-      await webSerialRef.current.disconnect();
-      webSerialRef.current = null;
-      setUsingWebSerial(false);
-    }
     await controllerRef.current?.disconnect();
+    portRef.current = null;
+    setMachineState(null);
+    setProgress(null);
+    setMessages(prev => [...prev, 'Disconnected']);
   };
 
-  const handleSendJob = async () => {
+  // ─── Machine control ────────────────────────────────────
+
+  const sendCmd = (cmd: string) => {
+    try { controllerRef.current?.sendCommand(cmd); } catch { /* ignore */ }
+  };
+
+  const handleStartJob = () => {
     if (!gcode || !controllerRef.current) return;
-    await controllerRef.current.startJob(gcode);
-  };
-
-  const handleSendJobReal = async () => {
-    if (!gcode || !webSerialRef.current) return;
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
 
     // Pre-flight bounds check
-    const bounds = checkGcodeBounds(gcode, bedWidth, bedHeight);
-    if (bounds.warnings.length > 0) {
-      const msg = 'WARNING — G-code may cause limit switch errors:\n\n' +
-        bounds.warnings.join('\n') +
-        `\n\nCoordinate range: X ${bounds.minX.toFixed(1)} to ${bounds.maxX.toFixed(1)}, Y ${bounds.minY.toFixed(1)} to ${bounds.maxY.toFixed(1)}` +
-        '\n\nSend anyway?';
-      if (!confirm(msg)) {
-        setMessages(prev => [...prev, 'Job cancelled — coordinate bounds issue']);
-        return;
-      }
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (const line of lines) {
+      const xm = line.match(/X([-\d.]+)/);
+      const ym = line.match(/Y([-\d.]+)/);
+      if (xm) { const x = parseFloat(xm[1]); minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
+      if (ym) { const y = parseFloat(ym[1]); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+    }
+    const warnings: string[] = [];
+    if (minX < 0) warnings.push(`Negative X (${minX.toFixed(1)}mm)`);
+    if (minY < 0) warnings.push(`Negative Y (${minY.toFixed(1)}mm)`);
+    if (maxX > bedWidth) warnings.push(`X exceeds bed (${maxX.toFixed(1)}mm > ${bedWidth}mm)`);
+    if (maxY > bedHeight) warnings.push(`Y exceeds bed (${maxY.toFixed(1)}mm > ${bedHeight}mm)`);
+
+    if (warnings.length > 0) {
+      if (!confirm('Warnings:\n' + warnings.join('\n') + '\n\nSend anyway?')) return;
     }
 
-    setMessages(prev => [...prev, 'Preparing laser...']);
-
-    // Wait for GRBL startup message
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Soft reset to clear any alarm
+    setMessages(prev => [...prev, `Starting job: ${lines.length} commands`]);
     try {
-      await webSerialRef.current.send('\x18'); // Ctrl+X soft reset
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch { /* empty */ }
-
-    // Unlock
-    try {
-      await webSerialRef.current.sendAndWait('$X', 5000);
-      setMessages(prev => [...prev, '✓ Machine unlocked']);
-    } catch {
-      setMessages(prev => [...prev, 'Unlock timed out — trying to continue']);
+      controllerRef.current.sendJob(lines);
+    } catch (e: any) {
+      setMessages(prev => [...prev, `Failed to start: ${e.message}`]);
     }
-
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Set to absolute coordinates and mm mode
-    try {
-      await webSerialRef.current.sendAndWait('G21', 5000); // mm mode
-      await webSerialRef.current.sendAndWait('G90', 5000); // absolute positioning
-      setMessages(prev => [...prev, '✓ Set to mm mode, absolute positioning']);
-    } catch { /* empty */ }
-
-    // Turn off laser as safety
-    try {
-      await webSerialRef.current.sendAndWait('M5 S0', 5000);
-    } catch { /* empty */ }
-
-    setMessages(prev => [...prev, `Sending ${lines.length} commands...`]);
-
-    for (let i = 0; i < lines.length; i++) {
-      try {
-        const response = await webSerialRef.current.sendAndWait(lines[i], 30000);
-        setProgress({ sent: i + 1, total: lines.length });
-
-        if (response.startsWith('error:')) {
-          setMessages(prev => [...prev, `GRBL error on line ${i + 1}: ${response} — ${lines[i]}`]);
-          const cont = confirm(`GRBL error "${response}" on line ${i + 1}:\n${lines[i]}\n\nContinue?`);
-          if (!cont) {
-            // Turn off laser and stop
-            await webSerialRef.current.send('M5 S0');
-            setMessages(prev => [...prev, 'Job stopped. Laser off.']);
-            setProgress(null);
-            return;
-          }
-        }
-      } catch (e: any) {
-        // Turn off laser on failure
-        await webSerialRef.current.send('M5 S0').catch(() => {});
-        setMessages(prev => [...prev, `Error: ${e.message}`]);
-        alert(`Job failed at line ${i + 1}: ${e.message}\nLaser has been turned off.`);
-        setProgress(null);
-        return;
-      }
-    }
-
-    setMessages(prev => [...prev, '✓ Job complete!']);
-    setProgress(null);
   };
 
-  const handleSendManual = async () => {
-    if (!manualCmd.trim()) return;
-    if (usingWebSerial && webSerialRef.current) {
-      await webSerialRef.current.send(manualCmd);
-      setManualCmd('');
-      return;
+  const handleFrame = async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+
+    const x1 = boundsMinX ?? 0;
+    const y1 = boundsMinY ?? 0;
+    const x2 = boundsMaxX ?? 100;
+    const y2 = boundsMaxY ?? 100;
+
+    setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
+
+    const cmds = [
+      'G21', 'G90', 'M4 S10',
+      `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)}`,
+      `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F2000`,
+      `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F2000`,
+      `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F2000`,
+      `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F2000`,
+      'M5 S0',
+    ];
+
+    for (const cmd of cmds) {
+      try { ctrl.sendCommand(cmd); } catch { /* ignore */ }
+      await new Promise(r => setTimeout(r, 50));
     }
-    if (!controllerRef.current) return;
-    await controllerRef.current.send(manualCmd);
-    setManualCmd('');
+
+    setMessages(prev => [...prev, '✓ Frame complete']);
   };
+
+  // ─── Styles ─────────────────────────────────────────────
 
   const btnStyle = (color: string, disabled?: boolean): React.CSSProperties => ({
     padding: '6px 14px',
     background: disabled ? '#1a1a2e' : `rgba(${color}, 0.1)`,
     border: `1px solid ${disabled ? '#252540' : `rgba(${color}, 0.4)`}`,
-    borderRadius: 6,
+    borderRadius: 6, fontSize: 11, fontWeight: 500, cursor: disabled ? 'default' : 'pointer',
+    fontFamily: font, opacity: disabled ? 0.5 : 1,
     color: disabled ? '#333355' : `rgb(${color})`,
-    fontSize: 11,
-    fontWeight: 500,
-    cursor: disabled ? 'default' : 'pointer',
-    fontFamily: font,
-    opacity: disabled ? 0.5 : 1,
   });
 
-  const isConnected = connState === 'connected';
-  const isRunning = status?.state === 'run' || webJobRunning;
-  const isSimPort = selectedPort === 'SIMULATOR';
-  const totalLines = progress ? Math.max(progress.total, 1) : 1;
+  // ─── Render ─────────────────────────────────────────────
 
   return React.createElement('div', {
     style: {
-      position: 'fixed', inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 2000, fontFamily: font,
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: 2000, fontFamily: font,
     },
     onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
@@ -245,6 +194,7 @@ export function ConnectionPanel({
         boxShadow: '0 20px 60px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' as const,
       },
     },
+      // Header
       React.createElement('div', {
         style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
       },
@@ -252,15 +202,14 @@ export function ConnectionPanel({
           React.createElement('div', {
             style: {
               width: 8, height: 8, borderRadius: '50%',
-              background: isConnected ? '#2dd4a0' : connState === 'connecting' ? '#ffd444' : '#ff4466',
-              boxShadow: isConnected ? '0 0 8px rgba(45, 212, 160, 0.4)' : 'none',
+              background: isConnected ? '#2dd4a0' : '#ff4466',
+              boxShadow: isConnected ? '0 0 8px rgba(45,212,160,0.4)' : 'none',
             },
           }),
           React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Laser Connection'),
-          isSimPort && isConnected &&
-            React.createElement('span', { style: { fontSize: 9, color: '#ffd444', background: 'rgba(255,212,68,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,212,68,0.2)' } }, 'SIMULATOR'),
-          usingWebSerial && isConnected &&
-            React.createElement('span', { style: { fontSize: 9, color: '#2dd4a0', background: 'rgba(45,212,160,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(45,212,160,0.2)' } }, 'WEB SERIAL'),
+          isSimulator && isConnected && React.createElement('span', {
+            style: { fontSize: 9, color: '#ffd444', background: 'rgba(255,212,68,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,212,68,0.2)' },
+          }, 'SIMULATOR'),
         ),
         React.createElement('button', {
           onClick: onClose,
@@ -268,410 +217,192 @@ export function ConnectionPanel({
         }, '×'),
       ),
 
-      React.createElement('div', { style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' } },
-        React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'flex-end' } },
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 3 } }, 'Serial Port'),
-            React.createElement('select', {
-              value: selectedPort,
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setSelectedPort(e.target.value),
-              disabled: isConnected,
-              style: {
-                width: '100%', padding: '6px 8px',
-                background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
-                color: '#e0e0ec', fontSize: 12, fontFamily: mono, outline: 'none',
-              },
-            },
-              React.createElement('option', { value: '' }, '— Select port —'),
-              ...ports.map(p => React.createElement('option', { key: p.path, value: p.path },
-                `${p.path}${p.manufacturer ? ` (${p.manufacturer})` : ''}`
-              )),
-            ),
-          ),
-          !isConnected
-            ? React.createElement('button', {
-                onClick: handleConnect,
-                disabled: !selectedPort,
-                style: btnStyle('0, 212, 255', !selectedPort),
-              }, 'Connect')
-            : React.createElement('button', {
-                onClick: handleDisconnect,
-                style: btnStyle('255, 68, 102'),
-              }, 'Disconnect'),
+      // Connect section
+      !isConnected && React.createElement('div', { style: { padding: '16px 18px', borderBottom: '1px solid #1a1a2e' } },
+        React.createElement('div', { style: { display: 'flex', gap: 8 } },
           React.createElement('button', {
-            onClick: () => controllerRef.current?.listPorts().then(setPorts),
-            style: { ...btnStyle('136, 136, 170'), padding: '6px 10px' },
-          }, '↻'),
+            onClick: connectSimulator,
+            style: { ...btnStyle('255, 212, 68'), flex: 1, padding: '12px' },
+          }, 'Simulator'),
+          WebSerialPort.isSupported() && React.createElement('button', {
+            onClick: connectRealLaser,
+            style: { ...btnStyle('45, 212, 160'), flex: 1, padding: '12px', fontWeight: 600 },
+          }, 'Select USB Port'),
+        ),
+        React.createElement('div', { style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const } },
+          'Simulator for testing. USB for real laser (GRBL 1.1+).'
         ),
       ),
 
-      !isConnected && WebSerialController.isSupported() && React.createElement('div', {
-        style: { padding: '8px 18px', borderBottom: '1px solid #1a1a2e' },
-      },
-        React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 6 } }, 'Or connect to a real laser:'),
-        React.createElement('button', {
-          onClick: async () => {
-            const ws = new WebSerialController({
-              onConnectionChange: setConnState,
-              onMessage: (msg) => setMessages(prev => [...prev.slice(-200), msg]),
-              onError: (err) => setMessages(prev => [...prev, `ERROR: ${err}`]),
-            });
-            webSerialRef.current = ws;
-
-            const hasPort = await ws.requestPort();
-            if (!hasPort) {
-              webSerialRef.current = null;
-              return;
-            }
-            const connected = await ws.connect(115200);
-            if (connected) {
-              setUsingWebSerial(true);
-              setMessages(prev => [...prev, '✓ Web Serial connected — ready to send jobs']);
-            } else {
-              webSerialRef.current = null;
-            }
-          },
-          style: {
-            width: '100%', padding: '10px',
-            background: 'rgba(45, 212, 160, 0.08)',
-            border: '1px solid rgba(45, 212, 160, 0.3)',
-            borderRadius: 8, color: '#2dd4a0',
-            fontSize: 12, fontWeight: 600, cursor: 'pointer',
-            fontFamily: "'DM Sans', system-ui, sans-serif",
-          },
-        }, 'Select USB Port (Real Laser)'),
+      // Disconnect
+      isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', justifyContent: 'flex-end' } },
+        React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
       ),
 
+      // Quick start guide
       isConnected && React.createElement('div', {
-        style: {
-          padding: '8px 18px',
-          background: 'rgba(0, 212, 255, 0.04)',
-          borderBottom: '1px solid #1a1a2e',
-          fontSize: 11,
-          color: '#8888aa',
-          lineHeight: 1.5,
-        },
+        style: { padding: '8px 18px', background: 'rgba(0,212,255,0.04)', borderBottom: '1px solid #1a1a2e', fontSize: 11, color: '#8888aa', lineHeight: 1.5 },
       },
         React.createElement('strong', { style: { color: '#00d4ff', fontSize: 10, display: 'block', marginBottom: 4 } }, 'QUICK START'),
-        '1. Use arrow buttons to jog laser to your workpiece corner',
-        React.createElement('br'),
-        '2. Click "Set Zero" to mark that as the starting point',
-        React.createElement('br'),
-        '3. Click "Start Job" to begin cutting',
-        React.createElement('br'),
-        React.createElement('span', { style: { color: '#555570', fontSize: 10 } }, 'Only click Home if your machine has configured limit switches.'),
+        '1. Jog laser to your workpiece corner', React.createElement('br'),
+        '2. Click ZERO to set starting point', React.createElement('br'),
+        '3. Click Frame to verify, then Start Job',
       ),
 
-      isConnected && React.createElement('div', { style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' } },
-        React.createElement('div', { style: { display: 'flex', gap: 16, marginBottom: 10 } },
-          React.createElement('div', { style: { flex: 1, background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
-            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'POSITION'),
-            React.createElement('div', { style: { fontFamily: mono, fontSize: 16, color: '#e0e0ec' } },
-              `X${status?.x.toFixed(2) || '0.00'}  Y${status?.y.toFixed(2) || '0.00'}`
-            ),
-          ),
-          React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
-            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'STATE'),
-            React.createElement('div', { style: {
-              fontFamily: mono, fontSize: 14, fontWeight: 600,
-              color: status?.state === 'idle' ? '#2dd4a0' : status?.state === 'run' ? '#00d4ff' : status?.state === 'alarm' ? '#ff4466' : '#ffd444',
-            } }, status?.state?.toUpperCase() || 'IDLE'),
+      // Position + state
+      isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', gap: 16 } },
+        React.createElement('div', { style: { flex: 1, background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'POSITION'),
+          React.createElement('div', { style: { fontFamily: mono, fontSize: 16, color: '#e0e0ec' } },
+            `X${machineState?.position.x.toFixed(2) || '0.00'}  Y${machineState?.position.y.toFixed(2) || '0.00'}`
           ),
         ),
-
-        React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', marginBottom: 8 } },
-          React.createElement('div', { style: { display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 6 } },
-            ...[1, 10, 50].map(step =>
-              React.createElement('button', {
-                key: step,
-                onClick: () => setJogStep(step),
-                style: {
-                  padding: '3px 10px', fontSize: 10,
-                  background: jogStep === step ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
-                  border: jogStep === step ? '1px solid #00d4ff' : '1px solid #252540',
-                  borderRadius: 4,
-                  color: jogStep === step ? '#00d4ff' : '#555570',
-                  cursor: 'pointer',
-                  fontFamily: "'JetBrains Mono', monospace",
-                },
-              }, `${step}mm`),
-            ),
+        React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'STATE'),
+          React.createElement('div', { style: {
+            fontFamily: mono, fontSize: 14, fontWeight: 600,
+            color: machineState?.status === 'idle' ? '#2dd4a0' : machineState?.status === 'run' ? '#00d4ff' : machineState?.status === 'alarm' ? '#ff4466' : '#ffd444',
+          } }, (machineState?.status || 'IDLE').toUpperCase()),
+        ),
+        React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'BUFFER'),
+          React.createElement('div', { style: { fontFamily: mono, fontSize: 14, color: '#8888aa' } },
+            `${progress?.bufferFill || 0}/127`
           ),
-          React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center' } },
-            React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
-              React.createElement('div'),
-              React.createElement('button', {
-                onClick: async () => {
-                  if (webSerialRef.current) {
-                    await webSerialRef.current.send(`$J=G91 Y-${jogStep} F1000`);
-                  } else {
-                    controllerRef.current?.jog(0, -jogStep);
-                  }
-                },
-                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
-              }, '↑'),
-              React.createElement('div'),
-              React.createElement('button', {
-                onClick: async () => {
-                  if (webSerialRef.current) {
-                    await webSerialRef.current.send(`$J=G91 X-${jogStep} F1000`);
-                  } else {
-                    controllerRef.current?.jog(-jogStep, 0);
-                  }
-                },
-                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
-              }, '←'),
-              React.createElement('button', {
-                onClick: async () => {
-                  if (webSerialRef.current) {
-                    await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
-                    setMessages(prev => [...prev, '✓ Zero set at current position']);
-                  } else {
-                    await controllerRef.current?.send('G10 L20 P1 X0 Y0');
-                  }
-                  // Update displayed position to 0,0
-                  setStatus(prev => prev ? { ...prev, x: 0, y: 0 } : prev);
-                },
-                title: 'Set current position as X0 Y0',
-                style: { ...btnStyle('0, 212, 255'), padding: '6px', fontSize: 8, fontWeight: 700 },
-              }, 'ZERO'),
-              React.createElement('button', {
-                onClick: async () => {
-                  if (webSerialRef.current) {
-                    await webSerialRef.current.send(`$J=G91 X${jogStep} F1000`);
-                  } else {
-                    controllerRef.current?.jog(jogStep, 0);
-                  }
-                },
-                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
-              }, '→'),
-              React.createElement('div'),
-              React.createElement('button', {
-                onClick: async () => {
-                  if (webSerialRef.current) {
-                    await webSerialRef.current.send(`$J=G91 Y${jogStep} F1000`);
-                  } else {
-                    controllerRef.current?.jog(0, jogStep);
-                  }
-                },
-                style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 },
-              }, '↓'),
-              React.createElement('div'),
-            ),
-            React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
+        ),
+      ),
+
+      // Jog controls
+      isConnected && React.createElement('div', { style: { padding: '8px 18px' } },
+        // Step selector
+        React.createElement('div', { style: { display: 'flex', gap: 3, justifyContent: 'center', marginBottom: 6 } },
+          ...[1, 10, 50].map(step =>
             React.createElement('button', {
-              onClick: async () => {
-                if (webSerialRef.current) {
-                  await webSerialRef.current.sendAndWait('$X', 5000).catch(() => {});
-                  setMessages(prev => [...prev, '✓ Machine unlocked']);
-                }
-                controllerRef.current?.unlock();
+              key: step, onClick: () => setJogStep(step),
+              style: {
+                padding: '3px 10px', fontSize: 10, fontFamily: mono, cursor: 'pointer',
+                background: jogStep === step ? 'rgba(0,212,255,0.1)' : 'transparent',
+                border: jogStep === step ? '1px solid #00d4ff' : '1px solid #252540',
+                borderRadius: 4, color: jogStep === step ? '#00d4ff' : '#555570',
               },
-              style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '4px 10px' },
-            }, 'Unlock'),
+            }, `${step}mm`),
+          ),
+        ),
+        // Arrow pad + side buttons
+        React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center' } },
+          React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
+            React.createElement('div'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↑'),
+            React.createElement('div'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
             React.createElement('button', {
-              onClick: async () => {
-                if (webSerialRef.current) {
-                  const s = Math.round((5 / 100) * 1000);
-                  await webSerialRef.current.send(`M4 S${s}`);
-                  setTimeout(async () => {
-                    await webSerialRef.current?.send('M5 S0');
-                  }, 500);
-                  setMessages(prev => [...prev, 'Test fire: 5% power, 0.5 sec']);
-                } else {
-                  controllerRef.current?.laserTest(5, 500);
-                }
-              },
-              style: { ...btnStyle('255, 136, 68'), fontSize: 10, padding: '4px 10px' },
+              onClick: () => { sendCmd('G10 L20 P1 X0 Y0'); setMachineState(prev => prev ? { ...prev, position: { ...prev.position, x: 0, y: 0 } } : prev); },
+              title: 'Set current position as X0 Y0',
+              style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
+            }, 'ZERO'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '→'),
+            React.createElement('div'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↓'),
+            React.createElement('div'),
+          ),
+          React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
+            React.createElement('button', { onClick: () => sendCmd('$X'), style: { ...btnStyle('255,212,68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
+            React.createElement('button', {
+              onClick: () => { sendCmd('M4 S50'); setTimeout(() => sendCmd('M5 S0'), 500); },
+              style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
             }, 'Test Fire'),
             React.createElement('button', {
-              onClick: async () => {
-                const confirmed = confirm('Homing moves the laser to limit switches.\nOnly use if your machine supports it.\n\nContinue?');
-                if (!confirmed) return;
-                if (webSerialRef.current) {
-                  setMessages(prev => [...prev, 'Homing...']);
-                  try {
-                    await webSerialRef.current.sendAndWait('$H', 60000);
-                    setMessages(prev => [...prev, '✓ Homing complete']);
-                  } catch {
-                    setMessages(prev => [...prev, '⚠ Homing failed — click Unlock']);
-                  }
-                } else {
-                  controllerRef.current?.home();
-                }
-              },
-              title: 'Home machine — requires limit switches',
-              style: { ...btnStyle('136, 136, 170'), fontSize: 10, padding: '4px 10px' },
+              onClick: () => { if (confirm('Homing moves to limit switches. Continue?')) sendCmd('$H'); },
+              style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
             }, 'Home'),
-            ),
           ),
         ),
+      ),
 
+      // Time estimate + job buttons
+      isConnected && React.createElement('div', { style: { padding: '8px 18px' } },
         gcode && React.createElement('div', {
-          style: {
-            padding: '6px 12px', marginBottom: 6,
-            background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e',
-            display: 'flex', justifyContent: 'space-between', fontSize: 11,
-          },
+          style: { padding: '6px 12px', marginBottom: 6, background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', fontSize: 11 },
         },
           React.createElement('span', { style: { color: '#8888aa' } }, 'Estimated time'),
-          React.createElement('span', { style: { color: '#00d4ff', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 } },
-            estimateJobTime(gcode).formatted,
-          ),
+          React.createElement('span', { style: { color: '#00d4ff', fontFamily: mono, fontWeight: 600 } }, estimateJobTime(gcode).formatted),
         ),
-
         React.createElement('div', { style: { display: 'flex', gap: 6 } },
           React.createElement('button', {
-            onClick: async () => {
-              const ws = webSerialRef.current;
-              const ctrl = controllerRef.current;
-              if (!ws && !ctrl) return;
-
-              const x1 = boundsMinX ?? 0;
-              const y1 = boundsMinY ?? 0;
-              const x2 = boundsMaxX ?? 100;
-              const y2 = boundsMaxY ?? 100;
-
-              const frameGcode = [
-                'G21',
-                'G90',
-                'M4 S10',  // Very low power — just visible dot
-                `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)}`,
-                `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F2000`,
-                `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F2000`,
-                `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F2000`,
-                `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F2000`,
-                'M5 S0',
-              ];
-
-              setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
-
-              for (const line of frameGcode) {
-                if (ws) {
-                  try {
-                    await ws.sendAndWait(line, 10000);
-                  } catch { /* empty */ }
-                } else {
-                  await ctrl?.send(line);
-                }
-              }
-
-              setMessages(prev => [...prev, '✓ Frame complete']);
-            },
-            disabled: !isConnected,
-            title: 'Trace the boundary of your design at low power to verify alignment',
-            style: { ...btnStyle('255, 212, 68', !isConnected), flex: 1 },
+            onClick: handleFrame, disabled: !isConnected,
+            style: { ...btnStyle('255,212,68', !isConnected), flex: 1 },
           }, 'Frame'),
           React.createElement('button', {
-            onClick: () => {
-              console.log('Start Job clicked', {
-                hasGcode: !!gcode,
-                gcodeLines: gcode?.split('\n').length,
-                hasWebSerial: !!webSerialRef.current,
-                hasSimulator: !!controllerRef.current,
-                connState,
-              });
-
-              if (webSerialRef.current && connState === 'connected') {
-                void handleSendJobReal();
-              } else if (controllerRef.current && connState === 'connected') {
-                void handleSendJob();
-              } else {
-                alert('Not connected. Connect to a laser or simulator first.');
-              }
-            },
-            disabled: !gcode || isRunning,
-            style: { ...btnStyle('45, 212, 160', !gcode || isRunning), flex: 1, fontWeight: 600 },
-          }, webSerialRef.current ? 'Start Job (USB)' : isRunning ? 'Running...' : 'Start Job (Sim)'),
-          isRunning && !usingWebSerial && React.createElement('button', {
+            onClick: handleStartJob, disabled: !gcode || isRunning,
+            style: { ...btnStyle('45,212,160', !gcode || isRunning), flex: 1, fontWeight: 600 },
+          }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
+        ),
+        // Pause/Resume/Stop when running
+        isRunning && React.createElement('div', { style: { display: 'flex', gap: 6, marginTop: 6 } },
+          React.createElement('button', {
             onClick: () => controllerRef.current?.pause(),
-            style: btnStyle('255, 212, 68'),
+            style: { ...btnStyle('255,212,68'), flex: 1 },
           }, 'Pause'),
-          isRunning && React.createElement('button', {
-            onClick: () => {
-              jobAbortRef.current = true;
-              controllerRef.current?.stopJob();
-              setProgress(null);
-            },
-            style: btnStyle('255, 68, 102'),
+          React.createElement('button', {
+            onClick: () => controllerRef.current?.resume(),
+            style: { ...btnStyle('45,212,160'), flex: 1 },
+          }, 'Resume'),
+          React.createElement('button', {
+            onClick: () => controllerRef.current?.stop(),
+            style: { ...btnStyle('255,68,102'), flex: 1 },
           }, 'Stop'),
         ),
-
-        progress && React.createElement('div', { style: { marginTop: 8 } },
+        // Progress bar
+        progress && progress.totalLines > 0 && React.createElement('div', { style: { marginTop: 8 } },
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#555570', marginBottom: 3 } },
-            React.createElement('span', null, `Line ${progress.sent} / ${progress.total}`),
-            React.createElement('span', null, `${Math.round(progress.sent / totalLines * 100)}%`),
+            React.createElement('span', null, `${progress.linesAcknowledged} / ${progress.totalLines} acknowledged`),
+            React.createElement('span', null, `${progress.percentComplete.toFixed(0)}%`),
           ),
           React.createElement('div', { style: { height: 3, background: '#1a1a2e', borderRadius: 2, overflow: 'hidden' } },
-            React.createElement('div', { style: { width: `${(progress.sent / totalLines) * 100}%`, height: '100%', background: '#00d4ff', borderRadius: 2, transition: 'width 0.1s' } }),
+            React.createElement('div', { style: { width: `${progress.percentComplete}%`, height: '100%', background: '#00d4ff', borderRadius: 2, transition: 'width 0.1s' } }),
           ),
         ),
+      ),
 
-        isConnected && React.createElement('button', {
-          onClick: async () => {
-            if (webSerialRef.current) {
-              await webSerialRef.current.send('\x18'); // Soft reset
-              await webSerialRef.current.send('M5 S0'); // Laser off
-              setMessages(prev => [...prev, '⚠ EMERGENCY STOP — laser off, machine reset']);
-            }
-            controllerRef.current?.stopJob();
-            setProgress(null);
+      // Emergency stop
+      isConnected && React.createElement('div', { style: { padding: '4px 18px' } },
+        React.createElement('button', {
+          onClick: () => {
+            controllerRef.current?.stop();
+            sendCmd('M5 S0');
+            setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
           },
-          style: {
-            width: '100%', padding: '8px',
-            background: 'rgba(255, 68, 102, 0.1)',
-            border: '1px solid #ff4466',
-            borderRadius: 6, color: '#ff4466',
-            fontSize: 12, fontWeight: 700, cursor: 'pointer',
-            fontFamily: "'DM Sans', system-ui, sans-serif",
-            marginTop: 6,
-          },
+          style: { width: '100%', padding: '8px', background: 'rgba(255,68,102,0.1)', border: '1px solid #ff4466', borderRadius: 6, color: '#ff4466', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: font },
         }, '⚠ EMERGENCY STOP'),
       ),
 
+      // Console
       React.createElement('div', {
         ref: logRef,
-        style: {
-          flex: 1, minHeight: 150, maxHeight: 250,
-          padding: '8px 12px', margin: '8px 18px',
-          background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e',
-          overflow: 'auto', fontFamily: mono, fontSize: 10, lineHeight: 1.5,
-        },
+        style: { flex: 1, minHeight: 120, maxHeight: 200, padding: '8px 12px', margin: '8px 18px', background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e', overflow: 'auto', fontFamily: mono, fontSize: 10, lineHeight: 1.5 },
       },
         messages.length === 0
-          ? React.createElement('span', { style: { color: '#333355' } }, 'Console output will appear here...')
+          ? React.createElement('span', { style: { color: '#333355' } }, 'Console...')
           : messages.map((msg, i) =>
-              React.createElement('div', {
-                key: i,
-                style: { color: msg.startsWith('ERROR') ? '#ff4466' : msg.startsWith('>') ? '#00d4ff' : '#555570' },
-              }, msg)
+              React.createElement('div', { key: i, style: { color: msg.startsWith('ERROR') || msg.startsWith('⚠') ? '#ff4466' : msg.startsWith('>') ? '#00d4ff' : msg.startsWith('✓') ? '#2dd4a0' : '#555570' } }, msg),
             ),
       ),
 
-      isConnected && React.createElement('div', {
-        style: { padding: '8px 18px', display: 'flex', gap: 6 },
-      },
+      // Manual command
+      isConnected && React.createElement('div', { style: { padding: '8px 18px 12px', display: 'flex', gap: 6 } },
         React.createElement('input', {
-          type: 'text',
-          value: manualCmd,
-          placeholder: 'G-code command...',
+          type: 'text', value: manualCmd, placeholder: 'G-code command...',
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setManualCmd(e.target.value),
-          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') void handleSendManual(); },
-          style: {
-            flex: 1, padding: '6px 10px',
-            background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
-            color: '#e0e0ec', fontSize: 11, fontFamily: mono, outline: 'none',
-          },
+          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') { sendCmd(manualCmd); setManualCmd(''); } },
+          style: { flex: 1, padding: '6px 10px', background: '#0a0a14', border: '1px solid #252540', borderRadius: 6, color: '#e0e0ec', fontSize: 11, fontFamily: mono, outline: 'none' },
         }),
-        React.createElement('button', {
-          onClick: () => void handleSendManual(),
-          style: btnStyle('0, 212, 255'),
-        }, 'Send'),
+        React.createElement('button', { onClick: () => { sendCmd(manualCmd); setManualCmd(''); }, style: btnStyle('0,212,255') }, 'Send'),
       ),
 
+      // Footer
       React.createElement('div', {
-        style: { padding: '10px 18px', borderTop: '1px solid #1a1a2e', fontSize: 10, color: '#444460' },
-      }, 'Supports GRBL 1.1+ via Web Serial (USB) or SIMULATOR. No native drivers required in Chromium/Electron.'),
+        style: { padding: '8px 18px', borderTop: '1px solid #1a1a2e', fontSize: 10, color: '#444460' },
+      }, 'GRBL 1.1+ · Character-counting buffer · 5Hz status polling'),
     ),
   );
 }
