@@ -16,7 +16,7 @@
  * Last updated: Refactor — Transform, pure orchestration
  */
 
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, type MutableRefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { createRect, createEllipse, createLine } from '../../core/scene/SceneObject';
 import { moveObjects } from '../../core/scene/SceneOps';
@@ -29,11 +29,12 @@ import {
   wheelToZoomFactor,
   pan,
   fitToAABB,
+  fitToBounds,
 } from '../viewport';
 import { computeFitBounds, computeObjectBounds } from '../../geometry/bounds';
 import { aabbIntersects, type Matrix3x2 } from '../../core/types';
 import { hitTestPoint } from '../../geometry/hit-test';
-import { renderScene } from '../renderers/SceneRenderer';
+import { renderScene, renderSceneBackground, renderSceneObjects } from '../renderers/SceneRenderer';
 import {
   renderSimulationPath,
   renderLaserHead,
@@ -49,7 +50,94 @@ function snapToGrid(value: number, gridSize: number): number {
   return Math.round(value / gridSize) * gridSize;
 }
 
+function drawRulers(
+  ctx: CanvasRenderingContext2D,
+  transform: Transform,
+  canvasWidth: number,
+  canvasHeight: number
+): void {
+  const rulerSize = 20;
+  ctx.save();
+
+  ctx.fillStyle = '#0f0f1a';
+  ctx.fillRect(0, 0, canvasWidth, rulerSize);
+  ctx.fillRect(0, rulerSize, rulerSize, canvasHeight - rulerSize);
+
+  ctx.fillStyle = '#141422';
+  ctx.fillRect(0, 0, rulerSize, rulerSize);
+
+  const zoom = transform.zoom;
+  let tickMm = 100;
+  if (zoom > 0.5) tickMm = 50;
+  if (zoom > 1) tickMm = 20;
+  if (zoom > 2) tickMm = 10;
+  if (zoom > 5) tickMm = 5;
+  if (zoom > 10) tickMm = 1;
+
+  ctx.fillStyle = '#555570';
+  ctx.strokeStyle = '#333355';
+  ctx.lineWidth = 1;
+  ctx.font = '8px "JetBrains Mono", monospace';
+  ctx.textBaseline = 'top';
+
+  const worldLeft = transform.screenToWorld({ x: rulerSize, y: rulerSize }).x;
+  const worldRight = transform.screenToWorld({ x: canvasWidth, y: rulerSize }).x;
+  const startX = Math.floor(worldLeft / tickMm) * tickMm;
+
+  for (let wmm = startX; wmm <= worldRight; wmm += tickMm) {
+    const sx = transform.worldToScreen({ x: wmm, y: 0 }).x;
+    if (sx < rulerSize) continue;
+
+    ctx.beginPath();
+    ctx.moveTo(sx, rulerSize - 5);
+    ctx.lineTo(sx, rulerSize);
+    ctx.stroke();
+
+    if (wmm % (tickMm * 2) === 0 || tickMm >= 10) {
+      ctx.fillText(`${wmm}`, sx + 2, 3);
+    }
+  }
+
+  const worldTop = transform.screenToWorld({ x: rulerSize, y: rulerSize }).y;
+  const worldBottom = transform.screenToWorld({ x: rulerSize, y: canvasHeight }).y;
+  const startY = Math.floor(worldTop / tickMm) * tickMm;
+
+  for (let wmm = startY; wmm <= worldBottom; wmm += tickMm) {
+    const sy = transform.worldToScreen({ x: 0, y: wmm }).y;
+    if (sy < rulerSize) continue;
+
+    ctx.beginPath();
+    ctx.moveTo(rulerSize - 5, sy);
+    ctx.lineTo(rulerSize, sy);
+    ctx.stroke();
+
+    if (wmm % (tickMm * 2) === 0 || tickMm >= 10) {
+      ctx.save();
+      ctx.translate(3, sy + 2);
+      ctx.rotate(-Math.PI / 2);
+      ctx.fillText(`${wmm}`, 0, 0);
+      ctx.restore();
+    }
+  }
+
+  ctx.strokeStyle = '#252540';
+  ctx.beginPath();
+  ctx.moveTo(rulerSize, 0);
+  ctx.lineTo(rulerSize, canvasHeight);
+  ctx.moveTo(0, rulerSize);
+  ctx.lineTo(canvasWidth, rulerSize);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
 // ─── PROPS ───────────────────────────────────────────────────────
+
+export type ViewportActions = {
+  zoomIn: () => void;
+  zoomOut: () => void;
+  fitToBed: () => void;
+};
 
 interface CanvasViewportProps {
   scene: Scene;
@@ -63,6 +151,8 @@ interface CanvasViewportProps {
   /** Called on drag end — for history. Parent pushes to history. */
   onSceneCommit?: (scene: Scene) => void;
   activeTool?: ToolType;
+  onZoomChange?: (zoom: number) => void;
+  actionsRef?: MutableRefObject<ViewportActions | null>;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -77,6 +167,8 @@ export function CanvasViewport({
   onSceneChange,
   onSceneCommit,
   activeTool = 'select',
+  onZoomChange,
+  actionsRef,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -95,6 +187,41 @@ export function CanvasViewport({
   const spaceHeldRef = useRef(false);
   const nodeTargetIdRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+
+  const onZoomChangeRef = useRef(onZoomChange);
+  onZoomChangeRef.current = onZoomChange;
+
+  useEffect(() => {
+    onZoomChangeRef.current?.(Math.round(viewport.zoom * 100));
+  }, [viewport.zoom]);
+
+  useEffect(() => {
+    if (!actionsRef) return;
+    actionsRef.current = {
+      zoomIn: () => {
+        setViewport(vp => {
+          const next = zoomAt(vp, width / 2, height / 2, 1.3);
+          onZoomChangeRef.current?.(Math.round(next.zoom * 100));
+          return next;
+        });
+      },
+      zoomOut: () => {
+        setViewport(vp => {
+          const next = zoomAt(vp, width / 2, height / 2, 1 / 1.3);
+          onZoomChangeRef.current?.(Math.round(next.zoom * 100));
+          return next;
+        });
+      },
+      fitToBed: () => {
+        const next = fitToBounds(0, 0, scene.canvas.width, scene.canvas.height, width, height, 20);
+        onZoomChangeRef.current?.(Math.round(next.zoom * 100));
+        setViewport(next);
+      },
+    };
+    return () => {
+      actionsRef.current = null;
+    };
+  }, [actionsRef, scene.canvas.width, scene.canvas.height, width, height]);
 
   useEffect(() => {
     isPanningRef.current = isPanning;
@@ -120,8 +247,14 @@ export function CanvasViewport({
       ctx.globalAlpha = 0.15;
       renderScene(ctx, scene, transform, width, height, selectedIds);
       ctx.restore();
+      drawRulers(ctx, transform, width, height);
     } else {
-      renderScene(ctx, scene, transform, width, height, selectedIds);
+      renderSceneBackground(ctx, scene, transform, width, height);
+      ctx.restore();
+      drawRulers(ctx, transform, width, height);
+      ctx.save();
+      transform.applyToContext(ctx);
+      renderSceneObjects(ctx, scene, transform, width, height, selectedIds);
     }
 
     // Resize handles (union bounds of all selected, world space)
@@ -303,7 +436,7 @@ export function CanvasViewport({
     }
 
     // 7. Screen-space overlay
-    renderOverlay(ctx, width, height, mouseWorldRef.current, viewport, scene.objects.length, selectedIds.size);
+    renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
   }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool]);
 
   useEffect(() => { render(); }, [render]);
@@ -443,7 +576,11 @@ export function CanvasViewport({
       const rect = canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      setViewport(vp => zoomAt(vp, sx, sy, wheelToZoomFactor(e.deltaY)));
+      setViewport(vp => {
+        const next = zoomAt(vp, sx, sy, wheelToZoomFactor(e.deltaY));
+        onZoomChangeRef.current?.(Math.round(next.zoom * 100));
+        return next;
+      });
     };
     canvas.addEventListener('wheel', handler, { passive: false });
     return () => canvas.removeEventListener('wheel', handler);
@@ -1032,12 +1169,14 @@ export function CanvasViewport({
           }
           render();
         } else {
+          nodeTargetIdRef.current = null;
           // Don't deselect when using node tool — keep current selection for node editing
           if (activeTool === 'node' && selectedIds.size > 0) {
             // Do nothing — keep selection for node editing
           } else {
             onSelectionChange?.(new Set());
           }
+          render();
         }
       }
       clickStartRef.current = null;
@@ -1097,7 +1236,6 @@ function renderOverlay(
   w: number,
   h: number,
   mouseWorld: { x: number; y: number },
-  viewport: ViewportState,
   objectCount: number,
   selectedCount: number
 ): void {
@@ -1108,7 +1246,7 @@ function renderOverlay(
   ctx.fillStyle = '#555580';
   const selText = selectedCount > 0 ? `  |  Selected: ${selectedCount}` : '';
   ctx.fillText(
-    `X: ${mouseWorld.x.toFixed(1)}mm  Y: ${mouseWorld.y.toFixed(1)}mm  |  Zoom: ${(viewport.zoom * 100).toFixed(0)}%  |  Objects: ${objectCount}${selText}`,
+    `X: ${mouseWorld.x.toFixed(1)}mm  Y: ${mouseWorld.y.toFixed(1)}mm  |  Objects: ${objectCount}${selText}`,
     8, h - 7
   );
 }

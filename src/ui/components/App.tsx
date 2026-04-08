@@ -102,6 +102,9 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
 // ─── COMPONENT ───────────────────────────────────────────────────
 
 export function App() {
+  const [zoomLevel, setZoomLevel] = useState(100);
+  const viewportActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; fitToBed: () => void } | null>(null);
+
   const [scene, setScene] = useState<Scene>(() => {
     const initial = createScene(400, 300, 'Untitled');
     return initial;
@@ -645,6 +648,8 @@ export function App() {
         onSelectionChange: setSelectedIds,
         onSceneChange: handleSceneChange,
         onSceneCommit: handleSceneCommit,
+        actionsRef: viewportActionsRef,
+        onZoomChange: setZoomLevel,
       }),
       React.createElement('div', {
         style: {
@@ -695,7 +700,29 @@ export function App() {
       },
     },
       React.createElement('span', {}, scene.metadata.name || 'Untitled'),
-      React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+        React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 4 } },
+          React.createElement('button', {
+            onClick: () => viewportActionsRef.current?.zoomOut(),
+            style: { background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, padding: '0 4px', fontFamily: "'DM Sans', system-ui" },
+            title: 'Zoom out',
+          }, '−'),
+          React.createElement('span', {
+            style: { fontSize: 10, color: '#555570', fontFamily: "'JetBrains Mono', monospace", minWidth: 40, textAlign: 'center' as const },
+          }, `${zoomLevel}%`),
+          React.createElement('button', {
+            onClick: () => viewportActionsRef.current?.zoomIn(),
+            style: { background: 'none', border: 'none', color: '#8888aa', cursor: 'pointer', fontSize: 14, padding: '0 4px', fontFamily: "'DM Sans', system-ui" },
+            title: 'Zoom in',
+          }, '+'),
+          React.createElement('button', {
+            onClick: () => viewportActionsRef.current?.fitToBed(),
+            style: { background: 'none', border: '1px solid #252540', borderRadius: 3, color: '#8888aa', cursor: 'pointer', fontSize: 9, padding: '2px 6px', fontFamily: "'DM Sans', system-ui", marginLeft: 4 },
+            title: 'Fit to bed',
+          }, 'FIT'),
+        ),
+      ),
     ),
 
     contextMenu && React.createElement(ContextMenu, {

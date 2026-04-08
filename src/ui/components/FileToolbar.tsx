@@ -308,6 +308,24 @@ export function FileToolbar({
     URL.revokeObjectURL(url);
   }, [scene]);
 
+  const handleBedSize = useCallback(() => {
+    const input = prompt(
+      `Bed size (current: ${scene.canvas.width} × ${scene.canvas.height} mm)\nEnter: width,height`,
+      `${scene.canvas.width},${scene.canvas.height}`
+    );
+    if (!input) return;
+    const parts = input.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length !== 2 || parts.some(isNaN) || parts.some(v => v < 10 || v > 2000)) {
+      alert('Enter width,height in mm (10-2000)');
+      return;
+    }
+    const newScene = {
+      ...scene,
+      canvas: { ...scene.canvas, width: parts[0], height: parts[1] },
+    };
+    onSceneCommit(newScene);
+  }, [scene, onSceneCommit]);
+
   // ─── RENDER ──────────────────────────────────────────────────
 
   const btnStyle: React.CSSProperties = {
@@ -349,6 +367,7 @@ export function FileToolbar({
     React.createElement('button', { onClick: handleExportSvg, style: btnStyle }, 'Export SVG'),
     !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
     isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
+    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
 
     // Hidden file input for SVG import
     React.createElement('input', {

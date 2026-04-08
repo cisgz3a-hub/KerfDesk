@@ -296,19 +296,55 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Width'),
         React.createElement('input', {
-          type: 'text',
-          value: w.toFixed(2) + ' mm',
-          readOnly: true,
-          style: { ...inputStyle, color: theme.text.tertiary },
+          type: 'number',
+          value: parseFloat(w.toFixed(2)),
+          step: 0.1,
+          style: inputStyle,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            const newW = parseFloat(e.target.value);
+            if (isNaN(newW) || newW <= 0) return;
+            const bounds = computeObjectBounds(obj);
+            if (!bounds) return;
+            const oldW = bounds.maxX - bounds.minX;
+            if (oldW === 0) return;
+            const scale = newW / (oldW * Math.abs(obj.transform.a || 1));
+            const newScene = {
+              ...scene,
+              objects: scene.objects.map(o =>
+                o.id === obj.id
+                  ? { ...o, transform: { ...o.transform, a: o.transform.a * scale }, _bounds: null, _worldTransform: null }
+                  : o
+              ),
+            };
+            onSceneCommit(newScene);
+          },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Height'),
         React.createElement('input', {
-          type: 'text',
-          value: h.toFixed(2) + ' mm',
-          readOnly: true,
-          style: { ...inputStyle, color: theme.text.tertiary },
+          type: 'number',
+          value: parseFloat(h.toFixed(2)),
+          step: 0.1,
+          style: inputStyle,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            const newH = parseFloat(e.target.value);
+            if (isNaN(newH) || newH <= 0) return;
+            const bounds = computeObjectBounds(obj);
+            if (!bounds) return;
+            const oldH = bounds.maxY - bounds.minY;
+            if (oldH === 0) return;
+            const scale = newH / (oldH * Math.abs(obj.transform.d || 1));
+            const newScene = {
+              ...scene,
+              objects: scene.objects.map(o =>
+                o.id === obj.id
+                  ? { ...o, transform: { ...o.transform, d: o.transform.d * scale }, _bounds: null, _worldTransform: null }
+                  : o
+              ),
+            };
+            onSceneCommit(newScene);
+          },
         }),
       ),
     ),

@@ -26,15 +26,14 @@ import { computeObjectBounds } from '../../geometry/bounds';
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
-export function renderScene(
+/** Bed, grid, origin, crosshair — leaves ctx with transform applied (outer save still active). */
+export function renderSceneBackground(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
   transform: Transform,
   canvasWidth: number,
-  canvasHeight: number,
-  selectedIds?: ReadonlySet<string>
+  canvasHeight: number
 ): void {
-  // Clear
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
   ctx.fillStyle = '#0a0a14';
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
@@ -42,19 +41,10 @@ export function renderScene(
   ctx.save();
   transform.applyToContext(ctx);
 
-  // Compute visible world bounds once for culling
-  const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
-
-  // 1. Bed
   renderBed(ctx, scene.canvas.width, scene.canvas.height, transform);
-
-  // 2. Grid
   renderGrid(ctx, scene.canvas.width, scene.canvas.height, transform);
-
-  // 3. Origin
   renderOrigin(ctx, transform);
 
-  // Center crosshair (bed center in scene/world space — already under transform)
   const bedW = scene.canvas.width;
   const bedH = scene.canvas.height;
   const cxBed = bedW / 2;
@@ -64,26 +54,34 @@ export function renderScene(
   ctx.strokeStyle = 'rgba(59, 139, 235, 0.4)';
   ctx.lineWidth = transform.screenPx(1);
   ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
-  // Horizontal line
   ctx.beginPath();
   ctx.moveTo(cxBed - crossSize, cyBed);
   ctx.lineTo(cxBed + crossSize, cyBed);
   ctx.stroke();
-  // Vertical line
   ctx.beginPath();
   ctx.moveTo(cxBed, cyBed - crossSize);
   ctx.lineTo(cxBed, cyBed + crossSize);
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
+}
 
-  // 4. Objects (with frustum culling)
+/** Objects + selection highlights + restores outer ctx.save from renderSceneBackground. */
+export function renderSceneObjects(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  transform: Transform,
+  canvasWidth: number,
+  canvasHeight: number,
+  selectedIds?: ReadonlySet<string>
+): void {
+  const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
+
   const layerMap = new Map<string, Layer>();
   for (const layer of scene.layers) {
     layerMap.set(layer.id, layer);
   }
 
-  // Cache bounds to avoid recomputing for selected objects
   const boundsCache = selectedIds && selectedIds.size > 0
     ? new Map<string, AABB>()
     : null;
@@ -92,11 +90,9 @@ export function renderScene(
     const layer = layerMap.get(obj.layerId);
     if (!layer || !layer.visible) continue;
 
-    // Frustum cull: skip objects entirely outside the visible area
     const objBounds = computeObjectBounds(obj);
     if (!aabbIntersects(objBounds, visibleBounds)) continue;
 
-    // Cache bounds for selected objects (reused in selection highlight pass)
     if (boundsCache && selectedIds!.has(obj.id)) {
       boundsCache.set(obj.id, objBounds);
     }
@@ -104,7 +100,6 @@ export function renderScene(
     renderObject(ctx, obj, layer, transform);
   }
 
-  // 5. Selection highlights (drawn on top of all objects)
   if (boundsCache && boundsCache.size > 0) {
     for (const [id, bounds] of boundsCache) {
       renderSelectionHighlight(ctx, bounds, transform);
@@ -112,6 +107,18 @@ export function renderScene(
   }
 
   ctx.restore();
+}
+
+export function renderScene(
+  ctx: CanvasRenderingContext2D,
+  scene: Scene,
+  transform: Transform,
+  canvasWidth: number,
+  canvasHeight: number,
+  selectedIds?: ReadonlySet<string>
+): void {
+  renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight);
+  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds);
 }
 
 // ─── BED ─────────────────────────────────────────────────────────
