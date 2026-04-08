@@ -42,9 +42,10 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
+import { textToPath } from '../../geometry/TextToPath';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { createLayer } from '../../core/scene/Layer';
-import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject, type ImageGeometry, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
@@ -723,6 +724,67 @@ export function App() {
     setSelectedIds(new Set([newId]));
   }, [scene, selectedIds, handleSceneCommit]);
 
+  const handleTextToPath = useCallback(async () => {
+    const textObjs = scene.objects.filter(
+      o => selectedIds.has(o.id) && o.geometry.type === 'text'
+    );
+
+    if (textObjs.length === 0) {
+      alert('Select a text object first.');
+      return;
+    }
+
+    const newObjects: SceneObject[] = [];
+    const removeIds = new Set<string>();
+
+    for (const obj of textObjs) {
+      const geom = obj.geometry as TextGeometry;
+      const result = await textToPath(
+        geom.text || '',
+        geom.fontFamily || 'Arial',
+        geom.fontSize || 20,
+        geom.bold ?? false
+      );
+
+      if (!result) continue;
+
+      removeIds.add(obj.id);
+
+      newObjects.push({
+        id: generateId(),
+        type: 'path',
+        name: `Path: "${geom.text}"`,
+        layerId: obj.layerId,
+        parentId: null,
+        transform: { ...obj.transform },
+        geometry: {
+          type: 'path',
+          subPaths: result.subPaths,
+        },
+        visible: true,
+        locked: false,
+        _bounds: null,
+        _worldTransform: null,
+      });
+    }
+
+    if (newObjects.length === 0) {
+      alert('Text to path conversion failed.');
+      return;
+    }
+
+    const newScene = {
+      ...scene,
+      objects: [
+        ...scene.objects.filter(o => !removeIds.has(o.id)),
+        ...newObjects,
+      ],
+    };
+
+    handleSceneCommit(newScene);
+    setSelectedIds(new Set(newObjects.map(o => o.id)));
+  }, [scene, selectedIds, handleSceneCommit]);
+
   const handleOffset = useCallback((distance: number) => {
     if (selectedIds.size === 0) return;
 
@@ -1021,7 +1083,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleOffset]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -1310,6 +1372,7 @@ export function App() {
         { label: 'Boolean Union', action: () => handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
         { label: 'Boolean Subtract', action: () => handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
         { label: 'Boolean Intersect', action: () => handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
+        { label: 'Text to Path', action: handleTextToPath, disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text') },
         { label: 'separator', action: () => {}, separator: true },
         { label: 'Offset Outset (+1mm)', action: () => handleOffset(1), disabled: selectedIds.size === 0 },
         { label: 'Offset Outset (+2mm)', action: () => handleOffset(2), disabled: selectedIds.size === 0 },
