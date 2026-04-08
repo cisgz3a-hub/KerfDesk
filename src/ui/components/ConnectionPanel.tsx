@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GrblController, type ConnectionState, type MachineStatus } from '../../core/controller/GrblController';
 import { WebSerialController } from '../../core/controller/WebSerialController';
+import { estimateJobTime } from '../../core/output/TimeEstimator';
 
 // Pre-flight check: scan G-code for coordinate range
 function checkGcodeBounds(gcodeText: string, bedW: number, bedH: number): { minX: number; minY: number; maxX: number; maxY: number; warnings: string[] } {
@@ -488,6 +489,19 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
               style: { ...btnStyle('136, 136, 170'), fontSize: 10, padding: '4px 10px' },
             }, 'Home'),
             ),
+          ),
+        ),
+
+        gcode && React.createElement('div', {
+          style: {
+            padding: '6px 12px', marginBottom: 6,
+            background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e',
+            display: 'flex', justifyContent: 'space-between', fontSize: 11,
+          },
+        },
+          React.createElement('span', { style: { color: '#8888aa' } }, 'Estimated time'),
+          React.createElement('span', { style: { color: '#00d4ff', fontFamily: "'JetBrains Mono', monospace", fontWeight: 600 } },
+            estimateJobTime(gcode).formatted,
           ),
         ),
 

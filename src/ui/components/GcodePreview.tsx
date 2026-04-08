@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { estimateJobTime } from '../../core/output/TimeEstimator';
 
 interface GcodePreviewProps {
   gcode: string;
@@ -38,6 +39,8 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     ctx.strokeStyle = '#1a1a2e';
     ctx.lineWidth = 1;
     ctx.strokeRect(ox, oy, bedWidth * scale, bedHeight * scale);
+
+    const estimate = estimateJobTime(gcode);
 
     // Parse and draw G-code
     const lines = gcode.split('\n');
@@ -110,13 +113,15 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
 
     // Stats overlay
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-    ctx.fillRect(8, ch - 52, 200, 44);
+    ctx.fillRect(8, ch - 66, 220, 58);
     ctx.font = "11px 'JetBrains Mono', monospace";
     ctx.fillStyle = '#8888aa';
     ctx.textBaseline = 'top';
-    ctx.fillText(`Travel moves: ${moveCount}`, 14, ch - 46);
-    ctx.fillText(`Cut moves: ${cutCount}`, 14, ch - 32);
-    ctx.fillText(`Total lines: ${lines.length}`, 14, ch - 18);
+    ctx.fillText(`Travel moves: ${moveCount}`, 14, ch - 58);
+    ctx.fillText(`Cut moves: ${cutCount}`, 14, ch - 44);
+    ctx.fillText(`Total distance: ${(estimate.totalDistance / 1000).toFixed(1)}m`, 14, ch - 30);
+    ctx.fillStyle = '#00d4ff';
+    ctx.fillText(`Estimated time: ${estimate.formatted}`, 14, ch - 16);
 
   }, [gcode, bedWidth, bedHeight]);
 
