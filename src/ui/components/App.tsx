@@ -81,10 +81,17 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
   let dx = 0, dy = 0;
 
   switch (alignment) {
-    case 'center':
-      dx = scn.canvas.width / 2 - (wMinX + wMaxX) / 2;
-      dy = scn.canvas.height / 2 - (wMinY + wMaxY) / 2;
+    case 'center': {
+      const targetCx = scn.material
+        ? scn.material.x + scn.material.width / 2
+        : scn.canvas.width / 2;
+      const targetCy = scn.material
+        ? scn.material.y + scn.material.height / 2
+        : scn.canvas.height / 2;
+      dx = targetCx - (wMinX + wMaxX) / 2;
+      dy = targetCy - (wMinY + wMaxY) / 2;
       break;
+    }
     case 'left':   dx = -wMinX; break;
     case 'right':  dx = scn.canvas.width - wMaxX; break;
     case 'top':    dy = -wMinY; break;
@@ -243,6 +250,19 @@ export function App() {
         const updated = importSvgIntoScene(text, scene, layerId, {
           mode: 'fit',
           allowScaleUp: false,
+          targetBounds: scene.material
+            ? {
+              minX: scene.material.x,
+              minY: scene.material.y,
+              maxX: scene.material.x + scene.material.width,
+              maxY: scene.material.y + scene.material.height,
+            }
+            : {
+              minX: 0,
+              minY: 0,
+              maxX: scene.canvas.width,
+              maxY: scene.canvas.height,
+            },
         });
         handleSceneCommit(updated);
       } else if (name.endsWith('.dxf') && text) {
@@ -279,8 +299,14 @@ export function App() {
         }
         const finalWidth = physicalWidth * fitScale;
         const finalHeight = physicalHeight * fitScale;
-        const cx = scene.canvas.width / 2 - finalWidth / 2;
-        const cy = scene.canvas.height / 2 - finalHeight / 2;
+        const centerX = scene.material
+          ? scene.material.x + scene.material.width / 2
+          : scene.canvas.width / 2;
+        const centerY = scene.material
+          ? scene.material.y + scene.material.height / 2
+          : scene.canvas.height / 2;
+        const cx = centerX - finalWidth / 2;
+        const cy = centerY - finalHeight / 2;
 
         // Grayscale conversion
         const maxDim = 1000;
@@ -840,7 +866,7 @@ export function App() {
         { label: 'Duplicate           Ctrl+D', action: handleDuplicate, disabled: selectedIds.size === 0 },
         { label: 'Delete              Del', action: handleDelete, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },
-        { label: 'Center on Bed    Ctrl+Shift+C', action: () => {
+        { label: `${scene.material ? 'Center on Material' : 'Center on Bed'}    Ctrl+Shift+C`, action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
         }, disabled: selectedIds.size === 0 },
         { label: 'Align Left', action: () => {

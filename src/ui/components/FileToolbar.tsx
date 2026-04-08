@@ -89,6 +89,19 @@ export function FileToolbar({
       const updated = importSvgIntoScene(svgString, scene, layerId, {
         mode: 'fit',
         allowScaleUp: false,
+        targetBounds: scene.material
+          ? {
+            minX: scene.material.x,
+            minY: scene.material.y,
+            maxX: scene.material.x + scene.material.width,
+            maxY: scene.material.y + scene.material.height,
+          }
+          : {
+            minX: 0,
+            minY: 0,
+            maxX: scene.canvas.width,
+            maxY: scene.canvas.height,
+          },
       });
 
       onSceneChange(updated);
@@ -162,9 +175,15 @@ export function FileToolbar({
       const finalWidth = physicalWidth * fitScale;
       const finalHeight = physicalHeight * fitScale;
 
-      // Center on canvas
-      const cx = scene.canvas.width / 2 - finalWidth / 2;
-      const cy = scene.canvas.height / 2 - finalHeight / 2;
+      // Center on material if present, otherwise center on bed
+      const centerX = scene.material
+        ? scene.material.x + scene.material.width / 2
+        : scene.canvas.width / 2;
+      const centerY = scene.material
+        ? scene.material.y + scene.material.height / 2
+        : scene.canvas.height / 2;
+      const cx = centerX - finalWidth / 2;
+      const cy = centerY - finalHeight / 2;
 
       // Find or create an image layer
       let targetScene = scene;
