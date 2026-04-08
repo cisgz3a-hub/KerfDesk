@@ -32,6 +32,16 @@ export interface Scene {
   // Content
   layers: Layer[];
   objects: SceneObject[];
+  material: {
+    type: 'wood' | 'acrylic' | 'leather' | 'paper' | 'fabric' | 'cardboard' | 'metal' | 'custom';
+    name: string;           // e.g. "3mm Birch Plywood"
+    width: number;          // mm
+    height: number;         // mm
+    x: number;              // position on bed (mm from left)
+    y: number;              // position on bed (mm from top)
+    thickness: number;      // mm
+    color: string;          // display color
+  } | null;
 
   // State (not saved to file, transient)
   selection: string[];       // Selected object IDs
@@ -69,6 +79,7 @@ export function createScene(
     },
     layers: [defaultLayer],
     objects: [],
+    material: null,
     selection: [],
     activeLayerId: defaultLayer.id,
     metadata: {

@@ -43,6 +43,85 @@ export function renderSceneBackground(
 
   renderBed(ctx, scene.canvas.width, scene.canvas.height, transform);
   renderGrid(ctx, scene.canvas.width, scene.canvas.height, transform);
+
+  // ─── MATERIAL RECTANGLE ─────────────────────────────────────────
+  if (scene.material) {
+    const mat = scene.material;
+    ctx.save();
+
+    // Material fill — warm color based on type
+    const materialColors: Record<string, { fill: string; stroke: string; grain: boolean }> = {
+      wood:      { fill: 'rgba(139, 90, 43, 0.18)', stroke: 'rgba(139, 90, 43, 0.5)', grain: true },
+      acrylic:   { fill: 'rgba(100, 180, 255, 0.12)', stroke: 'rgba(100, 180, 255, 0.4)', grain: false },
+      leather:   { fill: 'rgba(160, 82, 45, 0.18)', stroke: 'rgba(160, 82, 45, 0.5)', grain: false },
+      paper:     { fill: 'rgba(240, 230, 210, 0.15)', stroke: 'rgba(200, 190, 170, 0.4)', grain: false },
+      fabric:    { fill: 'rgba(180, 130, 180, 0.12)', stroke: 'rgba(180, 130, 180, 0.4)', grain: false },
+      cardboard: { fill: 'rgba(170, 130, 80, 0.15)', stroke: 'rgba(170, 130, 80, 0.4)', grain: false },
+      metal:     { fill: 'rgba(180, 190, 200, 0.12)', stroke: 'rgba(180, 190, 200, 0.4)', grain: false },
+      custom:    { fill: 'rgba(150, 150, 150, 0.12)', stroke: 'rgba(150, 150, 150, 0.4)', grain: false },
+    };
+
+    const mc = materialColors[mat.type] || materialColors.custom;
+
+    // Fill
+    ctx.fillStyle = mc.fill;
+    ctx.fillRect(mat.x, mat.y, mat.width, mat.height);
+
+    // Simulated wood grain lines (subtle horizontal lines)
+    if (mc.grain) {
+      ctx.strokeStyle = 'rgba(100, 60, 20, 0.06)';
+      ctx.lineWidth = transform.screenPx(1);
+      const grainSpacing = 3; // mm between grain lines
+      for (let gy = mat.y + grainSpacing; gy < mat.y + mat.height; gy += grainSpacing) {
+        ctx.beginPath();
+        // Slightly wavy grain
+        ctx.moveTo(mat.x, gy);
+        const steps = Math.ceil(mat.width / 10);
+        for (let i = 1; i <= steps; i++) {
+          const gx = mat.x + (i / steps) * mat.width;
+          const wave = Math.sin(i * 0.7 + gy * 0.3) * 0.5;
+          ctx.lineTo(gx, gy + wave);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // Border
+    ctx.strokeStyle = mc.stroke;
+    ctx.lineWidth = transform.screenPx(1.5);
+    ctx.setLineDash([]);
+    ctx.strokeRect(mat.x, mat.y, mat.width, mat.height);
+
+    // Dimension labels
+    ctx.fillStyle = mc.stroke;
+    ctx.font = `${transform.screenPx(10)}px "DM Sans", system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    // Width label (bottom)
+    ctx.fillText(
+      `${mat.width}mm`,
+      mat.x + mat.width / 2,
+      mat.y + mat.height + transform.screenPx(4)
+    );
+    // Height label (right)
+    ctx.save();
+    ctx.translate(mat.x + mat.width + transform.screenPx(4), mat.y + mat.height / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`${mat.height}mm`, 0, 0);
+    ctx.restore();
+
+    // Material name label (top-left inside)
+    ctx.font = `${transform.screenPx(9)}px "DM Sans", system-ui, sans-serif`;
+    ctx.fillStyle = mc.stroke;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(mat.name, mat.x + transform.screenPx(4), mat.y + transform.screenPx(4));
+
+    ctx.restore();
+  }
+
   renderOrigin(ctx, transform);
 
   const bedW = scene.canvas.width;

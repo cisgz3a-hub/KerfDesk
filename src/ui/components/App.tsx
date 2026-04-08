@@ -37,6 +37,7 @@ import { ContextMenu, type MenuItem } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
 import { MaterialTestDialog, type MaterialTestConfig } from './MaterialTestDialog';
 import { GcodePreview } from './GcodePreview';
+import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene } from '../../io/SceneSerializer';
@@ -123,6 +124,7 @@ export function App() {
   const [showGridArray, setShowGridArray] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
+  const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
 
   useEffect(() => {
@@ -507,6 +509,25 @@ export function App() {
     handleSceneCommit({ ...targetScene, objects: [...targetScene.objects, ...objects] });
   }, [scene, handleSceneCommit]);
 
+  const handleMaterialConfirm = useCallback((config: MaterialConfig) => {
+    setShowMaterialDialog(false);
+    const newScene = {
+      ...scene,
+      material: {
+        ...config,
+        x: (scene.canvas.width - config.width) / 2,
+        y: (scene.canvas.height - config.height) / 2,
+        color: '',
+      },
+    };
+    handleSceneCommit(newScene);
+  }, [scene, handleSceneCommit]);
+
+  const handleMaterialClear = useCallback(() => {
+    setShowMaterialDialog(false);
+    handleSceneCommit({ ...scene, material: null });
+  }, [scene, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -712,6 +733,7 @@ export function App() {
       onStopSimulation: handleStopSimulation,
       isSimulating: simulation !== null,
       onMaterialTest: () => setShowMaterialTest(true),
+      onMaterialSetup: () => setShowMaterialDialog(true),
     }),
 
     React.createElement('div', {
@@ -868,6 +890,15 @@ export function App() {
       bedWidth: scene.canvas.width,
       bedHeight: scene.canvas.height,
       onClose: () => setGcodePreview(null),
+    }),
+
+    showMaterialDialog && React.createElement(MaterialDialog, {
+      bedWidth: scene.canvas.width,
+      bedHeight: scene.canvas.height,
+      current: scene.material ? { type: scene.material.type, name: scene.material.name, width: scene.material.width, height: scene.material.height, thickness: scene.material.thickness } : null,
+      onConfirm: handleMaterialConfirm,
+      onClear: handleMaterialClear,
+      onCancel: () => setShowMaterialDialog(false),
     }),
   );
 }

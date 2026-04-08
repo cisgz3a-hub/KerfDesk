@@ -39,6 +39,7 @@ interface FileToolbarProps {
   onStopSimulation?: () => void;
   isSimulating?: boolean;
   onMaterialTest?: () => void;
+  onMaterialSetup?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -52,6 +53,7 @@ export function FileToolbar({
   onStopSimulation,
   isSimulating,
   onMaterialTest,
+  onMaterialSetup,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -370,6 +372,7 @@ export function FileToolbar({
     !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
     isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
     React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
+    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
 
     // Hidden file input for SVG import
