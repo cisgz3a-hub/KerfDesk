@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GrblController, type ConnectionState, type MachineStatus } from '../../core/controller/GrblController';
+import { WebSerialController } from '../../core/controller/WebSerialController';
 
 interface ConnectionPanelProps {
   gcode: string | null;
@@ -14,7 +15,11 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
   const [messages, setMessages] = useState<string[]>([]);
   const [progress, setProgress] = useState<{ sent: number; total: number } | null>(null);
   const [manualCmd, setManualCmd] = useState('');
+  const [usingWebSerial, setUsingWebSerial] = useState(false);
+  const [webJobRunning, setWebJobRunning] = useState(false);
   const controllerRef = useRef<GrblController | null>(null);
+  const webSerialRef = useRef<WebSerialController | null>(null);
+  const jobAbortRef = useRef(false);
   const logRef = useRef<HTMLDivElement>(null);
 
   const font = "'DM Sans', system-ui, sans-serif";
@@ -32,7 +37,11 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
     controllerRef.current = ctrl;
     ctrl.listPorts().then(setPorts);
 
-    return () => { void ctrl.disconnect(); };
+    return () => {
+      void webSerialRef.current?.disconnect();
+      webSerialRef.current = null;
+      void ctrl.disconnect();
+    };
   }, []);
 
   useEffect(() => {
@@ -43,10 +52,16 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
 
   const handleConnect = async () => {
     if (!selectedPort || !controllerRef.current) return;
+    setUsingWebSerial(false);
     await controllerRef.current.connect(selectedPort);
   };
 
   const handleDisconnect = async () => {
+    if (webSerialRef.current) {
+      await webSerialRef.current.disconnect();
+      webSerialRef.current = null;
+      setUsingWebSerial(false);
+    }
     await controllerRef.current?.disconnect();
   };
 
@@ -55,8 +70,44 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
     await controllerRef.current.startJob(gcode);
   };
 
+  const handleSendJobReal = async () => {
+    if (!gcode || !webSerialRef.current) return;
+    const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
+
+    setMessages(prev => [...prev, `Sending ${lines.length} commands to laser...`]);
+    jobAbortRef.current = false;
+    setWebJobRunning(true);
+
+    try {
+      for (let i = 0; i < lines.length; i++) {
+        if (jobAbortRef.current) break;
+        await webSerialRef.current.send(lines[i]);
+        setProgress({ sent: i + 1, total: lines.length });
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+
+      if (!jobAbortRef.current) {
+        setMessages(prev => [...prev, 'Job complete!']);
+      }
+    } finally {
+      setWebJobRunning(false);
+      setProgress(null);
+    }
+  };
+
+  const handleStartJobClick = async () => {
+    if (usingWebSerial) await handleSendJobReal();
+    else await handleSendJob();
+  };
+
   const handleSendManual = async () => {
-    if (!manualCmd.trim() || !controllerRef.current) return;
+    if (!manualCmd.trim()) return;
+    if (usingWebSerial && webSerialRef.current) {
+      await webSerialRef.current.send(manualCmd);
+      setManualCmd('');
+      return;
+    }
+    if (!controllerRef.current) return;
     await controllerRef.current.send(manualCmd);
     setManualCmd('');
   };
@@ -75,7 +126,7 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
   });
 
   const isConnected = connState === 'connected';
-  const isRunning = status?.state === 'run';
+  const isRunning = status?.state === 'run' || webJobRunning;
   const isSimPort = selectedPort === 'SIMULATOR';
   const totalLines = progress ? Math.max(progress.total, 1) : 1;
 
@@ -110,6 +161,8 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
           React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Laser Connection'),
           isSimPort && isConnected &&
             React.createElement('span', { style: { fontSize: 9, color: '#ffd444', background: 'rgba(255,212,68,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(255,212,68,0.2)' } }, 'SIMULATOR'),
+          usingWebSerial && isConnected &&
+            React.createElement('span', { style: { fontSize: 9, color: '#2dd4a0', background: 'rgba(45,212,160,0.1)', padding: '2px 8px', borderRadius: 4, border: '1px solid rgba(45,212,160,0.2)' } }, 'WEB SERIAL'),
         ),
         React.createElement('button', {
           onClick: onClose,
@@ -154,6 +207,43 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
         ),
       ),
 
+      !isConnected && WebSerialController.isSupported() && React.createElement('div', {
+        style: { padding: '8px 18px', borderBottom: '1px solid #1a1a2e' },
+      },
+        React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 6 } }, 'Or connect to a real laser:'),
+        React.createElement('button', {
+          onClick: async () => {
+            const ws = new WebSerialController({
+              onConnectionChange: setConnState,
+              onMessage: (msg) => setMessages(prev => [...prev.slice(-200), msg]),
+              onError: (err) => setMessages(prev => [...prev, `ERROR: ${err}`]),
+            });
+            webSerialRef.current = ws;
+
+            const hasPort = await ws.requestPort();
+            if (!hasPort) {
+              webSerialRef.current = null;
+              return;
+            }
+            const connected = await ws.connect(115200);
+            if (connected) {
+              setUsingWebSerial(true);
+              setMessages(prev => [...prev, 'Real laser connected via Web Serial']);
+            } else {
+              webSerialRef.current = null;
+            }
+          },
+          style: {
+            width: '100%', padding: '10px',
+            background: 'rgba(45, 212, 160, 0.08)',
+            border: '1px solid rgba(45, 212, 160, 0.3)',
+            borderRadius: 8, color: '#2dd4a0',
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+          },
+        }, 'Select USB Port (Real Laser)'),
+      ),
+
       isConnected && React.createElement('div', { style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' } },
         React.createElement('div', { style: { display: 'flex', gap: 16, marginBottom: 10 } },
           React.createElement('div', { style: { flex: 1, background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
@@ -174,33 +264,57 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
         React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center', marginBottom: 8 } },
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
             React.createElement('div'),
-            React.createElement('button', { onClick: () => controllerRef.current?.jog(0, -10), style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↑'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X0 Y-10 F1000');
+              else void controllerRef.current?.jog(0, -10);
+            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↑'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => controllerRef.current?.jog(-10, 0), style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '←'),
-            React.createElement('button', { onClick: () => controllerRef.current?.home(), style: { ...btnStyle('45, 212, 160'), padding: '6px', fontSize: 9 } }, '⌂'),
-            React.createElement('button', { onClick: () => controllerRef.current?.jog(10, 0), style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '→'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X-10 Y0 F1000');
+              else void controllerRef.current?.jog(-10, 0);
+            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '←'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$H');
+              else void controllerRef.current?.home();
+            }, style: { ...btnStyle('45, 212, 160'), padding: '6px', fontSize: 9 } }, '⌂'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X10 Y0 F1000');
+              else void controllerRef.current?.jog(10, 0);
+            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '→'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => controllerRef.current?.jog(0, 10), style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↓'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X0 Y10 F1000');
+              else void controllerRef.current?.jog(0, 10);
+            }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '↓'),
             React.createElement('div'),
           ),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
-            React.createElement('button', { onClick: () => controllerRef.current?.unlock(), style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
-            React.createElement('button', { onClick: () => controllerRef.current?.laserTest(5, 500), style: { ...btnStyle('255, 136, 68'), fontSize: 10, padding: '4px 10px' } }, 'Test Fire'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$X');
+              else void controllerRef.current?.unlock();
+            }, style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
+            React.createElement('button', { onClick: () => {
+              if (usingWebSerial && webSerialRef.current) {
+                void webSerialRef.current.send('M4 S50');
+                setTimeout(() => { void webSerialRef.current?.send('M5 S0'); }, 500);
+              } else void controllerRef.current?.laserTest(5, 500);
+            }, style: { ...btnStyle('255, 136, 68'), fontSize: 10, padding: '4px 10px' } }, 'Test Fire'),
           ),
         ),
 
         React.createElement('div', { style: { display: 'flex', gap: 6 } },
           React.createElement('button', {
-            onClick: handleSendJob,
+            onClick: () => void handleStartJobClick(),
             disabled: !gcode || isRunning,
             style: { ...btnStyle('45, 212, 160', !gcode || isRunning), flex: 1, fontWeight: 600 },
           }, isRunning ? 'Running...' : 'Start Job'),
-          isRunning && React.createElement('button', {
+          isRunning && !usingWebSerial && React.createElement('button', {
             onClick: () => controllerRef.current?.pause(),
             style: btnStyle('255, 212, 68'),
           }, 'Pause'),
           isRunning && React.createElement('button', {
             onClick: () => {
+              jobAbortRef.current = true;
               controllerRef.current?.stopJob();
               setProgress(null);
             },
@@ -261,7 +375,7 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
 
       React.createElement('div', {
         style: { padding: '10px 18px', borderTop: '1px solid #1a1a2e', fontSize: 10, color: '#444460' },
-      }, 'Supports GRBL 1.1+ controllers. Use SIMULATOR to test without a laser.'),
+      }, 'Supports GRBL 1.1+ via Web Serial (USB) or SIMULATOR. No native drivers required in Chromium/Electron.'),
     ),
   );
 }

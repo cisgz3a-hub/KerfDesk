@@ -47,6 +47,7 @@ interface FileToolbarProps {
   canRedo?: boolean;
   projectName?: string;
   onShowShortcuts?: () => void;
+  onToolpathPreview?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -68,6 +69,7 @@ export function FileToolbar({
   canRedo = false,
   projectName,
   onShowShortcuts,
+  onToolpathPreview,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -480,6 +482,12 @@ export function FileToolbar({
     React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file', ...stdHover }, 'DXF'),
     sep,
     React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser', ...stdHover }, 'G-code'),
+    React.createElement('button', {
+      onClick: () => onToolpathPreview?.(),
+      style: btnStyle,
+      title: 'Preview laser toolpath — see exactly how the laser will move (Ctrl+P)',
+      ...stdHover,
+    }, 'Toolpath'),
     React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file', ...stdHover }, 'Export'),
     sep,
     React.createElement('button', {

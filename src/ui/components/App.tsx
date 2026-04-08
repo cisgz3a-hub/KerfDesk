@@ -1060,6 +1060,19 @@ export function App() {
       canRedo: historyAvail.canRedo,
       projectName: scene.metadata?.name,
       onShowShortcuts: () => setShowShortcuts(true),
+      onToolpathPreview: () => {
+        try {
+          const job = compileJob(scene);
+          if (job.operations.length === 0) return;
+          const plan = optimizePlan(job);
+          const strategy = getOutputStrategy('grbl');
+          if (!strategy) return;
+          const output = strategy.generate(plan, job);
+          setGcodePreview(output.text ?? '');
+        } catch (err) {
+          alert('Toolpath preview failed: ' + (err as Error).message);
+        }
+      },
     }),
 
     showRecover && !showWizard && React.createElement('div', {
