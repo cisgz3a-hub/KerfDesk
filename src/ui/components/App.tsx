@@ -115,6 +115,7 @@ export function App() {
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [clipboard, setClipboard] = useState<typeof scene.objects>([]);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -378,9 +379,51 @@ export function App() {
         } else if (e.key === 'a') {
           e.preventDefault();
           handleSelectAll();
-        } else if (e.key === 'd') {
+        } else if (e.key === 'c' && e.ctrlKey && selectedIds.size > 0) {
           e.preventDefault();
-          handleDuplicate();
+          setClipboard(scene.objects.filter(o => selectedIds.has(o.id)));
+          return;
+        } else if (e.key === 'v' && e.ctrlKey && clipboard.length > 0) {
+          e.preventDefault();
+          const newIds = new Set<string>();
+          const pasted = clipboard.map(obj => {
+            const newId = generateId();
+            newIds.add(newId);
+            return {
+              ...obj,
+              id: newId,
+              name: obj.name,
+              transform: { ...obj.transform, tx: obj.transform.tx + 10, ty: obj.transform.ty + 10 },
+              _bounds: null,
+              _worldTransform: null,
+            };
+          });
+          const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
+          handleSceneCommit(newScene);
+          setSelectedIds(newIds);
+          setClipboard(pasted);
+          return;
+        } else if (e.key === 'd' && e.ctrlKey && selectedIds.size > 0) {
+          e.preventDefault();
+          const newIds = new Set<string>();
+          const clones: typeof scene.objects = [];
+          for (const obj of scene.objects) {
+            if (!selectedIds.has(obj.id)) continue;
+            const newId = generateId();
+            newIds.add(newId);
+            clones.push({
+              ...obj,
+              id: newId,
+              name: obj.name + ' copy',
+              transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
+              _bounds: null,
+              _worldTransform: null,
+            });
+          }
+          const newScene = { ...scene, objects: [...scene.objects, ...clones] };
+          handleSceneCommit(newScene);
+          setSelectedIds(newIds);
+          return;
         }
         if (e.key === 'C' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
           e.preventDefault();
@@ -431,7 +474,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDuplicate, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
