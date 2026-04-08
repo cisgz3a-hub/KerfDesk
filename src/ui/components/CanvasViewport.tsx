@@ -81,6 +81,7 @@ export function CanvasViewport({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
   const [isPanning, setIsPanning] = useState(false);
+  const isPanningRef = useRef(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number; vp: ViewportState } | null>(null);
   const mouseWorldRef = useRef({ x: 0, y: 0 });
   const [playbackTime, setPlaybackTime] = useState(0);
@@ -91,7 +92,12 @@ export function CanvasViewport({
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
   const lastClickTimeRef = useRef<number>(0);
   const lastClickIdRef = useRef<string>('');
+  const spaceHeldRef = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    isPanningRef.current = isPanning;
+  }, [isPanning]);
 
   // ─── RENDER LOOP ─────────────────────────────────────────────
   // Pure orchestration: create transform, call renderers in order.
@@ -433,9 +439,33 @@ export function CanvasViewport({
     return () => canvas.removeEventListener('wheel', handler);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !e.repeat) {
+        spaceHeldRef.current = true;
+        const canvas = canvasRef.current;
+        if (canvas) canvas.style.cursor = 'grab';
+        e.preventDefault();
+      }
+    };
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        spaceHeldRef.current = false;
+        const canvas = canvasRef.current;
+        if (canvas && !isPanningRef.current) canvas.style.cursor = '';
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    // Pan: middle button or Alt+left
-    if (e.button === 1 || (e.button === 0 && e.altKey)) {
+    // Pan: middle mouse button OR spacebar + left click (Alt+left fallback)
+    if (e.button === 1 || (e.button === 0 && (spaceHeldRef.current || e.altKey))) {
       e.preventDefault();
       setIsPanning(true);
       setPanStart({ x: e.clientX, y: e.clientY, vp: viewport });
@@ -626,9 +656,11 @@ export function CanvasViewport({
       render();
     }
 
-    // Pan
+    // Pan (middle held, or left + space / Alt)
     if (isPanning && panStart) {
-      setViewport(pan(panStart.vp, e.clientX - panStart.x, e.clientY - panStart.y));
+      if (e.buttons === 4 || (e.buttons === 1 && (spaceHeldRef.current || e.altKey))) {
+        setViewport(pan(panStart.vp, e.clientX - panStart.x, e.clientY - panStart.y));
+      }
       return;
     }
 
@@ -803,7 +835,11 @@ export function CanvasViewport({
 
     const canvas = canvasRef.current;
     if (canvas) {
-      if (activeTool === 'select' && selectedIds.size >= 1 && !dragRef.current?.isDragging && !resizeRef.current) {
+      if (isPanning) {
+        canvas.style.cursor = 'grabbing';
+      } else if (spaceHeldRef.current && !dragRef.current?.isDragging && !resizeRef.current) {
+        canvas.style.cursor = 'grab';
+      } else if (activeTool === 'select' && selectedIds.size >= 1 && !dragRef.current?.isDragging && !resizeRef.current) {
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
         const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
@@ -1007,7 +1043,10 @@ export function CanvasViewport({
   },
     React.createElement('canvas', {
       ref: canvasRef, width, height,
-      style: { display: 'block', cursor: isPanning ? 'grabbing' : isDragging ? 'move' : (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'text') ? 'crosshair' : 'default' },
+      style: {
+        display: 'block',
+        cursor: isPanning ? 'grabbing' : isDragging ? 'move' : (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line' || activeTool === 'text') ? 'crosshair' : 'default',
+      },
       onMouseDown: handleMouseDown,
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
