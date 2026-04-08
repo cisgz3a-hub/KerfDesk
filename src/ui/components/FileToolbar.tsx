@@ -24,7 +24,7 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { generateId } from '../../core/types';
 import { saveSceneToFile } from '../../io/FileIO';
-import { deserializeScene } from '../../io/SceneSerializer';
+import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { exportSceneToSvg } from '../../io/SvgExporter';
 
 // ─── PROPS ───────────────────────────────────────────────────────
@@ -82,6 +82,7 @@ export function FileToolbar({
     if (scene.objects.length > 0) {
       if (!confirm('Start a new project? Unsaved changes will be lost.')) return;
     }
+    try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
     const newScene = createScene(
       scene.canvas.width,
       scene.canvas.height,
@@ -290,6 +291,11 @@ export function FileToolbar({
 
   const handleSave = useCallback(() => {
     saveSceneToFile(scene);
+    try {
+      const serialized = serializeScene(scene);
+      localStorage.setItem('laserforge_autosave', serialized);
+      localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+    } catch { /* ignore */ }
   }, [scene]);
 
   const handleOpenClick = useCallback(() => {

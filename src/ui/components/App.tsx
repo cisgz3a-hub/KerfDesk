@@ -40,7 +40,7 @@ import { GcodePreview } from './GcodePreview';
 import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
-import { deserializeScene } from '../../io/SceneSerializer';
+import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { generateId } from '../../core/types';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
@@ -160,6 +160,18 @@ export function App() {
       return true;
     }
   });
+  const [showRecover, setShowRecover] = useState(() => {
+    try {
+      const saved = localStorage.getItem('laserforge_autosave');
+      const time = localStorage.getItem('laserforge_autosave_time');
+      if (saved && time) {
+        const parsed = JSON.parse(saved) as { scene?: { objects?: unknown[] } };
+        const objs = parsed.scene?.objects;
+        if (Array.isArray(objs) && objs.length > 0) return true;
+      }
+    } catch { /* ignore */ }
+    return false;
+  });
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -202,6 +214,32 @@ export function App() {
     historyRef.current.reset(newScene);
     setScene(newScene);
   }, []);
+
+  const handleRecover = useCallback(() => {
+    try {
+      const saved = localStorage.getItem('laserforge_autosave');
+      if (saved) {
+        const recovered = deserializeScene(saved);
+        handleNewProject(recovered);
+      }
+    } catch (e) {
+      console.error('Recovery failed:', e);
+    }
+    setShowRecover(false);
+  }, [handleNewProject]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      try {
+        const serialized = serializeScene(scene);
+        localStorage.setItem('laserforge_autosave', serialized);
+        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+      } catch {
+        /* Storage full or unavailable — silently skip */
+      }
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [scene]);
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
     setShowWizard(false);
@@ -845,6 +883,51 @@ export function App() {
       projectName: scene.metadata?.name,
       onShowShortcuts: () => setShowShortcuts(true),
     }),
+
+    showRecover && !showWizard && React.createElement('div', {
+      style: {
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        gap: 12, padding: '6px 16px',
+        background: 'rgba(0, 212, 255, 0.06)',
+        borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        fontSize: 11,
+      },
+    },
+      React.createElement('span', { style: { color: '#8888aa' } },
+        `Unsaved work found from ${(() => {
+          try {
+            const t = localStorage.getItem('laserforge_autosave_time');
+            if (t) {
+              const d = new Date(t);
+              return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
+            }
+          } catch { /* ignore */ }
+          return 'previous session';
+        })()}`,
+      ),
+      React.createElement('button', {
+        onClick: handleRecover,
+        style: {
+          padding: '3px 12px', background: 'rgba(0, 212, 255, 0.1)',
+          border: '1px solid #00d4ff', borderRadius: 4,
+          color: '#00d4ff', fontSize: 10, cursor: 'pointer',
+          fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 500,
+        },
+      }, 'Recover'),
+      React.createElement('button', {
+        onClick: () => {
+          setShowRecover(false);
+          try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
+        },
+        style: {
+          padding: '3px 12px', background: 'transparent',
+          border: '1px solid #252540', borderRadius: 4,
+          color: '#555570', fontSize: 10, cursor: 'pointer',
+          fontFamily: "'DM Sans', system-ui, sans-serif",
+        },
+      }, 'Dismiss'),
+    ),
 
     React.createElement('div', {
       style: { flex: 1, overflow: 'hidden', display: 'flex' },
