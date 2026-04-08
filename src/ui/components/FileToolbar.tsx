@@ -368,7 +368,7 @@ export function FileToolbar({
     fontWeight: 500,
   };
 
-  const sep = React.createElement('div', { style: { width: 1, height: 20, background: theme.border.default, margin: '0 6px' } });
+  const sep = React.createElement('div', { style: { width: 1, height: 20, background: '#252540', margin: '0 4px', flexShrink: 0 } });
 
   return React.createElement('div', {
     style: {
@@ -392,8 +392,7 @@ export function FileToolbar({
     sep,
     React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle }, 'G-code'),
     React.createElement('button', { onClick: handleExportSvg, style: btnStyle }, 'Export SVG'),
-    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
-    isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
+    sep,
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
       style: {
@@ -419,8 +418,11 @@ export function FileToolbar({
         }
       },
     }, previewMode ? '● Preview' : '○ Preview'),
-    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
+    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
+    isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
+    sep,
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
+    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
 
     // Hidden file input for SVG import
