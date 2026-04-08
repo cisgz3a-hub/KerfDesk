@@ -896,6 +896,16 @@ export function App() {
       React.createElement('span', {}, scene.metadata.name || 'Untitled'),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
         React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
+        React.createElement('span', {
+          title: 'The laser head moves here before cutting begins, and returns here when done. Drag the green dot on the canvas to change.',
+          style: {
+            fontSize: '10px',
+            color: '#2dd4a0',
+            cursor: 'help',
+            fontFamily: "'JetBrains Mono', monospace",
+            borderBottom: '1px dotted #2dd4a0',
+          },
+        }, `⌂ ${scene.startPosition.x}, ${scene.startPosition.y}`),
         scene.material && (() => {
           const mat = scene.material;
           let outCount = 0;
@@ -964,19 +974,19 @@ export function App() {
           handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
         }, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },
-        { label: 'Start: Material Top-Left', action: () => {
-          const mat = scene.material;
+        { label: '⌂ Home: top-left of material', action: () => {
+          const mat = scene.material?.enabled ? scene.material : null;
           const x = mat ? mat.x : 0;
           const y = mat ? mat.y : 0;
           handleSceneCommit({ ...scene, startPosition: { x, y } });
         }, disabled: false },
-        { label: 'Start: Material Center', action: () => {
-          const mat = scene.material;
+        { label: '⌂ Home: center of material', action: () => {
+          const mat = scene.material?.enabled ? scene.material : null;
           const x = mat ? mat.x + mat.width / 2 : scene.canvas.width / 2;
           const y = mat ? mat.y + mat.height / 2 : scene.canvas.height / 2;
           handleSceneCommit({ ...scene, startPosition: { x, y } });
         }, disabled: false },
-        { label: 'Start: Bed Origin (0,0)', action: () => {
+        { label: '⌂ Home: machine origin (0,0)', action: () => {
           handleSceneCommit({ ...scene, startPosition: { x: 0, y: 0 } });
         }, disabled: false },
         { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },

@@ -448,7 +448,11 @@ export function renderSceneObjects(
     ctx.font = `${transform.screenPx(9)}px "DM Sans", system-ui, sans-serif`;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'bottom';
-    ctx.fillText('START', sp.x + transform.screenPx(10), sp.y - transform.screenPx(4));
+    ctx.fillText('⌂ Home position', sp.x + transform.screenPx(10), sp.y - transform.screenPx(4));
+    ctx.globalAlpha = 0.3;
+    ctx.font = `${transform.screenPx(7)}px "DM Sans", system-ui, sans-serif`;
+    ctx.fillText('laser begins & returns here', sp.x + transform.screenPx(10), sp.y + transform.screenPx(6));
+    ctx.globalAlpha = 1;
   }
 
   if (!previewMode && boundsCache && boundsCache.size > 0) {
