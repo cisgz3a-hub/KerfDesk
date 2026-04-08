@@ -327,6 +327,26 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
         }, 'Select USB Port (Real Laser)'),
       ),
 
+      isConnected && React.createElement('div', {
+        style: {
+          padding: '8px 18px',
+          background: 'rgba(0, 212, 255, 0.04)',
+          borderBottom: '1px solid #1a1a2e',
+          fontSize: 11,
+          color: '#8888aa',
+          lineHeight: 1.5,
+        },
+      },
+        React.createElement('strong', { style: { color: '#00d4ff', fontSize: 10, display: 'block', marginBottom: 4 } }, 'QUICK START'),
+        '1. Use arrow buttons to jog laser to your workpiece corner',
+        React.createElement('br'),
+        '2. Click "Set Zero" to mark that as the starting point',
+        React.createElement('br'),
+        '3. Click "Start Job" to begin cutting',
+        React.createElement('br'),
+        React.createElement('span', { style: { color: '#555570', fontSize: 10 } }, 'Only click Home if your machine has configured limit switches.'),
+      ),
+
       isConnected && React.createElement('div', { style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' } },
         React.createElement('div', { style: { display: 'flex', gap: 16, marginBottom: 10 } },
           React.createElement('div', { style: { flex: 1, background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
@@ -356,10 +376,18 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
               if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X-10 Y0 F1000');
               else void controllerRef.current?.jog(-10, 0);
             }, style: { ...btnStyle('136, 136, 170'), padding: '6px', fontSize: 12 } }, '←'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$H');
-              else void controllerRef.current?.home();
-            }, style: { ...btnStyle('45, 212, 160'), padding: '6px', fontSize: 9 } }, '⌂'),
+            React.createElement('button', {
+              onClick: async () => {
+                if (webSerialRef.current) {
+                  await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
+                  setMessages(prev => [...prev, '✓ Zero set at current position']);
+                } else {
+                  controllerRef.current?.send('G10 L20 P1 X0 Y0');
+                }
+              },
+              title: 'Set current position as X0 Y0',
+              style: { ...btnStyle('0, 212, 255'), padding: '6px', fontSize: 8, fontWeight: 700 },
+            }, 'ZERO'),
             React.createElement('button', { onClick: () => {
               if (usingWebSerial && webSerialRef.current) void webSerialRef.current.send('$J=G91 X10 Y0 F1000');
               else void controllerRef.current?.jog(10, 0);
@@ -380,37 +408,42 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
                 }
                 controllerRef.current?.unlock();
               },
-              style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '6px 12px' },
-            }, 'Unlock ($X)'),
+              style: { ...btnStyle('255, 212, 68'), fontSize: 10, padding: '4px 10px' },
+            }, 'Unlock'),
             React.createElement('button', {
               onClick: async () => {
+                if (webSerialRef.current) {
+                  const s = Math.round((5 / 100) * 1000);
+                  await webSerialRef.current.send(`M4 S${s}`);
+                  setTimeout(async () => {
+                    await webSerialRef.current?.send('M5 S0');
+                  }, 500);
+                  setMessages(prev => [...prev, 'Test fire: 5% power, 0.5 sec']);
+                } else {
+                  controllerRef.current?.laserTest(5, 500);
+                }
+              },
+              style: { ...btnStyle('255, 136, 68'), fontSize: 10, padding: '4px 10px' },
+            }, 'Test Fire'),
+            React.createElement('button', {
+              onClick: async () => {
+                const confirmed = confirm('Homing moves the laser to limit switches.\nOnly use if your machine supports it.\n\nContinue?');
+                if (!confirmed) return;
                 if (webSerialRef.current) {
                   setMessages(prev => [...prev, 'Homing...']);
-                  await webSerialRef.current.sendAndWait('$H', 30000).catch(() => {});
-                  setMessages(prev => [...prev, '✓ Homing complete']);
-                }
-                controllerRef.current?.home();
-              },
-              style: { ...btnStyle('45, 212, 160'), fontSize: 10, padding: '6px 12px' },
-            }, 'Home ($H)'),
-            React.createElement('button', {
-              onClick: async () => {
-                if (webSerialRef.current) {
-                  await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
-                  setMessages(prev => [...prev, '✓ Work position set to X0 Y0 here']);
+                  try {
+                    await webSerialRef.current.sendAndWait('$H', 60000);
+                    setMessages(prev => [...prev, '✓ Homing complete']);
+                  } catch {
+                    setMessages(prev => [...prev, '⚠ Homing failed — click Unlock']);
+                  }
                 } else {
-                  void controllerRef.current?.send('G10 L20 P1 X0 Y0');
+                  controllerRef.current?.home();
                 }
               },
-              title: 'Set current position as X0 Y0 — jog laser to your workpiece corner first',
-              style: { ...btnStyle('0, 212, 255'), fontSize: 10, padding: '6px 12px' },
-            }, 'Set Zero'),
-            React.createElement('button', { onClick: () => {
-              if (usingWebSerial && webSerialRef.current) {
-                void webSerialRef.current.send('M4 S50');
-                setTimeout(() => { void webSerialRef.current?.send('M5 S0'); }, 500);
-              } else void controllerRef.current?.laserTest(5, 500);
-            }, style: { ...btnStyle('255, 136, 68'), fontSize: 10, padding: '4px 10px' } }, 'Test Fire'),
+              title: 'Home machine — requires limit switches',
+              style: { ...btnStyle('136, 136, 170'), fontSize: 10, padding: '4px 10px' },
+            }, 'Home'),
           ),
         ),
 
