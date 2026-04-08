@@ -41,7 +41,8 @@ import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
-import { generateId } from '../../core/types';
+import { generateId, IDENTITY_MATRIX } from '../../core/types';
+import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -628,6 +629,51 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
+  const handleBooleanOp = useCallback((op: BooleanOp) => {
+    const ids = [...selectedIds];
+    if (ids.length !== 2) {
+      alert('Select exactly 2 objects for boolean operations.');
+      return;
+    }
+
+    const objA = scene.objects.find(o => o.id === ids[0]);
+    const objB = scene.objects.find(o => o.id === ids[1]);
+    if (!objA || !objB) return;
+
+    const resultGeom = booleanOperation(objA, objB, op);
+
+    if (!resultGeom) {
+      alert('Boolean operation failed — shapes may not overlap.');
+      return;
+    }
+
+    const newId = generateId();
+    const newObj: SceneObject = {
+      id: newId,
+      type: 'path',
+      name: `${op} result`,
+      layerId: objA.layerId,
+      parentId: null,
+      transform: { ...IDENTITY_MATRIX },
+      geometry: resultGeom,
+      visible: true,
+      locked: false,
+      _bounds: null,
+      _worldTransform: null,
+    };
+
+    const newScene = {
+      ...scene,
+      objects: [
+        ...scene.objects.filter(o => !selectedIds.has(o.id)),
+        newObj,
+      ],
+    };
+
+    handleSceneCommit(newScene);
+    setSelectedIds(new Set([newId]));
+  }, [scene, selectedIds, handleSceneCommit]);
+
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
 
@@ -796,6 +842,24 @@ export function App() {
           setSelectedIds(newIds);
           return;
         }
+        if (e.ctrlKey && e.shiftKey && selectedIds.size === 2) {
+          const bk = e.key.toLowerCase();
+          if (bk === 'u') {
+            e.preventDefault();
+            handleBooleanOp('union');
+            return;
+          }
+          if (bk === 's') {
+            e.preventDefault();
+            handleBooleanOp('subtract');
+            return;
+          }
+          if (bk === 'i') {
+            e.preventDefault();
+            handleBooleanOp('intersect');
+            return;
+          }
+        }
         if (e.key === 'C' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
           e.preventDefault();
           handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
@@ -871,7 +935,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -1140,6 +1204,10 @@ export function App() {
           handleSceneCommit({ ...scene, startPosition: { x: 0, y: 0 } });
         }, disabled: false },
         { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
+        { label: 'separator', action: () => {}, separator: true },
+        { label: 'Boolean Union', action: () => handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
+        { label: 'Boolean Subtract', action: () => handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
+        { label: 'Boolean Intersect', action: () => handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
         { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
