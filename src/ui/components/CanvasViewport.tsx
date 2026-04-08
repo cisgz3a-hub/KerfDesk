@@ -166,13 +166,12 @@ export function CanvasViewport({
       }
     }
 
-    // Node editing overlay — one path/polygon at a time (first selected in scene order)
+    // Node editing overlay — all selected path/polygon objects
     if (activeTool === 'node' && selectedIds.size > 0) {
-      const nodeTarget = scene.objects.find(o =>
-        selectedIds.has(o.id) && (o.geometry.type === 'path' || o.geometry.type === 'polygon')
-      );
-      if (nodeTarget) {
-        const obj = nodeTarget;
+      for (const obj of scene.objects) {
+        if (!selectedIds.has(obj.id)) continue;
+        if (obj.geometry.type !== 'path' && obj.geometry.type !== 'polygon') continue;
+
         ctx.save();
         transform.applyToContext(ctx);
 
@@ -186,8 +185,8 @@ export function CanvasViewport({
           for (const sp of (pathGeom.subPaths || [])) {
             for (const seg of sp.segments) {
               if (seg.type === 'close') continue;
-              ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
-              ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+              ctx.fillStyle = 'rgba(45, 212, 160, 0.4)';
+              ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
               ctx.lineWidth = transform.screenPx(0.5);
               ctx.beginPath();
               ctx.arc(seg.to.x, seg.to.y, nodeSize, 0, Math.PI * 2);
@@ -195,7 +194,7 @@ export function CanvasViewport({
               ctx.stroke();
 
               if (seg.type === 'cubic' && seg.cp1 && seg.cp2) {
-                ctx.strokeStyle = 'rgba(45, 212, 160, 0.2)';
+                ctx.strokeStyle = 'rgba(45, 212, 160, 0.12)';
                 ctx.lineWidth = transform.screenPx(0.5);
                 ctx.beginPath();
                 ctx.moveTo(seg.cp1.x, seg.cp1.y);
@@ -206,7 +205,7 @@ export function CanvasViewport({
                 ctx.lineTo(seg.to.x, seg.to.y);
                 ctx.stroke();
 
-                ctx.fillStyle = 'rgba(255, 100, 100, 0.7)';
+                ctx.fillStyle = 'rgba(255, 100, 100, 0.35)';
                 const cpSize = transform.screenPx(2);
                 ctx.beginPath();
                 ctx.arc(seg.cp1.x, seg.cp1.y, cpSize, 0, Math.PI * 2);
@@ -220,8 +219,8 @@ export function CanvasViewport({
         } else if (obj.geometry.type === 'polygon') {
           const polyGeom = obj.geometry as any;
           for (const pt of (polyGeom.points || [])) {
-            ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.fillStyle = 'rgba(45, 212, 160, 0.4)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
             ctx.lineWidth = transform.screenPx(0.5);
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, nodeSize, 0, Math.PI * 2);
