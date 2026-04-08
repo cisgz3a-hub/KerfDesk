@@ -33,11 +33,12 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
+import { MaterialTestDialog, type MaterialTestConfig } from './MaterialTestDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { generateId } from '../../core/types';
-import { createLayer } from '../../core/scene/Layer';
+import { createLayer, type Layer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
@@ -118,6 +119,7 @@ export function App() {
   const [clipboard, setClipboard] = useState<typeof scene.objects>([]);
   const [showGridArray, setShowGridArray] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
+  const [showMaterialTest, setShowMaterialTest] = useState(false);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -441,6 +443,88 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
+  const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
+    setShowMaterialTest(false);
+
+    const newLayers: Layer[] = [];
+    const objects: SceneObject[] = [];
+    const startX = 10;
+    const startY = 10;
+    let order = scene.layers.length;
+
+    for (let r = 0; r < config.rows; r++) {
+      for (let c = 0; c < config.cols; c++) {
+        const x = startX + c * (config.cellSize + config.spacing);
+        const y = startY + r * (config.cellSize + config.spacing);
+        const power = config.rows === 1 ? config.powerMin :
+          config.powerMin + (r / (config.rows - 1)) * (config.powerMax - config.powerMin);
+        const speed = config.cols === 1 ? config.speedMin :
+          config.speedMin + (c / (config.cols - 1)) * (config.speedMax - config.speedMin);
+        const pRounded = Math.round(power);
+        const sRounded = Math.round(speed);
+
+        const layer = createLayer(order++, 'engrave', `MatTest P${pRounded} S${sRounded}`);
+        layer.settings = {
+          ...layer.settings,
+          power: { min: pRounded, max: pRounded },
+          speed: sRounded,
+        };
+        newLayers.push(layer);
+        const layerId = layer.id;
+
+        const id = generateId();
+        objects.push({
+          id,
+          type: 'rect',
+          name: `P${pRounded} S${sRounded}`,
+          layerId,
+          parentId: null,
+          transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y },
+          geometry: {
+            type: 'rect',
+            x: 0, y: 0,
+            width: config.cellSize,
+            height: config.cellSize,
+            cornerRadius: 0,
+          },
+          visible: true,
+          locked: false,
+          _bounds: null,
+          _worldTransform: null,
+        });
+
+        const textId = generateId();
+        objects.push({
+          id: textId,
+          type: 'text',
+          name: `Label P${pRounded} S${sRounded}`,
+          layerId,
+          parentId: null,
+          transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y + config.cellSize + 0.5 },
+          geometry: {
+            type: 'text',
+            text: `${pRounded}%/${sRounded}`,
+            fontFamily: 'Arial',
+            fontSize: Math.min(config.cellSize * 0.3, 3),
+            bold: false,
+            italic: false,
+          },
+          visible: true,
+          locked: false,
+          _bounds: null,
+          _worldTransform: null,
+        });
+      }
+    }
+
+    const newScene = {
+      ...scene,
+      layers: [...scene.layers, ...newLayers],
+      objects: [...scene.objects, ...objects],
+    };
+    handleSceneCommit(newScene);
+  }, [scene, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -629,6 +713,7 @@ export function App() {
       onSimulate: handleSimulate,
       onStopSimulation: handleStopSimulation,
       isSimulating: simulation !== null,
+      onMaterialTest: () => setShowMaterialTest(true),
     }),
 
     React.createElement('div', {
@@ -751,6 +836,7 @@ export function App() {
           handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
         }, disabled: selectedIds.size === 0 },
         { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
+        { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
           disabled: selectedIds.size === 0,
@@ -772,6 +858,11 @@ export function App() {
       sourceHeight: gridArrayBounds.h,
       onConfirm: handleGridArrayConfirm,
       onCancel: () => setShowGridArray(false),
+    }),
+
+    showMaterialTest && React.createElement(MaterialTestDialog, {
+      onConfirm: handleMaterialTestConfirm,
+      onCancel: () => setShowMaterialTest(false),
     }),
   );
 }
