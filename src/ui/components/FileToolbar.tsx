@@ -394,9 +394,6 @@ export function FileToolbar({
     React.createElement('button', { onClick: handleExportSvg, style: btnStyle }, 'Export SVG'),
     !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),
     isSimulating && React.createElement('button', { onClick: onStopSimulation, style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' } }, 'Stop Sim'),
-    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
-    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
       style: {
@@ -421,7 +418,10 @@ export function FileToolbar({
           (e.target as HTMLElement).style.color = '#8888aa';
         }
       },
-    }, previewMode ? '● Preview ON' : '○ Preview'),
+    }, previewMode ? '● Preview' : '○ Preview'),
+    React.createElement('button', { onClick: handleBedSize, style: btnStyle }, 'Bed Size'),
+    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle }, 'Material'),
+    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle }, 'Material Test'),
 
     // Hidden file input for SVG import
     React.createElement('input', {

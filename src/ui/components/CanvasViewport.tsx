@@ -259,6 +259,7 @@ export function CanvasViewport({
       renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
     }
 
+    if (!previewMode) {
     // Resize handles (union bounds of all selected, world space)
     if (selectedIds.size >= 1) {
       let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
@@ -365,6 +366,8 @@ export function CanvasViewport({
 
         ctx.restore();
       }
+    }
+
     }
 
     // 5–6. Simulation overlay (in world space)

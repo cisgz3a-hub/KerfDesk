@@ -41,6 +41,8 @@ export interface Scene {
     y: number;              // position on bed (mm from top)
     thickness: number;      // mm
     color: string;          // display color
+    /** When false, material / result preview is disabled. Omitted = enabled. */
+    enabled?: boolean;
   } | null;
 
   /** Laser start position */

@@ -92,10 +92,26 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
       dy = targetCy - (wMinY + wMaxY) / 2;
       break;
     }
-    case 'left':   dx = -wMinX; break;
-    case 'right':  dx = scn.canvas.width - wMaxX; break;
-    case 'top':    dy = -wMinY; break;
-    case 'bottom': dy = scn.canvas.height - wMaxY; break;
+    case 'left': {
+      const edge = scn.material?.enabled ? scn.material.x : 0;
+      dx = edge - wMinX;
+      break;
+    }
+    case 'right': {
+      const edge = scn.material?.enabled ? scn.material.x + scn.material.width : scn.canvas.width;
+      dx = edge - wMaxX;
+      break;
+    }
+    case 'top': {
+      const edge = scn.material?.enabled ? scn.material.y : 0;
+      dy = edge - wMinY;
+      break;
+    }
+    case 'bottom': {
+      const edge = scn.material?.enabled ? scn.material.y + scn.material.height : scn.canvas.height;
+      dy = edge - wMaxY;
+      break;
+    }
   }
 
   return {
@@ -545,6 +561,7 @@ export function App() {
         x: (scene.canvas.width - config.width) / 2,
         y: (scene.canvas.height - config.height) / 2,
         color: '',
+        enabled: true,
       },
     };
     handleSceneCommit(newScene);
@@ -892,16 +909,16 @@ export function App() {
         { label: `${scene.material ? 'Center on Material' : 'Center on Bed'}    Ctrl+Shift+C`, action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
         }, disabled: selectedIds.size === 0 },
-        { label: 'Align Left', action: () => {
+        { label: scene.material?.enabled ? 'Align to Material Left' : 'Align Left', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'left'));
         }, disabled: selectedIds.size === 0 },
-        { label: 'Align Right', action: () => {
+        { label: scene.material?.enabled ? 'Align to Material Right' : 'Align Right', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'right'));
         }, disabled: selectedIds.size === 0 },
-        { label: 'Align Top', action: () => {
+        { label: scene.material?.enabled ? 'Align to Material Top' : 'Align Top', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'top'));
         }, disabled: selectedIds.size === 0 },
-        { label: 'Align Bottom', action: () => {
+        { label: scene.material?.enabled ? 'Align to Material Bottom' : 'Align Bottom', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
         }, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },

@@ -166,67 +166,157 @@ export function renderSceneObjects(
     ? new Map<string, AABB>()
     : null;
 
-  // Preview mode: render as simulated burn result on material.
-  if (previewMode && scene.material) {
+  // Preview mode: simulated burn marks on material (replaces normal object pass).
+  if (previewMode && scene.material && scene.material.enabled !== false) {
     const mat = scene.material;
 
     ctx.save();
+    // Transform is already applied by CanvasViewport / renderScene.
+
+    // 1. Draw solid material background
     ctx.fillStyle = mat.color || '#c4a882';
     ctx.fillRect(mat.x, mat.y, mat.width, mat.height);
 
+    // 2. Subtle wood grain
     if (mat.type === 'wood') {
-      ctx.globalAlpha = 0.08;
+      ctx.globalAlpha = 0.07;
       ctx.strokeStyle = '#6B5335';
-      ctx.lineWidth = transform.screenPx(0.8);
-      for (let gy = mat.y; gy < mat.y + mat.height; gy += 2) {
-        const wobble = Math.sin(gy * 0.3) * 2 + Math.sin(gy * 0.7) * 0.5;
+      ctx.lineWidth = transform.screenPx(0.6);
+      for (let gy = mat.y; gy < mat.y + mat.height; gy += 2.5) {
+        const w1 = Math.sin(gy * 0.3) * 2;
+        const w2 = Math.sin(gy * 0.7) * 0.8;
         ctx.beginPath();
-        ctx.moveTo(mat.x, gy + wobble);
+        ctx.moveTo(mat.x, gy + w1);
         ctx.bezierCurveTo(
-          mat.x + mat.width * 0.3, gy + wobble * 1.2,
-          mat.x + mat.width * 0.7, gy + wobble * 0.8,
-          mat.x + mat.width, gy + wobble * 0.6
+          mat.x + mat.width * 0.3, gy + w1 + w2,
+          mat.x + mat.width * 0.7, gy + w1 - w2,
+          mat.x + mat.width, gy + w1 * 0.6
         );
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
     }
-    ctx.restore();
 
+    // 3. Acrylic sheen
+    if (mat.type === 'acrylic') {
+      const grad = ctx.createLinearGradient(mat.x, mat.y, mat.x + mat.width, mat.y + mat.height);
+      grad.addColorStop(0, 'rgba(255,255,255,0.05)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.15)');
+      grad.addColorStop(1, 'rgba(255,255,255,0.03)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(mat.x, mat.y, mat.width, mat.height);
+    }
+
+    // 4. Draw each object as a burn mark
     for (const obj of scene.objects) {
       if (!obj.visible) continue;
-      const layer = layerMap.get(obj.layerId);
+      const layer = scene.layers.find(l => l.id === obj.layerId);
       if (!layer || !layer.visible) continue;
-      if (obj.geometry.type === 'image') continue;
-      const objBounds = computeObjectBounds(obj);
-      if (!aabbIntersects(objBounds, visibleBounds)) continue;
 
       const mode = layer.settings.mode;
-      const power = layer.settings.power.max;
-      const intensity = Math.max(0, Math.min(1, power / 100));
+      const power = layer.settings.power.max / 100;
 
       ctx.save();
       const t = obj.transform;
       ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
 
+      const geom = obj.geometry as any;
+
+      // Build path
+      ctx.beginPath();
+      if (geom.type === 'rect') {
+        ctx.rect(geom.x || 0, geom.y || 0, geom.width, geom.height);
+      } else if (geom.type === 'ellipse') {
+        ctx.ellipse(geom.cx, geom.cy, geom.rx, geom.ry, 0, 0, Math.PI * 2);
+      } else if (geom.type === 'line') {
+        ctx.moveTo(geom.x1, geom.y1);
+        ctx.lineTo(geom.x2, geom.y2);
+      } else if (geom.type === 'path') {
+        for (const sp of (geom.subPaths || [])) {
+          for (const seg of sp.segments) {
+            if (seg.type === 'move') ctx.moveTo(seg.to.x, seg.to.y);
+            else if (seg.type === 'line') ctx.lineTo(seg.to.x, seg.to.y);
+            else if (seg.type === 'cubic') ctx.bezierCurveTo(seg.cp1.x, seg.cp1.y, seg.cp2.x, seg.cp2.y, seg.to.x, seg.to.y);
+            else if (seg.type === 'quadratic') ctx.quadraticCurveTo(seg.cp.x, seg.cp.y, seg.to.x, seg.to.y);
+            else if (seg.type === 'close') ctx.closePath();
+          }
+        }
+      } else if (geom.type === 'polygon') {
+        const pts = geom.points || [];
+        if (pts.length > 0) {
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+          if (geom.closed) ctx.closePath();
+        }
+      } else if (geom.type === 'text') {
+        const fontSize = geom.fontSize || 10;
+        const bold = geom.bold ? 'bold ' : '';
+        const italic = geom.italic ? 'italic ' : '';
+        ctx.font = `${italic}${bold}${fontSize}px ${geom.fontFamily || 'Arial'}`;
+        ctx.textBaseline = 'top';
+        ctx.fillStyle = `rgba(30, 15, 0, ${0.5 + power * 0.5})`;
+        ctx.fillText(geom.text || '', 0, 0);
+        ctx.restore();
+        continue;
+      } else if (geom.type === 'image') {
+        ctx.restore();
+        continue;
+      } else {
+        ctx.restore();
+        continue;
+      }
+
+      // Render based on mode
       if (mode === 'cut') {
-        ctx.strokeStyle = `rgba(30, 15, 5, ${0.7 + intensity * 0.3})`;
-        ctx.lineWidth = transform.screenPx(1.5);
-        ctx.shadowColor = 'rgba(20, 10, 0, 0.5)';
-        ctx.shadowBlur = transform.screenPx(2);
-        drawObjectPath(ctx, obj);
+        // Cut: thin dark burn line with glow
+        ctx.strokeStyle = `rgba(25, 10, 0, ${0.6 + power * 0.4})`;
+        ctx.lineWidth = transform.screenPx(1.2);
+        ctx.shadowColor = `rgba(40, 15, 0, ${power * 0.4})`;
+        ctx.shadowBlur = transform.screenPx(3);
+        ctx.stroke();
         ctx.shadowBlur = 0;
-      } else if (mode === 'engrave' || mode === 'score') {
-        ctx.fillStyle = `rgba(40, 20, 5, ${intensity * 0.6})`;
-        ctx.strokeStyle = `rgba(30, 15, 5, ${intensity * 0.4})`;
-        ctx.lineWidth = transform.screenPx(mode === 'score' ? 0.8 : 0.3);
-        drawObjectFilled(ctx, obj, mode === 'engrave');
+        // Slight inner edge (kerf simulation)
+        ctx.strokeStyle = `rgba(60, 30, 0, ${power * 0.2})`;
+        ctx.lineWidth = transform.screenPx(2.5);
+        ctx.stroke();
+      } else if (mode === 'engrave') {
+        // Engrave: filled dark area
+        ctx.fillStyle = `rgba(35, 18, 0, ${power * 0.55})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(25, 10, 0, ${power * 0.3})`;
+        ctx.lineWidth = transform.screenPx(0.5);
+        ctx.stroke();
+      } else if (mode === 'score') {
+        // Score: light surface mark
+        ctx.strokeStyle = `rgba(50, 25, 5, ${power * 0.35})`;
+        ctx.lineWidth = transform.screenPx(0.8);
+        ctx.stroke();
+      } else {
+        ctx.restore();
+        continue;
       }
 
       ctx.restore();
     }
 
-    // Keep start marker visible in preview mode.
+    // 5. Material border
+    ctx.strokeStyle = 'rgba(0,0,0,0.2)';
+    ctx.lineWidth = transform.screenPx(1);
+    ctx.strokeRect(mat.x, mat.y, mat.width, mat.height);
+
+    // 6. Subtle shadow under material
+    ctx.shadowColor = 'rgba(0,0,0,0.3)';
+    ctx.shadowBlur = transform.screenPx(8);
+    ctx.shadowOffsetX = transform.screenPx(2);
+    ctx.shadowOffsetY = transform.screenPx(2);
+    ctx.strokeStyle = 'transparent';
+    ctx.lineWidth = 0;
+    ctx.strokeRect(mat.x, mat.y, mat.width, mat.height);
+    ctx.shadowBlur = 0;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    // Start position (same role as normal pass)
     if (scene.startPosition) {
       const sp = scene.startPosition;
       const dotRadius = transform.screenPx(6);
