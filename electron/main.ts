@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
+import { listSerialPorts, openSerial, closeSerial, writeSerialLine } from './serial';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -42,6 +43,10 @@ app.on('window-all-closed', () => {
 
 app.on('activate', () => {
   if (mainWindow === null) createWindow();
+});
+
+app.on('before-quit', () => {
+  void closeSerial();
 });
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────
@@ -91,8 +96,19 @@ ipcMain.handle('dialog:open', async () => {
   return { filePath, content, ext: path.extname(filePath).toLowerCase() };
 });
 
-// ─── SERIAL PORT (STUB) ──────────────────────────────────────────
-// Will be wired when adding real laser connection.
-// ipcMain.handle('serial:list', async () => { ... });
-// ipcMain.handle('serial:connect', async (_e, port, baud) => { ... });
-// ipcMain.handle('serial:write', async (_e, data) => { ... });
+// ─── SERIAL / GRBL ───────────────────────────────────────────────
+
+ipcMain.handle('serial:list', async () => listSerialPorts());
+
+ipcMain.handle('serial:connect', async (_event, portPath: string, baudRate: number) => {
+  if (portPath === 'SIMULATOR') return false;
+  return openSerial(portPath, baudRate);
+});
+
+ipcMain.handle('serial:disconnect', async () => {
+  await closeSerial();
+});
+
+ipcMain.handle('serial:send', async (_event, line: string) => {
+  await writeSerialLine(line);
+});

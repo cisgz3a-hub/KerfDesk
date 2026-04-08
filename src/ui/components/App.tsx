@@ -51,6 +51,7 @@ import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
+import { ConnectionPanel } from './ConnectionPanel';
 
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -157,6 +158,8 @@ export function App() {
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [showConnection, setShowConnection] = useState(false);
+  const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(() => {
     try {
       return !localStorage.getItem('laserforge_setup_complete');
@@ -552,6 +555,31 @@ export function App() {
   const handleStopSimulation = useCallback(() => {
     setSimulation(null);
   }, []);
+
+  const handleConnect = useCallback(() => {
+    try {
+      const job = compileJob(scene);
+      if (job.operations.length === 0) {
+        alert('No objects to process. Add objects to an output layer first.');
+        setCurrentGcode(null);
+        setShowConnection(true);
+        return;
+      }
+      const plan = optimizePlan(job);
+      const strategy = getOutputStrategy('grbl');
+      if (!strategy) {
+        setCurrentGcode(null);
+        setShowConnection(true);
+        return;
+      }
+      const output = strategy.generate(plan, job);
+      setCurrentGcode(output.text ?? null);
+    } catch (err) {
+      console.error('G-code build failed:', err);
+      setCurrentGcode(null);
+    }
+    setShowConnection(true);
+  }, [scene]);
 
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -1017,6 +1045,7 @@ export function App() {
       onNewProject: handleNewProject,
       onSimulate: handleSimulate,
       onStopSimulation: handleStopSimulation,
+      onConnect: handleConnect,
       isSimulating: simulation !== null,
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
@@ -1310,6 +1339,11 @@ export function App() {
 
     showShortcuts && React.createElement(ShortcutsPanel, {
       onClose: () => setShowShortcuts(false),
+    }),
+
+    showConnection && React.createElement(ConnectionPanel, {
+      gcode: currentGcode,
+      onClose: () => setShowConnection(false),
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

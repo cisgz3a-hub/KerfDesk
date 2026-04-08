@@ -37,6 +37,7 @@ interface FileToolbarProps {
   onNewProject: (scene: Scene) => void;
   onSimulate?: () => void;
   onStopSimulation?: () => void;
+  onConnect?: () => void;
   isSimulating?: boolean;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
@@ -59,6 +60,7 @@ export function FileToolbar({
   onNewProject,
   onSimulate,
   onStopSimulation,
+  onConnect,
   isSimulating,
   onMaterialTest,
   onMaterialSetup,
@@ -550,6 +552,7 @@ export function FileToolbar({
         el.style.color = '#e63e6d';
       },
     }, 'Stop Sim'),
+    React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
     sep,
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
     React.createElement('button', { onClick: handleBedSize, style: btnStyle, title: 'Change laser bed dimensions', ...stdHover }, 'Bed Size'),
