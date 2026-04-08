@@ -38,6 +38,69 @@ import { deserializeScene } from '../../io/SceneSerializer';
 import { generateId } from '../../core/types';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
+import { computeObjectBounds } from '../../geometry/bounds';
+
+function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
+  const selected = scn.objects.filter(o => selIds.has(o.id));
+  if (selected.length === 0) return scn;
+
+  // computeObjectBounds returns LOCAL space bounds (before transform)
+  // But we were multiplying by transform again — double transform!
+  // Instead, compute world bounds manually from tx/ty and local bounds * scale
+
+  let wMinX = Infinity, wMinY = Infinity, wMaxX = -Infinity, wMaxY = -Infinity;
+
+  for (const o of selected) {
+    const b = computeObjectBounds(o);
+    if (!b) continue;
+    const t = o.transform;
+
+    // World position = local * scale + translate
+    // But bounds might ALREADY be in world space if computeObjectBounds applies transform
+    // Use bounds directly as world coords (don't multiply by transform)
+    const x1 = b.minX;
+    const y1 = b.minY;
+    const x2 = b.maxX;
+    const y2 = b.maxY;
+
+    wMinX = Math.min(wMinX, x1);
+    wMinY = Math.min(wMinY, y1);
+    wMaxX = Math.max(wMaxX, x2);
+    wMaxY = Math.max(wMaxY, y2);
+  }
+
+  console.log('Direct bounds:', { wMinX, wMinY, wMaxX, wMaxY });
+  console.log('Bed:', scn.canvas.width, 'x', scn.canvas.height);
+
+  if (!isFinite(wMinX)) return scn;
+
+  let dx = 0, dy = 0;
+
+  switch (alignment) {
+    case 'center':
+      dx = scn.canvas.width / 2 - (wMinX + wMaxX) / 2;
+      dy = scn.canvas.height / 2 - (wMinY + wMaxY) / 2;
+      break;
+    case 'left':   dx = -wMinX; break;
+    case 'right':  dx = scn.canvas.width - wMaxX; break;
+    case 'top':    dy = -wMinY; break;
+    case 'bottom': dy = scn.canvas.height - wMaxY; break;
+  }
+
+  console.log('Offset dx:', dx, 'dy:', dy);
+
+  return {
+    ...scn,
+    objects: scn.objects.map(o => {
+      if (!selIds.has(o.id)) return o;
+      return {
+        ...o,
+        transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+        _bounds: null, _worldTransform: null,
+      };
+    }),
+  };
+}
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 
@@ -319,6 +382,11 @@ export function App() {
           e.preventDefault();
           handleDuplicate();
         }
+        if (e.key === 'C' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
+          e.preventDefault();
+          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
+          return;
+        }
         return;
       }
 
@@ -341,7 +409,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDuplicate, handleDelete, handleClearSelection, setActiveTool]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDuplicate, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -449,6 +517,21 @@ export function App() {
         { label: 'Duplicate           Ctrl+D', action: handleDuplicate, disabled: selectedIds.size === 0 },
         { label: 'Delete              Del', action: handleDelete, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },
+        { label: 'Center on Bed    Ctrl+Shift+C', action: () => {
+          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
+        }, disabled: selectedIds.size === 0 },
+        { label: 'Align Left', action: () => {
+          handleSceneCommit(alignSelection(scene, selectedIds, 'left'));
+        }, disabled: selectedIds.size === 0 },
+        { label: 'Align Right', action: () => {
+          handleSceneCommit(alignSelection(scene, selectedIds, 'right'));
+        }, disabled: selectedIds.size === 0 },
+        { label: 'Align Top', action: () => {
+          handleSceneCommit(alignSelection(scene, selectedIds, 'top'));
+        }, disabled: selectedIds.size === 0 },
+        { label: 'Align Bottom', action: () => {
+          handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
+        }, disabled: selectedIds.size === 0 },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
           disabled: selectedIds.size === 0,
