@@ -37,9 +37,22 @@ interface ConnectionPanelProps {
   onClose: () => void;
   bedWidth: number;
   bedHeight: number;
+  boundsMinX?: number;
+  boundsMinY?: number;
+  boundsMaxX?: number;
+  boundsMaxY?: number;
 }
 
-export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: ConnectionPanelProps) {
+export function ConnectionPanel({
+  gcode,
+  onClose,
+  bedWidth,
+  bedHeight,
+  boundsMinX,
+  boundsMinY,
+  boundsMaxX,
+  boundsMaxY,
+}: ConnectionPanelProps) {
   const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
   const [selectedPort, setSelectedPort] = useState('');
   const [connState, setConnState] = useState<ConnectionState>('disconnected');
@@ -414,8 +427,10 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
                     await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
                     setMessages(prev => [...prev, '✓ Zero set at current position']);
                   } else {
-                    controllerRef.current?.send('G10 L20 P1 X0 Y0');
+                    await controllerRef.current?.send('G10 L20 P1 X0 Y0');
                   }
+                  // Update displayed position to 0,0
+                  setStatus(prev => prev ? { ...prev, x: 0, y: 0 } : prev);
                 },
                 title: 'Set current position as X0 Y0',
                 style: { ...btnStyle('0, 212, 255'), padding: '6px', fontSize: 8, fontWeight: 700 },
@@ -506,6 +521,47 @@ export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: Connect
         ),
 
         React.createElement('div', { style: { display: 'flex', gap: 6 } },
+          React.createElement('button', {
+            onClick: async () => {
+              const ws = webSerialRef.current;
+              const ctrl = controllerRef.current;
+              if (!ws && !ctrl) return;
+
+              const x1 = boundsMinX ?? 0;
+              const y1 = boundsMinY ?? 0;
+              const x2 = boundsMaxX ?? 100;
+              const y2 = boundsMaxY ?? 100;
+
+              const frameGcode = [
+                'G21',
+                'G90',
+                'M4 S10',  // Very low power — just visible dot
+                `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)}`,
+                `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F2000`,
+                `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F2000`,
+                `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F2000`,
+                `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F2000`,
+                'M5 S0',
+              ];
+
+              setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
+
+              for (const line of frameGcode) {
+                if (ws) {
+                  try {
+                    await ws.sendAndWait(line, 10000);
+                  } catch { /* empty */ }
+                } else {
+                  await ctrl?.send(line);
+                }
+              }
+
+              setMessages(prev => [...prev, '✓ Frame complete']);
+            },
+            disabled: !isConnected,
+            title: 'Trace the boundary of your design at low power to verify alignment',
+            style: { ...btnStyle('255, 212, 68', !isConnected), flex: 1 },
+          }, 'Frame'),
           React.createElement('button', {
             onClick: () => {
               console.log('Start Job clicked', {

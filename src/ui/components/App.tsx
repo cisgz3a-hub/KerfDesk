@@ -19,7 +19,7 @@
  * Last updated: UI Wiring — App Shell
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
@@ -152,6 +152,21 @@ export function App() {
     const initial = createScene(400, 300, 'Untitled');
     return initial;
   });
+
+  const sceneBounds = useMemo(() => {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const obj of scene.objects) {
+      if (!obj.visible) continue;
+      const b = computeObjectBounds(obj);
+      if (!b) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
+    return { minX, minY, maxX, maxY };
+  }, [scene.objects]);
+
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
@@ -1366,6 +1381,10 @@ export function App() {
       onClose: () => setShowConnection(false),
       bedWidth: scene.canvas.width,
       bedHeight: scene.canvas.height,
+      boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
+      boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
+      boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
+      boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
