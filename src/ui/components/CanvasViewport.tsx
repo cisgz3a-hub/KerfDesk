@@ -89,6 +89,8 @@ export function CanvasViewport({
   const playStartRef = useRef(0);
   const playOffsetRef = useRef(0);
   const mouseDownPos = useRef<{ x: number; y: number } | null>(null);
+  const lastClickTimeRef = useRef<number>(0);
+  const lastClickIdRef = useRef<string>('');
   const [isDragging, setIsDragging] = useState(false);
 
   // ─── RENDER LOOP ─────────────────────────────────────────────
@@ -952,14 +954,24 @@ export function CanvasViewport({
             newSelection = next;
           } else {
             const hitObj = scene.objects.find(o => o.id === hit.id);
-            if (hitObj?.parentId) {
+            // Double-click selects individual object inside group
+            // Single click selects entire group
+            const now = Date.now();
+            const isDoubleClick = (now - (lastClickTimeRef.current || 0)) < 300
+              && hitObj != null && hitObj.id === lastClickIdRef.current;
+            lastClickTimeRef.current = now;
+            lastClickIdRef.current = hitObj?.id ?? hit.id;
+
+            if (hitObj?.parentId && !isDoubleClick && !e.shiftKey) {
+              // Single click: select entire group
               newSelection = new Set(
                 scene.objects
                   .filter(o => o.parentId === hitObj.parentId)
                   .map(o => o.id)
               );
             } else {
-              newSelection = new Set([hit.id]);
+              // Double click, shift click, or ungrouped: select individual object
+              newSelection = new Set([hitObj?.id ?? hit.id]);
             }
           }
         } else {
