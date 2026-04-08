@@ -1364,6 +1364,8 @@ export function App() {
     showConnection && React.createElement(ConnectionPanel, {
       gcode: currentGcode,
       onClose: () => setShowConnection(false),
+      bedWidth: scene.canvas.width,
+      bedHeight: scene.canvas.height,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

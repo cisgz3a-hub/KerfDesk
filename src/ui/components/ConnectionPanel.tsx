@@ -2,12 +2,43 @@ import React, { useState, useEffect, useRef } from 'react';
 import { GrblController, type ConnectionState, type MachineStatus } from '../../core/controller/GrblController';
 import { WebSerialController } from '../../core/controller/WebSerialController';
 
+// Pre-flight check: scan G-code for coordinate range
+function checkGcodeBounds(gcodeText: string, bedW: number, bedH: number): { minX: number; minY: number; maxX: number; maxY: number; warnings: string[] } {
+  const lines = gcodeText.split('\n');
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const warnings: string[] = [];
+
+  for (const line of lines) {
+    const xMatch = line.match(/X([-\d.]+)/);
+    const yMatch = line.match(/Y([-\d.]+)/);
+    if (xMatch) {
+      const x = parseFloat(xMatch[1]);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+    }
+    if (yMatch) {
+      const y = parseFloat(yMatch[1]);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (minX < 0) warnings.push(`G-code has negative X coordinates (min: ${minX.toFixed(1)}mm)`);
+  if (minY < 0) warnings.push(`G-code has negative Y coordinates (min: ${minY.toFixed(1)}mm)`);
+  if (maxX > bedW) warnings.push(`G-code exceeds bed width (max X: ${maxX.toFixed(1)}mm, bed: ${bedW}mm)`);
+  if (maxY > bedH) warnings.push(`G-code exceeds bed height (max Y: ${maxY.toFixed(1)}mm, bed: ${bedH}mm)`);
+
+  return { minX, minY, maxX, maxY, warnings };
+}
+
 interface ConnectionPanelProps {
   gcode: string | null;
   onClose: () => void;
+  bedWidth: number;
+  bedHeight: number;
 }
 
-export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
+export function ConnectionPanel({ gcode, onClose, bedWidth, bedHeight }: ConnectionPanelProps) {
   const [ports, setPorts] = useState<{ path: string; manufacturer?: string }[]>([]);
   const [selectedPort, setSelectedPort] = useState('');
   const [connState, setConnState] = useState<ConnectionState>('disconnected');
@@ -74,21 +105,51 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
     if (!gcode || !webSerialRef.current) return;
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
 
-    setMessages(prev => [...prev, `Preparing laser...`]);
+    // Pre-flight bounds check
+    const bounds = checkGcodeBounds(gcode, bedWidth, bedHeight);
+    if (bounds.warnings.length > 0) {
+      const msg = 'WARNING — G-code may cause limit switch errors:\n\n' +
+        bounds.warnings.join('\n') +
+        `\n\nCoordinate range: X ${bounds.minX.toFixed(1)} to ${bounds.maxX.toFixed(1)}, Y ${bounds.minY.toFixed(1)} to ${bounds.maxY.toFixed(1)}` +
+        '\n\nSend anyway?';
+      if (!confirm(msg)) {
+        setMessages(prev => [...prev, 'Job cancelled — coordinate bounds issue']);
+        return;
+      }
+    }
 
-    // Wait for GRBL startup
+    setMessages(prev => [...prev, 'Preparing laser...']);
+
+    // Wait for GRBL startup message
     await new Promise(resolve => setTimeout(resolve, 2000));
 
-    // Unlock if in alarm state
+    // Soft reset to clear any alarm
+    try {
+      await webSerialRef.current.send('\x18'); // Ctrl+X soft reset
+      await new Promise(resolve => setTimeout(resolve, 1000));
+    } catch { /* empty */ }
+
+    // Unlock
     try {
       await webSerialRef.current.sendAndWait('$X', 5000);
       setMessages(prev => [...prev, '✓ Machine unlocked']);
     } catch {
-      setMessages(prev => [...prev, 'Unlock timed out — continuing anyway']);
+      setMessages(prev => [...prev, 'Unlock timed out — trying to continue']);
     }
 
-    // Small delay after unlock
     await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Set to absolute coordinates and mm mode
+    try {
+      await webSerialRef.current.sendAndWait('G21', 5000); // mm mode
+      await webSerialRef.current.sendAndWait('G90', 5000); // absolute positioning
+      setMessages(prev => [...prev, '✓ Set to mm mode, absolute positioning']);
+    } catch { /* empty */ }
+
+    // Turn off laser as safety
+    try {
+      await webSerialRef.current.sendAndWait('M5 S0', 5000);
+    } catch { /* empty */ }
 
     setMessages(prev => [...prev, `Sending ${lines.length} commands...`]);
 
@@ -332,6 +393,18 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
               },
               style: { ...btnStyle('45, 212, 160'), fontSize: 10, padding: '6px 12px' },
             }, 'Home ($H)'),
+            React.createElement('button', {
+              onClick: async () => {
+                if (webSerialRef.current) {
+                  await webSerialRef.current.sendAndWait('G10 L20 P1 X0 Y0', 5000).catch(() => {});
+                  setMessages(prev => [...prev, '✓ Work position set to X0 Y0 here']);
+                } else {
+                  void controllerRef.current?.send('G10 L20 P1 X0 Y0');
+                }
+              },
+              title: 'Set current position as X0 Y0 — jog laser to your workpiece corner first',
+              style: { ...btnStyle('0, 212, 255'), fontSize: 10, padding: '6px 12px' },
+            }, 'Set Zero'),
             React.createElement('button', { onClick: () => {
               if (usingWebSerial && webSerialRef.current) {
                 void webSerialRef.current.send('M4 S50');
@@ -386,6 +459,27 @@ export function ConnectionPanel({ gcode, onClose }: ConnectionPanelProps) {
             React.createElement('div', { style: { width: `${(progress.sent / totalLines) * 100}%`, height: '100%', background: '#00d4ff', borderRadius: 2, transition: 'width 0.1s' } }),
           ),
         ),
+
+        isConnected && React.createElement('button', {
+          onClick: async () => {
+            if (webSerialRef.current) {
+              await webSerialRef.current.send('\x18'); // Soft reset
+              await webSerialRef.current.send('M5 S0'); // Laser off
+              setMessages(prev => [...prev, '⚠ EMERGENCY STOP — laser off, machine reset']);
+            }
+            controllerRef.current?.stopJob();
+            setProgress(null);
+          },
+          style: {
+            width: '100%', padding: '8px',
+            background: 'rgba(255, 68, 102, 0.1)',
+            border: '1px solid #ff4466',
+            borderRadius: 6, color: '#ff4466',
+            fontSize: 12, fontWeight: 700, cursor: 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            marginTop: 6,
+          },
+        }, '⚠ EMERGENCY STOP'),
       ),
 
       React.createElement('div', {
