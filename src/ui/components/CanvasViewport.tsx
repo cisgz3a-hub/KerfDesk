@@ -166,6 +166,8 @@ interface CanvasViewportProps {
   onZoomChange?: (zoom: number) => void;
   actionsRef?: MutableRefObject<ViewportActions | null>;
   previewMode?: boolean;
+  /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
+  onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -183,6 +185,7 @@ export function CanvasViewport({
   onZoomChange,
   actionsRef,
   previewMode = false,
+  onSelectionScreenPos,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -208,6 +211,63 @@ export function CanvasViewport({
   useEffect(() => {
     onZoomChangeRef.current?.(Math.round(viewport.zoom * 100));
   }, [viewport.zoom]);
+
+  const selectionKey = [...selectedIds].sort().join(',');
+
+  useEffect(() => {
+    if (!onSelectionScreenPos) return;
+
+    const report = () => {
+      const canvas = canvasRef.current;
+      if (selectedIds.size === 0) {
+        onSelectionScreenPos(null);
+        return;
+      }
+      if (!canvas) {
+        onSelectionScreenPos(null);
+        return;
+      }
+
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      for (const id of selectedIds) {
+        const obj = scene.objects.find(o => o.id === id);
+        if (!obj) continue;
+        const b = computeObjectBounds(obj);
+        if (b.minX > b.maxX) continue;
+        minX = Math.min(minX, b.minX);
+        minY = Math.min(minY, b.minY);
+        maxX = Math.max(maxX, b.maxX);
+        maxY = Math.max(maxY, b.maxY);
+      }
+
+      if (minX === Infinity) {
+        onSelectionScreenPos(null);
+        return;
+      }
+
+      const transform = Transform.from(viewport);
+      const cx = (minX + maxX) / 2;
+      const screen = transform.worldToScreen({ x: cx, y: minY });
+      const rect = canvas.getBoundingClientRect();
+      onSelectionScreenPos({ x: rect.left + screen.x, y: rect.top + screen.y });
+    };
+
+    report();
+    let raf = 0;
+    const onResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(report);
+    };
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      cancelAnimationFrame(raf);
+    };
+  }, [scene, viewport, selectionKey, width, height, onSelectionScreenPos, selectedIds]);
 
   useEffect(() => {
     if (!actionsRef) return;

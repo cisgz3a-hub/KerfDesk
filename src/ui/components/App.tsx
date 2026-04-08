@@ -48,6 +48,7 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
+import { QuickActions } from './QuickActions';
 
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -141,6 +142,7 @@ export function App() {
   });
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
@@ -310,7 +312,49 @@ export function App() {
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
+    setQuickActionPos(null);
   }, []);
+
+  const handleQuickActionDuplicate = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    const newIds = new Set<string>();
+    const clones: typeof scene.objects = [];
+    const parentIdMap = new Map<string, string>();
+    for (const obj of scene.objects) {
+      if (!selectedIds.has(obj.id)) continue;
+      const newId = generateId();
+      newIds.add(newId);
+      let newParentId = obj.parentId;
+      if (obj.parentId) {
+        if (!parentIdMap.has(obj.parentId)) {
+          parentIdMap.set(obj.parentId, generateId());
+        }
+        newParentId = parentIdMap.get(obj.parentId)!;
+      }
+      clones.push({
+        ...obj,
+        id: newId,
+        parentId: newParentId,
+        name: obj.name + ' copy',
+        transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
+        _bounds: null,
+        _worldTransform: null,
+      });
+    }
+    const newScene = { ...scene, objects: [...scene.objects, ...clones] };
+    handleSceneCommit(newScene);
+    setSelectedIds(newIds);
+  }, [scene, selectedIds, handleSceneCommit]);
+
+  const handleQuickActionDelete = useCallback(() => {
+    handleDelete();
+    setQuickActionPos(null);
+  }, [handleDelete]);
+
+  const handleQuickActionCenter = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
+  }, [scene, selectedIds, handleSceneCommit]);
 
   const handleContextMenu = useCallback((e: MouseEvent) => {
     e.preventDefault();
@@ -949,6 +993,7 @@ export function App() {
         actionsRef: viewportActionsRef,
         onZoomChange: setZoomLevel,
         previewMode,
+        onSelectionScreenPos: setQuickActionPos,
       }),
       React.createElement('div', {
         style: {
@@ -1147,6 +1192,16 @@ export function App() {
 
     showShortcuts && React.createElement(ShortcutsPanel, {
       onClose: () => setShowShortcuts(false),
+    }),
+
+    quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
+      x: quickActionPos.x,
+      y: quickActionPos.y,
+      selectedCount: selectedIds.size,
+      onDuplicate: handleQuickActionDuplicate,
+      onDelete: handleQuickActionDelete,
+      onCenter: handleQuickActionCenter,
+      onGridArray: handleGridArray,
     }),
   );
 }
