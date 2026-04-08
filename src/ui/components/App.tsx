@@ -47,6 +47,7 @@ import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObje
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
+import { ShortcutsPanel } from './ShortcutsPanel';
 
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -151,6 +152,7 @@ export function App() {
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [showShortcuts, setShowShortcuts] = useState(false);
   const [showWizard, setShowWizard] = useState(() => {
     try {
       return !localStorage.getItem('laserforge_setup_complete');
@@ -733,6 +735,10 @@ export function App() {
       }
 
       // Non-modifier shortcuts
+      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
+        setShowShortcuts(s => !s);
+        return;
+      }
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         handleDelete();
@@ -1038,6 +1044,10 @@ export function App() {
     showWizard && React.createElement(WelcomeWizard, {
       onComplete: handleWizardComplete,
       onSkip: handleWizardSkip,
+    }),
+
+    showShortcuts && React.createElement(ShortcutsPanel, {
+      onClose: () => setShowShortcuts(false),
     }),
   );
 }
