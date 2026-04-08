@@ -46,6 +46,7 @@ import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
+import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -150,6 +151,13 @@ export function App() {
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [showWizard, setShowWizard] = useState(() => {
+    try {
+      return !localStorage.getItem('laserforge_setup_complete');
+    } catch {
+      return true;
+    }
+  });
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -181,6 +189,40 @@ export function App() {
   const handleNewProject = useCallback((newScene: Scene) => {
     historyRef.current.reset(newScene);
     setScene(newScene);
+  }, []);
+
+  const handleWizardComplete = useCallback((result: WizardResult) => {
+    setShowWizard(false);
+    try { localStorage.setItem('laserforge_setup_complete', 'true'); } catch { /* ignore */ }
+
+    // Apply wizard results to scene
+    const matX = Math.round((result.bedWidth - result.materialWidth) / 2);
+    const matY = Math.round((result.bedHeight - result.materialHeight) / 2);
+
+    const newScene = {
+      ...scene,
+      canvas: { ...scene.canvas, width: result.bedWidth, height: result.bedHeight },
+      material: {
+        enabled: true,
+        x: matX,
+        y: matY,
+        width: result.materialWidth,
+        height: result.materialHeight,
+        thickness: result.materialThickness,
+        type: result.materialType as NonNullable<Scene['material']>['type'],
+        name: result.materialName,
+        color: result.materialColor,
+      },
+    };
+    handleSceneCommit(newScene);
+
+    // Fit to bed after a tick
+    setTimeout(() => viewportActionsRef.current?.fitToBed(), 100);
+  }, [scene, handleSceneCommit]);
+
+  const handleWizardSkip = useCallback(() => {
+    setShowWizard(false);
+    try { localStorage.setItem('laserforge_setup_complete', 'true'); } catch { /* ignore */ }
   }, []);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
@@ -981,6 +1023,11 @@ export function App() {
       onConfirm: handleMaterialConfirm,
       onClear: handleMaterialClear,
       onCancel: () => setShowMaterialDialog(false),
+    }),
+
+    showWizard && React.createElement(WelcomeWizard, {
+      onComplete: handleWizardComplete,
+      onSkip: handleWizardSkip,
     }),
   );
 }
