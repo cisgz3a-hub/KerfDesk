@@ -1,4 +1,5 @@
 import React from 'react';
+import { theme } from '../styles/theme';
 
 export type ToolType = 'select' | 'node' | 'rect' | 'ellipse' | 'line' | 'text';
 
@@ -17,38 +18,53 @@ const TOOLS: { id: ToolType; label: string; title?: string }[] = [
 ];
 
 export function ToolBar({ activeTool, onToolChange }: ToolBarProps) {
+  const toolBtnStyle = (toolId: string): React.CSSProperties => ({
+    width: 32,
+    height: 32,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    background: activeTool === toolId ? 'rgba(0, 212, 255, 0.12)' : 'transparent',
+    border: activeTool === toolId ? `1px solid ${theme.accent.cyan}` : '1px solid transparent',
+    borderRadius: theme.radius.sm,
+    color: activeTool === toolId ? theme.accent.cyan : theme.text.secondary,
+    fontSize: '14px',
+    cursor: 'pointer',
+    transition: `all ${theme.transition.fast}`,
+    fontFamily: theme.font.ui,
+  });
+
+  const selectNodeTools = TOOLS.slice(0, 2);
+  const drawTools = TOOLS.slice(2);
+
   return React.createElement('div', {
     style: {
       display: 'flex',
       flexDirection: 'column' as const,
-      width: 36,
-      background: '#0c0c18',
-      borderRight: '1px solid #1a1a30',
-      paddingTop: 4,
-      gap: 2,
       alignItems: 'center',
+      gap: 2,
+      padding: '8px 4px',
+      background: theme.bg.panel,
+      borderRight: `1px solid ${theme.border.subtle}`,
+      width: 40,
     },
   },
-    ...TOOLS.map(tool =>
+    ...selectNodeTools.map(tool =>
       React.createElement('button', {
         key: tool.id,
         title: tool.title,
         onClick: () => onToolChange(tool.id),
-        style: {
-          width: 28,
-          height: 28,
-          background: activeTool === tool.id ? '#2a2a4e' : 'transparent',
-          border: activeTool === tool.id ? '1px solid #3b8beb' : '1px solid transparent',
-          borderRadius: 4,
-          color: activeTool === tool.id ? '#3b8beb' : '#666688',
-          cursor: 'pointer',
-          fontSize: 14,
-          fontFamily: 'monospace',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        },
+        style: toolBtnStyle(tool.id),
       }, tool.label)
-    )
+    ),
+    React.createElement('div', { style: { width: 20, height: 1, background: theme.border.default, margin: '4px 0' } }),
+    ...drawTools.map(tool =>
+      React.createElement('button', {
+        key: tool.id,
+        title: tool.title,
+        onClick: () => onToolChange(tool.id),
+        style: toolBtnStyle(tool.id),
+      }, tool.label)
+    ),
   );
 }

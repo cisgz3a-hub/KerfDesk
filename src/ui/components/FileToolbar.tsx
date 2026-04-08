@@ -13,6 +13,7 @@
  */
 
 import React, { useRef, useCallback } from 'react';
+import { theme } from '../styles/theme';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
@@ -310,31 +311,40 @@ export function FileToolbar({
   // ─── RENDER ──────────────────────────────────────────────────
 
   const btnStyle: React.CSSProperties = {
-    background: '#1a1a2e',
-    border: '1px solid #333355',
-    borderRadius: 4,
-    color: '#aaaacc',
-    padding: '4px 12px',
+    padding: '5px 14px',
+    background: 'transparent',
+    border: '1px solid transparent',
+    borderRadius: theme.radius.sm,
+    color: theme.text.secondary,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.ui,
     cursor: 'pointer',
-    fontSize: 11,
-    fontFamily: 'monospace',
+    transition: `all ${theme.transition.fast}`,
+    fontWeight: 500,
   };
+
+  const sep = React.createElement('div', { style: { width: 1, height: 20, background: theme.border.default, margin: '0 6px' } });
 
   return React.createElement('div', {
     style: {
       display: 'flex',
-      gap: 6,
-      padding: '6px 8px',
-      background: '#0c0c18',
-      borderBottom: '1px solid #1a1a30',
+      alignItems: 'center',
+      gap: 2,
+      padding: '4px 8px',
+      background: theme.bg.panel,
+      borderBottom: `1px solid ${theme.border.subtle}`,
+      fontFamily: theme.font.ui,
+      flexWrap: 'wrap' as const,
     },
   },
     React.createElement('button', { onClick: handleNew, style: btnStyle }, 'New'),
     React.createElement('button', { onClick: handleOpenClick, style: btnStyle }, 'Open'),
+    React.createElement('button', { onClick: handleSave, style: btnStyle }, 'Save'),
+    sep,
     React.createElement('button', { onClick: handleImportClick, style: btnStyle }, 'Import SVG'),
     React.createElement('button', { onClick: handleImportImageClick, style: btnStyle }, 'Import Image'),
     React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle }, 'Import DXF'),
-    React.createElement('button', { onClick: handleSave, style: btnStyle }, 'Save'),
+    sep,
     React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle }, 'G-code'),
     React.createElement('button', { onClick: handleExportSvg, style: btnStyle }, 'Export SVG'),
     !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle }, 'Simulate'),

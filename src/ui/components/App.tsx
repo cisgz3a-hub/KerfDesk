@@ -32,6 +32,7 @@ import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu, type MenuItem } from './ContextMenu';
+import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene } from '../../io/SceneSerializer';
@@ -39,6 +40,7 @@ import { generateId } from '../../core/types';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
+import { theme } from '../styles/theme';
 
 function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -116,6 +118,8 @@ export function App() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [clipboard, setClipboard] = useState<typeof scene.objects>([]);
+  const [showGridArray, setShowGridArray] = useState(false);
+  const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -365,24 +369,11 @@ export function App() {
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
 
-    const input = prompt('Grid array: columns x rows, spacing mm\nExample: 3x2,10', '3x2,10');
-    if (!input) return;
-
-    const match = input.match(/(\d+)\s*x\s*(\d+)\s*,\s*([\d.]+)/);
-    if (!match) { alert('Format: 3x2,10 (columns x rows, spacing)'); return; }
-
-    const cols = parseInt(match[1]);
-    const rows = parseInt(match[2]);
-    const spacing = parseFloat(match[3]);
-
-    if (cols < 1 || rows < 1 || cols > 20 || rows > 20) { alert('Max 20x20'); return; }
-
-    // Get bounds of selected objects
+    // Compute bounds of selection
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const selected = scene.objects.filter(o => selectedIds.has(o.id));
-
-    for (const o of selected) {
-      const b = computeObjectBounds(o);
+    for (const obj of scene.objects) {
+      if (!selectedIds.has(obj.id)) continue;
+      const b = computeObjectBounds(obj);
       if (!b) continue;
       minX = Math.min(minX, b.minX);
       minY = Math.min(minY, b.minY);
@@ -390,26 +381,41 @@ export function App() {
       maxY = Math.max(maxY, b.maxY);
     }
 
+    setGridArrayBounds({ w: maxX - minX, h: maxY - minY });
+    setShowGridArray(true);
+  }, [scene, selectedIds]);
+
+  const handleGridArrayConfirm = useCallback((config: GridArrayConfig) => {
+    setShowGridArray(false);
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const obj of selected) {
+      const b = computeObjectBounds(obj);
+      if (!b) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
     const objW = maxX - minX;
     const objH = maxY - minY;
-    const stepX = objW + spacing;
-    const stepY = objH + spacing;
+    const stepX = objW + config.spacingX;
+    const stepY = objH + config.spacingY;
 
     const allClones: typeof scene.objects = [];
-    const newIds = new Set<string>();
 
-    for (let row = 0; row < rows; row++) {
-      for (let col = 0; col < cols; col++) {
-        if (row === 0 && col === 0) continue; // Skip original position
+    for (let row = 0; row < config.rows; row++) {
+      for (let col = 0; col < config.cols; col++) {
+        if (row === 0 && col === 0) continue;
 
         const dx = col * stepX;
         const dy = row * stepY;
-
         const parentIdMap = new Map<string, string>();
 
         for (const obj of selected) {
           const newId = generateId();
-          newIds.add(newId);
 
           let newParentId = obj.parentId;
           if (obj.parentId) {
@@ -589,7 +595,7 @@ export function App() {
       display: 'flex',
       flexDirection: 'column' as const,
       height: '100vh',
-      background: '#06060c',
+      background: theme.bg.base,
       color: '#ccc',
       fontFamily: 'monospace',
       position: 'relative' as const,
@@ -678,6 +684,25 @@ export function App() {
       ),
     ),
 
+    React.createElement('div', {
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '3px 12px',
+        background: theme.bg.panel,
+        borderTop: `1px solid ${theme.border.subtle}`,
+        fontSize: theme.font.size.xs,
+        fontFamily: theme.font.mono,
+        color: theme.text.tertiary,
+        height: 24,
+        flexShrink: 0,
+      },
+    },
+      React.createElement('span', {}, scene.metadata.name || 'Untitled'),
+      React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
+    ),
+
     contextMenu && React.createElement(ContextMenu, {
       x: contextMenu.x,
       y: contextMenu.y,
@@ -718,6 +743,13 @@ export function App() {
           },
         })),
       ] as MenuItem[],
+    }),
+
+    showGridArray && React.createElement(GridArrayDialog, {
+      sourceWidth: gridArrayBounds.w,
+      sourceHeight: gridArrayBounds.h,
+      onConfirm: handleGridArrayConfirm,
+      onCancel: () => setShowGridArray(false),
     }),
   );
 }
