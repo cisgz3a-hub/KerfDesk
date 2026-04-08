@@ -167,7 +167,7 @@ export function CanvasViewport({
     }
 
     // Node editing overlay
-    if (activeTool === 'node' && selectedIds.size === 1) {
+    if (activeTool === 'node' && selectedIds.size > 0) {
       for (const obj of scene.objects) {
         if (!selectedIds.has(obj.id)) continue;
         if (obj.geometry.type !== 'path' && obj.geometry.type !== 'polygon') continue;
@@ -559,9 +559,9 @@ export function CanvasViewport({
       }
     }
 
-    if (activeTool === 'node' && selectedIds.size === 1) {
-      const obj = scene.objects.find(o => selectedIds.has(o.id));
-      if (obj) {
+    if (activeTool === 'node' && selectedIds.size > 0) {
+      const selectedObjs = scene.objects.filter(o => selectedIds.has(o.id));
+      for (const obj of selectedObjs) {
         const hitRadius = 6 / (viewport.zoom || 1);
         // Transform world point to object-local coordinates
         const localX = (worldPt.x - obj.transform.tx) / (obj.transform.a || 1);
@@ -937,7 +937,12 @@ export function CanvasViewport({
       if (hits.size > 0) {
         onSelectionChange?.(hits);
       } else {
-        onSelectionChange?.(new Set());
+        // Don't deselect when using node tool — keep current selection for node editing
+        if (activeTool === 'node' && selectedIds.size > 0) {
+          // Do nothing — keep selection for node editing
+        } else {
+          onSelectionChange?.(new Set());
+        }
       }
 
       marqueeRef.current = null;
@@ -1010,11 +1015,15 @@ export function CanvasViewport({
               newSelection = new Set([hitObj?.id ?? hit.id]);
             }
           }
+          onSelectionChange?.(newSelection);
         } else {
-          newSelection = new Set();
+          // Don't deselect when using node tool — keep current selection for node editing
+          if (activeTool === 'node' && selectedIds.size > 0) {
+            // Do nothing — keep selection for node editing
+          } else {
+            onSelectionChange?.(new Set());
+          }
         }
-
-        onSelectionChange?.(newSelection);
       }
       clickStartRef.current = null;
     }
