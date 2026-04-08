@@ -71,9 +71,6 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
     wMaxY = Math.max(wMaxY, y2);
   }
 
-  console.log('Direct bounds:', { wMinX, wMinY, wMaxX, wMaxY });
-  console.log('Bed:', scn.canvas.width, 'x', scn.canvas.height);
-
   if (!isFinite(wMinX)) return scn;
 
   let dx = 0, dy = 0;
@@ -88,8 +85,6 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
     case 'top':    dy = -wMinY; break;
     case 'bottom': dy = scn.canvas.height - wMaxY; break;
   }
-
-  console.log('Offset dx:', dx, 'dy:', dy);
 
   return {
     ...scn,

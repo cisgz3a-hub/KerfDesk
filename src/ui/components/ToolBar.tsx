@@ -8,13 +8,35 @@ interface ToolBarProps {
   onToolChange: (tool: ToolType) => void;
 }
 
-const TOOLS: { id: ToolType; label: string; title?: string }[] = [
-  { id: 'select', label: '⊹' },
-  { id: 'node', label: '◇', title: 'Node Edit (N)' },
-  { id: 'rect', label: '▭' },
-  { id: 'ellipse', label: '◯' },
-  { id: 'line', label: '╲' },
-  { id: 'text', label: 'T' },
+const icons: Record<ToolType, React.ReactNode> = {
+  select: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+    React.createElement('path', { d: 'M3 2l5 12 2-5 5-2L3 2z' }),
+  ),
+  node: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+    React.createElement('path', { d: 'M2 8h4M10 8h4M8 2v4M8 10v4' }),
+    React.createElement('rect', { x: 5.5, y: 5.5, width: 5, height: 5, rx: 1, fill: 'currentColor' }),
+  ),
+  rect: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+    React.createElement('rect', { x: 2.5, y: 3.5, width: 11, height: 9, rx: 1 }),
+  ),
+  ellipse: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+    React.createElement('ellipse', { cx: 8, cy: 8, rx: 6, ry: 5 }),
+  ),
+  line: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'none', stroke: 'currentColor', strokeWidth: 1.5 },
+    React.createElement('line', { x1: 3, y1: 13, x2: 13, y2: 3 }),
+  ),
+  text: React.createElement('svg', { width: 16, height: 16, viewBox: '0 0 16 16', fill: 'currentColor' },
+    React.createElement('text', { x: 3, y: 13, fontSize: 13, fontWeight: 700, fontFamily: 'serif' }, 'T'),
+  ),
+};
+
+const TOOLS: { id: ToolType; title?: string }[] = [
+  { id: 'select' },
+  { id: 'node', title: 'Node Edit (N)' },
+  { id: 'rect' },
+  { id: 'ellipse' },
+  { id: 'line' },
+  { id: 'text' },
 ];
 
 export function ToolBar({ activeTool, onToolChange }: ToolBarProps) {
@@ -55,7 +77,7 @@ export function ToolBar({ activeTool, onToolChange }: ToolBarProps) {
         title: tool.title,
         onClick: () => onToolChange(tool.id),
         style: toolBtnStyle(tool.id),
-      }, tool.label)
+      }, icons[tool.id])
     ),
     React.createElement('div', { style: { width: 20, height: 1, background: theme.border.default, margin: '4px 0' } }),
     ...drawTools.map(tool =>
@@ -64,7 +86,7 @@ export function ToolBar({ activeTool, onToolChange }: ToolBarProps) {
         title: tool.title,
         onClick: () => onToolChange(tool.id),
         style: toolBtnStyle(tool.id),
-      }, tool.label)
+      }, icons[tool.id])
     ),
   );
 }
