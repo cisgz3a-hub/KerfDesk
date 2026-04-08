@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="120mm" height="80mm" viewBox="0 0 120 80">
+  <title>LaserForge tester sample</title>
+  <rect x="10" y="10" width="40" height="30" fill="none" stroke="#333" stroke-width="0.5"/>
+  <circle cx="85" cy="35" r="18" fill="none" stroke="#333" stroke-width="0.5"/>
+  <line x1="10" y1="65" x2="110" y2="65" stroke="#333" stroke-width="0.5"/>
+</svg>

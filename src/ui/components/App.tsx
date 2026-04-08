@@ -25,7 +25,6 @@ import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../../core/output/Output';
 import '../../core/output/GrblStrategy';
-import { simulatePlan, type SimulationResult } from '../../core/plan/Simulation';
 import { deleteObjects, duplicateObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { FileToolbar } from './FileToolbar';
@@ -146,7 +145,6 @@ export function App() {
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
-  const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -535,26 +533,6 @@ export function App() {
       console.error('Drop import failed:', err);
     }
   }, [scene, handleSceneCommit, handleNewProject]);
-
-  const handleSimulate = useCallback(() => {
-    try {
-      const job = compileJob(scene);
-      if (job.operations.length === 0) {
-        setSimulation(null);
-        return;
-      }
-      const plan = optimizePlan(job);
-      const result = simulatePlan(plan);
-      setSimulation(result);
-    } catch (err) {
-      console.error('Simulation failed:', err);
-      setSimulation(null);
-    }
-  }, [scene]);
-
-  const handleStopSimulation = useCallback(() => {
-    setSimulation(null);
-  }, []);
 
   const handleConnect = useCallback(() => {
     try {
@@ -1043,10 +1021,7 @@ export function App() {
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
-      onSimulate: handleSimulate,
-      onStopSimulation: handleStopSimulation,
       onConnect: handleConnect,
-      isSimulating: simulation !== null,
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
@@ -1113,7 +1088,6 @@ export function App() {
       }),
       React.createElement(CanvasViewport, {
         scene,
-        simulation,
         activeTool: activeTool,
         width: canvasSize.width - 240 - 36,
         height: canvasSize.height,
@@ -1174,7 +1148,12 @@ export function App() {
         flexShrink: 0,
       },
     },
-      React.createElement('span', {}, scene.metadata.name || 'Untitled'),
+      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
+        React.createElement('span', {
+          style: { fontSize: '9px', color: '#333355', fontFamily: "'JetBrains Mono', monospace" },
+        }, 'v0.1.0'),
+        React.createElement('span', {}, scene.metadata.name || 'Untitled'),
+      ),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
         React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
         React.createElement('span', {

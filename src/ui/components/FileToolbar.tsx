@@ -35,10 +35,7 @@ interface FileToolbarProps {
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
   onNewProject: (scene: Scene) => void;
-  onSimulate?: () => void;
-  onStopSimulation?: () => void;
   onConnect?: () => void;
-  isSimulating?: boolean;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
   onPreviewToggle?: () => void;
@@ -58,10 +55,7 @@ export function FileToolbar({
   onSceneChange,
   onSceneCommit,
   onNewProject,
-  onSimulate,
-  onStopSimulation,
   onConnect,
-  isSimulating,
   onMaterialTest,
   onMaterialSetup,
   onPreviewToggle,
@@ -128,8 +122,9 @@ export function FileToolbar({
 
       onSceneChange(updated);
       onSceneCommit(updated);
-    } catch (err) {
-      console.error('SVG import failed:', err);
+    } catch (e) {
+      console.error('SVG import failed:', e);
+      alert('Import failed: ' + (e as Error).message);
     }
 
     // Reset input so the same file can be re-imported
@@ -253,9 +248,9 @@ export function FileToolbar({
       };
       onSceneChange(newScene);
       onSceneCommit(newScene);
-    } catch (err) {
-      console.error('Image import failed:', err);
-      alert('Image import failed: ' + (err as Error).message);
+    } catch (e) {
+      console.error('Image import failed:', e);
+      alert('Import failed: ' + (e as Error).message);
     }
 
     if (imageInputRef.current) {
@@ -279,9 +274,9 @@ export function FileToolbar({
       const updated = importDxfIntoScene(text, scene, layerId);
       onSceneChange(updated);
       onSceneCommit(updated);
-    } catch (err) {
-      console.error('DXF import failed:', err);
-      alert('DXF import failed: ' + (err as Error).message);
+    } catch (e) {
+      console.error('DXF import failed:', e);
+      alert('Import failed: ' + (e as Error).message);
     }
 
     if (dxfInputRef.current) {
@@ -292,12 +287,16 @@ export function FileToolbar({
   // ─── SAVE ────────────────────────────────────────────────────
 
   const handleSave = useCallback(() => {
-    saveSceneToFile(scene);
     try {
-      const serialized = serializeScene(scene);
-      localStorage.setItem('laserforge_autosave', serialized);
-      localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
-    } catch { /* ignore */ }
+      saveSceneToFile(scene);
+      try {
+        const serialized = serializeScene(scene);
+        localStorage.setItem('laserforge_autosave', serialized);
+        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+      } catch { /* ignore */ }
+    } catch (e) {
+      alert('Save failed: ' + (e as Error).message);
+    }
   }, [scene]);
 
   const handleOpenClick = useCallback(() => {
@@ -312,9 +311,9 @@ export function FileToolbar({
       const text = await file.text();
       const loaded = deserializeScene(text);
       onNewProject(loaded);
-    } catch (err) {
-      console.error('Failed to open file:', err);
-      alert('Failed to open file: ' + (err as Error).message);
+    } catch (e) {
+      console.error('Failed to open file:', e);
+      alert('Import failed: ' + (e as Error).message);
     }
 
     if (openInputRef.current) {
@@ -341,40 +340,26 @@ export function FileToolbar({
       a.download = (scene.metadata.name || 'untitled').replace(/\s+/g, '_') + '.gcode';
       a.click();
       URL.revokeObjectURL(url);
-    } catch (err) {
-      console.error('G-code generation failed:', err);
-      alert('G-code generation failed: ' + (err as Error).message);
+    } catch (e) {
+      console.error('G-code generation failed:', e);
+      alert('G-code generation failed: ' + (e as Error).message);
     }
   }, [scene]);
 
   const handleExportSvg = useCallback(() => {
-    const svg = exportSceneToSvg(scene);
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = (scene.metadata.name || 'Untitled') + '.svg';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [scene]);
-
-  const handleBedSize = useCallback(() => {
-    const input = prompt(
-      `Bed size (current: ${scene.canvas.width} × ${scene.canvas.height} mm)\nEnter: width,height`,
-      `${scene.canvas.width},${scene.canvas.height}`
-    );
-    if (!input) return;
-    const parts = input.split(',').map(s => parseFloat(s.trim()));
-    if (parts.length !== 2 || parts.some(isNaN) || parts.some(v => v < 10 || v > 2000)) {
-      alert('Enter width,height in mm (10-2000)');
-      return;
+    try {
+      const svg = exportSceneToSvg(scene);
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (scene.metadata.name || 'Untitled') + '.svg';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Export failed: ' + (e as Error).message);
     }
-    const newScene = {
-      ...scene,
-      canvas: { ...scene.canvas, width: parts[0], height: parts[1] },
-    };
-    onSceneCommit(newScene);
-  }, [scene, onSceneCommit]);
+  }, [scene]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -440,7 +425,8 @@ export function FileToolbar({
       background: theme.bg.panel,
       borderBottom: `1px solid ${theme.border.subtle}`,
       fontFamily: theme.font.ui,
-      flexWrap: 'wrap' as const,
+      flexWrap: 'nowrap' as const,
+      overflow: 'hidden',
     },
   },
     React.createElement('span', {
@@ -487,12 +473,12 @@ export function FileToolbar({
       ...undoRedoHover(!!canRedo),
     }, '↪'),
     sep,
-    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file', ...stdHover }, 'Import SVG'),
-    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving', ...stdHover }, 'Import Image'),
-    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file', ...stdHover }, 'Import DXF'),
+    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file', ...stdHover }, 'SVG'),
+    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving', ...stdHover }, 'Image'),
+    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file', ...stdHover }, 'DXF'),
     sep,
     React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser', ...stdHover }, 'G-code'),
-    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file', ...stdHover }, 'Export SVG'),
+    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file', ...stdHover }, 'Export'),
     sep,
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
@@ -534,29 +520,10 @@ export function FileToolbar({
         }
       },
     }, previewMode ? '● Preview' : '○ Preview'),
-    !isSimulating && React.createElement('button', { onClick: onSimulate, style: btnStyle, title: 'Simulate laser toolpath', ...stdHover }, 'Simulate'),
-    isSimulating && React.createElement('button', {
-      onClick: onStopSimulation,
-      title: 'Stop simulation',
-      style: { ...btnStyle, borderColor: '#e63e6d', color: '#e63e6d' },
-      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = '#1a1a2e';
-        el.style.borderColor = '#333355';
-        el.style.color = '#ff8899';
-      },
-      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = 'transparent';
-        el.style.borderColor = '#e63e6d';
-        el.style.color = '#e63e6d';
-      },
-    }, 'Stop Sim'),
     React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
     sep,
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
-    React.createElement('button', { onClick: handleBedSize, style: btnStyle, title: 'Change laser bed dimensions', ...stdHover }, 'Bed Size'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Material Test'),
+    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 
     React.createElement('div', { style: { flex: 1 } }),
     React.createElement('button', {

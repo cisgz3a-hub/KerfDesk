@@ -20,6 +20,7 @@
   "build": {
     "appId": "com.laserforge.app",
     "productName": "LaserForge",
+    "npmRebuild": false,
     "directories": {
       "output": "release"
     },

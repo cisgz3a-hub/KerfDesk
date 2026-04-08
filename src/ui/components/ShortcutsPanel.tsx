@@ -56,6 +56,15 @@ const SECTIONS = [
       { key: 'Ctrl+S', desc: 'Save project' },
     ],
   },
+  {
+    title: 'Known Limitations',
+    shortcuts: [
+      { key: 'v0.1.0', desc: 'Beta — expect bugs' },
+      { key: 'No laser', desc: 'Use Simulator to test' },
+      { key: 'Ctrl+S', desc: 'Save often!' },
+      { key: 'Ctrl+Z', desc: 'Undo if something breaks' },
+    ],
+  },
 ];
 
 export function ShortcutsPanel({ onClose }: ShortcutsPanelProps) {
@@ -110,6 +119,7 @@ export function ShortcutsPanel({ onClose }: ShortcutsPanelProps) {
             style: {
               padding: '12px 24px',
               borderBottom: si < SECTIONS.length - 1 ? '1px solid #0f0f1a' : 'none',
+              ...(section.title === 'Known Limitations' ? { gridColumn: '1 / -1' as const } : {}),
             },
           },
             React.createElement('div', {
