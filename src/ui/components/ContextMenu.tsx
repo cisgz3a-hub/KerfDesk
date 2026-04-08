@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { theme } from '../styles/theme';
 
 export interface MenuItem {
   label: string;
@@ -38,34 +39,37 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     position: 'fixed',
     left: x,
     top: y,
-    background: '#1a1a2e',
-    border: '1px solid #2a2a44',
-    borderRadius: 6,
+    background: theme.bg.elevated,
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.lg,
     padding: '4px 0',
-    minWidth: 160,
+    minWidth: 200,
     zIndex: 1000,
-    boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
-    fontFamily: 'monospace',
-    fontSize: 11,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+    fontFamily: theme.font.ui,
+    fontSize: theme.font.size.sm,
+    backdropFilter: 'blur(12px)',
   };
 
   const itemStyle = (disabled?: boolean): React.CSSProperties => ({
-    padding: '6px 14px',
-    color: disabled ? '#444466' : '#ccc',
+    padding: '7px 14px',
+    color: disabled ? theme.text.tertiary : theme.text.primary,
     cursor: disabled ? 'default' : 'pointer',
-    display: 'block',
+    display: 'flex',
+    justifyContent: 'space-between',
     width: '100%',
     background: 'none',
     border: 'none',
     textAlign: 'left' as const,
-    fontFamily: 'monospace',
-    fontSize: 11,
+    fontFamily: theme.font.ui,
+    fontSize: theme.font.size.sm,
+    transition: `background ${theme.transition.fast}`,
   });
 
   const separatorStyle: React.CSSProperties = {
     height: 1,
-    background: '#2a2a44',
-    margin: '4px 0',
+    background: theme.border.subtle,
+    margin: '4px 8px',
   };
 
   return React.createElement('div', { ref, style: menuStyle },
@@ -76,7 +80,7 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
             key: i,
             style: itemStyle(item.disabled),
             onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-              if (!item.disabled) (e.target as HTMLElement).style.background = '#2a2a4e';
+              if (!item.disabled) (e.target as HTMLElement).style.background = theme.bg.hover;
             },
             onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
               (e.target as HTMLElement).style.background = 'none';

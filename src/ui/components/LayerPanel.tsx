@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, createLayer } from '../../core/scene/Layer';
 import { MATERIAL_PRESETS, getPresetById } from '../../data/MaterialPresets';
+import { theme } from '../styles/theme';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -107,23 +108,22 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
     flex: 1,
     minHeight: 0,
     overflowY: 'auto' as const,
-    fontFamily: 'monospace',
-    fontSize: 11,
-    color: '#aaa',
     display: 'flex',
     flexDirection: 'column' as const,
+    fontFamily: theme.font.ui,
+    borderBottom: `1px solid ${theme.border.subtle}`,
   };
 
   const listStyle = {
-    padding: 8,
-    borderBottom: '1px solid #1a1a30',
+    padding: '4px 0',
+    borderBottom: `1px solid ${theme.border.subtle}`,
   };
 
   const settingsStyle = {
-    padding: 8,
+    padding: '10px 12px',
     display: 'flex',
     flexDirection: 'column' as const,
-    gap: 8,
+    gap: 10,
   };
 
   const fieldStyle = {
@@ -132,36 +132,115 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
     gap: 4,
   };
 
-  const inputStyle = {
-    background: '#111122',
-    color: '#ccc',
-    border: '1px solid #2a2a40',
-    borderRadius: 3,
-    padding: '4px 6px',
-    fontFamily: 'monospace',
-    fontSize: 11,
+  const settingsLabelStyle = {
+    fontSize: theme.font.size.xs,
+    color: theme.text.secondary,
+    fontFamily: theme.font.ui,
+    marginBottom: 2,
   };
 
-  const labelStyle = {
-    color: '#666688',
-    fontSize: 10,
+  const numberInputStyle = {
+    width: '100%',
+    padding: '4px 8px',
+    background: theme.bg.base,
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.sm,
+    color: theme.text.primary,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.mono,
+    outline: 'none',
+  };
+
+  const selectStyle = {
+    width: '100%',
+    padding: '4px 8px',
+    background: theme.bg.base,
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.sm,
+    color: theme.text.primary,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.ui,
+    outline: 'none',
+    cursor: 'pointer',
+  };
+
+  const layerSettingsHeaderStyle = {
+    fontSize: theme.font.size.sm,
+    fontWeight: 600,
+    color: theme.text.secondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
     marginBottom: 4,
   };
 
+  const iconToggleStyle = (layer: Layer) => ({
+    background: 'none',
+    border: 'none',
+    color: layer.visible ? theme.text.secondary : theme.text.tertiary,
+    cursor: 'pointer',
+    fontSize: 12,
+    padding: 2,
+    opacity: layer.visible ? 1 : 0.4,
+  });
+
   return React.createElement('div', { style: panelStyle },
+    // Header
     React.createElement('div', {
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', borderBottom: '1px solid #1a1a30' },
+      style: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '8px 12px',
+        borderBottom: `1px solid ${theme.border.subtle}`,
+      },
     },
-      React.createElement('span', { style: { fontSize: 10, color: '#666688', textTransform: 'uppercase' as const, letterSpacing: 1 } }, 'Layers'),
+      React.createElement('span', {
+        style: {
+          fontSize: theme.font.size.sm,
+          fontWeight: 600,
+          color: theme.text.secondary,
+          textTransform: 'uppercase' as const,
+          letterSpacing: '0.08em',
+        },
+      }, 'Layers'),
       React.createElement('div', { style: { display: 'flex', gap: 4 } },
         React.createElement('button', {
           onClick: handleAddLayer,
-          style: { background: 'none', border: '1px solid #333355', borderRadius: 3, color: '#3b8beb', cursor: 'pointer', fontSize: 12, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+          title: 'Add layer',
+          style: {
+            width: 24,
+            height: 24,
+            background: 'transparent',
+            border: `1px solid ${theme.border.default}`,
+            borderRadius: theme.radius.sm,
+            color: theme.text.secondary,
+            cursor: 'pointer',
+            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: `all ${theme.transition.fast}`,
+          },
         }, '+'),
         React.createElement('button', {
           onClick: handleRemoveLayer,
+          title: 'Remove layer',
           disabled: scene.layers.length <= 1,
-          style: { background: 'none', border: '1px solid #333355', borderRadius: 3, color: scene.layers.length <= 1 ? '#333' : '#e63e6d', cursor: scene.layers.length <= 1 ? 'default' : 'pointer', fontSize: 12, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center' },
+          style: {
+            width: 24,
+            height: 24,
+            background: 'transparent',
+            border: `1px solid ${theme.border.default}`,
+            borderRadius: theme.radius.sm,
+            color: scene.layers.length <= 1 ? theme.text.tertiary : theme.text.secondary,
+            cursor: scene.layers.length <= 1 ? 'default' : 'pointer',
+            fontSize: 14,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: `all ${theme.transition.fast}`,
+            opacity: scene.layers.length <= 1 ? 0.45 : 1,
+          },
         }, '−'),
       ),
     ),
@@ -169,30 +248,15 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
       scene.layers.map(layer => {
         const objectCount = scene.objects.filter(o => o.layerId === layer.id).length;
         const isActive = scene.activeLayerId === layer.id;
-        const isSelectedLayer = scene.objects.some(o => selectedIds.has(o.id) && o.layerId === layer.id);
         const rowStyle = {
           display: 'flex',
           alignItems: 'center',
-          gap: 6,
-          padding: '6px 8px',
-          marginBottom: 4,
-          borderRadius: 4,
+          gap: 8,
+          padding: '6px 12px',
+          background: isActive ? 'rgba(0, 212, 255, 0.06)' : 'transparent',
+          borderLeft: isActive ? `2px solid ${theme.accent.cyan}` : '2px solid transparent',
           cursor: 'pointer',
-          background: isActive ? '#1a1a2e' : isSelectedLayer ? '#141426' : 'transparent',
-          border: '1px solid #23233a',
-        };
-        const iconButtonStyle = {
-          background: 'none',
-          border: '1px solid #2a2a40',
-          borderRadius: 3,
-          color: '#aaa',
-          cursor: 'pointer',
-          fontFamily: 'monospace',
-          fontSize: 11,
-          width: 20,
-          height: 20,
-          lineHeight: '16px',
-          padding: 0,
+          transition: `all ${theme.transition.fast}`,
         };
 
         return React.createElement('div', {
@@ -202,29 +266,30 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
         },
           React.createElement('div', {
             style: {
-              width: 12,
-              height: 12,
+              width: 10,
+              height: 10,
               borderRadius: 2,
               background: layer.color,
-              border: '1px solid #000',
               flexShrink: 0,
             },
           }),
           React.createElement('div', { style: { flex: 1, minWidth: 0 } },
             React.createElement('div', {
               style: {
-                color: '#ddd',
+                fontSize: theme.font.size.sm,
+                color: theme.text.primary,
+                fontWeight: 500,
                 whiteSpace: 'nowrap' as const,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
               },
             }, layer.name),
-            React.createElement('div', { style: { color: '#6f6f90', fontSize: 10 } },
-              `${layer.settings.mode} • ${objectCount}`
-            ),
+            React.createElement('div', {
+              style: { fontSize: theme.font.size.xs, color: theme.text.tertiary },
+            }, `${layer.settings.mode} • ${objectCount}`),
           ),
           React.createElement('button', {
-            style: iconButtonStyle,
+            style: iconToggleStyle(layer),
             onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               toggleVisible(layer.id);
@@ -232,7 +297,15 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
             title: layer.visible ? 'Hide layer' : 'Show layer',
           }, layer.visible ? '👁' : '·'),
           React.createElement('button', {
-            style: iconButtonStyle,
+            style: {
+              background: 'none',
+              border: 'none',
+              color: !layer.locked ? theme.text.secondary : theme.text.tertiary,
+              cursor: 'pointer',
+              fontSize: 12,
+              padding: 2,
+              opacity: !layer.locked ? 1 : 0.4,
+            },
             onClick: (e: React.MouseEvent<HTMLButtonElement>) => {
               e.stopPropagation();
               toggleLocked(layer.id);
@@ -243,10 +316,10 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
       }),
     ),
     activeLayer && React.createElement('div', { style: settingsStyle },
-      React.createElement('div', { style: { color: '#7b7ba4' } }, 'Layer Settings'),
-      React.createElement('div', { style: labelStyle }, 'Material Preset'),
+      React.createElement('div', { style: layerSettingsHeaderStyle }, 'Layer Settings'),
+      React.createElement('div', { style: settingsLabelStyle }, 'Material Preset'),
       React.createElement('select', {
-        style: inputStyle,
+        style: selectStyle,
         value: '',
         onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
           const preset = getPresetById(e.target.value);
@@ -280,31 +353,31 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
         ),
       ),
       React.createElement('label', { style: fieldStyle },
-        React.createElement('span', null, 'Power %'),
+        React.createElement('span', { style: settingsLabelStyle }, 'Power %'),
         React.createElement('input', {
           type: 'number',
           min: 0,
           max: 100,
           value: activeLayer.settings.power.max,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => updatePower(Number(e.target.value)),
-          style: inputStyle,
+          style: numberInputStyle,
         }),
       ),
       React.createElement('label', { style: fieldStyle },
-        React.createElement('span', null, 'Speed mm/min'),
+        React.createElement('span', { style: settingsLabelStyle }, 'Speed mm/min'),
         React.createElement('input', {
           type: 'number',
           value: activeLayer.settings.speed,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => updateSpeed(Number(e.target.value)),
-          style: inputStyle,
+          style: numberInputStyle,
         }),
       ),
       React.createElement('label', { style: fieldStyle },
-        React.createElement('span', null, 'Mode'),
+        React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
         React.createElement('select', {
           value: activeLayer.settings.mode,
           onChange: (e: React.ChangeEvent<HTMLSelectElement>) => updateMode(e.target.value as LayerMode),
-          style: inputStyle,
+          style: selectStyle,
         },
           React.createElement('option', { value: 'cut' }, 'cut'),
           React.createElement('option', { value: 'engrave' }, 'engrave'),

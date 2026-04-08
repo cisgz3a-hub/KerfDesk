@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene } from '../../core/scene/Scene';
+import { theme } from '../styles/theme';
 import { type ImageGeometry, type PathGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
@@ -171,29 +172,73 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
   }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, onSceneCommit, onSelectionChange]);
 
   const containerStyle: React.CSSProperties = {
-    padding: '8px 10px',
-    borderTop: '1px solid #1a1a30',
-    fontSize: 11,
-    fontFamily: 'monospace',
-    color: '#999',
+    padding: '10px 12px',
+    borderTop: `1px solid ${theme.border.subtle}`,
+    fontFamily: theme.font.ui,
+    color: theme.text.secondary,
   };
 
   const labelStyle: React.CSSProperties = {
-    color: '#666688',
-    fontSize: 10,
+    fontSize: theme.font.size.xs,
+    color: theme.text.secondary,
+    fontFamily: theme.font.ui,
     marginBottom: 2,
   };
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: '#12121f',
-    border: '1px solid #2a2a44',
-    borderRadius: 3,
-    color: '#ccc',
-    padding: '3px 6px',
-    fontSize: 11,
-    fontFamily: 'monospace',
+    padding: '4px 8px',
+    background: theme.bg.base,
+    border: `1px solid ${theme.border.default}`,
+    borderRadius: theme.radius.sm,
+    color: theme.text.primary,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.mono,
+    outline: 'none',
     marginBottom: 6,
+  };
+
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    fontFamily: theme.font.ui,
+    cursor: 'pointer',
+  };
+
+  const sectionHeaderStyle: React.CSSProperties = {
+    fontSize: theme.font.size.sm,
+    fontWeight: 600,
+    color: theme.text.secondary,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.05em',
+    marginBottom: 6,
+  };
+
+  const emptyStateStyle: React.CSSProperties = {
+    padding: 12,
+    color: theme.text.tertiary,
+    fontSize: theme.font.size.sm,
+    fontFamily: theme.font.ui,
+    fontStyle: 'italic' as const,
+  };
+
+  const dividerStyle: React.CSSProperties = {
+    marginTop: 8,
+    borderTop: `1px solid ${theme.border.subtle}`,
+    paddingTop: 8,
+  };
+
+  const traceButtonStyle: React.CSSProperties = {
+    width: '100%',
+    padding: '7px 12px',
+    background: 'rgba(45, 212, 160, 0.1)',
+    border: `1px solid ${theme.accent.green}`,
+    borderRadius: theme.radius.md,
+    color: theme.accent.green,
+    cursor: 'pointer',
+    fontFamily: theme.font.ui,
+    fontSize: theme.font.size.sm,
+    fontWeight: 500,
+    transition: `all ${theme.transition.fast}`,
   };
 
   const rowStyle: React.CSSProperties = {
@@ -203,14 +248,14 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
 
   if (selectedObjects.length === 0) {
     return React.createElement('div', { style: containerStyle },
-      React.createElement('div', { style: { color: '#444466', fontStyle: 'italic' } }, 'No selection')
+      React.createElement('div', { style: emptyStateStyle }, 'No selection')
     );
   }
 
   if (selectedObjects.length > 1) {
     return React.createElement('div', { style: containerStyle },
       React.createElement('div', { style: labelStyle }, 'Selection'),
-      React.createElement('div', null, `${selectedObjects.length} objects selected`)
+      React.createElement('div', { style: emptyStateStyle }, `${selectedObjects.length} objects selected`)
     );
   }
 
@@ -220,7 +265,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
   const h = bounds.maxY - bounds.minY;
 
   return React.createElement('div', { style: containerStyle },
-    React.createElement('div', { style: { ...labelStyle, marginBottom: 6, color: '#888' } }, obj.name || obj.type),
+    React.createElement('div', { style: { ...labelStyle, marginBottom: 6, fontWeight: 600, color: theme.text.primary } }, obj.name || obj.type),
 
     React.createElement('div', { style: rowStyle },
       React.createElement('div', { style: { flex: 1 } },
@@ -254,7 +299,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
           type: 'text',
           value: w.toFixed(2) + ' mm',
           readOnly: true,
-          style: { ...inputStyle, color: '#666' },
+          style: { ...inputStyle, color: theme.text.tertiary },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
@@ -263,7 +308,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
           type: 'text',
           value: h.toFixed(2) + ' mm',
           readOnly: true,
-          style: { ...inputStyle, color: '#666' },
+          style: { ...inputStyle, color: theme.text.tertiary },
         }),
       ),
     ),
@@ -271,7 +316,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
     React.createElement('div', { style: labelStyle }, 'Layer'),
     React.createElement('select', {
       value: obj.layerId,
-      style: inputStyle,
+      style: selectStyle,
       onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
         updateObjectLayer(obj.id, e.target.value),
     },
@@ -282,10 +327,10 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
     ),
 
     React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Type'),
-    React.createElement('div', { style: { color: '#aaa' } }, obj.type),
+    React.createElement('div', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, obj.type),
 
-    obj.geometry.type === 'image' && React.createElement('div', { style: { marginTop: 8, borderTop: '1px solid #1a1a30', paddingTop: 8 } },
-      React.createElement('div', { style: { ...labelStyle, color: '#888', marginBottom: 6 } }, 'Image Processing'),
+    obj.geometry.type === 'image' && React.createElement('div', { style: dividerStyle },
+      React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),
 
       React.createElement('div', { style: labelStyle }, 'Brightness'),
       React.createElement('input', {
@@ -293,7 +338,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
         min: -100,
         max: 100,
         value: (obj.geometry as ImageGeometry).brightness ?? 0,
-        style: { width: '100%', accentColor: '#3b8beb', marginBottom: 6 },
+        style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
         onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
           updateImageSettings(obj.id, 'brightness', parseInt(e.target.value, 10)),
       }),
@@ -304,7 +349,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
         min: -100,
         max: 100,
         value: (obj.geometry as ImageGeometry).contrast ?? 0,
-        style: { width: '100%', accentColor: '#3b8beb', marginBottom: 6 },
+        style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
         onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
           updateImageSettings(obj.id, 'contrast', parseInt(e.target.value, 10)),
       }),
@@ -316,13 +361,13 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
           onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
             updateImageSettings(obj.id, 'invert', e.target.checked),
         }),
-        React.createElement('span', { style: { color: '#aaa' } }, 'Invert'),
+        React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Invert'),
       ),
 
       React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Dither Mode'),
       React.createElement('select', {
         value: (obj.geometry as ImageGeometry).ditherMode ?? ditherMode,
-        style: inputStyle,
+        style: selectStyle,
         onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
           const mode = e.target.value as DitherMode;
           setDitherMode(mode);
@@ -369,27 +414,27 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
         React.createElement('option', { value: 'ordered' }, 'Ordered (Bayer)'),
       ),
 
-      React.createElement('div', { style: { marginTop: 8, borderTop: '1px solid #1a1a30', paddingTop: 8 } },
-        React.createElement('div', { style: { ...labelStyle, color: '#888', marginBottom: 6 } }, 'Image Tracing'),
+      React.createElement('div', { style: dividerStyle },
+        React.createElement('div', { style: sectionHeaderStyle }, 'Image Tracing'),
 
         React.createElement('div', { style: labelStyle }, `Threshold: ${traceThreshold}`),
         React.createElement('input', {
           type: 'range', min: 1, max: 255, value: traceThreshold,
-          style: { width: '100%', accentColor: '#2dd4a0', marginBottom: 4 },
+          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceThreshold(parseInt(e.target.value, 10)),
         }),
 
         React.createElement('div', { style: labelStyle }, `Speckle filter: ${traceTurdsize}`),
         React.createElement('input', {
           type: 'range', min: 0, max: 50, value: traceTurdsize,
-          style: { width: '100%', accentColor: '#2dd4a0', marginBottom: 4 },
+          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceTurdsize(parseInt(e.target.value, 10)),
         }),
 
         React.createElement('div', { style: labelStyle }, `Smoothness: ${traceAlphamax.toFixed(1)}`),
         React.createElement('input', {
           type: 'range', min: 0, max: 1.33, step: 0.1, value: traceAlphamax,
-          style: { width: '100%', accentColor: '#2dd4a0', marginBottom: 4 },
+          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceAlphamax(parseFloat(e.target.value)),
         }),
 
@@ -398,16 +443,12 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
             type: 'checkbox', checked: traceInvert,
             onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceInvert(e.target.checked),
           }),
-          React.createElement('span', { style: { color: '#aaa' } }, 'Trace light areas'),
+          React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Trace light areas'),
         ),
 
         React.createElement('button', {
           onClick: handleTrace,
-          style: {
-            width: '100%', padding: '6px 12px',
-            background: '#1a3a2e', border: '1px solid #2dd4a0', borderRadius: 4,
-            color: '#2dd4a0', cursor: 'pointer', fontFamily: 'monospace', fontSize: 11,
-          },
+          style: traceButtonStyle,
         }, 'Trace to Vector (Cut layer)'),
       ),
     ),
