@@ -385,6 +385,30 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
           React.createElement('option', { value: 'image' }, 'image'),
         ),
       ),
+      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
+        React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Air Assist'),
+        React.createElement('button', {
+          onClick: () => {
+            const newLayers = scene.layers.map(l =>
+              l.id === activeLayer.id
+                ? { ...l, settings: { ...l.settings, airAssist: !l.settings.airAssist } }
+                : l
+            );
+            onSceneCommit({ ...scene, layers: newLayers });
+          },
+          style: {
+            padding: '3px 12px',
+            background: activeLayer.settings.airAssist ? 'rgba(45, 212, 160, 0.1)' : 'rgba(255,255,255,0.03)',
+            border: activeLayer.settings.airAssist ? '1px solid #2dd4a0' : '1px solid #252540',
+            borderRadius: 4,
+            color: activeLayer.settings.airAssist ? '#2dd4a0' : '#555570',
+            fontSize: 11,
+            cursor: 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            transition: 'all 0.15s ease',
+          },
+        }, activeLayer.settings.airAssist ? 'ON' : 'OFF'),
+      ),
     ),
   );
 }
