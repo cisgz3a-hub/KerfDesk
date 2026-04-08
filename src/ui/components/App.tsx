@@ -23,6 +23,8 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
+import { getOutputStrategy } from '../../core/output/Output';
+import '../../core/output/GrblStrategy';
 import { simulatePlan, type SimulationResult } from '../../core/plan/Simulation';
 import { deleteObjects, duplicateObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
@@ -34,11 +36,12 @@ import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu, type MenuItem } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
 import { MaterialTestDialog, type MaterialTestConfig } from './MaterialTestDialog';
+import { GcodePreview } from './GcodePreview';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { generateId } from '../../core/types';
-import { createLayer, type Layer } from '../../core/scene/Layer';
+import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
@@ -120,6 +123,7 @@ export function App() {
   const [showGridArray, setShowGridArray] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
+  const [gcodePreview, setGcodePreview] = useState<string | null>(null);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -446,83 +450,61 @@ export function App() {
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
 
-    const newLayers: Layer[] = [];
-    const objects: SceneObject[] = [];
+    // Use existing engrave layer or create one
+    let targetScene = scene;
+    let layerId = scene.layers.find(l => l.settings.mode === 'engrave')?.id;
+    if (!layerId) {
+      const newLayer = createLayer(scene.layers.length, 'engrave', 'Material Test');
+      targetScene = { ...scene, layers: [...scene.layers, newLayer] };
+      layerId = newLayer.id;
+    }
+
+    const objects: typeof scene.objects = [];
     const startX = 10;
     const startY = 10;
-    let order = scene.layers.length;
 
     for (let r = 0; r < config.rows; r++) {
       for (let c = 0; c < config.cols; c++) {
         const x = startX + c * (config.cellSize + config.spacing);
         const y = startY + r * (config.cellSize + config.spacing);
         const power = config.rows === 1 ? config.powerMin :
-          config.powerMin + (r / (config.rows - 1)) * (config.powerMax - config.powerMin);
-        const speed = config.cols === 1 ? config.speedMin :
-          config.speedMin + (c / (config.cols - 1)) * (config.speedMax - config.speedMin);
-        const pRounded = Math.round(power);
-        const sRounded = Math.round(speed);
+          Math.round(config.powerMin + (r / (config.rows - 1)) * (config.powerMax - config.powerMin));
+        const speed = config.cols === 1 ? config.speedMax :
+          Math.round(config.speedMax - (c / (config.cols - 1)) * (config.speedMax - config.speedMin));
 
-        const layer = createLayer(order++, 'engrave', `MatTest P${pRounded} S${sRounded}`);
-        layer.settings = {
-          ...layer.settings,
-          power: { min: pRounded, max: pRounded },
-          speed: sRounded,
-        };
-        newLayers.push(layer);
-        const layerId = layer.id;
-
-        const id = generateId();
+        // Filled rectangle
         objects.push({
-          id,
-          type: 'rect',
-          name: `P${pRounded} S${sRounded}`,
+          id: generateId(),
+          type: 'rect' as any,
+          name: `P${power} S${speed}`,
           layerId,
           parentId: null,
           transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y },
-          geometry: {
-            type: 'rect',
-            x: 0, y: 0,
-            width: config.cellSize,
-            height: config.cellSize,
-            cornerRadius: 0,
-          },
-          visible: true,
-          locked: false,
-          _bounds: null,
-          _worldTransform: null,
+          geometry: { type: 'rect', x: 0, y: 0, width: config.cellSize, height: config.cellSize } as any,
+          visible: true, locked: false, _bounds: null, _worldTransform: null,
         });
 
-        const textId = generateId();
+        // Label below each cell
         objects.push({
-          id: textId,
-          type: 'text',
-          name: `Label P${pRounded} S${sRounded}`,
+          id: generateId(),
+          type: 'text' as any,
+          name: `Label`,
           layerId,
           parentId: null,
-          transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y + config.cellSize + 0.5 },
+          transform: { a: 1, b: 0, c: 0, d: 1, tx: x + 0.5, ty: y + config.cellSize + 1 },
           geometry: {
             type: 'text',
-            text: `${pRounded}%/${sRounded}`,
+            text: `${power}%/${speed}`,
             fontFamily: 'Arial',
-            fontSize: Math.min(config.cellSize * 0.3, 3),
-            bold: false,
-            italic: false,
-          },
-          visible: true,
-          locked: false,
-          _bounds: null,
-          _worldTransform: null,
+            fontSize: Math.min(config.cellSize * 0.25, 2.5),
+            bold: false, italic: false,
+          } as any,
+          visible: true, locked: false, _bounds: null, _worldTransform: null,
         });
       }
     }
 
-    const newScene = {
-      ...scene,
-      layers: [...scene.layers, ...newLayers],
-      objects: [...scene.objects, ...objects],
-    };
-    handleSceneCommit(newScene);
+    handleSceneCommit({ ...targetScene, objects: [...targetScene.objects, ...objects] });
   }, [scene, handleSceneCommit]);
 
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
@@ -622,6 +604,22 @@ export function App() {
         if (e.key === 'A' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
           e.preventDefault();
           handleGridArray();
+          return;
+        }
+        // Preview G-code: Ctrl+P
+        if (e.key === 'p' || e.key === 'P') {
+          e.preventDefault();
+          try {
+            const job = compileJob(scene);
+            if (job.operations.length === 0) return;
+            const plan = optimizePlan(job);
+            const strategy = getOutputStrategy('grbl');
+            if (!strategy) return;
+            const output = strategy.generate(plan, job);
+            setGcodePreview(output.text ?? '');
+          } catch (err) {
+            console.error('G-code generation failed:', err);
+          }
           return;
         }
         return;
@@ -863,6 +861,13 @@ export function App() {
     showMaterialTest && React.createElement(MaterialTestDialog, {
       onConfirm: handleMaterialTestConfirm,
       onCancel: () => setShowMaterialTest(false),
+    }),
+
+    gcodePreview && React.createElement(GcodePreview, {
+      gcode: gcodePreview,
+      bedWidth: scene.canvas.width,
+      bedHeight: scene.canvas.height,
+      onClose: () => setGcodePreview(null),
     }),
   );
 }
