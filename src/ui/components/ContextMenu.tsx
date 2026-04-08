@@ -35,6 +35,34 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     };
   }, [onClose]);
 
+  useEffect(() => {
+    if (!ref.current) return;
+    const el = ref.current;
+    const rect = el.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+
+    let newX = x;
+    let newY = y;
+
+    // Clamp right edge
+    if (newX + rect.width > vw - 10) {
+      newX = vw - rect.width - 10;
+    }
+    // Clamp bottom edge
+    if (newY + rect.height > vh - 10) {
+      newY = vh - rect.height - 10;
+    }
+    // Clamp left/top
+    if (newX < 10) newX = 10;
+    if (newY < 10) newY = 10;
+
+    if (newX !== x || newY !== y) {
+      el.style.left = `${newX}px`;
+      el.style.top = `${newY}px`;
+    }
+  }, [x, y]);
+
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
     left: x,

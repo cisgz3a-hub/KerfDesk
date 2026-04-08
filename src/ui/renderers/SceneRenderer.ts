@@ -451,7 +451,7 @@ export function renderSceneObjects(
     ctx.fillText('START', sp.x + transform.screenPx(10), sp.y - transform.screenPx(4));
   }
 
-  if (boundsCache && boundsCache.size > 0) {
+  if (!previewMode && boundsCache && boundsCache.size > 0) {
     for (const [id, bounds] of boundsCache) {
       renderSelectionHighlight(ctx, bounds, transform);
     }

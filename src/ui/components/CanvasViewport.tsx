@@ -368,19 +368,6 @@ export function CanvasViewport({
       }
     }
 
-    }
-
-    // 5–6. Simulation overlay (in world space)
-    if (simulation && simulation.frames.length > 1) {
-      const visibleBounds = transform.getVisibleWorldBounds(width, height);
-      ctx.save();
-      transform.applyToContext(ctx);
-      renderSimulationPath(ctx, simulation, transform, playbackTime, visibleBounds);
-      renderTrail(ctx, simulation, transform, playbackTime, 0.5, visibleBounds);
-      renderLaserHead(ctx, simulation, transform, playbackTime);
-      ctx.restore();
-    }
-
     // 8. Drawing preview (rubber band)
     if (drawRef.current && drawRef.current.tool === activeTool) {
       ctx.save();
@@ -437,6 +424,19 @@ export function CanvasViewport({
       ctx.setLineDash([transform.screenPx(4), transform.screenPx(3)]);
       ctx.strokeRect(x, y, w, h);
       ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    }
+
+    // 5–6. Simulation overlay (in world space)
+    if (simulation && simulation.frames.length > 1) {
+      const visibleBounds = transform.getVisibleWorldBounds(width, height);
+      ctx.save();
+      transform.applyToContext(ctx);
+      renderSimulationPath(ctx, simulation, transform, playbackTime, visibleBounds);
+      renderTrail(ctx, simulation, transform, playbackTime, 0.5, visibleBounds);
+      renderLaserHead(ctx, simulation, transform, playbackTime);
       ctx.restore();
     }
 
