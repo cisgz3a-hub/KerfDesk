@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LaserForge — Laser Cutting & Engraving Software</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #06060e;
+    --bg2: #0a0a16;
+    --bg3: #0f0f1e;
+    --surface: #141428;
+    --border: #1a1a35;
+    --text: #d8d8f0;
+    --text2: #8888aa;
+    --text3: #555578;
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0, 212, 255, 0.08);
+    --green: #2dd4a0;
+    --red: #ff4466;
+    --orange: #ff8844;
+    --font: 'Outfit', system-ui, sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+
+  /* Grain overlay */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4'/%3E%3C/filter%3E%3Crect width='256' height='256' filter='url(%23n)'/%3E%3C/svg%3E");
+    z-index: 9999;
+  }
+
+  /* ===== NAV ===== */
+  nav {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+    padding: 16px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(6, 6, 14, 0.8);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+  }
+
+  .logo-icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .logo-text {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: -0.02em;
+  }
+
+  .logo-text span {
+    color: var(--cyan);
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .nav-links a {
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 500;
+    transition: color 0.2s;
+  }
+
+  .nav-links a:hover { color: var(--text); }
+
+  .btn-nav {
+    padding: 8px 20px;
+    background: var(--cyan-dim);
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    color: var(--cyan);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.2s;
+  }
+
+  .btn-nav:hover {
+    background: rgba(0, 212, 255, 0.15);
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+  }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 120px 40px 80px;
+    position: relative;
+  }
+
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 800px;
+    background: radial-gradient(circle, rgba(0, 212, 255, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 32px;
+    animation: fadeIn 0.6s ease;
+  }
+
+  .hero-badge .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .hero h1 {
+    font-size: clamp(48px, 7vw, 86px);
+    font-weight: 800;
+    line-height: 1.05;
+    letter-spacing: -0.03em;
+    margin-bottom: 24px;
+    animation: fadeUp 0.8s ease;
+  }
+
+  .hero h1 .gradient {
+    background: linear-gradient(135deg, var(--cyan), var(--green));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .hero p {
+    font-size: 18px;
+    color: var(--text2);
+    max-width: 560px;
+    margin-bottom: 40px;
+    font-weight: 300;
+    line-height: 1.7;
+    animation: fadeUp 0.8s ease 0.1s both;
+  }
+
+  .hero-ctas {
+    display: flex;
+    gap: 16px;
+    animation: fadeUp 0.8s ease 0.2s both;
+  }
+
+  .btn-primary {
+    padding: 14px 36px;
+    background: linear-gradient(135deg, var(--cyan), #0099cc);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.25s;
+    text-decoration: none;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 32px rgba(0, 212, 255, 0.3);
+  }
+
+  .btn-secondary {
+    padding: 14px 36px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-size: 15px;
+    font-weight: 500;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.25s;
+    text-decoration: none;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--text3);
+    background: var(--bg3);
+  }
+
+  .hero-image {
+    margin-top: 60px;
+    width: 100%;
+    max-width: 1000px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 32px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    animation: fadeUp 1s ease 0.3s both;
+    overflow: hidden;
+    aspect-ratio: 16/9;
+    background: var(--bg2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .hero-image .mock-ui {
+    width: 100%;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mock-toolbar {
+    height: 36px;
+    background: var(--bg3);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 6px;
+  }
+
+  .mock-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+
+  .mock-canvas {
+    flex: 1;
+    background: var(--bg);
+    position: relative;
+    display: flex;
+  }
+
+  .mock-sidebar {
+    width: 200px;
+    background: var(--bg3);
+    border-left: 1px solid var(--border);
+    padding: 16px;
+  }
+
+  .mock-bed {
+    flex: 1;
+    margin: 20px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mock-material {
+    position: absolute;
+    top: 20%;
+    left: 15%;
+    width: 55%;
+    height: 60%;
+    background: rgba(196, 168, 130, 0.15);
+    border: 1px solid rgba(196, 168, 130, 0.4);
+    border-radius: 2px;
+  }
+
+  .mock-shape {
+    position: absolute;
+    top: 30%;
+    left: 25%;
+    width: 35%;
+    height: 40%;
+    border: 2px solid var(--red);
+    border-radius: 4px;
+  }
+
+  .mock-dot-start {
+    position: absolute;
+    top: 20%;
+    left: 15%;
+    width: 10px;
+    height: 10px;
+    background: var(--green);
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+  }
+
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* ===== PROBLEM ===== */
+  .problem {
+    padding: 120px 40px;
+    text-align: center;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: clamp(28px, 4vw, 42px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+    line-height: 1.2;
+  }
+
+  .section-sub {
+    font-size: 16px;
+    color: var(--text2);
+    max-width: 600px;
+    margin: 0 auto 60px;
+    font-weight: 300;
+  }
+
+  .pain-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .pain-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 24px;
+    text-align: left;
+    transition: all 0.3s;
+  }
+
+  .pain-card:hover {
+    border-color: rgba(255, 68, 102, 0.3);
+    transform: translateY(-4px);
+  }
+
+  .pain-card .icon {
+    font-size: 28px;
+    margin-bottom: 14px;
+  }
+
+  .pain-card h3 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+
+  .pain-card p {
+    font-size: 13px;
+    color: var(--text2);
+    line-height: 1.6;
+  }
+
+  /* ===== FEATURES ===== */
+  .features {
+    padding: 120px 40px;
+  }
+
+  .feature-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    max-width: 1080px;
+    margin: 0 auto 100px;
+    align-items: center;
+  }
+
+  .feature-row.reverse { direction: rtl; }
+  .feature-row.reverse > * { direction: ltr; }
+
+  .feature-visual {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: hidden;
+    aspect-ratio: 4/3;
+    background: var(--bg2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+
+  .feature-visual .demo {
+    width: 80%;
+    height: 70%;
+    position: relative;
+  }
+
+  .feature-content h3 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+
+  .feature-content p {
+    font-size: 15px;
+    color: var(--text2);
+    line-height: 1.7;
+    margin-bottom: 16px;
+  }
+
+  .feature-tag {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--cyan-dim);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 6px;
+    font-size: 11px;
+    color: var(--cyan);
+    font-weight: 500;
+  }
+
+  /* ===== COMPARISON ===== */
+  .comparison {
+    padding: 120px 40px;
+    text-align: center;
+  }
+
+  .compare-table {
+    max-width: 800px;
+    margin: 0 auto;
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .compare-table th {
+    text-align: left;
+    padding: 16px 20px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .compare-table th:nth-child(2),
+  .compare-table th:nth-child(3) {
+    text-align: center;
+    width: 160px;
+  }
+
+  .compare-table td {
+    padding: 14px 20px;
+    font-size: 14px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+
+  .compare-table td:nth-child(2),
+  .compare-table td:nth-child(3) {
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .compare-table tr:hover { background: rgba(255,255,255,0.015); }
+
+  .check { color: var(--green); font-size: 16px; }
+  .cross { color: var(--text3); font-size: 14px; }
+  .star { color: var(--cyan); font-size: 14px; }
+
+  .compare-table th.ours {
+    color: var(--cyan);
+  }
+
+  /* ===== PRICING ===== */
+  .pricing {
+    padding: 120px 40px;
+    text-align: center;
+  }
+
+  .price-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+  }
+
+  .price-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px 28px;
+    text-align: left;
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .price-card.featured {
+    border-color: var(--cyan);
+    background: linear-gradient(180deg, rgba(0, 212, 255, 0.04) 0%, var(--bg2) 100%);
+  }
+
+  .price-card .tier {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+
+  .price-card .price {
+    font-size: 42px;
+    font-weight: 800;
+    margin-bottom: 4px;
+    letter-spacing: -0.03em;
+  }
+
+  .price-card .price span { font-size: 16px; font-weight: 400; color: var(--text2); }
+
+  .price-card .desc {
+    font-size: 13px;
+    color: var(--text3);
+    margin-bottom: 24px;
+  }
+
+  .price-card ul {
+    list-style: none;
+    margin-bottom: 28px;
+  }
+
+  .price-card li {
+    font-size: 13px;
+    color: var(--text2);
+    padding: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .price-card li::before {
+    content: '✓';
+    color: var(--green);
+    font-weight: 700;
+    font-size: 12px;
+  }
+
+  .price-card .btn-price {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    border-radius: 8px;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-decoration: none;
+  }
+
+  .price-card .btn-price.primary {
+    background: linear-gradient(135deg, var(--cyan), #0099cc);
+    border: none;
+    color: #fff;
+  }
+
+  .price-card .btn-price.secondary {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+
+  .price-badge {
+    position: absolute;
+    top: -10px;
+    right: 20px;
+    background: var(--cyan);
+    color: var(--bg);
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 100px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* ===== CTA ===== */
+  .final-cta {
+    padding: 120px 40px;
+    text-align: center;
+    position: relative;
+  }
+
+  .final-cta::before {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 600px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(0, 212, 255, 0.05) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .final-cta h2 {
+    font-size: clamp(32px, 5vw, 52px);
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    margin-bottom: 16px;
+  }
+
+  .final-cta p {
+    color: var(--text2);
+    font-size: 16px;
+    margin-bottom: 36px;
+    max-width: 500px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+
+  /* ===== FOOTER ===== */
+  footer {
+    padding: 40px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--text3);
+  }
+
+  footer a {
+    color: var(--text2);
+    text-decoration: none;
+    margin-left: 24px;
+  }
+
+  footer a:hover { color: var(--text); }
+
+  /* ===== DEMO VISUALS ===== */
+  .demo-material {
+    width: 100%;
+    height: 100%;
+    border-radius: 6px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .demo-material .bed {
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+  }
+
+  .demo-material .wood {
+    position: absolute;
+    top: 15%;
+    left: 10%;
+    width: 65%;
+    height: 70%;
+    background: rgba(196, 168, 130, 0.2);
+    border: 1.5px solid rgba(196, 168, 130, 0.5);
+    border-radius: 3px;
+  }
+
+  .demo-material .wood::after {
+    content: '200 × 150mm Plywood';
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: rgba(196, 168, 130, 0.6);
+    font-family: var(--mono);
+    white-space: nowrap;
+  }
+
+  .demo-material .design {
+    position: absolute;
+    top: 25%;
+    left: 20%;
+    width: 40%;
+    height: 45%;
+    border: 2px solid var(--red);
+    border-radius: 50%;
+  }
+
+  .demo-material .home-dot {
+    position: absolute;
+    top: 14%;
+    left: 9%;
+    width: 8px;
+    height: 8px;
+    background: var(--green);
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.5);
+    box-shadow: 0 0 8px rgba(45, 212, 160, 0.4);
+  }
+
+  .demo-material .home-label {
+    position: absolute;
+    top: 12%;
+    left: calc(9% + 14px);
+    font-size: 8px;
+    color: var(--green);
+    font-family: var(--font);
+    opacity: 0.7;
+  }
+
+  .demo-preview .wood-solid {
+    position: absolute;
+    top: 15%;
+    left: 10%;
+    width: 65%;
+    height: 70%;
+    background: #c4a882;
+    border-radius: 3px;
+  }
+
+  .demo-preview .burn {
+    position: absolute;
+    top: 25%;
+    left: 20%;
+    width: 40%;
+    height: 45%;
+    border: 3px solid rgba(30, 15, 0, 0.7);
+    border-radius: 50%;
+    box-shadow: 0 0 6px rgba(40, 20, 0, 0.3);
+  }
+
+  /* ===== RESPONSIVE ===== */
+  @media (max-width: 768px) {
+    nav { padding: 12px 20px; }
+    .nav-links { gap: 16px; }
+    .hero { padding: 100px 20px 60px; }
+    .pain-grid { grid-template-columns: 1fr; }
+    .feature-row { grid-template-columns: 1fr; gap: 30px; }
+    .feature-row.reverse { direction: ltr; }
+    .price-grid { grid-template-columns: 1fr; max-width: 400px; }
+    .compare-table { font-size: 12px; }
+    footer { flex-direction: column; gap: 12px; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="logo">
+    <svg class="logo-icon" viewBox="0 0 32 32" fill="none">
+      <rect width="32" height="32" rx="6" fill="#0a0a14"/>
+      <path d="M8 24 L16 6 L24 24 Z" stroke="#00d4ff" stroke-width="2.5" stroke-linejoin="round" fill="none"/>
+      <circle cx="16" cy="18" r="3" fill="#2dd4a0"/>
+    </svg>
+    <span class="logo-text">Laser<span>Forge</span></span>
+  </a>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#compare">Compare</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#download" class="btn-nav">Download</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-badge">
+    <div class="dot"></div>
+    Open Source · Free to start
+  </div>
+  <h1>Laser cutting<br>made <span class="gradient">obvious</span></h1>
+  <p>LaserForge replaces confusion with clarity. See your material, see your design, see exactly what will happen — before you press start.</p>
+  <div class="hero-ctas">
+    <a href="#download" class="btn-primary">Download Free</a>
+    <a href="#features" class="btn-secondary">See Features</a>
+  </div>
+  <div class="hero-image">
+    <div class="mock-ui">
+      <div class="mock-toolbar">
+        <div class="mock-dot" style="background:#ff5f57"></div>
+        <div class="mock-dot" style="background:#febc2e"></div>
+        <div class="mock-dot" style="background:#28c840"></div>
+      </div>
+      <div class="mock-canvas">
+        <div class="mock-bed">
+          <div class="mock-material"></div>
+          <div class="mock-shape"></div>
+          <div class="mock-dot-start"></div>
+        </div>
+        <div class="mock-sidebar">
+          <div style="width:60%;height:8px;background:var(--border);border-radius:4px;margin-bottom:12px"></div>
+          <div style="width:100%;height:24px;background:var(--surface);border:1px solid var(--border);border-radius:4px;margin-bottom:8px;display:flex;align-items:center;padding:0 8px"><div style="width:8px;height:8px;background:var(--red);border-radius:2px;margin-right:6px"></div><div style="width:40%;height:4px;background:var(--border);border-radius:2px"></div></div>
+          <div style="width:100%;height:1px;background:var(--border);margin:12px 0"></div>
+          <div style="width:80%;height:4px;background:var(--border);border-radius:2px;margin-bottom:8px"></div>
+          <div style="width:100%;height:20px;background:var(--surface);border:1px solid var(--border);border-radius:4px;margin-bottom:6px"></div>
+          <div style="width:100%;height:20px;background:var(--surface);border:1px solid var(--border);border-radius:4px;margin-bottom:6px"></div>
+          <div style="width:100%;height:20px;background:var(--surface);border:1px solid var(--border);border-radius:4px"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="problem">
+  <div class="section-label">The Problem</div>
+  <h2 class="section-title">Laser software wasn't built for humans</h2>
+  <p class="section-sub">Current tools think in coordinates and origins. You think in "where's my wood?" and "will this fit?"</p>
+  <div class="pain-grid">
+    <div class="pain-card">
+      <div class="icon">🤯</div>
+      <h3>9 origin modes</h3>
+      <p>Absolute, User Origin, Current Position, Job Origin... most beginners give up here.</p>
+    </div>
+    <div class="pain-card">
+      <div class="icon">👻</div>
+      <h3>Invisible material</h3>
+      <p>Your wood sits on the bed, but the software shows an empty rectangle. You're guessing where things land.</p>
+    </div>
+    <div class="pain-card">
+      <div class="icon">🎰</div>
+      <h3>First cut = gamble</h3>
+      <p>Wrong power? Wrong position? Wrong scale? You won't know until you've wasted material.</p>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div style="text-align:center">
+    <div class="section-label">The Solution</div>
+    <h2 class="section-title">See your material. See the result.</h2>
+    <p class="section-sub">LaserForge puts your physical workspace on screen. No guessing, no coordinates, no confusion.</p>
+  </div>
+
+  <!-- Feature 1: Material -->
+  <div class="feature-row">
+    <div class="feature-visual">
+      <div class="demo demo-material">
+        <div class="bed">
+          <div class="wood"></div>
+          <div class="design"></div>
+          <div class="home-dot"></div>
+          <div class="home-label">⌂ Home</div>
+        </div>
+      </div>
+    </div>
+    <div class="feature-content">
+      <h3>Material-aware design</h3>
+      <p>Tell LaserForge what you're cutting — plywood, acrylic, leather. Set the size. The software shows your material on the bed, exactly where it sits.</p>
+      <p>Designs auto-center on your material, not the bed. If anything extends past the edge, you see a red warning before you waste a single piece.</p>
+      <span class="feature-tag">No other laser software does this</span>
+    </div>
+  </div>
+
+  <!-- Feature 2: Preview -->
+  <div class="feature-row reverse">
+    <div class="feature-visual">
+      <div class="demo demo-preview" style="position:relative">
+        <div class="wood-solid"></div>
+        <div class="burn"></div>
+      </div>
+    </div>
+    <div class="feature-content">
+      <h3>See before you burn</h3>
+      <p>Toggle Preview mode and the canvas transforms into a realistic simulation. Dark burn marks on wood grain show exactly what your finished piece will look like.</p>
+      <p>Cuts appear as thin dark lines. Engraves show as darkened areas. Power intensity affects the depth. No surprises.</p>
+      <span class="feature-tag">Result preview</span>
+    </div>
+  </div>
+
+  <!-- Feature 3: Home position -->
+  <div class="feature-row">
+    <div class="feature-visual" style="display:flex;align-items:center;justify-content:center">
+      <div style="text-align:center;padding:40px">
+        <div style="display:inline-flex;align-items:center;gap:12px;padding:14px 24px;background:var(--surface);border:1px solid var(--border);border-radius:10px">
+          <div style="width:14px;height:14px;background:var(--green);border-radius:50%;border:2px solid rgba(255,255,255,0.5);box-shadow:0 0 12px rgba(45,212,160,0.3)"></div>
+          <div>
+            <div style="font-size:13px;color:var(--green);font-weight:500">⌂ Home position</div>
+            <div style="font-size:10px;color:var(--text3)">laser begins & returns here</div>
+          </div>
+        </div>
+        <div style="margin-top:16px;font-size:11px;color:var(--text3)">Drag to move. Right-click for presets.</div>
+      </div>
+    </div>
+    <div class="feature-content">
+      <h3>One dot replaces nine origin modes</h3>
+      <p>A green dot on the canvas. It says "Laser starts here." Drag it to where your laser head is. That's it.</p>
+      <p>No "Absolute Coordinates." No "User Origin." No 9-point grid selector. Just a dot that means exactly what it says.</p>
+      <span class="feature-tag">Zero learning curve</span>
+    </div>
+  </div>
+
+  <!-- Feature 4: Wizard -->
+  <div class="feature-row reverse">
+    <div class="feature-visual" style="display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px">
+      <div style="display:flex;gap:6px;align-items:center">
+        <div style="width:40px;height:3px;background:var(--cyan);border-radius:2px"></div>
+        <div style="width:40px;height:3px;background:var(--cyan);border-radius:2px"></div>
+        <div style="width:40px;height:3px;background:var(--border);border-radius:2px"></div>
+        <div style="width:40px;height:3px;background:var(--border);border-radius:2px"></div>
+      </div>
+      <div style="font-size:18px;font-weight:600;color:var(--text)">What's your laser?</div>
+      <div style="display:flex;gap:8px">
+        <div style="padding:10px 14px;background:var(--cyan-dim);border:1px solid var(--cyan);border-radius:8px;font-size:11px;color:var(--cyan)">🔹 Small Diode</div>
+        <div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text2)">🔷 Medium Diode</div>
+        <div style="padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:8px;font-size:11px;color:var(--text2)">🔴 CO2</div>
+      </div>
+    </div>
+    <div class="feature-content">
+      <h3>30 seconds to your first cut</h3>
+      <p>On first launch, a 4-step wizard sets up everything: your laser, your material, your workspace. No manual, no tutorial, no YouTube video required.</p>
+      <p>Pick your machine from a visual menu. Choose your material. LaserForge handles power, speed, and bed size automatically.</p>
+      <span class="feature-tag">First-time experience</span>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="comparison" id="compare">
+  <div class="section-label">Comparison</div>
+  <h2 class="section-title">LaserForge vs LightBurn</h2>
+  <p class="section-sub">Same power, less confusion.</p>
+  <table class="compare-table">
+    <thead>
+      <tr>
+        <th>Feature</th>
+        <th class="ours">LaserForge</th>
+        <th>LightBurn</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Material visualization on bed</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>Burn result preview</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>First-time setup wizard</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>Simple home position (1 dot)</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">9 modes</span></td>
+      </tr>
+      <tr>
+        <td>Boundary warnings</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="cross">—</span></td>
+      </tr>
+      <tr>
+        <td>Material test generator</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+      <tr>
+        <td>Boolean operations</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+      <tr>
+        <td>SVG / DXF import</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+      <tr>
+        <td>Image tracing</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+      <tr>
+        <td>Free tier</td>
+        <td><span class="check">✓ Free forever</span></td>
+        <td><span class="cross">30-day trial</span></td>
+      </tr>
+      <tr>
+        <td>One-time purchase</td>
+        <td><span class="check">✓</span></td>
+        <td><span class="check">✓</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="section-label">Pricing</div>
+  <h2 class="section-title">Start free. Pay once.</h2>
+  <p class="section-sub">No subscriptions. No expiring licenses. Buy it once, use it forever.</p>
+  <div class="price-grid">
+    <div class="price-card">
+      <div class="tier">Free</div>
+      <div class="price">$0</div>
+      <div class="desc">Perfect for getting started</div>
+      <ul>
+        <li>Full design tools</li>
+        <li>SVG & DXF import</li>
+        <li>G-code generation</li>
+        <li>Material system</li>
+        <li>Burn preview</li>
+      </ul>
+      <a href="#download" class="btn-price secondary">Download Free</a>
+    </div>
+    <div class="price-card featured">
+      <div class="price-badge">Most Popular</div>
+      <div class="tier">Pro</div>
+      <div class="price">$39 <span>one-time</span></div>
+      <div class="desc">Everything you need</div>
+      <ul>
+        <li>Everything in Free</li>
+        <li>Image tracing & dithering</li>
+        <li>Boolean operations</li>
+        <li>Material test generator</li>
+        <li>Priority support</li>
+        <li>Future updates included</li>
+      </ul>
+      <a href="#download" class="btn-price primary">Get Pro</a>
+    </div>
+    <div class="price-card">
+      <div class="tier">Business</div>
+      <div class="price">$99 <span>one-time</span></div>
+      <div class="desc">For workshops & makerspaces</div>
+      <ul>
+        <li>Everything in Pro</li>
+        <li>Commercial license</li>
+        <li>Multi-machine support</li>
+        <li>Custom material presets</li>
+        <li>Bulk export tools</li>
+      </ul>
+      <a href="#download" class="btn-price secondary">Get Business</a>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta" id="download">
+  <h2>Ready to stop guessing?</h2>
+  <p>Download LaserForge and make your first cut with confidence.</p>
+  <div class="hero-ctas" style="justify-content:center">
+    <a href="#" class="btn-primary">Download for Windows</a>
+    <a href="#" class="btn-secondary">Download for Mac</a>
+  </div>
+  <p style="margin-top:20px;font-size:12px;color:var(--text3)">Free forever. No account required. ~80MB download.</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>© 2026 LaserForge. Built for makers.</div>
+  <div>
+    <a href="#">Documentation</a>
+    <a href="#">GitHub</a>
+    <a href="#">Community</a>
+    <a href="#">Contact</a>
+  </div>
+</footer>
+
+<script>
+// Smooth reveal on scroll
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.opacity = '1';
+      entry.target.style.transform = 'translateY(0)';
+    }
+  });
+}, { threshold: 0.1 });
+
+document.querySelectorAll('.pain-card, .feature-row, .price-card').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(20px)';
+  el.style.transition = 'all 0.6s ease';
+  observer.observe(el);
+});
+</script>
+
+</body>
+</html>
