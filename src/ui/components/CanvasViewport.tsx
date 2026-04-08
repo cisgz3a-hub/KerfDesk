@@ -42,6 +42,13 @@ import {
 import { createTextObject } from '../tools/TextTool';
 import { type ToolType } from './ToolBar';
 
+const GRID_SNAP = 1; // mm — snap to 1mm grid. Set to 0 to disable.
+
+function snapToGrid(value: number, gridSize: number): number {
+  if (gridSize <= 0) return value;
+  return Math.round(value / gridSize) * gridSize;
+}
+
 // ─── PROPS ───────────────────────────────────────────────────────
 
 interface CanvasViewportProps {
@@ -449,7 +456,7 @@ export function CanvasViewport({
       if (text && text.trim()) {
         const layerId = scene.activeLayerId || scene.layers[0]?.id;
         if (!layerId) return;
-        const textObj = createTextObject(text.trim(), worldPt.x, worldPt.y, layerId);
+        const textObj = createTextObject(text.trim(), snapToGrid(worldPt.x, GRID_SNAP), snapToGrid(worldPt.y, GRID_SNAP), layerId);
         const newScene = {
           ...scene,
           objects: [...scene.objects, textObj],
@@ -462,7 +469,13 @@ export function CanvasViewport({
 
     if (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line') {
       // Drawing tools: record start point
-      drawRef.current = { tool: activeTool, startWorldX: worldPt.x, startWorldY: worldPt.y, currentWorldX: worldPt.x, currentWorldY: worldPt.y };
+      drawRef.current = {
+        tool: activeTool,
+        startWorldX: snapToGrid(worldPt.x, GRID_SNAP),
+        startWorldY: snapToGrid(worldPt.y, GRID_SNAP),
+        currentWorldX: snapToGrid(worldPt.x, GRID_SNAP),
+        currentWorldY: snapToGrid(worldPt.y, GRID_SNAP),
+      };
       return;
     }
 
@@ -606,8 +619,8 @@ export function CanvasViewport({
 
     // Drawing preview: update current position for rubber band
     if (drawRef.current && (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line')) {
-      drawRef.current.currentWorldX = world.x;
-      drawRef.current.currentWorldY = world.y;
+      drawRef.current.currentWorldX = snapToGrid(world.x, GRID_SNAP);
+      drawRef.current.currentWorldY = snapToGrid(world.y, GRID_SNAP);
       render();
     }
 
@@ -757,7 +770,25 @@ export function CanvasViewport({
       dragRef.current.lastWorldY = world.y;
 
       if ((worldDx !== 0 || worldDy !== 0) && onSceneChange) {
-        onSceneChange(moveObjects(scene, dragRef.current.dragIds, worldDx, worldDy));
+        const moved = moveObjects(scene, dragRef.current.dragIds, worldDx, worldDy);
+        const dragIds = dragRef.current.dragIds;
+        const snapped = {
+          ...moved,
+          objects: moved.objects.map(o => {
+            if (!dragIds.has(o.id)) return o;
+            return {
+              ...o,
+              transform: {
+                ...o.transform,
+                tx: snapToGrid(o.transform.tx, GRID_SNAP),
+                ty: snapToGrid(o.transform.ty, GRID_SNAP),
+              },
+              _bounds: null,
+              _worldTransform: null,
+            };
+          }),
+        };
+        onSceneChange(snapped);
       }
     }
 
@@ -804,10 +835,15 @@ export function CanvasViewport({
           y: e.clientY - rect.top,
         });
 
-        const x1 = Math.min(drawRef.current.startWorldX, endWorld.x);
-        const y1 = Math.min(drawRef.current.startWorldY, endWorld.y);
-        const x2 = Math.max(drawRef.current.startWorldX, endWorld.x);
-        const y2 = Math.max(drawRef.current.startWorldY, endWorld.y);
+        const sx0 = snapToGrid(drawRef.current.startWorldX, GRID_SNAP);
+        const sy0 = snapToGrid(drawRef.current.startWorldY, GRID_SNAP);
+        const ex0 = snapToGrid(endWorld.x, GRID_SNAP);
+        const ey0 = snapToGrid(endWorld.y, GRID_SNAP);
+
+        const x1 = Math.min(sx0, ex0);
+        const y1 = Math.min(sy0, ey0);
+        const x2 = Math.max(sx0, ex0);
+        const y2 = Math.max(sy0, ey0);
         const w = x2 - x1;
         const h = y2 - y1;
 
@@ -821,7 +857,7 @@ export function CanvasViewport({
             } else if (activeTool === 'ellipse') {
               newObj = createEllipse(layerId, x1 + w / 2, y1 + h / 2, w / 2, h / 2);
             } else if (activeTool === 'line') {
-              newObj = createLine(layerId, drawRef.current.startWorldX, drawRef.current.startWorldY, endWorld.x, endWorld.y);
+              newObj = createLine(layerId, sx0, sy0, ex0, ey0);
             }
 
             if (newObj) {
