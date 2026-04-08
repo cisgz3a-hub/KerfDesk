@@ -166,16 +166,16 @@ export function CanvasViewport({
       }
     }
 
-    // Node editing overlay
+    // Node editing overlay — one path/polygon at a time (first selected in scene order)
     if (activeTool === 'node' && selectedIds.size > 0) {
-      for (const obj of scene.objects) {
-        if (!selectedIds.has(obj.id)) continue;
-        if (obj.geometry.type !== 'path' && obj.geometry.type !== 'polygon') continue;
-
+      const nodeTarget = scene.objects.find(o =>
+        selectedIds.has(o.id) && (o.geometry.type === 'path' || o.geometry.type === 'polygon')
+      );
+      if (nodeTarget) {
+        const obj = nodeTarget;
         ctx.save();
         transform.applyToContext(ctx);
 
-        // Apply object transform
         const t = obj.transform;
         ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
 
@@ -186,14 +186,12 @@ export function CanvasViewport({
           for (const sp of (pathGeom.subPaths || [])) {
             for (const seg of sp.segments) {
               if (seg.type === 'close') continue;
-              // Draw node point
               ctx.fillStyle = '#2dd4a0';
               ctx.strokeStyle = '#ffffff';
               ctx.lineWidth = transform.screenPx(1);
               ctx.fillRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
               ctx.strokeRect(seg.to.x - nodeSize / 2, seg.to.y - nodeSize / 2, nodeSize, nodeSize);
 
-              // Draw control point handles for curves
               if (seg.type === 'cubic' && seg.cp1 && seg.cp2) {
                 ctx.strokeStyle = 'rgba(45, 212, 160, 0.5)';
                 ctx.lineWidth = transform.screenPx(1);
@@ -206,7 +204,6 @@ export function CanvasViewport({
                 ctx.lineTo(seg.to.x, seg.to.y);
                 ctx.stroke();
 
-                // Control point diamonds
                 ctx.fillStyle = '#ff6b6b';
                 const cpSize = transform.screenPx(4);
                 ctx.fillRect(seg.cp1.x - cpSize / 2, seg.cp1.y - cpSize / 2, cpSize, cpSize);
