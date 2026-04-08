@@ -362,6 +362,81 @@ export function App() {
     setSimulation(null);
   }, []);
 
+  const handleGridArray = useCallback(() => {
+    if (selectedIds.size === 0) return;
+
+    const input = prompt('Grid array: columns x rows, spacing mm\nExample: 3x2,10', '3x2,10');
+    if (!input) return;
+
+    const match = input.match(/(\d+)\s*x\s*(\d+)\s*,\s*([\d.]+)/);
+    if (!match) { alert('Format: 3x2,10 (columns x rows, spacing)'); return; }
+
+    const cols = parseInt(match[1]);
+    const rows = parseInt(match[2]);
+    const spacing = parseFloat(match[3]);
+
+    if (cols < 1 || rows < 1 || cols > 20 || rows > 20) { alert('Max 20x20'); return; }
+
+    // Get bounds of selected objects
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+
+    for (const o of selected) {
+      const b = computeObjectBounds(o);
+      if (!b) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
+
+    const objW = maxX - minX;
+    const objH = maxY - minY;
+    const stepX = objW + spacing;
+    const stepY = objH + spacing;
+
+    const allClones: typeof scene.objects = [];
+    const newIds = new Set<string>();
+
+    for (let row = 0; row < rows; row++) {
+      for (let col = 0; col < cols; col++) {
+        if (row === 0 && col === 0) continue; // Skip original position
+
+        const dx = col * stepX;
+        const dy = row * stepY;
+
+        const parentIdMap = new Map<string, string>();
+
+        for (const obj of selected) {
+          const newId = generateId();
+          newIds.add(newId);
+
+          let newParentId = obj.parentId;
+          if (obj.parentId) {
+            const mapKey = `${obj.parentId}_${row}_${col}`;
+            if (!parentIdMap.has(mapKey)) {
+              parentIdMap.set(mapKey, generateId());
+            }
+            newParentId = parentIdMap.get(mapKey)!;
+          }
+
+          allClones.push({
+            ...obj,
+            id: newId,
+            parentId: newParentId,
+            name: obj.name,
+            transform: { ...obj.transform, tx: obj.transform.tx + dx, ty: obj.transform.ty + dy },
+            _bounds: null,
+            _worldTransform: null,
+          });
+        }
+      }
+    }
+
+    const newScene = { ...scene, objects: [...scene.objects, ...allClones] };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -455,6 +530,12 @@ export function App() {
           handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
           return;
         }
+        // Grid array: Ctrl+Shift+A
+        if (e.key === 'A' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
+          e.preventDefault();
+          handleGridArray();
+          return;
+        }
         return;
       }
 
@@ -499,7 +580,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -622,6 +703,7 @@ export function App() {
         { label: 'Align Bottom', action: () => {
           handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
         }, disabled: selectedIds.size === 0 },
+        { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
           disabled: selectedIds.size === 0,
