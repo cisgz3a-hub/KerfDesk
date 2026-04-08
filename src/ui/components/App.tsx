@@ -38,7 +38,6 @@ import { deserializeScene } from '../../io/SceneSerializer';
 import { generateId } from '../../core/types';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
-import { computeObjectBounds } from '../../geometry/bounds';
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 
@@ -327,72 +326,6 @@ export function App() {
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
         handleDelete();
-      } else if (e.key === 'h' && !e.ctrlKey && selectedIds.size > 0) {
-        const newScene = {
-          ...scene,
-          objects: scene.objects.map(o => {
-            if (!selectedIds.has(o.id)) return o;
-            const bounds = computeObjectBounds(o);
-            if (!bounds) return o;
-            const cx = (bounds.minX + bounds.maxX) / 2;
-            return {
-              ...o,
-              transform: { ...o.transform, a: -o.transform.a, tx: o.transform.tx + 2 * cx * o.transform.a },
-              _bounds: null, _worldTransform: null,
-            };
-          }),
-        };
-        handleSceneCommit(newScene);
-        return;
-      } else if (e.key === 'v' && !e.ctrlKey && selectedIds.size > 0) {
-        e.preventDefault();
-        const newScene = {
-          ...scene,
-          objects: scene.objects.map(o => {
-            if (!selectedIds.has(o.id)) return o;
-            const bounds = computeObjectBounds(o);
-            if (!bounds) return o;
-            const cy = (bounds.minY + bounds.maxY) / 2;
-            return {
-              ...o,
-              transform: { ...o.transform, d: -o.transform.d, ty: o.transform.ty + 2 * cy * o.transform.d },
-              _bounds: null, _worldTransform: null,
-            };
-          }),
-        };
-        handleSceneCommit(newScene);
-        return;
-      } else if (e.key === ']' && selectedIds.size > 0) {
-        const newScene = {
-          ...scene,
-          objects: scene.objects.map(o => {
-            if (!selectedIds.has(o.id)) return o;
-            const bounds = computeObjectBounds(o);
-            if (!bounds) return o;
-            const cx = bounds.minX + (bounds.maxX - bounds.minX) / 2;
-            const cy = bounds.minY + (bounds.maxY - bounds.minY) / 2;
-            const t = o.transform;
-            // Rotate transform around object center
-            const cos = Math.cos(Math.PI / 2);
-            const sin = Math.sin(Math.PI / 2);
-            const wcx = cx * t.a + t.tx;
-            const wcy = cy * t.d + t.ty;
-            return {
-              ...o,
-              transform: {
-                a: t.a * cos - t.d * sin,
-                b: t.a * sin + t.d * cos,
-                c: t.c * cos - t.d * sin,
-                d: t.c * sin + t.d * cos,
-                tx: wcx - (cx * (t.a * cos - t.d * sin) + cy * (t.c * cos - t.d * sin)),
-                ty: wcy - (cx * (t.a * sin + t.d * cos) + cy * (t.c * sin + t.d * cos)),
-              },
-              _bounds: null, _worldTransform: null,
-            };
-          }),
-        };
-        handleSceneCommit(newScene);
-        return;
       } else if (e.key === 'Escape') {
         handleClearSelection();
       } else if (e.key === 't' || e.key === 'T') {
@@ -408,7 +341,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDuplicate, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDuplicate, handleDelete, handleClearSelection, setActiveTool]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -515,52 +448,6 @@ export function App() {
         { label: 'separator', action: () => {}, separator: true },
         { label: 'Duplicate           Ctrl+D', action: handleDuplicate, disabled: selectedIds.size === 0 },
         { label: 'Delete              Del', action: handleDelete, disabled: selectedIds.size === 0 },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: 'Flip Horizontal       H', action: () => {
-          const newScene = {
-            ...scene,
-            objects: scene.objects.map(o => {
-              if (!selectedIds.has(o.id)) return o;
-              const bounds = computeObjectBounds(o);
-              if (!bounds) return o;
-              const cx = (bounds.minX + bounds.maxX) / 2;
-              return { ...o, transform: { ...o.transform, a: -o.transform.a, tx: o.transform.tx + 2 * cx * o.transform.a }, _bounds: null, _worldTransform: null };
-            }),
-          };
-          handleSceneCommit(newScene);
-        }, disabled: selectedIds.size === 0 },
-        { label: 'Flip Vertical         V', action: () => {
-          const newScene = {
-            ...scene,
-            objects: scene.objects.map(o => {
-              if (!selectedIds.has(o.id)) return o;
-              const bounds = computeObjectBounds(o);
-              if (!bounds) return o;
-              const cy = (bounds.minY + bounds.maxY) / 2;
-              return { ...o, transform: { ...o.transform, d: -o.transform.d, ty: o.transform.ty + 2 * cy * o.transform.d }, _bounds: null, _worldTransform: null };
-            }),
-          };
-          handleSceneCommit(newScene);
-        }, disabled: selectedIds.size === 0 },
-        { label: 'Rotate 90° CW         ]', action: () => {
-          // Simplified: swap width/height via transform
-          const newScene = {
-            ...scene,
-            objects: scene.objects.map(o => {
-              if (!selectedIds.has(o.id)) return o;
-              return {
-                ...o,
-                transform: {
-                  a: 0, b: o.transform.d,
-                  c: -o.transform.a, d: 0,
-                  tx: o.transform.tx, ty: o.transform.ty,
-                },
-                _bounds: null, _worldTransform: null,
-              };
-            }),
-          };
-          handleSceneCommit(newScene);
-        }, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },
         ...scene.layers.map(l => ({
           label: `Move to: ${l.name}`,
