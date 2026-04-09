@@ -59,6 +59,7 @@ import { type MachineState, type JobProgress } from '../../controllers/Controlle
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
+import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
@@ -193,6 +194,8 @@ export function App() {
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const [showBoxGenerator, setShowBoxGenerator] = useState(false);
+  const [showVariableText, setShowVariableText] = useState(false);
+  const [variableTextSource, setVariableTextSource] = useState<SceneObject | null>(null);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -1067,6 +1070,16 @@ export function App() {
     setSelectedIds(new Set(objects.map(o => o.id)));
   }, [scene, handleSceneCommit]);
 
+  const handleVariableTextGenerate = useCallback((objects: SceneObject[]) => {
+    const newScene = {
+      ...scene,
+      objects: [...scene.objects, ...objects],
+      selection: objects.map(o => o.id),
+    };
+    handleSceneCommit(newScene);
+    setSelectedIds(new Set(objects.map(o => o.id)));
+  }, [scene, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -1585,6 +1598,17 @@ export function App() {
         { label: 'Boolean Subtract', action: () => void handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
         { label: 'Boolean Intersect', action: () => void handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
         { label: 'Text to Path', action: () => void handleTextToPath(), disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text') },
+        {
+          label: 'Variable Text / Serial Numbers',
+          action: () => {
+            const textObj = scene.objects.find(o => selectedIds.has(o.id) && o.geometry.type === 'text');
+            if (textObj) {
+              setVariableTextSource(textObj);
+              setShowVariableText(true);
+            }
+          },
+          disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text'),
+        },
         { label: 'separator', action: () => {}, separator: true },
         { label: 'Offset Outset (+1mm)', action: () => void handleOffset(1), disabled: selectedIds.size === 0 },
         { label: 'Offset Outset (+2mm)', action: () => void handleOffset(2), disabled: selectedIds.size === 0 },
@@ -1624,6 +1648,13 @@ export function App() {
     showMaterialTest && React.createElement(MaterialTestDialog, {
       onConfirm: handleMaterialTestConfirm,
       onCancel: () => setShowMaterialTest(false),
+    }),
+
+    showVariableText && variableTextSource && React.createElement(VariableTextDialog, {
+      scene,
+      sourceObject: variableTextSource,
+      onGenerate: handleVariableTextGenerate,
+      onClose: () => { setShowVariableText(false); setVariableTextSource(null); },
     }),
 
     gcodePreview && React.createElement(GcodePreview, {
