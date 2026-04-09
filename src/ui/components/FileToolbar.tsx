@@ -49,6 +49,8 @@ interface FileToolbarProps {
   projectName?: string;
   onShowShortcuts?: () => void;
   onToolpathPreview?: () => void;
+  productionMode?: boolean;
+  onToggleProductionMode?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -72,6 +74,8 @@ export function FileToolbar({
   projectName,
   onShowShortcuts,
   onToolpathPreview,
+  productionMode = false,
+  onToggleProductionMode,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -554,6 +558,24 @@ export function FileToolbar({
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 
     React.createElement('div', { style: { flex: 1 } }),
+    React.createElement('button', {
+      onClick: () => onToggleProductionMode?.(),
+      title: productionMode
+        ? 'Production Mode: all controls visible. Click for Beginner Mode.'
+        : 'Beginner Mode: simplified controls. Click for Production Mode.',
+      style: {
+        padding: '4px 10px',
+        background: productionMode ? 'rgba(155, 109, 255, 0.1)' : 'rgba(45, 212, 160, 0.1)',
+        border: `1px solid ${productionMode ? 'rgba(155, 109, 255, 0.3)' : 'rgba(45, 212, 160, 0.3)'}`,
+        borderRadius: 6,
+        color: productionMode ? '#9b6dff' : '#2dd4a0',
+        fontSize: 10,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        whiteSpace: 'nowrap' as const,
+      },
+    }, productionMode ? 'PRO' : 'EASY'),
     React.createElement('button', {
       onClick: () => onShowShortcuts?.(),
       title: 'Keyboard shortcuts (?)',

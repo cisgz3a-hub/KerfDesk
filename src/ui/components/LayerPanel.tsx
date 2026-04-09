@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
-import { type Layer, type LayerMode, createLayer } from '../../core/scene/Layer';
+import { type Layer, type LayerMode, type CutOrder, createLayer } from '../../core/scene/Layer';
 import { MATERIAL_PRESETS, getPresetSettings } from '../../core/materials/MaterialPresets';
 import { theme } from '../styles/theme';
 
@@ -8,6 +8,7 @@ interface LayerPanelProps {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
+  productionMode?: boolean;
 }
 
 function updateLayer(
@@ -21,7 +22,7 @@ function updateLayer(
   };
 }
 
-export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProps) {
+export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode = false }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
 
   const setActiveLayer = (layerId: string) => {
@@ -317,6 +318,19 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
     ),
     activeLayer && React.createElement('div', { style: settingsStyle },
       React.createElement('div', { style: layerSettingsHeaderStyle }, 'Layer Settings'),
+      React.createElement('label', { style: fieldStyle },
+        React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
+        React.createElement('select', {
+          value: activeLayer.settings.mode,
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => updateMode(e.target.value as LayerMode),
+          style: selectStyle,
+        },
+          React.createElement('option', { value: 'cut' }, 'cut'),
+          React.createElement('option', { value: 'engrave' }, 'engrave'),
+          React.createElement('option', { value: 'score' }, 'score'),
+          React.createElement('option', { value: 'image' }, 'image'),
+        ),
+      ),
       React.createElement('div', { style: { marginTop: 6 } },
         React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Material Preset'),
         React.createElement('select', {
@@ -424,42 +438,248 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit }: LayerPanelProp
           },
         }),
       ),
-      React.createElement('label', { style: fieldStyle },
-        React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
-        React.createElement('select', {
-          value: activeLayer.settings.mode,
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => updateMode(e.target.value as LayerMode),
-          style: selectStyle,
-        },
-          React.createElement('option', { value: 'cut' }, 'cut'),
-          React.createElement('option', { value: 'engrave' }, 'engrave'),
-          React.createElement('option', { value: 'score' }, 'score'),
-          React.createElement('option', { value: 'image' }, 'image'),
+      productionMode && React.createElement('div', {
+        style: { marginTop: 10, paddingTop: 8, borderTop: '1px solid #1a1a2e' },
+      },
+        React.createElement('div', {
+          style: { fontSize: 9, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1 },
+        }, 'Advanced'),
+        React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 } },
+          React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Air Assist'),
+          React.createElement('button', {
+            onClick: () => {
+              const newLayers = scene.layers.map(l =>
+                l.id === activeLayer.id
+                  ? { ...l, settings: { ...l.settings, airAssist: !l.settings.airAssist } }
+                  : l
+              );
+              onSceneCommit({ ...scene, layers: newLayers });
+            },
+            style: {
+              padding: '3px 12px',
+              background: activeLayer.settings.airAssist ? 'rgba(45, 212, 160, 0.1)' : 'rgba(255,255,255,0.03)',
+              border: activeLayer.settings.airAssist ? '1px solid #2dd4a0' : '1px solid #252540',
+              borderRadius: 4,
+              color: activeLayer.settings.airAssist ? '#2dd4a0' : '#555570',
+              fontSize: 11,
+              cursor: 'pointer',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
+              transition: 'all 0.15s ease',
+            },
+          }, activeLayer.settings.airAssist ? 'ON' : 'OFF'),
         ),
-      ),
-      React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
-        React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Air Assist'),
-        React.createElement('button', {
-          onClick: () => {
-            const newLayers = scene.layers.map(l =>
-              l.id === activeLayer.id
-                ? { ...l, settings: { ...l.settings, airAssist: !l.settings.airAssist } }
-                : l
-            );
-            onSceneCommit({ ...scene, layers: newLayers });
+        React.createElement('label', { style: { ...fieldStyle, marginTop: 8 } },
+          React.createElement('span', { style: settingsLabelStyle }, 'Power min %'),
+          React.createElement('input', {
+            type: 'number',
+            min: 0,
+            max: 100,
+            value: activeLayer.settings.power.min,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const v = Math.max(0, Math.min(100, Number(e.target.value) || 0));
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                ...l,
+                settings: { ...l.settings, power: { ...l.settings.power, min: v } },
+              })));
+            },
+            style: numberInputStyle,
+          }),
+        ),
+        React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
+          React.createElement('span', { style: settingsLabelStyle }, 'Z step per pass (mm)'),
+          React.createElement('input', {
+            type: 'number',
+            step: 0.01,
+            value: activeLayer.settings.zStepPerPass,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const v = Number(e.target.value) || 0;
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                ...l,
+                settings: { ...l.settings, zStepPerPass: v },
+              })));
+            },
+            style: numberInputStyle,
+          }),
+        ),
+        (activeLayer.settings.mode === 'engrave' || activeLayer.settings.mode === 'image') && React.createElement('div', { style: { marginTop: 8 } },
+          React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 4 } }, 'Fill'),
+          React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
+            React.createElement('span', { style: settingsLabelStyle }, 'Interval (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              step: 0.01,
+              value: activeLayer.settings.fill.interval,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0.01, Number(e.target.value) || 0.1);
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, interval: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+          ),
+          React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
+            React.createElement('span', { style: settingsLabelStyle }, 'Angle (°)'),
+            React.createElement('input', {
+              type: 'number',
+              value: activeLayer.settings.fill.angle,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Number(e.target.value) || 0;
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, angle: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+          ),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Bidirectional'),
+            React.createElement('button', {
+              onClick: () => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, biDirectional: !l.settings.fill.biDirectional } },
+                })));
+              },
+              style: {
+                padding: '3px 12px',
+                background: activeLayer.settings.fill.biDirectional ? 'rgba(45, 212, 160, 0.1)' : 'rgba(255,255,255,0.03)',
+                border: activeLayer.settings.fill.biDirectional ? '1px solid #2dd4a0' : '1px solid #252540',
+                borderRadius: 4,
+                color: activeLayer.settings.fill.biDirectional ? '#2dd4a0' : '#555570',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+              },
+            }, activeLayer.settings.fill.biDirectional ? 'ON' : 'OFF'),
+          ),
+          React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
+            React.createElement('span', { style: settingsLabelStyle }, 'Overscanning (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              step: 0.1,
+              value: activeLayer.settings.fill.overscanning,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0, Number(e.target.value) || 0);
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, overscanning: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+          ),
+        ),
+        activeLayer.settings.mode === 'cut' && React.createElement('div', { style: { marginTop: 8 } },
+          React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 4 } }, 'Cut'),
+          React.createElement('div', { style: { marginTop: 6 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Overcut (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              step: 0.01,
+              value: activeLayer.settings.cut.overcut,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0, Number(e.target.value) || 0);
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, overcut: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
+          ),
+          React.createElement('div', { style: { marginTop: 6 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Lead-in (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              step: 0.01,
+              value: activeLayer.settings.cut.leadIn,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0, Number(e.target.value) || 0);
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, leadIn: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
+          ),
+          React.createElement('div', { style: { marginTop: 6 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
+            React.createElement('input', {
+              type: 'number',
+              min: 0,
+              value: activeLayer.settings.cut.tabCount,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0, Math.floor(Number(e.target.value) || 0));
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, tabCount: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
+          ),
+          React.createElement('div', { style: { marginTop: 6 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab width (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              step: 0.1,
+              value: activeLayer.settings.cut.tabWidth,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = Math.max(0, Number(e.target.value) || 0);
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, tabWidth: v } },
+                })));
+              },
+              style: numberInputStyle,
+            }),
+            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
+          ),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
+            React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Inside first'),
+            React.createElement('button', {
+              onClick: () => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, insideFirst: !l.settings.cut.insideFirst } },
+                })));
+              },
+              style: {
+                padding: '3px 12px',
+                background: activeLayer.settings.cut.insideFirst ? 'rgba(45, 212, 160, 0.1)' : 'rgba(255,255,255,0.03)',
+                border: activeLayer.settings.cut.insideFirst ? '1px solid #2dd4a0' : '1px solid #252540',
+                borderRadius: 4,
+                color: activeLayer.settings.cut.insideFirst ? '#2dd4a0' : '#555570',
+                fontSize: 11,
+                cursor: 'pointer',
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+              },
+            }, activeLayer.settings.cut.insideFirst ? 'ON' : 'OFF'),
+          ),
+        ),
+        React.createElement('label', { style: { ...fieldStyle, marginTop: 8 } },
+          React.createElement('span', { style: settingsLabelStyle }, 'Cut order'),
+          React.createElement('select', {
+            value: activeLayer.settings.cutOrder,
+            onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                ...l,
+                settings: { ...l.settings, cutOrder: e.target.value as CutOrder },
+              }))),
+            style: selectStyle,
           },
-          style: {
-            padding: '3px 12px',
-            background: activeLayer.settings.airAssist ? 'rgba(45, 212, 160, 0.1)' : 'rgba(255,255,255,0.03)',
-            border: activeLayer.settings.airAssist ? '1px solid #2dd4a0' : '1px solid #252540',
-            borderRadius: 4,
-            color: activeLayer.settings.airAssist ? '#2dd4a0' : '#555570',
-            fontSize: 11,
-            cursor: 'pointer',
-            fontFamily: "'DM Sans', system-ui, sans-serif",
-            transition: 'all 0.15s ease',
-          },
-        }, activeLayer.settings.airAssist ? 'ON' : 'OFF'),
+            React.createElement('option', { value: 'layer-priority' }, 'layer-priority'),
+            React.createElement('option', { value: 'object-order' }, 'object-order'),
+            React.createElement('option', { value: 'optimized' }, 'optimized'),
+          ),
+        ),
       ),
     ),
   );

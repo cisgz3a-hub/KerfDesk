@@ -187,6 +187,22 @@ export function App() {
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
+  const [productionMode, setProductionMode] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('laserforge_production_mode') === 'true';
+    } catch {
+      return false;
+    }
+  });
+  const toggleProductionMode = useCallback(() => {
+    setProductionMode(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('laserforge_production_mode', String(next));
+      } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
   const [showWizard, setShowWizard] = useState(() => {
     try {
       return !localStorage.getItem(getSetupStorageKey());
@@ -1187,6 +1203,8 @@ export function App() {
       canRedo: historyAvail.canRedo,
       projectName: scene.metadata?.name,
       onShowShortcuts: () => setShowShortcuts(true),
+      productionMode,
+      onToggleProductionMode: toggleProductionMode,
       onToolpathPreview: () => {
         try {
           // Preflight: warn about text objects that won't be in output
@@ -1292,6 +1310,7 @@ export function App() {
           scene,
           selectedIds,
           onSceneCommit: handleSceneCommit,
+          productionMode,
         }),
         React.createElement('div', {
           style: {
@@ -1505,6 +1524,7 @@ export function App() {
 
     showConnection && React.createElement(ConnectionPanel, {
       scene,
+      productionMode,
       gcode: currentGcode,
       onClose: () => setShowConnection(false),
       bedWidth: scene.canvas.width,

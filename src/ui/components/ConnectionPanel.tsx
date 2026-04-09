@@ -18,9 +18,10 @@ interface ConnectionPanelProps {
   boundsMaxX?: number;
   boundsMaxY?: number;
   onClose: () => void;
+  productionMode?: boolean;
 }
 
-export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose }: ConnectionPanelProps) {
+export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose, productionMode = false }: ConnectionPanelProps) {
   const [machineState, setMachineState] = useState<MachineState | null>(null);
   const [progress, setProgress] = useState<JobProgress | null>(null);
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -508,7 +509,7 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
               onClick: () => { sendCmd('M4 S50'); setTimeout(() => sendCmd('M5 S0'), 500); },
               style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
             }, 'Test Fire'),
-            React.createElement('button', {
+            productionMode && React.createElement('button', {
               onClick: () => { if (confirm('Homing moves to limit switches. Continue?')) sendCmd('$H'); },
               style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
             }, 'Home'),
@@ -622,8 +623,8 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
         ),
       ),
 
-      // Console
-      React.createElement('div', {
+      // Console — full log in Production, simple status in Beginner
+      productionMode ? React.createElement('div', {
         ref: logRef,
         style: { flex: 1, minHeight: 120, maxHeight: 200, padding: '8px 12px', margin: '8px 18px', background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e', overflow: 'auto', fontFamily: mono, fontSize: 10, lineHeight: 1.5 },
       },
@@ -632,10 +633,20 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
           : messages.map((msg, i) =>
               React.createElement('div', { key: i, style: { color: msg.startsWith('ERROR') || msg.startsWith('⚠') ? '#ff4466' : msg.startsWith('>') ? '#00d4ff' : msg.startsWith('✓') ? '#2dd4a0' : '#555570' } }, msg),
             ),
+      ) : React.createElement('div', {
+        style: {
+          padding: '8px 18px', fontSize: 11, color: '#555570',
+          minHeight: 40, display: 'flex', alignItems: 'center',
+        },
+      },
+        messages.length > 0
+          ? React.createElement('span', { style: { color: messages[messages.length - 1].startsWith('✓') ? '#2dd4a0' : messages[messages.length - 1].startsWith('ERROR') ? '#ff4466' : '#8888aa' } },
+              messages[messages.length - 1])
+          : 'Waiting for connection...',
       ),
 
-      // Manual command
-      isConnected && React.createElement('div', { style: { padding: '8px 18px 12px', display: 'flex', gap: 6 } },
+      // Manual command — Production mode only
+      isConnected && productionMode && React.createElement('div', { style: { padding: '8px 18px 12px', display: 'flex', gap: 6 } },
         React.createElement('input', {
           type: 'text', value: manualCmd, placeholder: 'G-code command...',
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setManualCmd(e.target.value),
