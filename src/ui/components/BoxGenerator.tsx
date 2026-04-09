@@ -44,7 +44,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   function generateBoxFaces() {
     const t = thickness;
     const fw = fingerWidth;
-    const spacing = 8; // mm between laid-out faces
+    const spacing = thickness * 2 + 5; // Account for finger tab protrusions + gap
 
     const faces: Array<{
       name: string;
@@ -53,58 +53,54 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       offsetY: number;
     }> = [];
 
-    // Face layout (flat, for laser cutting):
-    // Row 1: Front, Back
-    // Row 2: Left, Right
-    // Row 3: Bottom, Top (if not open)
-
-    // FRONT face (width x height)
+    // Row 1: Front, Back (width x height)
     faces.push({
       name: 'Front',
       points: generateRectWithFingers(width, height, t, fw, true, true, true, true),
-      offsetX: 0,
-      offsetY: 0,
+      offsetX: t,
+      offsetY: t,
     });
 
-    // BACK face (width x height)
     faces.push({
       name: 'Back',
       points: generateRectWithFingers(width, height, t, fw, true, true, true, true),
-      offsetX: width + spacing,
-      offsetY: 0,
+      offsetX: width + spacing + t,
+      offsetY: t,
     });
 
-    // LEFT face (depth x height)
+    // Row 2: Left, Right (depth x height)
+    const row2Y = height + spacing + t;
+
     faces.push({
       name: 'Left',
       points: generateRectWithFingers(depth, height, t, fw, false, false, true, true),
-      offsetX: 0,
-      offsetY: height + spacing,
+      offsetX: t,
+      offsetY: row2Y,
     });
 
-    // RIGHT face (depth x height)
     faces.push({
       name: 'Right',
       points: generateRectWithFingers(depth, height, t, fw, false, false, true, true),
-      offsetX: depth + spacing,
-      offsetY: height + spacing,
+      offsetX: depth + spacing + t,
+      offsetY: row2Y,
     });
 
-    // BOTTOM face (width x depth)
+    // Row 3: Bottom, Top (width x depth)
+    const row3Y = row2Y + height + spacing + t;
+
     faces.push({
       name: 'Bottom',
       points: generateRectWithFingers(width, depth, t, fw, false, false, false, false),
-      offsetX: 0,
-      offsetY: height + depth + spacing * 2,
+      offsetX: t,
+      offsetY: row3Y,
     });
 
-    // TOP face (width x depth) — only if not open top
     if (!openTop) {
       faces.push({
         name: 'Top',
         points: generateRectWithFingers(width, depth, t, fw, false, false, false, false),
-        offsetX: width + spacing,
-        offsetY: height + depth + spacing * 2,
+        offsetX: width + spacing + t,
+        offsetY: row3Y,
       });
     }
 
@@ -123,88 +119,82 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
     rightFingers: boolean
   ): Array<{ x: number; y: number }> {
     const points: Array<{ x: number; y: number }> = [];
-    const fingerCount_w = Math.max(1, Math.round(w / fw));
-    const fingerCount_h = Math.max(1, Math.round(h / fw));
-    const actualFW_w = w / fingerCount_w;
-    const actualFW_h = h / fingerCount_h;
 
-    // Top edge (left to right)
-    if (topFingers) {
-      for (let i = 0; i < fingerCount_w; i++) {
-        const x = i * actualFW_w;
-        if (i % 2 === 0) {
-          points.push({ x, y: 0 });
-          points.push({ x, y: -t });
-          points.push({ x: x + actualFW_w, y: -t });
-          points.push({ x: x + actualFW_w, y: 0 });
-        } else {
-          points.push({ x, y: 0 });
-          points.push({ x: x + actualFW_w, y: 0 });
-        }
+    const countW = Math.max(1, Math.round(w / fw)) | 1; // Force odd for symmetry
+    const countH = Math.max(1, Math.round(h / fw)) | 1;
+    const segW = w / countW;
+    const segH = h / countH;
+
+    // Top edge: left to right
+    for (let i = 0; i < countW; i++) {
+      const x1 = i * segW;
+      const x2 = (i + 1) * segW;
+      if (topFingers && i % 2 === 0) {
+        points.push({ x: x1, y: 0 });
+        points.push({ x: x1, y: -t });
+        points.push({ x: x2, y: -t });
+        points.push({ x: x2, y: 0 });
+      } else {
+        points.push({ x: x1, y: 0 });
+        points.push({ x: x2, y: 0 });
       }
-    } else {
-      points.push({ x: 0, y: 0 });
-      points.push({ x: w, y: 0 });
     }
 
-    // Right edge (top to bottom)
-    if (rightFingers) {
-      for (let i = 0; i < fingerCount_h; i++) {
-        const y = i * actualFW_h;
-        if (i % 2 === 0) {
-          points.push({ x: w, y });
-          points.push({ x: w + t, y });
-          points.push({ x: w + t, y: y + actualFW_h });
-          points.push({ x: w, y: y + actualFW_h });
-        } else {
-          points.push({ x: w, y });
-          points.push({ x: w, y: y + actualFW_h });
-        }
+    // Right edge: top to bottom
+    for (let i = 0; i < countH; i++) {
+      const y1 = i * segH;
+      const y2 = (i + 1) * segH;
+      if (rightFingers && i % 2 === 0) {
+        points.push({ x: w, y: y1 });
+        points.push({ x: w + t, y: y1 });
+        points.push({ x: w + t, y: y2 });
+        points.push({ x: w, y: y2 });
+      } else {
+        points.push({ x: w, y: y1 });
+        points.push({ x: w, y: y2 });
       }
-    } else {
-      points.push({ x: w, y: 0 });
-      points.push({ x: w, y: h });
     }
 
-    // Bottom edge (right to left)
-    if (bottomFingers) {
-      for (let i = fingerCount_w - 1; i >= 0; i--) {
-        const x = i * actualFW_w;
-        if (i % 2 === 0) {
-          points.push({ x: x + actualFW_w, y: h });
-          points.push({ x: x + actualFW_w, y: h + t });
-          points.push({ x, y: h + t });
-          points.push({ x, y: h });
-        } else {
-          points.push({ x: x + actualFW_w, y: h });
-          points.push({ x, y: h });
-        }
+    // Bottom edge: right to left
+    for (let i = countW - 1; i >= 0; i--) {
+      const x1 = i * segW;
+      const x2 = (i + 1) * segW;
+      if (bottomFingers && i % 2 === 0) {
+        points.push({ x: x2, y: h });
+        points.push({ x: x2, y: h + t });
+        points.push({ x: x1, y: h + t });
+        points.push({ x: x1, y: h });
+      } else {
+        points.push({ x: x2, y: h });
+        points.push({ x: x1, y: h });
       }
-    } else {
-      points.push({ x: w, y: h });
-      points.push({ x: 0, y: h });
     }
 
-    // Left edge (bottom to top)
-    if (leftFingers) {
-      for (let i = fingerCount_h - 1; i >= 0; i--) {
-        const y = i * actualFW_h;
-        if (i % 2 === 0) {
-          points.push({ x: 0, y: y + actualFW_h });
-          points.push({ x: -t, y: y + actualFW_h });
-          points.push({ x: -t, y });
-          points.push({ x: 0, y });
-        } else {
-          points.push({ x: 0, y: y + actualFW_h });
-          points.push({ x: 0, y });
-        }
+    // Left edge: bottom to top
+    for (let i = countH - 1; i >= 0; i--) {
+      const y1 = i * segH;
+      const y2 = (i + 1) * segH;
+      if (leftFingers && i % 2 === 0) {
+        points.push({ x: 0, y: y2 });
+        points.push({ x: -t, y: y2 });
+        points.push({ x: -t, y: y1 });
+        points.push({ x: 0, y: y1 });
+      } else {
+        points.push({ x: 0, y: y2 });
+        points.push({ x: 0, y: y1 });
       }
-    } else {
-      points.push({ x: 0, y: h });
-      points.push({ x: 0, y: 0 });
     }
 
-    return points;
+    // Remove duplicate consecutive points
+    const cleaned: Array<{ x: number; y: number }> = [points[0]];
+    for (let i = 1; i < points.length; i++) {
+      const prev = cleaned[cleaned.length - 1];
+      if (Math.abs(points[i].x - prev.x) > 0.001 || Math.abs(points[i].y - prev.y) > 0.001) {
+        cleaned.push(points[i]);
+      }
+    }
+
+    return cleaned;
   }
 
   // Preview render
