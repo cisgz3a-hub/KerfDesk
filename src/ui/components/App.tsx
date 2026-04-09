@@ -1392,6 +1392,7 @@ export function App() {
         previewMode,
         onSelectionScreenPos: setQuickActionPos,
         onRequestTextPlacement: handleRequestTextPlacement,
+        onActiveTool: setActiveTool,
       }),
       React.createElement('div', {
         style: {

@@ -162,6 +162,8 @@ interface CanvasViewportProps {
   /** Called on drag end — for history. Parent pushes to history. */
   onSceneCommit?: (scene: Scene) => void;
   activeTool?: ToolType;
+  /** After draw-tool shape creation, parent can switch back to select (e.g. setActiveTool). */
+  onActiveTool?: (tool: ToolType) => void;
   onZoomChange?: (zoom: number) => void;
   actionsRef?: MutableRefObject<ViewportActions | null>;
   previewMode?: boolean;
@@ -183,6 +185,7 @@ export function CanvasViewport({
   onSceneChange,
   onSceneCommit,
   activeTool = 'select',
+  onActiveTool,
   onZoomChange,
   actionsRef,
   previewMode = false,
@@ -1159,6 +1162,8 @@ export function CanvasViewport({
               onSceneChange?.(newScene);
               onSceneCommit?.(newScene);
               onSelectionChange?.(new Set([newObj.id]));
+              // After shape creation is complete, switch back to select tool
+              onActiveTool?.('select');
             }
           }
         }
@@ -1290,7 +1295,7 @@ export function CanvasViewport({
       }
       clickStartRef.current = null;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool]);
 
   const handleFitView = useCallback(() => {
     const bounds = computeFitBounds(scene, simulation);
