@@ -34,6 +34,8 @@ interface FileToolbarProps {
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
   onNewProject: (scene: Scene) => void;
+  showAlert: (title: string, message: string) => Promise<void>;
+  showConfirm: (title: string, message: string) => Promise<boolean>;
   onConnect?: () => void;
   onSetup?: () => void;
   onMaterialTest?: () => void;
@@ -61,6 +63,8 @@ export function FileToolbar({
   onSceneChange,
   onSceneCommit,
   onNewProject,
+  showAlert,
+  showConfirm,
   onConnect,
   onSetup,
   onMaterialTest,
@@ -86,9 +90,10 @@ export function FileToolbar({
 
   // ─── NEW PROJECT ─────────────────────────────────────────────
 
-  const handleNew = useCallback(() => {
+  const handleNew = useCallback(async () => {
     if (scene.objects.length > 0) {
-      if (!confirm('Start a new project? Unsaved changes will be lost.')) return;
+      const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
+      if (!ok) return;
     }
     try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
     const newScene = createScene(
@@ -97,7 +102,7 @@ export function FileToolbar({
       'Untitled'
     );
     onNewProject(newScene);
-  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, onNewProject]);
+  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, onNewProject, showConfirm]);
 
   // ─── IMPORT SVG ──────────────────────────────────────────────
 
@@ -136,14 +141,14 @@ export function FileToolbar({
       onSceneCommit(updated);
     } catch (e) {
       console.error('SVG import failed:', e);
-      alert('Import failed: ' + (e as Error).message);
+      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
     }
 
     // Reset input so the same file can be re-imported
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit]);
+  }, [scene, onSceneChange, onSceneCommit, showAlert]);
 
   const handleImportImageClick = useCallback(() => {
     imageInputRef.current?.click();
@@ -262,13 +267,13 @@ export function FileToolbar({
       onSceneCommit(newScene);
     } catch (e) {
       console.error('Image import failed:', e);
-      alert('Import failed: ' + (e as Error).message);
+      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
     }
 
     if (imageInputRef.current) {
       imageInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit]);
+  }, [scene, onSceneChange, onSceneCommit, showAlert]);
 
   const handleImportDxfClick = useCallback(() => {
     dxfInputRef.current?.click();
@@ -288,17 +293,17 @@ export function FileToolbar({
       onSceneCommit(updated);
     } catch (e) {
       console.error('DXF import failed:', e);
-      alert('Import failed: ' + (e as Error).message);
+      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
     }
 
     if (dxfInputRef.current) {
       dxfInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit]);
+  }, [scene, onSceneChange, onSceneCommit, showAlert]);
 
   // ─── SAVE ────────────────────────────────────────────────────
 
-  const handleSave = useCallback(() => {
+  const handleSave = useCallback(async () => {
     try {
       saveSceneToFile(scene);
       try {
@@ -307,9 +312,9 @@ export function FileToolbar({
         localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
       } catch { /* ignore */ }
     } catch (e) {
-      alert('Save failed: ' + (e as Error).message);
+      await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
     }
-  }, [scene]);
+  }, [scene, showAlert]);
 
   const handleOpenClick = useCallback(() => {
     openInputRef.current?.click();
@@ -325,15 +330,15 @@ export function FileToolbar({
       onNewProject(loaded);
     } catch (e) {
       console.error('Failed to open file:', e);
-      alert('Import failed: ' + (e as Error).message);
+      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
     }
 
     if (openInputRef.current) {
       openInputRef.current.value = '';
     }
-  }, [onNewProject]);
+  }, [onNewProject, showAlert]);
 
-  const handleGenerateGcode = useCallback(() => {
+  const handleGenerateGcode = useCallback(async () => {
     try {
       // Preflight: warn about text objects that won't be in output
       const textObjs = scene.objects.filter(o =>
@@ -342,11 +347,15 @@ export function FileToolbar({
       );
       if (textObjs.length > 0) {
         const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
-        if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
+        const ok = await showConfirm(
+          'Text Objects',
+          `${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`
+        );
+        if (!ok) return;
       }
       const gc = compileGcode(scene);
       if (!gc) {
-        alert('No objects to process. Add objects to an output layer first.');
+        await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
         return;
       }
 
@@ -359,11 +368,11 @@ export function FileToolbar({
       URL.revokeObjectURL(url);
     } catch (e) {
       console.error('G-code generation failed:', e);
-      alert('G-code generation failed: ' + (e as Error).message);
+      await showAlert('G-code', 'G-code generation failed: ' + (e as Error).message);
     }
-  }, [scene, compileGcode]);
+  }, [scene, compileGcode, showAlert, showConfirm]);
 
-  const handleExportSvg = useCallback(() => {
+  const handleExportSvg = useCallback(async () => {
     try {
       const svg = exportSceneToSvg(scene);
       const blob = new Blob([svg], { type: 'image/svg+xml' });
@@ -374,9 +383,9 @@ export function FileToolbar({
       a.click();
       URL.revokeObjectURL(url);
     } catch (e) {
-      alert('Export failed: ' + (e as Error).message);
+      await showAlert('Export Failed', 'Export failed: ' + (e as Error).message);
     }
-  }, [scene]);
+  }, [scene, showAlert]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 

@@ -11,9 +11,10 @@ interface PropertiesPanelProps {
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
+  showAlert: (title: string, message: string) => Promise<void>;
 }
 
-export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelectionChange }: PropertiesPanelProps) {
+export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelectionChange, showAlert }: PropertiesPanelProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
   const [txDraft, setTxDraft] = useState<string | undefined>(undefined);
@@ -106,7 +107,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
     if (o) setDitherMode((o.geometry as ImageGeometry).ditherMode ?? 'none');
   }, [scene, selectedIds]);
 
-  const handleTrace = useCallback(() => {
+  const handleTrace = useCallback(async () => {
     if (selectedObjects.length !== 1) return;
     const obj = selectedObjects[0];
     if (obj.geometry.type !== 'image') return;
@@ -137,7 +138,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
     );
 
     if (!traced) {
-      alert('No contours found. Try adjusting the threshold.');
+      await showAlert('Trace', 'No contours found. Try adjusting the threshold.');
       return;
     }
 
@@ -180,7 +181,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
     };
     onSceneCommit(newScene);
     onSelectionChange?.(new Set([finalObj.id]));
-  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, onSceneCommit, onSelectionChange]);
+  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, onSceneCommit, onSelectionChange, showAlert]);
 
   const containerStyle: React.CSSProperties = {
     padding: '10px 12px',

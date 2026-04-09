@@ -28,6 +28,7 @@ import '../../core/output/GrblStrategy';
 import { deleteObjects, duplicateObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { FileToolbar } from './FileToolbar';
+import { useAppDialog } from './AppDialog';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -155,6 +156,7 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
 // ─── COMPONENT ───────────────────────────────────────────────────
 
 export function App() {
+  const { showAlert, showConfirm, showPrompt, renderDialog } = useAppDialog();
   const [zoomLevel, setZoomLevel] = useState(100);
   const viewportActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; fitToBed: () => void } | null>(null);
 
@@ -663,11 +665,11 @@ export function App() {
     }
   }, []);
 
-  const handleConnect = useCallback(() => {
+  const handleConnect = useCallback(async () => {
     try {
       const gc = compileGcode(scene);
       if (!gc) {
-        alert('No objects to process. Add objects to an output layer first.');
+        await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
       }
       setCurrentGcode(gc);
     } catch (err) {
@@ -675,7 +677,7 @@ export function App() {
       setCurrentGcode(null);
     }
     setShowConnection(true);
-  }, [scene, compileGcode]);
+  }, [scene, compileGcode, showAlert]);
 
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -754,10 +756,10 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
-  const handleBooleanOp = useCallback((op: BooleanOp) => {
+  const handleBooleanOp = useCallback(async (op: BooleanOp) => {
     const ids = [...selectedIds];
     if (ids.length !== 2) {
-      alert('Select exactly 2 objects for boolean operations.');
+      await showAlert('Boolean', 'Select exactly 2 objects for boolean operations.');
       return;
     }
 
@@ -768,7 +770,7 @@ export function App() {
     const resultGeom = booleanOperation(objA, objB, op);
 
     if (!resultGeom) {
-      alert('Boolean operation failed — shapes may not overlap.');
+      await showAlert('Boolean', 'Boolean operation failed — shapes may not overlap.');
       return;
     }
 
@@ -797,7 +799,7 @@ export function App() {
 
     handleSceneCommit(newScene);
     setSelectedIds(new Set([newId]));
-  }, [scene, selectedIds, handleSceneCommit]);
+  }, [scene, selectedIds, handleSceneCommit, showAlert]);
 
   const handleTextToPath = useCallback(async () => {
     const textObjs = scene.objects.filter(
@@ -805,7 +807,7 @@ export function App() {
     );
 
     if (textObjs.length === 0) {
-      alert('Select a text object first.');
+      await showAlert('Text to Path', 'Select a text object first.');
       return;
     }
 
@@ -844,7 +846,7 @@ export function App() {
     }
 
     if (newObjects.length === 0) {
-      alert('Text to path conversion failed.');
+      await showAlert('Text to Path', 'Text to path conversion failed.');
       return;
     }
 
@@ -858,9 +860,9 @@ export function App() {
 
     handleSceneCommit(newScene);
     setSelectedIds(new Set(newObjects.map(o => o.id)));
-  }, [scene, selectedIds, handleSceneCommit]);
+  }, [scene, selectedIds, handleSceneCommit, showAlert]);
 
-  const handleOffset = useCallback((distance: number) => {
+  const handleOffset = useCallback(async (distance: number) => {
     if (selectedIds.size === 0) return;
 
     const newObjects: typeof scene.objects = [];
@@ -887,7 +889,7 @@ export function App() {
     }
 
     if (newObjects.length === 0) {
-      alert('Offset failed — shape may be too small or complex.');
+      await showAlert('Offset', 'Offset failed — shape may be too small or complex.');
       return;
     }
 
@@ -895,7 +897,7 @@ export function App() {
       ...scene,
       objects: [...scene.objects, ...newObjects],
     });
-  }, [scene, selectedIds, handleSceneCommit]);
+  }, [scene, selectedIds, handleSceneCommit, showAlert]);
 
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
@@ -977,7 +979,7 @@ export function App() {
     handleSceneCommit({ ...scene, material: null });
   }, [scene, handleSceneCommit]);
 
-  const handleTemplateSelect = useCallback((template: Template) => {
+  const handleTemplateSelect = useCallback(async (template: Template) => {
     setShowTemplates(false);
     try {
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
@@ -1001,11 +1003,11 @@ export function App() {
       });
       handleSceneCommit(newScene);
     } catch (e) {
-      alert('Failed to load template: ' + (e as Error).message);
+      await showAlert('Template', 'Failed to load template: ' + (e as Error).message);
     }
-  }, [scene, handleSceneCommit]);
+  }, [scene, handleSceneCommit, showAlert]);
 
-  const handleBoxGenerate = useCallback((svg: string, name: string) => {
+  const handleBoxGenerate = useCallback(async (svg: string, name: string) => {
     setShowBoxGenerator(false);
     try {
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
@@ -1029,9 +1031,9 @@ export function App() {
       });
       handleSceneCommit({ ...newScene, metadata: { ...newScene.metadata, name } });
     } catch (e) {
-      alert('Box generation failed: ' + (e as Error).message);
+      await showAlert('Box Generator', 'Box generation failed: ' + (e as Error).message);
     }
-  }, [scene, handleSceneCommit]);
+  }, [scene, handleSceneCommit, showAlert]);
 
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
@@ -1125,17 +1127,17 @@ export function App() {
           const bk = e.key.toLowerCase();
           if (bk === 'u') {
             e.preventDefault();
-            handleBooleanOp('union');
+            void handleBooleanOp('union');
             return;
           }
           if (bk === 's') {
             e.preventDefault();
-            handleBooleanOp('subtract');
+            void handleBooleanOp('subtract');
             return;
           }
           if (bk === 'i') {
             e.preventDefault();
-            handleBooleanOp('intersect');
+            void handleBooleanOp('intersect');
             return;
           }
         }
@@ -1252,6 +1254,8 @@ export function App() {
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
+      showAlert,
+      showConfirm,
       onConnect: handleConnect,
       onSetup: () => setShowWizard(true),
       onMaterialTest: () => setShowMaterialTest(true),
@@ -1268,12 +1272,12 @@ export function App() {
       onShowShortcuts: () => setShowShortcuts(true),
       productionMode,
       onToggleProductionMode: toggleProductionMode,
-      onToolpathPreview: () => {
+      onToolpathPreview: async () => {
         try {
           const gc = compileGcode(scene);
           if (gc) setGcodePreview(gc);
         } catch (err) {
-          alert('Toolpath preview failed: ' + (err as Error).message);
+          await showAlert('Preview Failed', 'Toolpath preview failed: ' + (err as Error).message);
         }
       },
     }),
@@ -1343,6 +1347,7 @@ export function App() {
         onZoomChange: setZoomLevel,
         previewMode,
         onSelectionScreenPos: setQuickActionPos,
+        showPrompt,
       }),
       React.createElement('div', {
         style: {
@@ -1373,6 +1378,7 @@ export function App() {
             selectedIds,
             onSceneCommit: handleSceneCommit,
             onSelectionChange: setSelectedIds,
+            showAlert,
           }),
         ),
       ),
@@ -1496,21 +1502,21 @@ export function App() {
         }, disabled: false },
         { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
         { label: 'separator', action: () => {}, separator: true },
-        { label: 'Boolean Union', action: () => handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
-        { label: 'Boolean Subtract', action: () => handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
-        { label: 'Boolean Intersect', action: () => handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
-        { label: 'Text to Path', action: handleTextToPath, disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text') },
+        { label: 'Boolean Union', action: () => void handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
+        { label: 'Boolean Subtract', action: () => void handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
+        { label: 'Boolean Intersect', action: () => void handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
+        { label: 'Text to Path', action: () => void handleTextToPath(), disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text') },
         { label: 'separator', action: () => {}, separator: true },
-        { label: 'Offset Outset (+1mm)', action: () => handleOffset(1), disabled: selectedIds.size === 0 },
-        { label: 'Offset Outset (+2mm)', action: () => handleOffset(2), disabled: selectedIds.size === 0 },
-        { label: 'Offset Inset (-1mm)', action: () => handleOffset(-1), disabled: selectedIds.size === 0 },
-        { label: 'Offset Inset (-2mm)', action: () => handleOffset(-2), disabled: selectedIds.size === 0 },
-        { label: 'Offset Custom...', action: () => {
-          const input = prompt('Offset distance in mm (positive = outset, negative = inset):', '1');
-          if (!input) return;
+        { label: 'Offset Outset (+1mm)', action: () => void handleOffset(1), disabled: selectedIds.size === 0 },
+        { label: 'Offset Outset (+2mm)', action: () => void handleOffset(2), disabled: selectedIds.size === 0 },
+        { label: 'Offset Inset (-1mm)', action: () => void handleOffset(-1), disabled: selectedIds.size === 0 },
+        { label: 'Offset Inset (-2mm)', action: () => void handleOffset(-2), disabled: selectedIds.size === 0 },
+        { label: 'Offset Custom...', action: async () => {
+          const input = await showPrompt('Offset', 'Enter offset distance in mm (positive = outset, negative = inset):', '1');
+          if (input == null || input === '') return;
           const dist = parseFloat(input);
           if (Number.isNaN(dist) || dist === 0) return;
-          handleOffset(dist);
+          void handleOffset(dist);
         }, disabled: selectedIds.size === 0 },
         { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
         ...scene.layers.map(l => ({
@@ -1591,6 +1597,8 @@ export function App() {
       boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
       boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
       boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
+      showAlert,
+      showConfirm,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
@@ -1626,5 +1634,7 @@ export function App() {
       },
       onDismiss: () => setToastSuggestion(null),
     }),
+
+    renderDialog(),
   );
 }

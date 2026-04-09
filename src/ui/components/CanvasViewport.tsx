@@ -168,6 +168,7 @@ interface CanvasViewportProps {
   previewMode?: boolean;
   /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
   onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
+  showPrompt: (title: string, message: string, defaultValue?: string, placeholder?: string) => Promise<string | null>;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -186,6 +187,7 @@ export function CanvasViewport({
   actionsRef,
   previewMode = false,
   onSelectionScreenPos,
+  showPrompt,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -694,7 +696,7 @@ export function CanvasViewport({
     canvas.style.cursor = defaultCursorForTool(activeTool);
   }, [activeTool]);
 
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+  const handleMouseDown = useCallback(async (e: React.MouseEvent) => {
     // Pan: middle mouse button OR spacebar + left click (Alt+left fallback)
     if (e.button === 1 || (e.button === 0 && (spaceHeldRef.current || e.altKey))) {
       e.preventDefault();
@@ -715,7 +717,7 @@ export function CanvasViewport({
     });
 
     if (activeTool === 'text') {
-      const text = prompt('Enter text:');
+      const text = await showPrompt('Add Text', 'Enter text:', '', 'Type here...');
       if (text && text.trim()) {
         const layerId = scene.activeLayerId || scene.layers[0]?.id;
         if (!layerId) return;
@@ -878,7 +880,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, showPrompt]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

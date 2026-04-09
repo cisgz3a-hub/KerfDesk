@@ -24,6 +24,8 @@ interface ConnectionPanelProps {
   boundsMaxY?: number;
   onClose: () => void;
   productionMode?: boolean;
+  showAlert: (title: string, message: string) => Promise<void>;
+  showConfirm: (title: string, message: string) => Promise<boolean>;
 }
 
 export function ConnectionPanel({
@@ -41,6 +43,8 @@ export function ConnectionPanel({
   boundsMaxY,
   onClose,
   productionMode = false,
+  showAlert,
+  showConfirm,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -160,35 +164,37 @@ export function ConnectionPanel({
     try { controllerRef.current?.sendCommand(cmd); } catch { /* ignore */ }
   };
 
-  const handleStartJob = () => {
+  const handleStartJob = async () => {
     if (!gcode || !controllerRef.current) return;
 
     // Machine readiness gate
     const status = machineState?.status;
     if (status === 'alarm') {
-      alert('Machine is in ALARM state. Click Unlock ($X) first.');
+      await showAlert('Machine', 'Machine is in ALARM state. Click Unlock ($X) first.');
       return;
     }
     if (status === 'hold') {
-      alert('Machine is paused. Click Resume or Stop first.');
+      await showAlert('Machine', 'Machine is paused. Click Resume or Stop first.');
       return;
     }
     if (status === 'run') {
-      alert('A job is already running. Wait for it to finish or Stop it.');
+      await showAlert('Machine', 'A job is already running. Wait for it to finish or Stop it.');
       return;
     }
     if (status === 'homing') {
-      alert('Machine is homing. Wait for it to finish.');
+      await showAlert('Machine', 'Machine is homing. Wait for it to finish.');
       return;
     }
     if (status !== 'idle' && status !== undefined) {
-      alert(`Machine not ready (state: ${status}). Wait for idle.`);
+      await showAlert('Machine', `Machine not ready (state: ${status}). Wait for idle.`);
       return;
     }
 
     // Use preflight to gate job start
     if (preflight && !preflight.canStart) {
-      alert('Cannot start job — resolve all blockers first:\n\n' +
+      await showAlert(
+        'Cannot Start Job',
+        'Cannot start job — resolve all blockers first:\n\n' +
         preflight.issues
           .filter(i => i.severity === 'blocker')
           .map(i => `• ${i.title}`)
@@ -258,35 +264,38 @@ export function ConnectionPanel({
     setMessages(prev => [...prev, '✓ Frame complete']);
   };
 
-  const handleProofRun = () => {
+  const handleProofRun = async () => {
     if (!gcode || !controllerRef.current) return;
 
     const status = machineState?.status;
     if (status === 'alarm') {
-      alert('Machine is in ALARM state. Click Unlock ($X) first.');
+      await showAlert('Machine', 'Machine is in ALARM state. Click Unlock ($X) first.');
       return;
     }
     if (status === 'hold') {
-      alert('Machine is paused. Click Resume or Stop first.');
+      await showAlert('Machine', 'Machine is paused. Click Resume or Stop first.');
       return;
     }
     if (status === 'run') {
-      alert('A job is already running. Wait for it to finish or Stop it.');
+      await showAlert('Machine', 'A job is already running. Wait for it to finish or Stop it.');
       return;
     }
     if (status === 'homing') {
-      alert('Machine is homing. Wait for it to finish.');
+      await showAlert('Machine', 'Machine is homing. Wait for it to finish.');
       return;
     }
     if (status !== 'idle' && status !== undefined) {
-      alert(`Machine not ready (state: ${status}). Wait for idle.`);
+      await showAlert('Machine', `Machine not ready (state: ${status}). Wait for idle.`);
       return;
     }
 
     if (preflight && preflight.issues.some(i => i.severity === 'blocker' && i.category === 'machine')) {
       const machineBlockers = preflight.issues.filter(i => i.severity === 'blocker' && i.category === 'machine');
-      alert('Cannot run proof — resolve machine blockers first:\n\n' +
-        machineBlockers.map(i => `• ${i.title}`).join('\n'));
+      await showAlert(
+        'Proof Mode',
+        'Cannot run proof — resolve machine blockers first:\n\n' +
+        machineBlockers.map(i => `• ${i.title}`).join('\n')
+      );
       return;
     }
 
@@ -587,7 +596,10 @@ export function ConnectionPanel({
               style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
             }, 'Test Fire'),
             productionMode && React.createElement('button', {
-              onClick: () => { if (confirm('Homing moves to limit switches. Continue?')) sendCmd('$H'); },
+              onClick: async () => {
+                const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
+                if (ok) sendCmd('$H');
+              },
               style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
             }, 'Home'),
           ),
