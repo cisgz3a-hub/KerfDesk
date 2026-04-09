@@ -2,6 +2,7 @@ import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type CutOrder, createLayer } from '../../core/scene/Layer';
 import { MATERIAL_PRESETS, getPresetSettings } from '../../core/materials/MaterialPresets';
+import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
 
 interface LayerPanelProps {
@@ -394,6 +395,54 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode =
           `Settings for ${scene.machine?.type || 'diode'} laser. Run a material test to fine-tune.`,
         ),
       ),
+      (() => {
+        const machineType = scene.machine?.type || 'diode';
+        const materialName = scene.material?.name || '';
+        if (!materialName) return null;
+
+        const suggestion = getSuggestion(materialName, machineType, activeLayer.settings.mode);
+        if (!suggestion || suggestion.sampleCount === 0) return null;
+
+        return React.createElement('div', {
+          style: {
+            margin: '6px 0', padding: '6px 10px',
+            background: suggestion.confidence > 0 ? 'rgba(45,212,160,0.06)' : 'rgba(255,212,68,0.06)',
+            border: `1px solid ${suggestion.confidence > 0 ? 'rgba(45,212,160,0.15)' : 'rgba(255,212,68,0.15)'}`,
+            borderRadius: 6, fontSize: 10,
+          },
+        },
+          React.createElement('div', {
+            style: { fontWeight: 600, marginBottom: 3, color: suggestion.confidence > 0 ? '#2dd4a0' : '#ffd444' },
+          }, suggestion.confidence > 0
+            ? `✓ Learned: ${suggestion.confidence}% confidence (${suggestion.sampleCount} jobs)`
+            : `⚡ Suggested adjustment (${suggestion.sampleCount} jobs tried)`),
+          React.createElement('div', { style: { color: '#8888aa', marginBottom: 4 } },
+            `Power ${suggestion.power}% · Speed ${suggestion.speed} · ${suggestion.passes} pass${suggestion.passes > 1 ? 'es' : ''}`),
+          React.createElement('button', {
+            onClick: () => {
+              const newLayers = scene.layers.map(l =>
+                l.id === activeLayer.id
+                  ? {
+                      ...l,
+                      settings: {
+                        ...l.settings,
+                        power: { ...l.settings.power, max: suggestion.power },
+                        speed: suggestion.speed,
+                        passes: suggestion.passes,
+                      },
+                    }
+                  : l
+              );
+              onSceneCommit({ ...scene, layers: newLayers });
+            },
+            style: {
+              padding: '3px 10px', fontSize: 10, cursor: 'pointer',
+              background: 'rgba(255,255,255,0.03)', border: '1px solid #252540',
+              borderRadius: 4, color: '#e0e0ec', fontFamily: "'DM Sans', system-ui, sans-serif",
+            },
+          }, 'Apply suggestion'),
+        );
+      })(),
       React.createElement('label', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Power %'),
         React.createElement('input', {

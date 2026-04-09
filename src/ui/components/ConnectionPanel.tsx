@@ -7,6 +7,7 @@ import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
+import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
 
 interface ConnectionPanelProps {
   scene: Scene;
@@ -597,9 +598,25 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
                 if (currentReplay) {
                   currentReplay.outcome = outcome;
                   saveReplay(currentReplay);
+
+                  // Record for material learning
+                  if (currentReplay.settings.material) {
+                    for (const layer of currentReplay.settings.layers) {
+                      recordMaterialOutcome({
+                        material: currentReplay.settings.material,
+                        machineType: currentReplay.settings.machineType || 'diode',
+                        mode: layer.mode,
+                        power: layer.power,
+                        speed: layer.speed,
+                        passes: layer.passes,
+                        outcome,
+                        timestamp: new Date().toISOString(),
+                      });
+                    }
+                  }
                 }
                 setShowOutcome(false);
-                setMessages(prev => [...prev, `Outcome recorded: ${outcome.replace('_', ' ')}`]);
+                setMessages(prev => [...prev, `Outcome recorded: ${outcome.replace(/_/g, ' ')}`]);
               },
               style: {
                 padding: '6px 12px', fontSize: 11, cursor: 'pointer',
