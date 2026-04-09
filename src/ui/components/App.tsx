@@ -28,7 +28,9 @@ import '../../core/output/GrblStrategy';
 import { deleteObjects, duplicateObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { FileToolbar } from './FileToolbar';
-import { useAppDialog } from './AppDialog';
+import { AppModal } from './AppModal';
+import { useModal } from '../hooks/useModal';
+import { storeImage } from '../../io/ImageStore';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -158,7 +160,16 @@ function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: stri
 // ─── COMPONENT ───────────────────────────────────────────────────
 
 export function App() {
-  const { showAlert, showConfirm, showPrompt, renderDialog } = useAppDialog();
+  const {
+    modal,
+    showAlert,
+    showConfirm,
+    showPrompt,
+    dismissModal,
+    finishAlert,
+    finishConfirm,
+    finishPrompt,
+  } = useModal();
   const [zoomLevel, setZoomLevel] = useState(100);
   const viewportActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; fitToBed: () => void } | null>(null);
 
@@ -599,6 +610,16 @@ export function App() {
           img.src = dataUri;
         });
 
+        let imageSrc = dataUri;
+        if (dataUri.length > 100000) {
+          try {
+            const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
+            imageSrc = `indexeddb://${imageId}`;
+          } catch {
+            imageSrc = dataUri;
+          }
+        }
+
         const dpi = 96;
         const physicalWidth = (img.width / dpi) * 25.4;
         const physicalHeight = (img.height / dpi) * 25.4;
@@ -662,7 +683,7 @@ export function App() {
           transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
           geometry: {
             type: 'image',
-            src: dataUri,
+            src: imageSrc,
             originalWidth: img.width,
             originalHeight: img.height,
             cropX: 0,
@@ -1974,6 +1995,26 @@ export function App() {
       ),
     ),
 
-    renderDialog(),
+    modal && React.createElement(AppModal, {
+      title: modal.title,
+      message: modal.message,
+      details: modal.details,
+      onClose: dismissModal,
+      prompt: modal.variant === 'prompt'
+        ? { defaultValue: modal.defaultValue, placeholder: modal.placeholder }
+        : undefined,
+      onPromptSubmit: modal.variant === 'prompt' ? (v: string) => finishPrompt(v) : undefined,
+      buttons: modal.variant === 'alert'
+        ? [{ label: 'OK', action: finishAlert, primary: true }]
+        : modal.variant === 'confirm'
+          ? [
+              { label: 'Cancel', action: () => finishConfirm(false) },
+              { label: 'OK', action: () => finishConfirm(true), primary: true },
+            ]
+          : [
+              { label: 'Cancel', action: () => finishPrompt(null) },
+              { label: 'OK', action: () => {}, primary: true },
+            ],
+    }),
   );
 }

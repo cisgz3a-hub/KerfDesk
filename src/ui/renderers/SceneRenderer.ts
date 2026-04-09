@@ -23,10 +23,14 @@ import { type Layer } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
+import { getImage } from '../../io/ImageStore';
 
 // Renderer-private caches — not stored on scene objects
 const imageCacheMap = new WeakMap<object, Map<string, HTMLImageElement>>();
 const ditherCacheMap = new WeakMap<object, { key: string; canvas: HTMLCanvasElement }>();
+/** Per render object: maps `indexeddb://id` → resolved data URI */
+const idbResolvedUriByObject = new WeakMap<object, Map<string, string>>();
+const idbPendingLoadByObject = new WeakMap<object, Set<string>>();
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
@@ -720,14 +724,55 @@ function drawGeometry(
         imageCacheMap.set(renderObject, imgCache);
       }
 
-      let img = imgCache.get(geom.src);
+      let loadSrc = geom.src;
+      if (geom.src.startsWith('indexeddb://')) {
+        let rmap = idbResolvedUriByObject.get(renderObject);
+        if (!rmap) {
+          rmap = new Map<string, string>();
+          idbResolvedUriByObject.set(renderObject, rmap);
+        }
+        const resolved = rmap.get(geom.src);
+        if (resolved) {
+          loadSrc = resolved;
+        } else {
+          let pending = idbPendingLoadByObject.get(renderObject);
+          if (!pending) {
+            pending = new Set<string>();
+            idbPendingLoadByObject.set(renderObject, pending);
+          }
+          if (!pending.has(geom.src)) {
+            pending.add(geom.src);
+            const rawId = geom.src.slice('indexeddb://'.length);
+            void getImage(rawId).then(uri => {
+              pending!.delete(geom.src);
+              if (uri) {
+                rmap!.set(geom.src, uri);
+                window.dispatchEvent(new Event('resize'));
+              }
+            });
+          }
+          const dpi = 96;
+          const physicalWidth = (geom.originalWidth / dpi) * 25.4;
+          const physicalHeight = (geom.originalHeight / dpi) * 25.4;
+          ctx.save();
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(0, 0, physicalWidth, physicalHeight);
+          ctx.lineWidth = transform.screenPx(1);
+          ctx.strokeRect(0, 0, physicalWidth, physicalHeight);
+          ctx.fillStyle = '#666';
+          ctx.font = `${transform.screenPx(10)}px monospace`;
+          ctx.fillText('Loading...', transform.screenPx(4), physicalHeight / 2);
+          ctx.restore();
+          break;
+        }
+      }
+
+      let img = imgCache.get(loadSrc);
       if (!img) {
         img = new Image();
-        img.src = geom.src;
-        imgCache.set(geom.src, img);
+        img.src = loadSrc;
+        imgCache.set(loadSrc, img);
         img.onload = () => {
-          // Image loaded — canvas will update on next render cycle.
-          // Dispatch a resize event to trigger a re-render.
           window.dispatchEvent(new Event('resize'));
         };
       }

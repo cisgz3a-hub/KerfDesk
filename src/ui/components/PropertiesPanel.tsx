@@ -15,7 +15,7 @@ interface PropertiesPanelProps {
   /** Live preview without history (optional). */
   onSceneChange?: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
-  showAlert: (title: string, message: string) => Promise<void>;
+  showAlert: (title: string, message: string, details?: string) => Promise<void>;
   handleTextToPath: () => void;
   productionMode?: boolean;
 }

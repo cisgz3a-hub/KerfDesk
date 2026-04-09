@@ -33,8 +33,8 @@ interface FileToolbarProps {
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
   onNewProject: (scene: Scene) => void;
-  showAlert: (title: string, message: string) => Promise<void>;
-  showConfirm: (title: string, message: string) => Promise<boolean>;
+  showAlert: (title: string, message: string, details?: string) => Promise<void>;
+  showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   onConnect?: () => void;
   onSetup?: () => void;
   onMaterialTest?: () => void;

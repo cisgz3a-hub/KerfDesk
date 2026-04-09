@@ -1,0 +1,119 @@
+import { useState, useCallback } from 'react';
+
+type ModalInternal =
+  | {
+      variant: 'alert';
+      title: string;
+      message: string;
+      details?: string;
+      resolve: () => void;
+    }
+  | {
+      variant: 'confirm';
+      title: string;
+      message: string;
+      details?: string;
+      resolve: (ok: boolean) => void;
+    }
+  | {
+      variant: 'prompt';
+      title: string;
+      message: string;
+      details?: string;
+      defaultValue?: string;
+      placeholder?: string;
+      resolve: (value: string | null) => void;
+    };
+
+export function useModal() {
+  const [modal, setModal] = useState<ModalInternal | null>(null);
+
+  const showAlert = useCallback((title: string, message: string, details?: string): Promise<void> => {
+    return new Promise(resolve => {
+      setModal({
+        variant: 'alert',
+        title,
+        message,
+        details,
+        resolve: () => resolve(),
+      });
+    });
+  }, []);
+
+  const showConfirm = useCallback((title: string, message: string, details?: string): Promise<boolean> => {
+    return new Promise(resolve => {
+      setModal({
+        variant: 'confirm',
+        title,
+        message,
+        details,
+        resolve,
+      });
+    });
+  }, []);
+
+  const showPrompt = useCallback((
+    title: string,
+    message: string,
+    defaultValue?: string,
+    placeholder?: string,
+    details?: string
+  ): Promise<string | null> => {
+    return new Promise(resolve => {
+      setModal({
+        variant: 'prompt',
+        title,
+        message,
+        details,
+        defaultValue,
+        placeholder,
+        resolve,
+      });
+    });
+  }, []);
+
+  const dismissModal = useCallback(() => {
+    setModal(m => {
+      if (!m) return null;
+      if (m.variant === 'confirm') m.resolve(false);
+      else if (m.variant === 'prompt') m.resolve(null);
+      else m.resolve();
+      return null;
+    });
+  }, []);
+
+  const finishAlert = useCallback(() => {
+    setModal(m => {
+      if (!m || m.variant !== 'alert') return null;
+      m.resolve();
+      return null;
+    });
+  }, []);
+
+  const finishConfirm = useCallback((ok: boolean) => {
+    setModal(m => {
+      if (!m || m.variant !== 'confirm') return null;
+      m.resolve(ok);
+      return null;
+    });
+  }, []);
+
+  const finishPrompt = useCallback((value: string | null) => {
+    setModal(m => {
+      if (!m || m.variant !== 'prompt') return null;
+      m.resolve(value);
+      return null;
+    });
+  }, []);
+
+  return {
+    modal,
+    showAlert,
+    showConfirm,
+    showPrompt,
+    dismissModal,
+    finishAlert,
+    finishConfirm,
+    finishPrompt,
+  };
+}

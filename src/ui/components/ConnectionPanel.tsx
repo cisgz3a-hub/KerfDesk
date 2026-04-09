@@ -33,8 +33,8 @@ interface ConnectionPanelProps {
   boundsMaxY?: number;
   onClose: () => void;
   productionMode?: boolean;
-  showAlert: (title: string, message: string) => Promise<void>;
-  showConfirm: (title: string, message: string) => Promise<boolean>;
+  showAlert: (title: string, message: string, details?: string) => Promise<void>;
+  showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
 }
 
 export function ConnectionPanel({
@@ -315,7 +315,12 @@ export function ConnectionPanel({
     if ((x2 - x1) > bedWidth * 0.9 || (y2 - y1) > bedHeight * 0.9) warnings.push('Frame covers most of the bed — make sure the laser has room');
 
     if (warnings.length > 0) {
-      if (!confirm('Frame warnings:\n\n' + warnings.join('\n') + '\n\nFrame anyway?')) return;
+      const ok = await showConfirm(
+        'Frame',
+        'The design may extend beyond safe limits or the bed. Frame the boundary anyway?',
+        warnings.join('\n'),
+      );
+      if (!ok) return;
     }
 
     setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
@@ -910,7 +915,12 @@ export function ConnectionPanel({
           style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
         }, showLogHistory ? 'Hide History' : `Job History (${getJobLogs().length})`),
         getJobLogs().length > 0 && React.createElement('button', {
-          onClick: () => { if (confirm('Clear all job logs?')) { clearJobLogs(); setShowLogHistory(false); } },
+          onClick: async () => {
+            const ok = await showConfirm('Clear logs', 'Clear all job logs?');
+            if (!ok) return;
+            clearJobLogs();
+            setShowLogHistory(false);
+          },
           style: { background: 'none', border: 'none', color: '#333355', fontSize: 9, cursor: 'pointer' },
         }, 'Clear'),
       ),
