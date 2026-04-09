@@ -45,6 +45,21 @@ interface SerializedScene {
   metadata: Scene['metadata'];
 }
 
+// ─── TYPED ARRAY ENCODING ───────────────────────────────────────
+
+function uint8ToBase64(arr: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
+  return btoa(binary);
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const arr = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
+  return arr;
+}
+
 // ─── SERIALIZE ───────────────────────────────────────────────────
 
 /**
@@ -242,6 +257,19 @@ function restoreLayerDefaults(l: any): Layer {
 }
 
 function restoreObjectDefaults(o: any): SceneObject {
+  // Decode base64 image buffers back to Uint8Array
+  if (o.geometry?.type === 'image') {
+    const geom = o.geometry;
+    if (geom._grayscaleB64) {
+      geom.grayscaleData = base64ToUint8(geom._grayscaleB64);
+      delete geom._grayscaleB64;
+    }
+    if (geom._adjustedB64) {
+      geom.adjustedData = base64ToUint8(geom._adjustedB64);
+      delete geom._adjustedB64;
+    }
+  }
+
   return {
     id: o.id,
     type: o.type || 'path',
@@ -252,14 +280,29 @@ function restoreObjectDefaults(o: any): SceneObject {
     geometry: o.geometry,
     visible: o.visible !== false,
     locked: o.locked === true,
-    _bounds: null,           // Cache: always null on load
-    _worldTransform: null,   // Cache: always null on load
+    _bounds: null,
+    _worldTransform: null,
   };
 }
 
 // ─── CACHE STRIPPING ─────────────────────────────────────────────
 
-function stripObjectCache(obj: SceneObject): Omit<SceneObject, '_bounds' | '_worldTransform'> {
+function stripObjectCache(obj: SceneObject): any {
   const { _bounds, _worldTransform, ...clean } = obj;
+
+  // Encode Uint8Array fields as base64 for JSON safety
+  if (clean.geometry?.type === 'image') {
+    const geom = { ...clean.geometry };
+    if (geom.grayscaleData instanceof Uint8Array) {
+      (geom as any)._grayscaleB64 = uint8ToBase64(geom.grayscaleData);
+      delete geom.grayscaleData;
+    }
+    if ((geom as any).adjustedData instanceof Uint8Array) {
+      (geom as any)._adjustedB64 = uint8ToBase64((geom as any).adjustedData);
+      delete (geom as any).adjustedData;
+    }
+    return { ...clean, geometry: geom };
+  }
+
   return clean;
 }

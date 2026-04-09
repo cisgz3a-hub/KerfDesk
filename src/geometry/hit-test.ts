@@ -261,8 +261,11 @@ function hitTestImageBounds(
   p: Point,
   geom: { originalWidth: number; originalHeight: number; cropWidth: number; cropHeight: number }
 ): boolean {
-  const w = geom.cropWidth || geom.originalWidth;
-  const h = geom.cropHeight || geom.originalHeight;
+  const dpi = 96;
+  const rawW = geom.cropWidth || geom.originalWidth;
+  const rawH = geom.cropHeight || geom.originalHeight;
+  const w = (rawW / dpi) * 25.4;  // Convert pixels to mm to match renderer
+  const h = (rawH / dpi) * 25.4;
   return p.x >= 0 && p.x <= w && p.y >= 0 && p.y <= h;
 }
 

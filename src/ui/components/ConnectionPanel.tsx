@@ -495,7 +495,10 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
             React.createElement('div'),
             React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
             React.createElement('button', {
-              onClick: () => { sendCmd('G10 L20 P1 X0 Y0'); setMachineState(prev => prev ? { ...prev, position: { ...prev.position, x: 0, y: 0 } } : prev); },
+              onClick: () => {
+                sendCmd('G10 L20 P1 X0 Y0');
+                setMessages(prev => [...prev, 'Zero sent — position updates on next status report']);
+              },
               title: 'Set current position as X0 Y0',
               style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
             }, 'ZERO'),

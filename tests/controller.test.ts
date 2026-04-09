@@ -362,8 +362,8 @@ async function testErrorHandling() {
   assert(errors[0].includes('20'), 'Error code 20 reported');
   assert(errors[0].includes('BADCMD'), 'Error attributed to correct line');
 
-  // Job should still complete (errors don't stop streaming)
-  assert(!ctrl.isJobRunning, 'Job completed despite error');
+  // Job should abort on error (safe default for real hardware)
+  assert(!ctrl.isJobRunning, 'Job stopped after error');
 
   await ctrl.disconnect();
 }

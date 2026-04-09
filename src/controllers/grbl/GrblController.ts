@@ -42,6 +42,7 @@ export class GrblController implements LaserController {
   private _bufferAvailable = GRBL_BUFFER_SIZE;
   private _linesAcknowledged = 0;
   private _jobStartTime = 0;
+  private _stopOnError = true;
 
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -241,6 +242,14 @@ export class GrblController implements LaserController {
 
     this._state.errorCode = code;
     this._emitProgress();
+
+    // Stop streaming on error by default — safer for real machines
+    if (this._stopOnError) {
+      this._abortJob();
+      this._updateStatus('idle');
+      return;
+    }
+
     this._drainQueue();
   }
 
