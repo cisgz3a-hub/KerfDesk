@@ -173,10 +173,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   }
 
   encodeFooter(job: Job): string {
-    const start = job.metadata.startPosition ?? { x: 0, y: 0 };
+    const startX = job.metadata.startPositionX ?? 0;
+    const startY = job.metadata.startPositionY ?? 0;
     return [
       this.encodeLaserOff(),
-      `G0 X${start.x.toFixed(3)} Y${start.y.toFixed(3)} ; return to start`,
+      `G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} ; return to start`,
       'M2 ; program end',
     ].join('\n');
   }

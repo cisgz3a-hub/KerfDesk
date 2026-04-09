@@ -329,6 +329,15 @@ export function FileToolbar({
 
   const handleGenerateGcode = useCallback(() => {
     try {
+      // Preflight: warn about text objects that won't be in output
+      const textObjs = scene.objects.filter(o =>
+        o.visible && (o.geometry as any).type === 'text' &&
+        scene.layers.find(l => l.id === o.layerId)?.visible
+      );
+      if (textObjs.length > 0) {
+        const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
+        if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
+      }
       const job = compileJob(scene);
       if (job.operations.length === 0) {
         alert('No objects to process. Add objects to an output layer first.');

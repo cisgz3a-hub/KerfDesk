@@ -24,6 +24,10 @@ import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 
+// Renderer-private caches — not stored on scene objects
+const imageCacheMap = new WeakMap<object, Map<string, HTMLImageElement>>();
+const ditherCacheMap = new WeakMap<object, { key: string; canvas: HTMLCanvasElement }>();
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
 /** Bed, grid, origin, crosshair — leaves ctx with transform applied (outer save still active). */
@@ -710,8 +714,11 @@ function drawGeometry(
       if (!forObject) break;
       const renderObject = forObject;
       // Load and cache images for rendering
-      const imgCache = (renderObject as { _imgCache?: Map<string, HTMLImageElement> })._imgCache || new Map<string, HTMLImageElement>();
-      (renderObject as { _imgCache?: Map<string, HTMLImageElement> })._imgCache = imgCache;
+      let imgCache = imageCacheMap.get(renderObject);
+      if (!imgCache) {
+        imgCache = new Map<string, HTMLImageElement>();
+        imageCacheMap.set(renderObject, imgCache);
+      }
 
       let img = imgCache.get(geom.src);
       if (!img) {
@@ -753,7 +760,7 @@ function drawGeometry(
         const adjustedData = (geom as any).adjustedData;
         if (ditherMode && ditherMode !== 'none' && adjustedData && geom.grayscaleWidth && geom.grayscaleHeight) {
           const cacheKey = `dither_${geom.grayscaleWidth}_${geom.grayscaleHeight}_${ditherMode}_${adjustedData.length}`;
-          let cached = (renderObject as any)._ditherCache as { key: string; canvas: HTMLCanvasElement } | undefined;
+          let cached = ditherCacheMap.get(renderObject);
 
           if (!cached || cached.key !== cacheKey) {
             const dw = geom.grayscaleWidth;
@@ -773,7 +780,7 @@ function drawGeometry(
               }
               offCtx.putImageData(imgData, 0, 0);
               cached = { key: cacheKey, canvas: offscreen };
-              (renderObject as any)._ditherCache = cached;
+              ditherCacheMap.set(renderObject, cached);
             }
           }
 

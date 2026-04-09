@@ -30,7 +30,7 @@ import {
 // ─── MAIN COMPILER ───────────────────────────────────────────────
 
 export function compileJob(scene: Scene): Job {
-  const job = createEmptyJob(scene.metadata.name, scene.id, scene.startPosition);
+  const job = createEmptyJob(scene.metadata.name, scene.id);
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
 
   let totalObjects = 0;
@@ -38,6 +38,20 @@ export function compileJob(scene: Scene): Job {
   for (const layer of outputLayers) {
     const objects = getObjectsByLayer(scene, layer.id);
     if (objects.length === 0) continue;
+
+    // Raster layers: one operation per image (not per layer)
+    if (layer.settings.mode === 'image') {
+      for (const obj of objects) {
+        if (!obj.visible || obj.geometry.type !== 'image') continue;
+        const imgOp = compileOperation(layer, [obj]);
+        if (imgOp) {
+          job.operations.push(imgOp);
+          job.bounds = mergeAABB(job.bounds, imgOp.bounds);
+          totalObjects++;
+        }
+      }
+      continue;
+    }
 
     const operation = compileOperation(layer, objects);
     if (operation) {
@@ -49,6 +63,12 @@ export function compileJob(scene: Scene): Job {
 
   job.metadata.objectCount = totalObjects;
   job.metadata.layerCount = job.operations.length;
+
+  // Pass start position from scene to job for G-code footer
+  if ((scene as any).startPosition) {
+    job.metadata.startPositionX = (scene as any).startPosition.x;
+    job.metadata.startPositionY = (scene as any).startPosition.y;
+  }
 
   return job;
 }
@@ -145,8 +165,10 @@ function compileGeometry(
 
       const geom = obj.geometry;
       const dpi = 254; // Default raster resolution
-      const physicalWidth = (geom.originalWidth / 96) * 25.4;
-      const physicalHeight = (geom.originalHeight / 96) * 25.4;
+      const scaleX = Math.abs(obj.transform.a) || 1;
+      const scaleY = Math.abs(obj.transform.d) || 1;
+      const physicalWidth = ((geom.originalWidth / 96) * 25.4) * scaleX;
+      const physicalHeight = ((geom.originalHeight / 96) * 25.4) * scaleY;
 
       // Create a simple 8-bit grayscale bitmap from the image
       // For now, create a placeholder bitmap — actual image processing
