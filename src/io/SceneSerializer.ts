@@ -181,6 +181,45 @@ export function deserializeScene(json: string): Scene {
     },
   };
 
+  // ─── REFERENTIAL INTEGRITY ────────────────────────────────────
+  // Validate and repair broken references to prevent runtime crashes
+
+  const layerIds = new Set(scene.layers.map(l => l.id));
+
+  // Fix activeLayerId if it points to a non-existent layer
+  if (!layerIds.has(scene.activeLayerId)) {
+    scene.activeLayerId = scene.layers[0].id;
+  }
+
+  // Fix objects whose layerId points to a non-existent layer
+  let orphanCount = 0;
+  for (const obj of scene.objects) {
+    if (!layerIds.has(obj.layerId)) {
+      obj.layerId = scene.layers[0].id;
+      orphanCount++;
+    }
+  }
+
+  // Fix objects whose parentId points to a non-existent object
+  const objectIds = new Set(scene.objects.map(o => o.id));
+  for (const obj of scene.objects) {
+    if (obj.parentId && !objectIds.has(obj.parentId)) {
+      obj.parentId = null;
+    }
+  }
+
+  // Remove duplicate object IDs (keep the first occurrence)
+  const seenIds = new Set<string>();
+  scene.objects = scene.objects.filter(o => {
+    if (seenIds.has(o.id)) return false;
+    seenIds.add(o.id);
+    return true;
+  });
+
+  if (orphanCount > 0) {
+    console.warn(`[LaserForge] Repaired ${orphanCount} object(s) with invalid layer references`);
+  }
+
   return scene;
 }
 
