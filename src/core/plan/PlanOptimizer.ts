@@ -413,14 +413,22 @@ function planFillOperation(
   settings: ResolvedLaserSettings,
   startPos: Point
 ): Move[] {
-  const fillSettings: FillSettings = {
-    interval: settings.fillInterval,
-    angle: settings.fillAngle,
-    biDirectional: settings.fillBiDirectional,
-    overscanning: settings.overscanning,
-  };
+  const fillMode = settings.fillMode ?? 'line';
+  const baseAngle = settings.fillAngle;
+  const fillAngles: number[] =
+    fillMode === 'cross-hatch' ? [baseAngle, baseAngle + 90] : [baseAngle];
 
-  const scanlines = generateFillScanlines(boundaryPaths, fillSettings);
+  const scanlines: ScanlineSegment[] = [];
+  for (const angle of fillAngles) {
+    const fillSettings: FillSettings = {
+      interval: settings.fillInterval,
+      angle,
+      biDirectional: settings.fillBiDirectional,
+      overscanning: settings.overscanning,
+    };
+    scanlines.push(...generateFillScanlines(boundaryPaths, fillSettings));
+  }
+
   if (scanlines.length === 0) return [];
 
   const moves: Move[] = [];
