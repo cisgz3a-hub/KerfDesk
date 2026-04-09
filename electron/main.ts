@@ -39,6 +39,7 @@ function createWindow() {
     minHeight: 600,
     title: 'LaserForge',
     backgroundColor: '#0a0a12',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
@@ -46,6 +47,9 @@ function createWindow() {
       webviewTag: false,
     },
   });
+
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.removeMenu();
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
