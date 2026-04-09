@@ -172,34 +172,78 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
   const handleProofRun = () => {
     if (!gcode || !controllerRef.current) return;
 
-    // Convert G-code to proof mode: replace all S-values with S0, keep all motion
-    const proofLines = gcode
-      .split('\n')
-      .map(l => l.trim())
-      .filter(l => l && !l.startsWith(';'))
-      .map(line => {
-        // Replace any S-value with S0 (laser off)
-        if (line.match(/S\d/)) {
-          return line.replace(/S\d+/g, 'S0') + ' ; PROOF';
-        }
-        // Replace M4/M3 laser-on with M4 S0
-        if (line.startsWith('M4 ') || line.startsWith('M3 ')) {
-          return 'M4 S0 ; PROOF';
-        }
-        return line;
-      });
-
-    // Use preflight to gate
-    if (preflight && preflight.issues.some(i => i.severity === 'blocker' && i.id !== 'output-no-gcode')) {
+    if (preflight && preflight.issues.some(i => i.severity === 'blocker' && i.category === 'machine')) {
       const machineBlockers = preflight.issues.filter(i => i.severity === 'blocker' && i.category === 'machine');
-      if (machineBlockers.length > 0) {
-        alert('Cannot run proof — resolve machine blockers first:\n\n' +
-          machineBlockers.map(i => `• ${i.title}`).join('\n'));
-        return;
-      }
+      alert('Cannot run proof — resolve machine blockers first:\n\n' +
+        machineBlockers.map(i => `• ${i.title}`).join('\n'));
+      return;
     }
 
-    setMessages(prev => [...prev, `PROOF RUN: ${proofLines.length} commands (laser OFF)`]);
+    const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
+
+    // Build a fast proof: laser off, rapid speed, skip dense raster lines
+    const proofLines: string[] = [];
+    let lastX = '', lastY = '';
+    let skippedCount = 0;
+
+    for (const line of lines) {
+      // Always keep setup/teardown commands
+      if (line.startsWith('G21') || line.startsWith('G90') || line.startsWith('M2') || line.startsWith('M5')) {
+        proofLines.push(line);
+        continue;
+      }
+
+      // Kill all laser power
+      if (line.startsWith('M4 ') || line.startsWith('M3 ')) {
+        proofLines.push('M5 S0');
+        continue;
+      }
+      if (line.startsWith('M8') || line.startsWith('M9')) {
+        continue; // Skip air assist in proof
+      }
+
+      // Rapid moves — keep as-is, they're already fast
+      if (line.startsWith('G0 ')) {
+        proofLines.push(line);
+        const xm = line.match(/X([-\d.]+)/);
+        const ym = line.match(/Y([-\d.]+)/);
+        if (xm) lastX = xm[1];
+        if (ym) lastY = ym[1];
+        continue;
+      }
+
+      // G1 cutting moves — keep only moves that change position significantly
+      if (line.startsWith('G1 ')) {
+        const xm = line.match(/X([-\d.]+)/);
+        const ym = line.match(/Y([-\d.]+)/);
+        const newX = xm ? xm[1] : lastX;
+        const newY = ym ? ym[1] : lastY;
+
+        // Skip if position barely changed (dense raster lines)
+        const dx = Math.abs(parseFloat(newX) - parseFloat(lastX || '0'));
+        const dy = Math.abs(parseFloat(newY) - parseFloat(lastY || '0'));
+
+        if (dx < 0.5 && dy < 0.5) {
+          skippedCount++;
+          continue; // Skip micro-moves (raster scanlines)
+        }
+
+        // Convert to rapid move at high speed, no power
+        proofLines.push(`G0 X${newX} Y${newY}`);
+        lastX = newX;
+        lastY = newY;
+        continue;
+      }
+
+      // Keep everything else (G4 dwells, etc) but strip power
+      proofLines.push(line.replace(/S\d+/g, 'S0'));
+    }
+
+    setMessages(prev => [...prev,
+      `PROOF RUN: ${proofLines.length} moves (${skippedCount} raster lines skipped)`,
+      `Original: ${lines.length} commands → Proof: ${proofLines.length} commands`,
+    ]);
+
     try {
       controllerRef.current.sendJob(proofLines);
     } catch (e: any) {
