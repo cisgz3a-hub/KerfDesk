@@ -256,7 +256,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode =
           gap: 8,
           padding: '6px 12px',
           background: isActive ? 'rgba(0, 212, 255, 0.06)' : 'transparent',
-          borderLeft: isActive ? `2px solid ${theme.accent.cyan}` : '2px solid transparent',
+          borderLeft: layer.id === scene.activeLayerId ? `3px solid ${layer.color}` : '3px solid transparent',
           cursor: 'pointer',
           transition: `all ${theme.transition.fast}`,
         };

@@ -158,6 +158,8 @@ export function FileToolbar({
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const previousActiveLayerId = scene.activeLayerId;
+
     try {
       const dataUri = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
@@ -228,7 +230,6 @@ export function FileToolbar({
         targetScene = {
           ...scene,
           layers: [...scene.layers, newLayer],
-          activeLayerId: newLayer.id,
         };
         layerId = newLayer.id;
       }
@@ -263,6 +264,13 @@ export function FileToolbar({
         ...targetScene,
         objects: [...targetScene.objects, imageObj],
       };
+      const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
+      const priorStillValid =
+        previousActiveLayerId != null &&
+        newScene.layers.some(l => l.id === previousActiveLayerId);
+      newScene.activeLayerId = priorStillValid
+        ? previousActiveLayerId
+        : (cutLayer?.id ?? newScene.layers[0].id);
       onSceneChange(newScene);
       onSceneCommit(newScene);
     } catch (e) {

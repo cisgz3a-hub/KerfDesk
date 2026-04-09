@@ -554,7 +554,8 @@ export function App() {
         const updated = importDxfIntoScene(text, scene, layerId);
         handleSceneCommit(updated);
       } else if (file.type.startsWith('image/')) {
-        // Import image
+        // Import image — preserve active layer (do not switch to image layer)
+        const previousActiveLayerId = scene.activeLayerId;
         const dataUri = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
@@ -619,7 +620,6 @@ export function App() {
           targetScene = {
             ...scene,
             layers: [...scene.layers, newLayer],
-            activeLayerId: newLayer.id,
           };
           layerId = newLayer.id;
         }
@@ -650,10 +650,18 @@ export function App() {
           _worldTransform: null,
         };
 
-        handleSceneCommit({
+        const newScene = {
           ...targetScene,
           objects: [...targetScene.objects, imageObj],
-        });
+        };
+        const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
+        const priorStillValid =
+          previousActiveLayerId != null &&
+          newScene.layers.some(l => l.id === previousActiveLayerId);
+        newScene.activeLayerId = priorStillValid
+          ? previousActiveLayerId
+          : (cutLayer?.id ?? newScene.layers[0].id);
+        handleSceneCommit(newScene);
       }
     } catch (err) {
       console.error('Drop import failed:', err);
