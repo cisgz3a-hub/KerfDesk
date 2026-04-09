@@ -39,6 +39,7 @@ interface FileToolbarProps {
   onSetup?: () => void;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
+  onTemplates?: () => void;
   onPreviewToggle?: () => void;
   previewMode?: boolean;
   onUndo?: () => void;
@@ -61,6 +62,7 @@ export function FileToolbar({
   onSetup,
   onMaterialTest,
   onMaterialSetup,
+  onTemplates,
   onPreviewToggle,
   previewMode = false,
   onUndo,
@@ -533,6 +535,12 @@ export function FileToolbar({
     React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
     sep,
     React.createElement('button', { onClick: () => onSetup?.(), style: btnStyle, title: 'Change laser machine and workspace settings', ...stdHover }, 'Setup'),
+    React.createElement('button', {
+      onClick: () => onTemplates?.(),
+      style: btnStyle,
+      title: 'Browse starter designs — keychains, signs, coasters, and more',
+      ...stdHover,
+    }, 'Templates'),
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 

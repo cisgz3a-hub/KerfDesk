@@ -52,6 +52,8 @@ import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
+import { TemplateBrowser } from './TemplateBrowser';
+import { type Template } from '../../templates/TemplateLibrary';
 
 /** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
 function getSetupStorageKey(): string {
@@ -179,6 +181,7 @@ export function App() {
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -902,6 +905,34 @@ export function App() {
     handleSceneCommit({ ...scene, material: null });
   }, [scene, handleSceneCommit]);
 
+  const handleTemplateSelect = useCallback((template: Template) => {
+    setShowTemplates(false);
+    try {
+      const layerId = scene.activeLayerId || scene.layers[0]?.id;
+      if (!layerId) return;
+      const newScene = importSvgIntoScene(template.svg, scene, layerId, {
+        mode: 'fit',
+        allowScaleUp: false,
+        targetBounds: scene.material
+          ? {
+            minX: scene.material.x,
+            minY: scene.material.y,
+            maxX: scene.material.x + scene.material.width,
+            maxY: scene.material.y + scene.material.height,
+          }
+          : {
+            minX: 0,
+            minY: 0,
+            maxX: scene.canvas.width,
+            maxY: scene.canvas.height,
+          },
+      });
+      handleSceneCommit(newScene);
+    } catch (e) {
+      alert('Failed to load template: ' + (e as Error).message);
+    }
+  }, [scene, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -1129,6 +1160,7 @@ export function App() {
       onSetup: () => setShowWizard(true),
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
+      onTemplates: () => setShowTemplates(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
       onUndo: handleUndo,
@@ -1428,6 +1460,11 @@ export function App() {
       onConfirm: handleMaterialConfirm,
       onClear: handleMaterialClear,
       onCancel: () => setShowMaterialDialog(false),
+    }),
+
+    showTemplates && React.createElement(TemplateBrowser, {
+      onSelect: handleTemplateSelect,
+      onClose: () => setShowTemplates(false),
     }),
 
     showWizard && React.createElement(WelcomeWizard, {
