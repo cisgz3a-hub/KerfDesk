@@ -1437,6 +1437,7 @@ export function App() {
       boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
       showAlert,
       showConfirm,
+      onSceneCommit: handleSceneCommit,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

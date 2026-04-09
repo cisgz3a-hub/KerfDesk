@@ -418,7 +418,7 @@ const testBitmap: ProcessedBitmap = {
 const rasterSettings: ResolvedLaserSettings = {
   powerMin: 10, powerMax: 80, speed: 2000,
   passes: 1, zStepPerPass: 0,
-  fillInterval: 0.1, fillAngle: 0, fillBiDirectional: true, overscanning: 0,
+  fillInterval: 0.1, fillAngle: 0, fillMode: 'line', fillBiDirectional: true, overscanning: 0,
   overcut: 0, leadIn: 0, tabCount: 0, tabWidth: 0, insideFirst: false,
   airAssist: false,
 };

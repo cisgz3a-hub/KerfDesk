@@ -5,6 +5,17 @@ import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
+import {
+  getDeviceProfiles,
+  saveDeviceProfile,
+  deleteDeviceProfile,
+  getActiveProfileId,
+  setActiveProfileId as persistActiveProfileId,
+  getActiveProfile,
+  profileFromScene,
+  applyProfileToScene,
+  type DeviceProfile,
+} from '../../core/devices/DeviceProfile';
 import { runPreflight, type PreflightResult } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
 import {
@@ -54,6 +65,7 @@ export function ConnectionPanel({
   productionMode = false,
   showAlert,
   showConfirm,
+  onSceneCommit,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -64,6 +76,8 @@ export function ConnectionPanel({
   const [showOutcome, setShowOutcome] = useState(false);
   const [currentLog, setCurrentLog] = useState<JobLog | null>(null);
   const [showLogHistory, setShowLogHistory] = useState(false);
+  const [profiles, setProfiles] = useState<DeviceProfile[]>(() => getDeviceProfiles());
+  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => getActiveProfileId());
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -537,6 +551,80 @@ export function ConnectionPanel({
       // Disconnect
       isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', justifyContent: 'flex-end' } },
         React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
+      ),
+
+      isConnected && React.createElement('div', {
+        style: { padding: '8px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 6, alignItems: 'center' },
+      },
+        React.createElement('select', {
+          value: activeProfileId || '',
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const id = e.target.value;
+            if (id === '__new__') {
+              const name = prompt('Profile name:');
+              if (!name) return;
+              const profile = profileFromScene(name, scene);
+              saveDeviceProfile(profile);
+              persistActiveProfileId(profile.id);
+              setActiveProfileId(profile.id);
+              setProfiles(getDeviceProfiles());
+              return;
+            }
+            if (id === '__save__') {
+              const active = getActiveProfile();
+              if (active) {
+                const updated = profileFromScene(active.name, scene);
+                updated.id = active.id;
+                updated.createdAt = active.createdAt;
+                saveDeviceProfile(updated);
+                setProfiles(getDeviceProfiles());
+                setMessages(prev => [...prev, `✓ Profile "${active.name}" updated`]);
+              }
+              return;
+            }
+            if (id) {
+              persistActiveProfileId(id);
+              setActiveProfileId(id);
+              const profile = getDeviceProfiles().find(p => p.id === id);
+              if (profile) {
+                const newScene = applyProfileToScene(profile, scene);
+                onSceneCommit(newScene);
+                setMessages(prev => [...prev, `✓ Switched to "${profile.name}"`]);
+              }
+            } else {
+              persistActiveProfileId(null);
+              setActiveProfileId(null);
+            }
+          },
+          style: {
+            flex: 1, padding: '4px 8px', fontSize: 10,
+            background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
+            color: '#e0e0ec', fontFamily: font,
+            outline: 'none',
+          },
+        },
+          React.createElement('option', { value: '' }, 'No device profile'),
+          ...profiles.map(p =>
+            React.createElement('option', { key: p.id, value: p.id },
+              `${p.name} (${p.machineType} ${p.watts}W)`,
+            ),
+          ),
+          React.createElement('option', { value: '__save__', disabled: !activeProfileId }, '↻ Update current profile'),
+          React.createElement('option', { value: '__new__' }, '+ Save new profile'),
+        ),
+        activeProfileId && React.createElement('button', {
+          onClick: () => {
+            const profile = profiles.find(p => p.id === activeProfileId);
+            if (profile && confirm(`Delete profile "${profile.name}"?`)) {
+              deleteDeviceProfile(activeProfileId);
+              persistActiveProfileId(null);
+              setActiveProfileId(null);
+              setProfiles(getDeviceProfiles());
+            }
+          },
+          title: 'Delete this profile',
+          style: { background: 'none', border: 'none', color: '#555570', fontSize: 14, cursor: 'pointer', padding: '0 4px' },
+        }, '×'),
       ),
 
       // Step-by-step workflow guide — highlights current step based on state

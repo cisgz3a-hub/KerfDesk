@@ -138,6 +138,7 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
 
     fillInterval: s.fill.enabled ? Math.max(0.01, s.fill.interval) : 0,
     fillAngle: s.fill.angle % 360,
+    fillMode: s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line',
     fillBiDirectional: s.fill.biDirectional,
     overscanning: Math.max(0, s.fill.overscanning),
 

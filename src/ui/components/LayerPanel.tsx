@@ -624,7 +624,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             value: activeLayer.settings.fill.mode || 'line',
             onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
               const v = e.target.value as FillMode;
-              if (v !== 'line') return;
+              if (v === 'offset') return;
               onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
                 ...l,
                 settings: { ...l.settings, fill: { ...l.settings.fill, mode: v } },
@@ -634,7 +634,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           },
             React.createElement('option', { value: 'line' }, 'Lines (scanline fill)'),
             React.createElement('option', { value: 'offset', disabled: true }, 'Offset fill (coming soon)'),
-            React.createElement('option', { value: 'cross-hatch', disabled: true }, 'Cross-hatch (coming soon)'),
+            React.createElement('option', { value: 'cross-hatch' }, 'Cross-hatch'),
           ),
         ),
         React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },

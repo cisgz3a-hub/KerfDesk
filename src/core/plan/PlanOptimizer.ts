@@ -12,10 +12,10 @@
  *             - Air assist insertion
  *
  *             NOT yet implemented:
- *             - Fill / engrave scanline generation
- *             - Raster / image scanline generation
- *             - 2-opt / cluster optimization
- *             - Inside-first ordering
+ *             - Cluster optimization beyond 2-opt
+ *
+ *             Implemented: fill scanlines (incl. cross-hatch), raster scanlines,
+ *             inside-first ordering, 2-opt path order + direction choice.
  *
  * Pipeline:   Job → [optimizePlan()] → Plan
  *
@@ -50,6 +50,7 @@ import {
   type RasterSettings,
   type RasterScanline,
 } from './RasterGenerator';
+import { optimizePathOrder } from './PathOptimizer';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -522,9 +523,9 @@ function planRasterOperation(
 /**
  * Order paths for cutting with two constraints:
  * 1. Inner paths must be cut before outer paths (containment safety)
- * 2. Within each containment depth, minimize travel (nearest-neighbor)
+ * 2. Within each containment depth, minimize travel (2-opt order + best direction)
  *
- * When insideFirst is false, falls back to pure nearest-neighbor.
+ * When insideFirst is false, uses 2-opt ordering from the job start (no nesting).
  */
 function orderPathsForCutting(
   paths: FlatPath[],
@@ -532,7 +533,7 @@ function orderPathsForCutting(
   insideFirst: boolean
 ): OrderedPath[] {
   if (!insideFirst || paths.length <= 1) {
-    return nearestNeighborOrder(paths, startPos);
+    return orderWithBestDirection(optimizePathOrder(paths), startPos);
   }
 
   // Separate closed and open paths
@@ -544,7 +545,7 @@ function orderPathsForCutting(
 
   // If no closed paths, just nearest-neighbor the open ones
   if (closed.length === 0) {
-    return nearestNeighborOrder(open, startPos);
+    return orderWithBestDirection(optimizePathOrder(open), startPos);
   }
 
   // Build containment tree and get depth-grouped paths
@@ -558,8 +559,8 @@ function orderPathsForCutting(
     const group = depthGroups.get(depth);
     if (!group || group.length === 0) continue;
 
-    // Within this depth level, apply nearest-neighbor
-    const ordered = nearestNeighborOrder(group, pos);
+    // Within this depth level, optimize order then pick traversal direction
+    const ordered = orderWithBestDirection(optimizePathOrder(group), pos);
     result.push(...ordered);
 
     // Update position to end of last path in this group
@@ -569,9 +570,9 @@ function orderPathsForCutting(
     }
   }
 
-  // Open paths go last, nearest-neighbor ordered
+  // Open paths go last, optimized order
   if (open.length > 0) {
-    result.push(...nearestNeighborOrder(open, pos));
+    result.push(...orderWithBestDirection(optimizePathOrder(open), pos));
   }
 
   return result;
@@ -606,64 +607,21 @@ interface OrderedPath {
 }
 
 /**
- * Greedy nearest-neighbor ordering.
- *
- * For each unvisited path, find the one whose start or end is
- * closest to the current position. If the end is closer, the
- * path will be traversed in reverse.
- *
- * Complexity: O(n²) where n = number of paths.
- * Quality: ~70% of optimal. Good enough for MVP.
+ * Fixed path order: choose start vs end traversal to minimize travel from current position.
  */
-function nearestNeighborOrder(
-  paths: FlatPath[],
-  startPos: Point
-): OrderedPath[] {
+function orderWithBestDirection(paths: FlatPath[], startPos: Point): OrderedPath[] {
   if (paths.length === 0) return [];
-  if (paths.length === 1) {
-    return [{ path: paths[0], reversed: false }];
-  }
-
-  const remaining = new Set<number>(paths.map((_, i) => i));
   const result: OrderedPath[] = [];
   let pos = startPos;
-
-  while (remaining.size > 0) {
-    let bestIdx = -1;
-    let bestDist = Infinity;
-    let bestReversed = false;
-
-    for (const idx of remaining) {
-      const path = paths[idx];
-
-      // Distance to path start
-      const start = getPathStart(path);
-      const dStart = distanceSq(pos, start);
-
-      // Distance to path end (could traverse in reverse)
-      const end = getPathEnd(path);
-      const dEnd = distanceSq(pos, end);
-
-      if (dStart < bestDist) {
-        bestDist = dStart;
-        bestIdx = idx;
-        bestReversed = false;
-      }
-      if (dEnd < bestDist) {
-        bestDist = dEnd;
-        bestIdx = idx;
-        bestReversed = true;
-      }
-    }
-
-    remaining.delete(bestIdx);
-    const path = paths[bestIdx];
-    result.push({ path, reversed: bestReversed });
-
-    // Update position to the endpoint of the path we just added
-    pos = getPathEndpoint(path, bestReversed);
+  for (const path of paths) {
+    const start = getPathStart(path);
+    const end = getPathEnd(path);
+    const dStart = distanceSq(pos, start);
+    const dEnd = distanceSq(pos, end);
+    const reversed = dEnd < dStart;
+    result.push({ path, reversed });
+    pos = getPathEndpoint(path, reversed);
   }
-
   return result;
 }
 

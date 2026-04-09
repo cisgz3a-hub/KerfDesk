@@ -16,6 +16,7 @@
  */
 
 import { type AABB, type Point, emptyAABB, generateId } from '../types';
+import { type FillMode } from '../scene/Layer';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -89,6 +90,7 @@ export interface ResolvedLaserSettings {
 
   fillInterval: number;          // mm (0 if not fill mode)
   fillAngle: number;             // degrees
+  fillMode: FillMode;
   fillBiDirectional: boolean;
   overscanning: number;          // mm
 
