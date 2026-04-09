@@ -1504,6 +1504,7 @@ export function App() {
     }),
 
     showConnection && React.createElement(ConnectionPanel, {
+      scene,
       gcode: currentGcode,
       onClose: () => setShowConnection(false),
       bedWidth: scene.canvas.width,

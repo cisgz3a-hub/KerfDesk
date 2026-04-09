@@ -4,8 +4,11 @@ import { MockSerialPort } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
+import { type Scene } from '../../core/scene/Scene';
+import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
 
 interface ConnectionPanelProps {
+  scene: Scene;
   gcode: string | null;
   bedWidth: number;
   bedHeight: number;
@@ -16,9 +19,10 @@ interface ConnectionPanelProps {
   onClose: () => void;
 }
 
-export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose }: ConnectionPanelProps) {
+export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose }: ConnectionPanelProps) {
   const [machineState, setMachineState] = useState<MachineState | null>(null);
   const [progress, setProgress] = useState<JobProgress | null>(null);
+  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [isSimulator, setIsSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
@@ -49,6 +53,12 @@ export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, bounds
   useEffect(() => {
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
+
+  useEffect(() => {
+    if (!scene) return;
+    const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight);
+    setPreflight(result);
+  }, [gcode, machineState, scene, bedWidth, bedHeight]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
@@ -109,27 +119,20 @@ export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, bounds
 
   const handleStartJob = () => {
     if (!gcode || !controllerRef.current) return;
+
+    // Use preflight to gate job start
+    if (preflight && !preflight.canStart) {
+      alert('Cannot start job — resolve all blockers first:\n\n' +
+        preflight.issues
+          .filter(i => i.severity === 'blocker')
+          .map(i => `• ${i.title}`)
+          .join('\n')
+      );
+      return;
+    }
+
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
-
-    // Pre-flight bounds check
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const line of lines) {
-      const xm = line.match(/X([-\d.]+)/);
-      const ym = line.match(/Y([-\d.]+)/);
-      if (xm) { const x = parseFloat(xm[1]); minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
-      if (ym) { const y = parseFloat(ym[1]); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-    }
-    const warnings: string[] = [];
-    if (minX < 0) warnings.push(`Negative X (${minX.toFixed(1)}mm)`);
-    if (minY < 0) warnings.push(`Negative Y (${minY.toFixed(1)}mm)`);
-    if (maxX > bedWidth) warnings.push(`X exceeds bed (${maxX.toFixed(1)}mm > ${bedWidth}mm)`);
-    if (maxY > bedHeight) warnings.push(`Y exceeds bed (${maxY.toFixed(1)}mm > ${bedHeight}mm)`);
-
-    if (warnings.length > 0) {
-      if (!confirm('Warnings:\n' + warnings.join('\n') + '\n\nSend anyway?')) return;
-    }
-
-    setMessages(prev => [...prev, `Starting job: ${lines.length} commands`]);
+    setMessages(prev => [...prev, `Starting job: ${lines.length} commands (score: ${preflight?.score ?? '?'}%)`]);
     try {
       controllerRef.current.sendJob(lines);
     } catch (e: any) {
@@ -249,6 +252,65 @@ export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, bounds
         '3. Click Frame to verify, then Start Job',
       ),
 
+      // Readiness Score
+      isConnected && preflight && React.createElement('div', {
+        style: {
+          padding: '12px 18px', borderBottom: '1px solid #1a1a2e',
+        },
+      },
+        // Score badge
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+        },
+          React.createElement('div', {
+            style: { display: 'flex', alignItems: 'center', gap: 10 },
+          },
+            React.createElement('div', {
+              style: {
+                width: 44, height: 44, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, fontWeight: 700, fontFamily: mono,
+                background: preflight.score >= 80 ? 'rgba(45,212,160,0.1)' :
+                            preflight.score >= 50 ? 'rgba(255,212,68,0.1)' :
+                            'rgba(255,68,102,0.1)',
+                border: `2px solid ${preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466'}`,
+                color: preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466',
+              },
+            }, `${preflight.score}`),
+            React.createElement('div', null,
+              React.createElement('div', {
+                style: { fontSize: 12, fontWeight: 600, color: '#e0e0ec' },
+              }, preflight.canStart ? 'Ready to cut' : 'Not ready'),
+              React.createElement('div', {
+                style: { fontSize: 10, color: '#555570' },
+              }, `${preflight.blockers} blocker${preflight.blockers !== 1 ? 's' : ''}, ${preflight.warnings} warning${preflight.warnings !== 1 ? 's' : ''}`),
+            ),
+          ),
+        ),
+
+        // Issue list (collapsed by default, show blockers and warnings)
+        ...(preflight.issues.filter(i => i.severity !== 'info').map(issue =>
+          React.createElement('div', {
+            key: issue.id,
+            style: {
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '6px 0', fontSize: 11, lineHeight: 1.4,
+            },
+          },
+            React.createElement('span', {
+              style: {
+                fontSize: 10, marginTop: 2, flexShrink: 0,
+                color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
+              },
+            }, issue.severity === 'blocker' ? '●' : '▲'),
+            React.createElement('div', null,
+              React.createElement('div', { style: { color: '#e0e0ec', fontWeight: 500 } }, issue.title),
+              issue.fix && React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, issue.fix),
+            ),
+          ),
+        )),
+      ),
+
       // Position + state
       isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', gap: 16 } },
         React.createElement('div', { style: { flex: 1, background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
@@ -333,8 +395,8 @@ export function ConnectionPanel({ gcode, bedWidth, bedHeight, boundsMinX, bounds
             style: { ...btnStyle('255,212,68', !isConnected), flex: 1 },
           }, 'Frame'),
           React.createElement('button', {
-            onClick: handleStartJob, disabled: !gcode || isRunning,
-            style: { ...btnStyle('45,212,160', !gcode || isRunning), flex: 1, fontWeight: 600 },
+            onClick: handleStartJob, disabled: !gcode || isRunning || !!(preflight && !preflight.canStart),
+            style: { ...btnStyle('45,212,160', !gcode || isRunning || !!(preflight && !preflight.canStart)), flex: 1, fontWeight: 600 },
           }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
         ),
         // Pause/Resume/Stop when running
