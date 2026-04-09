@@ -1,6 +1,6 @@
 import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
-import { type Layer, type LayerMode, type CutOrder, createLayer } from '../../core/scene/Layer';
+import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import {
   MATERIAL_CATEGORIES,
   MATERIAL_PRESETS,
@@ -619,6 +619,25 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           style: { fontSize: 9, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1 },
         }, 'Fill Settings'),
         React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
+          React.createElement('span', { style: settingsLabelStyle }, 'Fill mode'),
+          React.createElement('select', {
+            value: activeLayer.settings.fill.mode || 'line',
+            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+              const v = e.target.value as FillMode;
+              if (v !== 'line') return;
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                ...l,
+                settings: { ...l.settings, fill: { ...l.settings.fill, mode: v } },
+              })));
+            },
+            style: selectStyle,
+          },
+            React.createElement('option', { value: 'line' }, 'Lines (scanline fill)'),
+            React.createElement('option', { value: 'offset', disabled: true }, 'Offset fill (coming soon)'),
+            React.createElement('option', { value: 'cross-hatch', disabled: true }, 'Cross-hatch (coming soon)'),
+          ),
+        ),
+        React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
             React.createElement('span', { style: settingsLabelStyle }, 'Interval (mm)'),
             React.createElement(NumberInput, {
               value: activeLayer.settings.fill.interval,
@@ -709,7 +728,6 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                 })));
               },
             }),
-            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Lead-in (mm)'),
@@ -726,7 +744,6 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                 })));
               },
             }),
-            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
@@ -745,7 +762,6 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                 })));
               },
             }),
-            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab width (mm)'),
@@ -762,7 +778,6 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                 })));
               },
             }),
-            React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Inside first'),
@@ -786,16 +801,13 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             }, activeLayer.settings.cut.insideFirst ? 'ON' : 'OFF'),
           ),
       ),
-      productionMode && React.createElement('label', { style: { ...fieldStyle, marginTop: 8 } },
-        React.createElement('span', { style: settingsLabelStyle }, 'Cut order'),
+      productionMode && React.createElement('label', { style: { ...fieldStyle, marginTop: 8, opacity: 0.7 } },
+        React.createElement('span', { style: settingsLabelStyle }, 'Cut order (coming soon)'),
         React.createElement('select', {
           value: activeLayer.settings.cutOrder,
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) =>
-            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-              ...l,
-              settings: { ...l.settings, cutOrder: e.target.value as CutOrder },
-            }))),
-          style: selectStyle,
+          disabled: true,
+          title: 'Stored for future use — planner uses fixed ordering today.',
+          style: { ...selectStyle, cursor: 'not-allowed', opacity: 0.85 },
         },
           React.createElement('option', { value: 'layer-priority' }, 'layer-priority'),
           React.createElement('option', { value: 'object-order' }, 'object-order'),

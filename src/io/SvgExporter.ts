@@ -2,7 +2,16 @@
  * Export scene objects to SVG format.
  */
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject } from '../core/scene/SceneObject';
+import { type SceneObject, type TextGeometry } from '../core/scene/SceneObject';
+
+function escapeXml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
 
 export function exportSceneToSvg(scene: Scene): string {
   const w = scene.canvas.width;
@@ -24,8 +33,28 @@ export function exportSceneToSvg(scene: Scene): string {
 
     const layer = scene.layers.find(l => l.id === obj.layerId);
     const mode = layer?.settings?.mode || 'cut';
-    const strokeColor = layerColorMap[mode] || '#000000';
+    const strokeColor = layer?.color || layerColorMap[mode] || '#000000';
     const t = obj.transform;
+
+    if (obj.geometry.type === 'text') {
+      const geom = obj.geometry as TextGeometry;
+      const fontSize = geom.fontSize || 20;
+      const attrs: string[] = [
+        'x="0"',
+        `y="${fontSize.toFixed(2)}"`,
+        `font-family="${escapeXml(geom.fontFamily || 'Arial')}"`,
+        `font-size="${fontSize.toFixed(2)}"`,
+      ];
+      if (geom.bold) attrs.push('font-weight="bold"');
+      if (geom.italic) attrs.push('font-style="italic"');
+      attrs.push('fill="none"');
+      attrs.push(`stroke="${strokeColor}"`);
+      attrs.push('stroke-width="0.3"');
+      paths += `  <g transform="matrix(${t.a},${t.b},${t.c},${t.d},${t.tx},${t.ty})">\n`;
+      paths += `    <text ${attrs.join(' ')}>${escapeXml(geom.text || '')}</text>\n`;
+      paths += `  </g>\n`;
+      continue;
+    }
 
     const pathData = objectToSvgPath(obj);
     if (!pathData) continue;
@@ -83,10 +112,8 @@ function objectToSvgPath(obj: SceneObject): string | null {
       return d.trim();
     }
 
-    case 'text': {
-      // Text can't be a path without font shaping — skip for now
+    case 'text':
       return null;
-    }
 
     default:
       return null;

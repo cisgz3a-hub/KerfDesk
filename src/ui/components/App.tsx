@@ -216,6 +216,8 @@ export function App() {
   const [jobProgress, setJobProgress] = useState<JobProgress | null>(null);
   const grblControllerRef = useRef<GrblController | null>(null);
   const serialPortRef = useRef<WebSerialPort | MockSerialPort | null>(null);
+  const sceneIsDirtyRef = useRef(false);
+  const lastSavedSceneRef = useRef('');
   const [grblReady, setGrblReady] = useState(false);
   const [productionMode, setProductionMode] = useState<boolean>(() => {
     try {
@@ -354,6 +356,7 @@ export function App() {
 
   /** Commit: update UI AND create a history entry. */
   const handleSceneCommit = useCallback((newScene: Scene) => {
+    sceneIsDirtyRef.current = true;
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
@@ -378,16 +381,27 @@ export function App() {
   }, [handleNewProject]);
 
   useEffect(() => {
-    const timer = setInterval(() => {
+    const interval = setInterval(() => {
+      if (!sceneIsDirtyRef.current) return;
+
       try {
-        const serialized = serializeScene(scene);
-        localStorage.setItem('laserforge_autosave', serialized);
+        const json = serializeScene(scene);
+
+        if (json === lastSavedSceneRef.current) {
+          sceneIsDirtyRef.current = false;
+          return;
+        }
+
+        localStorage.setItem('laserforge_autosave', json);
         localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
-      } catch {
-        /* Storage full or unavailable — silently skip */
+        lastSavedSceneRef.current = json;
+        sceneIsDirtyRef.current = false;
+      } catch (e) {
+        console.warn('[LaserForge] Autosave failed:', e);
       }
     }, 30000);
-    return () => clearInterval(timer);
+
+    return () => clearInterval(interval);
   }, [scene]);
 
   useEffect(() => {
