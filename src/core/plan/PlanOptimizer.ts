@@ -418,15 +418,28 @@ function planFillOperation(
   const fillAngles: number[] =
     fillMode === 'cross-hatch' ? [baseAngle, baseAngle + 90] : [baseAngle];
 
+  const interval = Math.max(0.01, settings.fillInterval || 0.1);
+
   const scanlines: ScanlineSegment[] = [];
   for (const angle of fillAngles) {
     const fillSettings: FillSettings = {
-      interval: settings.fillInterval,
+      interval,
       angle,
       biDirectional: settings.fillBiDirectional,
       overscanning: settings.overscanning,
     };
     scanlines.push(...generateFillScanlines(boundaryPaths, fillSettings));
+  }
+
+  if (scanlines.length === 0 && boundaryPaths.length > 0) {
+    let pos = startPos;
+    const movesOut: Move[] = [];
+    const ordered = orderPathsForCutting(boundaryPaths, pos, false);
+    for (const { path, reversed } of ordered) {
+      movesOut.push(...planPath(path, reversed, settings));
+      pos = getPathEndpoint(path, reversed);
+    }
+    return movesOut;
   }
 
   if (scanlines.length === 0) return [];

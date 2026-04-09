@@ -79,6 +79,10 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
       settings: {
         ...layer.settings,
         mode,
+        fill: {
+          ...layer.settings.fill,
+          enabled: mode === 'engrave' || mode === 'image',
+        },
       },
     })));
   };
