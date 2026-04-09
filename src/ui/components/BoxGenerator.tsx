@@ -16,7 +16,26 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   const [thickness, setThickness] = useState(3);
   const [fingerWidth, setFingerWidth] = useState(10);
   const [openTop, setOpenTop] = useState(false);
+  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const bindDim = (key: string, value: number, min: number, max: number, set: (v: number) => void) => ({
+    type: 'text' as const,
+    inputMode: 'decimal' as const,
+    value: Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(value),
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+      setNumDrafts(d => ({ ...d, [key]: e.target.value })),
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      setNumDrafts(d => {
+        const n = { ...d };
+        delete n[key];
+        return n;
+      });
+      let v = parseFloat(e.target.value);
+      if (!Number.isFinite(v)) v = value;
+      set(Math.max(min, Math.min(max, v)));
+    },
+  });
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -294,19 +313,17 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
         // Left: inputs
         React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
           ...[
-            { label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500 },
-            { label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500 },
-            { label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500 },
-            { label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20 },
-            { label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50 },
+            { key: 'width', label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500 },
+            { key: 'height', label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500 },
+            { key: 'depth', label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500 },
+            { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20 },
+            { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50 },
           ].map(f =>
-            React.createElement('div', { key: f.label, style: { marginBottom: 10 } },
+            React.createElement('div', { key: f.key, style: { marginBottom: 10 } },
               React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
               React.createElement('input', {
-                type: 'number', value: f.value, min: f.min, max: f.max,
+                ...bindDim(f.key, f.value, f.min, f.max, f.set),
                 style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => f.set(parseFloat(e.target.value) || f.min),
-                onBlur: (e: React.FocusEvent<HTMLInputElement>) => f.set(Math.max(f.min, Math.min(f.max, parseFloat(e.target.value) || f.min))),
               }),
             ),
           ),

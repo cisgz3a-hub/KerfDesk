@@ -71,7 +71,11 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
   const [machineName, setMachineName] = useState('Custom');
   const [machineWatts, setMachineWatts] = useState('');
   const [machineType, setMachineType] = useState<MachineKind>('diode');
+  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const numDisplay = (key: string, canonical: number) =>
+    Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(canonical);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
   const mono = "'JetBrains Mono', 'Consolas', monospace";
@@ -190,35 +194,51 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           },
             React.createElement('span', { style: { color: customBed ? '#00d4ff' : '#8888aa', fontSize: 12 } }, 'Custom size:'),
             React.createElement('input', {
-              type: 'number', value: bedW, min: 50, max: 2000,
+              type: 'text',
+              inputMode: 'numeric',
+              value: numDisplay('bedW', bedW),
               onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                setBedW(parseInt(e.target.value, 10) || 0);
+                setNumDrafts(d => ({ ...d, bedW: e.target.value }));
                 setCustomBed(true);
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
               },
               onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                const val = parseInt(e.target.value, 10) || 400;
+                setNumDrafts(d => {
+                  const n = { ...d };
+                  delete n.bedW;
+                  return n;
+                });
+                let val = parseInt(e.target.value, 10);
+                if (!Number.isFinite(val)) val = bedW;
                 setBedW(Math.max(50, Math.min(2000, val)));
               },
             }),
             React.createElement('span', { style: { color: '#555570' } }, '×'),
             React.createElement('input', {
-              type: 'number', value: bedH, min: 50, max: 2000,
+              type: 'text',
+              inputMode: 'numeric',
+              value: numDisplay('bedH', bedH),
               onClick: (e: React.MouseEvent) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
               style: { ...inputStyle, width: 70 },
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                setBedH(parseInt(e.target.value, 10) || 0);
+                setNumDrafts(d => ({ ...d, bedH: e.target.value }));
                 setCustomBed(true);
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
               },
               onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                const val = parseInt(e.target.value, 10) || 300;
+                setNumDrafts(d => {
+                  const n = { ...d };
+                  delete n.bedH;
+                  return n;
+                });
+                let val = parseInt(e.target.value, 10);
+                if (!Number.isFinite(val)) val = bedH;
                 setBedH(Math.max(50, Math.min(2000, val)));
               },
             }),
@@ -271,30 +291,60 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           React.createElement('div', { style: { display: 'flex', gap: 8, marginBottom: 10 } },
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Width (mm)'),
-              React.createElement('input', { type: 'number', value: matW, min: 10, max: bedW, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatW(parseInt(e.target.value, 10) || 0),
+              React.createElement('input', {
+                type: 'text',
+                inputMode: 'numeric',
+                value: numDisplay('matW', matW),
+                style: inputStyle,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, matW: e.target.value })),
                 onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                  const val = parseInt(e.target.value, 10) || 200;
+                  setNumDrafts(d => {
+                    const n = { ...d };
+                    delete n.matW;
+                    return n;
+                  });
+                  let val = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(val)) val = matW;
                   setMatW(Math.max(10, Math.min(bedW, val)));
                 },
               }),
             ),
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Height (mm)'),
-              React.createElement('input', { type: 'number', value: matH, min: 10, max: bedH, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatH(parseInt(e.target.value, 10) || 0),
+              React.createElement('input', {
+                type: 'text',
+                inputMode: 'numeric',
+                value: numDisplay('matH', matH),
+                style: inputStyle,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, matH: e.target.value })),
                 onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                  const val = parseInt(e.target.value, 10) || 150;
+                  setNumDrafts(d => {
+                    const n = { ...d };
+                    delete n.matH;
+                    return n;
+                  });
+                  let val = parseInt(e.target.value, 10);
+                  if (!Number.isFinite(val)) val = matH;
                   setMatH(Math.max(10, Math.min(bedH, val)));
                 },
               }),
             ),
             React.createElement('div', { style: { flex: 1 } },
               React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginBottom: 2 } }, 'Thickness (mm)'),
-              React.createElement('input', { type: 'number', value: matThick, min: 0.5, max: 30, step: 0.5, style: inputStyle,
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setMatThick(parseFloat(e.target.value) || 0),
+              React.createElement('input', {
+                type: 'text',
+                inputMode: 'decimal',
+                value: numDisplay('matThick', matThick),
+                style: inputStyle,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, matThick: e.target.value })),
                 onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                  const val = parseFloat(e.target.value) || 3;
+                  setNumDrafts(d => {
+                    const n = { ...d };
+                    delete n.matThick;
+                    return n;
+                  });
+                  let val = parseFloat(e.target.value);
+                  if (!Number.isFinite(val)) val = matThick;
                   setMatThick(Math.max(0.5, Math.min(30, val)));
                 },
               }),

@@ -25,11 +25,13 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
   const [tyDraft, setTyDraft] = useState<string | undefined>(undefined);
   const [wDraft, setWDraft] = useState<string | undefined>(undefined);
   const [hDraft, setHDraft] = useState<string | undefined>(undefined);
+  const [powerScaleDraft, setPowerScaleDraft] = useState<string | undefined>(undefined);
   useEffect(() => {
     setTxDraft(undefined);
     setTyDraft(undefined);
     setWDraft(undefined);
     setHDraft(undefined);
+    setPowerScaleDraft(undefined);
   }, [singleId]);
 
   const updateObjectTransform = useCallback((objId: string, field: 'tx' | 'ty', value: number) => {
@@ -323,30 +325,30 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'X (mm)'),
         React.createElement('input', {
-          type: 'number',
-          step: 0.1,
+          type: 'text',
+          inputMode: 'decimal',
           value: txDraft !== undefined ? txDraft : obj.transform.tx.toFixed(2),
           style: inputStyle,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTxDraft(e.target.value),
           onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
             setTxDraft(undefined);
             const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) updateObjectTransform(obj.id, 'tx', v);
+            updateObjectTransform(obj.id, 'tx', Number.isFinite(v) ? v : obj.transform.tx);
           },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Y (mm)'),
         React.createElement('input', {
-          type: 'number',
-          step: 0.1,
+          type: 'text',
+          inputMode: 'decimal',
           value: tyDraft !== undefined ? tyDraft : obj.transform.ty.toFixed(2),
           style: inputStyle,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTyDraft(e.target.value),
           onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
             setTyDraft(undefined);
             const v = parseFloat(e.target.value);
-            if (Number.isFinite(v)) updateObjectTransform(obj.id, 'ty', v);
+            updateObjectTransform(obj.id, 'ty', Number.isFinite(v) ? v : obj.transform.ty);
           },
         }),
       ),
@@ -356,28 +358,30 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Width'),
         React.createElement('input', {
-          type: 'number',
+          type: 'text',
+          inputMode: 'decimal',
           value: wDraft !== undefined ? wDraft : w.toFixed(2),
-          step: 0.1,
           style: inputStyle,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWDraft(e.target.value),
           onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
             setWDraft(undefined);
-            commitWidth(parseFloat(e.target.value));
+            const v = parseFloat(e.target.value);
+            commitWidth(Number.isFinite(v) ? v : w);
           },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Height'),
         React.createElement('input', {
-          type: 'number',
+          type: 'text',
+          inputMode: 'decimal',
           value: hDraft !== undefined ? hDraft : h.toFixed(2),
-          step: 0.1,
           style: inputStyle,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHDraft(e.target.value),
           onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
             setHDraft(undefined);
-            commitHeight(parseFloat(e.target.value));
+            const v = parseFloat(e.target.value);
+            commitHeight(Number.isFinite(v) ? v : h);
           },
         }),
       ),
@@ -386,23 +390,17 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
     productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
       React.createElement('input', {
-        type: 'number',
-        value: Math.round((obj.powerScale ?? 1) * 100),
-        min: 1,
-        max: 100,
+        type: 'text',
+        inputMode: 'numeric',
+        value: powerScaleDraft !== undefined ? powerScaleDraft : String(Math.round((obj.powerScale ?? 1) * 100)),
         style: inputStyle,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-          const val = parseInt(e.target.value, 10) || 100;
-          const apply = onSceneChange ?? onSceneCommit;
-          apply({
-            ...scene,
-            objects: scene.objects.map(o =>
-              selectedIds.has(o.id) ? { ...o, powerScale: val / 100 } : o
-            ),
-          });
-        },
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPowerScaleDraft(e.target.value),
         onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 100));
+          setPowerScaleDraft(undefined);
+          const prevPct = Math.round((obj.powerScale ?? 1) * 100);
+          let val = parseInt(e.target.value, 10);
+          if (!Number.isFinite(val)) val = prevPct;
+          val = Math.max(1, Math.min(100, val));
           onSceneCommit({
             ...scene,
             objects: scene.objects.map(o =>
