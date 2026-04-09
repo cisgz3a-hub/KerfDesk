@@ -123,6 +123,9 @@ export interface SceneObject {
   /** 0.0–1.0 multiplier on layer max power when cutting (default 1). */
   powerScale: number;
 
+  /** Index into flattened path points where cutting begins (closed shapes). Default 0. */
+  cutStartIndex?: number;
+
   // Cached values — null means needs recomputation
   _bounds: AABB | null;
   _worldTransform: Matrix3x2 | null;

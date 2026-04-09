@@ -41,6 +41,7 @@ import {
   renderTrail,
 } from '../renderers/SimulationRenderer';
 import { type ToolType } from './ToolBar';
+import { geometryToPoints } from '../../core/job/JobCompiler';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -451,6 +452,66 @@ export function CanvasViewport({
           ctx.strokeRect(hp.x - hSize / 2, hp.y - hSize / 2, hSize, hSize);
         }
         ctx.restore();
+      }
+    }
+
+    // Cut start point indicator on selected closed shapes (screen space)
+    if (selectedIds.size === 1) {
+      const obj = scene.objects.find(o => selectedIds.has(o.id));
+      if (obj && obj.visible && obj.geometry.type !== 'text' && obj.geometry.type !== 'image') {
+        const groups = geometryToPoints(obj.geometry);
+        const grp = groups.find(g => g.closed && g.points.length > 0);
+        if (grp) {
+          const m = obj.transform;
+          const toWorld = (lx: number, ly: number) => ({
+            x: m.a * lx + m.c * ly + m.tx,
+            y: m.b * lx + m.d * ly + m.ty,
+          });
+          const idx = (obj.cutStartIndex ?? 0) % grp.points.length;
+          const p0 = grp.points[idx];
+          const p1 = grp.points[(idx + 1) % grp.points.length];
+          const w0 = toWorld(p0.x, p0.y);
+          const w1 = toWorld(p1.x, p1.y);
+          const s0 = transform.worldToScreen(w0);
+          const s1 = transform.worldToScreen(w1);
+          let dx = s1.x - s0.x;
+          let dy = s1.y - s0.y;
+          const len = Math.hypot(dx, dy) || 1;
+          dx /= len;
+          dy /= len;
+          const sx = s0.x;
+          const sy = s0.y;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(sx, sy - 6);
+          ctx.lineTo(sx + 6, sy);
+          ctx.lineTo(sx, sy + 6);
+          ctx.lineTo(sx - 6, sy);
+          ctx.closePath();
+          ctx.fillStyle = 'rgba(45, 212, 160, 0.3)';
+          ctx.fill();
+          ctx.strokeStyle = '#2dd4a0';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          const ax = sx + dx * 8;
+          const ay = sy + dy * 8;
+          const tipX = sx + dx * 14;
+          const tipY = sy + dy * 14;
+          const perpX = -dy * 3;
+          const perpY = dx * 3;
+          ctx.beginPath();
+          ctx.moveTo(ax, ay);
+          ctx.lineTo(tipX, tipY);
+          ctx.lineTo(tipX - dx * 4 + perpX, tipY - dy * 4 + perpY);
+          ctx.moveTo(tipX, tipY);
+          ctx.lineTo(tipX - dx * 4 - perpX, tipY - dy * 4 - perpY);
+          ctx.strokeStyle = '#2dd4a0';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+          ctx.restore();
+        }
       }
     }
 

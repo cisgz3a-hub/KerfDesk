@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { theme } from '../styles/theme';
-import { type ImageGeometry, type PathGeometry, type RectGeometry } from '../../core/scene/SceneObject';
+import { type ImageGeometry, type PathGeometry, type PolygonGeometry, type RectGeometry } from '../../core/scene/SceneObject';
+import { geometryToPoints } from '../../core/job/JobCompiler';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
@@ -407,6 +408,50 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
         },
       }),
     ),
+
+    (() => {
+      const g = obj.geometry;
+      const closedPath = g.type === 'path' && (g as PathGeometry).subPaths.some(sp => sp.closed);
+      const eligible =
+        (g.type === 'polygon' && (g as PolygonGeometry).closed) ||
+        g.type === 'rect' ||
+        g.type === 'ellipse' ||
+        closedPath;
+      if (!eligible) return null;
+      const groups = geometryToPoints(g);
+      const primary = groups.find(gr => gr.closed && gr.points.length > 1);
+      if (!primary) return null;
+      const maxIdx = Math.max(0, primary.points.length - 1);
+      return React.createElement('div', {
+        style: { marginTop: 8 },
+      },
+        React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Cut Start Point'),
+        React.createElement('div', { style: { display: 'flex', gap: 4, alignItems: 'center' } },
+          React.createElement(NumberInput, {
+            value: obj.cutStartIndex ?? 0,
+            min: 0,
+            max: maxIdx,
+            integer: true,
+            inputMode: 'numeric',
+            defaultValue: 0,
+            style: { ...inputStyle, width: 60 },
+            onCommit: (val: number) => {
+              const newScene = {
+                ...scene,
+                objects: scene.objects.map(o =>
+                  selectedIds.has(o.id) ? { ...o, cutStartIndex: Math.round(val) } : o
+                ),
+              };
+              onSceneCommit(newScene);
+            },
+          }),
+          React.createElement('span', { style: { fontSize: 9, color: '#555570' } },
+            `of ${primary.points.length} points`),
+        ),
+        React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 3 } },
+          'Choose which vertex the laser starts from. Helps hide the entry mark.'),
+      );
+    })(),
 
     productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),

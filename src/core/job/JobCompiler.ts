@@ -249,19 +249,26 @@ function flattenObject(obj: SceneObject): FlatPath[] {
     closed: group.closed,
   }));
 
-  return transformed.map(group =>
-    flatPathFromPoints(group.points, group.closed, obj.id, obj.powerScale ?? 1.0)
-  );
+  return transformed.map(group => {
+    let pts = group.points;
+    if (group.closed && pts.length > 1) {
+      const idx = (obj.cutStartIndex ?? 0) % pts.length;
+      if (idx !== 0) {
+        pts = [...pts.slice(idx), ...pts.slice(0, idx)];
+      }
+    }
+    return flatPathFromPoints(pts, group.closed, obj.id, obj.powerScale ?? 1.0);
+  });
 }
 
 // ─── GEOMETRY TO POINTS ──────────────────────────────────────────
 
-interface PointGroup {
+export interface PointGroup {
   points: Point[];
   closed: boolean;
 }
 
-function geometryToPoints(geom: Geometry): PointGroup[] {
+export function geometryToPoints(geom: Geometry): PointGroup[] {
   switch (geom.type) {
     case 'rect': {
       const { x, y, width, height, cornerRadius } = geom;
