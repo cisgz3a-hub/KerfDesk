@@ -1119,13 +1119,17 @@ export function App() {
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept when user is typing in an input field
-      const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
-      if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-        if (e.key !== 'Escape') return;
-      }
-      if ((e.target as HTMLElement)?.isContentEditable) {
-        if (e.key !== 'Escape') return;
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      const isTextInput =
+        tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable;
+
+      if (isTextInput) {
+        if (e.key === 'Escape') {
+          target.blur();
+          return;
+        }
+        return;
       }
 
       const isMod = e.ctrlKey || e.metaKey;

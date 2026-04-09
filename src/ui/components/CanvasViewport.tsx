@@ -808,6 +808,12 @@ export function CanvasViewport({
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      const isTextInput =
+        tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable;
+      if (isTextInput) return;
+
       if (e.code === 'Space' && !e.repeat) {
         spaceHeldRef.current = true;
         const canvas = canvasRef.current;
