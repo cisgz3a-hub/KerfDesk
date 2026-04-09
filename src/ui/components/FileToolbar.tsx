@@ -409,6 +409,7 @@ export function FileToolbar({
     cursor: 'pointer',
     transition: `all ${theme.transition.fast}`,
     fontWeight: 500,
+    flexShrink: 0,
   };
 
   const btnBase = btnStyle;
@@ -461,7 +462,8 @@ export function FileToolbar({
       borderBottom: `1px solid ${theme.border.subtle}`,
       fontFamily: theme.font.ui,
       flexWrap: 'nowrap' as const,
-      overflow: 'hidden',
+      overflowX: 'auto' as const,
+      overflowY: 'hidden' as const,
     },
   },
     React.createElement('span', {
@@ -476,8 +478,23 @@ export function FileToolbar({
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap' as const,
+        flexShrink: 0,
       },
     }, projectName || 'Untitled'),
+    React.createElement('button', {
+      onClick: () => onToggleProductionMode?.(),
+      title: productionMode ? 'Switch to Beginner Mode — simpler controls' : 'Switch to Production Mode — full control',
+      style: {
+        padding: '3px 8px', fontSize: 9, fontWeight: 700, cursor: 'pointer',
+        background: productionMode ? 'rgba(255, 170, 50, 0.15)' : 'rgba(45, 212, 160, 0.15)',
+        border: productionMode ? '1px solid rgba(255, 170, 50, 0.4)' : '1px solid rgba(45, 212, 160, 0.4)',
+        borderRadius: 4,
+        color: productionMode ? '#ffaa32' : '#2dd4a0',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        whiteSpace: 'nowrap' as const,
+        flexShrink: 0,
+      },
+    }, productionMode ? 'PRO' : 'EASY'),
     React.createElement('button', { onClick: handleNew, style: btnStyle, title: 'New project (clear canvas)', ...stdHover }, 'New'),
     React.createElement('button', { onClick: handleOpenClick, style: btnStyle, title: 'Open saved project', ...stdHover }, 'Open'),
     React.createElement('button', { onClick: handleSave, style: btnStyle, title: 'Save project (Ctrl+S)', ...stdHover }, 'Save'),
@@ -491,6 +508,7 @@ export function FileToolbar({
         cursor: canUndo ? 'pointer' : 'default',
         fontSize: 14,
         padding: '4px 8px',
+        flexShrink: 0,
       },
       ...undoRedoHover(!!canUndo),
     }, '↩'),
@@ -504,6 +522,7 @@ export function FileToolbar({
         cursor: canRedo ? 'pointer' : 'default',
         fontSize: 14,
         padding: '4px 8px',
+        flexShrink: 0,
       },
       ...undoRedoHover(!!canRedo),
     }, '↪'),
@@ -535,6 +554,7 @@ export function FileToolbar({
         cursor: 'pointer',
         fontWeight: 600,
         transition: 'all 0.15s ease',
+        flexShrink: 0,
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
         const el = e.currentTarget;
@@ -563,10 +583,10 @@ export function FileToolbar({
     }, previewMode ? '● Preview' : '○ Preview'),
     React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
     sep,
-    React.createElement('button', { onClick: () => onSetup?.(), style: btnStyle, title: 'Change laser machine and workspace settings', ...stdHover }, 'Setup'),
+    React.createElement('button', { onClick: () => onSetup?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Change laser machine and workspace settings', ...stdHover }, 'Setup'),
     React.createElement('button', {
       onClick: () => onTemplates?.(),
-      style: btnStyle,
+      style: { ...btnStyle, padding: '4px 6px', fontSize: 11 },
       title: 'Browse starter designs — keychains, signs, coasters, and more',
       ...stdHover,
     }, 'Templates'),
@@ -576,28 +596,10 @@ export function FileToolbar({
       title: 'Generate a parametric laser-cut box with finger joints',
       ...stdHover,
     }, 'Box'),
-    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
+    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Set material type and size', ...stdHover }, 'Material'),
+    React.createElement('button', { onClick: () => onMaterialTest?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 
     React.createElement('div', { style: { flex: 1 } }),
-    React.createElement('button', {
-      onClick: () => onToggleProductionMode?.(),
-      title: productionMode
-        ? 'Switch to Beginner Mode — simpler controls'
-        : 'Switch to Production Mode — full control',
-      style: {
-        padding: '4px 10px',
-        fontSize: 10,
-        fontWeight: 600,
-        cursor: 'pointer',
-        background: productionMode ? 'rgba(255, 170, 50, 0.1)' : 'rgba(45, 212, 160, 0.1)',
-        border: productionMode ? '1px solid rgba(255, 170, 50, 0.3)' : '1px solid rgba(45, 212, 160, 0.3)',
-        borderRadius: 4,
-        color: productionMode ? '#ffaa32' : '#2dd4a0',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        whiteSpace: 'nowrap' as const,
-      },
-    }, productionMode ? 'PRO' : 'EASY'),
     React.createElement('button', {
       onClick: () => onShowShortcuts?.(),
       title: 'Keyboard shortcuts (?)',
@@ -610,6 +612,7 @@ export function FileToolbar({
         fontSize: 13,
         cursor: 'pointer',
         fontFamily: "'DM Sans', system-ui, sans-serif",
+        flexShrink: 0,
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
         const el = e.currentTarget;
