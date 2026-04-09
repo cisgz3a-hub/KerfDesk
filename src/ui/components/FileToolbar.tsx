@@ -296,10 +296,8 @@ export function FileToolbar({
 
     try {
       const text = await file.text();
-      const layerId = scene.activeLayerId || scene.layers[0]?.id;
-      if (!layerId) return;
 
-      const updated = importDxfIntoScene(text, scene, layerId);
+      const updated = importDxfIntoScene(text, scene);
       onSceneChange(updated);
       onSceneCommit(updated);
     } catch (e) {

@@ -67,6 +67,7 @@ export function parseDxf(text: string): DxfFile {
         i += 2;
       }
 
+      entity.layer = entity.layer ?? entity.data.get(8)?.[0] ?? '0';
       entities.push(entity);
     }
   }

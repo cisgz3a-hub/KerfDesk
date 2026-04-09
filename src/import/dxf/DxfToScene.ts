@@ -1,26 +1,77 @@
 import { type Scene } from '../../core/scene/Scene';
+import { createLayer, type Layer } from '../../core/scene/Layer';
 import { type SceneObject, type PathSegment, type Geometry } from '../../core/scene/SceneObject';
 import { IDENTITY_MATRIX, generateId, type Point } from '../../core/types';
 import { type DxfFile, type DxfEntity, parseDxf, getNum, getAllNums } from './DxfParser';
 
+/**
+ * Map DXF layer names to LaserForge layer modes.
+ * Common DXF conventions:
+ *   - "Cut", "CUT", "Outline" → cut
+ *   - "Engrave", "ENGRAVE", "Fill", "Etch" → engrave
+ *   - "Score", "SCORE", "Mark" → score
+ *   - Numbers (0, 1, 2...) → cut for 0, engrave for 1, score for 2
+ *   - Everything else → cut
+ */
+function dxfLayerToMode(layerName: string): 'cut' | 'engrave' | 'score' {
+  const name = layerName.toLowerCase().trim();
+
+  if (name.includes('engrav') || name.includes('fill') || name.includes('etch') || name.includes('raster')) return 'engrave';
+  if (name.includes('score') || name.includes('mark') || name.includes('line')) return 'score';
+  if (name.includes('cut') || name.includes('outline') || name.includes('thru')) return 'cut';
+
+  if (name === '1') return 'engrave';
+  if (name === '2') return 'score';
+
+  return 'cut';
+}
+
+function getOrCreateDxfLayer(
+  layers: Layer[],
+  dxfLayerName: string,
+): { layers: Layer[]; layerId: string } {
+  const existing = layers.find(l => l.name === dxfLayerName);
+  if (existing) {
+    return { layers, layerId: existing.id };
+  }
+
+  const mode = dxfLayerToMode(dxfLayerName);
+  const newLayer = createLayer(
+    layers.length,
+    mode,
+    dxfLayerName,
+  );
+
+  return {
+    layers: [...layers, newLayer],
+    layerId: newLayer.id,
+  };
+}
+
 export function importDxfIntoScene(
   dxfText: string,
   scene: Scene,
-  layerId: string
 ): Scene {
   const dxf: DxfFile = parseDxf(dxfText);
-  const objects: SceneObject[] = [];
+  const newObjects: SceneObject[] = [];
+
+  let currentLayers = [...scene.layers];
 
   for (const entity of dxf.entities) {
+    const dxfLayerName = entity.layer || '0';
+    const { layers: updatedLayers, layerId } = getOrCreateDxfLayer(currentLayers, dxfLayerName);
+    currentLayers = updatedLayers;
+
     const obj = convertEntity(entity, layerId);
-    if (obj) objects.push(obj);
+    if (obj) newObjects.push(obj);
   }
 
-  if (objects.length === 0) return scene;
+  if (newObjects.length === 0) return scene;
 
   return {
     ...scene,
-    objects: [...scene.objects, ...objects],
+    layers: currentLayers,
+    objects: [...scene.objects, ...newObjects],
     metadata: {
       ...scene.metadata,
       modified: new Date().toISOString(),

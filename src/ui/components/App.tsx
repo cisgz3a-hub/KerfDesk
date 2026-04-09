@@ -575,10 +575,8 @@ export function App() {
         });
         handleSceneCommit(updated);
       } else if (name.endsWith('.dxf') && text) {
-        // Import DXF
-        const layerId = scene.activeLayerId || scene.layers[0]?.id;
-        if (!layerId) return;
-        const updated = importDxfIntoScene(text, scene, layerId);
+        // Import DXF (layers from DXF file)
+        const updated = importDxfIntoScene(text, scene);
         handleSceneCommit(updated);
       } else if (file.type.startsWith('image/')) {
         // Import image — preserve active layer (do not switch to image layer)
