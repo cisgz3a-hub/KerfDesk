@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type CutOrder, createLayer } from '../../core/scene/Layer';
 import {
@@ -9,6 +9,7 @@ import {
 } from '../../core/materials/MaterialPresets';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
+import { NumberInput } from './NumberInput';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -30,42 +31,6 @@ function updateLayer(
 
 export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
-  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
-  useEffect(() => {
-    setNumDrafts({});
-  }, [activeLayer?.id]);
-
-  const numDisplay = (key: string, canonical: number) =>
-    Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(canonical);
-
-  const bindLayerNumber = (
-    key: string,
-    canonical: number,
-    min: number,
-    max: number,
-    fallback: number,
-    apply: (n: number) => void,
-    opts?: { int?: boolean }
-  ) => ({
-    type: 'text' as const,
-    inputMode: 'decimal' as const,
-    value: numDisplay(key, canonical),
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-      setNumDrafts(d => ({ ...d, [key]: e.target.value }));
-    },
-    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-      setNumDrafts(d => {
-        const next = { ...d };
-        delete next[key];
-        return next;
-      });
-      let v = parseFloat(e.target.value);
-      if (!Number.isFinite(v)) v = fallback;
-      if (opts?.int) v = Math.trunc(v);
-      v = Math.max(min, Math.min(max, v));
-      apply(v);
-    },
-  });
 
   const setActiveLayer = (layerId: string) => {
     if (scene.activeLayerId === layerId) return;
@@ -549,50 +514,42 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
       })(),
       React.createElement('label', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Power %'),
-        React.createElement('input', {
-          ...bindLayerNumber(
-            'powerMax',
-            activeLayer.settings.power.max,
-            0,
-            100,
-            activeLayer.settings.power.max,
-            updatePower
-          ),
+        React.createElement(NumberInput, {
+          value: activeLayer.settings.power.max,
+          min: 0,
+          max: 100,
+          defaultValue: activeLayer.settings.power.max,
           style: numberInputStyle,
+          onCommit: updatePower,
         }),
       ),
       React.createElement('label', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Speed mm/min'),
-        React.createElement('input', {
-          ...bindLayerNumber(
-            'speed',
-            activeLayer.settings.speed,
-            1,
-            250000,
-            activeLayer.settings.speed,
-            updateSpeed
-          ),
+        React.createElement(NumberInput, {
+          value: activeLayer.settings.speed,
+          min: 1,
+          max: 250000,
+          defaultValue: activeLayer.settings.speed,
           style: numberInputStyle,
+          onCommit: updateSpeed,
         }),
       ),
       React.createElement('div', { style: { marginTop: 6 } },
         React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Passes'),
-        React.createElement('input', {
-          ...bindLayerNumber(
-            'passes',
-            activeLayer.settings.passes ?? 1,
-            1,
-            20,
-            activeLayer.settings.passes ?? 1,
-            n => {
-              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                ...l,
-                settings: { ...l.settings, passes: n },
-              })));
-            },
-            { int: true }
-          ),
+        React.createElement(NumberInput, {
+          value: activeLayer.settings.passes ?? 1,
+          min: 1,
+          max: 20,
+          integer: true,
+          inputMode: 'numeric',
+          defaultValue: activeLayer.settings.passes ?? 1,
           style: numberInputStyle,
+          onCommit: (n: number) => {
+            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+              ...l,
+              settings: { ...l.settings, passes: n },
+            })));
+          },
         }),
       ),
       productionMode && React.createElement('div', {
@@ -625,40 +582,34 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
       ),
       productionMode && React.createElement('label', { style: { ...fieldStyle, marginTop: 8 } },
         React.createElement('span', { style: settingsLabelStyle }, 'Power min %'),
-        React.createElement('input', {
-          ...bindLayerNumber(
-            'powerMin',
-            activeLayer.settings.power.min,
-            0,
-            100,
-            activeLayer.settings.power.min,
-            n => {
-              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                ...l,
-                settings: { ...l.settings, power: { ...l.settings.power, min: n } },
-              })));
-            }
-          ),
+        React.createElement(NumberInput, {
+          value: activeLayer.settings.power.min,
+          min: 0,
+          max: 100,
+          defaultValue: activeLayer.settings.power.min,
           style: numberInputStyle,
+          onCommit: (n: number) => {
+            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+              ...l,
+              settings: { ...l.settings, power: { ...l.settings.power, min: n } },
+            })));
+          },
         }),
       ),
       productionMode && React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
         React.createElement('span', { style: settingsLabelStyle }, 'Z step per pass (mm)'),
-        React.createElement('input', {
-          ...bindLayerNumber(
-            'zStepPerPass',
-            activeLayer.settings.zStepPerPass,
-            -500,
-            500,
-            activeLayer.settings.zStepPerPass,
-            n => {
-              onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                ...l,
-                settings: { ...l.settings, zStepPerPass: n },
-              })));
-            }
-          ),
+        React.createElement(NumberInput, {
+          value: activeLayer.settings.zStepPerPass,
+          min: -500,
+          max: 500,
+          defaultValue: activeLayer.settings.zStepPerPass,
           style: numberInputStyle,
+          onCommit: (n: number) => {
+            onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+              ...l,
+              settings: { ...l.settings, zStepPerPass: n },
+            })));
+          },
         }),
       ),
       productionMode && activeLayer.settings.mode === 'engrave' && React.createElement('div', {
@@ -669,40 +620,34 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
         }, 'Fill Settings'),
         React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
             React.createElement('span', { style: settingsLabelStyle }, 'Interval (mm)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'fillInterval',
-                activeLayer.settings.fill.interval,
-                0.01,
-                100,
-                activeLayer.settings.fill.interval,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, fill: { ...l.settings.fill, interval: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.fill.interval,
+              min: 0.01,
+              max: 100,
+              defaultValue: activeLayer.settings.fill.interval,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, interval: n } },
+                })));
+              },
             }),
           ),
           React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
             React.createElement('span', { style: settingsLabelStyle }, 'Angle (°)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'fillAngle',
-                activeLayer.settings.fill.angle,
-                -360,
-                360,
-                activeLayer.settings.fill.angle,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, fill: { ...l.settings.fill, angle: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.fill.angle,
+              min: -360,
+              max: 360,
+              defaultValue: activeLayer.settings.fill.angle,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, angle: n } },
+                })));
+              },
             }),
           ),
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 } },
@@ -728,21 +673,18 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           ),
           React.createElement('label', { style: { ...fieldStyle, marginTop: 6 } },
             React.createElement('span', { style: settingsLabelStyle }, 'Overscanning (mm)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'overscanning',
-                activeLayer.settings.fill.overscanning,
-                0,
-                500,
-                activeLayer.settings.fill.overscanning,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, fill: { ...l.settings.fill, overscanning: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.fill.overscanning,
+              min: 0,
+              max: 500,
+              defaultValue: activeLayer.settings.fill.overscanning,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, fill: { ...l.settings.fill, overscanning: n } },
+                })));
+              },
             }),
           ),
       ),
@@ -754,82 +696,71 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
         }, 'Advanced Cut'),
         React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Overcut (mm)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'overcut',
-                activeLayer.settings.cut.overcut,
-                0,
-                100,
-                activeLayer.settings.cut.overcut,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, cut: { ...l.settings.cut, overcut: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.cut.overcut,
+              min: 0,
+              max: 100,
+              defaultValue: activeLayer.settings.cut.overcut,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, overcut: n } },
+                })));
+              },
             }),
             React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Lead-in (mm)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'leadIn',
-                activeLayer.settings.cut.leadIn,
-                0,
-                100,
-                activeLayer.settings.cut.leadIn,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, cut: { ...l.settings.cut, leadIn: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.cut.leadIn,
+              min: 0,
+              max: 100,
+              defaultValue: activeLayer.settings.cut.leadIn,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, leadIn: n } },
+                })));
+              },
             }),
             React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'tabCount',
-                activeLayer.settings.cut.tabCount,
-                0,
-                100,
-                activeLayer.settings.cut.tabCount,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, cut: { ...l.settings.cut, tabCount: n } },
-                  })));
-                },
-                { int: true }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.cut.tabCount,
+              min: 0,
+              max: 100,
+              integer: true,
+              inputMode: 'numeric',
+              defaultValue: activeLayer.settings.cut.tabCount,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, tabCount: n } },
+                })));
+              },
             }),
             React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),
           React.createElement('div', { style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab width (mm)'),
-            React.createElement('input', {
-              ...bindLayerNumber(
-                'tabWidth',
-                activeLayer.settings.cut.tabWidth,
-                0,
-                100,
-                activeLayer.settings.cut.tabWidth,
-                n => {
-                  onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                    ...l,
-                    settings: { ...l.settings, cut: { ...l.settings.cut, tabWidth: n } },
-                  })));
-                }
-              ),
+            React.createElement(NumberInput, {
+              value: activeLayer.settings.cut.tabWidth,
+              min: 0,
+              max: 100,
+              defaultValue: activeLayer.settings.cut.tabWidth,
               style: numberInputStyle,
+              onCommit: (n: number) => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: { ...l.settings, cut: { ...l.settings.cut, tabWidth: n } },
+                })));
+              },
             }),
             React.createElement('div', { style: { fontSize: 9, color: '#444460', marginTop: 1 } }, 'Coming soon'),
           ),

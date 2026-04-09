@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { NumberInput } from './NumberInput';
 
 export interface MaterialTestConfig {
   rows: number;
@@ -25,7 +26,6 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
   const [powerMax, setPowerMax] = useState(100);
   const [speedMin, setSpeedMin] = useState(100);
   const [speedMax, setSpeedMax] = useState(1000);
-  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
@@ -130,7 +130,6 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
   };
 
   const field = (
-    key: string,
     label: string,
     value: number,
     setValue: (v: number) => void,
@@ -140,24 +139,16 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
   ) =>
     React.createElement('div', { style: { flex: 1 } },
       React.createElement('div', { style: labelStyle }, label),
-      React.createElement('input', {
-        type: 'text',
-        inputMode: 'decimal',
-        value: Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(value),
+      React.createElement(NumberInput, {
+        value,
+        min,
+        max,
+        integer: opts?.int,
+        inputMode: opts?.int ? 'numeric' : 'decimal',
+        defaultValue: value,
         style: inputStyle,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          setNumDrafts(d => ({ ...d, [key]: e.target.value })),
-        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          setNumDrafts(d => {
-            const n = { ...d };
-            delete n[key];
-            return n;
-          });
-          let v = parseFloat(e.target.value);
-          if (!Number.isFinite(v)) v = value;
-          if (opts?.int) v = Math.trunc(v);
-          setValue(Math.max(min, Math.min(max, v)));
-        },
+        onChange: (v: number) => setValue(v),
+        onCommit: (v: number) => setValue(v),
       }),
     );
 
@@ -206,22 +197,22 @@ export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogPr
       React.createElement('div', { style: { padding: '12px 18px', display: 'flex', flexDirection: 'column' as const, gap: 8 } },
         // Grid size
         React.createElement('div', { style: { display: 'flex', gap: 8 } },
-          field('cols', 'Columns', cols, setCols, 2, 10, { int: true }),
-          field('rows', 'Rows', rows, setRows, 2, 10, { int: true }),
-          field('cellSize', 'Cell (mm)', cellSize, setCellSize, 5, 30),
-          field('spacing', 'Gap (mm)', spacing, setSpacing, 1, 10),
+          field('Columns', cols, setCols, 2, 10, { int: true }),
+          field('Rows', rows, setRows, 2, 10, { int: true }),
+          field('Cell (mm)', cellSize, setCellSize, 5, 30),
+          field('Gap (mm)', spacing, setSpacing, 1, 10),
         ),
         // Power range
         React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'flex-end' } },
-          field('powerMin', 'Power Min %', powerMin, setPowerMin, 1, 99, { int: true }),
+          field('Power Min %', powerMin, setPowerMin, 1, 99, { int: true }),
           React.createElement('span', { style: { color: '#555570', paddingBottom: 6, fontSize: 12 } }, '→'),
-          field('powerMax', 'Power Max %', powerMax, setPowerMax, 2, 100, { int: true }),
+          field('Power Max %', powerMax, setPowerMax, 2, 100, { int: true }),
         ),
         // Speed range
         React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'flex-end' } },
-          field('speedMin', 'Speed Min', speedMin, setSpeedMin, 10, 9999, { int: true }),
+          field('Speed Min', speedMin, setSpeedMin, 10, 9999, { int: true }),
           React.createElement('span', { style: { color: '#555570', paddingBottom: 6, fontSize: 12 } }, '→'),
-          field('speedMax', 'Speed Max', speedMax, setSpeedMax, 20, 10000, { int: true }),
+          field('Speed Max', speedMax, setSpeedMax, 20, 10000, { int: true }),
         ),
       ),
 

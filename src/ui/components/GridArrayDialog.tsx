@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { NumberInput } from './NumberInput';
 
 export interface GridArrayConfig {
   cols: number;
@@ -21,11 +22,7 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
   const [spacingX, setSpacingX] = useState(5);
   const [spacingY, setSpacingY] = useState(5);
   const [lockSpacing, setLockSpacing] = useState(true);
-  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const numDisplay = (key: string, canonical: number) =>
-    Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(canonical);
 
   // Update linked spacing
   const handleSpacingX = useCallback((val: number) => {
@@ -301,31 +298,18 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Columns'),
             React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
               React.createElement('button', {
-                onClick: () => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.cols;
-                    return n;
-                  });
-                  setCols(Math.max(1, cols - 1));
-                },
+                onClick: () => setCols(Math.max(1, cols - 1)),
                 style: { width: 28, height: 28, background: '#1a1a2e', border: '1px solid #252540', borderRadius: 4, color: '#8888aa', cursor: 'pointer', fontSize: 14 },
               }, '−'),
-              React.createElement('input', {
-                type: 'text',
+              React.createElement(NumberInput, {
+                value: cols,
+                min: 1,
+                max: 20,
+                integer: true,
                 inputMode: 'numeric',
-                value: numDisplay('cols', cols),
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, cols: e.target.value })),
-                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.cols;
-                    return n;
-                  });
-                  let val = parseInt(e.target.value, 10);
-                  if (!Number.isFinite(val)) val = cols;
-                  setCols(Math.max(1, Math.min(20, Math.trunc(val))));
-                },
+                defaultValue: cols,
+                onChange: (v: number) => setCols(v),
+                onCommit: (v: number) => setCols(v),
                 style: {
                   width: 44, textAlign: 'center' as const, padding: '4px 0',
                   background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -333,14 +317,7 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
                 },
               }),
               React.createElement('button', {
-                onClick: () => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.cols;
-                    return n;
-                  });
-                  setCols(Math.min(20, cols + 1));
-                },
+                onClick: () => setCols(Math.min(20, cols + 1)),
                 style: { width: 28, height: 28, background: '#1a1a2e', border: '1px solid #252540', borderRadius: 4, color: '#8888aa', cursor: 'pointer', fontSize: 14 },
               }, '+'),
             ),
@@ -350,31 +327,18 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Rows'),
             React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
               React.createElement('button', {
-                onClick: () => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.rows;
-                    return n;
-                  });
-                  setRows(Math.max(1, rows - 1));
-                },
+                onClick: () => setRows(Math.max(1, rows - 1)),
                 style: { width: 28, height: 28, background: '#1a1a2e', border: '1px solid #252540', borderRadius: 4, color: '#8888aa', cursor: 'pointer', fontSize: 14 },
               }, '−'),
-              React.createElement('input', {
-                type: 'text',
+              React.createElement(NumberInput, {
+                value: rows,
+                min: 1,
+                max: 20,
+                integer: true,
                 inputMode: 'numeric',
-                value: numDisplay('rows', rows),
-                onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, rows: e.target.value })),
-                onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.rows;
-                    return n;
-                  });
-                  let val = parseInt(e.target.value, 10);
-                  if (!Number.isFinite(val)) val = rows;
-                  setRows(Math.max(1, Math.min(20, Math.trunc(val))));
-                },
+                defaultValue: rows,
+                onChange: (v: number) => setRows(v),
+                onCommit: (v: number) => setRows(v),
                 style: {
                   width: 44, textAlign: 'center' as const, padding: '4px 0',
                   background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -382,14 +346,7 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
                 },
               }),
               React.createElement('button', {
-                onClick: () => {
-                  setNumDrafts(d => {
-                    const n = { ...d };
-                    delete n.rows;
-                    return n;
-                  });
-                  setRows(Math.min(20, rows + 1));
-                },
+                onClick: () => setRows(Math.min(20, rows + 1)),
                 style: { width: 28, height: 28, background: '#1a1a2e', border: '1px solid #252540', borderRadius: 4, color: '#8888aa', cursor: 'pointer', fontSize: 14 },
               }, '+'),
             ),
@@ -400,21 +357,13 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
         React.createElement('div', { style: { display: 'flex', gap: 12, alignItems: 'flex-end' } },
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Spacing X (mm)'),
-            React.createElement('input', {
-              type: 'text',
-              inputMode: 'decimal',
-              value: numDisplay('spacingX', spacingX),
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, spacingX: e.target.value })),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                setNumDrafts(d => {
-                  const n = { ...d };
-                  delete n.spacingX;
-                  return n;
-                });
-                let val = parseFloat(e.target.value);
-                if (!Number.isFinite(val)) val = spacingX;
-                handleSpacingX(Math.max(0, Math.min(100, val)));
-              },
+            React.createElement(NumberInput, {
+              value: spacingX,
+              min: 0,
+              max: 100,
+              defaultValue: spacingX,
+              onChange: (v: number) => handleSpacingX(v),
+              onCommit: (v: number) => handleSpacingX(v),
               style: {
                 width: '100%', padding: '5px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
@@ -436,21 +385,13 @@ export function GridArrayDialog({ sourceWidth, sourceHeight, onConfirm, onCancel
           }, lockSpacing ? '🔗' : '🔓'),
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('label', { style: { fontSize: 11, color: '#8888aa', display: 'block', marginBottom: 4 } }, 'Spacing Y (mm)'),
-            React.createElement('input', {
-              type: 'text',
-              inputMode: 'decimal',
-              value: numDisplay('spacingY', spacingY),
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, spacingY: e.target.value })),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                setNumDrafts(d => {
-                  const n = { ...d };
-                  delete n.spacingY;
-                  return n;
-                });
-                let val = parseFloat(e.target.value);
-                if (!Number.isFinite(val)) val = spacingY;
-                handleSpacingY(Math.max(0, Math.min(100, val)));
-              },
+            React.createElement(NumberInput, {
+              value: spacingY,
+              min: 0,
+              max: 100,
+              defaultValue: spacingY,
+              onChange: (v: number) => handleSpacingY(v),
+              onCommit: (v: number) => handleSpacingY(v),
               style: {
                 width: '100%', padding: '5px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,

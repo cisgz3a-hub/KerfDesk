@@ -5,6 +5,7 @@ import { type ImageGeometry, type PathGeometry, type RectGeometry } from '../../
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
+import { NumberInput } from './NumberInput';
 
 interface PropertiesPanelProps {
   scene: Scene;
@@ -21,31 +22,6 @@ interface PropertiesPanelProps {
 export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: PropertiesPanelProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
-  const [txDraft, setTxDraft] = useState<string | undefined>(undefined);
-  const [tyDraft, setTyDraft] = useState<string | undefined>(undefined);
-  const [wDraft, setWDraft] = useState<string | undefined>(undefined);
-  const [hDraft, setHDraft] = useState<string | undefined>(undefined);
-  const [powerScaleDraft, setPowerScaleDraft] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    setTxDraft(undefined);
-    setTyDraft(undefined);
-    setWDraft(undefined);
-    setHDraft(undefined);
-    setPowerScaleDraft(undefined);
-  }, [singleId]);
-
-  const updateObjectTransform = useCallback((objId: string, field: 'tx' | 'ty', value: number) => {
-    if (!Number.isFinite(value)) return;
-    const newScene = {
-      ...scene,
-      objects: scene.objects.map(o =>
-        o.id === objId
-          ? { ...o, transform: { ...o.transform, [field]: value }, _bounds: null, _worldTransform: null }
-          : o
-      ),
-    };
-    onSceneCommit(newScene);
-  }, [scene, onSceneCommit]);
 
   const updateObjectLayer = useCallback((objId: string, newLayerId: string) => {
     const newScene = {
@@ -282,14 +258,14 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
 
-  const commitWidth = (newW: number) => {
-    if (!Number.isFinite(newW) || newW <= 0) return;
+  const buildWidthScene = (newW: number): Scene | null => {
+    if (!Number.isFinite(newW) || newW <= 0) return null;
     const b = computeObjectBounds(obj);
-    if (!b) return;
+    if (!b) return null;
     const oldW = b.maxX - b.minX;
-    if (oldW === 0) return;
+    if (oldW === 0) return null;
     const scale = newW / (oldW * Math.abs(obj.transform.a || 1));
-    const newScene = {
+    return {
       ...scene,
       objects: scene.objects.map(o =>
         o.id === obj.id
@@ -297,17 +273,16 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           : o
       ),
     };
-    onSceneCommit(newScene);
   };
 
-  const commitHeight = (newH: number) => {
-    if (!Number.isFinite(newH) || newH <= 0) return;
+  const buildHeightScene = (newH: number): Scene | null => {
+    if (!Number.isFinite(newH) || newH <= 0) return null;
     const b = computeObjectBounds(obj);
-    if (!b) return;
+    if (!b) return null;
     const oldH = b.maxY - b.minY;
-    if (oldH === 0) return;
+    if (oldH === 0) return null;
     const scale = newH / (oldH * Math.abs(obj.transform.d || 1));
-    const newScene = {
+    return {
       ...scene,
       objects: scene.objects.map(o =>
         o.id === obj.id
@@ -315,8 +290,25 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           : o
       ),
     };
-    onSceneCommit(newScene);
   };
+
+  const buildTxScene = (v: number): Scene => ({
+    ...scene,
+    objects: scene.objects.map(o =>
+      o.id === obj.id
+        ? { ...o, transform: { ...o.transform, tx: v }, _bounds: null, _worldTransform: null }
+        : o
+    ),
+  });
+
+  const buildTyScene = (v: number): Scene => ({
+    ...scene,
+    objects: scene.objects.map(o =>
+      o.id === obj.id
+        ? { ...o, transform: { ...o.transform, ty: v }, _bounds: null, _worldTransform: null }
+        : o
+    ),
+  });
 
   return React.createElement('div', { style: containerStyle },
     React.createElement('div', { style: { ...labelStyle, marginBottom: 6, fontWeight: 600, color: theme.text.primary } }, obj.name || obj.type),
@@ -324,32 +316,22 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
     React.createElement('div', { style: rowStyle },
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'X (mm)'),
-        React.createElement('input', {
-          type: 'text',
-          inputMode: 'decimal',
-          value: txDraft !== undefined ? txDraft : obj.transform.tx.toFixed(2),
+        React.createElement(NumberInput, {
+          value: obj.transform.tx,
+          defaultValue: obj.transform.tx,
           style: inputStyle,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTxDraft(e.target.value),
-          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-            setTxDraft(undefined);
-            const v = parseFloat(e.target.value);
-            updateObjectTransform(obj.id, 'tx', Number.isFinite(v) ? v : obj.transform.tx);
-          },
+          onChange: (v: number) => { onSceneChange?.(buildTxScene(v)); },
+          onCommit: (v: number) => { onSceneCommit(buildTxScene(v)); },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Y (mm)'),
-        React.createElement('input', {
-          type: 'text',
-          inputMode: 'decimal',
-          value: tyDraft !== undefined ? tyDraft : obj.transform.ty.toFixed(2),
+        React.createElement(NumberInput, {
+          value: obj.transform.ty,
+          defaultValue: obj.transform.ty,
           style: inputStyle,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTyDraft(e.target.value),
-          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-            setTyDraft(undefined);
-            const v = parseFloat(e.target.value);
-            updateObjectTransform(obj.id, 'ty', Number.isFinite(v) ? v : obj.transform.ty);
-          },
+          onChange: (v: number) => { onSceneChange?.(buildTyScene(v)); },
+          onCommit: (v: number) => { onSceneCommit(buildTyScene(v)); },
         }),
       ),
     ),
@@ -357,31 +339,35 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
     React.createElement('div', { style: rowStyle },
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Width'),
-        React.createElement('input', {
-          type: 'text',
-          inputMode: 'decimal',
-          value: wDraft !== undefined ? wDraft : w.toFixed(2),
+        React.createElement(NumberInput, {
+          value: w,
+          min: 0.01,
+          defaultValue: w,
           style: inputStyle,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWDraft(e.target.value),
-          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-            setWDraft(undefined);
-            const v = parseFloat(e.target.value);
-            commitWidth(Number.isFinite(v) ? v : w);
+          onChange: (v: number) => {
+            const s = buildWidthScene(v);
+            if (s) onSceneChange?.(s);
+          },
+          onCommit: (v: number) => {
+            const s = buildWidthScene(v);
+            if (s) onSceneCommit(s);
           },
         }),
       ),
       React.createElement('div', { style: { flex: 1 } },
         React.createElement('div', { style: labelStyle }, 'Height'),
-        React.createElement('input', {
-          type: 'text',
-          inputMode: 'decimal',
-          value: hDraft !== undefined ? hDraft : h.toFixed(2),
+        React.createElement(NumberInput, {
+          value: h,
+          min: 0.01,
+          defaultValue: h,
           style: inputStyle,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHDraft(e.target.value),
-          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-            setHDraft(undefined);
-            const v = parseFloat(e.target.value);
-            commitHeight(Number.isFinite(v) ? v : h);
+          onChange: (v: number) => {
+            const s = buildHeightScene(v);
+            if (s) onSceneChange?.(s);
+          },
+          onCommit: (v: number) => {
+            const s = buildHeightScene(v);
+            if (s) onSceneCommit(s);
           },
         }),
       ),
@@ -391,18 +377,13 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       style: { marginTop: 8 },
     },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Corner Radius (mm)'),
-      React.createElement('input', {
-        type: 'number',
+      React.createElement(NumberInput, {
         value: (obj.geometry as RectGeometry).cornerRadius || 0,
         min: 0,
         max: Math.min((obj.geometry as RectGeometry).width / 2, (obj.geometry as RectGeometry).height / 2) || 50,
-        step: 0.5,
+        defaultValue: 0,
         style: inputStyle,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-          const raw = e.target.value;
-          if (raw === '') return;
-          const val = parseFloat(raw);
-          if (isNaN(val)) return;
+        onChange: (val: number) => {
           const newScene = {
             ...scene,
             objects: scene.objects.map(o =>
@@ -413,10 +394,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           };
           (onSceneChange ?? onSceneCommit)(newScene);
         },
-        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          const geom = obj.geometry as RectGeometry;
-          const maxR = Math.min(geom.width / 2, geom.height / 2);
-          const val = Math.max(0, Math.min(maxR, parseFloat(e.target.value) || 0));
+        onCommit: (val: number) => {
           const newScene = {
             ...scene,
             objects: scene.objects.map(o =>
@@ -432,18 +410,23 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
 
     productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
-      React.createElement('input', {
-        type: 'text',
+      React.createElement(NumberInput, {
+        value: Math.round((obj.powerScale ?? 1) * 100),
+        min: 1,
+        max: 100,
+        integer: true,
         inputMode: 'numeric',
-        value: powerScaleDraft !== undefined ? powerScaleDraft : String(Math.round((obj.powerScale ?? 1) * 100)),
+        defaultValue: Math.round((obj.powerScale ?? 1) * 100),
         style: inputStyle,
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) => setPowerScaleDraft(e.target.value),
-        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          setPowerScaleDraft(undefined);
-          const prevPct = Math.round((obj.powerScale ?? 1) * 100);
-          let val = parseInt(e.target.value, 10);
-          if (!Number.isFinite(val)) val = prevPct;
-          val = Math.max(1, Math.min(100, val));
+        onChange: (val: number) => {
+          onSceneChange?.({
+            ...scene,
+            objects: scene.objects.map(o =>
+              selectedIds.has(o.id) ? { ...o, powerScale: val / 100 } : o
+            ),
+          });
+        },
+        onCommit: (val: number) => {
           onSceneCommit({
             ...scene,
             objects: scene.objects.map(o =>

@@ -59,6 +59,7 @@ import { type MachineState, type JobProgress } from '../../controllers/Controlle
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
+import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Template } from '../../templates/TemplateLibrary';
@@ -1792,13 +1793,15 @@ export function App() {
           ),
           React.createElement('div', { style: { width: 80 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),
-            React.createElement('input', {
-              type: 'number',
+            React.createElement(NumberInput, {
               value: textSize,
               min: 3,
               max: 200,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTextSize(parseInt(e.target.value, 10) || 20),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => setTextSize(Math.max(3, Math.min(200, parseInt(e.target.value, 10) || 20))),
+              integer: true,
+              inputMode: 'numeric',
+              defaultValue: 20,
+              onChange: (v: number) => setTextSize(v),
+              onCommit: (v: number) => setTextSize(v),
               style: {
                 width: '100%', padding: '6px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,

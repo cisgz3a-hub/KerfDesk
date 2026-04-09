@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { generateId } from '../../core/types';
+import { NumberInput } from './NumberInput';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 
@@ -16,26 +17,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   const [thickness, setThickness] = useState(3);
   const [fingerWidth, setFingerWidth] = useState(10);
   const [openTop, setOpenTop] = useState(false);
-  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  const bindDim = (key: string, value: number, min: number, max: number, set: (v: number) => void) => ({
-    type: 'text' as const,
-    inputMode: 'decimal' as const,
-    value: Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(value),
-    onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-      setNumDrafts(d => ({ ...d, [key]: e.target.value })),
-    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-      setNumDrafts(d => {
-        const n = { ...d };
-        delete n[key];
-        return n;
-      });
-      let v = parseFloat(e.target.value);
-      if (!Number.isFinite(v)) v = value;
-      set(Math.max(min, Math.min(max, v)));
-    },
-  });
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -311,9 +293,14 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
           ].map(f =>
             React.createElement('div', { key: f.key, style: { marginBottom: 10 } },
               React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
-              React.createElement('input', {
-                ...bindDim(f.key, f.value, f.min, f.max, f.set),
+              React.createElement(NumberInput, {
+                value: f.value,
+                min: f.min,
+                max: f.max,
+                defaultValue: f.value,
                 style: inputStyle,
+                onChange: (v: number) => f.set(v),
+                onCommit: (v: number) => f.set(v),
               }),
             ),
           ),

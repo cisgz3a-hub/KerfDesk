@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { NumberInput } from './NumberInput';
 
 export interface MaterialConfig {
   type: 'wood' | 'acrylic' | 'leather' | 'paper' | 'fabric' | 'cardboard' | 'metal' | 'custom';
@@ -34,10 +35,6 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
   const [width, setWidth] = useState(current?.width || Math.min(200, bedWidth));
   const [height, setHeight] = useState(current?.height || Math.min(150, bedHeight));
   const [thickness, setThickness] = useState(current?.thickness || 3);
-  const [numDrafts, setNumDrafts] = useState<Record<string, string>>({});
-
-  const numDisplay = (key: string, canonical: number) =>
-    Object.prototype.hasOwnProperty.call(numDrafts, key) ? numDrafts[key]! : String(canonical);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
   const mono = "'JetBrains Mono', 'Consolas', monospace";
@@ -46,11 +43,6 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
     setSelectedType(preset.type);
     setName(preset.defaults.name);
     setThickness(preset.defaults.thickness);
-    setNumDrafts(d => {
-      const n = { ...d };
-      delete n.thickness;
-      return n;
-    });
   };
 
   const inputStyle: React.CSSProperties = {
@@ -139,62 +131,38 @@ export function MaterialDialog({ bedWidth, bedHeight, current, onConfirm, onClea
         React.createElement('div', { style: { display: 'flex', gap: 10 } },
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('div', { style: labelStyle }, 'Width (mm)'),
-            React.createElement('input', {
-              type: 'text',
-              inputMode: 'decimal',
-              value: numDisplay('width', width),
+            React.createElement(NumberInput, {
+              value: width,
+              min: 10,
+              max: bedWidth,
+              defaultValue: width,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, width: e.target.value })),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                setNumDrafts(d => {
-                  const n = { ...d };
-                  delete n.width;
-                  return n;
-                });
-                let val = parseFloat(e.target.value);
-                if (!Number.isFinite(val)) val = width;
-                setWidth(Math.max(10, Math.min(bedWidth, val)));
-              },
+              onChange: (v: number) => setWidth(v),
+              onCommit: (v: number) => setWidth(v),
             }),
           ),
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('div', { style: labelStyle }, 'Height (mm)'),
-            React.createElement('input', {
-              type: 'text',
-              inputMode: 'decimal',
-              value: numDisplay('height', height),
+            React.createElement(NumberInput, {
+              value: height,
+              min: 10,
+              max: bedHeight,
+              defaultValue: height,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, height: e.target.value })),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                setNumDrafts(d => {
-                  const n = { ...d };
-                  delete n.height;
-                  return n;
-                });
-                let val = parseFloat(e.target.value);
-                if (!Number.isFinite(val)) val = height;
-                setHeight(Math.max(10, Math.min(bedHeight, val)));
-              },
+              onChange: (v: number) => setHeight(v),
+              onCommit: (v: number) => setHeight(v),
             }),
           ),
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('div', { style: labelStyle }, 'Thickness (mm)'),
-            React.createElement('input', {
-              type: 'text',
-              inputMode: 'decimal',
-              value: numDisplay('thickness', thickness),
+            React.createElement(NumberInput, {
+              value: thickness,
+              min: 0.1,
+              max: 50,
+              defaultValue: thickness,
               style: inputStyle,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNumDrafts(d => ({ ...d, thickness: e.target.value })),
-              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-                setNumDrafts(d => {
-                  const n = { ...d };
-                  delete n.thickness;
-                  return n;
-                });
-                let val = parseFloat(e.target.value);
-                if (!Number.isFinite(val)) val = thickness;
-                setThickness(Math.max(0.1, Math.min(50, val)));
-              },
+              onChange: (v: number) => setThickness(v),
+              onCommit: (v: number) => setThickness(v),
             }),
           ),
         ),
