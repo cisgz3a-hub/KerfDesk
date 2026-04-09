@@ -31,6 +31,7 @@ import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useGcodeExport } from '../hooks/useGcodeExport';
 import { useContextMenu } from '../hooks/useContextMenu';
+import { useDialogs } from '../hooks/useDialogs';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -171,6 +172,7 @@ export function App() {
     finishConfirm,
     finishPrompt,
   } = useModal();
+  const dialogs = useDialogs();
   const [zoomLevel, setZoomLevel] = useState(100);
   const viewportActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; fitToBed: () => void } | null>(null);
 
@@ -201,15 +203,8 @@ export function App() {
   const [showGridArray, setShowGridArray] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
-  const [showMaterialDialog, setShowMaterialDialog] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [showBoxGenerator, setShowBoxGenerator] = useState(false);
-  const [showVariableText, setShowVariableText] = useState(false);
-  const [variableTextSource, setVariableTextSource] = useState<SceneObject | null>(null);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showConnection, setShowConnection] = useState(false);
   const [machineState, setMachineState] = useState<MachineState | null>(null);
   const [jobProgress, setJobProgress] = useState<JobProgress | null>(null);
   const grblControllerRef = useRef<GrblController | null>(null);
@@ -231,13 +226,6 @@ export function App() {
       localStorage.setItem('laserforge_production_mode', String(newMode));
     } catch { /* ignore */ }
   }, [productionMode]);
-  const [showWizard, setShowWizard] = useState(() => {
-    try {
-      return !localStorage.getItem(getSetupStorageKey());
-    } catch {
-      return true;
-    }
-  });
   const [showRecover, setShowRecover] = useState(() => {
     try {
       const saved = localStorage.getItem('laserforge_autosave');
@@ -252,14 +240,7 @@ export function App() {
   });
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
-  const [showTextDialog, setShowTextDialog] = useState(false);
-  const [textInput, setTextInput] = useState('');
-  const [textFont, setTextFont] = useState('Arial');
-  const [textSize, setTextSize] = useState(20);
-  const [textBold, setTextBold] = useState(false);
-  const [textItalic, setTextItalic] = useState(false);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!textPlacementHint) return;
@@ -272,23 +253,16 @@ export function App() {
   }, []);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
-    setEditingTextId(null);
+    dialogs.setEditingTextId(null);
     setTextPlacementPt({ x: world.x, y: world.y });
-    setShowTextDialog(true);
-  }, []);
+    dialogs.setShowTextDialog(true);
+  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog]);
 
   const handleEditText = useCallback((obj: SceneObject) => {
-    const geom = obj.geometry as TextGeometry;
-    setTextInput(geom.text || '');
-    setTextFont(geom.fontFamily || 'Arial');
-    setTextSize(geom.fontSize || 20);
-    setTextBold(geom.bold || false);
-    setTextItalic(geom.italic || false);
-    setEditingTextId(obj.id);
+    dialogs.openTextEdit(obj);
     setTextPlacementPt(null);
-    setShowTextDialog(true);
     setSelectedIds(new Set([obj.id]));
-  }, []);
+  }, [dialogs.openTextEdit]);
 
   useEffect(() => {
     const ctrl = new GrblController();
@@ -319,12 +293,12 @@ export function App() {
     const id = requestAnimationFrame(() => {
       try {
         if (!localStorage.getItem(getSetupStorageKey())) {
-          setShowWizard(true);
+          dialogs.setShowSetup(true);
         }
       } catch { /* ignore */ }
     });
     return () => cancelAnimationFrame(id);
-  }, []);
+  }, [dialogs.setShowSetup]);
 
   const historyRef = useRef<HistoryManager>(new HistoryManager());
   const isNudgingRef = useRef(false);
@@ -435,7 +409,7 @@ export function App() {
   }, [scene.material?.name, scene.activeLayerId]); // eslint-disable-line react-hooks/exhaustive-deps -- material/layer identity only
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
-    setShowWizard(false);
+    dialogs.setShowSetup(false);
     try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
 
     // Apply wizard results to scene
@@ -466,12 +440,12 @@ export function App() {
 
     // Fit to bed after a tick
     setTimeout(() => viewportActionsRef.current?.fitToBed(), 100);
-  }, [scene, handleSceneCommit]);
+  }, [scene, handleSceneCommit, dialogs.setShowSetup]);
 
   const handleWizardSkip = useCallback(() => {
-    setShowWizard(false);
+    dialogs.setShowSetup(false);
     try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
-  }, []);
+  }, [dialogs.setShowSetup]);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 
@@ -507,16 +481,16 @@ export function App() {
       handlePaste,
       handleDuplicate,
       handleDelete,
-      setShowTextDialog,
-      setEditingTextId,
-      setTextInput,
-      setTextFont,
-      setTextSize,
-      setTextBold,
-      setTextItalic,
+      setShowTextDialog: dialogs.setShowTextDialog,
+      setEditingTextId: dialogs.setEditingTextId,
+      setTextInput: dialogs.setTextInput,
+      setTextFont: dialogs.setTextFont,
+      setTextSize: dialogs.setTextSize,
+      setTextBold: dialogs.setTextBold,
+      setTextItalic: dialogs.setTextItalic,
       setTextPlacementPt,
-      setShowVariableText,
-      setVariableTextSource,
+      setShowVariableText: dialogs.setShowVariableText,
+      setVariableTextSource: dialogs.setVariableTextSource,
     }),
     [
       handleSceneCommit,
@@ -524,16 +498,16 @@ export function App() {
       handlePaste,
       handleDuplicate,
       handleDelete,
-      setShowTextDialog,
-      setEditingTextId,
-      setTextInput,
-      setTextFont,
-      setTextSize,
-      setTextBold,
-      setTextItalic,
+      dialogs.setShowTextDialog,
+      dialogs.setEditingTextId,
+      dialogs.setTextInput,
+      dialogs.setTextFont,
+      dialogs.setTextSize,
+      dialogs.setTextBold,
+      dialogs.setTextItalic,
       setTextPlacementPt,
-      setShowVariableText,
-      setVariableTextSource,
+      dialogs.setShowVariableText,
+      dialogs.setVariableTextSource,
     ],
   );
 
@@ -648,7 +622,7 @@ export function App() {
       console.error('G-code build failed:', err);
       setCurrentGcode(null);
     }
-    setShowConnection(true);
+    dialogs.setShowConnection(true);
   }, [scene, compileGcode, showAlert]);
 
   const handleGridArray = useCallback(() => {
@@ -950,7 +924,7 @@ export function App() {
   }, [scene, handleSceneCommit]);
 
   const handleMaterialConfirm = useCallback((config: MaterialConfig) => {
-    setShowMaterialDialog(false);
+    dialogs.setShowMaterial(false);
     const newScene = {
       ...scene,
       material: {
@@ -965,12 +939,12 @@ export function App() {
   }, [scene, handleSceneCommit]);
 
   const handleMaterialClear = useCallback(() => {
-    setShowMaterialDialog(false);
+    dialogs.setShowMaterial(false);
     handleSceneCommit({ ...scene, material: null });
   }, [scene, handleSceneCommit]);
 
   const handleTemplateSelect = useCallback(async (template: Template) => {
-    setShowTemplates(false);
+    dialogs.setShowTemplates(false);
     try {
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
       if (!layerId) return;
@@ -1076,7 +1050,7 @@ export function App() {
             console.error('G-code generation failed:', err);
           }
         },
-        onToggleShortcuts: () => setShowShortcuts(s => !s),
+        onToggleShortcuts: () => dialogs.setShowShortcuts(s => !s),
         onNudge: handleNudge,
         selectionCount: selectedIds.size,
         clipboardItemCount: clipboard.length,
@@ -1161,11 +1135,11 @@ export function App() {
       showAlert,
       showConfirm,
       onConnect: handleConnect,
-      onSetup: () => setShowWizard(true),
+      onSetup: () => dialogs.setShowSetup(true),
       onMaterialTest: () => setShowMaterialTest(true),
-      onMaterialSetup: () => setShowMaterialDialog(true),
-      onTemplates: () => setShowTemplates(true),
-      onBoxGenerator: () => setShowBoxGenerator(true),
+      onMaterialSetup: () => dialogs.setShowMaterial(true),
+      onTemplates: () => dialogs.setShowTemplates(true),
+      onBoxGenerator: () => dialogs.setShowBoxGenerator(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
       onUndo: handleUndo,
@@ -1174,7 +1148,7 @@ export function App() {
       canRedo: historyAvail.canRedo,
       projectName: scene.metadata?.name,
       materialName: scene.material?.name ?? null,
-      onShowShortcuts: () => setShowShortcuts(true),
+      onShowShortcuts: () => dialogs.setShowShortcuts(true),
       productionMode,
       onToggleProductionMode: handleToggleProductionMode,
       onToolpathPreview: async () => {
@@ -1187,7 +1161,7 @@ export function App() {
       },
     }),
 
-    showRecover && !showWizard && React.createElement('div', {
+    showRecover && !dialogs.showSetup && React.createElement('div', {
       style: {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         gap: 12, padding: '6px 16px',
@@ -1402,11 +1376,11 @@ export function App() {
       onCancel: () => setShowMaterialTest(false),
     }),
 
-    showVariableText && variableTextSource && React.createElement(VariableTextDialog, {
+    dialogs.showVariableText && dialogs.variableTextSource && React.createElement(VariableTextDialog, {
       scene,
-      sourceObject: variableTextSource,
+      sourceObject: dialogs.variableTextSource,
       onGenerate: handleVariableTextGenerate,
-      onClose: () => { setShowVariableText(false); setVariableTextSource(null); },
+      onClose: () => dialogs.closeVariableText(),
     }),
 
     gcodePreview && React.createElement(GcodePreview, {
@@ -1416,36 +1390,36 @@ export function App() {
       onClose: () => setGcodePreview(null),
     }),
 
-    showMaterialDialog && React.createElement(MaterialDialog, {
+    dialogs.showMaterial && React.createElement(MaterialDialog, {
       bedWidth: scene.canvas.width,
       bedHeight: scene.canvas.height,
       current: scene.material ? { type: scene.material.type, name: scene.material.name, width: scene.material.width, height: scene.material.height, thickness: scene.material.thickness } : null,
       onConfirm: handleMaterialConfirm,
       onClear: handleMaterialClear,
-      onCancel: () => setShowMaterialDialog(false),
+      onCancel: () => dialogs.setShowMaterial(false),
     }),
 
-    showTemplates && React.createElement(TemplateBrowser, {
+    dialogs.showTemplates && React.createElement(TemplateBrowser, {
       onSelect: handleTemplateSelect,
-      onClose: () => setShowTemplates(false),
+      onClose: () => dialogs.setShowTemplates(false),
     }),
 
-    showBoxGenerator && React.createElement(BoxGenerator, {
+    dialogs.showBoxGenerator && React.createElement(BoxGenerator, {
       scene,
       onGenerate: handleBoxGenerate,
-      onClose: () => setShowBoxGenerator(false),
+      onClose: () => dialogs.setShowBoxGenerator(false),
     }),
 
-    showWizard && React.createElement(WelcomeWizard, {
+    dialogs.showSetup && React.createElement(WelcomeWizard, {
       onComplete: handleWizardComplete,
       onSkip: handleWizardSkip,
     }),
 
-    showShortcuts && React.createElement(ShortcutsPanel, {
-      onClose: () => setShowShortcuts(false),
+    dialogs.showShortcuts && React.createElement(ShortcutsPanel, {
+      onClose: () => dialogs.setShowShortcuts(false),
     }),
 
-    showConnection && grblReady && React.createElement(ConnectionPanel, {
+    dialogs.showConnection && grblReady && React.createElement(ConnectionPanel, {
       controller: grblControllerRef.current!,
       portRef: serialPortRef,
       machineState,
@@ -1453,7 +1427,7 @@ export function App() {
       scene,
       productionMode,
       gcode: currentGcode,
-      onClose: () => setShowConnection(false),
+      onClose: () => dialogs.setShowConnection(false),
       bedWidth: scene.canvas.width,
       bedHeight: scene.canvas.height,
       boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
@@ -1500,7 +1474,7 @@ export function App() {
       onDismiss: () => setToastSuggestion(null),
     }),
 
-    showTextDialog && React.createElement('div', {
+    dialogs.showTextDialog && React.createElement('div', {
       style: {
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
         backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
@@ -1508,10 +1482,8 @@ export function App() {
       },
       onClick: (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
-          setShowTextDialog(false);
+          dialogs.closeTextDialog();
           setTextPlacementPt(null);
-          setEditingTextId(null);
-          setTextInput('');
         }
       },
     },
@@ -1526,13 +1498,11 @@ export function App() {
         React.createElement('div', {
           style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
         },
-          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, editingTextId ? 'Edit Text' : 'Add Text'),
+          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, dialogs.editingTextId ? 'Edit Text' : 'Add Text'),
           React.createElement('button', {
             onClick: () => {
-              setShowTextDialog(false);
+              dialogs.closeTextDialog();
               setTextPlacementPt(null);
-              setEditingTextId(null);
-              setTextInput('');
             },
             style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
           }, '×'),
@@ -1540,17 +1510,17 @@ export function App() {
 
         React.createElement('div', { style: { padding: '16px 18px' } },
           React.createElement('textarea', {
-            value: textInput,
-            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setTextInput(e.target.value),
+            value: dialogs.textInput,
+            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => dialogs.setTextInput(e.target.value),
             placeholder: 'Type your text here...',
             autoFocus: true,
             rows: 3,
             style: {
               width: '100%', padding: '10px 12px',
               background: '#0a0a14', border: '1px solid #252540', borderRadius: 8,
-              color: '#e0e0ec', fontSize: 14, fontFamily: textFont,
-              fontWeight: textBold ? 'bold' : 'normal',
-              fontStyle: textItalic ? 'italic' : 'normal',
+              color: '#e0e0ec', fontSize: 14, fontFamily: dialogs.textFont,
+              fontWeight: dialogs.textBold ? 'bold' : 'normal',
+              fontStyle: dialogs.textItalic ? 'italic' : 'normal',
               outline: 'none', resize: 'vertical' as const,
             },
           }),
@@ -1560,8 +1530,8 @@ export function App() {
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Font'),
             React.createElement('select', {
-              value: textFont,
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setTextFont(e.target.value),
+              value: dialogs.textFont,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => dialogs.setTextFont(e.target.value),
               style: {
                 width: '100%', padding: '6px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
@@ -1577,14 +1547,14 @@ export function App() {
           React.createElement('div', { style: { width: 80 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),
             React.createElement(NumberInput, {
-              value: textSize,
+              value: dialogs.textSize,
               min: 3,
               max: 200,
               integer: true,
               inputMode: 'numeric',
               defaultValue: 20,
-              onChange: (v: number) => setTextSize(v),
-              onCommit: (v: number) => setTextSize(v),
+              onChange: (v: number) => dialogs.setTextSize(v),
+              onCommit: (v: number) => dialogs.setTextSize(v),
               style: {
                 width: '100%', padding: '6px 8px',
                 background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
@@ -1597,22 +1567,22 @@ export function App() {
 
         React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
           React.createElement('button', {
-            onClick: () => setTextBold(!textBold),
+            onClick: () => dialogs.setTextBold(!dialogs.textBold),
             style: {
               padding: '6px 16px', fontSize: 13, fontWeight: 700,
-              background: textBold ? 'rgba(0,212,255,0.1)' : '#0a0a14',
-              border: textBold ? '1px solid #00d4ff' : '1px solid #252540',
-              borderRadius: 6, color: textBold ? '#00d4ff' : '#555570',
+              background: dialogs.textBold ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+              border: dialogs.textBold ? '1px solid #00d4ff' : '1px solid #252540',
+              borderRadius: 6, color: dialogs.textBold ? '#00d4ff' : '#555570',
               cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
             },
           }, 'B'),
           React.createElement('button', {
-            onClick: () => setTextItalic(!textItalic),
+            onClick: () => dialogs.setTextItalic(!dialogs.textItalic),
             style: {
               padding: '6px 16px', fontSize: 13, fontStyle: 'italic',
-              background: textItalic ? 'rgba(0,212,255,0.1)' : '#0a0a14',
-              border: textItalic ? '1px solid #00d4ff' : '1px solid #252540',
-              borderRadius: 6, color: textItalic ? '#00d4ff' : '#555570',
+              background: dialogs.textItalic ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+              border: dialogs.textItalic ? '1px solid #00d4ff' : '1px solid #252540',
+              borderRadius: 6, color: dialogs.textItalic ? '#00d4ff' : '#555570',
               cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
             },
           }, 'I'),
@@ -1627,34 +1597,34 @@ export function App() {
         },
           React.createElement('span', {
             style: {
-              fontFamily: textFont, fontSize: Math.min(textSize * 2, 48),
-              fontWeight: textBold ? 'bold' : 'normal',
-              fontStyle: textItalic ? 'italic' : 'normal',
+              fontFamily: dialogs.textFont, fontSize: Math.min(dialogs.textSize * 2, 48),
+              fontWeight: dialogs.textBold ? 'bold' : 'normal',
+              fontStyle: dialogs.textItalic ? 'italic' : 'normal',
               color: '#e0e0ec',
             },
-          }, textInput || 'Preview'),
+          }, dialogs.textInput || 'Preview'),
         ),
 
         React.createElement('div', { style: { padding: '0 18px 16px' } },
           React.createElement('button', {
             onClick: () => {
-              if (!textInput.trim()) return;
+              if (!dialogs.textInput.trim()) return;
 
-              if (editingTextId) {
+              if (dialogs.editingTextId) {
                 const newScene = {
                   ...scene,
                   objects: scene.objects.map(o =>
-                    o.id === editingTextId
+                    o.id === dialogs.editingTextId
                       ? {
                           ...o,
-                          name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
+                          name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
                           geometry: {
                             type: 'text' as const,
-                            text: textInput,
-                            fontSize: textSize,
-                            fontFamily: textFont,
-                            bold: textBold,
-                            italic: textItalic,
+                            text: dialogs.textInput,
+                            fontSize: dialogs.textSize,
+                            fontFamily: dialogs.textFont,
+                            bold: dialogs.textBold,
+                            italic: dialogs.textItalic,
                           },
                           _bounds: null,
                           _worldTransform: null,
@@ -1663,7 +1633,6 @@ export function App() {
                   ),
                 };
                 handleSceneCommit(newScene);
-                setEditingTextId(null);
               } else {
                 const layerId = scene.activeLayerId || scene.layers[0]?.id;
                 if (!layerId) return;
@@ -1674,17 +1643,17 @@ export function App() {
                 const textObj: SceneObject = {
                   id: generateId(),
                   type: 'text',
-                  name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
+                  name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
                   layerId,
                   parentId: null,
                   transform: { ...IDENTITY_MATRIX, tx, ty },
                   geometry: {
                     type: 'text',
-                    text: textInput,
-                    fontSize: textSize,
-                    fontFamily: textFont,
-                    bold: textBold,
-                    italic: textItalic,
+                    text: dialogs.textInput,
+                    fontSize: dialogs.textSize,
+                    fontFamily: dialogs.textFont,
+                    bold: dialogs.textBold,
+                    italic: dialogs.textItalic,
                   },
                   visible: true,
                   locked: false,
@@ -1703,21 +1672,20 @@ export function App() {
                 handleTextPlaced();
               }
 
-              setShowTextDialog(false);
-              setTextInput('');
+              dialogs.closeTextDialog();
               setTextPlacementPt(null);
               setActiveTool('select');
             },
-            disabled: !textInput.trim(),
+            disabled: !dialogs.textInput.trim(),
             style: {
               width: '100%', padding: '10px',
-              background: textInput.trim() ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
-              border: textInput.trim() ? '1px solid #2dd4a0' : '1px solid #252540',
-              borderRadius: 8, color: textInput.trim() ? '#2dd4a0' : '#333355',
-              fontSize: 13, fontWeight: 600, cursor: textInput.trim() ? 'pointer' : 'default',
+              background: dialogs.textInput.trim() ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
+              border: dialogs.textInput.trim() ? '1px solid #2dd4a0' : '1px solid #252540',
+              borderRadius: 8, color: dialogs.textInput.trim() ? '#2dd4a0' : '#333355',
+              fontSize: 13, fontWeight: 600, cursor: dialogs.textInput.trim() ? 'pointer' : 'default',
               fontFamily: "'DM Sans', system-ui, sans-serif",
             },
-          }, editingTextId ? 'Update Text' : 'Add Text to Canvas'),
+          }, dialogs.editingTextId ? 'Update Text' : 'Add Text to Canvas'),
 
           React.createElement('div', {
             style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const },
