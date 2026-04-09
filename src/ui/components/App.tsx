@@ -1239,25 +1239,20 @@ export function App() {
       } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedIds.size > 0) {
         e.preventDefault();
         const step = e.shiftKey ? 0.1 : 1;
-        let dx = 0, dy = 0;
-        if (e.key === 'ArrowLeft') dx = -step;
-        if (e.key === 'ArrowRight') dx = step;
-        if (e.key === 'ArrowUp') dy = -step;
-        if (e.key === 'ArrowDown') dy = step;
+        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
 
-        const baseScene = nudgeSceneRef.current ?? scene;
+        // Use the latest scene (may already be mid-nudge)
+        const baseScene = nudgeSceneRef.current || scene;
         const newScene = {
           ...baseScene,
-          objects: baseScene.objects.map(o => {
-            if (!selectedIds.has(o.id)) return o;
-            return {
-              ...o,
-              transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
-              _bounds: null, _worldTransform: null,
-            };
-          }),
+          objects: baseScene.objects.map(o =>
+            selectedIds.has(o.id)
+              ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
+              : o
+          ),
         };
-        handleSceneChange(newScene);   // Preview only — no history entry
+        handleSceneChange(newScene); // Preview only — no history
         nudgeSceneRef.current = newScene;
         isNudgingRef.current = true;
         return;
