@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { GrblController } from '../../controllers/grbl/GrblController';
+import { type GrblController } from '../../controllers/grbl/GrblController';
 import { MockSerialPort } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
@@ -10,6 +10,10 @@ import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobRepla
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
 
 interface ConnectionPanelProps {
+  controller: GrblController;
+  portRef: React.MutableRefObject<WebSerialPort | MockSerialPort | null>;
+  machineState: MachineState | null;
+  jobProgress: JobProgress | null;
   scene: Scene;
   gcode: string | null;
   bedWidth: number;
@@ -22,9 +26,22 @@ interface ConnectionPanelProps {
   productionMode?: boolean;
 }
 
-export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX, boundsMinY, boundsMaxX, boundsMaxY, onClose, productionMode = false }: ConnectionPanelProps) {
-  const [machineState, setMachineState] = useState<MachineState | null>(null);
-  const [progress, setProgress] = useState<JobProgress | null>(null);
+export function ConnectionPanel({
+  controller,
+  portRef,
+  machineState,
+  jobProgress,
+  scene,
+  gcode,
+  bedWidth,
+  bedHeight,
+  boundsMinX,
+  boundsMinY,
+  boundsMaxX,
+  boundsMaxY,
+  onClose,
+  productionMode = false,
+}: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [isSimulator, setIsSimulator] = useState(false);
@@ -33,8 +50,8 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
   const [showOutcome, setShowOutcome] = useState(false);
 
-  const controllerRef = useRef<GrblController | null>(null);
-  const portRef = useRef<WebSerialPort | MockSerialPort | null>(null);
+  const controllerRef = useRef(controller);
+  controllerRef.current = controller;
   const logRef = useRef<HTMLDivElement>(null);
   /** Same object as currentReplay while a job is recording; set before sendJob so sync TX callbacks see it */
   const activeReplayRef = useRef<JobReplay | null>(null);
@@ -42,14 +59,9 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
 
-  // Initialize controller
+  // Replay logging + job-complete detection (controller lives in App)
   useEffect(() => {
-    const ctrl = new GrblController();
-
-    ctrl.onStateChange((state) => setMachineState({ ...state }));
-    ctrl.onProgress((prog) => {
-      setProgress({ ...prog });
-      // Detect job completion
+    const unsubProgress = controller.onProgress((prog) => {
       if (prog.percentComplete >= 100) {
         const r = activeReplayRef.current;
         if (r && r.status === 'running') {
@@ -61,25 +73,26 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
         }
       }
     });
-    ctrl.onError((code, msg) => {
+    const unsubError = controller.onError((code, msg) => {
       setMessages(prev => [...prev.slice(-200), `ERROR ${code}: ${msg}`]);
       const r = activeReplayRef.current;
       if (r && r.status === 'running') {
         addReplayEntry(r, 'error', msg);
       }
     });
-    ctrl.onRawLine((line, dir) => {
+    const unsubRaw = controller.onRawLine((line, dir) => {
       setMessages(prev => [...prev.slice(-200), `${dir === 'tx' ? '>' : '<'} ${line}`]);
       const r = activeReplayRef.current;
       if (r && r.status === 'running') {
         addReplayEntry(r, dir === 'tx' ? 'tx' : 'rx', line);
       }
     });
-
-    controllerRef.current = ctrl;
-
-    return () => { void ctrl.disconnect(); };
-  }, []);
+    return () => {
+      unsubProgress();
+      unsubError();
+      unsubRaw();
+    };
+  }, [controller]);
 
   // Auto-scroll log
   useEffect(() => {
@@ -138,8 +151,6 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
   const handleDisconnect = async () => {
     await controllerRef.current?.disconnect();
     portRef.current = null;
-    setMachineState(null);
-    setProgress(null);
     setMessages(prev => [...prev, 'Disconnected']);
   };
 
@@ -151,6 +162,29 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
 
   const handleStartJob = () => {
     if (!gcode || !controllerRef.current) return;
+
+    // Machine readiness gate
+    const status = machineState?.status;
+    if (status === 'alarm') {
+      alert('Machine is in ALARM state. Click Unlock ($X) first.');
+      return;
+    }
+    if (status === 'hold') {
+      alert('Machine is paused. Click Resume or Stop first.');
+      return;
+    }
+    if (status === 'run') {
+      alert('A job is already running. Wait for it to finish or Stop it.');
+      return;
+    }
+    if (status === 'homing') {
+      alert('Machine is homing. Wait for it to finish.');
+      return;
+    }
+    if (status !== 'idle' && status !== undefined) {
+      alert(`Machine not ready (state: ${status}). Wait for idle.`);
+      return;
+    }
 
     // Use preflight to gate job start
     if (preflight && !preflight.canStart) {
@@ -466,7 +500,7 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
         React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
           React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'BUFFER'),
           React.createElement('div', { style: { fontFamily: mono, fontSize: 14, color: '#8888aa' } },
-            `${progress?.bufferFill || 0}/127`
+            `${jobProgress?.bufferFill || 0}/127`
           ),
         ),
       ),
@@ -497,7 +531,7 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
             React.createElement('button', {
               onClick: () => {
                 sendCmd('G10 L20 P1 X0 Y0');
-                setMessages(prev => [...prev, 'Zero sent — position updates on next status report']);
+                setMessages(prev => [...prev, 'Zero command sent — position updates on next status report']);
               },
               title: 'Set current position as X0 Y0',
               style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
@@ -560,13 +594,13 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
           }, 'Stop'),
         ),
         // Progress bar
-        progress && progress.totalLines > 0 && React.createElement('div', { style: { marginTop: 8 } },
+        jobProgress && jobProgress.totalLines > 0 && React.createElement('div', { style: { marginTop: 8 } },
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#555570', marginBottom: 3 } },
-            React.createElement('span', null, `${progress.linesAcknowledged} / ${progress.totalLines} acknowledged`),
-            React.createElement('span', null, `${progress.percentComplete.toFixed(0)}%`),
+            React.createElement('span', null, `${jobProgress.linesAcknowledged} / ${jobProgress.totalLines} acknowledged`),
+            React.createElement('span', null, `${jobProgress.percentComplete.toFixed(0)}%`),
           ),
           React.createElement('div', { style: { height: 3, background: '#1a1a2e', borderRadius: 2, overflow: 'hidden' } },
-            React.createElement('div', { style: { width: `${progress.percentComplete}%`, height: '100%', background: '#00d4ff', borderRadius: 2, transition: 'width 0.1s' } }),
+            React.createElement('div', { style: { width: `${jobProgress.percentComplete}%`, height: '100%', background: '#00d4ff', borderRadius: 2, transition: 'width 0.1s' } }),
           ),
         ),
       ),
