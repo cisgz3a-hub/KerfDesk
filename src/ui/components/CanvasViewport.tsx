@@ -40,7 +40,6 @@ import {
   renderLaserHead,
   renderTrail,
 } from '../renderers/SimulationRenderer';
-import { createTextObject } from '../tools/TextTool';
 import { type ToolType } from './ToolBar';
 
 function defaultCursorForTool(activeTool: ToolType): string {
@@ -168,9 +167,8 @@ interface CanvasViewportProps {
   previewMode?: boolean;
   /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
   onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
-  showPrompt: (title: string, message: string, defaultValue?: string, placeholder?: string) => Promise<string | null>;
-  /** Called after user places a new text object (text tool). */
-  onTextPlaced?: () => void;
+  /** Text tool: user clicked canvas — open text dialog with this world position. */
+  onRequestTextPlacement?: (world: { x: number; y: number }) => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -189,8 +187,7 @@ export function CanvasViewport({
   actionsRef,
   previewMode = false,
   onSelectionScreenPos,
-  showPrompt,
-  onTextPlaced,
+  onRequestTextPlacement,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -699,7 +696,7 @@ export function CanvasViewport({
     canvas.style.cursor = defaultCursorForTool(activeTool);
   }, [activeTool]);
 
-  const handleMouseDown = useCallback(async (e: React.MouseEvent) => {
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
     // Pan: middle mouse button OR spacebar + left click (Alt+left fallback)
     if (e.button === 1 || (e.button === 0 && (spaceHeldRef.current || e.altKey))) {
       e.preventDefault();
@@ -720,19 +717,10 @@ export function CanvasViewport({
     });
 
     if (activeTool === 'text') {
-      const text = await showPrompt('Add Text', 'Enter text:', '', 'Type here...');
-      if (text && text.trim()) {
-        const layerId = scene.activeLayerId || scene.layers[0]?.id;
-        if (!layerId) return;
-        const textObj = createTextObject(text.trim(), snapToGrid(worldPt.x, GRID_SNAP), snapToGrid(worldPt.y, GRID_SNAP), layerId);
-        const newScene = {
-          ...scene,
-          objects: [...scene.objects, textObj],
-        };
-        onSceneCommit?.(newScene);
-        onSelectionChange?.(new Set([textObj.id]));
-        onTextPlaced?.();
-      }
+      onRequestTextPlacement?.({
+        x: snapToGrid(worldPt.x, GRID_SNAP),
+        y: snapToGrid(worldPt.y, GRID_SNAP),
+      });
       return;
     }
 
@@ -884,7 +872,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, showPrompt, onTextPlaced]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

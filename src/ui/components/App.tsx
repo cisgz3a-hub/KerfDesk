@@ -239,6 +239,13 @@ export function App() {
   });
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
+  const [showTextDialog, setShowTextDialog] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  const [textFont, setTextFont] = useState('Arial');
+  const [textSize, setTextSize] = useState(20);
+  const [textBold, setTextBold] = useState(false);
+  const [textItalic, setTextItalic] = useState(false);
+  const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!textPlacementHint) return;
@@ -248,6 +255,11 @@ export function App() {
 
   const handleTextPlaced = useCallback(() => {
     setTextPlacementHint('Tip: Select text and click "Convert to Path" before cutting');
+  }, []);
+
+  const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
+    setTextPlacementPt({ x: world.x, y: world.y });
+    setShowTextDialog(true);
   }, []);
 
   useEffect(() => {
@@ -1379,8 +1391,7 @@ export function App() {
         onZoomChange: setZoomLevel,
         previewMode,
         onSelectionScreenPos: setQuickActionPos,
-        showPrompt,
-        onTextPlaced: handleTextPlaced,
+        onRequestTextPlacement: handleRequestTextPlacement,
       }),
       React.createElement('div', {
         style: {
@@ -1678,6 +1689,197 @@ export function App() {
       },
       onDismiss: () => setToastSuggestion(null),
     }),
+
+    showTextDialog && React.createElement('div', {
+      style: {
+        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+        backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', zIndex: 2000, fontFamily: "'DM Sans', system-ui, sans-serif",
+      },
+      onClick: (e: React.MouseEvent) => {
+        if (e.target === e.currentTarget) {
+          setShowTextDialog(false);
+          setTextPlacementPt(null);
+        }
+      },
+    },
+      React.createElement('div', {
+        style: {
+          background: '#12121e', border: '1px solid #252540', borderRadius: 14,
+          width: 420, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+          overflow: 'hidden',
+        },
+        onClick: (e: React.MouseEvent) => e.stopPropagation(),
+      },
+        React.createElement('div', {
+          style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+        },
+          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Add Text'),
+          React.createElement('button', {
+            onClick: () => {
+              setShowTextDialog(false);
+              setTextPlacementPt(null);
+            },
+            style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
+          }, '×'),
+        ),
+
+        React.createElement('div', { style: { padding: '16px 18px' } },
+          React.createElement('textarea', {
+            value: textInput,
+            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => setTextInput(e.target.value),
+            placeholder: 'Type your text here...',
+            autoFocus: true,
+            rows: 3,
+            style: {
+              width: '100%', padding: '10px 12px',
+              background: '#0a0a14', border: '1px solid #252540', borderRadius: 8,
+              color: '#e0e0ec', fontSize: 14, fontFamily: textFont,
+              fontWeight: textBold ? 'bold' : 'normal',
+              fontStyle: textItalic ? 'italic' : 'normal',
+              outline: 'none', resize: 'vertical' as const,
+            },
+          }),
+        ),
+
+        React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Font'),
+            React.createElement('select', {
+              value: textFont,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => setTextFont(e.target.value),
+              style: {
+                width: '100%', padding: '6px 8px',
+                background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
+                color: '#e0e0ec', fontSize: 12, outline: 'none',
+                fontFamily: "'DM Sans', system-ui, sans-serif",
+              },
+            },
+              ...['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman', 'Avant Garde'].map(f =>
+                React.createElement('option', { key: f, value: f, style: { fontFamily: f } }, f),
+              ),
+            ),
+          ),
+          React.createElement('div', { style: { width: 80 } },
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              value: textSize,
+              min: 3,
+              max: 200,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTextSize(parseInt(e.target.value, 10) || 20),
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => setTextSize(Math.max(3, Math.min(200, parseInt(e.target.value, 10) || 20))),
+              style: {
+                width: '100%', padding: '6px 8px',
+                background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
+                color: '#e0e0ec', fontSize: 12, outline: 'none',
+                fontFamily: "'JetBrains Mono', monospace",
+              },
+            }),
+          ),
+        ),
+
+        React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
+          React.createElement('button', {
+            onClick: () => setTextBold(!textBold),
+            style: {
+              padding: '6px 16px', fontSize: 13, fontWeight: 700,
+              background: textBold ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+              border: textBold ? '1px solid #00d4ff' : '1px solid #252540',
+              borderRadius: 6, color: textBold ? '#00d4ff' : '#555570',
+              cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
+            },
+          }, 'B'),
+          React.createElement('button', {
+            onClick: () => setTextItalic(!textItalic),
+            style: {
+              padding: '6px 16px', fontSize: 13, fontStyle: 'italic',
+              background: textItalic ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+              border: textItalic ? '1px solid #00d4ff' : '1px solid #252540',
+              borderRadius: 6, color: textItalic ? '#00d4ff' : '#555570',
+              cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
+            },
+          }, 'I'),
+        ),
+
+        React.createElement('div', {
+          style: {
+            margin: '0 18px 12px', padding: '16px',
+            background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e',
+            minHeight: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          },
+        },
+          React.createElement('span', {
+            style: {
+              fontFamily: textFont, fontSize: Math.min(textSize * 2, 48),
+              fontWeight: textBold ? 'bold' : 'normal',
+              fontStyle: textItalic ? 'italic' : 'normal',
+              color: '#e0e0ec',
+            },
+          }, textInput || 'Preview'),
+        ),
+
+        React.createElement('div', { style: { padding: '0 18px 16px' } },
+          React.createElement('button', {
+            onClick: () => {
+              if (!textInput.trim()) return;
+              const layerId = scene.activeLayerId || scene.layers[0]?.id;
+              if (!layerId) return;
+
+              const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
+              const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
+
+              const textObj: SceneObject = {
+                id: generateId(),
+                type: 'text',
+                name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
+                layerId,
+                parentId: null,
+                transform: { ...IDENTITY_MATRIX, tx, ty },
+                geometry: {
+                  type: 'text',
+                  text: textInput,
+                  fontSize: textSize,
+                  fontFamily: textFont,
+                  bold: textBold,
+                  italic: textItalic,
+                },
+                visible: true,
+                locked: false,
+                _bounds: null,
+                _worldTransform: null,
+              };
+
+              const newScene = {
+                ...scene,
+                objects: [...scene.objects, textObj],
+                selection: [textObj.id],
+              };
+              handleSceneCommit(newScene);
+              setSelectedIds(new Set([textObj.id]));
+              setShowTextDialog(false);
+              setTextInput('');
+              setTextPlacementPt(null);
+              setActiveTool('select');
+              handleTextPlaced();
+            },
+            disabled: !textInput.trim(),
+            style: {
+              width: '100%', padding: '10px',
+              background: textInput.trim() ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
+              border: textInput.trim() ? '1px solid #2dd4a0' : '1px solid #252540',
+              borderRadius: 8, color: textInput.trim() ? '#2dd4a0' : '#333355',
+              fontSize: 13, fontWeight: 600, cursor: textInput.trim() ? 'pointer' : 'default',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
+            },
+          }, 'Add Text to Canvas'),
+
+          React.createElement('div', {
+            style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const },
+          }, 'After adding, select the text and click "Convert to Path" before cutting'),
+        ),
+      ),
+    ),
 
     renderDialog(),
   );
