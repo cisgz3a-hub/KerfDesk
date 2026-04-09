@@ -1,0 +1,10 @@
+# Netlify: web build (Vite). Electron build is separate (npm run electron:build).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+# SPA: serve index.html for client-side routes if you add a router later
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
