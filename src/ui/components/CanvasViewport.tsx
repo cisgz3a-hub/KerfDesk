@@ -61,78 +61,75 @@ function snapToGrid(value: number, gridSize: number): number {
   return Math.round(value / gridSize) * gridSize;
 }
 
-/** Nearest snap point from other objects (world mm). */
-function findObjectSnapPoint(
+/** Get snap points from a single object */
+function getObjectSnapPoints(obj: SceneObject): Array<{ x: number; y: number }> {
+  const t = obj.transform;
+  const g = obj.geometry;
+  const pts: Array<{ x: number; y: number }> = [];
+
+  if (g.type === 'rect') {
+    const x1 = t.a * g.x + t.tx;
+    const y1 = t.d * g.y + t.ty;
+    const x2 = t.a * (g.x + g.width) + t.tx;
+    const y2 = t.d * (g.y + g.height) + t.ty;
+    const cx = (x1 + x2) / 2;
+    const cy = (y1 + y2) / 2;
+    pts.push({ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 });
+    pts.push({ x: cx, y: cy });
+    pts.push({ x: cx, y: y1 }, { x: x2, y: cy }, { x: cx, y: y2 }, { x: x1, y: cy });
+  } else if (g.type === 'ellipse') {
+    const cx = t.a * g.cx + t.tx;
+    const cy = t.d * g.cy + t.ty;
+    pts.push({ x: cx, y: cy });
+    pts.push({ x: cx - t.a * g.rx, y: cy });
+    pts.push({ x: cx + t.a * g.rx, y: cy });
+    pts.push({ x: cx, y: cy - t.d * g.ry });
+    pts.push({ x: cx, y: cy + t.d * g.ry });
+  } else if (g.type === 'line') {
+    pts.push({ x: t.a * g.x1 + t.tx, y: t.d * g.y1 + t.ty });
+    pts.push({ x: t.a * g.x2 + t.tx, y: t.d * g.y2 + t.ty });
+    pts.push({
+      x: t.a * ((g.x1 + g.x2) / 2) + t.tx,
+      y: t.d * ((g.y1 + g.y2) / 2) + t.ty,
+    });
+  } else if (g.type === 'polygon') {
+    for (const pt of g.points) {
+      pts.push({ x: t.a * pt.x + t.tx, y: t.d * pt.y + t.ty });
+    }
+  } else {
+    pts.push({ x: t.tx, y: t.ty });
+  }
+
+  return pts;
+}
+
+/** Find nearest snap point from non-selected objects */
+function findSnapPoint(
   x: number,
   y: number,
   excludeIds: Set<string>,
   objects: SceneObject[],
-  snapDistance: number
+  snapDist: number,
 ): { x: number; y: number; snapped: boolean } {
-  let bestDist = snapDistance;
-  let snapX = x;
-  let snapY = y;
+  let bestDist = snapDist;
+  let sx = x;
+  let sy = y;
   let snapped = false;
 
   for (const obj of objects) {
     if (excludeIds.has(obj.id) || !obj.visible) continue;
-
-    const points = getObjectSnapPoints(obj);
-
-    for (const p of points) {
-      const dist = Math.sqrt((p.x - x) ** 2 + (p.y - y) ** 2);
-      if (dist < bestDist) {
-        bestDist = dist;
-        snapX = p.x;
-        snapY = p.y;
+    for (const p of getObjectSnapPoints(obj)) {
+      const d = Math.hypot(p.x - x, p.y - y);
+      if (d < bestDist) {
+        bestDist = d;
+        sx = p.x;
+        sy = p.y;
         snapped = true;
       }
     }
   }
 
-  return { x: snapX, y: snapY, snapped };
-}
-
-function getObjectSnapPoints(obj: SceneObject): Array<{ x: number; y: number }> {
-  const t = obj.transform;
-  const points: Array<{ x: number; y: number }> = [];
-  const g = obj.geometry;
-
-  if (g.type === 'rect') {
-    const cx = t.a * (g.x + g.width / 2) + t.tx;
-    const cy = t.d * (g.y + g.height / 2) + t.ty;
-    points.push({ x: cx, y: cy });
-    points.push({ x: t.a * g.x + t.tx, y: t.d * g.y + t.ty });
-    points.push({ x: t.a * (g.x + g.width) + t.tx, y: t.d * g.y + t.ty });
-    points.push({ x: t.a * (g.x + g.width) + t.tx, y: t.d * (g.y + g.height) + t.ty });
-    points.push({ x: t.a * g.x + t.tx, y: t.d * (g.y + g.height) + t.ty });
-    points.push({ x: t.a * (g.x + g.width / 2) + t.tx, y: t.d * g.y + t.ty });
-    points.push({ x: t.a * (g.x + g.width) + t.tx, y: t.d * (g.y + g.height / 2) + t.ty });
-    points.push({ x: t.a * (g.x + g.width / 2) + t.tx, y: t.d * (g.y + g.height) + t.ty });
-    points.push({ x: t.a * g.x + t.tx, y: t.d * (g.y + g.height / 2) + t.ty });
-  } else if (g.type === 'ellipse') {
-    const cx = t.a * g.cx + t.tx;
-    const cy = t.d * g.cy + t.ty;
-    points.push({ x: cx, y: cy });
-    points.push({ x: cx - t.a * g.rx, y: cy });
-    points.push({ x: cx + t.a * g.rx, y: cy });
-    points.push({ x: cx, y: cy - t.d * g.ry });
-    points.push({ x: cx, y: cy + t.d * g.ry });
-  } else if (g.type === 'line') {
-    points.push({ x: t.a * g.x1 + t.tx, y: t.d * g.y1 + t.ty });
-    points.push({ x: t.a * g.x2 + t.tx, y: t.d * g.y2 + t.ty });
-    points.push({ x: t.a * (g.x1 + g.x2) / 2 + t.tx, y: t.d * (g.y1 + g.y2) / 2 + t.ty });
-  } else if (g.type === 'polygon') {
-    for (const pt of g.points) {
-      points.push({ x: t.a * pt.x + t.tx, y: t.d * pt.y + t.ty });
-    }
-  }
-
-  if (points.length === 0) {
-    points.push({ x: t.tx, y: t.ty });
-  }
-
-  return points;
+  return { x: sx, y: sy, snapped };
 }
 
 function drawRulers(
@@ -1149,28 +1146,21 @@ export function CanvasViewport({
       dragRef.current.lastWorldY = world.y;
 
       if ((worldDx !== 0 || worldDy !== 0) && onSceneChange) {
-        let moved = moveObjects(scene, dragRef.current.dragIds, worldDx, worldDy);
+        let dx = worldDx;
+        let dy = worldDy;
         const dragIds = dragRef.current.dragIds;
-
-        const dragObjs = moved.objects.filter(o => dragIds.has(o.id));
-        let cx = 0;
-        let cy = 0;
-        let count = 0;
-        for (const o of dragObjs) {
-          const b = computeObjectBounds(o);
-          if (!b) continue;
-          cx += (b.minX + b.maxX) / 2;
-          cy += (b.minY + b.maxY) / 2;
-          count++;
-        }
-        if (count > 0) {
-          cx /= count;
-          cy /= count;
-          const snap = findObjectSnapPoint(cx, cy, new Set(dragIds), moved.objects, 2);
+        const primaryObj = scene.objects.find(o => dragIds.has(o.id));
+        if (primaryObj) {
+          const candidateX = primaryObj.transform.tx + dx;
+          const candidateY = primaryObj.transform.ty + dy;
+          const snap = findSnapPoint(candidateX, candidateY, new Set(dragIds), scene.objects, 2);
           if (snap.snapped) {
-            moved = moveObjects(moved, dragIds, snap.x - cx, snap.y - cy);
+            dx = snap.x - primaryObj.transform.tx;
+            dy = snap.y - primaryObj.transform.ty;
           }
         }
+
+        let moved = moveObjects(scene, dragIds, dx, dy);
 
         const snapped = {
           ...moved,
@@ -1250,7 +1240,7 @@ export function CanvasViewport({
         const sy0 = snapToGrid(drawRef.current.startWorldY, GRID_SNAP);
         let ex0 = snapToGrid(endWorld.x, GRID_SNAP);
         let ey0 = snapToGrid(endWorld.y, GRID_SNAP);
-        const endSnap = findObjectSnapPoint(ex0, ey0, new Set(), scene.objects, 2);
+        const endSnap = findSnapPoint(ex0, ey0, new Set(), scene.objects, 2);
         if (endSnap.snapped) {
           ex0 = endSnap.x;
           ey0 = endSnap.y;
@@ -1381,14 +1371,6 @@ export function CanvasViewport({
             const isDoubleClick = (now - (lastClickTimeRef.current || 0)) < 300
               && hitObj != null && hitObj.id === lastClickIdRef.current;
 
-            if (isDoubleClick && hitObj && hitObj.geometry.type === 'text') {
-              onEditText?.(hitObj);
-              lastClickTimeRef.current = now;
-              lastClickIdRef.current = hitObj.id;
-              clickStartRef.current = null;
-              return;
-            }
-
             lastClickTimeRef.current = now;
             lastClickIdRef.current = hitObj?.id ?? hit.id;
 
@@ -1423,7 +1405,33 @@ export function CanvasViewport({
       }
       clickStartRef.current = null;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool, onEditText]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool]);
+
+  const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const transform = Transform.from(viewport);
+    const screenX = e.clientX - rect.left;
+    const screenY = e.clientY - rect.top;
+    const worldPt = transform.screenToWorld({ x: screenX, y: screenY });
+    const worldX = worldPt.x;
+    const worldY = worldPt.y;
+
+    for (let i = scene.objects.length - 1; i >= 0; i--) {
+      const obj = scene.objects[i];
+      if (!obj.visible || obj.locked) continue;
+      const bounds = computeObjectBounds(obj);
+      if (!bounds) continue;
+      if (worldX >= bounds.minX && worldX <= bounds.maxX &&
+          worldY >= bounds.minY && worldY <= bounds.maxY) {
+        if (obj.geometry.type === 'text') {
+          onEditText?.(obj);
+          return;
+        }
+        break;
+      }
+    }
+  }, [scene, viewport, onEditText]);
 
   const handleFitView = useCallback(() => {
     const bounds = computeFitBounds(scene, simulation);
@@ -1456,6 +1464,7 @@ export function CanvasViewport({
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
       onMouseLeave: handleMouseUp,
+      onDoubleClick: handleCanvasDoubleClick,
       onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
     }),
 

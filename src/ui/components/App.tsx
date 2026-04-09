@@ -1726,6 +1726,7 @@ export function App() {
           setShowTextDialog(false);
           setTextPlacementPt(null);
           setEditingTextId(null);
+          setTextInput('');
         }
       },
     },
@@ -1746,6 +1747,7 @@ export function App() {
               setShowTextDialog(false);
               setTextPlacementPt(null);
               setEditingTextId(null);
+              setTextInput('');
             },
             style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
           }, '×'),
