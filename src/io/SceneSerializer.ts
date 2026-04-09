@@ -45,21 +45,6 @@ interface SerializedScene {
   metadata: Scene['metadata'];
 }
 
-// ─── TYPED ARRAY ENCODING ───────────────────────────────────────
-
-function uint8ToBase64(arr: Uint8Array): string {
-  let binary = '';
-  for (let i = 0; i < arr.length; i++) binary += String.fromCharCode(arr[i]);
-  return btoa(binary);
-}
-
-function base64ToUint8(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const arr = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-  return arr;
-}
-
 // ─── SERIALIZE ───────────────────────────────────────────────────
 
 /**
@@ -76,7 +61,7 @@ export function serializeScene(scene: Scene): string {
     version: scene.version,
     canvas: scene.canvas,
     layers: scene.layers,
-    objects: scene.objects.map(stripObjectCache),
+    objects: scene.objects.map((o) => encodeImageBuffers(stripObjectCache(o))),
     material: scene.material,
     startPosition: scene.startPosition,
     machine: scene.machine,
@@ -179,7 +164,7 @@ export function deserializeScene(json: string): Scene {
       units: s.canvas.units || 'mm',
     },
     layers: s.layers.map((l: any) => restoreLayerDefaults(l)),
-    objects: s.objects.map((o: any) => restoreObjectDefaults(o)),
+    objects: s.objects.map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
     material: s.material ?? null,
     startPosition: s.startPosition ?? { x: 0, y: 0 },
     machine: s.machine,
@@ -257,19 +242,6 @@ function restoreLayerDefaults(l: any): Layer {
 }
 
 function restoreObjectDefaults(o: any): SceneObject {
-  // Decode base64 image buffers back to Uint8Array
-  if (o.geometry?.type === 'image') {
-    const geom = o.geometry;
-    if (geom._grayscaleB64) {
-      geom.grayscaleData = base64ToUint8(geom._grayscaleB64);
-      delete geom._grayscaleB64;
-    }
-    if (geom._adjustedB64) {
-      geom.adjustedData = base64ToUint8(geom._adjustedB64);
-      delete geom._adjustedB64;
-    }
-  }
-
   return {
     id: o.id,
     type: o.type || 'path',
@@ -290,20 +262,92 @@ function restoreObjectDefaults(o: any): SceneObject {
 
 function stripObjectCache(obj: SceneObject): any {
   const { _bounds, _worldTransform, ...clean } = obj;
+  return clean;
+}
 
-  // Encode Uint8Array fields as base64 for JSON safety
-  if (clean.geometry?.type === 'image') {
-    const geom = { ...clean.geometry };
+// ─── BASE64 HELPERS FOR TYPED ARRAYS ────────────────────────────
+
+function uint8ToBase64(arr: Uint8Array): string {
+  let binary = '';
+  const len = arr.length;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(arr[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(b64: string): Uint8Array {
+  const binary = atob(b64);
+  const len = binary.length;
+  const arr = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    arr[i] = binary.charCodeAt(i);
+  }
+  return arr;
+}
+
+/**
+ * Encode Uint8Array image buffers as base64 strings for JSON safety.
+ * JSON.stringify turns Uint8Array into {"0":128,"1":64,...} which
+ * doesn't reconstruct back on parse. Base64 preserves the data correctly.
+ */
+function encodeImageBuffers(obj: any): any {
+  if (obj.geometry?.type === 'image') {
+    const geom = { ...obj.geometry };
     if (geom.grayscaleData instanceof Uint8Array) {
-      (geom as any)._grayscaleB64 = uint8ToBase64(geom.grayscaleData);
+      geom._grayscaleDataB64 = uint8ToBase64(geom.grayscaleData);
+      geom._grayscaleDataLength = geom.grayscaleData.length;
       delete geom.grayscaleData;
     }
-    if ((geom as any).adjustedData instanceof Uint8Array) {
-      (geom as any)._adjustedB64 = uint8ToBase64((geom as any).adjustedData);
-      delete (geom as any).adjustedData;
+    if (geom.adjustedData instanceof Uint8Array) {
+      geom._adjustedDataB64 = uint8ToBase64(geom.adjustedData);
+      geom._adjustedDataLength = geom.adjustedData.length;
+      delete geom.adjustedData;
     }
-    return { ...clean, geometry: geom };
+    return { ...obj, geometry: geom };
   }
+  return obj;
+}
 
-  return clean;
+/**
+ * Decode base64 image buffers back into Uint8Arrays on load.
+ * Also handles legacy files where Uint8Array was serialized as a plain object.
+ */
+function decodeImageBuffers(obj: any): any {
+  if (obj.geometry?.type === 'image') {
+    const geom = obj.geometry;
+
+    // Decode base64 encoded buffers (new format)
+    if (geom._grayscaleDataB64 && typeof geom._grayscaleDataB64 === 'string') {
+      geom.grayscaleData = base64ToUint8(geom._grayscaleDataB64);
+      delete geom._grayscaleDataB64;
+      delete geom._grayscaleDataLength;
+    }
+    if (geom._adjustedDataB64 && typeof geom._adjustedDataB64 === 'string') {
+      geom.adjustedData = base64ToUint8(geom._adjustedDataB64);
+      delete geom._adjustedDataB64;
+      delete geom._adjustedDataLength;
+    }
+
+    // Previous laserforge saves used _grayscaleB64 / _adjustedB64
+    if (geom._grayscaleB64 && typeof geom._grayscaleB64 === 'string') {
+      geom.grayscaleData = base64ToUint8(geom._grayscaleB64);
+      delete geom._grayscaleB64;
+    }
+    if (geom._adjustedB64 && typeof geom._adjustedB64 === 'string') {
+      geom.adjustedData = base64ToUint8(geom._adjustedB64);
+      delete geom._adjustedB64;
+    }
+
+    // Handle legacy files where Uint8Array became a plain object {"0":128,"1":64,...}
+    if (geom.grayscaleData && !(geom.grayscaleData instanceof Uint8Array) && typeof geom.grayscaleData === 'object') {
+      const values = Object.values(geom.grayscaleData) as number[];
+      geom.grayscaleData = new Uint8Array(values);
+    }
+    if (geom.adjustedData && !(geom.adjustedData instanceof Uint8Array) && typeof geom.adjustedData === 'object') {
+      const values = Object.values(geom.adjustedData) as number[];
+      geom.adjustedData = new Uint8Array(values);
+    }
+  }
+  return obj;
 }
