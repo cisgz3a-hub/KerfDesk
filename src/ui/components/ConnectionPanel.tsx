@@ -169,6 +169,44 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
     setMessages(prev => [...prev, '✓ Frame complete']);
   };
 
+  const handleProofRun = () => {
+    if (!gcode || !controllerRef.current) return;
+
+    // Convert G-code to proof mode: replace all S-values with S0, keep all motion
+    const proofLines = gcode
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith(';'))
+      .map(line => {
+        // Replace any S-value with S0 (laser off)
+        if (line.match(/S\d/)) {
+          return line.replace(/S\d+/g, 'S0') + ' ; PROOF';
+        }
+        // Replace M4/M3 laser-on with M4 S0
+        if (line.startsWith('M4 ') || line.startsWith('M3 ')) {
+          return 'M4 S0 ; PROOF';
+        }
+        return line;
+      });
+
+    // Use preflight to gate
+    if (preflight && preflight.issues.some(i => i.severity === 'blocker' && i.id !== 'output-no-gcode')) {
+      const machineBlockers = preflight.issues.filter(i => i.severity === 'blocker' && i.category === 'machine');
+      if (machineBlockers.length > 0) {
+        alert('Cannot run proof — resolve machine blockers first:\n\n' +
+          machineBlockers.map(i => `• ${i.title}`).join('\n'));
+        return;
+      }
+    }
+
+    setMessages(prev => [...prev, `PROOF RUN: ${proofLines.length} commands (laser OFF)`]);
+    try {
+      controllerRef.current.sendJob(proofLines);
+    } catch (e: any) {
+      setMessages(prev => [...prev, `Proof run failed: ${e.message}`]);
+    }
+  };
+
   // ─── Styles ─────────────────────────────────────────────
 
   const btnStyle = (color: string, disabled?: boolean): React.CSSProperties => ({
@@ -395,8 +433,13 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
             style: { ...btnStyle('255,212,68', !isConnected), flex: 1 },
           }, 'Frame'),
           React.createElement('button', {
-            onClick: handleStartJob, disabled: !gcode || isRunning || !!(preflight && !preflight.canStart),
-            style: { ...btnStyle('45,212,160', !gcode || isRunning || !!(preflight && !preflight.canStart)), flex: 1, fontWeight: 600 },
+            onClick: handleProofRun, disabled: !gcode || isRunning,
+            title: 'Run the full job with laser OFF — verify motion path on the real machine',
+            style: { ...btnStyle('136,180,255', !gcode || isRunning), flex: 1 },
+          }, 'Proof'),
+          React.createElement('button', {
+            onClick: handleStartJob, disabled: !gcode || isRunning || (preflight ? !preflight.canStart : false),
+            style: { ...btnStyle('45,212,160', !gcode || isRunning || (preflight ? !preflight.canStart : false)), flex: 1, fontWeight: 600 },
           }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
         ),
         // Pause/Resume/Stop when running
