@@ -361,7 +361,34 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                   }
                 : l
             );
-            onSceneCommit({ ...scene, layers: newLayers });
+
+            const preset = MATERIAL_PRESETS.find(p => p.name === presetName);
+            const sceneMaterialType = preset?.type;
+            const validTypes = ['wood', 'acrylic', 'leather', 'paper', 'fabric', 'cardboard', 'metal', 'custom'] as const;
+            const matType = sceneMaterialType && validTypes.includes(sceneMaterialType as typeof validTypes[number])
+              ? (sceneMaterialType as NonNullable<typeof scene.material>['type'])
+              : ('custom' as NonNullable<typeof scene.material>['type']);
+
+            const updatedMaterial = scene.material
+              ? {
+                  ...scene.material,
+                  name: presetName,
+                  type: matType,
+                  thickness: preset?.thickness ?? scene.material.thickness,
+                }
+              : {
+                  type: matType,
+                  name: presetName,
+                  width: scene.canvas.width * 0.6,
+                  height: scene.canvas.height * 0.5,
+                  x: scene.canvas.width * 0.1,
+                  y: scene.canvas.height * 0.1,
+                  thickness: preset?.thickness ?? 3,
+                  color: '#c4956a',
+                  enabled: true,
+                };
+
+            onSceneCommit({ ...scene, layers: newLayers, material: updatedMaterial });
           },
         },
           React.createElement('option', { value: '' }, '— Select material —'),

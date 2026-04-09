@@ -48,6 +48,8 @@ interface FileToolbarProps {
   canUndo?: boolean;
   canRedo?: boolean;
   projectName?: string;
+  /** Active material name from scene (toolbar display). */
+  materialName?: string | null;
   onShowShortcuts?: () => void;
   onToolpathPreview?: () => void;
   productionMode?: boolean;
@@ -77,6 +79,7 @@ export function FileToolbar({
   canUndo = false,
   canRedo = false,
   projectName,
+  materialName,
   onShowShortcuts,
   onToolpathPreview,
   productionMode = false,
@@ -542,8 +545,33 @@ export function FileToolbar({
 
     React.createElement('div', { style: { flex: 1 } }),
 
-    productionMode && iconBtn('Material', 'Material settings', () => onMaterialSetup?.()),
-    productionMode && iconBtn('Setup', 'Machine setup', () => onSetup?.()),
+    React.createElement('button', {
+      onClick: () => onMaterialSetup?.(),
+      title: 'Material settings',
+      style: {
+        padding: '3px 8px',
+        fontSize: 10,
+        cursor: 'pointer',
+        background: materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent',
+        border: materialName ? '1px solid rgba(255, 170, 50, 0.2)' : 'none',
+        borderRadius: 4,
+        fontFamily: font,
+        color: materialName ? '#ffaa32' : '#8888aa',
+        whiteSpace: 'nowrap' as const,
+        maxWidth: 140,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        transition: 'background 0.1s',
+        flexShrink: 0,
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (e.target as HTMLElement).style.background = materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent';
+      },
+    }, materialName || '⊞ Material'),
+    iconBtn('Setup', 'Machine setup', () => onSetup?.()),
 
     iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
 

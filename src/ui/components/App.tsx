@@ -312,6 +312,8 @@ export function App() {
   }, []);
 
   const historyRef = useRef<HistoryManager>(new HistoryManager());
+  const isNudgingRef = useRef(false);
+  const nudgeSceneRef = useRef<Scene | null>(null);
   const [historyAvail, setHistoryAvail] = useState({ canUndo: false, canRedo: false });
 
   useEffect(() => {
@@ -1243,9 +1245,10 @@ export function App() {
         if (e.key === 'ArrowUp') dy = -step;
         if (e.key === 'ArrowDown') dy = step;
 
+        const baseScene = nudgeSceneRef.current ?? scene;
         const newScene = {
-          ...scene,
-          objects: scene.objects.map(o => {
+          ...baseScene,
+          objects: baseScene.objects.map(o => {
             if (!selectedIds.has(o.id)) return o;
             return {
               ...o,
@@ -1254,7 +1257,9 @@ export function App() {
             };
           }),
         };
-        handleSceneCommit(newScene);
+        handleSceneChange(newScene);   // Preview only — no history entry
+        nudgeSceneRef.current = newScene;
+        isNudgingRef.current = true;
         return;
       } else if (e.key === 'Escape') {
         handleClearSelection();
@@ -1271,7 +1276,21 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset, compileGcode]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, handleSceneChange, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset, compileGcode]);
+
+  useEffect(() => {
+    const handleKeyUp = (e: KeyboardEvent) => {
+      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+        if (isNudgingRef.current && nudgeSceneRef.current) {
+          handleSceneCommit(nudgeSceneRef.current);
+          isNudgingRef.current = false;
+          nudgeSceneRef.current = null;
+        }
+      }
+    };
+    window.addEventListener('keyup', handleKeyUp);
+    return () => window.removeEventListener('keyup', handleKeyUp);
+  }, [handleSceneCommit]);
 
   const hasSelectedText = scene.objects.some(o =>
     selectedIds.has(o.id) && o.geometry.type === 'text'
@@ -1333,6 +1352,7 @@ export function App() {
       canUndo: historyAvail.canUndo,
       canRedo: historyAvail.canRedo,
       projectName: scene.metadata?.name,
+      materialName: scene.material?.name ?? null,
       onShowShortcuts: () => setShowShortcuts(true),
       productionMode,
       onToggleProductionMode: handleToggleProductionMode,
