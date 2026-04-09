@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { theme } from '../styles/theme';
-import { type ImageGeometry, type PathGeometry } from '../../core/scene/SceneObject';
+import { type ImageGeometry, type PathGeometry, type RectGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
@@ -385,6 +385,49 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           },
         }),
       ),
+    ),
+
+    obj.geometry.type === 'rect' && React.createElement('div', {
+      style: { marginTop: 8 },
+    },
+      React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Corner Radius (mm)'),
+      React.createElement('input', {
+        type: 'number',
+        value: (obj.geometry as RectGeometry).cornerRadius || 0,
+        min: 0,
+        max: Math.min((obj.geometry as RectGeometry).width / 2, (obj.geometry as RectGeometry).height / 2) || 50,
+        step: 0.5,
+        style: inputStyle,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+          const raw = e.target.value;
+          if (raw === '') return;
+          const val = parseFloat(raw);
+          if (isNaN(val)) return;
+          const newScene = {
+            ...scene,
+            objects: scene.objects.map(o =>
+              selectedIds.has(o.id) && o.geometry.type === 'rect'
+                ? { ...o, geometry: { ...o.geometry, cornerRadius: val }, _bounds: null, _worldTransform: null }
+                : o
+            ),
+          };
+          (onSceneChange ?? onSceneCommit)(newScene);
+        },
+        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+          const geom = obj.geometry as RectGeometry;
+          const maxR = Math.min(geom.width / 2, geom.height / 2);
+          const val = Math.max(0, Math.min(maxR, parseFloat(e.target.value) || 0));
+          const newScene = {
+            ...scene,
+            objects: scene.objects.map(o =>
+              selectedIds.has(o.id) && o.geometry.type === 'rect'
+                ? { ...o, geometry: { ...o.geometry, cornerRadius: val }, _bounds: null, _worldTransform: null }
+                : o
+            ),
+          };
+          onSceneCommit(newScene);
+        },
+      }),
     ),
 
     productionMode && React.createElement('div', { style: { marginTop: 8 } },
