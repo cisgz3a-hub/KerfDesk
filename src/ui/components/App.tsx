@@ -1061,11 +1061,11 @@ export function App() {
       // Don't intercept when user is typing in an input field
       const tag = (e.target as HTMLElement)?.tagName?.toLowerCase();
       if (tag === 'input' || tag === 'textarea' || tag === 'select') {
-        // Only allow Escape and Enter to pass through to shortcuts
-        if (e.key !== 'Escape' && e.key !== 'Enter') return;
+        if (e.key !== 'Escape') return;
       }
-      // Also check contentEditable
-      if ((e.target as HTMLElement)?.isContentEditable) return;
+      if ((e.target as HTMLElement)?.isContentEditable) {
+        if (e.key !== 'Escape') return;
+      }
 
       const isMod = e.ctrlKey || e.metaKey;
 
