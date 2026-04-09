@@ -478,7 +478,6 @@ export function FileToolbar({
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap' as const,
-        flexShrink: 0,
       },
     }, projectName || 'Untitled'),
     React.createElement('button', {
