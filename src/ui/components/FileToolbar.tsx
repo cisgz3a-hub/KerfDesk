@@ -40,6 +40,7 @@ interface FileToolbarProps {
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
   onTemplates?: () => void;
+  onBoxGenerator?: () => void;
   onPreviewToggle?: () => void;
   previewMode?: boolean;
   onUndo?: () => void;
@@ -65,6 +66,7 @@ export function FileToolbar({
   onMaterialTest,
   onMaterialSetup,
   onTemplates,
+  onBoxGenerator,
   onPreviewToggle,
   previewMode = false,
   onUndo,
@@ -554,6 +556,12 @@ export function FileToolbar({
       title: 'Browse starter designs — keychains, signs, coasters, and more',
       ...stdHover,
     }, 'Templates'),
+    React.createElement('button', {
+      onClick: () => onBoxGenerator?.(),
+      style: btnStyle,
+      title: 'Generate a parametric laser-cut box with finger joints',
+      ...stdHover,
+    }, 'Box'),
     React.createElement('button', { onClick: () => onMaterialSetup?.(), style: btnStyle, title: 'Set material type and size', ...stdHover }, 'Material'),
     React.createElement('button', { onClick: () => onMaterialTest?.(), style: btnStyle, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
 

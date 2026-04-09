@@ -53,6 +53,7 @@ import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
+import { BoxGenerator } from './BoxGenerator';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Template } from '../../templates/TemplateLibrary';
@@ -184,6 +185,7 @@ export function App() {
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [showMaterialDialog, setShowMaterialDialog] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [showBoxGenerator, setShowBoxGenerator] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -980,6 +982,34 @@ export function App() {
     }
   }, [scene, handleSceneCommit]);
 
+  const handleBoxGenerate = useCallback((svg: string, name: string) => {
+    setShowBoxGenerator(false);
+    try {
+      const layerId = scene.activeLayerId || scene.layers[0]?.id;
+      if (!layerId) return;
+      const newScene = importSvgIntoScene(svg, scene, layerId, {
+        mode: 'fit',
+        allowScaleUp: false,
+        targetBounds: scene.material
+          ? {
+            minX: scene.material.x,
+            minY: scene.material.y,
+            maxX: scene.material.x + scene.material.width,
+            maxY: scene.material.y + scene.material.height,
+          }
+          : {
+            minX: 0,
+            minY: 0,
+            maxX: scene.canvas.width,
+            maxY: scene.canvas.height,
+          },
+      });
+      handleSceneCommit({ ...newScene, metadata: { ...newScene.metadata, name } });
+    } catch (e) {
+      alert('Box generation failed: ' + (e as Error).message);
+    }
+  }, [scene, handleSceneCommit]);
+
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
   useEffect(() => {
@@ -1217,6 +1247,7 @@ export function App() {
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => setShowMaterialDialog(true),
       onTemplates: () => setShowTemplates(true),
+      onBoxGenerator: () => setShowBoxGenerator(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
       onUndo: handleUndo,
@@ -1533,6 +1564,11 @@ export function App() {
     showTemplates && React.createElement(TemplateBrowser, {
       onSelect: handleTemplateSelect,
       onClose: () => setShowTemplates(false),
+    }),
+
+    showBoxGenerator && React.createElement(BoxGenerator, {
+      onGenerate: handleBoxGenerate,
+      onClose: () => setShowBoxGenerator(false),
     }),
 
     showWizard && React.createElement(WelcomeWizard, {
