@@ -242,26 +242,115 @@ function planPath(
     }
   }
 
-  // 3. Linear moves along path
+  // 3. Linear moves along path (with optional tabs on closed paths)
+  type PathSeg = { fromX: number; fromY: number; toX: number; toY: number; len: number };
+  const segments: PathSeg[] = [];
+  let totalLength = 0;
   for (let i = 1; i < indices.length; i++) {
-    const idx = indices[i];
-    moves.push({
-      type: 'linear',
-      to: { x: coords[idx * 2], y: coords[idx * 2 + 1] },
-      power,
-      speed,
-    });
+    const prevIdx = indices[i - 1];
+    const currIdx = indices[i];
+    const fromX = coords[prevIdx * 2];
+    const fromY = coords[prevIdx * 2 + 1];
+    const toX = coords[currIdx * 2];
+    const toY = coords[currIdx * 2 + 1];
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segments.push({ fromX, fromY, toX, toY, len });
+    totalLength += len;
+  }
+  if (path.closed && n > 2) {
+    const lastIdx = indices[indices.length - 1];
+    const firstIdx = indices[0];
+    const fromX = coords[lastIdx * 2];
+    const fromY = coords[lastIdx * 2 + 1];
+    const toX = coords[firstIdx * 2];
+    const toY = coords[firstIdx * 2 + 1];
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    segments.push({ fromX, fromY, toX, toY, len });
+    totalLength += len;
   }
 
-  // 4. Close path — return to start point if path is closed
-  if (path.closed && n > 2) {
-    const closeIdx = indices[0];
-    moves.push({
-      type: 'linear',
-      to: { x: coords[closeIdx * 2], y: coords[closeIdx * 2 + 1] },
-      power,
-      speed,
-    });
+  const tabPositions: Array<{ startDist: number; endDist: number }> = [];
+  if (path.closed && settings.tabCount > 0 && settings.tabWidth > 0 && totalLength > 0) {
+    const spacing = totalLength / settings.tabCount;
+    for (let t = 0; t < settings.tabCount; t++) {
+      const center = spacing * (t + 0.5);
+      const halfTab = settings.tabWidth / 2;
+      tabPositions.push({
+        startDist: Math.max(0, center - halfTab),
+        endDist: Math.min(totalLength, center + halfTab),
+      });
+    }
+  }
+
+  function isInTab(dist: number): boolean {
+    for (const tab of tabPositions) {
+      if (dist >= tab.startDist && dist <= tab.endDist) return true;
+    }
+    return false;
+  }
+
+  if (tabPositions.length === 0) {
+    for (const seg of segments) {
+      moves.push({
+        type: 'linear',
+        to: { x: seg.toX, y: seg.toY },
+        power,
+        speed,
+      });
+    }
+  } else {
+    let laserIsOn = true;
+    let cumulativeDist = 0;
+    for (const seg of segments) {
+      const { fromX, fromY, toX, toY, len: segLen } = seg;
+      const segStart = cumulativeDist;
+      if (segLen < 1e-12) {
+        cumulativeDist += segLen;
+        continue;
+      }
+      const critical: number[] = [segStart, segStart + segLen];
+      for (const tab of tabPositions) {
+        if (tab.startDist > segStart && tab.startDist < segStart + segLen) critical.push(tab.startDist);
+        if (tab.endDist > segStart && tab.endDist < segStart + segLen) critical.push(tab.endDist);
+      }
+      critical.sort((a, b) => a - b);
+      const uniq: number[] = [];
+      for (const c of critical) {
+        if (uniq.length === 0 || Math.abs(c - uniq[uniq.length - 1]) > 1e-9) uniq.push(c);
+      }
+      for (let k = 0; k < uniq.length - 1; k++) {
+        const d0 = uniq[k];
+        const d1 = uniq[k + 1];
+        if (d1 - d0 < 1e-9) continue;
+        const mid = (d0 + d1) / 2;
+        const t1 = (d1 - segStart) / segLen;
+        const px = fromX + (toX - fromX) * t1;
+        const py = fromY + (toY - fromY) * t1;
+        const inTab = isInTab(mid);
+        if (inTab) {
+          if (laserIsOn) {
+            moves.push({ type: 'laserOff' });
+            laserIsOn = false;
+          }
+          moves.push({ type: 'rapid', to: { x: px, y: py } });
+        } else {
+          if (!laserIsOn) {
+            moves.push({ type: 'laserOn', power });
+            laserIsOn = true;
+          }
+          moves.push({ type: 'linear', to: { x: px, y: py }, power, speed });
+        }
+      }
+      cumulativeDist += segLen;
+    }
+
+    if (!laserIsOn && (path.closed || settings.overcut > 0)) {
+      moves.push({ type: 'laserOn', power });
+    }
   }
 
   // Overcut — continue past the start point on closed paths
