@@ -276,14 +276,18 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             },
           }),
           React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-            React.createElement('div', {
+            // Layer name — dimmed when output is off
+            React.createElement('span', {
               style: {
-                fontSize: theme.font.size.sm,
-                color: theme.text.primary,
-                fontWeight: 500,
-                whiteSpace: 'nowrap' as const,
+                color: layer.output ? '#e0e0ec' : '#555570',
+                textDecoration: layer.output ? 'none' : 'line-through',
+                fontSize: 12,
+                flex: 1,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap' as const,
+                fontWeight: 500,
+                display: 'block',
               },
             }, layer.name),
             React.createElement('div', {
@@ -298,6 +302,23 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             },
             title: layer.visible ? 'Hide layer' : 'Show layer',
           }, layer.visible ? '👁' : '·'),
+          // Output toggle — controls whether this layer is included in G-code
+          React.createElement('button', {
+            onClick: (e: React.MouseEvent) => {
+              e.stopPropagation();
+              const newLayers = scene.layers.map(l =>
+                l.id === layer.id ? { ...l, output: !l.output } : l
+              );
+              onSceneCommit({ ...scene, layers: newLayers });
+            },
+            title: layer.output ? 'Layer included in output — click to exclude' : 'Layer excluded from output — click to include',
+            style: {
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 12, padding: '0 2px',
+              color: layer.output ? '#2dd4a0' : '#333355',
+              opacity: layer.output ? 0.8 : 0.4,
+            },
+          }, layer.output ? '⚡' : '○'),
           React.createElement('button', {
             style: {
               background: 'none',
@@ -319,6 +340,16 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
     ),
     activeLayer && React.createElement('div', { style: settingsStyle },
       React.createElement('div', { style: layerSettingsHeaderStyle }, 'Layer Settings'),
+      // Output disabled notice
+      !activeLayer.output && React.createElement('div', {
+        style: {
+          padding: '8px 12px', margin: '4px 0',
+          background: 'rgba(255,170,50,0.06)',
+          border: '1px solid rgba(255,170,50,0.15)',
+          borderRadius: 6, fontSize: 10, color: '#ffaa32',
+          textAlign: 'center' as const,
+        },
+      }, 'This layer is visible but excluded from output'),
       React.createElement('label', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
         React.createElement('select', {
