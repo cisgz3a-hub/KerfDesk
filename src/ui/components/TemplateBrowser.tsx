@@ -109,16 +109,15 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                 // SVG Preview
                 React.createElement('div', {
                   style: {
-                    height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: '#08080f', padding: 16,
-                    borderRadius: '10px 10px 0 0',
+                    height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: '#08080f', padding: 12, borderRadius: '10px 10px 0 0',
                   },
                   dangerouslySetInnerHTML: {
                     __html: t.svg.replace(/stroke="red"/g, 'stroke="#ff4466"')
                       .replace(/stroke="blue"/g, 'stroke="#4488ff"')
                       .replace(/stroke="green"/g, 'stroke="#44cc66"')
                       .replace(/fill="blue"/g, 'fill="#4488ff"')
-                      .replace(/fill="none"/g, 'fill="none"'),
+                      .replace(/<svg /, '<svg style="max-width:100%;max-height:66px;width:auto;height:auto;" '),
                   },
                 }),
                 // Info
