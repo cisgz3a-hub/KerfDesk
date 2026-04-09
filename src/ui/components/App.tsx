@@ -53,6 +53,8 @@ import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
+import { LearnedToast } from './LearnedToast';
+import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Template } from '../../templates/TemplateLibrary';
 
 /** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
@@ -222,6 +224,7 @@ export function App() {
     } catch { /* ignore */ }
     return false;
   });
+  const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -302,6 +305,25 @@ export function App() {
     }, 30000);
     return () => clearInterval(timer);
   }, [scene]);
+
+  useEffect(() => {
+    const materialName = scene.material?.name;
+    const machineType = scene.machine?.type || 'diode';
+    const activeLayer = scene.layers.find(l => l.id === scene.activeLayerId);
+
+    if (!materialName || !activeLayer) {
+      setToastSuggestion(null);
+      return;
+    }
+
+    const suggestion = getSuggestion(materialName, machineType, activeLayer.settings.mode);
+
+    if (suggestion && suggestion.sampleCount > 0) {
+      setToastSuggestion({ suggestion, materialName });
+    } else {
+      setToastSuggestion(null);
+    }
+  }, [scene.material?.name, scene.activeLayerId]); // eslint-disable-line react-hooks/exhaustive-deps -- material/layer identity only
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
     setShowWizard(false);
@@ -1543,6 +1565,30 @@ export function App() {
       onDelete: handleQuickActionDelete,
       onCenter: handleQuickActionCenter,
       onGridArray: handleGridArray,
+    }),
+
+    toastSuggestion && React.createElement(LearnedToast, {
+      suggestion: toastSuggestion.suggestion,
+      materialName: toastSuggestion.materialName,
+      onApply: (power, speed, passes) => {
+        const activeLayer = scene.layers.find(l => l.id === scene.activeLayerId);
+        if (!activeLayer) return;
+        const newLayers = scene.layers.map(l =>
+          l.id === activeLayer.id
+            ? {
+                ...l,
+                settings: {
+                  ...l.settings,
+                  power: { ...l.settings.power, max: power },
+                  speed,
+                  passes,
+                },
+              }
+            : l
+        );
+        handleSceneCommit({ ...scene, layers: newLayers });
+      },
+      onDismiss: () => setToastSuggestion(null),
     }),
   );
 }
