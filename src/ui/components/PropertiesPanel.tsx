@@ -15,9 +15,10 @@ interface PropertiesPanelProps {
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string) => Promise<void>;
   handleTextToPath: () => void;
+  productionMode?: boolean;
 }
 
-export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath }: PropertiesPanelProps) {
+export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: PropertiesPanelProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
   const [txDraft, setTxDraft] = useState<string | undefined>(undefined);
@@ -382,7 +383,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       ),
     ),
 
-    React.createElement('div', { style: { marginTop: 8 } },
+    productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
       React.createElement('input', {
         type: 'number',

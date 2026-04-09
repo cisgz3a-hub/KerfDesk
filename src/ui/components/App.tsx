@@ -209,15 +209,13 @@ export function App() {
       return false;
     }
   });
-  const toggleProductionMode = useCallback(() => {
-    setProductionMode(prev => {
-      const next = !prev;
-      try {
-        localStorage.setItem('laserforge_production_mode', String(next));
-      } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
+  const handleToggleProductionMode = useCallback(() => {
+    const newMode = !productionMode;
+    setProductionMode(newMode);
+    try {
+      localStorage.setItem('laserforge_production_mode', String(newMode));
+    } catch { /* ignore */ }
+  }, [productionMode]);
   const [showWizard, setShowWizard] = useState(() => {
     try {
       return !localStorage.getItem(getSetupStorageKey());
@@ -1337,7 +1335,7 @@ export function App() {
       projectName: scene.metadata?.name,
       onShowShortcuts: () => setShowShortcuts(true),
       productionMode,
-      onToggleProductionMode: toggleProductionMode,
+      onToggleProductionMode: handleToggleProductionMode,
       onToolpathPreview: async () => {
         try {
           const gc = compileGcode(scene);
@@ -1449,6 +1447,7 @@ export function App() {
             onSelectionChange: setSelectedIds,
             showAlert,
             handleTextToPath: () => void handleTextToPath(),
+            productionMode,
           }),
         ),
       ),
@@ -1474,6 +1473,12 @@ export function App() {
           style: { fontSize: '9px', color: '#333355', fontFamily: "'JetBrains Mono', monospace" },
         }, 'v0.1.0'),
         React.createElement('span', {}, scene.metadata.name || 'Untitled'),
+        React.createElement('span', {
+          style: {
+            fontSize: 9, color: productionMode ? '#ffaa32' : '#2dd4a0',
+            marginLeft: 8, opacity: 0.6,
+          },
+        }, productionMode ? 'Production Mode' : 'Beginner Mode'),
       ),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
         textPlacementHint && React.createElement('span', {

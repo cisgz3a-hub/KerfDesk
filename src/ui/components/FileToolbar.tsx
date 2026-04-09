@@ -583,17 +583,17 @@ export function FileToolbar({
     React.createElement('button', {
       onClick: () => onToggleProductionMode?.(),
       title: productionMode
-        ? 'Production Mode: all controls visible. Click for Beginner Mode.'
-        : 'Beginner Mode: simplified controls. Click for Production Mode.',
+        ? 'Switch to Beginner Mode — simpler controls'
+        : 'Switch to Production Mode — full control',
       style: {
         padding: '4px 10px',
-        background: productionMode ? 'rgba(155, 109, 255, 0.1)' : 'rgba(45, 212, 160, 0.1)',
-        border: `1px solid ${productionMode ? 'rgba(155, 109, 255, 0.3)' : 'rgba(45, 212, 160, 0.3)'}`,
-        borderRadius: 6,
-        color: productionMode ? '#9b6dff' : '#2dd4a0',
         fontSize: 10,
         fontWeight: 600,
         cursor: 'pointer',
+        background: productionMode ? 'rgba(255, 170, 50, 0.1)' : 'rgba(45, 212, 160, 0.1)',
+        border: productionMode ? '1px solid rgba(255, 170, 50, 0.3)' : '1px solid rgba(45, 212, 160, 0.3)',
+        borderRadius: 4,
+        color: productionMode ? '#ffaa32' : '#2dd4a0',
         fontFamily: "'DM Sans', system-ui, sans-serif",
         whiteSpace: 'nowrap' as const,
       },

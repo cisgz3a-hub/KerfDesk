@@ -690,7 +690,7 @@ export function ConnectionPanel({
             color: machineState?.status === 'idle' ? '#2dd4a0' : machineState?.status === 'run' ? '#00d4ff' : machineState?.status === 'alarm' ? '#ff4466' : '#ffd444',
           } }, (machineState?.status || 'IDLE').toUpperCase()),
         ),
-        React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
+        productionMode && React.createElement('div', { style: { background: '#0a0a14', borderRadius: 6, padding: '8px 12px', border: '1px solid #1a1a2e' } },
           React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'BUFFER'),
           React.createElement('div', { style: { fontFamily: mono, fontSize: 14, color: '#8888aa' } },
             `${jobProgress?.bufferFill || 0}/127`
@@ -904,7 +904,7 @@ export function ConnectionPanel({
           : 'Waiting for connection...',
       ),
 
-      React.createElement('div', { style: { padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+      productionMode && React.createElement('div', { style: { padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
         React.createElement('button', {
           onClick: () => setShowLogHistory(!showLogHistory),
           style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
@@ -915,7 +915,7 @@ export function ConnectionPanel({
         }, 'Clear'),
       ),
 
-      showLogHistory && React.createElement('div', {
+      productionMode && showLogHistory && React.createElement('div', {
         style: { padding: '0 18px 12px', maxHeight: 200, overflowY: 'auto' as const },
       },
         ...getJobLogs().map(log =>
