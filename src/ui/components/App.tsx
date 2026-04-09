@@ -21,22 +21,21 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
-import { compileJob } from '../../core/job/JobCompiler';
-import { optimizePlan } from '../../core/plan/PlanOptimizer';
-import { getOutputStrategy } from '../../core/output/Output';
-import '../../core/output/GrblStrategy';
-import { deleteObjects, duplicateObjects } from '../../core/scene/SceneOps';
+import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { FileToolbar } from './FileToolbar';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
-import { storeImage } from '../../io/ImageStore';
+import { useClipboard } from '../hooks/useClipboard';
+import { useImport } from '../hooks/useImport';
+import { useGcodeExport } from '../hooks/useGcodeExport';
+import { useContextMenu } from '../hooks/useContextMenu';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
 import { ToolBar, type ToolType } from './ToolBar';
-import { ContextMenu, type MenuItem } from './ContextMenu';
+import { ContextMenu } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
 import { MaterialTestDialog, type MaterialTestConfig } from './MaterialTestDialog';
 import { GcodePreview } from './GcodePreview';
@@ -50,7 +49,7 @@ import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { textToPath } from '../../geometry/TextToPath';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { createLayer } from '../../core/scene/Layer';
-import { type SceneObject, type ImageGeometry, type TextGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
@@ -198,9 +197,7 @@ export function App() {
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
   const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number } | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
-  const [clipboard, setClipboard] = useState<typeof scene.objects>([]);
   const [showGridArray, setShowGridArray] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
@@ -213,7 +210,6 @@ export function App() {
   const [previewMode, setPreviewMode] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showConnection, setShowConnection] = useState(false);
-  const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [machineState, setMachineState] = useState<MachineState | null>(null);
   const [jobProgress, setJobProgress] = useState<JobProgress | null>(null);
   const grblControllerRef = useRef<GrblController | null>(null);
@@ -369,6 +365,19 @@ export function App() {
     setScene(newScene);
   }, []);
 
+  const { currentGcode, setCurrentGcode, compileGcode } = useGcodeExport();
+  const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
+    scene,
+    selectedIds,
+    handleSceneCommit,
+    (ids) => setSelectedIds(ids),
+  );
+  const { handleDragOver, handleDragLeave, handleDrop } = useImport(scene, {
+    handleSceneCommit,
+    handleNewProject,
+    setIsDragOver,
+  });
+
   const handleRecover = useCallback(() => {
     try {
       const saved = localStorage.getItem('laserforge_autosave');
@@ -489,52 +498,46 @@ export function App() {
     setSelectedIds(new Set());
   }, [scene, selectedIds]);
 
-  const handleDuplicate = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    const newScene = duplicateObjects(scene, selectedIds, 10, 10);
-    historyRef.current.push(newScene);
-    setScene(newScene);
-    setSelectedIds(new Set(newScene.selection));
-  }, [scene, selectedIds]);
+  const contextMenuActions = useMemo(
+    () => ({
+      handleSceneCommit,
+      setSelectedIds: (ids: Set<string>) => setSelectedIds(ids),
+      setActiveTool: (t: string) => setActiveTool(t as ToolType),
+      handleCopy,
+      handlePaste,
+      handleDuplicate,
+      handleDelete,
+      setShowTextDialog,
+      setEditingTextId,
+      setTextInput,
+      setTextFont,
+      setTextSize,
+      setTextBold,
+      setTextItalic,
+      setTextPlacementPt,
+      setShowVariableText,
+      setVariableTextSource,
+    }),
+    [
+      handleSceneCommit,
+      handleCopy,
+      handlePaste,
+      handleDuplicate,
+      handleDelete,
+      setShowTextDialog,
+      setEditingTextId,
+      setTextInput,
+      setTextFont,
+      setTextSize,
+      setTextBold,
+      setTextItalic,
+      setTextPlacementPt,
+      setShowVariableText,
+      setVariableTextSource,
+    ],
+  );
 
-  const handleCopy = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    setClipboard(scene.objects.filter(o => selectedIds.has(o.id)));
-  }, [scene, selectedIds]);
-
-  const handlePaste = useCallback(() => {
-    if (clipboard.length === 0) return;
-    const newIds = new Set<string>();
-    const parentIdMap = new Map<string, string>();
-
-    const pasted = clipboard.map(obj => {
-      const newId = generateId();
-      newIds.add(newId);
-
-      let newParentId = obj.parentId;
-      if (obj.parentId) {
-        if (!parentIdMap.has(obj.parentId)) {
-          parentIdMap.set(obj.parentId, generateId());
-        }
-        newParentId = parentIdMap.get(obj.parentId)!;
-      }
-
-      return {
-        ...obj,
-        id: newId,
-        parentId: newParentId,
-        name: obj.name,
-        powerScale: obj.powerScale ?? 1,
-        transform: { ...obj.transform, tx: obj.transform.tx + 10, ty: obj.transform.ty + 10 },
-        _bounds: null,
-        _worldTransform: null,
-      };
-    });
-    const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
-    handleSceneCommit(newScene);
-    setSelectedIds(newIds);
-    setClipboard(pasted);
-  }, [clipboard, scene, handleSceneCommit]);
+  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(scene, selectedIds, contextMenuActions);
 
   const handleKeyboardSave = useCallback(async () => {
     try {
@@ -621,213 +624,18 @@ export function App() {
     handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
   }, [scene, selectedIds, handleSceneCommit]);
 
-  const handleContextMenu = useCallback((e: MouseEvent) => {
-    e.preventDefault();
-    setContextMenu({ x: e.clientX, y: e.clientY });
-  }, []);
+  const handleContextMenu = useCallback(
+    (e: MouseEvent) => {
+      e.preventDefault();
+      showContextMenu(e.clientX, e.clientY);
+    },
+    [showContextMenu],
+  );
 
   useEffect(() => {
     window.addEventListener('contextmenu', handleContextMenu);
     return () => window.removeEventListener('contextmenu', handleContextMenu);
   }, [handleContextMenu]);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback(async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragOver(false);
-
-    const file = e.dataTransfer.files[0];
-    if (!file) return;
-
-    const name = file.name.toLowerCase();
-    const text = name.endsWith('.svg') || name.endsWith('.dxf') || name.endsWith('.json')
-      ? await file.text()
-      : null;
-
-    try {
-      if (name.endsWith('.laserforge.json') || (name.endsWith('.json') && text)) {
-        // Open project file
-        const loaded = deserializeScene(text!);
-        handleNewProject(loaded);
-      } else if (name.endsWith('.svg') && text) {
-        // Import SVG
-        const layerId = scene.activeLayerId || scene.layers[0]?.id;
-        if (!layerId) return;
-        const updated = importSvgIntoScene(text, scene, layerId, {
-          mode: 'fit',
-          allowScaleUp: false,
-          targetBounds: scene.material
-            ? {
-              minX: scene.material.x,
-              minY: scene.material.y,
-              maxX: scene.material.x + scene.material.width,
-              maxY: scene.material.y + scene.material.height,
-            }
-            : {
-              minX: 0,
-              minY: 0,
-              maxX: scene.canvas.width,
-              maxY: scene.canvas.height,
-            },
-        });
-        handleSceneCommit(updated);
-      } else if (name.endsWith('.dxf') && text) {
-        // Import DXF (layers from DXF file)
-        const updated = importDxfIntoScene(text, scene);
-        handleSceneCommit(updated);
-      } else if (file.type.startsWith('image/')) {
-        // Import image — preserve active layer (do not switch to image layer)
-        const previousActiveLayerId = scene.activeLayerId;
-        const dataUri = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(file);
-        });
-
-        const img = new Image();
-        await new Promise<void>((resolve, reject) => {
-          img.onload = () => resolve();
-          img.onerror = () => reject(new Error('Failed to decode image'));
-          img.src = dataUri;
-        });
-
-        let imageSrc = dataUri;
-        if (dataUri.length > 100000) {
-          try {
-            const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
-            imageSrc = `indexeddb://${imageId}`;
-          } catch {
-            imageSrc = dataUri;
-          }
-        }
-
-        const dpi = 96;
-        const physicalWidth = (img.width / dpi) * 25.4;
-        const physicalHeight = (img.height / dpi) * 25.4;
-
-        const maxW = scene.canvas.width * 0.8;
-        const maxH = scene.canvas.height * 0.8;
-        let fitScale = 1;
-        if (physicalWidth > maxW || physicalHeight > maxH) {
-          fitScale = Math.min(maxW / physicalWidth, maxH / physicalHeight);
-        }
-        const finalWidth = physicalWidth * fitScale;
-        const finalHeight = physicalHeight * fitScale;
-        const centerX = scene.material
-          ? scene.material.x + scene.material.width / 2
-          : scene.canvas.width / 2;
-        const centerY = scene.material
-          ? scene.material.y + scene.material.height / 2
-          : scene.canvas.height / 2;
-        const cx = centerX - finalWidth / 2;
-        const cy = centerY - finalHeight / 2;
-
-        // Grayscale conversion
-        const maxDim = 1000;
-        const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-        const gsWidth = Math.round(img.width * scale);
-        const gsHeight = Math.round(img.height * scale);
-        const offscreen = document.createElement('canvas');
-        offscreen.width = gsWidth;
-        offscreen.height = gsHeight;
-        const offCtx = offscreen.getContext('2d')!;
-        offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
-        const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
-        const grayscaleData = new Uint8Array(gsWidth * gsHeight);
-        for (let i = 0; i < grayscaleData.length; i++) {
-          const r = imageData.data[i * 4];
-          const g = imageData.data[i * 4 + 1];
-          const b = imageData.data[i * 4 + 2];
-          const a = imageData.data[i * 4 + 3];
-          const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-          grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
-        }
-
-        // Find or create image layer
-        let targetScene = scene;
-        let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
-        if (!layerId) {
-          const newLayer = createLayer(scene.layers.length, 'image', 'Image');
-          targetScene = {
-            ...scene,
-            layers: [...scene.layers, newLayer],
-          };
-          layerId = newLayer.id;
-        }
-
-        const imageObj: SceneObject = {
-          id: generateId(),
-          type: 'image',
-          name: file.name.replace(/\.[^.]+$/, ''),
-          layerId,
-          parentId: null,
-          transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
-          geometry: {
-            type: 'image',
-            src: imageSrc,
-            originalWidth: img.width,
-            originalHeight: img.height,
-            cropX: 0,
-            cropY: 0,
-            cropWidth: img.width,
-            cropHeight: img.height,
-            grayscaleData,
-            grayscaleWidth: gsWidth,
-            grayscaleHeight: gsHeight,
-          } as ImageGeometry,
-          visible: true,
-          locked: false,
-          powerScale: 1,
-          _bounds: null,
-          _worldTransform: null,
-        };
-
-        const newScene = {
-          ...targetScene,
-          objects: [...targetScene.objects, imageObj],
-        };
-        const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
-        const priorStillValid =
-          previousActiveLayerId != null &&
-          newScene.layers.some(l => l.id === previousActiveLayerId);
-        newScene.activeLayerId = priorStillValid
-          ? previousActiveLayerId
-          : (cutLayer?.id ?? newScene.layers[0].id);
-        handleSceneCommit(newScene);
-      }
-    } catch (err) {
-      console.error('Drop import failed:', err);
-    }
-  }, [scene, handleSceneCommit, handleNewProject]);
-
-  /** Compile scene to G-code string. Returns null on failure. */
-  const compileGcode = useCallback((targetScene: Scene): string | null => {
-    try {
-      const job = compileJob(targetScene);
-      if (job.operations.length === 0) return null;
-      const plan = optimizePlan(job);
-      const strategy = getOutputStrategy('grbl');
-      if (!strategy) return null;
-      const output = strategy.generate(plan, job);
-      return output.text ?? null;
-    } catch (err) {
-      console.error('G-code compilation failed:', err);
-      return null;
-    }
-  }, []);
 
   const handleConnect = useCallback(async () => {
     try {
@@ -1028,6 +836,20 @@ export function App() {
     handleSceneCommit(newScene);
     setSelectedIds(new Set(newObjects.map(o => o.id)));
   }, [scene, selectedIds, handleSceneCommit, showAlert]);
+
+  useEffect(() => {
+    const onBoolean = (e: Event) => {
+      const op = (e as CustomEvent<{ op: BooleanOp }>).detail?.op;
+      if (op) void handleBooleanOp(op);
+    };
+    const onTextToPath = () => void handleTextToPath();
+    window.addEventListener('laserforge:boolean', onBoolean as EventListener);
+    window.addEventListener('laserforge:textToPath', onTextToPath);
+    return () => {
+      window.removeEventListener('laserforge:boolean', onBoolean as EventListener);
+      window.removeEventListener('laserforge:textToPath', onTextToPath);
+    };
+  }, [handleBooleanOp, handleTextToPath]);
 
   const handleOffset = useCallback(async (distance: number) => {
     if (selectedIds.size === 0) return;
@@ -1564,88 +1386,8 @@ export function App() {
     contextMenu && React.createElement(ContextMenu, {
       x: contextMenu.x,
       y: contextMenu.y,
-      onClose: () => setContextMenu(null),
-      items: [
-        { label: 'Select All          Ctrl+A', action: handleSelectAll },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: 'Duplicate           Ctrl+D', action: handleDuplicate, disabled: selectedIds.size === 0 },
-        { label: 'Delete              Del', action: handleDelete, disabled: selectedIds.size === 0 },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: `${scene.material ? 'Center on Material' : 'Center on Bed'}    Ctrl+Shift+C`, action: () => {
-          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
-        }, disabled: selectedIds.size === 0 },
-        { label: scene.material?.enabled ? 'Align to Material Left' : 'Align Left', action: () => {
-          handleSceneCommit(alignSelection(scene, selectedIds, 'left'));
-        }, disabled: selectedIds.size === 0 },
-        { label: scene.material?.enabled ? 'Align to Material Right' : 'Align Right', action: () => {
-          handleSceneCommit(alignSelection(scene, selectedIds, 'right'));
-        }, disabled: selectedIds.size === 0 },
-        { label: scene.material?.enabled ? 'Align to Material Top' : 'Align Top', action: () => {
-          handleSceneCommit(alignSelection(scene, selectedIds, 'top'));
-        }, disabled: selectedIds.size === 0 },
-        { label: scene.material?.enabled ? 'Align to Material Bottom' : 'Align Bottom', action: () => {
-          handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
-        }, disabled: selectedIds.size === 0 },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: '⌂ Home: top-left of material', action: () => {
-          const mat = scene.material?.enabled ? scene.material : null;
-          const x = mat ? mat.x : 0;
-          const y = mat ? mat.y : 0;
-          handleSceneCommit({ ...scene, startPosition: { x, y } });
-        }, disabled: false },
-        { label: '⌂ Home: center of material', action: () => {
-          const mat = scene.material?.enabled ? scene.material : null;
-          const x = mat ? mat.x + mat.width / 2 : scene.canvas.width / 2;
-          const y = mat ? mat.y + mat.height / 2 : scene.canvas.height / 2;
-          handleSceneCommit({ ...scene, startPosition: { x, y } });
-        }, disabled: false },
-        { label: '⌂ Home: machine origin (0,0)', action: () => {
-          handleSceneCommit({ ...scene, startPosition: { x: 0, y: 0 } });
-        }, disabled: false },
-        { label: 'Grid Array...', action: handleGridArray, disabled: selectedIds.size === 0 },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: 'Boolean Union', action: () => void handleBooleanOp('union'), disabled: selectedIds.size !== 2 },
-        { label: 'Boolean Subtract', action: () => void handleBooleanOp('subtract'), disabled: selectedIds.size !== 2 },
-        { label: 'Boolean Intersect', action: () => void handleBooleanOp('intersect'), disabled: selectedIds.size !== 2 },
-        { label: 'Text to Path', action: () => void handleTextToPath(), disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text') },
-        {
-          label: 'Variable Text / Serial Numbers',
-          action: () => {
-            const textObj = scene.objects.find(o => selectedIds.has(o.id) && o.geometry.type === 'text');
-            if (textObj) {
-              setVariableTextSource(textObj);
-              setShowVariableText(true);
-            }
-          },
-          disabled: !scene.objects.some(o => selectedIds.has(o.id) && o.geometry.type === 'text'),
-        },
-        { label: 'separator', action: () => {}, separator: true },
-        { label: 'Offset Outset (+1mm)', action: () => void handleOffset(1), disabled: selectedIds.size === 0 },
-        { label: 'Offset Outset (+2mm)', action: () => void handleOffset(2), disabled: selectedIds.size === 0 },
-        { label: 'Offset Inset (-1mm)', action: () => void handleOffset(-1), disabled: selectedIds.size === 0 },
-        { label: 'Offset Inset (-2mm)', action: () => void handleOffset(-2), disabled: selectedIds.size === 0 },
-        { label: 'Offset Custom...', action: async () => {
-          const input = await showPrompt('Offset', 'Enter offset distance in mm (positive = outset, negative = inset):', '1');
-          if (input == null || input === '') return;
-          const dist = parseFloat(input);
-          if (Number.isNaN(dist) || dist === 0) return;
-          void handleOffset(dist);
-        }, disabled: selectedIds.size === 0 },
-        { label: 'Material Test...', action: () => setShowMaterialTest(true), disabled: false },
-        ...scene.layers.map(l => ({
-          label: `Move to: ${l.name}`,
-          disabled: selectedIds.size === 0,
-          action: () => {
-            const newScene = {
-              ...scene,
-              objects: scene.objects.map(o =>
-                selectedIds.has(o.id) ? { ...o, layerId: l.id } : o
-              ),
-            };
-            handleSceneCommit(newScene);
-          },
-        })),
-      ] as MenuItem[],
+      onClose: hideContextMenu,
+      items: contextMenu.items,
     }),
 
     showGridArray && React.createElement(GridArrayDialog, {

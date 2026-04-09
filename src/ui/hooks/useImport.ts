@@ -1,0 +1,200 @@
+import { useCallback, type DragEvent } from 'react';
+import { type Scene } from '../../core/scene/Scene';
+import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
+import { importSvgIntoScene } from '../../import/svg/SvgToScene';
+import { importDxfIntoScene } from '../../import/dxf';
+import { deserializeScene } from '../../io/SceneSerializer';
+import { storeImage } from '../../io/ImageStore';
+import { generateId } from '../../core/types';
+import { createLayer } from '../../core/scene/Layer';
+
+export interface UseImportDeps {
+  handleSceneCommit: (scene: Scene) => void;
+  handleNewProject: (scene: Scene) => void;
+  setIsDragOver: (v: boolean) => void;
+}
+
+export function useImport(scene: Scene, deps: UseImportDeps) {
+  const { handleSceneCommit, handleNewProject, setIsDragOver } = deps;
+
+  const handleDragOver = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(true);
+  }, [setIsDragOver]);
+
+  const handleDragLeave = useCallback((e: DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  }, [setIsDragOver]);
+
+  const handleDrop = useCallback(
+    async (e: DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+
+      const file = e.dataTransfer.files[0];
+      if (!file) return;
+
+      const name = file.name.toLowerCase();
+      const text = name.endsWith('.svg') || name.endsWith('.dxf') || name.endsWith('.json')
+        ? await file.text()
+        : null;
+
+      try {
+        if (name.endsWith('.laserforge.json') || (name.endsWith('.json') && text)) {
+          const loaded = deserializeScene(text!);
+          handleNewProject(loaded);
+        } else if (name.endsWith('.svg') && text) {
+          const layerId = scene.activeLayerId || scene.layers[0]?.id;
+          if (!layerId) return;
+          const updated = importSvgIntoScene(text, scene, layerId, {
+            mode: 'fit',
+            allowScaleUp: false,
+            targetBounds: scene.material
+              ? {
+                  minX: scene.material.x,
+                  minY: scene.material.y,
+                  maxX: scene.material.x + scene.material.width,
+                  maxY: scene.material.y + scene.material.height,
+                }
+              : {
+                  minX: 0,
+                  minY: 0,
+                  maxX: scene.canvas.width,
+                  maxY: scene.canvas.height,
+                },
+          });
+          handleSceneCommit(updated);
+        } else if (name.endsWith('.dxf') && text) {
+          const updated = importDxfIntoScene(text, scene);
+          handleSceneCommit(updated);
+        } else if (file.type.startsWith('image/')) {
+          const previousActiveLayerId = scene.activeLayerId;
+          const dataUri = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = () => reject(new Error('Failed to read file'));
+            reader.readAsDataURL(file);
+          });
+
+          const img = new Image();
+          await new Promise<void>((resolve, reject) => {
+            img.onload = () => resolve();
+            img.onerror = () => reject(new Error('Failed to decode image'));
+            img.src = dataUri;
+          });
+
+          let imageSrc = dataUri;
+          if (dataUri.length > 100000) {
+            try {
+              const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
+              imageSrc = `indexeddb://${imageId}`;
+            } catch {
+              imageSrc = dataUri;
+            }
+          }
+
+          const dpi = 96;
+          const physicalWidth = (img.width / dpi) * 25.4;
+          const physicalHeight = (img.height / dpi) * 25.4;
+
+          const maxW = scene.canvas.width * 0.8;
+          const maxH = scene.canvas.height * 0.8;
+          let fitScale = 1;
+          if (physicalWidth > maxW || physicalHeight > maxH) {
+            fitScale = Math.min(maxW / physicalWidth, maxH / physicalHeight);
+          }
+          const finalWidth = physicalWidth * fitScale;
+          const finalHeight = physicalHeight * fitScale;
+          const centerX = scene.material
+            ? scene.material.x + scene.material.width / 2
+            : scene.canvas.width / 2;
+          const centerY = scene.material
+            ? scene.material.y + scene.material.height / 2
+            : scene.canvas.height / 2;
+          const cx = centerX - finalWidth / 2;
+          const cy = centerY - finalHeight / 2;
+
+          const maxDim = 1000;
+          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+          const gsWidth = Math.round(img.width * scale);
+          const gsHeight = Math.round(img.height * scale);
+          const offscreen = document.createElement('canvas');
+          offscreen.width = gsWidth;
+          offscreen.height = gsHeight;
+          const offCtx = offscreen.getContext('2d')!;
+          offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
+          const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
+          const grayscaleData = new Uint8Array(gsWidth * gsHeight);
+          for (let i = 0; i < grayscaleData.length; i++) {
+            const r = imageData.data[i * 4];
+            const g = imageData.data[i * 4 + 1];
+            const b = imageData.data[i * 4 + 2];
+            const a = imageData.data[i * 4 + 3];
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
+          }
+
+          let targetScene = scene;
+          let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
+          if (!layerId) {
+            const newLayer = createLayer(scene.layers.length, 'image', 'Image');
+            targetScene = {
+              ...scene,
+              layers: [...scene.layers, newLayer],
+            };
+            layerId = newLayer.id;
+          }
+
+          const imageObj: SceneObject = {
+            id: generateId(),
+            type: 'image',
+            name: file.name.replace(/\.[^.]+$/, ''),
+            layerId,
+            parentId: null,
+            transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
+            geometry: {
+              type: 'image',
+              src: imageSrc,
+              originalWidth: img.width,
+              originalHeight: img.height,
+              cropX: 0,
+              cropY: 0,
+              cropWidth: img.width,
+              cropHeight: img.height,
+              grayscaleData,
+              grayscaleWidth: gsWidth,
+              grayscaleHeight: gsHeight,
+            } as ImageGeometry,
+            visible: true,
+            locked: false,
+            powerScale: 1,
+            _bounds: null,
+            _worldTransform: null,
+          };
+
+          const newScene = {
+            ...targetScene,
+            objects: [...targetScene.objects, imageObj],
+          };
+          const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
+          const priorStillValid =
+            previousActiveLayerId != null &&
+            newScene.layers.some(l => l.id === previousActiveLayerId);
+          newScene.activeLayerId = priorStillValid
+            ? previousActiveLayerId
+            : (cutLayer?.id ?? newScene.layers[0].id);
+          handleSceneCommit(newScene);
+        }
+      } catch (err) {
+        console.error('Drop import failed:', err);
+      }
+    },
+    [scene, handleSceneCommit, handleNewProject, setIsDragOver],
+  );
+
+  return { handleDragOver, handleDragLeave, handleDrop };
+}
