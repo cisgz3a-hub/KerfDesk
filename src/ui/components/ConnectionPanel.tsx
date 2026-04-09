@@ -6,6 +6,7 @@ import { type MachineState, type JobProgress } from '../../controllers/Controlle
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
+import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
 
 interface ConnectionPanelProps {
   scene: Scene;
@@ -27,10 +28,14 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
   const [isSimulator, setIsSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
   const [manualCmd, setManualCmd] = useState('');
+  const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
+  const [showOutcome, setShowOutcome] = useState(false);
 
   const controllerRef = useRef<GrblController | null>(null);
   const portRef = useRef<WebSerialPort | MockSerialPort | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  /** Same object as currentReplay while a job is recording; set before sendJob so sync TX callbacks see it */
+  const activeReplayRef = useRef<JobReplay | null>(null);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -40,9 +45,34 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
     const ctrl = new GrblController();
 
     ctrl.onStateChange((state) => setMachineState({ ...state }));
-    ctrl.onProgress((prog) => setProgress({ ...prog }));
-    ctrl.onError((code, msg) => setMessages(prev => [...prev.slice(-200), `ERROR ${code}: ${msg}`]));
-    ctrl.onRawLine((line, dir) => setMessages(prev => [...prev.slice(-200), `${dir === 'tx' ? '>' : '<'} ${line}`]));
+    ctrl.onProgress((prog) => {
+      setProgress({ ...prog });
+      // Detect job completion
+      if (prog.percentComplete >= 100) {
+        const r = activeReplayRef.current;
+        if (r && r.status === 'running') {
+          finalizeReplay(r, 'completed', prog.linesAcknowledged);
+          saveReplay(r);
+          setShowOutcome(true);
+          activeReplayRef.current = null;
+          setCurrentReplay({ ...r });
+        }
+      }
+    });
+    ctrl.onError((code, msg) => {
+      setMessages(prev => [...prev.slice(-200), `ERROR ${code}: ${msg}`]);
+      const r = activeReplayRef.current;
+      if (r && r.status === 'running') {
+        addReplayEntry(r, 'error', msg);
+      }
+    });
+    ctrl.onRawLine((line, dir) => {
+      setMessages(prev => [...prev.slice(-200), `${dir === 'tx' ? '>' : '<'} ${line}`]);
+      const r = activeReplayRef.current;
+      if (r && r.status === 'running') {
+        addReplayEntry(r, dir === 'tx' ? 'tx' : 'rx', line);
+      }
+    });
 
     controllerRef.current = ctrl;
 
@@ -134,8 +164,31 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
     setMessages(prev => [...prev, `Starting job: ${lines.length} commands (score: ${preflight?.score ?? '?'}%)`]);
     try {
+      // Start recording replay (before sendJob — TX lines emit synchronously inside sendJob)
+      const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
+        name: l.name,
+        mode: l.settings.mode,
+        power: l.settings.power.max,
+        speed: l.settings.speed,
+        passes: l.settings.passes,
+      }));
+      const estimate = gcode ? estimateJobTime(gcode) : null;
+      const replay = createReplay(
+        scene.metadata?.name || 'Untitled',
+        lines.length,
+        {
+          layers: layerSettings,
+          material: scene.material?.name || null,
+          machineType: scene.machine?.type || null,
+        },
+        estimate ? estimate.totalSeconds * 1000 : null,
+      );
+      activeReplayRef.current = replay;
+      setCurrentReplay(replay);
+
       controllerRef.current.sendJob(lines);
     } catch (e: any) {
+      activeReplayRef.current = null;
       setMessages(prev => [...prev, `Failed to start: ${e.message}`]);
     }
   };
@@ -523,6 +576,50 @@ export function ConnectionPanel({ scene, gcode, bedWidth, bedHeight, boundsMinX,
           },
           style: { width: '100%', padding: '8px', background: 'rgba(255,68,102,0.1)', border: '1px solid #ff4466', borderRadius: 6, color: '#ff4466', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: font },
         }, '⚠ EMERGENCY STOP'),
+      ),
+
+      // Job outcome feedback
+      showOutcome && currentReplay && React.createElement('div', {
+        style: {
+          padding: '12px 18px', background: 'rgba(45,212,160,0.06)',
+          borderTop: '1px solid rgba(45,212,160,0.2)', borderBottom: '1px solid rgba(45,212,160,0.2)',
+        },
+      },
+        React.createElement('div', {
+          style: { fontSize: 12, fontWeight: 600, color: '#2dd4a0', marginBottom: 8 },
+        }, '✓ Job complete — how did it turn out?'),
+        React.createElement('div', { style: { display: 'flex', gap: 6, flexWrap: 'wrap' as const } },
+          ...(['perfect', 'too_dark', 'too_light', 'didnt_cut', 'burned'] as const).map(outcome =>
+            React.createElement('button', {
+              key: outcome,
+              onClick: () => {
+                if (currentReplay) {
+                  currentReplay.outcome = outcome;
+                  saveReplay(currentReplay);
+                }
+                setShowOutcome(false);
+                setMessages(prev => [...prev, `Outcome recorded: ${outcome.replace('_', ' ')}`]);
+              },
+              style: {
+                padding: '6px 12px', fontSize: 11, cursor: 'pointer',
+                background: 'rgba(255,255,255,0.03)', border: '1px solid #252540',
+                borderRadius: 6, color: '#8888aa', fontFamily: font,
+              },
+            }, outcome === 'perfect' ? '✓ Perfect' :
+               outcome === 'too_dark' ? 'Too dark' :
+               outcome === 'too_light' ? 'Too light' :
+               outcome === 'didnt_cut' ? "Didn't cut through" :
+               'Burned/charred'),
+          ),
+          React.createElement('button', {
+            onClick: () => setShowOutcome(false),
+            style: {
+              padding: '6px 12px', fontSize: 11, cursor: 'pointer',
+              background: 'transparent', border: '1px solid #1a1a2e',
+              borderRadius: 6, color: '#555570', fontFamily: font,
+            },
+          }, 'Skip'),
+        ),
       ),
 
       // Console
