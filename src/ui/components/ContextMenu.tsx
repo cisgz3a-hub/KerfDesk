@@ -35,43 +35,26 @@ export function ContextMenu({ x, y, items, onClose }: ContextMenuProps) {
     };
   }, [onClose]);
 
-  useEffect(() => {
-    if (!ref.current) return;
-    const el = ref.current;
-    const rect = el.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
+  const menuWidth = 240;
+  const viewportW = window.innerWidth;
+  const viewportH = window.innerHeight;
+  const naturalMenuHeight = items.length * 32 + 16;
+  const menuHeight = Math.min(naturalMenuHeight, viewportH - 16);
 
-    let newX = x;
-    let newY = y;
-
-    // Clamp right edge
-    if (newX + rect.width > vw - 10) {
-      newX = vw - rect.width - 10;
-    }
-    // Clamp bottom edge
-    if (newY + rect.height > vh - 10) {
-      newY = vh - rect.height - 10;
-    }
-    // Clamp left/top
-    if (newX < 10) newX = 10;
-    if (newY < 10) newY = 10;
-
-    if (newX !== x || newY !== y) {
-      el.style.left = `${newX}px`;
-      el.style.top = `${newY}px`;
-    }
-  }, [x, y]);
+  const clampedX = Math.min(x, viewportW - menuWidth - 8);
+  const clampedY = Math.min(y, viewportH - menuHeight - 8);
 
   const menuStyle: React.CSSProperties = {
     position: 'fixed',
-    left: x,
-    top: y,
+    left: Math.max(4, clampedX),
+    top: Math.max(4, clampedY),
     background: theme.bg.elevated,
     border: `1px solid ${theme.border.default}`,
     borderRadius: theme.radius.lg,
     padding: '4px 0',
     minWidth: 200,
+    maxHeight: viewportH - 16,
+    overflowY: 'auto',
     zIndex: 1000,
     boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
     fontFamily: theme.font.ui,
