@@ -51,6 +51,7 @@ function makeObject(layerId: string, type: SceneObject['type'], name: string, ge
     geometry,
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };

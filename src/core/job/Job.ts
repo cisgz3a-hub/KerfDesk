@@ -39,6 +39,8 @@ export interface FlatPath {
   direction: 'cw' | 'ccw';      // Winding (for inside-first ordering)
   bounds: AABB;
   parentId: string | null;       // For containment hierarchy
+  /** Multiplier on layer max power (from SceneObject.powerScale). */
+  powerScale: number;
 }
 
 // ─── PROCESSED BITMAP ────────────────────────────────────────────
@@ -162,7 +164,8 @@ export function createEmptyJob(name: string, sourceProjectId: string): Job {
 export function flatPathFromPoints(
   points: Point[],
   closed: boolean,
-  sourceId: string
+  sourceId: string,
+  powerScale: number = 1.0
 ): FlatPath {
   const coords = new Float64Array(points.length * 2);
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -185,6 +188,7 @@ export function flatPathFromPoints(
     direction: computeWinding(coords) >= 0 ? 'ccw' : 'cw',
     bounds: { minX, minY, maxX, maxY },
     parentId: null,
+    powerScale,
   };
 }
 

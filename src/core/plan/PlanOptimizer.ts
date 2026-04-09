@@ -180,7 +180,7 @@ function planPath(
   if (n < 2) return [];
 
   const moves: Move[] = [];
-  const power = settings.powerMax;
+  const power = settings.powerMax * (path.powerScale ?? 1.0);
   const speed = settings.speed;
 
   // Build point index order

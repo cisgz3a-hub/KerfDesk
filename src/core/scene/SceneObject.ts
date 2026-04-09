@@ -120,6 +120,9 @@ export interface SceneObject {
   visible: boolean;
   locked: boolean;
 
+  /** 0.0–1.0 multiplier on layer max power when cutting (default 1). */
+  powerScale: number;
+
   // Cached values — null means needs recomputation
   _bounds: AABB | null;
   _worldTransform: Matrix3x2 | null;
@@ -145,6 +148,7 @@ export function createRect(
     geometry: { type: 'rect', x: 0, y: 0, width, height, cornerRadius: 0 },
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };
@@ -168,6 +172,7 @@ export function createEllipse(
     geometry: { type: 'ellipse', cx: 0, cy: 0, rx, ry },
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };
@@ -191,6 +196,7 @@ export function createLine(
     geometry: { type: 'line', x1, y1, x2, y2 },
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };
@@ -212,6 +218,7 @@ export function createPolygon(
     geometry: { type: 'polygon', points: [...points], closed },
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };
@@ -232,6 +239,7 @@ export function createPath(
     geometry: { type: 'path', subPaths },
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };

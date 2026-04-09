@@ -256,6 +256,7 @@ export function FileToolbar({
         } as ImageGeometry,
         visible: true,
         locked: false,
+        powerScale: 1,
         _bounds: null,
         _worldTransform: null,
       };

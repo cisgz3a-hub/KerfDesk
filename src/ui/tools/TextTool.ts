@@ -28,6 +28,7 @@ export function createTextObject(
     geometry,
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };

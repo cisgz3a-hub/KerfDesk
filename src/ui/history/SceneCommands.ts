@@ -72,7 +72,7 @@ export function addObject(
 export function updateObject(
   scene: Scene,
   objectId: string,
-  updates: Partial<Pick<SceneObject, 'name' | 'layerId' | 'visible' | 'locked' | 'transform' | 'geometry'>>
+  updates: Partial<Pick<SceneObject, 'name' | 'layerId' | 'visible' | 'locked' | 'transform' | 'geometry' | 'powerScale'>>
 ): Scene {
   let found = false;
 

@@ -280,6 +280,7 @@ function restoreObjectDefaults(o: any): SceneObject {
     geometry: o.geometry,
     visible: o.visible !== false,
     locked: o.locked === true,
+    powerScale: o.powerScale ?? 1.0,
     _bounds: null,
     _worldTransform: null,
   };

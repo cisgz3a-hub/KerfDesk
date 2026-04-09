@@ -246,6 +246,7 @@ export function App() {
   const [textBold, setTextBold] = useState(false);
   const [textItalic, setTextItalic] = useState(false);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
+  const [editingTextId, setEditingTextId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!textPlacementHint) return;
@@ -258,8 +259,22 @@ export function App() {
   }, []);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
+    setEditingTextId(null);
     setTextPlacementPt({ x: world.x, y: world.y });
     setShowTextDialog(true);
+  }, []);
+
+  const handleEditText = useCallback((obj: SceneObject) => {
+    const geom = obj.geometry as TextGeometry;
+    setTextInput(geom.text || '');
+    setTextFont(geom.fontFamily || 'Arial');
+    setTextSize(geom.fontSize || 20);
+    setTextBold(geom.bold || false);
+    setTextItalic(geom.italic || false);
+    setEditingTextId(obj.id);
+    setTextPlacementPt(null);
+    setShowTextDialog(true);
+    setSelectedIds(new Set([obj.id]));
   }, []);
 
   useEffect(() => {
@@ -658,6 +673,7 @@ export function App() {
           } as ImageGeometry,
           visible: true,
           locked: false,
+          powerScale: 1,
           _bounds: null,
           _worldTransform: null,
         };
@@ -775,6 +791,7 @@ export function App() {
             id: newId,
             parentId: newParentId,
             name: obj.name,
+            powerScale: obj.powerScale ?? 1,
             transform: { ...obj.transform, tx: obj.transform.tx + dx, ty: obj.transform.ty + dy },
             _bounds: null,
             _worldTransform: null,
@@ -816,6 +833,7 @@ export function App() {
       geometry: resultGeom,
       visible: true,
       locked: false,
+      powerScale: 1,
       _bounds: null,
       _worldTransform: null,
     };
@@ -871,6 +889,7 @@ export function App() {
         },
         visible: true,
         locked: false,
+        powerScale: obj.powerScale ?? 1,
         _bounds: null,
         _worldTransform: null,
       });
@@ -914,6 +933,7 @@ export function App() {
         geometry: resultGeom,
         visible: true,
         locked: false,
+        powerScale: obj.powerScale ?? 1,
         _bounds: null,
         _worldTransform: null,
       });
@@ -964,7 +984,7 @@ export function App() {
           parentId: null,
           transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y },
           geometry: { type: 'rect', x: 0, y: 0, width: config.cellSize, height: config.cellSize } as any,
-          visible: true, locked: false, _bounds: null, _worldTransform: null,
+          visible: true, locked: false, powerScale: 1, _bounds: null, _worldTransform: null,
         });
 
         // Label below each cell
@@ -982,7 +1002,7 @@ export function App() {
             fontSize: Math.min(config.cellSize * 0.25, 2.5),
             bold: false, italic: false,
           } as any,
-          visible: true, locked: false, _bounds: null, _worldTransform: null,
+          visible: true, locked: false, powerScale: 1, _bounds: null, _worldTransform: null,
         });
       }
     }
@@ -1118,6 +1138,7 @@ export function App() {
               id: newId,
               parentId: newParentId,
               name: obj.name,
+              powerScale: obj.powerScale ?? 1,
               transform: { ...obj.transform, tx: obj.transform.tx + 10, ty: obj.transform.ty + 10 },
               _bounds: null,
               _worldTransform: null,
@@ -1153,6 +1174,7 @@ export function App() {
               id: newId,
               parentId: newParentId,
               name: obj.name + ' copy',
+              powerScale: obj.powerScale ?? 1,
               transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
               _bounds: null,
               _worldTransform: null,
@@ -1393,6 +1415,7 @@ export function App() {
         onSelectionScreenPos: setQuickActionPos,
         onRequestTextPlacement: handleRequestTextPlacement,
         onActiveTool: setActiveTool,
+        onEditText: handleEditText,
       }),
       React.createElement('div', {
         style: {
@@ -1422,6 +1445,7 @@ export function App() {
             scene,
             selectedIds,
             onSceneCommit: handleSceneCommit,
+            onSceneChange: handleSceneChange,
             onSelectionChange: setSelectedIds,
             showAlert,
             handleTextToPath: () => void handleTextToPath(),
@@ -1701,6 +1725,7 @@ export function App() {
         if (e.target === e.currentTarget) {
           setShowTextDialog(false);
           setTextPlacementPt(null);
+          setEditingTextId(null);
         }
       },
     },
@@ -1715,11 +1740,12 @@ export function App() {
         React.createElement('div', {
           style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
         },
-          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Add Text'),
+          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, editingTextId ? 'Edit Text' : 'Add Text'),
           React.createElement('button', {
             onClick: () => {
               setShowTextDialog(false);
               setTextPlacementPt(null);
+              setEditingTextId(null);
             },
             style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
           }, '×'),
@@ -1824,45 +1850,74 @@ export function App() {
           React.createElement('button', {
             onClick: () => {
               if (!textInput.trim()) return;
-              const layerId = scene.activeLayerId || scene.layers[0]?.id;
-              if (!layerId) return;
 
-              const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
-              const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
+              if (editingTextId) {
+                const newScene = {
+                  ...scene,
+                  objects: scene.objects.map(o =>
+                    o.id === editingTextId
+                      ? {
+                          ...o,
+                          name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
+                          geometry: {
+                            type: 'text' as const,
+                            text: textInput,
+                            fontSize: textSize,
+                            fontFamily: textFont,
+                            bold: textBold,
+                            italic: textItalic,
+                          },
+                          _bounds: null,
+                          _worldTransform: null,
+                        }
+                      : o
+                  ),
+                };
+                handleSceneCommit(newScene);
+                setEditingTextId(null);
+              } else {
+                const layerId = scene.activeLayerId || scene.layers[0]?.id;
+                if (!layerId) return;
 
-              const textObj: SceneObject = {
-                id: generateId(),
-                type: 'text',
-                name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
-                layerId,
-                parentId: null,
-                transform: { ...IDENTITY_MATRIX, tx, ty },
-                geometry: {
+                const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
+                const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
+
+                const textObj: SceneObject = {
+                  id: generateId(),
                   type: 'text',
-                  text: textInput,
-                  fontSize: textSize,
-                  fontFamily: textFont,
-                  bold: textBold,
-                  italic: textItalic,
-                },
-                visible: true,
-                locked: false,
-                _bounds: null,
-                _worldTransform: null,
-              };
+                  name: textInput.length > 20 ? textInput.slice(0, 20) + '...' : textInput,
+                  layerId,
+                  parentId: null,
+                  transform: { ...IDENTITY_MATRIX, tx, ty },
+                  geometry: {
+                    type: 'text',
+                    text: textInput,
+                    fontSize: textSize,
+                    fontFamily: textFont,
+                    bold: textBold,
+                    italic: textItalic,
+                  },
+                  visible: true,
+                  locked: false,
+                  powerScale: 1,
+                  _bounds: null,
+                  _worldTransform: null,
+                };
 
-              const newScene = {
-                ...scene,
-                objects: [...scene.objects, textObj],
-                selection: [textObj.id],
-              };
-              handleSceneCommit(newScene);
-              setSelectedIds(new Set([textObj.id]));
+                const newScene = {
+                  ...scene,
+                  objects: [...scene.objects, textObj],
+                  selection: [textObj.id],
+                };
+                handleSceneCommit(newScene);
+                setSelectedIds(new Set([textObj.id]));
+                handleTextPlaced();
+              }
+
               setShowTextDialog(false);
               setTextInput('');
               setTextPlacementPt(null);
               setActiveTool('select');
-              handleTextPlaced();
             },
             disabled: !textInput.trim(),
             style: {
@@ -1873,7 +1928,7 @@ export function App() {
               fontSize: 13, fontWeight: 600, cursor: textInput.trim() ? 'pointer' : 'default',
               fontFamily: "'DM Sans', system-ui, sans-serif",
             },
-          }, 'Add Text to Canvas'),
+          }, editingTextId ? 'Update Text' : 'Add Text to Canvas'),
 
           React.createElement('div', {
             style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const },

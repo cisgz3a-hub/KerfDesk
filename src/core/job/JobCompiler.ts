@@ -250,7 +250,7 @@ function flattenObject(obj: SceneObject): FlatPath[] {
   }));
 
   return transformed.map(group =>
-    flatPathFromPoints(group.points, group.closed, obj.id)
+    flatPathFromPoints(group.points, group.closed, obj.id, obj.powerScale ?? 1.0)
   );
 }
 

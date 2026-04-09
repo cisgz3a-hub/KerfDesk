@@ -10,12 +10,14 @@ interface PropertiesPanelProps {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
+  /** Live preview without history (optional). */
+  onSceneChange?: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string) => Promise<void>;
   handleTextToPath: () => void;
 }
 
-export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelectionChange, showAlert, handleTextToPath }: PropertiesPanelProps) {
+export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath }: PropertiesPanelProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
   const [txDraft, setTxDraft] = useState<string | undefined>(undefined);
@@ -378,6 +380,36 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
           },
         }),
       ),
+    ),
+
+    React.createElement('div', { style: { marginTop: 8 } },
+      React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
+      React.createElement('input', {
+        type: 'number',
+        value: Math.round((obj.powerScale ?? 1) * 100),
+        min: 1,
+        max: 100,
+        style: inputStyle,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+          const val = parseInt(e.target.value, 10) || 100;
+          const apply = onSceneChange ?? onSceneCommit;
+          apply({
+            ...scene,
+            objects: scene.objects.map(o =>
+              selectedIds.has(o.id) ? { ...o, powerScale: val / 100 } : o
+            ),
+          });
+        },
+        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+          const val = Math.max(1, Math.min(100, parseInt(e.target.value, 10) || 100));
+          onSceneCommit({
+            ...scene,
+            objects: scene.objects.map(o =>
+              selectedIds.has(o.id) ? { ...o, powerScale: val / 100 } : o
+            ),
+          });
+        },
+      }),
     ),
 
     React.createElement('div', { style: labelStyle }, 'Layer'),

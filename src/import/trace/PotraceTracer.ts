@@ -127,6 +127,7 @@ export function traceToSceneObject(
     } as PathGeometry,
     visible: true,
     locked: false,
+    powerScale: 1,
     _bounds: null,
     _worldTransform: null,
   };
