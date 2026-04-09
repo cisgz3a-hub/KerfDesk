@@ -530,19 +530,69 @@ export function ConnectionPanel({
         React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
       ),
 
-      // Quick start guide
+      // Step-by-step workflow guide — highlights current step based on state
       isConnected && React.createElement('div', {
         style: {
-          padding: '8px 18px', background: 'rgba(0,212,255,0.04)',
-          borderBottom: '1px solid #1a1a2e', fontSize: 11, color: '#8888aa', lineHeight: 1.5,
+          padding: '10px 18px', background: 'rgba(0,212,255,0.04)',
+          borderBottom: '1px solid #1a1a2e', fontSize: 11, lineHeight: 1.6,
         },
       },
-        React.createElement('strong', { style: { color: '#00d4ff', fontSize: 10, display: 'block', marginBottom: 4 } }, 'QUICK START'),
-        '1. Use jog buttons to position the laser (not by hand)', React.createElement('br'),
-        '2. Click ZERO to mark that as the starting point', React.createElement('br'),
-        '3. Click Frame to verify, then Start Job', React.createElement('br'),
-        React.createElement('span', { style: { color: '#ffaa32', fontSize: 10 } },
-          'If you moved the laser by hand, press ZERO to sync the position first.'
+        React.createElement('strong', { style: { color: '#00d4ff', fontSize: 10, display: 'block', marginBottom: 6 } }, 'WORKFLOW'),
+
+        // Step 1: Unlock
+        React.createElement('div', {
+          style: {
+            padding: '4px 8px', marginBottom: 3, borderRadius: 4,
+            background: machineState?.status === 'alarm' ? 'rgba(255,212,68,0.08)' : 'transparent',
+            color: machineState?.status === 'alarm' ? '#ffd444' : '#555570',
+          },
+        }, machineState?.status === 'alarm' ? '→ 1. Click Unlock — machine is in alarm' : '✓ 1. Unlock (if needed)'),
+
+        // Step 2: Jog
+        React.createElement('div', {
+          style: {
+            padding: '4px 8px', marginBottom: 3, borderRadius: 4,
+            background: machineState?.status === 'idle' && (machineState?.position.x !== 0 || machineState?.position.y !== 0) ? 'transparent' :
+                        machineState?.status === 'idle' ? 'rgba(0,212,255,0.08)' : 'transparent',
+            color: machineState?.status === 'idle' ? '#8888aa' : '#555570',
+          },
+        }, '2. Use jog arrows to move laser to your workpiece corner'),
+
+        // Step 3: Zero
+        React.createElement('div', {
+          style: {
+            padding: '4px 8px', marginBottom: 3, borderRadius: 4,
+            color: '#8888aa',
+          },
+        }, '3. Press ZERO — this is where the laser starts and returns'),
+
+        // Step 4: Frame
+        React.createElement('div', {
+          style: {
+            padding: '4px 8px', marginBottom: 3, borderRadius: 4,
+            color: '#8888aa',
+          },
+        }, '4. Press Frame — laser traces the outline at low power to check alignment'),
+
+        // Step 5: Start
+        React.createElement('div', {
+          style: {
+            padding: '4px 8px', marginBottom: 3, borderRadius: 4,
+            color: gcode ? '#8888aa' : '#555570',
+          },
+        }, '5. Press Start Job — the cut begins'),
+
+        // Important warnings
+        React.createElement('div', {
+          style: { marginTop: 6, padding: '6px 8px', background: 'rgba(255,170,50,0.06)', borderRadius: 4, border: '1px solid rgba(255,170,50,0.15)' },
+        },
+          React.createElement('div', { style: { color: '#ffaa32', fontSize: 10, fontWeight: 600, marginBottom: 3 } }, 'IMPORTANT'),
+          React.createElement('div', { style: { color: '#8888aa', fontSize: 10, lineHeight: 1.5 } },
+            '• Use jog arrows to move the laser, not by hand', React.createElement('br'),
+            '• If you moved it by hand, press ZERO to sync', React.createElement('br'),
+            '• Frame shows where the laser will cut — check before starting', React.createElement('br'),
+            '• Emergency Stop is always at the bottom of this panel',
+          ),
         ),
       ),
 
@@ -604,9 +654,9 @@ export function ConnectionPanel({
         React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center' } },
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↑'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y-${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↑'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
             React.createElement('button', {
               onClick: async () => {
                 const ctrl = controllerRef.current;
@@ -631,16 +681,16 @@ export function ConnectionPanel({
                   setMessages(prev => [...prev, 'Zero failed — try again']);
                 }
               },
-              title: 'Set current position as X0 Y0',
+              title: 'Step 3: Set this position as the starting point (0,0) — jog here first, then press ZERO',
               style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
             }, 'ZERO'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '→'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '→'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↓'),
+            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↓'),
             React.createElement('div'),
           ),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
-            React.createElement('button', { onClick: () => sendCmd('$X'), style: { ...btnStyle('255,212,68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
+            React.createElement('button', { onClick: () => sendCmd('$X'), title: 'Step 1: Clear alarm state so the machine can move', style: { ...btnStyle('255,212,68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
             React.createElement('button', {
               onClick: () => { sendCmd('M4 S50'); setTimeout(() => sendCmd('M5 S0'), 500); },
               style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
@@ -667,6 +717,7 @@ export function ConnectionPanel({
         React.createElement('div', { style: { display: 'flex', gap: 6 } },
           React.createElement('button', {
             onClick: handleFrame, disabled: !isConnected,
+            title: 'Step 4: Trace the outline of your design at very low power to check alignment before cutting',
             style: { ...btnStyle('255,212,68', !isConnected), flex: 1 },
           }, 'Frame'),
           React.createElement('button', {
@@ -676,6 +727,7 @@ export function ConnectionPanel({
           }, 'Proof'),
           React.createElement('button', {
             onClick: handleStartJob, disabled: !gcode || isRunning || (preflight ? !preflight.canStart : false),
+            title: 'Step 5: Begin cutting — make sure you have framed first to verify position',
             style: { ...btnStyle('45,212,160', !gcode || isRunning || (preflight ? !preflight.canStart : false)), flex: 1, fontWeight: 600 },
           }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
         ),
