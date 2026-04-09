@@ -7,6 +7,15 @@ import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
+import {
+  createJobLog,
+  addLogEntry,
+  finalizeLog,
+  saveJobLog,
+  getJobLogs,
+  clearJobLogs,
+  type JobLog,
+} from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
 
 interface ConnectionPanelProps {
@@ -53,12 +62,19 @@ export function ConnectionPanel({
   const [manualCmd, setManualCmd] = useState('');
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
   const [showOutcome, setShowOutcome] = useState(false);
+  const [currentLog, setCurrentLog] = useState<JobLog | null>(null);
+  const [showLogHistory, setShowLogHistory] = useState(false);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
   const logRef = useRef<HTMLDivElement>(null);
   /** Same object as currentReplay while a job is recording; set before sendJob so sync TX callbacks see it */
   const activeReplayRef = useRef<JobReplay | null>(null);
+  const currentLogRef = useRef<JobLog | null>(null);
+
+  useEffect(() => {
+    currentLogRef.current = currentLog;
+  }, [currentLog]);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -83,12 +99,20 @@ export function ConnectionPanel({
       if (r && r.status === 'running') {
         addReplayEntry(r, 'error', msg);
       }
+      const jl = currentLogRef.current;
+      if (jl && jl.status === 'running') {
+        addLogEntry(jl, 'error', `${code}: ${msg}`);
+      }
     });
     const unsubRaw = controller.onRawLine((line, dir) => {
       setMessages(prev => [...prev.slice(-200), `${dir === 'tx' ? '>' : '<'} ${line}`]);
       const r = activeReplayRef.current;
       if (r && r.status === 'running') {
         addReplayEntry(r, dir === 'tx' ? 'tx' : 'rx', line);
+      }
+      const jl = currentLogRef.current;
+      if (jl && jl.status === 'running') {
+        addLogEntry(jl, dir === 'tx' ? 'sent' : 'received', line);
       }
     });
     return () => {
@@ -97,6 +121,38 @@ export function ConnectionPanel({
       unsubRaw();
     };
   }, [controller]);
+
+  // Job log: finalize when machine returns to idle after a running job
+  useEffect(() => {
+    if (!currentLog) return;
+    if (currentLog.status !== 'running') return;
+
+    const idle = machineState?.status === 'idle';
+    const notRunning = !controllerRef.current?.isJobRunning;
+    if (!idle || !notRunning) return;
+
+    const linesCompleted = jobProgress?.linesAcknowledged ?? 0;
+    const status = currentLog.errors > 0
+      ? 'failed'
+      : linesCompleted >= currentLog.gcodeLines
+        ? 'completed'
+        : 'stopped';
+
+    finalizeLog(currentLog, status, linesCompleted);
+    addLogEntry(
+      currentLog,
+      'milestone',
+      status === 'completed'
+        ? `Job completed in ${(currentLog.actualDuration / 1000).toFixed(0)}s`
+        : status === 'failed'
+          ? `Job failed with ${currentLog.errors} error(s)`
+          : 'Job stopped by user',
+    );
+    saveJobLog(currentLog);
+    setMessages(prev => [...prev, `✓ Job log saved (${status})`]);
+    currentLogRef.current = null;
+    setCurrentLog(null);
+  }, [machineState?.status, currentLog, jobProgress?.linesAcknowledged, jobProgress?.totalLines]);
 
   // Auto-scroll log
   useEffect(() => {
@@ -206,6 +262,25 @@ export function ConnectionPanel({
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
     setMessages(prev => [...prev, `Starting job: ${lines.length} commands (score: ${preflight?.score ?? '?'}%)`]);
     try {
+      const estimate = gcode ? estimateJobTime(gcode) : null;
+      const jobLog = createJobLog(
+        scene.metadata?.name || 'Untitled',
+        lines.length,
+        estimate ? estimate.formatted : '?',
+        scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
+          name: l.name,
+          mode: l.settings.mode,
+          power: l.settings.power.max,
+          speed: l.settings.speed,
+          passes: l.settings.passes,
+        })),
+        machineState?.status || 'unknown',
+        { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
+      );
+      addLogEntry(jobLog, 'milestone', `Job started: ${lines.length} commands`);
+      currentLogRef.current = jobLog;
+      setCurrentLog(jobLog);
+
       // Start recording replay (before sendJob — TX lines emit synchronously inside sendJob)
       const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
         name: l.name,
@@ -214,7 +289,6 @@ export function ConnectionPanel({
         speed: l.settings.speed,
         passes: l.settings.passes,
       }));
-      const estimate = gcode ? estimateJobTime(gcode) : null;
       const replay = createReplay(
         scene.metadata?.name || 'Untitled',
         lines.length,
@@ -231,6 +305,8 @@ export function ConnectionPanel({
       controllerRef.current.sendJob(lines);
     } catch (e: any) {
       activeReplayRef.current = null;
+      currentLogRef.current = null;
+      setCurrentLog(null);
       setMessages(prev => [...prev, `Failed to start: ${e.message}`]);
     }
   };
@@ -838,6 +914,67 @@ export function ConnectionPanel({
           ? React.createElement('span', { style: { color: messages[messages.length - 1].startsWith('✓') ? '#2dd4a0' : messages[messages.length - 1].startsWith('ERROR') ? '#ff4466' : '#8888aa' } },
               messages[messages.length - 1])
           : 'Waiting for connection...',
+      ),
+
+      React.createElement('div', { style: { padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+        React.createElement('button', {
+          onClick: () => setShowLogHistory(!showLogHistory),
+          style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
+        }, showLogHistory ? 'Hide History' : `Job History (${getJobLogs().length})`),
+        getJobLogs().length > 0 && React.createElement('button', {
+          onClick: () => { if (confirm('Clear all job logs?')) { clearJobLogs(); setShowLogHistory(false); } },
+          style: { background: 'none', border: 'none', color: '#333355', fontSize: 9, cursor: 'pointer' },
+        }, 'Clear'),
+      ),
+
+      showLogHistory && React.createElement('div', {
+        style: { padding: '0 18px 12px', maxHeight: 200, overflowY: 'auto' as const },
+      },
+        ...getJobLogs().map(log =>
+          React.createElement('div', {
+            key: log.id,
+            style: {
+              padding: '8px 10px', marginBottom: 4,
+              background: '#0a0a14', borderRadius: 6,
+              border: `1px solid ${log.status === 'completed' ? '#1a2e1a' : log.status === 'failed' ? '#2e1a1a' : '#1a1a2e'}`,
+              fontSize: 10, cursor: 'pointer',
+            },
+            onClick: () => {
+              setMessages([
+                `═══ JOB REPLAY: ${log.projectName} ═══`,
+                `Status: ${log.status.toUpperCase()}`,
+                `Started: ${new Date(log.startedAt).toLocaleString()}`,
+                `Duration: ${(log.actualDuration / 1000).toFixed(0)}s`,
+                `Lines: ${log.linesCompleted}/${log.gcodeLines}`,
+                `Errors: ${log.errors}`,
+                `Layers: ${log.layers.map(l => `${l.name} (${l.mode} ${l.power}% ${l.speed}mm/min)`).join(', ')}`,
+                `Start position: X${log.startPosition.x.toFixed(1)} Y${log.startPosition.y.toFixed(1)}`,
+                '',
+                ...log.entries.slice(-100).map(e => {
+                  const time = new Date(e.timestamp).toLocaleTimeString();
+                  const prefix = e.type === 'error' ? '✗' : e.type === 'milestone' ? '★' : e.type === 'sent' ? '>' : '<';
+                  return `[${time}] ${prefix} ${e.message}`;
+                }),
+              ]);
+            },
+          },
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 2 } },
+              React.createElement('span', { style: { color: '#e0e0ec', fontWeight: 500 } }, log.projectName),
+              React.createElement('span', {
+                style: {
+                  color: log.status === 'completed' ? '#2dd4a0' : log.status === 'failed' ? '#ff4466' : '#ffd444',
+                  fontWeight: 600,
+                },
+              }, log.status.toUpperCase()),
+            ),
+            React.createElement('div', { style: { color: '#555570', display: 'flex', gap: 8 } },
+              React.createElement('span', null, new Date(log.startedAt).toLocaleDateString()),
+              React.createElement('span', null, `${(log.actualDuration / 1000).toFixed(0)}s`),
+              React.createElement('span', null, `${log.linesCompleted}/${log.gcodeLines} lines`),
+              log.errors > 0 && React.createElement('span', { style: { color: '#ff4466' } }, `${log.errors} errors`),
+            ),
+          ),
+        ),
       ),
 
       // Manual command — Production mode only
