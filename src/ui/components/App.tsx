@@ -620,6 +620,22 @@ export function App() {
     }
   }, [scene, handleSceneCommit, handleNewProject]);
 
+  /** Compile scene to G-code string. Returns null on failure. */
+  const compileGcode = useCallback((targetScene: Scene): string | null => {
+    try {
+      const job = compileJob(targetScene);
+      if (job.operations.length === 0) return null;
+      const plan = optimizePlan(job);
+      const strategy = getOutputStrategy('grbl');
+      if (!strategy) return null;
+      const output = strategy.generate(plan, job);
+      return output.text ?? null;
+    } catch (err) {
+      console.error('G-code compilation failed:', err);
+      return null;
+    }
+  }, []);
+
   const handleConnect = useCallback(() => {
     try {
       // Preflight: warn about text objects that won't be in output
@@ -631,28 +647,17 @@ export function App() {
         const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
         if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
       }
-      const job = compileJob(scene);
-      if (job.operations.length === 0) {
+      const gc = compileGcode(scene);
+      if (!gc) {
         alert('No objects to process. Add objects to an output layer first.');
-        setCurrentGcode(null);
-        setShowConnection(true);
-        return;
       }
-      const plan = optimizePlan(job);
-      const strategy = getOutputStrategy('grbl');
-      if (!strategy) {
-        setCurrentGcode(null);
-        setShowConnection(true);
-        return;
-      }
-      const output = strategy.generate(plan, job);
-      setCurrentGcode(output.text ?? null);
+      setCurrentGcode(gc);
     } catch (err) {
       console.error('G-code build failed:', err);
       setCurrentGcode(null);
     }
     setShowConnection(true);
-  }, [scene]);
+  }, [scene, compileGcode]);
 
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -1140,13 +1145,8 @@ export function App() {
               const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
               if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
             }
-            const job = compileJob(scene);
-            if (job.operations.length === 0) return;
-            const plan = optimizePlan(job);
-            const strategy = getOutputStrategy('grbl');
-            if (!strategy) return;
-            const output = strategy.generate(plan, job);
-            setGcodePreview(output.text ?? '');
+            const gc = compileGcode(scene);
+            if (gc) setGcodePreview(gc);
           } catch (err) {
             console.error('G-code generation failed:', err);
           }
@@ -1200,7 +1200,7 @@ export function App() {
 
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset]);
+  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset, compileGcode]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
@@ -1239,6 +1239,7 @@ export function App() {
 
     React.createElement(FileToolbar, {
       scene,
+      compileGcode,
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
@@ -1269,13 +1270,8 @@ export function App() {
             const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
             if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
           }
-          const job = compileJob(scene);
-          if (job.operations.length === 0) return;
-          const plan = optimizePlan(job);
-          const strategy = getOutputStrategy('grbl');
-          if (!strategy) return;
-          const output = strategy.generate(plan, job);
-          setGcodePreview(output.text ?? '');
+          const gc = compileGcode(scene);
+          if (gc) setGcodePreview(gc);
         } catch (err) {
           alert('Toolpath preview failed: ' + (err as Error).message);
         }

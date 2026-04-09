@@ -15,9 +15,6 @@
 import React, { useRef, useCallback } from 'react';
 import { theme } from '../styles/theme';
 import { type Scene, createScene } from '../../core/scene/Scene';
-import { compileJob } from '../../core/job/JobCompiler';
-import { optimizePlan } from '../../core/plan/PlanOptimizer';
-import { getOutputStrategy } from '../../core/output/Output';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
@@ -31,6 +28,8 @@ import { exportSceneToSvg } from '../../io/SvgExporter';
 
 interface FileToolbarProps {
   scene: Scene;
+  /** Compile scene to G-code (shared with App — resets singleton strategy state). */
+  compileGcode: (scene: Scene) => string | null;
   onSceneChange: (scene: Scene) => void;
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
@@ -58,6 +57,7 @@ interface FileToolbarProps {
 
 export function FileToolbar({
   scene,
+  compileGcode,
   onSceneChange,
   onSceneCommit,
   onNewProject,
@@ -344,17 +344,13 @@ export function FileToolbar({
         const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
         if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
       }
-      const job = compileJob(scene);
-      if (job.operations.length === 0) {
+      const gc = compileGcode(scene);
+      if (!gc) {
         alert('No objects to process. Add objects to an output layer first.');
         return;
       }
-      const plan = optimizePlan(job);
-      const strategy = getOutputStrategy('grbl');
-      if (!strategy) return;
-      const output = strategy.generate(plan, job);
 
-      const blob = new Blob([output.text!], { type: 'text/plain' });
+      const blob = new Blob([gc], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -365,7 +361,7 @@ export function FileToolbar({
       console.error('G-code generation failed:', e);
       alert('G-code generation failed: ' + (e as Error).message);
     }
-  }, [scene]);
+  }, [scene, compileGcode]);
 
   const handleExportSvg = useCallback(() => {
     try {

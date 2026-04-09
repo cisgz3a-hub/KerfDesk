@@ -23,13 +23,11 @@ app.on('web-contents-created', (_, contents) => {
   });
 
   contents.session.setPermissionCheckHandler((_webContents, permission) => {
-    if (permission === 'serial') return true;
-    return true;
+    return permission === 'serial';
   });
 
   contents.session.setDevicePermissionHandler((details) => {
-    if (details.deviceType === 'serial') return true;
-    return true;
+    return details.deviceType === 'serial';
   });
 });
 

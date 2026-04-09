@@ -98,6 +98,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   private currentSpeed = 0;
 
   generate(plan: Plan, job: Job): Output {
+    this.currentSpeed = 0; // Reset between calls — strategy is a singleton
     const lines: string[] = [];
 
     lines.push(this.encodeHeader(job));
