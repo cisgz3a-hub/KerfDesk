@@ -28,7 +28,7 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
     React.createElement('div', {
       style: {
         background: '#12121e', border: '1px solid #252540', borderRadius: 14,
-        width: 680, maxHeight: '85vh', display: 'flex', flexDirection: 'column' as const,
+        width: 800, maxHeight: '85vh', display: 'flex', flexDirection: 'column' as const,
         boxShadow: '0 20px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
       },
     },
@@ -61,7 +61,7 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
 
       // Categories
       React.createElement('div', {
-        style: { display: 'flex', gap: 4, padding: '0 20px 10px', overflowX: 'auto' as const },
+        style: { display: 'flex', gap: 6, padding: '0 20px 12px', flexWrap: 'wrap' as const },
       },
         ...TEMPLATE_CATEGORIES.map(cat =>
           React.createElement('button', {
@@ -83,7 +83,7 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
       React.createElement('div', {
         style: {
           flex: 1, overflow: 'auto', padding: '0 20px 20px',
-          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12,
+          display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12,
           alignContent: 'start',
         },
       },
@@ -109,8 +109,9 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                 // SVG Preview
                 React.createElement('div', {
                   style: {
-                    height: 120, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    height: 140, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: '#08080f', padding: 16,
+                    borderRadius: '10px 10px 0 0',
                   },
                   dangerouslySetInnerHTML: {
                     __html: t.svg.replace(/stroke="red"/g, 'stroke="#ff4466"')
@@ -121,7 +122,7 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                   },
                 }),
                 // Info
-                React.createElement('div', { style: { padding: '10px 12px' } },
+                React.createElement('div', { style: { padding: '12px 14px 14px' } },
                   React.createElement('div', { style: { color: '#e0e0ec', fontSize: 12, fontWeight: 500, marginBottom: 3 } }, t.name),
                   React.createElement('div', { style: { color: '#555570', fontSize: 10, lineHeight: 1.4 } }, t.description),
                   React.createElement('div', { style: { marginTop: 6, display: 'flex', gap: 4 } },
