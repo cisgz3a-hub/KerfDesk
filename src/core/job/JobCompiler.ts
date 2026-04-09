@@ -129,8 +129,10 @@ function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType 
  */
 function resolveSettings(layer: Layer): ResolvedLaserSettings {
   const s = layer.settings;
-  const fillActive = s.fill.enabled || layer.settings.mode === 'engrave';
-  const rawInterval = s.fill.interval > 0 ? s.fill.interval : 0.1;
+  const engraveFillInterval =
+    layer.settings.mode === 'engrave'
+      ? Math.max(0.01, s.fill.interval > 0 ? s.fill.interval : 0.1)
+      : 0;
   return {
     powerMin: Math.max(0, Math.min(100, s.power.min)),
     powerMax: Math.max(0, Math.min(100, s.power.max)),
@@ -138,7 +140,7 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
     passes: Math.max(1, Math.min(99, s.passes)),
     zStepPerPass: s.zStepPerPass,
 
-    fillInterval: fillActive ? Math.max(0.01, rawInterval) : 0,
+    fillInterval: engraveFillInterval,
     fillAngle: s.fill.angle % 360,
     fillMode: s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line',
     fillBiDirectional: s.fill.biDirectional,

@@ -121,8 +121,8 @@ function planOperation(
         pos
       );
       moves.push(...rasterMoves);
-    } else if (operation.geometry.type === 'fill') {
-      // FILL: Generate scanlines from boundary paths
+    } else if (operation.type === 'engrave' && operation.geometry.type === 'fill') {
+      // FILL: engrave only — never infer from fillInterval on cut/score jobs
       const fillMoves = planFillOperation(
         operation.geometry.paths,
         settings,
@@ -418,7 +418,7 @@ function planFillOperation(
   const fillAngles: number[] =
     fillMode === 'cross-hatch' ? [baseAngle, baseAngle + 90] : [baseAngle];
 
-  const interval = Math.max(0.01, settings.fillInterval || 0.1);
+  const interval = Math.max(0.01, settings.fillInterval);
 
   const scanlines: ScanlineSegment[] = [];
   for (const angle of fillAngles) {
