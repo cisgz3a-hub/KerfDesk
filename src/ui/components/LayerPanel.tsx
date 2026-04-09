@@ -1,7 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type CutOrder, createLayer } from '../../core/scene/Layer';
-import { MATERIAL_PRESETS, getPresetSettings } from '../../core/materials/MaterialPresets';
+import {
+  MATERIAL_CATEGORIES,
+  MATERIAL_PRESETS,
+  canCutMaterial,
+  getPresetSettings,
+} from '../../core/materials/MaterialPresets';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
 
@@ -409,7 +414,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             if (!presetName || !activeLayer) return;
 
             const machineType = scene.machine?.type || 'diode';
-            const settings = getPresetSettings(presetName, machineType);
+            const settings = getPresetSettings(presetName, machineType, scene.machine?.watts || '10');
             if (!settings) return;
 
             const mode = activeLayer.settings.mode;
@@ -430,11 +435,15 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             );
 
             const preset = MATERIAL_PRESETS.find(p => p.name === presetName);
-            const sceneMaterialType = preset?.type;
-            const validTypes = ['wood', 'acrylic', 'leather', 'paper', 'fabric', 'cardboard', 'metal', 'custom'] as const;
-            const matType = sceneMaterialType && validTypes.includes(sceneMaterialType as typeof validTypes[number])
-              ? (sceneMaterialType as NonNullable<typeof scene.material>['type'])
-              : ('custom' as NonNullable<typeof scene.material>['type']);
+            const categoryToSceneMaterialType = (category: string): NonNullable<typeof scene.material>['type'] => {
+              if (category === 'Acrylic') return 'acrylic';
+              if (category === 'Leather') return 'leather';
+              if (category === 'Paper & Card') return 'paper';
+              if (category === 'Fabric') return 'fabric';
+              if (category === 'Wood' || category === 'Plywood' || category === 'MDF') return 'wood';
+              return 'custom';
+            };
+            const matType = preset ? categoryToSceneMaterialType(preset.category) : 'custom';
 
             const updatedMaterial = scene.material
               ? {
@@ -459,32 +468,33 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           },
         },
           React.createElement('option', { value: '' }, '— Select material —'),
-          React.createElement('optgroup', { label: 'Wood' },
-            ...MATERIAL_PRESETS.filter(p => p.type === 'wood').map(p =>
-              React.createElement('option', { key: p.name, value: p.name }, p.name)
-            ),
-          ),
-          React.createElement('optgroup', { label: 'Acrylic' },
-            ...MATERIAL_PRESETS.filter(p => p.type === 'acrylic').map(p =>
-              React.createElement('option', { key: p.name, value: p.name }, p.name)
-            ),
-          ),
-          React.createElement('optgroup', { label: 'Leather' },
-            ...MATERIAL_PRESETS.filter(p => p.type === 'leather').map(p =>
-              React.createElement('option', { key: p.name, value: p.name }, p.name)
-            ),
-          ),
-          React.createElement('optgroup', { label: 'Paper' },
-            ...MATERIAL_PRESETS.filter(p => p.type === 'paper').map(p =>
-              React.createElement('option', { key: p.name, value: p.name }, p.name)
-            ),
-          ),
-          React.createElement('optgroup', { label: 'Fabric' },
-            ...MATERIAL_PRESETS.filter(p => p.type === 'fabric').map(p =>
-              React.createElement('option', { key: p.name, value: p.name }, p.name)
-            ),
-          ),
+          ...MATERIAL_CATEGORIES.map(cat => {
+            const presets = MATERIAL_PRESETS.filter(p => p.category === cat);
+            if (presets.length === 0) return null;
+            return React.createElement('optgroup', { key: cat, label: cat },
+              ...presets.map(p =>
+                React.createElement('option', { key: p.name, value: p.name }, p.name),
+              ),
+            );
+          }).filter(Boolean),
         ),
+        (() => {
+          const selectedPresetName = scene.material?.name || '';
+          return selectedPresetName &&
+            !canCutMaterial(selectedPresetName, scene.machine?.type || 'diode', scene.machine?.watts || '10') &&
+            activeLayer.settings.mode === 'cut'
+            ? React.createElement('div', {
+              style: {
+                fontSize: 9,
+                color: '#ff4466',
+                marginTop: 3,
+                padding: '3px 6px',
+                background: 'rgba(255,68,102,0.06)',
+                borderRadius: 4,
+              },
+            }, '⚠ This material cannot be cut with your laser type. Use CO2 laser or switch to engrave mode.')
+            : null;
+        })(),
         React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 3 } },
           `Settings for ${scene.machine?.type || 'diode'} laser. Run a material test to fine-tune.`,
         ),
