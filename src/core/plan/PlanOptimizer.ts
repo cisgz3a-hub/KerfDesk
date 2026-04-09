@@ -201,6 +201,47 @@ function planPath(
     power,
   });
 
+  // Lead-in — approach the start point from slightly before it
+  // This allows the laser to reach full speed before the actual cut begins
+  if (path.closed && settings.leadIn > 0) {
+    if (n >= 2) {
+      // Get direction from second-to-last point to first point (approach direction)
+      const lastIdx = indices[indices.length - 1];
+      const lastX = coords[lastIdx * 2];
+      const lastY = coords[lastIdx * 2 + 1];
+      const firstX = coords[indices[0] * 2];
+      const firstY = coords[indices[0] * 2 + 1];
+
+      const dx = firstX - lastX;
+      const dy = firstY - lastY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+
+      if (len > 0.001) {
+        // Start the rapid move at the lead-in position (before the actual start)
+        const leadInX = firstX - (dx / len) * settings.leadIn;
+        const leadInY = firstY - (dy / len) * settings.leadIn;
+
+        // Override the rapid destination to the lead-in point
+        moves[0] = {
+          type: 'rapid',
+          to: { x: leadInX, y: leadInY },
+        };
+
+        // Add a laser-on cut from lead-in to the actual start point
+        // This goes right after laserOn
+        const laserOnIndex = moves.findIndex(m => m.type === 'laserOn');
+        if (laserOnIndex >= 0) {
+          moves.splice(laserOnIndex + 1, 0, {
+            type: 'linear',
+            to: { x: firstX, y: firstY },
+            power,
+            speed,
+          });
+        }
+      }
+    }
+  }
+
   // 3. Linear moves along path
   for (let i = 1; i < indices.length; i++) {
     const idx = indices[i];
@@ -221,6 +262,38 @@ function planPath(
       power,
       speed,
     });
+  }
+
+  // Overcut — continue past the start point on closed paths
+  // This ensures the cut fully separates the piece
+  if (path.closed && settings.overcut > 0) {
+    if (n >= 2) {
+      // Get the direction from the last point to the first point
+      const firstX = coords[indices[0] * 2];
+      const firstY = coords[indices[0] * 2 + 1];
+      // Get the second point to determine the direction the path continues
+      const secondIdx = indices.length > 1 ? indices[1] : indices[0];
+      const secondX = coords[secondIdx * 2];
+      const secondY = coords[secondIdx * 2 + 1];
+
+      // Direction from first to second point
+      const dx = secondX - firstX;
+      const dy = secondY - firstY;
+      const len = Math.sqrt(dx * dx + dy * dy);
+
+      if (len > 0.001) {
+        // Normalize and extend by overcut distance
+        const overcutX = firstX + (dx / len) * settings.overcut;
+        const overcutY = firstY + (dy / len) * settings.overcut;
+
+        moves.push({
+          type: 'linear',
+          to: { x: overcutX, y: overcutY },
+          power,
+          speed,
+        });
+      }
+    }
   }
 
   // 5. Laser OFF
