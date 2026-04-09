@@ -234,11 +234,11 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dpr = window.devicePixelRatio || 1;
-    const logicalW = 700;
-    const logicalH = 500;
+    const logicalW = 650;
+    const logicalH = 400;
     canvas.width = logicalW * dpr;
     canvas.height = logicalH * dpr;
-    canvas.style.width = `${logicalW}px`;
+    canvas.style.width = '100%';
     canvas.style.height = `${logicalH}px`;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -279,49 +279,64 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
 
   return React.createElement('div', {
+    // Outer modal container
     style: {
-      position: 'fixed', inset: 0,
-      background: 'rgba(0, 0, 0, 0.8)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 2000, fontFamily: font,
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: 2000,
     },
     onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
     React.createElement('div', {
+      // Inner dialog
       style: {
-        background: '#0c0c16', border: '1px solid #252540', borderRadius: 12,
-        overflow: 'hidden', boxShadow: '0 20px 60px rgba(0,0,0,0.7)',
+        background: '#12121e', border: '1px solid #252540', borderRadius: 14,
+        width: 700, maxHeight: '90vh',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        display: 'flex', flexDirection: 'column' as const,
+        overflow: 'hidden',
+        fontFamily: font,
       },
+      onClick: (e: React.MouseEvent) => { e.stopPropagation(); },
     },
+      // Header — always visible
       React.createElement('div', {
         style: {
           padding: '12px 18px', borderBottom: '1px solid #1a1a2e',
           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          flexShrink: 0,
         },
       },
-        React.createElement('div', null,
-          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'G-code Toolpath Preview'),
-          React.createElement('span', { style: { color: '#555570', fontSize: 11, marginLeft: 12 } },
-            `${(gcode.length / 1024).toFixed(1)} KB`
-          ),
-        ),
+        React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Toolpath Preview'),
         React.createElement('button', {
           onClick: onClose,
-          style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
+          style: { background: 'none', border: 'none', color: '#555570', fontSize: 20, cursor: 'pointer', padding: '0 4px' },
         }, '×'),
       ),
 
-      React.createElement('div', { style: { padding: 8 } },
-        React.createElement('canvas', {
-          ref: canvasRef,
-          style: { borderRadius: 8, display: 'block' },
-        }),
+      React.createElement('div', {
+        style: {
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto' as const,
+        },
+      },
+        // Canvas container
+        React.createElement('div', {
+          style: { padding: '12px 18px', flexShrink: 0 },
+        },
+          React.createElement('canvas', {
+            ref: canvasRef,
+            width: 650,
+            height: 400,
+            style: { width: '100%', height: 400, background: '#08080f', borderRadius: 8, display: 'block' },
+          }),
+        ),
       ),
 
-      // Playback controls
+      // Playback controls — always visible
       React.createElement('div', {
-        style: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 16px', borderTop: '1px solid #1a1a2e' },
+        style: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 18px', borderTop: '1px solid #1a1a2e', flexShrink: 0 },
       },
         React.createElement('button', {
           onClick: () => {
@@ -364,8 +379,9 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
 
       React.createElement('div', {
         style: {
-          padding: '8px 18px 14px',
+          padding: '8px 18px 10px',
           display: 'flex', gap: 20, borderTop: '1px solid #1a1a2e',
+          flexShrink: 0,
         },
       },
         React.createElement('span', { style: { fontSize: 10, color: '#555570', display: 'flex', alignItems: 'center', gap: 4 } },
@@ -380,6 +396,23 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
           React.createElement('span', { style: { width: 16, height: 2, background: '#ff8844', display: 'inline-block' } }),
           'Low power'
         ),
+      ),
+
+      // Bottom close — always reachable
+      React.createElement('div', {
+        style: { padding: '8px 18px 12px', borderTop: '1px solid #1a1a2e', flexShrink: 0 },
+      },
+        React.createElement('button', {
+          onClick: onClose,
+          style: {
+            width: '100%', padding: '8px',
+            background: 'rgba(136,136,170,0.08)',
+            border: '1px solid #252540',
+            borderRadius: 6, color: '#8888aa',
+            fontSize: 12, cursor: 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+          },
+        }, 'Close'),
       ),
     ),
   );
