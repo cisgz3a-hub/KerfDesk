@@ -30,6 +30,7 @@ import { HistoryManager } from '../history/HistoryManager';
 import { FileToolbar } from './FileToolbar';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { storeImage } from '../../io/ImageStore';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
@@ -43,6 +44,7 @@ import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
+import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { textToPath } from '../../geometry/TextToPath';
@@ -494,6 +496,84 @@ export function App() {
     setScene(newScene);
     setSelectedIds(new Set(newScene.selection));
   }, [scene, selectedIds]);
+
+  const handleCopy = useCallback(() => {
+    if (selectedIds.size === 0) return;
+    setClipboard(scene.objects.filter(o => selectedIds.has(o.id)));
+  }, [scene, selectedIds]);
+
+  const handlePaste = useCallback(() => {
+    if (clipboard.length === 0) return;
+    const newIds = new Set<string>();
+    const parentIdMap = new Map<string, string>();
+
+    const pasted = clipboard.map(obj => {
+      const newId = generateId();
+      newIds.add(newId);
+
+      let newParentId = obj.parentId;
+      if (obj.parentId) {
+        if (!parentIdMap.has(obj.parentId)) {
+          parentIdMap.set(obj.parentId, generateId());
+        }
+        newParentId = parentIdMap.get(obj.parentId)!;
+      }
+
+      return {
+        ...obj,
+        id: newId,
+        parentId: newParentId,
+        name: obj.name,
+        powerScale: obj.powerScale ?? 1,
+        transform: { ...obj.transform, tx: obj.transform.tx + 10, ty: obj.transform.ty + 10 },
+        _bounds: null,
+        _worldTransform: null,
+      };
+    });
+    const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
+    handleSceneCommit(newScene);
+    setSelectedIds(newIds);
+    setClipboard(pasted);
+  }, [clipboard, scene, handleSceneCommit]);
+
+  const handleKeyboardSave = useCallback(async () => {
+    try {
+      saveSceneToFile(scene);
+      try {
+        const serialized = serializeScene(scene);
+        localStorage.setItem('laserforge_autosave', serialized);
+        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+      } catch { /* ignore */ }
+    } catch (e) {
+      await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
+    }
+  }, [scene, showAlert]);
+
+  const handleKeyboardOpen = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,.laserforge.json';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        handleNewProject(deserializeScene(text));
+      } catch (err) {
+        await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
+      }
+    };
+    input.click();
+  }, [handleNewProject, showAlert]);
+
+  const handleKeyboardNew = useCallback(async () => {
+    if (scene.objects.length > 0) {
+      const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
+      if (!ok) return;
+    }
+    try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
+    handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'));
+  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, handleNewProject, showConfirm]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
@@ -1115,210 +1195,101 @@ export function App() {
     setSelectedIds(new Set(objects.map(o => o.id)));
   }, [scene, handleSceneCommit]);
 
-  // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
-
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const target = e.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      const isTextInput =
-        tag === 'input' || tag === 'textarea' || tag === 'select' || target?.isContentEditable;
-
-      if (isTextInput) {
-        if (e.key === 'Escape') {
-          target.blur();
-          return;
-        }
-        return;
+  const handleNudge = useCallback((dx: number, dy: number, commit: boolean) => {
+    if (commit) {
+      if (isNudgingRef.current && nudgeSceneRef.current) {
+        handleSceneCommit(nudgeSceneRef.current);
+        isNudgingRef.current = false;
+        nudgeSceneRef.current = null;
       }
+      return;
+    }
+    if (selectedIds.size === 0) return;
+    const baseScene = nudgeSceneRef.current || scene;
+    const newScene = {
+      ...baseScene,
+      objects: baseScene.objects.map(o =>
+        selectedIds.has(o.id)
+          ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
+          : o
+      ),
+    };
+    handleSceneChange(newScene);
+    nudgeSceneRef.current = newScene;
+    isNudgingRef.current = true;
+  }, [scene, selectedIds, handleSceneChange, handleSceneCommit]);
 
-      const isMod = e.ctrlKey || e.metaKey;
-
-      // Modifier shortcuts
-      if (isMod) {
-        if (e.key === 'z' && !e.shiftKey) {
-          e.preventDefault();
-          handleUndo();
-        } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey)) {
-          e.preventDefault();
-          handleRedo();
-        } else if (e.key === 'a') {
-          e.preventDefault();
-          handleSelectAll();
-        } else if (e.key === 'c' && e.ctrlKey && selectedIds.size > 0) {
-          e.preventDefault();
-          setClipboard(scene.objects.filter(o => selectedIds.has(o.id)));
-          return;
-        } else if (e.key === 'v' && e.ctrlKey && clipboard.length > 0) {
-          e.preventDefault();
-          const newIds = new Set<string>();
-          const parentIdMap = new Map<string, string>();
-
-          const pasted = clipboard.map(obj => {
-            const newId = generateId();
-            newIds.add(newId);
-
-            let newParentId = obj.parentId;
-            if (obj.parentId) {
-              if (!parentIdMap.has(obj.parentId)) {
-                parentIdMap.set(obj.parentId, generateId());
-              }
-              newParentId = parentIdMap.get(obj.parentId)!;
-            }
-
-            return {
-              ...obj,
-              id: newId,
-              parentId: newParentId,
-              name: obj.name,
-              powerScale: obj.powerScale ?? 1,
-              transform: { ...obj.transform, tx: obj.transform.tx + 10, ty: obj.transform.ty + 10 },
-              _bounds: null,
-              _worldTransform: null,
-            };
-          });
-          const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
-          handleSceneCommit(newScene);
-          setSelectedIds(newIds);
-          setClipboard(pasted);
-          return;
-        } else if (e.key === 'd' && e.ctrlKey && selectedIds.size > 0) {
-          e.preventDefault();
-          const newIds = new Set<string>();
-          const clones: typeof scene.objects = [];
-
-          const parentIdMap = new Map<string, string>();
-
-          for (const obj of scene.objects) {
-            if (!selectedIds.has(obj.id)) continue;
-            const newId = generateId();
-            newIds.add(newId);
-
-            let newParentId = obj.parentId;
-            if (obj.parentId) {
-              if (!parentIdMap.has(obj.parentId)) {
-                parentIdMap.set(obj.parentId, generateId());
-              }
-              newParentId = parentIdMap.get(obj.parentId)!;
-            }
-
-            clones.push({
-              ...obj,
-              id: newId,
-              parentId: newParentId,
-              name: obj.name + ' copy',
-              powerScale: obj.powerScale ?? 1,
-              transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
-              _bounds: null,
-              _worldTransform: null,
-            });
-          }
-          const newScene = { ...scene, objects: [...scene.objects, ...clones] };
-          handleSceneCommit(newScene);
-          setSelectedIds(newIds);
-          return;
-        }
-        if (e.ctrlKey && e.shiftKey && selectedIds.size === 2) {
-          const bk = e.key.toLowerCase();
-          if (bk === 'u') {
-            e.preventDefault();
-            void handleBooleanOp('union');
-            return;
-          }
-          if (bk === 's') {
-            e.preventDefault();
-            void handleBooleanOp('subtract');
-            return;
-          }
-          if (bk === 'i') {
-            e.preventDefault();
-            void handleBooleanOp('intersect');
-            return;
-          }
-        }
-        if (e.key === 'C' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
-          e.preventDefault();
-          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
-          return;
-        }
-        // Grid array: Ctrl+Shift+A
-        if (e.key === 'A' && e.ctrlKey && e.shiftKey && selectedIds.size > 0) {
-          e.preventDefault();
-          handleGridArray();
-          return;
-        }
-        // Preview G-code: Ctrl+P
-        if (e.key === 'p' || e.key === 'P') {
-          e.preventDefault();
+  useKeyboardShortcuts(
+    useMemo(
+      () => ({
+        onUndo: handleUndo,
+        onRedo: handleRedo,
+        onSave: () => void handleKeyboardSave(),
+        onOpen: handleKeyboardOpen,
+        onNew: () => void handleKeyboardNew(),
+        onSelectAll: handleSelectAll,
+        onDelete: handleDelete,
+        onCopy: handleCopy,
+        onPaste: handlePaste,
+        onDuplicate: handleDuplicate,
+        onEscape: () => {
+          handleClearSelection();
+          setActiveTool('select');
+        },
+        onZoomIn: () => viewportActionsRef.current?.zoomIn(),
+        onZoomOut: () => viewportActionsRef.current?.zoomOut(),
+        onZoomFit: () => viewportActionsRef.current?.fitToBed(),
+        onToolSelect: () => setActiveTool('select'),
+        onToolRect: () => setActiveTool('rect'),
+        onToolEllipse: () => setActiveTool('ellipse'),
+        onToolLine: () => setActiveTool('line'),
+        onToolText: () => setActiveTool('text'),
+        onToolNode: () => setActiveTool('node'),
+        onToolPan: () => {},
+        onToggleToolpath: () => {
           try {
             const gc = compileGcode(scene);
             if (gc) setGcodePreview(gc);
           } catch (err) {
             console.error('G-code generation failed:', err);
           }
-          return;
-        }
-        return;
-      }
-
-      // Non-modifier shortcuts
-      if (e.key === '?' || (e.key === '/' && e.shiftKey)) {
-        setShowShortcuts(s => !s);
-        return;
-      }
-      if (e.key === 'Delete' || e.key === 'Backspace') {
-        e.preventDefault();
-        handleDelete();
-      } else if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedIds.size > 0) {
-        e.preventDefault();
-        const step = e.shiftKey ? 0.1 : 1;
-        const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
-        const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
-
-        // Use the latest scene (may already be mid-nudge)
-        const baseScene = nudgeSceneRef.current || scene;
-        const newScene = {
-          ...baseScene,
-          objects: baseScene.objects.map(o =>
-            selectedIds.has(o.id)
-              ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
-              : o
-          ),
-        };
-        handleSceneChange(newScene); // Preview only — no history
-        nudgeSceneRef.current = newScene;
-        isNudgingRef.current = true;
-        return;
-      } else if (e.key === 'Escape') {
-        handleClearSelection();
-      } else if (e.key === 't' || e.key === 'T') {
-        e.preventDefault();
-        setActiveTool('text');
-        return;
-      } else if (e.key === 'n' || e.key === 'N') {
-        e.preventDefault();
-        setActiveTool('node');
-        return;
-      }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, handleSceneChange, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset, compileGcode]);
-
-  useEffect(() => {
-    const handleKeyUp = (e: KeyboardEvent) => {
-      if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
-        if (isNudgingRef.current && nudgeSceneRef.current) {
-          handleSceneCommit(nudgeSceneRef.current);
-          isNudgingRef.current = false;
-          nudgeSceneRef.current = null;
-        }
-      }
-    };
-    window.addEventListener('keyup', handleKeyUp);
-    return () => window.removeEventListener('keyup', handleKeyUp);
-  }, [handleSceneCommit]);
+        },
+        onToggleShortcuts: () => setShowShortcuts(s => !s),
+        onNudge: handleNudge,
+        selectionCount: selectedIds.size,
+        clipboardItemCount: clipboard.length,
+        onBooleanUnion: () => void handleBooleanOp('union'),
+        onBooleanSubtract: () => void handleBooleanOp('subtract'),
+        onBooleanIntersect: () => void handleBooleanOp('intersect'),
+        onAlignSelectionCenter: () => {
+          if (selectedIds.size === 0) return;
+          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
+        },
+        onGridArray: handleGridArray,
+      }),
+      [
+        handleUndo,
+        handleRedo,
+        handleKeyboardSave,
+        handleKeyboardOpen,
+        handleKeyboardNew,
+        handleSelectAll,
+        handleDelete,
+        handleCopy,
+        handlePaste,
+        handleDuplicate,
+        handleClearSelection,
+        handleNudge,
+        handleBooleanOp,
+        handleGridArray,
+        compileGcode,
+        scene,
+        selectedIds,
+        clipboard,
+        handleSceneCommit,
+      ],
+    ),
+  );
 
   const hasSelectedText = scene.objects.some(o =>
     selectedIds.has(o.id) && o.geometry.type === 'text'
