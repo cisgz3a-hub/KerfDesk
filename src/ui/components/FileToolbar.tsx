@@ -13,7 +13,6 @@
  */
 
 import React, { useRef, useCallback } from 'react';
-import { theme } from '../styles/theme';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
@@ -67,7 +66,7 @@ export function FileToolbar({
   showConfirm,
   onConnect,
   onSetup,
-  onMaterialTest,
+  onMaterialTest: _onMaterialTest,
   onMaterialSetup,
   onTemplates,
   onBoxGenerator,
@@ -398,234 +397,155 @@ export function FileToolbar({
 
   // ─── RENDER ──────────────────────────────────────────────────
 
-  const btnStyle: React.CSSProperties = {
-    padding: '5px 14px',
-    background: 'transparent',
-    border: '1px solid transparent',
-    borderRadius: theme.radius.sm,
-    color: theme.text.secondary,
-    fontSize: theme.font.size.sm,
-    fontFamily: theme.font.ui,
-    cursor: 'pointer',
-    transition: `all ${theme.transition.fast}`,
-    fontWeight: 500,
-    flexShrink: 0,
-  };
+  const font = "'DM Sans', system-ui, sans-serif";
 
-  const btnBase = btnStyle;
+  const iconBtn = (
+    label: string,
+    title: string,
+    onClick: (() => void) | undefined,
+    opts?: { disabled?: boolean; color?: string; bg?: string; bold?: boolean },
+  ) =>
+    React.createElement('button', {
+      onClick,
+      title,
+      disabled: opts?.disabled,
+      style: {
+        padding: '4px 8px',
+        fontSize: 11,
+        cursor: opts?.disabled ? 'default' : 'pointer',
+        background: opts?.bg || 'transparent',
+        border: 'none',
+        borderRadius: 4,
+        color: opts?.disabled ? '#333355' : (opts?.color || '#8888aa'),
+        fontFamily: font,
+        fontWeight: opts?.bold ? 600 : 400,
+        whiteSpace: 'nowrap' as const,
+        opacity: opts?.disabled ? 0.4 : 1,
+        transition: 'background 0.1s',
+        flexShrink: 0,
+      },
+      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+        if (!opts?.disabled) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+      },
+      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+        (e.target as HTMLElement).style.background = opts?.bg || 'transparent';
+      },
+    }, label);
 
-  const stdText = String(theme.text.secondary);
-
-  const stdHover = {
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-      const el = e.currentTarget;
-      if (el.disabled) return;
-      el.style.background = '#1a1a2e';
-      el.style.borderColor = '#333355';
-      el.style.color = '#e0e0ec';
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-      const el = e.currentTarget;
-      if (el.disabled) return;
-      el.style.background = 'transparent';
-      el.style.borderColor = 'transparent';
-      el.style.color = stdText;
-    },
-  };
-
-  const undoRedoHover = (enabled: boolean) => ({
-    onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!enabled) return;
-      const el = e.currentTarget;
-      el.style.background = '#1a1a2e';
-      el.style.borderColor = '#333355';
-      el.style.color = '#e0e0ec';
-    },
-    onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-      if (!enabled) return;
-      const el = e.currentTarget;
-      el.style.background = 'transparent';
-      el.style.borderColor = 'transparent';
-      el.style.color = stdText;
-    },
-  });
-
-  const sep = React.createElement('div', { style: { width: 1, height: 20, background: '#252540', margin: '0 4px', flexShrink: 0 } });
+  const sep = () =>
+    React.createElement('div', {
+      style: { width: 1, height: 18, background: '#1a1a2e', margin: '0 4px', flexShrink: 0 },
+    });
 
   return React.createElement('div', {
     style: {
       display: 'flex',
       alignItems: 'center',
-      gap: 2,
-      padding: '4px 8px',
-      background: theme.bg.panel,
-      borderBottom: `1px solid ${theme.border.subtle}`,
-      fontFamily: theme.font.ui,
-      flexWrap: 'nowrap' as const,
-      overflowX: 'auto' as const,
-      overflowY: 'hidden' as const,
+      height: 34,
+      background: '#0d0d18',
+      borderBottom: '1px solid #1a1a2e',
+      padding: '0 8px',
+      gap: 1,
+      fontFamily: font,
+      flexShrink: 0,
+      overflow: 'hidden',
     },
   },
+    React.createElement('button', {
+      onClick: () => onToggleProductionMode?.(),
+      title: productionMode ? 'Switch to Beginner Mode' : 'Switch to Production Mode',
+      style: {
+        padding: '3px 8px',
+        fontSize: 9,
+        fontWeight: 700,
+        cursor: 'pointer',
+        background: productionMode ? 'rgba(255,170,50,0.15)' : 'rgba(45,212,160,0.15)',
+        border: productionMode ? '1px solid rgba(255,170,50,0.3)' : '1px solid rgba(45,212,160,0.3)',
+        borderRadius: 4,
+        flexShrink: 0,
+        fontFamily: font,
+        color: productionMode ? '#ffaa32' : '#2dd4a0',
+      },
+    }, productionMode ? 'PRO' : 'EASY'),
+
+    sep(),
+
     React.createElement('span', {
       title: 'Project name',
       style: {
         color: '#555570',
         fontSize: 11,
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        fontStyle: 'italic' as const,
-        marginRight: 8,
         maxWidth: 120,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap' as const,
+        flexShrink: 1,
       },
     }, projectName || 'Untitled'),
-    React.createElement('button', {
-      onClick: () => onToggleProductionMode?.(),
-      title: productionMode ? 'Switch to Beginner Mode — simpler controls' : 'Switch to Production Mode — full control',
-      style: {
-        padding: '3px 8px', fontSize: 9, fontWeight: 700, cursor: 'pointer',
-        background: productionMode ? 'rgba(255, 170, 50, 0.15)' : 'rgba(45, 212, 160, 0.15)',
-        border: productionMode ? '1px solid rgba(255, 170, 50, 0.4)' : '1px solid rgba(45, 212, 160, 0.4)',
-        borderRadius: 4,
-        color: productionMode ? '#ffaa32' : '#2dd4a0',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        whiteSpace: 'nowrap' as const,
-        flexShrink: 0,
-      },
-    }, productionMode ? 'PRO' : 'EASY'),
-    React.createElement('button', { onClick: handleNew, style: btnStyle, title: 'New project (clear canvas)', ...stdHover }, 'New'),
-    React.createElement('button', { onClick: handleOpenClick, style: btnStyle, title: 'Open saved project', ...stdHover }, 'Open'),
-    React.createElement('button', { onClick: handleSave, style: btnStyle, title: 'Save project (Ctrl+S)', ...stdHover }, 'Save'),
-    React.createElement('button', {
-      onClick: () => onUndo?.(),
-      disabled: !canUndo,
-      title: 'Undo (Ctrl+Z)',
-      style: {
-        ...btnBase,
-        opacity: canUndo ? 1 : 0.3,
-        cursor: canUndo ? 'pointer' : 'default',
-        fontSize: 14,
-        padding: '4px 8px',
-        flexShrink: 0,
-      },
-      ...undoRedoHover(!!canUndo),
-    }, '↩'),
-    React.createElement('button', {
-      onClick: () => onRedo?.(),
-      disabled: !canRedo,
-      title: 'Redo (Ctrl+Y)',
-      style: {
-        ...btnBase,
-        opacity: canRedo ? 1 : 0.3,
-        cursor: canRedo ? 'pointer' : 'default',
-        fontSize: 14,
-        padding: '4px 8px',
-        flexShrink: 0,
-      },
-      ...undoRedoHover(!!canRedo),
-    }, '↪'),
-    sep,
-    React.createElement('button', { onClick: handleImportClick, style: btnStyle, title: 'Import SVG vector file', ...stdHover }, 'SVG'),
-    React.createElement('button', { onClick: handleImportImageClick, style: btnStyle, title: 'Import JPG/PNG image for tracing or engraving', ...stdHover }, 'Image'),
-    React.createElement('button', { onClick: handleImportDxfClick, style: btnStyle, title: 'Import DXF CAD file', ...stdHover }, 'DXF'),
-    sep,
-    React.createElement('button', { onClick: handleGenerateGcode, style: btnStyle, title: 'Generate G-code for laser', ...stdHover }, 'G-code'),
-    React.createElement('button', {
-      onClick: () => onToolpathPreview?.(),
-      style: btnStyle,
-      title: 'Preview laser toolpath — see exactly how the laser will move (Ctrl+P)',
-      ...stdHover,
-    }, 'Toolpath'),
-    React.createElement('button', { onClick: handleExportSvg, style: btnStyle, title: 'Export design as SVG file', ...stdHover }, 'Export'),
-    sep,
+
+    sep(),
+
+    iconBtn('New', 'New project (Ctrl+N)', handleNew),
+    iconBtn('Open', 'Open project (Ctrl+O)', handleOpenClick),
+    iconBtn('Save', 'Save project (Ctrl+S)', handleSave),
+
+    sep(),
+
+    iconBtn('↩', 'Undo (Ctrl+Z)', () => onUndo?.(), { disabled: !canUndo }),
+    iconBtn('↪', 'Redo (Ctrl+Y)', () => onRedo?.(), { disabled: !canRedo }),
+
+    sep(),
+
+    iconBtn('SVG', 'Import SVG file', handleImportClick),
+    iconBtn('IMG', 'Import image (PNG/JPG)', handleImportImageClick),
+    productionMode && iconBtn('DXF', 'Import DXF file', handleImportDxfClick),
+
+    sep(),
+
+    iconBtn('G-code', 'Export G-code file', handleGenerateGcode, { color: '#2dd4a0' }),
+    iconBtn('Export', 'Export as SVG', handleExportSvg),
+
+    sep(),
+
+    iconBtn('⎘ Toolpath', 'Preview laser toolpath (Ctrl+P)', () => { void onToolpathPreview?.(); }, { color: '#00d4ff' }),
     React.createElement('button', {
       onClick: () => onPreviewToggle?.(),
       title: 'Toggle burn preview — see how it will look on material',
       style: {
-        padding: '5px 14px',
-        background: previewMode ? 'rgba(45, 212, 160, 0.15)' : 'transparent',
-        border: previewMode ? '1px solid #2dd4a0' : '1px solid transparent',
+        padding: '4px 8px',
+        fontSize: 11,
+        cursor: 'pointer',
+        background: previewMode ? 'rgba(45,212,160,0.12)' : 'transparent',
+        border: 'none',
         borderRadius: 4,
         color: previewMode ? '#2dd4a0' : '#8888aa',
-        fontSize: '11px',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        cursor: 'pointer',
+        fontFamily: font,
         fontWeight: 600,
-        transition: 'all 0.15s ease',
         flexShrink: 0,
+        transition: 'background 0.1s',
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
         const el = e.currentTarget;
-        if (previewMode) {
-          el.style.background = 'rgba(45, 212, 160, 0.22)';
-          el.style.borderColor = '#3de8b0';
-          el.style.color = '#4dffc0';
-        } else {
-          el.style.background = '#1a1a2e';
-          el.style.borderColor = '#333355';
-          el.style.color = '#2dd4a0';
-        }
+        el.style.background = previewMode ? 'rgba(45,212,160,0.2)' : 'rgba(255,255,255,0.05)';
       },
       onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
         const el = e.currentTarget;
-        if (previewMode) {
-          el.style.background = 'rgba(45, 212, 160, 0.15)';
-          el.style.borderColor = '#2dd4a0';
-          el.style.color = '#2dd4a0';
-        } else {
-          el.style.background = 'transparent';
-          el.style.borderColor = 'transparent';
-          el.style.color = '#8888aa';
-        }
+        el.style.background = previewMode ? 'rgba(45,212,160,0.12)' : 'transparent';
       },
     }, previewMode ? '● Preview' : '○ Preview'),
-    React.createElement('button', { onClick: () => onConnect?.(), style: btnStyle, title: 'Connect to laser (GRBL)', ...stdHover }, 'Connect'),
-    sep,
-    React.createElement('button', { onClick: () => onSetup?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Change laser machine and workspace settings', ...stdHover }, 'Setup'),
-    React.createElement('button', {
-      onClick: () => onTemplates?.(),
-      style: { ...btnStyle, padding: '4px 6px', fontSize: 11 },
-      title: 'Browse starter designs — keychains, signs, coasters, and more',
-      ...stdHover,
-    }, 'Templates'),
-    React.createElement('button', {
-      onClick: () => onBoxGenerator?.(),
-      style: btnStyle,
-      title: 'Generate a parametric laser-cut box with finger joints',
-      ...stdHover,
-    }, 'Box'),
-    React.createElement('button', { onClick: () => onMaterialSetup?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Set material type and size', ...stdHover }, 'Material'),
-    React.createElement('button', { onClick: () => onMaterialTest?.(), style: { ...btnStyle, padding: '4px 6px', fontSize: 11 }, title: 'Generate power/speed test grid', ...stdHover }, 'Test'),
+    iconBtn('⌁ Connect', 'Connect to laser', () => onConnect?.(), { color: '#00d4ff', bold: true }),
+
+    sep(),
+
+    iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
+    iconBtn('▢ Box', 'Generate a parametric laser-cut box', () => onBoxGenerator?.()),
 
     React.createElement('div', { style: { flex: 1 } }),
-    React.createElement('button', {
-      onClick: () => onShowShortcuts?.(),
-      title: 'Keyboard shortcuts (?)',
-      style: {
-        padding: '4px 10px',
-        background: 'transparent',
-        border: '1px solid transparent',
-        borderRadius: 4,
-        color: '#555570',
-        fontSize: 13,
-        cursor: 'pointer',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        flexShrink: 0,
-      },
-      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = '#1a1a2e';
-        el.style.borderColor = '#333355';
-        el.style.color = '#e0e0ec';
-      },
-      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = 'transparent';
-        el.style.borderColor = 'transparent';
-        el.style.color = '#555570';
-      },
-    }, '?'),
+
+    productionMode && iconBtn('Material', 'Material settings', () => onMaterialSetup?.()),
+    productionMode && iconBtn('Setup', 'Machine setup', () => onSetup?.()),
+
+    iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
 
     // Hidden file input for SVG import
     React.createElement('input', {
