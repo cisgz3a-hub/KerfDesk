@@ -33,6 +33,8 @@ import {
 } from '../../core/scene/SceneObject';
 import { type Layer, createLayer } from '../../core/scene/Layer';
 import { type SvgElement, parseSvg } from './SvgParser';
+
+type SvgColorMode = 'cut' | 'engrave' | 'score';
 import { parsePathData } from './PathParser';
 import { computeSceneBounds } from '../../geometry/bounds';
 import {
@@ -59,13 +61,15 @@ export function importSvgToScene(
   // Canvas size comes from unit-converted dimensions
   const scene = createScene(parsed.widthMm, parsed.heightMm, name);
 
-  // Create default layers for common operations
-  const cutLayer = scene.layers[0]; // Default layer is 'cut'
-
-  // Convert each SVG element to a SceneObject
+  let currentLayers = [...scene.layers];
   const objects: SceneObject[] = [];
   for (const el of parsed.elements) {
-    const layerId = resolveLayerId(el, cutLayer.id);
+    const strokeColor = getSvgElementColor(el, 'stroke');
+    const fillColor = getSvgElementColor(el, 'fill');
+    const effectiveColor = strokeColor && strokeColor !== 'none' ? strokeColor : fillColor;
+    const mode = colorToLayerMode(effectiveColor);
+    const { layers: updatedLayers, layerId } = getOrCreateLayer(currentLayers, mode);
+    currentLayers = updatedLayers;
     const obj = convertElement(el, layerId);
     if (obj) objects.push(obj);
   }
@@ -78,7 +82,7 @@ export function importSvgToScene(
     }
   }
 
-  return { ...scene, objects };
+  return { ...scene, layers: currentLayers, objects };
 }
 
 /**
@@ -99,10 +103,24 @@ export function importSvgIntoScene(
 ): Scene {
   const parsed = parseSvg(svgString);
 
-  // Convert SVG elements to SceneObjects
+  let currentLayers = [...scene.layers];
   let objects: SceneObject[] = [];
   for (const el of parsed.elements) {
-    const obj = convertElement(el, layerId);
+    const strokeColor = getSvgElementColor(el, 'stroke');
+    const fillColor = getSvgElementColor(el, 'fill');
+    const effectiveColor = strokeColor && strokeColor !== 'none' ? strokeColor : fillColor;
+
+    let layerIdForObj: string;
+    if (effectiveColor == null || effectiveColor === '' || effectiveColor === 'none') {
+      layerIdForObj = layerId;
+    } else {
+      const mode = colorToLayerMode(effectiveColor);
+      const { layers: updatedLayers, layerId: mappedId } = getOrCreateLayer(currentLayers, mode);
+      currentLayers = updatedLayers;
+      layerIdForObj = mappedId;
+    }
+
+    const obj = convertElement(el, layerIdForObj);
     if (obj) objects.push(obj);
   }
 
@@ -142,6 +160,7 @@ export function importSvgIntoScene(
 
   return {
     ...scene,
+    layers: currentLayers,
     objects: [...scene.objects, ...objects],
     metadata: {
       ...scene.metadata,
@@ -150,27 +169,97 @@ export function importSvgIntoScene(
   };
 }
 
-// ─── LAYER RESOLUTION ────────────────────────────────────────────
+// ─── SVG COLOR → LAYER MODE ──────────────────────────────────────
 
 /**
- * Determine which layer an SVG element should go on based on its
- * stroke/fill attributes. For now: everything goes to the default layer.
- *
- * Future: color-based layer mapping (LightBurn-style):
- *   - Elements with fill → engrave layer
- *   - Elements with stroke only → cut layer
- *   - Color grouping → separate layers per color
- *
- * The SVG stroke/fill values are preserved in the element's attrs
- * and can be used for this mapping when layer management is wired.
+ * Extract stroke/fill from flattened SvgElement (attribute or style).
+ * Group inheritance is not available after flattening; colors should be on each shape or in style.
  */
-function resolveLayerId(el: SvgElement, defaultLayerId: string): string {
-  // Future hooks:
-  // const fill = el.attrs['fill'];
-  // const stroke = el.attrs['stroke'];
-  // if (fill && fill !== 'none') return engraveLayerId;
-  // if (stroke && stroke !== 'none') return cutLayerId;
-  return defaultLayerId;
+function getSvgElementColor(el: SvgElement, attr: 'stroke' | 'fill'): string | null {
+  const direct = el.attrs[attr];
+  if (direct && direct !== 'inherit') return direct;
+
+  const style = el.attrs['style'];
+  if (style) {
+    const match = style.match(new RegExp(`${attr}\\s*:\\s*([^;]+)`, 'i'));
+    if (match) return match[1].trim();
+  }
+
+  return null;
+}
+
+/**
+ * Map SVG stroke/fill color to a laser layer mode.
+ * Follows the universal laser convention:
+ *   Red → cut
+ *   Blue → engrave
+ *   Green → score
+ *   Black → engrave (default for filled shapes)
+ *   Everything else → cut
+ */
+function colorToLayerMode(color: string | null | undefined): SvgColorMode {
+  if (!color || color === 'none') return 'cut';
+
+  const c = color.toLowerCase().trim();
+
+  // Named colors
+  if (c === 'red' || c === 'crimson' || c === 'darkred') return 'cut';
+  if (c === 'blue' || c === 'navy' || c === 'darkblue' || c === 'royalblue') return 'engrave';
+  if (c === 'green' || c === 'lime' || c === 'darkgreen' || c === 'forestgreen') return 'score';
+  if (c === 'black' || c === '#000' || c === '#000000') return 'engrave';
+
+  // Hex colors — extract RGB
+  let r = 0;
+  let g = 0;
+  let b = 0;
+
+  if (c.startsWith('#')) {
+    const hex = c.slice(1);
+    if (hex.length === 3) {
+      r = parseInt(hex[0] + hex[0], 16);
+      g = parseInt(hex[1] + hex[1], 16);
+      b = parseInt(hex[2] + hex[2], 16);
+    } else if (hex.length === 6) {
+      r = parseInt(hex.slice(0, 2), 16);
+      g = parseInt(hex.slice(2, 4), 16);
+      b = parseInt(hex.slice(4, 6), 16);
+    }
+  } else if (c.startsWith('rgb')) {
+    const match = c.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (match) {
+      r = parseInt(match[1], 10);
+      g = parseInt(match[2], 10);
+      b = parseInt(match[3], 10);
+    }
+  }
+
+  // Classify by dominant channel
+  if (r > 150 && g < 100 && b < 100) return 'cut';       // Red-ish
+  if (b > 150 && r < 100 && g < 100) return 'engrave';   // Blue-ish
+  if (g > 150 && r < 100 && b < 100) return 'score';    // Green-ish
+
+  // Default
+  return 'cut';
+}
+
+function getOrCreateLayer(
+  layers: Layer[],
+  mode: SvgColorMode
+): { layers: Layer[]; layerId: string } {
+  const existing = layers.find(l => l.settings.mode === mode);
+  if (existing) {
+    return { layers, layerId: existing.id };
+  }
+
+  const newLayer = createLayer(
+    layers.length,
+    mode,
+    mode === 'cut' ? 'Cut' : mode === 'engrave' ? 'Engrave' : 'Score'
+  );
+  return {
+    layers: [...layers, newLayer],
+    layerId: newLayer.id,
+  };
 }
 
 // ─── ELEMENT CONVERSION ──────────────────────────────────────────
