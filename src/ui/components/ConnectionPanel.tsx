@@ -244,16 +244,30 @@ export function ConnectionPanel({
     const x2 = boundsMaxX ?? 100;
     const y2 = boundsMaxY ?? 100;
 
+    // Safety check: warn if frame is very large or has negative coordinates
+    const warnings: string[] = [];
+    if (x1 < 0 || y1 < 0) warnings.push('Design has negative coordinates — laser may hit limit switches');
+    if (x2 > bedWidth || y2 > bedHeight) warnings.push('Design extends beyond bed size');
+    if ((x2 - x1) > bedWidth * 0.9 || (y2 - y1) > bedHeight * 0.9) warnings.push('Frame covers most of the bed — make sure the laser has room');
+
+    if (warnings.length > 0) {
+      if (!confirm('Frame warnings:\n\n' + warnings.join('\n') + '\n\nFrame anyway?')) return;
+    }
+
     setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
 
     const cmds = [
-      'G21', 'G90', 'M4 S10',
-      `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)}`,
-      `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F2000`,
-      `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F2000`,
-      `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F2000`,
-      `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F2000`,
-      'M5 S0',
+      '$X',                          // Unlock if in alarm from previous attempt
+      'G21',                         // mm mode
+      'G90',                         // absolute positioning
+      'M5 S0',                       // Laser off for safety
+      `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)} F1000`,  // Move to start at controlled speed
+      'M4 S10',                      // Very low power — just visible dot
+      `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F1500`,  // Trace top edge
+      `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F1500`,  // Trace right edge
+      `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F1500`,  // Trace bottom edge
+      `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F1500`,  // Trace left edge
+      'M5 S0',                       // Laser off
     ];
 
     for (const cmd of cmds) {
