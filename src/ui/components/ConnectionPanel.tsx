@@ -521,12 +521,18 @@ export function ConnectionPanel({
 
       // Quick start guide
       isConnected && React.createElement('div', {
-        style: { padding: '8px 18px', background: 'rgba(0,212,255,0.04)', borderBottom: '1px solid #1a1a2e', fontSize: 11, color: '#8888aa', lineHeight: 1.5 },
+        style: {
+          padding: '8px 18px', background: 'rgba(0,212,255,0.04)',
+          borderBottom: '1px solid #1a1a2e', fontSize: 11, color: '#8888aa', lineHeight: 1.5,
+        },
       },
         React.createElement('strong', { style: { color: '#00d4ff', fontSize: 10, display: 'block', marginBottom: 4 } }, 'QUICK START'),
-        '1. Jog laser to your workpiece corner', React.createElement('br'),
-        '2. Click ZERO to set starting point', React.createElement('br'),
-        '3. Click Frame to verify, then Start Job',
+        '1. Use jog buttons to position the laser (not by hand)', React.createElement('br'),
+        '2. Click ZERO to mark that as the starting point', React.createElement('br'),
+        '3. Click Frame to verify, then Start Job', React.createElement('br'),
+        React.createElement('span', { style: { color: '#ffaa32', fontSize: 10 } },
+          'If you moved the laser by hand, press ZERO to sync the position first.'
+        ),
       ),
 
       // Proof mode — dry run (pairs with readiness score)
@@ -591,9 +597,28 @@ export function ConnectionPanel({
             React.createElement('div'),
             React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
             React.createElement('button', {
-              onClick: () => {
-                sendCmd('G10 L20 P1 X0 Y0');
-                setMessages(prev => [...prev, 'Zero command sent — position updates on next status report']);
+              onClick: async () => {
+                const ctrl = controllerRef.current;
+                if (!ctrl) return;
+
+                try {
+                  // Soft reset (realtime 0x18 via controller — sendCommand('\\x18') would wrongly buffer as G-code)
+                  ctrl.stop();
+                  await new Promise(r => setTimeout(r, 1000));
+
+                  ctrl.sendCommand('$X');
+                  await new Promise(r => setTimeout(r, 500));
+
+                  ctrl.sendCommand('G10 L20 P1 X0 Y0');
+                  await new Promise(r => setTimeout(r, 200));
+
+                  ctrl.sendCommand('G21');
+                  ctrl.sendCommand('G90');
+
+                  setMessages(prev => [...prev, '✓ Position synced and zeroed — laser will cut from here']);
+                } catch {
+                  setMessages(prev => [...prev, 'Zero failed — try again']);
+                }
               },
               title: 'Set current position as X0 Y0',
               style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
