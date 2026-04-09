@@ -94,6 +94,7 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
           : templates.map(t =>
               React.createElement('div', {
                 key: t.id,
+                title: `${t.name}\n${t.description}\n${t.svgWidth}×${t.svgHeight}mm`,
                 onClick: () => onSelect(t),
                 onMouseEnter: () => setHoveredId(t.id),
                 onMouseLeave: () => setHoveredId(null),
@@ -102,8 +103,8 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                   border: hoveredId === t.id ? '1px solid #00d4ff' : '1px solid #1a1a2e',
                   borderRadius: 10, cursor: 'pointer',
                   transition: 'all 0.2s ease',
-                  transform: hoveredId === t.id ? 'translateY(-2px)' : 'none',
                   overflow: 'hidden',
+                  position: 'relative' as const,
                 },
               },
                 // SVG Preview
@@ -111,6 +112,8 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                   style: {
                     height: 90, display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: '#08080f', padding: 12, borderRadius: '10px 10px 0 0',
+                    transition: 'transform 0.2s ease',
+                    transform: hoveredId === t.id ? 'scale(1.15)' : 'scale(1)',
                   },
                   dangerouslySetInnerHTML: {
                     __html: t.svg.replace(/stroke="red"/g, 'stroke="#ff4466"')
@@ -120,20 +123,14 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                       .replace(/<svg /, '<svg style="max-width:100%;max-height:66px;width:auto;height:auto;" '),
                   },
                 }),
-                // Info
-                React.createElement('div', { style: { padding: '12px 14px 14px' } },
-                  React.createElement('div', { style: { color: '#e0e0ec', fontSize: 12, fontWeight: 500, marginBottom: 3 } }, t.name),
-                  React.createElement('div', { style: { color: '#555570', fontSize: 10, lineHeight: 1.4 } }, t.description),
-                  React.createElement('div', { style: { marginTop: 6, display: 'flex', gap: 4 } },
+                // Info section
+                React.createElement('div', { style: { padding: '8px 10px 10px' } },
+                  React.createElement('div', { style: { color: '#e0e0ec', fontSize: 11, fontWeight: 600, marginBottom: 2, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' } }, t.name),
+                  React.createElement('div', { style: { color: '#555570', fontSize: 9, marginBottom: 4, whiteSpace: 'nowrap' as const, overflow: 'hidden', textOverflow: 'ellipsis' } }, t.description),
+                  React.createElement('div', { style: { display: 'flex', gap: 3 } },
                     React.createElement('span', {
-                      style: { fontSize: 9, color: '#444460', background: '#0a0a14', padding: '2px 6px', borderRadius: 3 },
+                      style: { fontSize: 8, color: '#444460', background: '#0a0a14', padding: '1px 5px', borderRadius: 3 },
                     }, `${t.svgWidth}×${t.svgHeight}mm`),
-                    ...t.tags.slice(0, 2).map(tag =>
-                      React.createElement('span', {
-                        key: tag,
-                        style: { fontSize: 9, color: '#444460', background: '#0a0a14', padding: '2px 6px', borderRadius: 3 },
-                      }, tag),
-                    ),
                   ),
                 ),
               ),
