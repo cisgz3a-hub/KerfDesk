@@ -169,6 +169,8 @@ interface CanvasViewportProps {
   /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
   onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
   showPrompt: (title: string, message: string, defaultValue?: string, placeholder?: string) => Promise<string | null>;
+  /** Called after user places a new text object (text tool). */
+  onTextPlaced?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -188,6 +190,7 @@ export function CanvasViewport({
   previewMode = false,
   onSelectionScreenPos,
   showPrompt,
+  onTextPlaced,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
@@ -728,6 +731,7 @@ export function CanvasViewport({
         };
         onSceneCommit?.(newScene);
         onSelectionChange?.(new Set([textObj.id]));
+        onTextPlaced?.();
       }
       return;
     }
@@ -880,7 +884,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, showPrompt]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, showPrompt, onTextPlaced]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

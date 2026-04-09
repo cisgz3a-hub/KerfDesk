@@ -12,9 +12,10 @@ interface PropertiesPanelProps {
   onSceneCommit: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string) => Promise<void>;
+  handleTextToPath: () => void;
 }
 
-export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelectionChange, showAlert }: PropertiesPanelProps) {
+export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelectionChange, showAlert, handleTextToPath }: PropertiesPanelProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
   const [txDraft, setTxDraft] = useState<string | undefined>(undefined);
@@ -394,6 +395,21 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSelection
 
     React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Type'),
     React.createElement('div', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, obj.type),
+
+    obj.geometry.type === 'text' && React.createElement('div', {
+      style: {
+        padding: '8px 12px', margin: '8px 0',
+        background: 'rgba(255, 170, 50, 0.08)',
+        border: '1px solid rgba(255, 170, 50, 0.2)',
+        borderRadius: 6, fontSize: 10, color: '#ffaa32', lineHeight: 1.5,
+      },
+    },
+      '⚠ Text must be converted to paths before cutting. ',
+      React.createElement('span', {
+        onClick: () => void handleTextToPath(),
+        style: { textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 },
+      }, 'Convert now'),
+    ),
 
     obj.geometry.type === 'image' && React.createElement('div', { style: dividerStyle },
       React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),

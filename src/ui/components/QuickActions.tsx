@@ -8,9 +8,11 @@ interface QuickActionsProps {
   onCenter: () => void;
   onGridArray: () => void;
   selectedCount: number;
+  hasSelectedText: boolean;
+  handleTextToPath: () => void;
 }
 
-export function QuickActions({ x, y, onDuplicate, onDelete, onCenter, onGridArray, selectedCount }: QuickActionsProps) {
+export function QuickActions({ x, y, onDuplicate, onDelete, onCenter, onGridArray, selectedCount, hasSelectedText, handleTextToPath }: QuickActionsProps) {
   const font = "'DM Sans', system-ui, sans-serif";
 
   const btnStyle: React.CSSProperties = {
@@ -45,7 +47,7 @@ export function QuickActions({ x, y, onDuplicate, onDelete, onCenter, onGridArra
     }, icon);
 
   // Clamp position to stay on screen
-  const barWidth = 160;
+  const barWidth = hasSelectedText ? 340 : 160;
   const clampedX = Math.min(x, window.innerWidth - barWidth - 20);
   const clampedY = Math.max(y, 60);
 
@@ -71,6 +73,25 @@ export function QuickActions({ x, y, onDuplicate, onDelete, onCenter, onGridArra
     btn('⌧', 'Delete (Del)', onDelete),
     btn('◎', 'Center on material', onCenter),
     btn('⊞', 'Grid array', onGridArray),
+    hasSelectedText && React.createElement('button', {
+      onClick: handleTextToPath,
+      title: 'Convert text to cuttable vector paths',
+      style: {
+        padding: '6px 12px',
+        background: 'rgba(255, 170, 50, 0.15)',
+        border: '1px solid rgba(255, 170, 50, 0.4)',
+        borderRadius: 6,
+        color: '#ffaa32',
+        fontSize: 11,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        whiteSpace: 'nowrap' as const,
+      },
+    }, '✦ Convert to Path'),
     // Count badge
     React.createElement('span', {
       style: {

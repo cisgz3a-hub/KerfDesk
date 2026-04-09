@@ -238,6 +238,17 @@ export function App() {
     return false;
   });
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
+  const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!textPlacementHint) return;
+    const id = window.setTimeout(() => setTextPlacementHint(null), 5000);
+    return () => clearTimeout(id);
+  }, [textPlacementHint]);
+
+  const handleTextPlaced = useCallback(() => {
+    setTextPlacementHint('Tip: Select text and click "Convert to Path" before cutting');
+  }, []);
 
   useEffect(() => {
     const ctrl = new GrblController();
@@ -1222,6 +1233,10 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [handleUndo, handleRedo, handleSelectAll, handleDelete, handleClearSelection, setActiveTool, scene, selectedIds, handleSceneCommit, clipboard, handleGridArray, handleBooleanOp, handleTextToPath, handleOffset, compileGcode]);
 
+  const hasSelectedText = scene.objects.some(o =>
+    selectedIds.has(o.id) && o.geometry.type === 'text'
+  );
+
   // ─── RENDER ──────────────────────────────────────────────────
 
   return React.createElement('div', {
@@ -1357,6 +1372,7 @@ export function App() {
         previewMode,
         onSelectionScreenPos: setQuickActionPos,
         showPrompt,
+        onTextPlaced: handleTextPlaced,
       }),
       React.createElement('div', {
         style: {
@@ -1388,6 +1404,7 @@ export function App() {
             onSceneCommit: handleSceneCommit,
             onSelectionChange: setSelectedIds,
             showAlert,
+            handleTextToPath: () => void handleTextToPath(),
           }),
         ),
       ),
@@ -1415,6 +1432,14 @@ export function App() {
         React.createElement('span', {}, scene.metadata.name || 'Untitled'),
       ),
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 12 } },
+        textPlacementHint && React.createElement('span', {
+          style: {
+            fontSize: '10px',
+            color: '#ffaa32',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            maxWidth: 420,
+          },
+        }, textPlacementHint),
         React.createElement('span', {}, `${scene.canvas.width} × ${scene.canvas.height} mm`),
         React.createElement('span', {
           title: 'The laser head moves here before cutting begins, and returns here when done. Drag the green dot on the canvas to change.',
@@ -1618,6 +1643,8 @@ export function App() {
       onDelete: handleQuickActionDelete,
       onCenter: handleQuickActionCenter,
       onGridArray: handleGridArray,
+      hasSelectedText,
+      handleTextToPath: () => void handleTextToPath(),
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {
