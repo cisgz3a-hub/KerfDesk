@@ -665,15 +665,6 @@ export function App() {
 
   const handleConnect = useCallback(() => {
     try {
-      // Preflight: warn about text objects that won't be in output
-      const textObjs = scene.objects.filter(o =>
-        o.visible && (o.geometry as any).type === 'text' &&
-        scene.layers.find(l => l.id === o.layerId)?.visible
-      );
-      if (textObjs.length > 0) {
-        const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
-        if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
-      }
       const gc = compileGcode(scene);
       if (!gc) {
         alert('No objects to process. Add objects to an output layer first.');
@@ -1163,15 +1154,6 @@ export function App() {
         if (e.key === 'p' || e.key === 'P') {
           e.preventDefault();
           try {
-            // Preflight: warn about text objects that won't be in output
-            const textObjs = scene.objects.filter(o =>
-              o.visible && (o.geometry as any).type === 'text' &&
-              scene.layers.find(l => l.id === o.layerId)?.visible
-            );
-            if (textObjs.length > 0) {
-              const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
-              if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
-            }
             const gc = compileGcode(scene);
             if (gc) setGcodePreview(gc);
           } catch (err) {
@@ -1288,15 +1270,6 @@ export function App() {
       onToggleProductionMode: toggleProductionMode,
       onToolpathPreview: () => {
         try {
-          // Preflight: warn about text objects that won't be in output
-          const textObjs = scene.objects.filter(o =>
-            o.visible && (o.geometry as any).type === 'text' &&
-            scene.layers.find(l => l.id === o.layerId)?.visible
-          );
-          if (textObjs.length > 0) {
-            const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
-            if (!confirm(`${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`)) return;
-          }
           const gc = compileGcode(scene);
           if (gc) setGcodePreview(gc);
         } catch (err) {

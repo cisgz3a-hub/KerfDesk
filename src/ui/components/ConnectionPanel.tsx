@@ -261,6 +261,28 @@ export function ConnectionPanel({
   const handleProofRun = () => {
     if (!gcode || !controllerRef.current) return;
 
+    const status = machineState?.status;
+    if (status === 'alarm') {
+      alert('Machine is in ALARM state. Click Unlock ($X) first.');
+      return;
+    }
+    if (status === 'hold') {
+      alert('Machine is paused. Click Resume or Stop first.');
+      return;
+    }
+    if (status === 'run') {
+      alert('A job is already running. Wait for it to finish or Stop it.');
+      return;
+    }
+    if (status === 'homing') {
+      alert('Machine is homing. Wait for it to finish.');
+      return;
+    }
+    if (status !== 'idle' && status !== undefined) {
+      alert(`Machine not ready (state: ${status}). Wait for idle.`);
+      return;
+    }
+
     if (preflight && preflight.issues.some(i => i.severity === 'blocker' && i.category === 'machine')) {
       const machineBlockers = preflight.issues.filter(i => i.severity === 'blocker' && i.category === 'machine');
       alert('Cannot run proof — resolve machine blockers first:\n\n' +
@@ -391,6 +413,67 @@ export function ConnectionPanel({
         }, '×'),
       ),
 
+      // Machine readiness score (visible before connect — design + machine checks)
+      preflight && React.createElement('div', {
+        style: {
+          padding: '12px 18px', borderBottom: '1px solid #1a1a2e',
+        },
+      },
+        React.createElement('div', {
+          style: { fontSize: 10, color: '#555570', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 8 },
+        }, 'Machine readiness'),
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
+        },
+          React.createElement('div', {
+            style: { display: 'flex', alignItems: 'center', gap: 10 },
+          },
+            React.createElement('div', {
+              style: {
+                width: 44, height: 44, borderRadius: '50%',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, fontWeight: 700, fontFamily: mono,
+                background: preflight.score >= 80 ? 'rgba(45,212,160,0.1)' :
+                            preflight.score >= 50 ? 'rgba(255,212,68,0.1)' :
+                            'rgba(255,68,102,0.1)',
+                border: `2px solid ${preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466'}`,
+                color: preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466',
+              },
+            }, `${preflight.score}`),
+            React.createElement('div', null,
+              React.createElement('div', {
+                style: { fontSize: 12, fontWeight: 600, color: '#e0e0ec' },
+              }, preflight.canStart ? 'Ready to cut' : 'Not ready'),
+              React.createElement('div', {
+                style: { fontSize: 10, color: '#555570' },
+              }, `${preflight.blockers} blocker${preflight.blockers !== 1 ? 's' : ''}, ${preflight.warnings} warning${preflight.warnings !== 1 ? 's' : ''}`),
+            ),
+          ),
+        ),
+
+        ...(preflight.issues.filter(i => i.severity !== 'info').map(issue =>
+          React.createElement('div', {
+            key: issue.id,
+            style: {
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '6px 0', fontSize: 11, lineHeight: 1.4,
+            },
+          },
+            React.createElement('span', {
+              style: {
+                fontSize: 10, marginTop: 2, flexShrink: 0,
+                color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
+              },
+            }, issue.severity === 'blocker' ? '●' : '▲'),
+            React.createElement('div', null,
+              React.createElement('div', { style: { color: '#e0e0ec', fontWeight: 500 } }, issue.title),
+              issue.detail && React.createElement('div', { style: { color: '#666680', fontSize: 10, marginTop: 2 } }, issue.detail),
+              issue.fix && React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, issue.fix),
+            ),
+          ),
+        )),
+      ),
+
       // Connect section
       !isConnected && React.createElement('div', { style: { padding: '16px 18px', borderBottom: '1px solid #1a1a2e' } },
         React.createElement('div', { style: { display: 'flex', gap: 8 } },
@@ -423,63 +506,19 @@ export function ConnectionPanel({
         '3. Click Frame to verify, then Start Job',
       ),
 
-      // Readiness Score
-      isConnected && preflight && React.createElement('div', {
+      // Proof mode — dry run (pairs with readiness score)
+      isConnected && gcode && React.createElement('div', {
         style: {
-          padding: '12px 18px', borderBottom: '1px solid #1a1a2e',
+          padding: '8px 18px', borderBottom: '1px solid #1a1a2e',
+          background: 'rgba(136, 180, 255, 0.04)',
         },
       },
-        // Score badge
         React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-        },
-          React.createElement('div', {
-            style: { display: 'flex', alignItems: 'center', gap: 10 },
-          },
-            React.createElement('div', {
-              style: {
-                width: 44, height: 44, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16, fontWeight: 700, fontFamily: mono,
-                background: preflight.score >= 80 ? 'rgba(45,212,160,0.1)' :
-                            preflight.score >= 50 ? 'rgba(255,212,68,0.1)' :
-                            'rgba(255,68,102,0.1)',
-                border: `2px solid ${preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466'}`,
-                color: preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466',
-              },
-            }, `${preflight.score}`),
-            React.createElement('div', null,
-              React.createElement('div', {
-                style: { fontSize: 12, fontWeight: 600, color: '#e0e0ec' },
-              }, preflight.canStart ? 'Ready to cut' : 'Not ready'),
-              React.createElement('div', {
-                style: { fontSize: 10, color: '#555570' },
-              }, `${preflight.blockers} blocker${preflight.blockers !== 1 ? 's' : ''}, ${preflight.warnings} warning${preflight.warnings !== 1 ? 's' : ''}`),
-            ),
-          ),
+          style: { fontSize: 10, color: '#88b4ff', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 4 },
+        }, 'Proof mode'),
+        React.createElement('div', { style: { fontSize: 11, color: '#8888aa', lineHeight: 1.45 } },
+          'Runs the same path with the laser off and rasters thinned — verify motion on the machine before cutting.',
         ),
-
-        // Issue list (collapsed by default, show blockers and warnings)
-        ...(preflight.issues.filter(i => i.severity !== 'info').map(issue =>
-          React.createElement('div', {
-            key: issue.id,
-            style: {
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '6px 0', fontSize: 11, lineHeight: 1.4,
-            },
-          },
-            React.createElement('span', {
-              style: {
-                fontSize: 10, marginTop: 2, flexShrink: 0,
-                color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
-              },
-            }, issue.severity === 'blocker' ? '●' : '▲'),
-            React.createElement('div', null,
-              React.createElement('div', { style: { color: '#e0e0ec', fontWeight: 500 } }, issue.title),
-              issue.fix && React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, issue.fix),
-            ),
-          ),
-        )),
       ),
 
       // Position + state
@@ -570,7 +609,7 @@ export function ConnectionPanel({
           }, 'Frame'),
           React.createElement('button', {
             onClick: handleProofRun, disabled: !gcode || isRunning,
-            title: 'Run the full job with laser OFF — verify motion path on the real machine',
+            title: 'Proof mode: same path, laser off — verify motion before cutting',
             style: { ...btnStyle('136,180,255', !gcode || isRunning), flex: 1 },
           }, 'Proof'),
           React.createElement('button', {
