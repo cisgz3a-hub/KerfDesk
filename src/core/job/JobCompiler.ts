@@ -264,16 +264,67 @@ interface PointGroup {
 function geometryToPoints(geom: Geometry): PointGroup[] {
   switch (geom.type) {
     case 'rect': {
-      const { x, y, width, height } = geom;
-      return [{
-        points: [
-          { x, y },
-          { x: x + width, y },
-          { x: x + width, y: y + height },
-          { x, y: y + height },
-        ],
-        closed: true,
-      }];
+      const { x, y, width, height, cornerRadius } = geom;
+      const r = Math.min(cornerRadius || 0, width / 2, height / 2);
+
+      if (r <= 0.01) {
+        // Sharp corners
+        return [{
+          points: [
+            { x, y },
+            { x: x + width, y },
+            { x: x + width, y: y + height },
+            { x, y: y + height },
+          ],
+          closed: true,
+        }];
+      }
+
+      // Rounded corners — generate arc segments
+      const pts: Point[] = [];
+      const arcSegments = Math.max(4, Math.ceil(r * 2)); // More segments for larger radii
+
+      // Helper: generate quarter arc points
+      const quarterArc = (cx: number, cy: number, startAngle: number) => {
+        for (let i = 0; i <= arcSegments; i++) {
+          const angle = startAngle + (Math.PI / 2) * (i / arcSegments);
+          pts.push({
+            x: cx + r * Math.cos(angle),
+            y: cy + r * Math.sin(angle),
+          });
+        }
+      };
+
+      // Top edge: left to right, then top-right arc
+      pts.push({ x: x + r, y });
+      pts.push({ x: x + width - r, y });
+      quarterArc(x + width - r, y + r, -Math.PI / 2); // Top-right corner
+
+      // Right edge: top to bottom, then bottom-right arc
+      pts.push({ x: x + width, y: y + r });
+      pts.push({ x: x + width, y: y + height - r });
+      quarterArc(x + width - r, y + height - r, 0); // Bottom-right corner
+
+      // Bottom edge: right to left, then bottom-left arc
+      pts.push({ x: x + width - r, y: y + height });
+      pts.push({ x: x + r, y: y + height });
+      quarterArc(x + r, y + height - r, Math.PI / 2); // Bottom-left corner
+
+      // Left edge: bottom to top, then top-left arc
+      pts.push({ x, y: y + height - r });
+      pts.push({ x, y: y + r });
+      quarterArc(x + r, y + r, Math.PI); // Top-left corner
+
+      // Remove duplicate consecutive points
+      const cleaned: Point[] = [pts[0]];
+      for (let i = 1; i < pts.length; i++) {
+        const prev = cleaned[cleaned.length - 1];
+        if (Math.abs(pts[i].x - prev.x) > 0.001 || Math.abs(pts[i].y - prev.y) > 0.001) {
+          cleaned.push(pts[i]);
+        }
+      }
+
+      return [{ points: cleaned, closed: true }];
     }
     case 'ellipse': {
       const { cx, cy, rx, ry } = geom;
