@@ -1083,6 +1083,7 @@ export function App() {
         selectedIds,
         clipboard,
         handleSceneCommit,
+        dialogs.setShowShortcuts,
       ],
     ),
   );
