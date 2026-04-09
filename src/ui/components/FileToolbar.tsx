@@ -541,7 +541,7 @@ export function FileToolbar({
     sep(),
 
     iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
-    iconBtn('▢ Box', 'Generate a parametric laser-cut box', () => onBoxGenerator?.()),
+    iconBtn('⊞ Box', 'Generate a finger-joint box', () => onBoxGenerator?.()),
 
     React.createElement('div', { style: { flex: 1 } }),
 

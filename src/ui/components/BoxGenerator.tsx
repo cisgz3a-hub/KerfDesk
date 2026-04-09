@@ -1,175 +1,269 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { generateId } from '../../core/types';
+import { type Scene } from '../../core/scene/Scene';
+import { type SceneObject } from '../../core/scene/SceneObject';
 
 interface BoxGeneratorProps {
-  onGenerate: (svg: string, name: string) => void;
+  scene: Scene;
+  onGenerate: (objects: SceneObject[]) => void;
   onClose: () => void;
 }
 
-export function BoxGenerator({ onGenerate, onClose }: BoxGeneratorProps) {
+export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) {
   const [width, setWidth] = useState(80);
   const [height, setHeight] = useState(50);
   const [depth, setDepth] = useState(40);
   const [thickness, setThickness] = useState(3);
   const [fingerWidth, setFingerWidth] = useState(10);
   const [openTop, setOpenTop] = useState(false);
-  const [hoveredPanel, setHoveredPanel] = useState<string | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
 
-  // ─── Generate finger-joint box SVG ────────────────────
-  const generateBox = useCallback(() => {
+  // Generate all box faces as polygon point arrays
+  function generateBoxFaces() {
     const t = thickness;
     const fw = fingerWidth;
+    const spacing = 8; // mm between laid-out faces
 
-    // Calculate finger counts for each edge
-    const fingersW = Math.max(1, Math.floor(width / fw));
-    const fingersH = Math.max(1, Math.floor(height / fw));
+    const faces: Array<{
+      name: string;
+      points: Array<{ x: number; y: number }>;
+      offsetX: number;
+      offsetY: number;
+    }> = [];
 
-    // Actual finger width adjusted to fill edge evenly
-    const fwW = width / fingersW;
-    const fwH = height / fingersH;
+    // Face layout (flat, for laser cutting):
+    // Row 1: Front, Back
+    // Row 2: Left, Right
+    // Row 3: Bottom, Top (if not open)
 
-    const panels: string[] = [];
-    let offsetX = 5;
-    let offsetY = 5;
-    const gap = 5;
+    // FRONT face (width x height)
+    faces.push({
+      name: 'Front',
+      points: generateRectWithFingers(width, height, t, fw, true, true, true, true),
+      offsetX: 0,
+      offsetY: 0,
+    });
 
-    // Helper: generate a simple rect with finger joints on specified edges
-    function panelRect(
-      px: number, py: number,
-      pw: number, ph: number,
-      label: string
-    ): string {
-      return `<rect x="${px}" y="${py}" width="${pw}" height="${ph}" fill="none" stroke="red" stroke-width="0.2"/>
-        <text x="${px + pw/2}" y="${py + ph/2}" text-anchor="middle" dominant-baseline="middle" font-size="3" fill="#666" font-family="sans-serif">${label}</text>`;
-    }
+    // BACK face (width x height)
+    faces.push({
+      name: 'Back',
+      points: generateRectWithFingers(width, height, t, fw, true, true, true, true),
+      offsetX: width + spacing,
+      offsetY: 0,
+    });
 
-    // Simple box layout: all 6 faces as rectangles (finger joints as visual markers)
-    // Front face
-    panels.push(panelRect(offsetX, offsetY, width, height, 'Front'));
-    // Add finger notches on bottom edge
-    for (let i = 0; i < fingersW; i++) {
-      if (i % 2 === 0) {
-        panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY + height}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
-    }
-    // Add finger notches on top edge (if not open)
+    // LEFT face (depth x height)
+    faces.push({
+      name: 'Left',
+      points: generateRectWithFingers(depth, height, t, fw, false, false, true, true),
+      offsetX: 0,
+      offsetY: height + spacing,
+    });
+
+    // RIGHT face (depth x height)
+    faces.push({
+      name: 'Right',
+      points: generateRectWithFingers(depth, height, t, fw, false, false, true, true),
+      offsetX: depth + spacing,
+      offsetY: height + spacing,
+    });
+
+    // BOTTOM face (width x depth)
+    faces.push({
+      name: 'Bottom',
+      points: generateRectWithFingers(width, depth, t, fw, false, false, false, false),
+      offsetX: 0,
+      offsetY: height + depth + spacing * 2,
+    });
+
+    // TOP face (width x depth) — only if not open top
     if (!openTop) {
-      for (let i = 0; i < fingersW; i++) {
+      faces.push({
+        name: 'Top',
+        points: generateRectWithFingers(width, depth, t, fw, false, false, false, false),
+        offsetX: width + spacing,
+        offsetY: height + depth + spacing * 2,
+      });
+    }
+
+    return faces;
+  }
+
+  // Generate a rectangle with finger joints on each edge
+  function generateRectWithFingers(
+    w: number,
+    h: number,
+    t: number,
+    fw: number,
+    topFingers: boolean,
+    bottomFingers: boolean,
+    leftFingers: boolean,
+    rightFingers: boolean
+  ): Array<{ x: number; y: number }> {
+    const points: Array<{ x: number; y: number }> = [];
+    const fingerCount_w = Math.max(1, Math.round(w / fw));
+    const fingerCount_h = Math.max(1, Math.round(h / fw));
+    const actualFW_w = w / fingerCount_w;
+    const actualFW_h = h / fingerCount_h;
+
+    // Top edge (left to right)
+    if (topFingers) {
+      for (let i = 0; i < fingerCount_w; i++) {
+        const x = i * actualFW_w;
         if (i % 2 === 0) {
-          panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY - t}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
+          points.push({ x, y: 0 });
+          points.push({ x, y: -t });
+          points.push({ x: x + actualFW_w, y: -t });
+          points.push({ x: x + actualFW_w, y: 0 });
+        } else {
+          points.push({ x, y: 0 });
+          points.push({ x: x + actualFW_w, y: 0 });
         }
       }
-    }
-    // Side notches
-    for (let i = 0; i < fingersH; i++) {
-      if (i % 2 === 0) {
-        panels.push(`<rect x="${offsetX - t}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-        panels.push(`<rect x="${offsetX + width}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
+    } else {
+      points.push({ x: 0, y: 0 });
+      points.push({ x: w, y: 0 });
     }
 
-    const frontH = height + (openTop ? 0 : t) + t;
-    offsetY += frontH + gap;
-
-    // Back face
-    panels.push(panelRect(offsetX, offsetY, width, height, 'Back'));
-    for (let i = 0; i < fingersW; i++) {
-      if (i % 2 === 0) {
-        panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY + height}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
-    }
-    if (!openTop) {
-      for (let i = 0; i < fingersW; i++) {
+    // Right edge (top to bottom)
+    if (rightFingers) {
+      for (let i = 0; i < fingerCount_h; i++) {
+        const y = i * actualFW_h;
         if (i % 2 === 0) {
-          panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY - t}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
+          points.push({ x: w, y });
+          points.push({ x: w + t, y });
+          points.push({ x: w + t, y: y + actualFW_h });
+          points.push({ x: w, y: y + actualFW_h });
+        } else {
+          points.push({ x: w, y });
+          points.push({ x: w, y: y + actualFW_h });
         }
       }
-    }
-    for (let i = 0; i < fingersH; i++) {
-      if (i % 2 === 0) {
-        panels.push(`<rect x="${offsetX - t}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-        panels.push(`<rect x="${offsetX + width}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
+    } else {
+      points.push({ x: w, y: 0 });
+      points.push({ x: w, y: h });
     }
 
-    offsetY += frontH + gap;
-
-    // Left side
-    panels.push(panelRect(offsetX, offsetY, depth, height, 'Left'));
-    for (let i = 0; i < fingersH; i++) {
-      if (i % 2 === 1) {
-        panels.push(`<rect x="${offsetX - t}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-        panels.push(`<rect x="${offsetX + depth}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
-    }
-
-    offsetY += height + gap;
-
-    // Right side
-    panels.push(panelRect(offsetX, offsetY, depth, height, 'Right'));
-    for (let i = 0; i < fingersH; i++) {
-      if (i % 2 === 1) {
-        panels.push(`<rect x="${offsetX - t}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-        panels.push(`<rect x="${offsetX + depth}" y="${offsetY + i * fwH}" width="${t}" height="${fwH}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
-    }
-
-    offsetY += height + gap;
-
-    // Bottom
-    panels.push(panelRect(offsetX, offsetY, width, depth, 'Bottom'));
-    for (let i = 0; i < fingersW; i++) {
-      if (i % 2 === 1) {
-        panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY - t}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
-        panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY + depth}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
-      }
-    }
-
-    offsetY += depth + gap;
-
-    // Top (if not open)
-    if (!openTop) {
-      panels.push(panelRect(offsetX, offsetY, width, depth, 'Top'));
-      for (let i = 0; i < fingersW; i++) {
-        if (i % 2 === 1) {
-          panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY - t}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
-          panels.push(`<rect x="${offsetX + i * fwW}" y="${offsetY + depth}" width="${fwW}" height="${t}" fill="none" stroke="red" stroke-width="0.2"/>`);
+    // Bottom edge (right to left)
+    if (bottomFingers) {
+      for (let i = fingerCount_w - 1; i >= 0; i--) {
+        const x = i * actualFW_w;
+        if (i % 2 === 0) {
+          points.push({ x: x + actualFW_w, y: h });
+          points.push({ x: x + actualFW_w, y: h + t });
+          points.push({ x, y: h + t });
+          points.push({ x, y: h });
+        } else {
+          points.push({ x: x + actualFW_w, y: h });
+          points.push({ x, y: h });
         }
       }
-      offsetY += depth + gap;
+    } else {
+      points.push({ x: w, y: h });
+      points.push({ x: 0, y: h });
     }
 
-    const totalW = Math.max(width, depth) + t * 2 + 10;
-    const totalH = offsetY + 5;
+    // Left edge (bottom to top)
+    if (leftFingers) {
+      for (let i = fingerCount_h - 1; i >= 0; i--) {
+        const y = i * actualFW_h;
+        if (i % 2 === 0) {
+          points.push({ x: 0, y: y + actualFW_h });
+          points.push({ x: -t, y: y + actualFW_h });
+          points.push({ x: -t, y });
+          points.push({ x: 0, y });
+        } else {
+          points.push({ x: 0, y: y + actualFW_h });
+          points.push({ x: 0, y });
+        }
+      }
+    } else {
+      points.push({ x: 0, y: h });
+      points.push({ x: 0, y: 0 });
+    }
 
-    const svg = `<svg viewBox="0 0 ${totalW} ${totalH}" width="${totalW}mm" height="${totalH}mm" xmlns="http://www.w3.org/2000/svg">
-      ${panels.join('\n      ')}
-    </svg>`;
+    return points;
+  }
 
-    onGenerate(svg, `Box ${width}×${depth}×${height}mm`);
-  }, [width, height, depth, thickness, fingerWidth, openTop, onGenerate]);
+  // Preview render
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  // ─── Styles ─────────────────────────────────────────────
+    const dpr = window.devicePixelRatio || 1;
+    const logicalW = 340;
+    const logicalH = 340;
+    canvas.width = logicalW * dpr;
+    canvas.height = logicalH * dpr;
+    canvas.style.width = '100%';
+    canvas.style.height = `${logicalH}px`;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const cw = logicalW;
+    const ch = logicalH;
+    ctx.fillStyle = '#08080f';
+    ctx.fillRect(0, 0, cw, ch);
+
+    const faces = generateBoxFaces();
+    if (faces.length === 0) return;
+
+    // Find total bounds
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const face of faces) {
+      for (const p of face.points) {
+        minX = Math.min(minX, p.x + face.offsetX);
+        minY = Math.min(minY, p.y + face.offsetY);
+        maxX = Math.max(maxX, p.x + face.offsetX);
+        maxY = Math.max(maxY, p.y + face.offsetY);
+      }
+    }
+
+    const rangeX = (maxX - minX) || 1;
+    const rangeY = (maxY - minY) || 1;
+    const padding = 20;
+    const scale = Math.min((cw - padding * 2) / rangeX, (ch - padding * 2) / rangeY);
+    const ox = (cw - rangeX * scale) / 2 - minX * scale;
+    const oy = (ch - rangeY * scale) / 2 - minY * scale;
+
+    // Draw each face
+    for (const face of faces) {
+      ctx.beginPath();
+      const pts = face.points;
+      if (pts.length === 0) continue;
+      ctx.moveTo((pts[0].x + face.offsetX) * scale + ox, (pts[0].y + face.offsetY) * scale + oy);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo((pts[i].x + face.offsetX) * scale + ox, (pts[i].y + face.offsetY) * scale + oy);
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#ff4466';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      // Label
+      const cx = face.offsetX + (face.name === 'Front' || face.name === 'Back' ? width / 2 : depth / 2);
+      const cy = face.offsetY + (face.name === 'Bottom' || face.name === 'Top' ? depth / 2 : height / 2);
+      ctx.fillStyle = '#555570';
+      ctx.font = `${Math.max(8, Math.min(12, scale * 5))}px ${font}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(face.name, cx * scale + ox, cy * scale + oy);
+    }
+  }, [width, height, depth, thickness, fingerWidth, openTop]);
+
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '6px 10px',
+    width: '100%', padding: '6px 8px',
     background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
-    color: '#e0e0ec', fontSize: 13, fontFamily: mono, outline: 'none',
-    textAlign: 'right' as const,
+    color: '#e0e0ec', fontSize: 12, outline: 'none',
+    fontFamily: mono,
   };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: 11, color: '#8888aa', marginBottom: 3,
-  };
-
-  // ─── 3D Preview ─────────────────────────────────────────
-  const previewScale = 1.5;
-  const pW = width * previewScale;
-  const pH = height * previewScale;
-  const pD = depth * previewScale * 0.5;
-  const isoX = pD * 0.7;
-  const isoY = pD * 0.4;
 
   return React.createElement('div', {
     style: {
@@ -182,158 +276,111 @@ export function BoxGenerator({ onGenerate, onClose }: BoxGeneratorProps) {
     React.createElement('div', {
       style: {
         background: '#12121e', border: '1px solid #252540', borderRadius: 14,
-        width: 560, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-        overflow: 'hidden',
+        width: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
       },
+      onClick: (e: React.MouseEvent) => { e.stopPropagation(); },
     },
       // Header
       React.createElement('div', {
-        style: { padding: '16px 20px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+        style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 },
       },
-        React.createElement('span', { style: { color: '#e0e0ec', fontSize: 16, fontWeight: 700 } }, 'Box Generator'),
-        React.createElement('button', {
-          onClick: onClose,
-          style: { background: 'none', border: 'none', color: '#555570', fontSize: 20, cursor: 'pointer' },
-        }, '×'),
+        React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Box Generator'),
+        React.createElement('button', { onClick: onClose, style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' } }, '×'),
       ),
 
-      // 3D Preview
-      React.createElement('div', {
-        style: {
-          height: 180, background: '#08080f', display: 'flex',
-          alignItems: 'center', justifyContent: 'center', position: 'relative' as const,
-        },
-      },
-        React.createElement('svg', {
-          viewBox: `0 0 ${pW + isoX + 40} ${pH + isoY + 40}`,
-          style: { maxHeight: 160, maxWidth: '90%' },
-        },
-          // Front face
-          React.createElement('polygon', {
-            points: `20,${isoY + 20} ${20 + pW},${isoY + 20} ${20 + pW},${isoY + 20 + pH} 20,${isoY + 20 + pH}`,
-            fill: hoveredPanel === 'front' ? 'rgba(255,68,102,0.15)' : 'rgba(255,68,102,0.08)',
-            stroke: '#ff4466', strokeWidth: 1,
-            onMouseEnter: () => setHoveredPanel('front'),
-            onMouseLeave: () => setHoveredPanel(null),
+      // Content
+      React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 } },
+        // Left: inputs
+        React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
+          ...[
+            { label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500 },
+            { label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500 },
+            { label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500 },
+            { label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20 },
+            { label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50 },
+          ].map(f =>
+            React.createElement('div', { key: f.label, style: { marginBottom: 10 } },
+              React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
+              React.createElement('input', {
+                type: 'number', value: f.value, min: f.min, max: f.max,
+                style: inputStyle,
+                onChange: (e: React.ChangeEvent<HTMLInputElement>) => f.set(parseFloat(e.target.value) || f.min),
+                onBlur: (e: React.FocusEvent<HTMLInputElement>) => f.set(Math.max(f.min, Math.min(f.max, parseFloat(e.target.value) || f.min))),
+              }),
+            ),
+          ),
+          // Open top toggle
+          React.createElement('div', { style: { marginBottom: 12 } },
+            React.createElement('button', {
+              onClick: () => setOpenTop(!openTop),
+              style: {
+                width: '100%', padding: '6px',
+                background: openTop ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                border: openTop ? '1px solid #00d4ff' : '1px solid #252540',
+                borderRadius: 6, color: openTop ? '#00d4ff' : '#555570',
+                fontSize: 11, cursor: 'pointer', fontFamily: font,
+              },
+            }, openTop ? '☐ Open top' : '☑ Closed top'),
+          ),
+          // Info
+          React.createElement('div', { style: { fontSize: 9, color: '#444460', lineHeight: 1.5 } },
+            `${openTop ? 5 : 6} faces`, React.createElement('br'),
+            `Material: ${thickness}mm`, React.createElement('br'),
+            `~${Math.round((width * 2 + depth * 2) * (height + depth) / 1000)}cm² material`,
+          ),
+        ),
+
+        // Right: preview
+        React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column' as const, minWidth: 0 } },
+          React.createElement('canvas', {
+            ref: canvasRef,
+            style: { width: '100%', flex: 1, background: '#08080f', minHeight: 200 },
           }),
-          // Top face
-          !openTop && React.createElement('polygon', {
-            points: `20,${isoY + 20} ${20 + isoX},20 ${20 + pW + isoX},20 ${20 + pW},${isoY + 20}`,
-            fill: hoveredPanel === 'top' ? 'rgba(0,212,255,0.15)' : 'rgba(0,212,255,0.08)',
-            stroke: '#00d4ff', strokeWidth: 1,
-            onMouseEnter: () => setHoveredPanel('top'),
-            onMouseLeave: () => setHoveredPanel(null),
-          }),
-          // Right face
-          React.createElement('polygon', {
-            points: `${20 + pW},${isoY + 20} ${20 + pW + isoX},20 ${20 + pW + isoX},${20 + pH} ${20 + pW},${isoY + 20 + pH}`,
-            fill: hoveredPanel === 'right' ? 'rgba(45,212,160,0.15)' : 'rgba(45,212,160,0.08)',
-            stroke: '#2dd4a0', strokeWidth: 1,
-            onMouseEnter: () => setHoveredPanel('right'),
-            onMouseLeave: () => setHoveredPanel(null),
-          }),
-          // Dimension labels
-          React.createElement('text', {
-            x: 20 + pW / 2, y: isoY + 20 + pH + 14,
-            textAnchor: 'middle', fontSize: 10, fill: '#8888aa',
-          }, `${width}mm`),
-          React.createElement('text', {
-            x: 10, y: isoY + 20 + pH / 2,
-            textAnchor: 'middle', fontSize: 10, fill: '#8888aa',
-            transform: `rotate(-90, 10, ${isoY + 20 + pH / 2})`,
-          }, `${height}mm`),
-          React.createElement('text', {
-            x: 20 + pW + isoX / 2 + 4, y: isoY / 2 + 12,
-            textAnchor: 'middle', fontSize: 10, fill: '#8888aa',
-          }, `${depth}mm`),
         ),
       ),
-
-      // Controls
-      React.createElement('div', {
-        style: { padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 },
-      },
-        // Width
-        React.createElement('div', null,
-          React.createElement('div', { style: labelStyle }, 'Width (mm)'),
-          React.createElement('input', {
-            type: 'number', value: width, min: 10, max: 500,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWidth(parseInt(e.target.value) || 10),
-            onBlur: () => setWidth(Math.max(10, Math.min(500, width))),
-            style: inputStyle,
-          }),
-        ),
-        // Depth
-        React.createElement('div', null,
-          React.createElement('div', { style: labelStyle }, 'Depth (mm)'),
-          React.createElement('input', {
-            type: 'number', value: depth, min: 10, max: 500,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setDepth(parseInt(e.target.value) || 10),
-            onBlur: () => setDepth(Math.max(10, Math.min(500, depth))),
-            style: inputStyle,
-          }),
-        ),
-        // Height
-        React.createElement('div', null,
-          React.createElement('div', { style: labelStyle }, 'Height (mm)'),
-          React.createElement('input', {
-            type: 'number', value: height, min: 10, max: 500,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setHeight(parseInt(e.target.value) || 10),
-            onBlur: () => setHeight(Math.max(10, Math.min(500, height))),
-            style: inputStyle,
-          }),
-        ),
-        // Material thickness
-        React.createElement('div', null,
-          React.createElement('div', { style: labelStyle }, 'Material (mm)'),
-          React.createElement('input', {
-            type: 'number', value: thickness, min: 1, max: 20, step: 0.5,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setThickness(parseFloat(e.target.value) || 3),
-            onBlur: () => setThickness(Math.max(1, Math.min(20, thickness))),
-            style: inputStyle,
-          }),
-        ),
-        // Finger width
-        React.createElement('div', null,
-          React.createElement('div', { style: labelStyle }, 'Finger (mm)'),
-          React.createElement('input', {
-            type: 'number', value: fingerWidth, min: 3, max: 50,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setFingerWidth(parseInt(e.target.value) || 10),
-            onBlur: () => setFingerWidth(Math.max(3, Math.min(50, fingerWidth))),
-            style: inputStyle,
-          }),
-        ),
-        // Open top toggle
-        React.createElement('div', { style: { display: 'flex', alignItems: 'flex-end' } },
-          React.createElement('button', {
-            onClick: () => setOpenTop(!openTop),
-            style: {
-              width: '100%', padding: '6px 10px', fontSize: 12, cursor: 'pointer',
-              background: openTop ? 'rgba(0,212,255,0.1)' : 'rgba(255,255,255,0.03)',
-              border: openTop ? '1px solid #00d4ff' : '1px solid #252540',
-              borderRadius: 6, fontFamily: font,
-              color: openTop ? '#00d4ff' : '#8888aa',
-            },
-          }, openTop ? '☐ Open top' : '☑ Closed top'),
-        ),
-      ),
-
-      // Info line
-      React.createElement('div', {
-        style: { padding: '0 20px 8px', fontSize: 10, color: '#555570' },
-      }, `${openTop ? 5 : 6} panels · ${Math.ceil((2*(width*height + width*depth + depth*height)) / 100)} cm² material`),
 
       // Generate button
-      React.createElement('div', { style: { padding: '12px 20px' } },
+      React.createElement('div', { style: { padding: '12px 18px', borderTop: '1px solid #1a1a2e', flexShrink: 0 } },
         React.createElement('button', {
-          onClick: generateBox,
-          style: {
-            width: '100%', padding: '12px',
-            background: 'rgba(45,212,160,0.1)', border: '1px solid #2dd4a0',
-            borderRadius: 8, color: '#2dd4a0', fontSize: 14, fontWeight: 600,
-            cursor: 'pointer', fontFamily: font,
+          onClick: () => {
+            const layerId = scene.activeLayerId || scene.layers[0]?.id;
+            if (!layerId) return;
+            const faces = generateBoxFaces();
+            const objects: SceneObject[] = faces.map(face => ({
+              id: generateId(),
+              type: 'polygon' as const,
+              name: `Box: ${face.name}`,
+              layerId,
+              parentId: null,
+              transform: {
+                a: 1, b: 0, c: 0, d: 1,
+                tx: face.offsetX + 20,
+                ty: face.offsetY + 20,
+              },
+              geometry: {
+                type: 'polygon' as const,
+                points: face.points,
+                closed: true,
+              },
+              visible: true,
+              locked: false,
+              powerScale: 1.0,
+              _bounds: null,
+              _worldTransform: null,
+            }));
+            onGenerate(objects);
+            onClose();
           },
-        }, 'Generate Box'),
+          style: {
+            width: '100%', padding: '10px',
+            background: 'rgba(45,212,160,0.1)',
+            border: '1px solid #2dd4a0',
+            borderRadius: 8, color: '#2dd4a0',
+            fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            fontFamily: font,
+          },
+        }, `Generate ${openTop ? 5 : 6}-Face Box`),
       ),
     ),
   );

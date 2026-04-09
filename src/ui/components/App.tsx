@@ -1058,33 +1058,15 @@ export function App() {
     }
   }, [scene, handleSceneCommit, showAlert]);
 
-  const handleBoxGenerate = useCallback(async (svg: string, name: string) => {
-    setShowBoxGenerator(false);
-    try {
-      const layerId = scene.activeLayerId || scene.layers[0]?.id;
-      if (!layerId) return;
-      const newScene = importSvgIntoScene(svg, scene, layerId, {
-        mode: 'fit',
-        allowScaleUp: false,
-        targetBounds: scene.material
-          ? {
-            minX: scene.material.x,
-            minY: scene.material.y,
-            maxX: scene.material.x + scene.material.width,
-            maxY: scene.material.y + scene.material.height,
-          }
-          : {
-            minX: 0,
-            minY: 0,
-            maxX: scene.canvas.width,
-            maxY: scene.canvas.height,
-          },
-      });
-      handleSceneCommit({ ...newScene, metadata: { ...newScene.metadata, name } });
-    } catch (e) {
-      await showAlert('Box Generator', 'Box generation failed: ' + (e as Error).message);
-    }
-  }, [scene, handleSceneCommit, showAlert]);
+  const handleBoxGenerate = useCallback((objects: SceneObject[]) => {
+    const newScene = {
+      ...scene,
+      objects: [...scene.objects, ...objects],
+      selection: objects.map(o => o.id),
+    };
+    handleSceneCommit(newScene);
+    setSelectedIds(new Set(objects.map(o => o.id)));
+  }, [scene, handleSceneCommit]);
 
   // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────
 
@@ -1667,6 +1649,7 @@ export function App() {
     }),
 
     showBoxGenerator && React.createElement(BoxGenerator, {
+      scene,
       onGenerate: handleBoxGenerate,
       onClose: () => setShowBoxGenerator(false),
     }),
