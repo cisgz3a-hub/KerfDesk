@@ -1,8 +1,6 @@
 /**
  * Preflight checker — validates a scene + machine state before job execution.
  * Returns a readiness score (0-100%) with categorized issues.
- *
- * This is the core of LaserForge's "avoid mistakes before they happen" philosophy.
  */
 
 import { type Scene } from '../scene/Scene';
@@ -15,22 +13,18 @@ export interface PreflightIssue {
   severity: IssueSeverity;
   title: string;
   detail: string;
-  fix?: string;          // Suggested action
+  fix?: string;
   category: 'machine' | 'design' | 'settings' | 'output';
 }
 
 export interface PreflightResult {
-  score: number;         // 0-100
+  score: number;
   issues: PreflightIssue[];
   blockers: number;
   warnings: number;
-  canStart: boolean;     // false if any blockers
+  canStart: boolean;
 }
 
-/**
- * Run all preflight checks against the current scene and machine state.
- * Machine state is optional — design checks run even when disconnected.
- */
 export function runPreflight(
   scene: Scene,
   gcode: string | null,
@@ -81,7 +75,6 @@ export function runPreflight(
       });
     }
     if (machineState.status !== 'idle') {
-      // Non-idle but not one of the above specific states
       if (!issues.some(i => i.category === 'machine' && i.severity === 'blocker')) {
         issues.push({
           id: 'machine-not-idle',
@@ -136,27 +129,30 @@ export function runPreflight(
   // Objects outside material bounds
   if (scene.material) {
     const mat = scene.material;
+    let outsideCount = 0;
     for (const obj of visibleObjects) {
       if (obj.geometry.type === 'text' || obj.geometry.type === 'image') continue;
-      // Simple bounds check using transform position
       const tx = obj.transform.tx;
       const ty = obj.transform.ty;
       if (tx < mat.x || ty < mat.y || tx > mat.x + mat.width || ty > mat.y + mat.height) {
-        issues.push({
-          id: `design-outside-material-${obj.id}`,
-          severity: 'warning',
-          title: `"${obj.name || obj.type}" may be outside material`,
-          detail: `Object at (${tx.toFixed(0)}, ${ty.toFixed(0)})mm, material at (${mat.x}, ${mat.y}) ${mat.width}×${mat.height}mm`,
-          category: 'design',
-        });
-        break; // Only report once
+        outsideCount++;
       }
+    }
+    if (outsideCount > 0) {
+      issues.push({
+        id: 'design-outside-material',
+        severity: 'warning',
+        title: `${outsideCount} object(s) may be outside material`,
+        detail: `Material area: ${mat.width}×${mat.height}mm at (${mat.x}, ${mat.y})`,
+        fix: 'Move objects onto the material or resize the material',
+        category: 'design',
+      });
     }
   }
 
   // ─── SETTINGS CHECKS ─────────────────────────────────
   for (const layer of visibleLayers) {
-    if (!layer.output) continue;
+    if (layer.output === false) continue;
 
     if (layer.settings.power.max === 0) {
       issues.push({
@@ -188,11 +184,21 @@ export function runPreflight(
         category: 'settings',
       });
     }
+
+    if (layer.settings.mode === 'cut' && layer.settings.power.max > 95 && layer.settings.speed < 100) {
+      issues.push({
+        id: `settings-overburn-${layer.id}`,
+        severity: 'warning',
+        title: `Layer "${layer.name}" high power + slow speed`,
+        detail: `${layer.settings.power.max}% at ${layer.settings.speed}mm/min may cause burning or fire`,
+        fix: 'Reduce power or increase speed',
+        category: 'settings',
+      });
+    }
   }
 
   // ─── OUTPUT CHECKS ──────────────────────────────────
   if (gcode) {
-    // Check G-code bounds against bed
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const line of gcode.split('\n')) {
       const xm = line.match(/X([-\d.]+)/);
@@ -255,19 +261,17 @@ export function runPreflight(
   const infos = issues.filter(i => i.severity === 'info').length;
 
   let score = 100;
-  score -= blockers * 30;   // Each blocker costs 30 points
-  score -= warnings * 10;   // Each warning costs 10 points
-  score -= infos * 2;       // Info items barely affect score
+  score -= blockers * 30;
+  score -= warnings * 10;
+  score -= infos * 2;
   score = Math.max(0, Math.min(100, score));
-
-  // Blockers force score below 50
   if (blockers > 0) score = Math.min(score, 40);
 
   return {
     score,
     issues,
     blockers,
-    warnings: warnings,
+    warnings,
     canStart: blockers === 0,
   };
 }

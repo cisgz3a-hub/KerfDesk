@@ -5,7 +5,7 @@ import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
-import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
+import { runPreflight, type PreflightResult } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
 import {
   createJobLog,
@@ -160,7 +160,6 @@ export function ConnectionPanel({
   }, [messages]);
 
   useEffect(() => {
-    if (!scene) return;
     const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight);
     setPreflight(result);
   }, [gcode, machineState, scene, bedWidth, bedHeight]);
@@ -223,44 +222,33 @@ export function ConnectionPanel({
   const handleStartJob = async () => {
     if (!gcode || !controllerRef.current) return;
 
-    // Machine readiness gate
-    const status = machineState?.status;
-    if (status === 'alarm') {
-      await showAlert('Machine', 'Machine is in ALARM state. Click Unlock ($X) first.');
-      return;
-    }
-    if (status === 'hold') {
-      await showAlert('Machine', 'Machine is paused. Click Resume or Stop first.');
-      return;
-    }
-    if (status === 'run') {
-      await showAlert('Machine', 'A job is already running. Wait for it to finish or Stop it.');
-      return;
-    }
-    if (status === 'homing') {
-      await showAlert('Machine', 'Machine is homing. Wait for it to finish.');
-      return;
-    }
-    if (status !== 'idle' && status !== undefined) {
-      await showAlert('Machine', `Machine not ready (state: ${status}). Wait for idle.`);
-      return;
-    }
-
-    // Use preflight to gate job start
     if (preflight && !preflight.canStart) {
       await showAlert(
-        'Cannot Start Job',
+        'Cannot start job',
         'Cannot start job — resolve all blockers first:\n\n' +
         preflight.issues
           .filter(i => i.severity === 'blocker')
-          .map(i => `• ${i.title}`)
-          .join('\n')
+          .map(i => `• ${i.title}${i.fix ? '\n  → ' + i.fix : ''}`)
+          .join('\n\n'),
       );
       return;
     }
 
+    if (preflight && preflight.warnings > 0) {
+      const proceed = await showConfirm(
+        'Start job?',
+        `${preflight.warnings} warning(s):\n\n` +
+        preflight.issues
+          .filter(i => i.severity === 'warning')
+          .map(i => `▲ ${i.title}`)
+          .join('\n') +
+        '\n\nStart job anyway?',
+      );
+      if (!proceed) return;
+    }
+
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
-    setMessages(prev => [...prev, `Starting job: ${lines.length} commands (score: ${preflight?.score ?? '?'}%)`]);
+    setMessages(prev => [...prev, `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%)`]);
     try {
       const estimate = gcode ? estimateJobTime(gcode) : null;
       const jobLog = createJobLog(
@@ -523,66 +511,6 @@ export function ConnectionPanel({
           overflowX: 'hidden' as const,
         },
       },
-      // Machine readiness score (visible before connect — design + machine checks)
-      preflight && React.createElement('div', {
-        style: {
-          padding: '12px 18px', borderBottom: '1px solid #1a1a2e',
-        },
-      },
-        React.createElement('div', {
-          style: { fontSize: 10, color: '#555570', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 8 },
-        }, 'Machine readiness'),
-        React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-        },
-          React.createElement('div', {
-            style: { display: 'flex', alignItems: 'center', gap: 10 },
-          },
-            React.createElement('div', {
-              style: {
-                width: 44, height: 44, borderRadius: '50%',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontSize: 16, fontWeight: 700, fontFamily: mono,
-                background: preflight.score >= 80 ? 'rgba(45,212,160,0.1)' :
-                            preflight.score >= 50 ? 'rgba(255,212,68,0.1)' :
-                            'rgba(255,68,102,0.1)',
-                border: `2px solid ${preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466'}`,
-                color: preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466',
-              },
-            }, `${preflight.score}`),
-            React.createElement('div', null,
-              React.createElement('div', {
-                style: { fontSize: 12, fontWeight: 600, color: '#e0e0ec' },
-              }, preflight.canStart ? 'Ready to cut' : 'Not ready'),
-              React.createElement('div', {
-                style: { fontSize: 10, color: '#555570' },
-              }, `${preflight.blockers} blocker${preflight.blockers !== 1 ? 's' : ''}, ${preflight.warnings} warning${preflight.warnings !== 1 ? 's' : ''}`),
-            ),
-          ),
-        ),
-
-        ...(preflight.issues.filter(i => i.severity !== 'info').map(issue =>
-          React.createElement('div', {
-            key: issue.id,
-            style: {
-              display: 'flex', alignItems: 'flex-start', gap: 8,
-              padding: '6px 0', fontSize: 11, lineHeight: 1.4,
-            },
-          },
-            React.createElement('span', {
-              style: {
-                fontSize: 10, marginTop: 2, flexShrink: 0,
-                color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
-              },
-            }, issue.severity === 'blocker' ? '●' : '▲'),
-            React.createElement('div', null,
-              React.createElement('div', { style: { color: '#e0e0ec', fontWeight: 500 } }, issue.title),
-              issue.detail && React.createElement('div', { style: { color: '#666680', fontSize: 10, marginTop: 2 } }, issue.detail),
-              issue.fix && React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, issue.fix),
-            ),
-          ),
-        )),
-      ),
 
       // Connect section
       !isConnected && React.createElement('div', { style: { padding: '16px 18px', borderBottom: '1px solid #1a1a2e' } },
@@ -668,6 +596,66 @@ export function ConnectionPanel({
             '• If you moved it by hand, press ZERO to sync', React.createElement('br'),
             '• Frame shows where the laser will cut — check before starting', React.createElement('br'),
             '• Emergency Stop is always at the bottom of this panel',
+          ),
+        ),
+      ),
+
+      // Machine Readiness Score
+      isConnected && preflight && React.createElement('div', {
+        style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' },
+      },
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: preflight.issues.filter(i => i.severity !== 'info').length > 0 ? 10 : 0 },
+        },
+          React.createElement('div', {
+            style: {
+              width: 48, height: 48, borderRadius: '50%',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 17, fontWeight: 700, fontFamily: mono,
+              background: preflight.score >= 80 ? 'rgba(45,212,160,0.1)' :
+                          preflight.score >= 50 ? 'rgba(255,212,68,0.1)' :
+                          'rgba(255,68,102,0.1)',
+              border: `2px solid ${preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466'}`,
+              color: preflight.score >= 80 ? '#2dd4a0' : preflight.score >= 50 ? '#ffd444' : '#ff4466',
+              flexShrink: 0,
+            },
+          }, `${preflight.score}`),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', {
+              style: {
+                fontSize: 13, fontWeight: 600,
+                color: preflight.canStart ? '#2dd4a0' : '#ff4466',
+              },
+            }, preflight.canStart ? 'Ready to cut' : 'Not ready'),
+            React.createElement('div', {
+              style: { fontSize: 10, color: '#555570', marginTop: 2 },
+            },
+              preflight.blockers > 0 ? `${preflight.blockers} blocker${preflight.blockers !== 1 ? 's' : ''}` : '',
+              preflight.blockers > 0 && preflight.warnings > 0 ? ', ' : '',
+              preflight.warnings > 0 ? `${preflight.warnings} warning${preflight.warnings !== 1 ? 's' : ''}` : '',
+              preflight.blockers === 0 && preflight.warnings === 0 ? 'All checks passed' : '',
+            ),
+          ),
+        ),
+
+        ...preflight.issues.filter(i => i.severity !== 'info').map(issue =>
+          React.createElement('div', {
+            key: issue.id,
+            style: {
+              display: 'flex', alignItems: 'flex-start', gap: 8,
+              padding: '5px 0', fontSize: 11, lineHeight: 1.4,
+            },
+          },
+            React.createElement('span', {
+              style: {
+                fontSize: 10, marginTop: 2, flexShrink: 0,
+                color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
+              },
+            }, issue.severity === 'blocker' ? '●' : '▲'),
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { color: '#e0e0ec', fontWeight: 500 } }, issue.title),
+              issue.fix && React.createElement('div', { style: { color: '#555570', fontSize: 10, marginTop: 1 } }, issue.fix),
+            ),
           ),
         ),
       ),
@@ -802,9 +790,9 @@ export function ConnectionPanel({
             style: { ...btnStyle('136,180,255', !gcode || isRunning), flex: 1 },
           }, 'Proof'),
           React.createElement('button', {
-            onClick: handleStartJob, disabled: !gcode || isRunning || (preflight ? !preflight.canStart : false),
+            onClick: handleStartJob, disabled: !gcode || isRunning,
             title: 'Step 5: Begin cutting — make sure you have framed first to verify position',
-            style: { ...btnStyle('45,212,160', !gcode || isRunning || (preflight ? !preflight.canStart : false)), flex: 1, fontWeight: 600 },
+            style: { ...btnStyle('45,212,160', !gcode || isRunning), flex: 1, fontWeight: 600 },
           }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
         ),
         // Pause/Resume/Stop when running
