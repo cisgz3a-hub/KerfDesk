@@ -409,13 +409,15 @@ export function ConnectionPanel({
     React.createElement('div', {
       style: {
         background: '#12121e', border: '1px solid #252540', borderRadius: 14,
-        width: 520, maxHeight: '85vh', overflow: 'hidden',
-        boxShadow: '0 20px 60px rgba(0,0,0,0.6)', display: 'flex', flexDirection: 'column' as const,
+        width: 520, maxHeight: '90vh',
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        display: 'flex', flexDirection: 'column' as const,
+        overflow: 'hidden',
       },
     },
       // Header
       React.createElement('div', {
-        style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+        style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 },
       },
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 10 } },
           React.createElement('div', {
@@ -436,6 +438,15 @@ export function ConnectionPanel({
         }, '×'),
       ),
 
+      // Scrollable content (everything below header except sticky Emergency Stop)
+      React.createElement('div', {
+        style: {
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto' as const,
+          overflowX: 'hidden' as const,
+        },
+      },
       // Machine readiness score (visible before connect — design + machine checks)
       preflight && React.createElement('div', {
         style: {
@@ -695,18 +706,6 @@ export function ConnectionPanel({
         ),
       ),
 
-      // Emergency stop
-      isConnected && React.createElement('div', { style: { padding: '4px 18px' } },
-        React.createElement('button', {
-          onClick: () => {
-            controllerRef.current?.stop();
-            sendCmd('M5 S0');
-            setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
-          },
-          style: { width: '100%', padding: '8px', background: 'rgba(255,68,102,0.1)', border: '1px solid #ff4466', borderRadius: 6, color: '#ff4466', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: font },
-        }, '⚠ EMERGENCY STOP'),
-      ),
-
       // Job outcome feedback
       showOutcome && currentReplay && React.createElement('div', {
         style: {
@@ -770,7 +769,7 @@ export function ConnectionPanel({
       // Console — full log in Production, simple status in Beginner
       productionMode ? React.createElement('div', {
         ref: logRef,
-        style: { flex: 1, minHeight: 120, maxHeight: 200, padding: '8px 12px', margin: '8px 18px', background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e', overflow: 'auto', fontFamily: mono, fontSize: 10, lineHeight: 1.5 },
+        style: { flex: 1, minHeight: 80, maxHeight: 140, padding: '8px 12px', margin: '8px 18px', background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e', overflow: 'auto', fontFamily: mono, fontSize: 10, lineHeight: 1.5 },
       },
         messages.length === 0
           ? React.createElement('span', { style: { color: '#333355' } }, 'Console...')
@@ -800,10 +799,35 @@ export function ConnectionPanel({
         React.createElement('button', { onClick: () => { sendCmd(manualCmd); setManualCmd(''); }, style: btnStyle('0,212,255') }, 'Send'),
       ),
 
-      // Footer
+      // Footer (scrollable)
       React.createElement('div', {
         style: { padding: '8px 18px', borderTop: '1px solid #1a1a2e', fontSize: 10, color: '#444460' },
       }, 'GRBL 1.1+ · Character-counting buffer · 5Hz status polling'),
+      ),
+
+      // Emergency stop — always visible, never scrolls away
+      isConnected && React.createElement('div', {
+        style: {
+          padding: '8px 18px 12px', borderTop: '1px solid #1a1a2e',
+          flexShrink: 0,
+        },
+      },
+        React.createElement('button', {
+          onClick: () => {
+            controllerRef.current?.stop();
+            try { controllerRef.current?.sendCommand('M5 S0'); } catch { /* ignore */ }
+            setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
+          },
+          style: {
+            width: '100%', padding: '10px',
+            background: 'rgba(255,68,102,0.15)',
+            border: '2px solid #ff4466',
+            borderRadius: 6, color: '#ff4466',
+            fontSize: 13, fontWeight: 700, cursor: 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+          },
+        }, '⚠ EMERGENCY STOP'),
+      ),
     ),
   );
 }
