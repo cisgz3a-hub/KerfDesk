@@ -110,84 +110,51 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     const animating = isPlaying || playProgress > 0;
     const currentTime = playProgress * totalDuration;
 
-    const lines = gcode.split('\n');
-    let moveCount = 0;
-    let cutCount = 0;
+    const travelCount = parsedMoves.filter(m => m.type === 'rapid').length;
+    const cutCount = parsedMoves.filter(m => m.type === 'cut').length;
 
-    const runDrawPass = (faint: boolean) => {
-      let lx = 0;
-      let ly = 0;
-      let lOn = false;
-      let pwr = 0;
-      ctx.globalAlpha = faint ? 0.22 : 1;
+    // Pass 1: Draw travel moves (G0) as faint gray dashes
+    ctx.beginPath();
+    ctx.strokeStyle = 'rgba(100, 100, 130, 0.3)';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([4, 4]);
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith(';')) continue;
+    let drawX = 0;
+    let drawY = 0;
+    for (const move of parsedMoves) {
+      const sx = ox + move.x * scale;
+      const sy = oy + move.y * scale;
 
-        const sMatch = trimmed.match(/S(\d+)/i);
-        if (sMatch) pwr = parseInt(sMatch[1], 10);
-
-        const up = trimmed.toUpperCase();
-        if (up.startsWith('M3') || up.startsWith('M4')) lOn = true;
-        if (up.startsWith('M5')) {
-          lOn = false;
-          pwr = 0;
-        }
-
-        const xMatch = trimmed.match(/X([-\d.]+)/i);
-        const yMatch = trimmed.match(/Y([-\d.]+)/i);
-
-        if (xMatch || yMatch) {
-          const nx = xMatch ? parseFloat(xMatch[1]) : lx;
-          const ny = yMatch ? parseFloat(yMatch[1]) : ly;
-
-          const px1 = ox + lx * scale;
-          const py1 = oy + ly * scale;
-          const px2 = ox + nx * scale;
-          const py2 = oy + ny * scale;
-
-          if (up.startsWith('G0')) {
-            ctx.strokeStyle = 'rgba(80, 80, 120, 0.5)';
-            ctx.lineWidth = 0.5;
-            ctx.setLineDash([2, 3]);
-            ctx.beginPath();
-            ctx.moveTo(px1, py1);
-            ctx.lineTo(px2, py2);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            moveCount++;
-          } else if (up.startsWith('G1')) {
-            const intensity = Math.min(pwr / 700, 1);
-            if (lOn && pwr > 0) {
-              const r = Math.round(255 * intensity);
-              const g = Math.round(120 * (1 - intensity));
-              const b = Math.round(50 * (1 - intensity));
-              ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.4 + intensity * 0.6})`;
-              ctx.lineWidth = 1 + intensity;
-            } else {
-              ctx.strokeStyle = 'rgba(80, 80, 120, 0.1)';
-              ctx.lineWidth = 0.5;
-            }
-            ctx.beginPath();
-            ctx.moveTo(px1, py1);
-            ctx.lineTo(px2, py2);
-            ctx.stroke();
-            cutCount++;
-          }
-
-          lx = nx;
-          ly = ny;
-        }
+      if (move.type === 'rapid') {
+        ctx.moveTo(ox + drawX * scale, oy + drawY * scale);
+        ctx.lineTo(sx, sy);
       }
-      ctx.globalAlpha = 1;
-    };
-
-    if (animating && totalDuration > 0) {
-      runDrawPass(true);
-    } else {
-      runDrawPass(false);
+      drawX = move.x;
+      drawY = move.y;
     }
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Pass 2: Draw cut moves (G1) as bright solid lines
+    ctx.beginPath();
+    ctx.strokeStyle = '#ff4466';
+    ctx.lineWidth = 1.5;
+
+    drawX = 0;
+    drawY = 0;
+    for (const move of parsedMoves) {
+      const sx = ox + move.x * scale;
+      const sy = oy + move.y * scale;
+
+      if (move.type === 'cut') {
+        ctx.lineTo(sx, sy);
+      } else {
+        ctx.moveTo(sx, sy);
+      }
+      drawX = move.x;
+      drawY = move.y;
+    }
+    ctx.stroke();
 
     if (animating && parsedMoves.length > 0 && totalDuration > 0) {
       ctx.beginPath();
@@ -218,13 +185,15 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
       }
     }
 
+    const statsY = ch - 58;
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(8, ch - 66, 220, 58);
     ctx.font = "11px 'JetBrains Mono', monospace";
-    ctx.fillStyle = '#8888aa';
     ctx.textBaseline = 'top';
-    ctx.fillText(`Travel moves: ${moveCount}`, 14, ch - 58);
-    ctx.fillText(`Cut moves: ${cutCount}`, 14, ch - 44);
+    ctx.fillStyle = 'rgba(100, 100, 130, 0.5)';
+    ctx.fillText(`Travel moves: ${travelCount} (gray dashed)`, 14, statsY);
+    ctx.fillStyle = '#ff4466';
+    ctx.fillText(`Cut moves: ${cutCount} (red solid)`, 14, statsY + 14);
     ctx.fillText(`Total distance: ${(estimate.totalDistance / 1000).toFixed(1)}m`, 14, ch - 30);
     ctx.fillStyle = '#00d4ff';
     ctx.fillText(`Estimated time: ${estimate.formatted}`, 14, ch - 16);
