@@ -317,6 +317,213 @@ export function useSceneOperations({
     setSelectedIds(new Set(newObjects.map(o => o.id)));
   }, [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert]);
 
+  const distributeObjects = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      const selected = scene.objects.filter(o => selectedIds.has(o.id));
+      if (selected.length < 3) return;
+
+      const sorted = [...selected].sort((a, b) =>
+        direction === 'horizontal'
+          ? a.transform.tx - b.transform.tx
+          : a.transform.ty - b.transform.ty,
+      );
+
+      const first = sorted[0];
+      const last = sorted[sorted.length - 1];
+      const totalSpan = direction === 'horizontal'
+        ? last.transform.tx - first.transform.tx
+        : last.transform.ty - first.transform.ty;
+      const step = totalSpan / (sorted.length - 1);
+
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o => {
+          const idx = sorted.findIndex(s => s.id === o.id);
+          if (idx <= 0 || idx >= sorted.length - 1) return o;
+          if (direction === 'horizontal') {
+            return {
+              ...o,
+              transform: { ...o.transform, tx: first.transform.tx + step * idx },
+              _bounds: null,
+              _worldTransform: null,
+            };
+          }
+          return {
+            ...o,
+            transform: { ...o.transform, ty: first.transform.ty + step * idx },
+            _bounds: null,
+            _worldTransform: null,
+          };
+        }),
+      };
+      handleSceneCommit(newScene);
+    },
+    [scene, selectedIds, handleSceneCommit],
+  );
+
+  const rotateSelected = useCallback(
+    (degrees: number) => {
+      if (selectedIds.size === 0) return;
+
+      const rad = (degrees * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o => {
+          if (!selectedIds.has(o.id)) return o;
+          const t = o.transform;
+          return {
+            ...o,
+            transform: {
+              a: t.a * cos - t.b * sin,
+              b: t.a * sin + t.b * cos,
+              c: t.c * cos - t.d * sin,
+              d: t.c * sin + t.d * cos,
+              tx: t.tx,
+              ty: t.ty,
+            },
+            _bounds: null,
+            _worldTransform: null,
+          };
+        }),
+      };
+      handleSceneCommit(newScene);
+    },
+    [scene, selectedIds, handleSceneCommit],
+  );
+
+  const flipSelected = useCallback(
+    (axis: 'horizontal' | 'vertical') => {
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o => {
+          if (!selectedIds.has(o.id)) return o;
+          const t = o.transform;
+          return {
+            ...o,
+            transform: {
+              ...t,
+              a: axis === 'horizontal' ? -t.a : t.a,
+              d: axis === 'vertical' ? -t.d : t.d,
+            },
+            _bounds: null,
+            _worldTransform: null,
+          };
+        }),
+      };
+      handleSceneCommit(newScene);
+    },
+    [scene, selectedIds, handleSceneCommit],
+  );
+
+  const moveToCorner = useCallback(
+    (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => {
+      const selected = scene.objects.filter(o => selectedIds.has(o.id));
+      if (selected.length === 0) return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const o of selected) {
+        const b = computeObjectBounds(o);
+        if (!b) continue;
+        minX = Math.min(minX, b.minX);
+        minY = Math.min(minY, b.minY);
+        maxX = Math.max(maxX, b.maxX);
+        maxY = Math.max(maxY, b.maxY);
+      }
+      if (!Number.isFinite(minX)) return;
+
+      const groupW = maxX - minX;
+      const groupH = maxY - minY;
+      let targetX = 0;
+      let targetY = 0;
+      switch (corner) {
+        case 'topLeft': targetX = 0; targetY = 0; break;
+        case 'topRight': targetX = scene.canvas.width - groupW; targetY = 0; break;
+        case 'bottomLeft': targetX = 0; targetY = scene.canvas.height - groupH; break;
+        case 'bottomRight': targetX = scene.canvas.width - groupW; targetY = scene.canvas.height - groupH; break;
+      }
+      const dx = targetX - minX;
+      const dy = targetY - minY;
+
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o =>
+          selectedIds.has(o.id)
+            ? {
+                ...o,
+                transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+                _bounds: null,
+                _worldTransform: null,
+              }
+            : o,
+        ),
+      };
+      handleSceneCommit(newScene);
+    },
+    [scene, selectedIds, handleSceneCommit],
+  );
+
+  const moveToMaterialOrigin = useCallback(() => {
+    if (!scene.material) return;
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
+
+    let minX = Infinity, minY = Infinity;
+    for (const o of selected) {
+      const b = computeObjectBounds(o);
+      if (!b) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+    }
+    if (!Number.isFinite(minX)) return;
+
+    const dx = scene.material.x - minX;
+    const dy = scene.material.y - minY;
+
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        selectedIds.has(o.id)
+          ? {
+              ...o,
+              transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+              _bounds: null,
+              _worldTransform: null,
+            }
+          : o,
+      ),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
+
+  const toggleLock = useCallback(() => {
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
+    const allLocked = selected.every(o => o.locked);
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        selectedIds.has(o.id) ? { ...o, locked: !allLocked } : o,
+      ),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
+
+  const toggleVisibility = useCallback(() => {
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
+    const allVisible = selected.every(o => o.visible);
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        selectedIds.has(o.id) ? { ...o, visible: !allVisible } : o,
+      ),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
+
   const alignObjects = useCallback(
     (mode: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY') => {
       switch (mode) {
@@ -346,5 +553,12 @@ export function useSceneOperations({
     offsetSelected: offsetShapes,
     textToPath,
     convertTextToPath: textToPath,
+    distributeObjects,
+    rotateSelected,
+    flipSelected,
+    moveToCorner,
+    moveToMaterialOrigin,
+    toggleLock,
+    toggleVisibility,
   };
 }

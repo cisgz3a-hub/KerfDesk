@@ -39,11 +39,21 @@ export interface ContextMenuActions {
   offsetSelected: (distance: number) => void;
   convertTextToPath: () => void;
   showAlert: (title: string, msg: string) => Promise<void>;
+  distributeObjects?: (direction: 'horizontal' | 'vertical') => void;
+  openGridArray?: () => void;
+  openMaterialTest?: () => void;
+  moveToCorner?: (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => void;
+  moveToMaterialOrigin?: () => void;
+  rotateSelected?: (degrees: number) => void;
+  flipSelected?: (axis: 'horizontal' | 'vertical') => void;
+  toggleLock?: () => void;
+  toggleVisibility?: () => void;
 }
 
 export function useContextMenu(
   scene: Scene,
   selectedIds: ReadonlySet<string>,
+  productionMode: boolean,
   actions: ContextMenuActions,
 ) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
@@ -172,6 +182,85 @@ export function useContextMenu(
         });
       }
 
+      if (productionMode && hasSelection) {
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({ label: '─ Pro Tools ─', action: () => {}, disabled: true });
+
+        if (selectedObjs.length >= 3 && actions.distributeObjects) {
+          items.push({
+            label: 'Distribute Horizontally',
+            action: () => actions.distributeObjects!('horizontal'),
+          });
+          items.push({
+            label: 'Distribute Vertically',
+            action: () => actions.distributeObjects!('vertical'),
+          });
+        }
+
+        if (actions.openGridArray) {
+          items.push({
+            label: 'Grid Array...',
+            action: () => actions.openGridArray!(),
+          });
+        }
+
+        if (actions.openMaterialTest) {
+          items.push({
+            label: 'Material Test Grid...',
+            action: () => actions.openMaterialTest!(),
+          });
+        }
+
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({
+          label: 'Move to Home (top-left)',
+          action: () => actions.moveToCorner?.('topLeft'),
+        });
+        items.push({
+          label: 'Move to Bottom-Right',
+          action: () => actions.moveToCorner?.('bottomRight'),
+        });
+        items.push({
+          label: 'Move to Material Origin',
+          action: () => actions.moveToMaterialOrigin?.(),
+        });
+
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({
+          label: 'Rotate 90° CW',
+          action: () => actions.rotateSelected?.(90),
+        });
+        items.push({
+          label: 'Rotate 90° CCW',
+          action: () => actions.rotateSelected?.(-90),
+        });
+        items.push({
+          label: 'Rotate 180°',
+          action: () => actions.rotateSelected?.(180),
+        });
+        items.push({
+          label: 'Flip Horizontal',
+          action: () => actions.flipSelected?.('horizontal'),
+        });
+        items.push({
+          label: 'Flip Vertical',
+          action: () => actions.flipSelected?.('vertical'),
+        });
+
+        items.push({ label: '', action: () => {}, separator: true });
+        const allLocked = selectedObjs.every(o => o.locked);
+        items.push({
+          label: allLocked ? 'Unlock' : 'Lock',
+          action: () => actions.toggleLock?.(),
+        });
+
+        const allVisible = selectedObjs.every(o => o.visible);
+        items.push({
+          label: allVisible ? 'Hide' : 'Show',
+          action: () => actions.toggleVisibility?.(),
+        });
+      }
+
       const menuWidth = 220;
       const menuHeight =
         items.filter(i => !i.separator).length * 28 + items.filter(i => i.separator).length * 8 + 16;
@@ -180,7 +269,7 @@ export function useContextMenu(
 
       setContextMenu({ x: clampedX, y: clampedY, items });
     },
-    [scene, selectedIds, actions],
+    [scene, selectedIds, productionMode, actions],
   );
 
   const hideContextMenu = useCallback(() => setContextMenu(null), []);

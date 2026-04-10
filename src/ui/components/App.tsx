@@ -406,6 +406,15 @@ export function App() {
       offsetSelected: sceneOps.offsetSelected,
       convertTextToPath: sceneOps.convertTextToPath,
       showAlert,
+      distributeObjects: sceneOps.distributeObjects,
+      openGridArray: () => setShowGridArray(true),
+      openMaterialTest: () => setShowMaterialTest(true),
+      moveToCorner: sceneOps.moveToCorner,
+      moveToMaterialOrigin: sceneOps.moveToMaterialOrigin,
+      rotateSelected: sceneOps.rotateSelected,
+      flipSelected: sceneOps.flipSelected,
+      toggleLock: sceneOps.toggleLock,
+      toggleVisibility: sceneOps.toggleVisibility,
     }),
     [
       handleSceneCommit,
@@ -429,10 +438,24 @@ export function App() {
       sceneOps.offsetSelected,
       sceneOps.convertTextToPath,
       showAlert,
+      sceneOps.distributeObjects,
+      sceneOps.moveToCorner,
+      sceneOps.moveToMaterialOrigin,
+      sceneOps.rotateSelected,
+      sceneOps.flipSelected,
+      sceneOps.toggleLock,
+      sceneOps.toggleVisibility,
+      setShowGridArray,
+      setShowMaterialTest,
     ],
   );
 
-  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(scene, selectedIds, contextMenuActions);
+  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
+    scene,
+    selectedIds,
+    productionMode,
+    contextMenuActions,
+  );
 
   const handleKeyboardSave = useCallback(async () => {
     try {
