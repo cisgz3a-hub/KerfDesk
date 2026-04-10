@@ -77,14 +77,29 @@ export function generateFillScanlines(
     maxY = Math.max(maxY, e.y1, e.y2);
   }
 
+  // Guard against extreme scanline counts from corrupt or tiny intervals
+  const MIN_FILL_INTERVAL = 0.01; // mm — finer than any laser can achieve
+  const MAX_SCANLINES = 50000;
+
+  let safeInterval = Math.max(MIN_FILL_INTERVAL, settings.interval);
+
+  const spanY = maxY - minY;
+  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
+  if (estimatedLines > MAX_SCANLINES) {
+    console.warn(
+      `[FillGenerator] Interval ${safeInterval}mm would produce ${estimatedLines} scanlines. Clamping to ${MAX_SCANLINES}.`,
+    );
+    safeInterval = spanY / MAX_SCANLINES;
+  }
+
   // Step 4: Generate scanlines
   const segments: ScanlineSegment[] = [];
 
   // Offset start by half-interval to avoid landing exactly on vertices
-  const startY = minY + settings.interval / 2;
+  const startY = minY + safeInterval / 2;
   let lineIndex = 0;
 
-  for (let y = startY; y < maxY; y += settings.interval) {
+  for (let y = startY; y < maxY; y += safeInterval) {
     // Step 4a: Find all intersections at this Y
     const intersections = findIntersections(rotatedEdges, y);
 
@@ -153,7 +168,16 @@ export function estimateScanlineCount(
     }
   }
 
-  return Math.max(0, Math.floor((maxY - minY) / interval));
+  const spanY = maxY - minY;
+  const MIN_FILL_INTERVAL = 0.01;
+  const MAX_SCANLINES = 50000;
+  let safeInterval = Math.max(MIN_FILL_INTERVAL, interval);
+  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
+  if (estimatedLines > MAX_SCANLINES) {
+    safeInterval = spanY / MAX_SCANLINES;
+  }
+
+  return Math.max(0, Math.floor(spanY / safeInterval));
 }
 
 // ─── EDGE EXTRACTION ─────────────────────────────────────────────

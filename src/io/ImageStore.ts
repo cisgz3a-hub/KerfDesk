@@ -35,33 +35,20 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-/** Generate a collision-resistant hash ID from a data URI */
-export function hashDataUri(dataUri: string): string {
-  const len = dataUri.length;
-
-  const sampleSize = Math.min(2000, len);
-  const step = Math.max(1, Math.floor(len / sampleSize));
-
-  let hash1 = 0;
-  let hash2 = 0;
-  let sampled = 0;
-
-  for (let i = 0; i < len && sampled < sampleSize; i += step) {
-    const char = dataUri.charCodeAt(i);
-    hash1 = ((hash1 << 5) - hash1 + char) | 0;
-    hash2 = ((hash2 << 7) + hash2 + char + 7) | 0;
-    sampled++;
-  }
-
-  const h1 = Math.abs(hash1).toString(36);
-  const h2 = Math.abs(hash2).toString(36);
-
-  return `img_${h1}_${h2}_${len}`;
+/**
+ * Generate a collision-resistant hash ID from a data URI using SHA-256.
+ */
+export async function hashDataUri(dataUri: string): Promise<string> {
+  const encoded = new TextEncoder().encode(dataUri);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encoded);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return `img_${hex.slice(0, 32)}`; // First 32 hex chars = 128 bits, more than enough
 }
 
 /** Store an image and return its ID */
 export async function storeImage(dataUri: string, width: number, height: number): Promise<string> {
-  const id = hashDataUri(dataUri);
+  const id = await hashDataUri(dataUri);
   const db = await openDB();
 
   return new Promise((resolve, reject) => {

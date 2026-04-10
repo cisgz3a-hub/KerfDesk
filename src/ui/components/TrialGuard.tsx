@@ -5,6 +5,37 @@ export { isProUnlocked } from '../utils/proGate';
 const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 
+const LICENSE_CACHE_KEY = 'laserforge_license_cache';
+const LICENSE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 days
+const LICENSE_OFFLINE_GRACE = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+interface LicenseCacheEntry {
+  code: string;
+  name: string;
+  validatedAt: number;
+  valid: boolean;
+}
+
+function getCachedLicense(code: string): LicenseCacheEntry | null {
+  try {
+    const raw = localStorage.getItem(LICENSE_CACHE_KEY);
+    if (!raw) return null;
+    const entry: LicenseCacheEntry = JSON.parse(raw);
+    if (entry.code !== code.toUpperCase().trim()) return null;
+    return entry;
+  } catch { return null; }
+}
+
+function setCachedLicense(code: string, name: string, valid: boolean): void {
+  const entry: LicenseCacheEntry = {
+    code: code.toUpperCase().trim(),
+    name,
+    validatedAt: Date.now(),
+    valid,
+  };
+  localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify(entry));
+}
+
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
 type TrialEntry =
@@ -61,7 +92,18 @@ async function validateAccess(code: string): Promise<AccessInfo | null> {
     return null;
   }
 
-  // Verify against Gumroad API
+  const cached = getCachedLicense(upper);
+  if (cached && cached.valid) {
+    const age = Date.now() - cached.validatedAt;
+    if (age < LICENSE_CACHE_MAX_AGE) {
+      return {
+        type: 'license',
+        code: upper,
+        name: cached.name,
+      };
+    }
+  }
+
   try {
     const formData = new FormData();
     formData.append('product_id', GUMROAD_PRODUCT_ID);
@@ -73,23 +115,44 @@ async function validateAccess(code: string): Promise<AccessInfo | null> {
       body: formData,
     });
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    if (!data.success || !data.purchase) return null;
-
-    // Reject refunded or disputed purchases
-    if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
+    if (!response.ok) {
+      setCachedLicense(upper, '', false);
       return null;
     }
+
+    const data = await response.json();
+    if (!data.success || !data.purchase) {
+      setCachedLicense(upper, '', false);
+      return null;
+    }
+
+    if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
+      setCachedLicense(upper, '', false);
+      return null;
+    }
+
+    const name = data.purchase.email || 'PRO User';
+    setCachedLicense(upper, name, true);
 
     return {
       type: 'license',
       code: upper,
-      name: data.purchase.email || 'PRO User',
+      name,
     };
   } catch (err) {
-    console.error('[TrialGuard] License verification failed:', err);
+    console.warn('[TrialGuard] Network error during license check:', err);
+
+    if (cached && cached.valid) {
+      const age = Date.now() - cached.validatedAt;
+      if (age < LICENSE_OFFLINE_GRACE) {
+        return {
+          type: 'license',
+          code: upper,
+          name: cached.name,
+        };
+      }
+    }
+
     return null;
   }
 }

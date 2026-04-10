@@ -65,10 +65,10 @@ export function compileJob(scene: Scene): Job {
   job.metadata.layerCount = job.operations.length;
 
   // Pass start position from scene to job for G-code footer
-  if ((scene as any).startPosition) {
-    job.metadata.startPositionX = (scene as any).startPosition.x;
-    job.metadata.startPositionY = (scene as any).startPosition.y;
-  }
+  const spX = scene.startPosition?.x ?? 0;
+  const spY = scene.startPosition?.y ?? 0;
+  job.metadata.startPositionX = spX;
+  job.metadata.startPositionY = spY;
 
   return job;
 }

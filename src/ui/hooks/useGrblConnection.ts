@@ -25,7 +25,9 @@ export function useGrblConnection() {
           controller.stop();
         }
         controller.sendCommand('M5 S0');
-      } catch { /* ignore */ }
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
       void controller.disconnect();
     };
   }, []);

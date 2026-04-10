@@ -298,7 +298,7 @@ export function runPreflight(
     if (maxX > bedWidth + 1) {
       issues.push({
         id: 'output-exceed-x',
-        severity: 'warning',
+        severity: 'blocker',
         title: `G-code exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
         detail: 'Objects extend beyond the machine workspace',
         category: 'output',
@@ -307,7 +307,7 @@ export function runPreflight(
     if (maxY > bedHeight + 1) {
       issues.push({
         id: 'output-exceed-y',
-        severity: 'warning',
+        severity: 'blocker',
         title: `G-code exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
         detail: 'Objects extend beyond the machine workspace',
         category: 'output',

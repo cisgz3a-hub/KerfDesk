@@ -275,8 +275,8 @@ export function ConnectionPanel({
     notifySimulatorTx(cmd);
     try {
       controllerRef.current?.sendCommand(cmd);
-    } catch {
-      /* ignore */
+    } catch (err: unknown) {
+      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
     }
   };
 
@@ -289,8 +289,8 @@ export function ConnectionPanel({
       notifySimulatorTx(cmd);
       try {
         c.sendCommand(cmd);
-      } catch {
-        /* ignore */
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
       setTimeout(() => {
         try {
@@ -413,8 +413,8 @@ export function ConnectionPanel({
       notifySimulatorTx(line);
       try {
         ctrl.sendCommand(line);
-      } catch {
-        /* ignore */
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
       await new Promise(r => setTimeout(r, 50));
     },
@@ -511,15 +511,15 @@ export function ConnectionPanel({
     try {
       notifySimulatorTx('M4 S20');
       ctrl.sendCommand('M4 S20');
-    } catch {
-      /* ignore */
+    } catch (err: unknown) {
+      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
     }
     await new Promise(resolve => setTimeout(resolve, 200));
     try {
       notifySimulatorTx('M5 S0');
       ctrl.sendCommand('M5 S0');
-    } catch {
-      /* ignore */
+    } catch (err: unknown) {
+      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
     }
   }, [notifySimulatorTx]);
 
@@ -1177,8 +1177,8 @@ export function ConnectionPanel({
             try {
               notifySimulatorTx('M5 S0');
               controllerRef.current?.sendCommand('M5 S0');
-            } catch {
-              /* ignore */
+            } catch (err: unknown) {
+              console.warn('[Command blocked]', err instanceof Error ? err.message : err);
             }
             setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
           },

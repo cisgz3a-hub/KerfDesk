@@ -1,3 +1,4 @@
+// Single source of truth for material presets. Do not duplicate.
 /**
  * Material presets with recommended power/speed settings.
  * Values sourced from xTool, LightBurn community, Snapmaker, and TwoTrees guides.

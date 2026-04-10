@@ -163,6 +163,27 @@ export class GrblController implements LaserController {
 
   sendCommand(command: string): void {
     if (!this._port?.isOpen) throw new Error('Not connected');
+
+    // Allow realtime commands during jobs (status query, feed hold, resume, soft reset)
+    const isRealtimeCommand =
+      command === '?' || command === '!' || command === '~' || command === '\x18';
+
+    if (this._isJobRunning && !isRealtimeCommand) {
+      throw new Error('Cannot send manual command while job is running');
+    }
+
+    if (typeof command !== 'string' || command.length === 0) {
+      throw new Error('Invalid command: empty');
+    }
+
+    if (command.length > 127) {
+      throw new Error('Command exceeds GRBL buffer size (127 bytes)');
+    }
+
+    if (/[\r\n]/.test(command)) {
+      throw new Error('Multi-line commands not allowed');
+    }
+
     this._writeLine(command);
   }
 
