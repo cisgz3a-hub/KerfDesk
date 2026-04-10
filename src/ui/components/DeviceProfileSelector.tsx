@@ -17,9 +17,10 @@ interface DeviceProfileSelectorProps {
   onSceneCommit: (scene: Scene) => void;
   onMessage: (msg: string) => void;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
+  showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
 }
 
-export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showConfirm }: DeviceProfileSelectorProps) {
+export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showConfirm, showPrompt }: DeviceProfileSelectorProps) {
   const [profiles, setProfiles] = useState<DeviceProfile[]>(getDeviceProfiles);
   const [activeId, setActiveId] = useState<string | null>(getActiveProfileId);
   const font = "'DM Sans', system-ui, sans-serif";
@@ -32,14 +33,16 @@ export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showCon
       onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
         const id = e.target.value;
         if (id === '__new__') {
-          const name = window.prompt('Profile name:');
-          if (!name) return;
-          const profile = profileFromScene(name, scene);
-          saveDeviceProfile(profile);
-          setActiveProfileId(profile.id);
-          setActiveId(profile.id);
-          setProfiles(getDeviceProfiles());
-          onMessage(`✓ Profile "${name}" saved`);
+          void (async () => {
+            const name = await showPrompt('New Profile', 'Enter a name for this device profile:', '');
+            if (!name?.trim()) return;
+            const profile = profileFromScene(name.trim(), scene);
+            saveDeviceProfile(profile);
+            setActiveProfileId(profile.id);
+            setActiveId(profile.id);
+            setProfiles(getDeviceProfiles());
+            onMessage(`✓ Profile "${name.trim()}" saved`);
+          })();
           return;
         }
         if (id === '__save__') {
@@ -85,7 +88,10 @@ export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showCon
       onClick: async () => {
         const profile = profiles.find(p => p.id === activeId);
         if (!profile) return;
-        const ok = await showConfirm('Delete profile', `Delete "${profile.name}"?`);
+        const ok = await showConfirm(
+          'Delete Profile',
+          `Delete "${profile.name}"? This cannot be undone.`,
+        );
         if (!ok) return;
         deleteDeviceProfile(activeId);
         setActiveProfileId(null);

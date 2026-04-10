@@ -35,6 +35,7 @@ interface ConnectionPanelProps {
   productionMode?: boolean;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
+  showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
   onSceneCommit: (scene: Scene) => void;
 }
 
@@ -55,6 +56,7 @@ export function ConnectionPanel({
   productionMode = false,
   showAlert,
   showConfirm,
+  showPrompt,
   onSceneCommit,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -636,6 +638,7 @@ export function ConnectionPanel({
         onSceneCommit,
         onMessage: (msg: string) => setMessages(prev => [...prev, msg]),
         showConfirm,
+        showPrompt,
       }),
 
       // Step-by-step workflow guide — highlights current step based on state

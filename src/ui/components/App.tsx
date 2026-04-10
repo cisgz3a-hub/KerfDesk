@@ -48,7 +48,6 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { type BooleanOp } from '../../geometry/BooleanOps';
 import { createLayer } from '../../core/scene/Layer';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -472,6 +471,7 @@ export function App() {
       offsetSelected: sceneOps.offsetSelected,
       convertTextToPath: sceneOps.convertTextToPath,
       showAlert,
+      showPrompt,
       distributeObjects: sceneOps.distributeObjects,
       openGridArray: () => setShowGridArray(true),
       openMaterialTest: () => setShowMaterialTest(true),
@@ -504,6 +504,7 @@ export function App() {
       sceneOps.offsetSelected,
       sceneOps.convertTextToPath,
       showAlert,
+      showPrompt,
       sceneOps.distributeObjects,
       sceneOps.moveToCorner,
       sceneOps.moveToMaterialOrigin,
@@ -718,20 +719,6 @@ export function App() {
     const newScene = { ...scene, objects: newObjects };
     handleSceneCommit(newScene);
   }, [scene, handleSceneCommit]);
-
-  useEffect(() => {
-    const onBoolean = (e: Event) => {
-      const op = (e as CustomEvent<{ op: BooleanOp }>).detail?.op;
-      if (op) void sceneOps.performBoolean(op);
-    };
-    const onTextToPath = () => void sceneOps.textToPath();
-    window.addEventListener('laserforge:boolean', onBoolean as EventListener);
-    window.addEventListener('laserforge:textToPath', onTextToPath);
-    return () => {
-      window.removeEventListener('laserforge:boolean', onBoolean as EventListener);
-      window.removeEventListener('laserforge:textToPath', onTextToPath);
-    };
-  }, [sceneOps.performBoolean, sceneOps.textToPath]);
 
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
@@ -1339,6 +1326,7 @@ export function App() {
       boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
       showAlert,
       showConfirm,
+      showPrompt,
       onSceneCommit: handleSceneCommit,
     }),
 

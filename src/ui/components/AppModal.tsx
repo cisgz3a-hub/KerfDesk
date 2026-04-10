@@ -82,6 +82,10 @@ export function AppModal({ title, message, details, buttons, onClose, prompt, on
               e.preventDefault();
               onPromptSubmit(inputValue);
             }
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              onClose();
+            }
           },
           style: {
             width: '100%', marginTop: 12, padding: '8px 10px', boxSizing: 'border-box' as const,

@@ -40,6 +40,7 @@ export interface ContextMenuActions {
   offsetSelected: (distance: number) => void;
   convertTextToPath: () => void;
   showAlert: (title: string, msg: string) => Promise<void>;
+  showPrompt?: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
   distributeObjects?: (direction: 'horizontal' | 'vertical') => void;
   openGridArray?: () => void;
   openMaterialTest?: () => void;
@@ -176,11 +177,16 @@ export function useContextMenu(
           label: 'Offset Custom...',
           action: () => {
             void (async () => {
-              const input = window.prompt('Offset distance in mm (negative for inward):', '5');
+              if (!actions.showPrompt) return;
+              const input = await actions.showPrompt(
+                'Custom Offset',
+                'Offset distance in mm (negative for inward):',
+                '5',
+              );
               if (input === null) return;
               const distance = parseFloat(input);
               if (Number.isNaN(distance)) return;
-              await actions.offsetSelected(distance);
+              actions.offsetSelected(distance);
             })();
           },
         });
