@@ -12,7 +12,7 @@
  * Last updated: UI Wiring — File Toolbar
  */
 
-import React, { useRef, useCallback, useState } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
@@ -90,7 +90,7 @@ export function FileToolbar({
   onRedo,
   canUndo = false,
   canRedo = false,
-  projectName,
+  projectName: _projectName,
   materialName,
   onShowShortcuts,
   onToolpathPreview,
@@ -98,7 +98,12 @@ export function FileToolbar({
   onToggleProductionMode,
 }: FileToolbarProps) {
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const [nameDraft, setNameDraft] = useState(() => scene.metadata.name || 'Untitled');
   const toolsButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    setNameDraft(scene.metadata.name || 'Untitled');
+  }, [scene.metadata.name, scene.id]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -298,6 +303,15 @@ export function FileToolbar({
     }
   }, [scene, showAlert]);
 
+  const commitProjectName = useCallback(() => {
+    const t = nameDraft.trim() || 'Untitled';
+    const cur = scene.metadata.name || 'Untitled';
+    if (t === cur) return;
+    const next = { ...scene, metadata: { ...scene.metadata, name: t } };
+    onSceneChange(next);
+    onSceneCommit(next);
+  }, [nameDraft, scene, onSceneChange, onSceneCommit]);
+
   // ─── RENDER ──────────────────────────────────────────────────
 
   const font = "'DM Sans', system-ui, sans-serif";
@@ -309,15 +323,17 @@ export function FileToolbar({
     opts?: { disabled?: boolean; color?: string; bg?: string; bold?: boolean },
   ) =>
     React.createElement('button', {
+      type: 'button',
       onClick,
       title,
       disabled: opts?.disabled,
       style: {
-        padding: '3px 8px',
-        fontSize: 10,
+        padding: '4px 6px',
+        fontSize: 14,
+        lineHeight: 1,
         cursor: opts?.disabled ? 'default' : 'pointer',
         background: opts?.bg || 'transparent',
-        border: 'none',
+        border: '1px solid transparent',
         borderRadius: 4,
         color: opts?.disabled ? '#333355' : (opts?.color || '#8888aa'),
         fontFamily: font,
@@ -328,7 +344,7 @@ export function FileToolbar({
         flexShrink: 0,
       },
       onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        if (!opts?.disabled) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
+        if (!opts?.disabled) (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.06)';
       },
       onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
         (e.target as HTMLElement).style.background = opts?.bg || 'transparent';
@@ -337,10 +353,11 @@ export function FileToolbar({
 
   const sep = () =>
     React.createElement('div', {
-      style: { width: 1, height: 18, background: '#1a1a2e', margin: '0 4px', flexShrink: 0 },
+      style: { width: 1, height: 18, background: '#1a1a2e', flexShrink: 0, margin: '0 2px' },
     });
 
   const toolMenuItems: Array<{ label: string; action?: () => void; show: boolean }> = [
+    { label: '⊞ Material settings', action: onMaterialSetup, show: true },
     { label: '📷 Camera', action: onCamera, show: true },
     { label: '🎯 Position', action: onStartPosition, show: true },
     { label: '⚄ Auto-Pack', action: onAutoNest, show: true },
@@ -389,20 +406,22 @@ export function FileToolbar({
         ref: toolsButtonRef,
         type: 'button',
         onClick: () => setShowToolsMenu(v => !v),
+        title: 'Tools menu',
         style: {
-          padding: '3px 8px',
-          fontSize: 10,
+          padding: '4px 6px',
+          fontSize: 14,
+          lineHeight: 1,
           cursor: 'pointer',
           background: showToolsMenu ? 'rgba(0,212,255,0.1)' : 'transparent',
-          border: showToolsMenu ? '1px solid #00d4ff' : '1px solid #252540',
-          borderRadius: 5,
-          color: showToolsMenu ? '#00d4ff' : '#c0c0d0',
+          border: showToolsMenu ? '1px solid #00d4ff' : '1px solid transparent',
+          borderRadius: 4,
+          color: showToolsMenu ? '#00d4ff' : '#8888aa',
           fontFamily: font,
           whiteSpace: 'nowrap' as const,
           flexShrink: 0,
         },
       },
-      '⚙ Tools ▾',
+      '⚙▾',
     ),
     showToolsMenu &&
       React.createElement(
@@ -452,22 +471,25 @@ export function FileToolbar({
     style: {
       display: 'flex',
       alignItems: 'center',
-      height: 34,
+      height: 36,
       background: '#0d0d18',
       borderBottom: '1px solid #1a1a2e',
-      padding: '0 8px',
-      gap: 4,
+      padding: '4px 8px',
+      gap: 2,
       fontFamily: font,
       flexShrink: 0,
       overflow: 'visible',
       flexWrap: 'nowrap' as const,
+      whiteSpace: 'nowrap' as const,
+      minWidth: 0,
     },
   },
     React.createElement('button', {
+      type: 'button',
       onClick: () => onToggleProductionMode?.(),
       title: productionMode ? 'Switch to Beginner Mode' : 'Switch to Production Mode',
       style: {
-        padding: '3px 8px',
+        padding: '4px 6px',
         fontSize: 9,
         fontWeight: 700,
         cursor: 'pointer',
@@ -477,29 +499,42 @@ export function FileToolbar({
         flexShrink: 0,
         fontFamily: font,
         color: productionMode ? '#ffaa32' : '#2dd4a0',
+        lineHeight: 1,
       },
     }, productionMode ? 'PRO' : 'EASY'),
 
     sep(),
 
-    React.createElement('span', {
-      title: 'Project name',
-      style: {
-        color: '#555570',
-        fontSize: 11,
-        maxWidth: 120,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap' as const,
-        flexShrink: 1,
+    React.createElement('input', {
+      type: 'text',
+      value: nameDraft,
+      title: 'Project name — edit and press Enter or blur to apply',
+      'aria-label': 'Project name',
+      onChange: (e: React.ChangeEvent<HTMLInputElement>) => setNameDraft(e.target.value),
+      onBlur: () => commitProjectName(),
+      onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
       },
-    }, projectName || 'Untitled'),
+      style: {
+        color: '#a0a0b8',
+        fontSize: 10,
+        minWidth: 48,
+        maxWidth: 120,
+        flex: '1 1 80px',
+        padding: '3px 6px',
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid #252540',
+        borderRadius: 4,
+        fontFamily: font,
+        outline: 'none',
+      },
+    }),
 
     sep(),
 
-    iconBtn('New', 'New project (Ctrl+N)', handleNew),
-    iconBtn('Open', 'Open project (Ctrl+O)', handleOpenClick),
-    iconBtn('Save', 'Save project (Ctrl+S)', handleSave),
+    iconBtn('📄', 'New project (Ctrl+N)', handleNew),
+    iconBtn('📂', 'Open project (Ctrl+O)', handleOpenClick),
+    iconBtn('💾', 'Save project (Ctrl+S)', handleSave),
 
     sep(),
 
@@ -508,44 +543,46 @@ export function FileToolbar({
 
     sep(),
 
-    iconBtn('SVG', 'Import SVG file', handleImportClick),
-    iconBtn('IMG', 'Import image (PNG/JPG)', handleImportImageClick),
+    iconBtn('📐', 'Import SVG file', handleImportClick),
+    iconBtn('🖼', 'Import image (PNG/JPG)', handleImportImageClick),
 
     sep(),
 
-    iconBtn('G-code', 'Export G-code file', handleGenerateGcode, { color: '#2dd4a0' }),
-    iconBtn('⌁ Connect', 'Connect to laser', () => onConnect?.(), { color: '#00d4ff', bold: true }),
+    iconBtn('G', 'Export G-code file', handleGenerateGcode, { color: '#2dd4a0', bold: true }),
 
-    React.createElement('div', { style: { flex: 1, minWidth: 0 } }),
-
-    React.createElement('button', {
-      onClick: () => onMaterialSetup?.(),
-      title: 'Material settings',
-      style: {
-        padding: '3px 8px',
-        fontSize: 10,
-        cursor: 'pointer',
-        background: materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent',
-        border: materialName ? '1px solid rgba(255, 170, 50, 0.2)' : 'none',
-        borderRadius: 4,
-        fontFamily: font,
-        color: materialName ? '#ffaa32' : '#8888aa',
-        whiteSpace: 'nowrap' as const,
-        maxWidth: 140,
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        transition: 'background 0.1s',
-        flexShrink: 0,
-      },
-      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        (e.target as HTMLElement).style.background = 'rgba(255,255,255,0.05)';
-      },
-      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        (e.target as HTMLElement).style.background = materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent';
-      },
-    }, materialName || '⊞ Material'),
+    sep(),
 
     toolsMenu,
+
+    materialName ? sep() : null,
+    materialName
+      ? React.createElement(
+        'button',
+        {
+          type: 'button',
+          onClick: () => onMaterialSetup?.(),
+          title: materialName,
+          style: {
+            fontSize: 9,
+            color: '#555570',
+            maxWidth: 80,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap' as const,
+            flexShrink: 0,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            fontFamily: font,
+            padding: '2px 4px',
+          },
+        },
+        materialName,
+      )
+      : null,
+
+    sep(),
+    iconBtn('⚡', 'Connect to laser', () => onConnect?.(), { color: '#00d4ff', bold: true }),
 
     // Hidden file input for SVG import
     React.createElement('input', {
