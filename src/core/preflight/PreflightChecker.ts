@@ -4,7 +4,58 @@
  */
 
 import { type Scene } from '../scene/Scene';
+import { type SceneObject } from '../scene/SceneObject';
 import { type MachineState } from '../../controllers/ControllerInterface';
+import { computeObjectBounds } from '../../geometry/bounds';
+
+function hasUsableObjectBounds(bounds: ReturnType<typeof computeObjectBounds>): boolean {
+  return Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX) &&
+    Number.isFinite(bounds.minY) && Number.isFinite(bounds.maxY) &&
+    bounds.maxX > bounds.minX && bounds.maxY > bounds.minY;
+}
+
+function isObjectOutsideMaterial(
+  obj: SceneObject,
+  material: { x: number; y: number; width: number; height: number },
+): { outside: boolean; partial: boolean } {
+  const bounds = computeObjectBounds(obj);
+  if (!hasUsableObjectBounds(bounds)) return { outside: false, partial: false };
+
+  const matMinX = material.x;
+  const matMinY = material.y;
+  const matMaxX = material.x + material.width;
+  const matMaxY = material.y + material.height;
+
+  const fullyOutside =
+    bounds.maxX < matMinX ||
+    bounds.minX > matMaxX ||
+    bounds.maxY < matMinY ||
+    bounds.minY > matMaxY;
+
+  if (fullyOutside) return { outside: true, partial: false };
+
+  const partiallyOutside =
+    bounds.minX < matMinX ||
+    bounds.maxX > matMaxX ||
+    bounds.minY < matMinY ||
+    bounds.maxY > matMaxY;
+
+  return { outside: false, partial: partiallyOutside };
+}
+
+function isObjectOutsideBed(
+  obj: SceneObject,
+  canvas: { width: number; height: number },
+): boolean {
+  const bounds = computeObjectBounds(obj);
+  if (!hasUsableObjectBounds(bounds)) return false;
+  return (
+    bounds.minX < 0 ||
+    bounds.minY < 0 ||
+    bounds.maxX > canvas.width ||
+    bounds.maxY > canvas.height
+  );
+}
 
 export type IssueSeverity = 'blocker' | 'warning' | 'info';
 
@@ -126,25 +177,42 @@ export function runPreflight(
     });
   }
 
-  // Objects outside material bounds
-  if (scene.material) {
+  // Objects outside material bounds (world-space AABB, respects rotation/scale)
+  if (scene.material && scene.material.enabled !== false) {
     const mat = scene.material;
-    let outsideCount = 0;
     for (const obj of visibleObjects) {
-      if (obj.geometry.type === 'text' || obj.geometry.type === 'image') continue;
-      const tx = obj.transform.tx;
-      const ty = obj.transform.ty;
-      if (tx < mat.x || ty < mat.y || tx > mat.x + mat.width || ty > mat.y + mat.height) {
-        outsideCount++;
+      const { outside, partial } = isObjectOutsideMaterial(obj, mat);
+
+      if (outside) {
+        issues.push({
+          id: `design-outside-material-full-${obj.id}`,
+          severity: 'blocker',
+          title: `Object "${obj.name || obj.id}" is completely outside the material area`,
+          detail: `Material: ${mat.width}×${mat.height}mm at (${mat.x}, ${mat.y})`,
+          fix: 'Move the object onto the material or resize the material',
+          category: 'design',
+        });
+      } else if (partial) {
+        issues.push({
+          id: `design-outside-material-partial-${obj.id}`,
+          severity: 'warning',
+          title: `Object "${obj.name || obj.id}" extends past the material edge`,
+          detail: `Material: ${mat.width}×${mat.height}mm at (${mat.x}, ${mat.y})`,
+          fix: 'Move or rotate the object so it fits on the material',
+          category: 'design',
+        });
       }
     }
-    if (outsideCount > 0) {
+  }
+
+  for (const obj of visibleObjects) {
+    if (isObjectOutsideBed(obj, scene.canvas)) {
       issues.push({
-        id: 'design-outside-material',
-        severity: 'warning',
-        title: `${outsideCount} object(s) may be outside material`,
-        detail: `Material area: ${mat.width}×${mat.height}mm at (${mat.x}, ${mat.y})`,
-        fix: 'Move objects onto the material or resize the material',
+        id: `design-outside-bed-${obj.id}`,
+        severity: 'blocker',
+        title: `Object "${obj.name || obj.id}" is outside the laser bed travel area`,
+        detail: `Bed workspace: ${scene.canvas.width}×${scene.canvas.height}mm`,
+        fix: 'Move the object within the bed or resize the canvas in setup',
         category: 'design',
       });
     }
