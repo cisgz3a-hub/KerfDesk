@@ -361,62 +361,98 @@ export function useSceneOperations({
     [scene, selectedIds, handleSceneCommit],
   );
 
-  const rotateSelected = useCallback(
-    (degrees: number) => {
-      if (selectedIds.size === 0) return;
+  const rotateSelected = useCallback((degrees: number) => {
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
 
-      const rad = (degrees * Math.PI) / 180;
-      const cos = Math.cos(rad);
-      const sin = Math.sin(rad);
+    const rad = (degrees * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
 
-      const newScene = {
-        ...scene,
-        objects: scene.objects.map(o => {
-          if (!selectedIds.has(o.id)) return o;
-          const t = o.transform;
-          return {
-            ...o,
-            transform: {
-              a: t.a * cos - t.b * sin,
-              b: t.a * sin + t.b * cos,
-              c: t.c * cos - t.d * sin,
-              d: t.c * sin + t.d * cos,
-              tx: t.tx,
-              ty: t.ty,
-            },
-            _bounds: null,
-            _worldTransform: null,
-          };
-        }),
-      };
-      handleSceneCommit(newScene);
-    },
-    [scene, selectedIds, handleSceneCommit],
-  );
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o => {
+        if (!selectedIds.has(o.id)) return o;
 
-  const flipSelected = useCallback(
-    (axis: 'horizontal' | 'vertical') => {
-      const newScene = {
-        ...scene,
-        objects: scene.objects.map(o => {
-          if (!selectedIds.has(o.id)) return o;
-          const t = o.transform;
-          return {
-            ...o,
-            transform: {
-              ...t,
-              a: axis === 'horizontal' ? -t.a : t.a,
-              d: axis === 'vertical' ? -t.d : t.d,
-            },
-            _bounds: null,
-            _worldTransform: null,
-          };
-        }),
-      };
-      handleSceneCommit(newScene);
-    },
-    [scene, selectedIds, handleSceneCommit],
-  );
+        // Compute object's bounding box center in world coordinates
+        const bounds = computeObjectBounds(o);
+        if (!bounds) return o;
+        const cx = (bounds.minX + bounds.maxX) / 2;
+        const cy = (bounds.minY + bounds.maxY) / 2;
+
+        const t = o.transform;
+
+        // Rotation around (cx, cy) is equivalent to:
+        // 1. Translate so (cx, cy) is at origin
+        // 2. Rotate
+        // 3. Translate back
+        //
+        // For an affine transform M, the new transform is:
+        //   T(cx,cy) * R * T(-cx,-cy) * M
+        //
+        // The new linear part: rotation applied to current linear part
+        const newA = cos * t.a - sin * t.c;
+        const newB = cos * t.b - sin * t.d;
+        const newC = sin * t.a + cos * t.c;
+        const newD = sin * t.b + cos * t.d;
+
+        // The new translation: rotated point + center offset back
+        const newTx = cos * (t.tx - cx) - sin * (t.ty - cy) + cx;
+        const newTy = sin * (t.tx - cx) + cos * (t.ty - cy) + cy;
+
+        return {
+          ...o,
+          transform: { a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy },
+          _bounds: null,
+          _worldTransform: null,
+        };
+      }),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
+
+  const flipSelected = useCallback((axis: 'horizontal' | 'vertical') => {
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    if (selected.length === 0) return;
+
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o => {
+        if (!selectedIds.has(o.id)) return o;
+
+        // Compute bounding box center
+        const bounds = computeObjectBounds(o);
+        if (!bounds) return o;
+        const cx = (bounds.minX + bounds.maxX) / 2;
+        const cy = (bounds.minY + bounds.maxY) / 2;
+
+        const t = o.transform;
+
+        // Flip horizontal: scale by (-1, 1) around (cx, cy)
+        // Flip vertical:   scale by (1, -1) around (cx, cy)
+        const sx = axis === 'horizontal' ? -1 : 1;
+        const sy = axis === 'vertical' ? -1 : 1;
+
+        // Apply the flip to the linear part
+        const newA = sx * t.a;
+        const newB = sx * t.b;
+        const newC = sy * t.c;
+        const newD = sy * t.d;
+
+        // Adjust translation so the object's center stays at (cx, cy)
+        const newTx = sx * (t.tx - cx) + cx;
+        const newTy = sy * (t.ty - cy) + cy;
+
+        return {
+          ...o,
+          transform: { a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy },
+          _bounds: null,
+          _worldTransform: null,
+        };
+      }),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
 
   const moveToCorner = useCallback(
     (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => {
