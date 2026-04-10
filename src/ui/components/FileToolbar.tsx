@@ -98,6 +98,7 @@ export function FileToolbar({
   onToggleProductionMode,
 }: FileToolbarProps) {
   const [showToolsMenu, setShowToolsMenu] = useState(false);
+  const toolsButtonRef = useRef<HTMLButtonElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -360,17 +361,32 @@ export function FileToolbar({
     { label: '? Shortcuts', action: onShowShortcuts, show: true },
   ];
 
+  const buttonRect = showToolsMenu ? toolsButtonRef.current?.getBoundingClientRect() : undefined;
+  const dropdownStyle = {
+    position: 'fixed' as const,
+    top: buttonRect ? buttonRect.bottom + 4 : 40,
+    left: buttonRect ? buttonRect.left : 0,
+    background: '#12121e',
+    border: '1px solid #252540',
+    borderRadius: 8,
+    padding: '4px 0',
+    zIndex: 3000,
+    minWidth: 180,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+  };
+
   const toolsMenu = React.createElement(
     'div',
-    { style: { position: 'relative' as const, flexShrink: 0, zIndex: showToolsMenu ? 1002 : undefined } },
+    { style: { position: 'relative' as const, flexShrink: 0 } },
     showToolsMenu &&
       React.createElement('div', {
-        style: { position: 'fixed' as const, inset: 0, zIndex: 999, background: 'transparent' },
+        style: { position: 'fixed' as const, inset: 0, zIndex: 2999, background: 'transparent' },
         onClick: () => setShowToolsMenu(false),
       }),
     React.createElement(
       'button',
       {
+        ref: toolsButtonRef,
         type: 'button',
         onClick: () => setShowToolsMenu(v => !v),
         style: {
@@ -392,19 +408,7 @@ export function FileToolbar({
       React.createElement(
         'div',
         {
-          style: {
-            position: 'absolute' as const,
-            top: '100%',
-            right: 0,
-            marginTop: 4,
-            background: '#12121e',
-            border: '1px solid #252540',
-            borderRadius: 8,
-            padding: '4px 0',
-            zIndex: 1001,
-            minWidth: 180,
-            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-          },
+          style: dropdownStyle,
         },
         ...toolMenuItems
           .filter(item => item.show && item.action)
@@ -455,7 +459,7 @@ export function FileToolbar({
       gap: 4,
       fontFamily: font,
       flexShrink: 0,
-      overflow: 'hidden',
+      overflow: 'visible',
       flexWrap: 'nowrap' as const,
     },
   },
