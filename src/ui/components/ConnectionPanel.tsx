@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { type GrblController } from '../../controllers/grbl/GrblController';
 import { MockSerialPort } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
@@ -168,6 +168,18 @@ export function ConnectionPanel({
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
 
+  const sceneBounds = useMemo(
+    () => ({
+      minX: boundsMinX ?? 0,
+      minY: boundsMinY ?? 0,
+      maxX: boundsMaxX ?? 100,
+      maxY: boundsMaxY ?? 100,
+    }),
+    [boundsMinX, boundsMinY, boundsMaxX, boundsMaxY],
+  );
+
+  const canFrame = isConnected && !isRunning;
+
   // ─── Connection handlers ─────────────────────────────────
 
   const connectSimulator = async () => {
@@ -300,20 +312,18 @@ export function ConnectionPanel({
     }
   };
 
-  const handleFrame = async () => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
+  const confirmFrameBounds = useCallback(async (): Promise<boolean> => {
+    const x1 = sceneBounds.minX;
+    const y1 = sceneBounds.minY;
+    const x2 = sceneBounds.maxX;
+    const y2 = sceneBounds.maxY;
 
-    const x1 = boundsMinX ?? 0;
-    const y1 = boundsMinY ?? 0;
-    const x2 = boundsMaxX ?? 100;
-    const y2 = boundsMaxY ?? 100;
-
-    // Safety check: warn if frame is very large or has negative coordinates
     const warnings: string[] = [];
     if (x1 < 0 || y1 < 0) warnings.push('Design has negative coordinates — laser may hit limit switches');
     if (x2 > bedWidth || y2 > bedHeight) warnings.push('Design extends beyond bed size');
-    if ((x2 - x1) > bedWidth * 0.9 || (y2 - y1) > bedHeight * 0.9) warnings.push('Frame covers most of the bed — make sure the laser has room');
+    if ((x2 - x1) > bedWidth * 0.9 || (y2 - y1) > bedHeight * 0.9) {
+      warnings.push('Frame covers most of the bed — make sure the laser has room');
+    }
 
     if (warnings.length > 0) {
       const ok = await showConfirm(
@@ -321,32 +331,113 @@ export function ConnectionPanel({
         'The design may extend beyond safe limits or the bed. Frame the boundary anyway?',
         warnings.join('\n'),
       );
-      if (!ok) return;
+      return ok;
     }
+    return true;
+  }, [sceneBounds, bedWidth, bedHeight, showConfirm]);
 
-    setMessages(prev => [...prev, `Framing: X${x1.toFixed(0)}-${x2.toFixed(0)} Y${y1.toFixed(0)}-${y2.toFixed(0)}`]);
+  const sendFrameLine = useCallback(async (ctrl: GrblController, line: string) => {
+    try {
+      ctrl.sendCommand(line);
+    } catch { /* ignore */ }
+    await new Promise(r => setTimeout(r, 50));
+  }, []);
 
-    const cmds = [
-      '$X',                          // Unlock if in alarm from previous attempt
-      'G21',                         // mm mode
-      'G90',                         // absolute positioning
-      'M5 S0',                       // Laser off for safety
-      `G0 X${x1.toFixed(2)} Y${y1.toFixed(2)} F1000`,  // Move to start at controlled speed
-      'M4 S10',                      // Very low power — just visible dot
-      `G1 X${x2.toFixed(2)} Y${y1.toFixed(2)} F1500`,  // Trace top edge
-      `G1 X${x2.toFixed(2)} Y${y2.toFixed(2)} F1500`,  // Trace right edge
-      `G1 X${x1.toFixed(2)} Y${y2.toFixed(2)} F1500`,  // Trace bottom edge
-      `G1 X${x1.toFixed(2)} Y${y1.toFixed(2)} F1500`,  // Trace left edge
-      'M5 S0',                       // Laser off
+  const handleFrameSafe = useCallback(async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl || !canFrame) return;
+
+    if (!(await confirmFrameBounds())) return;
+
+    setMessages(prev => [...prev,
+      `Framing (safe): X${sceneBounds.minX.toFixed(0)}-${sceneBounds.maxX.toFixed(0)} Y${sceneBounds.minY.toFixed(0)}-${sceneBounds.maxY.toFixed(0)}`,
+    ]);
+
+    const lines: string[] = [
+      'G90',
+      'G21',
+      'M5 S0',
+      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
+      `G0 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
+      `G0 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)}`,
+      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)}`,
+      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
+      'M5 S0',
     ];
 
-    for (const cmd of cmds) {
-      try { ctrl.sendCommand(cmd); } catch { /* ignore */ }
-      await new Promise(r => setTimeout(r, 50));
+    for (const line of lines) {
+      await sendFrameLine(ctrl, line);
     }
 
-    setMessages(prev => [...prev, '✓ Frame complete']);
-  };
+    setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
+  }, [canFrame, confirmFrameBounds, sceneBounds, sendFrameLine]);
+
+  const handleFrameDot = useCallback(async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl || !canFrame) return;
+
+    if (!(await confirmFrameBounds())) return;
+
+    const acknowledged = localStorage.getItem('laserforge_frame_dot_acknowledged');
+    if (!acknowledged) {
+      const ok = confirm(
+        '⚠ Frame with Laser Dot enables the laser at low power during framing.\n\n' +
+        'On slow diode lasers, even low power can scorch wood.\n\n' +
+        'Use only with eye protection and material that can handle a brief mark.\n\n' +
+        'Continue?',
+      );
+      if (!ok) return;
+      localStorage.setItem('laserforge_frame_dot_acknowledged', 'true');
+    }
+
+    setMessages(prev => [...prev,
+      `Framing (laser dot): X${sceneBounds.minX.toFixed(0)}-${sceneBounds.maxX.toFixed(0)} Y${sceneBounds.minY.toFixed(0)}-${sceneBounds.maxY.toFixed(0)}`,
+    ]);
+
+    const lines: string[] = [
+      'G90', 'G21',
+      'M4 S5',
+      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
+      `G1 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
+      `G1 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)} F3000`,
+      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)} F3000`,
+      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
+      'M5 S0',
+    ];
+
+    for (const line of lines) {
+      await sendFrameLine(ctrl, line);
+    }
+
+    setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
+  }, [canFrame, confirmFrameBounds, sceneBounds, sendFrameLine]);
+
+  const handleTestFire = useCallback(async () => {
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+
+    const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
+    if (!acknowledged) {
+      const ok = confirm(
+        '⚠ Test Fire briefly enables the laser at low power.\n\n' +
+        'Make sure:\n' +
+        '• Eye protection is on\n' +
+        '• No flammable material directly under the laser\n' +
+        '• You know where the laser head is\n\n' +
+        'Continue?',
+      );
+      if (!ok) return;
+      localStorage.setItem('laserforge_testfire_acknowledged', 'true');
+    }
+
+    try {
+      ctrl.sendCommand('M4 S20');
+    } catch { /* ignore */ }
+    await new Promise(resolve => setTimeout(resolve, 200));
+    try {
+      ctrl.sendCommand('M5 S0');
+    } catch { /* ignore */ }
+  }, []);
 
   const handleProofRun = async () => {
     if (!gcode || !controllerRef.current) return;
@@ -769,7 +860,7 @@ export function ConnectionPanel({
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
             React.createElement('button', { onClick: () => sendCmd('$X'), title: 'Step 1: Clear alarm state so the machine can move', style: { ...btnStyle('255,212,68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
             React.createElement('button', {
-              onClick: () => { sendCmd('M4 S50'); setTimeout(() => sendCmd('M5 S0'), 500); },
+              onClick: () => { void handleTestFire(); },
               style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
             }, 'Test Fire'),
             productionMode && React.createElement('button', {
@@ -791,22 +882,37 @@ export function ConnectionPanel({
           React.createElement('span', { style: { color: '#8888aa' } }, 'Estimated time'),
           React.createElement('span', { style: { color: '#00d4ff', fontFamily: mono, fontWeight: 600 } }, estimateJobTime(gcode).formatted),
         ),
-        React.createElement('div', { style: { display: 'flex', gap: 6 } },
-          React.createElement('button', {
-            onClick: handleFrame, disabled: !isConnected,
-            title: 'Step 4: Trace the outline of your design at very low power to check alignment before cutting',
-            style: { ...btnStyle('255,212,68', !isConnected), flex: 1 },
-          }, 'Frame'),
-          React.createElement('button', {
-            onClick: handleProofRun, disabled: !gcode || isRunning,
-            title: 'Proof mode: same path, laser off — verify motion before cutting',
-            style: { ...btnStyle('136,180,255', !gcode || isRunning), flex: 1 },
-          }, 'Proof'),
-          React.createElement('button', {
-            onClick: handleStartJob, disabled: !gcode || isRunning,
-            title: 'Step 5: Begin cutting — make sure you have framed first to verify position',
-            style: { ...btnStyle('45,212,160', !gcode || isRunning), flex: 1, fontWeight: 600 },
-          }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
+        React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 6 } },
+          React.createElement('div', { style: { display: 'flex', gap: 6 } },
+            React.createElement('button', {
+              onClick: () => { void handleFrameSafe(); },
+              disabled: !canFrame,
+              title: 'Trace the design outline with the laser OFF (safe)',
+              style: { ...btnStyle('255,212,68', !canFrame), flex: 1 },
+            }, '⬚ Frame (Safe)'),
+            React.createElement('button', {
+              onClick: () => { void handleFrameDot(); },
+              disabled: !canFrame,
+              title: 'Trace with low-power laser dot — visible but can scorch wood',
+              style: {
+                ...btnStyle('255,212,68', !canFrame),
+                flex: 1,
+                ...(canFrame ? { border: '2px solid rgba(255,212,68,0.55)' } : {}),
+              },
+            }, '◉ Frame (Laser Dot)'),
+          ),
+          React.createElement('div', { style: { display: 'flex', gap: 6 } },
+            React.createElement('button', {
+              onClick: handleProofRun, disabled: !gcode || isRunning,
+              title: 'Proof mode: same path, laser off — verify motion before cutting',
+              style: { ...btnStyle('136,180,255', !gcode || isRunning), flex: 1 },
+            }, 'Proof'),
+            React.createElement('button', {
+              onClick: handleStartJob, disabled: !gcode || isRunning,
+              title: 'Step 5: Begin cutting — make sure you have framed first to verify position',
+              style: { ...btnStyle('45,212,160', !gcode || isRunning), flex: 1, fontWeight: 600 },
+            }, isRunning ? 'Running...' : `Start Job${isSimulator ? ' (Sim)' : ''}`),
+          ),
         ),
         // Pause/Resume/Stop when running
         isRunning && React.createElement('div', { style: { display: 'flex', gap: 6, marginTop: 6 } },
