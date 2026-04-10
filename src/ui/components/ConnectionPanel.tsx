@@ -79,6 +79,8 @@ export function ConnectionPanel({
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
   const [showOutcome, setShowOutcome] = useState(false);
   const [currentLog, setCurrentLog] = useState<JobLog | null>(null);
+  const [isTestFiring, setIsTestFiring] = useState(false);
+  const testFireTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -263,6 +265,19 @@ export function ConnectionPanel({
   };
 
   const handleDisconnect = async () => {
+    if (testFireTimeoutRef.current) {
+      clearTimeout(testFireTimeoutRef.current);
+      testFireTimeoutRef.current = null;
+    }
+    if (isTestFiring) {
+      notifySimulatorTx('M5 S0');
+      try {
+        controllerRef.current?.sendCommand('M5 S0');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
+    }
+    setIsTestFiring(false);
     await controllerRef.current?.disconnect();
     portRef.current = null;
     setShowSimulator(false);
@@ -329,6 +344,20 @@ export function ConnectionPanel({
         '\n\nStart job anyway?',
       );
       if (!proceed) return;
+    }
+
+    if (isTestFiring) {
+      if (testFireTimeoutRef.current) {
+        clearTimeout(testFireTimeoutRef.current);
+        testFireTimeoutRef.current = null;
+      }
+      notifySimulatorTx('M5 S0');
+      try {
+        controllerRef.current?.sendCommand('M5 S0');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
+      setIsTestFiring(false);
     }
 
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
@@ -495,41 +524,68 @@ export function ConnectionPanel({
     const ctrl = controllerRef.current;
     if (!ctrl) return;
 
+    if (isTestFiring) {
+      if (testFireTimeoutRef.current) {
+        clearTimeout(testFireTimeoutRef.current);
+        testFireTimeoutRef.current = null;
+      }
+      notifySimulatorTx('M5 S0');
+      try {
+        ctrl.sendCommand('M5 S0');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
+      setIsTestFiring(false);
+      return;
+    }
+
     const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
     if (!acknowledged) {
       const ok = confirm(
-        '⚠ Test Fire briefly enables the laser at low power.\n\n' +
+        '⚠ Test Fire enables the laser at low power.\n\n' +
         'Make sure:\n' +
         '• Eye protection is on\n' +
-        '• No flammable material directly under the laser\n' +
-        '• You know where the laser head is\n\n' +
+        '• Nothing flammable directly under the laser\n\n' +
+        'Click the button again to turn off.\n\n' +
         'Continue?',
       );
       if (!ok) return;
       localStorage.setItem('laserforge_testfire_acknowledged', 'true');
     }
 
-    // M3 = constant spindle mode — fires laser even when stationary
-    // M4 = dynamic laser mode — only fires during movement (G1/G2/G3); GRBL $32=1 safety
-    // Test fire needs M3 because the machine is not moving
-    //
-    // S20 = low power pulse. If $30=1000, this is 2%. If $30=255, this is ~8%.
-    // Both should produce a visible dot on most diode lasers.
-    // If the dot is too weak, the user can adjust $30 or we can increase S value.
+    // M3 = constant spindle mode — fires laser even when stationary (GRBL $32 laser mode)
+    // S20 = low power. If $30=1000, ~2%; if $30=255, ~8%.
+    if (testFireTimeoutRef.current) {
+      clearTimeout(testFireTimeoutRef.current);
+      testFireTimeoutRef.current = null;
+    }
     try {
       notifySimulatorTx('M3 S20');
       ctrl.sendCommand('M3 S20');
     } catch (err: unknown) {
       console.warn('[Command blocked]', err instanceof Error ? err.message : err);
     }
-    await new Promise(resolve => setTimeout(resolve, 200));
-    try {
+    setIsTestFiring(true);
+    testFireTimeoutRef.current = setTimeout(() => {
+      testFireTimeoutRef.current = null;
       notifySimulatorTx('M5 S0');
-      ctrl.sendCommand('M5 S0');
-    } catch (err: unknown) {
-      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-    }
-  }, [notifySimulatorTx]);
+      try {
+        controllerRef.current?.sendCommand('M5 S0');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
+      setIsTestFiring(false);
+    }, 10000);
+  }, [notifySimulatorTx, isTestFiring]);
+
+  useEffect(() => {
+    return () => {
+      if (testFireTimeoutRef.current) {
+        clearTimeout(testFireTimeoutRef.current);
+        testFireTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const handleProofRun = async () => {
     if (!gcode || !controllerRef.current) return;
@@ -631,6 +687,20 @@ export function ConnectionPanel({
       `Original: ${lines.length} commands → Proof: ${proofLines.length} commands`,
     ]);
 
+    if (isTestFiring) {
+      if (testFireTimeoutRef.current) {
+        clearTimeout(testFireTimeoutRef.current);
+        testFireTimeoutRef.current = null;
+      }
+      notifySimulatorTx('M5 S0');
+      try {
+        controllerRef.current?.sendCommand('M5 S0');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      }
+      setIsTestFiring(false);
+    }
+
     try {
       for (const line of proofLines) notifySimulatorTx(line);
       controllerRef.current.sendJob(proofLines);
@@ -660,6 +730,7 @@ export function ConnectionPanel({
     },
     onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
+    React.createElement('style', {}, '@keyframes laserforgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }'),
     React.createElement('div', {
       style: {
         background: '#12121e', border: '1px solid #252540', borderRadius: 14,
@@ -954,8 +1025,18 @@ export function ConnectionPanel({
             React.createElement('button', { onClick: () => sendCmd('$X'), title: 'Step 1: Clear alarm state so the machine can move', style: { ...btnStyle('255,212,68'), fontSize: 10, padding: '4px 10px' } }, 'Unlock'),
             React.createElement('button', {
               onClick: () => { void handleTestFire(); },
-              style: { ...btnStyle('255,136,68'), fontSize: 10, padding: '4px 10px' },
-            }, 'Test Fire'),
+              disabled: !isConnected || isRunning,
+              style: {
+                padding: '4px 10px', fontSize: 11, cursor: (!isConnected || isRunning) ? 'default' : 'pointer',
+                fontFamily: font,
+                background: isTestFiring ? 'rgba(255,68,102,0.15)' : 'transparent',
+                border: isTestFiring ? '1px solid #ff4466' : '1px solid #252540',
+                borderRadius: 5,
+                color: isTestFiring ? '#ff4466' : '#c0c0d0',
+                animation: isTestFiring ? 'laserforgePulse 1s infinite' : 'none',
+                opacity: (!isConnected || isRunning) ? 0.5 : 1,
+              },
+            }, isTestFiring ? '🔴 Fire OFF' : '🔥 Test Fire'),
             productionMode && React.createElement('button', {
               onClick: async () => {
                 const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
@@ -1181,6 +1262,11 @@ export function ConnectionPanel({
       },
         React.createElement('button', {
           onClick: () => {
+            if (testFireTimeoutRef.current) {
+              clearTimeout(testFireTimeoutRef.current);
+              testFireTimeoutRef.current = null;
+            }
+            setIsTestFiring(false);
             controllerRef.current?.stop();
             try {
               notifySimulatorTx('M5 S0');
