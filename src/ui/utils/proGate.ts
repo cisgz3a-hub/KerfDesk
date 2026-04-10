@@ -23,6 +23,7 @@ const PRO_FEATURES = [
   'tabs',
   'text_to_path',
   'boolean_ops',
+  'kerf_wizard',
 ] as const;
 
 export type ProFeature = typeof PRO_FEATURES[number];

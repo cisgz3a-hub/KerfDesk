@@ -51,6 +51,7 @@ import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type Layer } from '../../core/scene/Layer';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
+import { offsetObject } from '../../geometry/OffsetPath';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
@@ -62,6 +63,7 @@ import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
 import { StartPositionWizard, type StartMode } from './StartPositionWizard';
+import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
@@ -127,6 +129,7 @@ export function App() {
   const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
+  const [showKerfWizard, setShowKerfWizard] = useState(false);
   const [showStartWizard, setShowStartWizard] = useState(false);
   const [startMode, setStartMode] = useState<StartMode>(() => {
     try {
@@ -517,6 +520,9 @@ export function App() {
       openMaterialTest: () => {
         if (gatedFeature('material_test')) setShowMaterialTest(true);
       },
+      openKerfWizard: () => {
+        if (gatedFeature('kerf_wizard')) setShowKerfWizard(true);
+      },
       moveToCorner: sceneOps.moveToCorner,
       moveToMaterialOrigin: sceneOps.moveToMaterialOrigin,
       rotateSelected: sceneOps.rotateSelected,
@@ -556,6 +562,7 @@ export function App() {
       sceneOps.toggleVisibility,
       setShowGridArray,
       setShowMaterialTest,
+      setShowKerfWizard,
     ],
   );
 
@@ -812,6 +819,55 @@ export function App() {
     });
   }, [scene, handleSceneCommit]);
 
+  const handleKerfGenerateTest = useCallback((objects: SceneObject[]) => {
+    handleSceneCommit({
+      ...scene,
+      objects: [...scene.objects, ...objects],
+    });
+  }, [scene, handleSceneCommit]);
+
+  const handleKerfApply = useCallback(async (offsetMm: number, objectIds: string[]) => {
+    const idsSet = new Set(objectIds);
+    const next: SceneObject[] = [];
+    let changed = 0;
+    for (const obj of scene.objects) {
+      if (!idsSet.has(obj.id)) {
+        next.push(obj);
+        continue;
+      }
+      if (obj.locked || !obj.visible) {
+        next.push(obj);
+        continue;
+      }
+      const resultGeom = offsetObject(obj, offsetMm);
+      if (!resultGeom) {
+        next.push(obj);
+        continue;
+      }
+      changed += 1;
+      next.push({
+        ...obj,
+        type: 'path',
+        name: obj.name.startsWith('Kerf Test') ? obj.name : `Kerf ${offsetMm >= 0 ? '+' : ''}${offsetMm.toFixed(3)}mm ${obj.name}`,
+        transform: { ...IDENTITY_MATRIX },
+        geometry: resultGeom,
+        _bounds: null,
+        _worldTransform: null,
+      } as SceneObject);
+    }
+    if (changed === 0) {
+      await showAlert('Kerf', 'Offset failed — select cut paths or shapes, or try a smaller kerf.');
+      return;
+    }
+    handleSceneCommit({ ...scene, objects: next });
+  }, [scene, handleSceneCommit, showAlert]);
+
+  const handleKerfSaveToPreset = useCallback((kerfMm: number) => {
+    try {
+      localStorage.setItem('laserforge_kerf', String(kerfMm));
+    } catch { /* ignore */ }
+  }, []);
+
   const handleMaterialConfirm = useCallback((config: MaterialConfig) => {
     dialogs.setShowMaterial(false);
     const newScene = {
@@ -1044,6 +1100,9 @@ export function App() {
         if (gatedFeature('nesting')) {
           setShowNesting(true);
         }
+      },
+      onKerfWizard: () => {
+        if (gatedFeature('kerf_wizard')) setShowKerfWizard(true);
       },
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
@@ -1282,6 +1341,15 @@ export function App() {
       scene,
       onApply: handleMaterialTestApply,
       onClose: () => setShowMaterialTest(false),
+    }),
+
+    showKerfWizard && React.createElement(KerfWizard, {
+      scene,
+      selectedIds,
+      onGenerateTestPiece: handleKerfGenerateTest,
+      onApplyKerf: handleKerfApply,
+      onSaveToPreset: handleKerfSaveToPreset,
+      onClose: () => setShowKerfWizard(false),
     }),
 
     showNesting && React.createElement(NestingDialog, {

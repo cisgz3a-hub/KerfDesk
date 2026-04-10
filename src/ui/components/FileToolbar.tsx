@@ -44,6 +44,7 @@ interface FileToolbarProps {
   onTemplates?: () => void;
   onBoxGenerator?: () => void;
   onAutoNest?: () => void;
+  onKerfWizard?: () => void;
   onPreviewToggle?: () => void;
   previewMode?: boolean;
   onUndo?: () => void;
@@ -79,6 +80,7 @@ export function FileToolbar({
   onTemplates,
   onBoxGenerator,
   onAutoNest,
+  onKerfWizard,
   onPreviewToggle,
   previewMode = false,
   onUndo,
@@ -436,6 +438,7 @@ export function FileToolbar({
     iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
     iconBtn('⊞ Box', 'Generate a finger-joint box', () => onBoxGenerator?.()),
     iconBtn('⚄ Auto-Pack', 'Auto-pack shapes to save material', () => onAutoNest?.()),
+    productionMode && iconBtn('📐 Kerf', 'Calibrate kerf for tight-fitting joints', () => onKerfWizard?.()),
 
     React.createElement('div', { style: { flex: 1 } }),
 

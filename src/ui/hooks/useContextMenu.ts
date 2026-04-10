@@ -44,6 +44,7 @@ export interface ContextMenuActions {
   distributeObjects?: (direction: 'horizontal' | 'vertical') => void;
   openGridArray?: () => void;
   openMaterialTest?: () => void;
+  openKerfWizard?: () => void;
   moveToCorner?: (corner: 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight') => void;
   moveToMaterialOrigin?: () => void;
   rotateSelected?: (degrees: number) => void;
@@ -218,6 +219,13 @@ export function useContextMenu(
           items.push({
             label: 'Material Test Grid...',
             action: () => actions.openMaterialTest!(),
+          });
+        }
+
+        if (actions.openKerfWizard) {
+          items.push({
+            label: 'Kerf & Fit Wizard...',
+            action: () => actions.openKerfWizard!(),
           });
         }
 
