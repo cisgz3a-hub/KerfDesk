@@ -45,13 +45,20 @@ export interface Output {
 
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
+import {
+  type GcodeGenerateOptions,
+  computeGcodeOffset,
+  designMinFromJob,
+} from './GcodeOrigin';
+
+export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 
 export interface OutputStrategy {
   readonly formatId: OutputFormat;
   readonly formatName: string;
 
   // Generate full output from a plan
-  generate(plan: Plan, job: Job): Output;
+  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output;
 
   // Individual move encoding (used by generate internally)
   encodeHeader(job: Job): string;
@@ -96,43 +103,56 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract encodePowerValue(power: number): string;
 
   private currentSpeed = 0;
+  private gcodeOffsetX = 0;
+  private gcodeOffsetY = 0;
 
-  generate(plan: Plan, job: Job): Output {
-    this.currentSpeed = 0; // Reset between calls — strategy is a singleton
-    const lines: string[] = [];
+  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
+    const startMode = options?.startMode ?? 'current';
+    const db = designMinFromJob(job);
+    const off = computeGcodeOffset(startMode, db, options?.savedOrigin ?? null);
+    this.gcodeOffsetX = off.x;
+    this.gcodeOffsetY = off.y;
+    this.currentSpeed = 0;
 
-    lines.push(this.encodeHeader(job));
+    try {
+      const lines: string[] = [];
 
-    for (const op of plan.operations) {
-      const srcOp = job.operations.find(o => o.id === op.operationId);
-      const passes = Math.max(1, srcOp?.settings.passes ?? 1);
+      lines.push(this.encodeHeader(job));
+
+      for (const op of plan.operations) {
+        const srcOp = job.operations.find(o => o.id === op.operationId);
+        const passes = Math.max(1, srcOp?.settings.passes ?? 1);
+        lines.push('');
+        if (passes > 1) {
+          lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}/${passes}) ---`);
+        } else {
+          lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
+        }
+
+        for (const move of op.moves) {
+          lines.push(this.encodeMove(move));
+        }
+      }
+
       lines.push('');
-      if (passes > 1) {
-        lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}/${passes}) ---`);
-      } else {
-        lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
-      }
+      lines.push(this.encodeFooter(job));
 
-      for (const move of op.moves) {
-        lines.push(this.encodeMove(move));
-      }
+      const text = lines.filter(l => l !== undefined).join('\n');
+
+      return {
+        id: generateId(),
+        planId: plan.id,
+        format: this.formatId,
+        createdAt: new Date().toISOString(),
+        text,
+        lineCount: lines.length,
+        binary: null,
+        fileSizeBytes: new TextEncoder().encode(text).length,
+      };
+    } finally {
+      this.gcodeOffsetX = 0;
+      this.gcodeOffsetY = 0;
     }
-
-    lines.push('');
-    lines.push(this.encodeFooter(job));
-
-    const text = lines.filter(l => l !== undefined).join('\n');
-
-    return {
-      id: generateId(),
-      planId: plan.id,
-      format: this.formatId,
-      createdAt: new Date().toISOString(),
-      text,
-      lineCount: lines.length,
-      binary: null,
-      fileSizeBytes: new TextEncoder().encode(text).length,
-    };
   }
 
   encodeHeader(job: Job): string {
@@ -148,11 +168,15 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   }
 
   encodeRapid(to: { x: number; y: number }): string {
-    return `G0 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`;
+    const x = to.x + this.gcodeOffsetX;
+    const y = to.y + this.gcodeOffsetY;
+    return `G0 X${x.toFixed(3)} Y${y.toFixed(3)}`;
   }
 
   encodeLinear(to: { x: number; y: number }, power: number, speed: number): string {
-    const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
+    const x = to.x + this.gcodeOffsetX;
+    const y = to.y + this.gcodeOffsetY;
+    const parts = [`G1 X${x.toFixed(3)} Y${y.toFixed(3)}`];
     if (speed !== this.currentSpeed) {
       parts.push(`F${speed.toFixed(0)}`);
       this.currentSpeed = speed;
@@ -174,8 +198,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   }
 
   encodeFooter(job: Job): string {
-    const startX = job.metadata.startPositionX ?? 0;
-    const startY = job.metadata.startPositionY ?? 0;
+    const startX = (job.metadata.startPositionX ?? 0) + this.gcodeOffsetX;
+    const startY = (job.metadata.startPositionY ?? 0) + this.gcodeOffsetY;
     return [
       this.encodeLaserOff(),
       `G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} ; return to start`,

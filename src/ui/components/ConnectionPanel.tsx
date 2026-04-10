@@ -17,7 +17,9 @@ import {
   type JobLog,
 } from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
+import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
 import { type StartMode } from './StartPositionWizard';
+import { SimulatorView } from './SimulatorView';
 
 interface ConnectionPanelProps {
   controller: GrblController;
@@ -39,6 +41,7 @@ interface ConnectionPanelProps {
   showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
   onSceneCommit: (scene: Scene) => void;
   startMode: StartMode;
+  savedOrigin: { x: number; y: number } | null;
   onOpenStartWizard: () => void;
   onSaveOrigin: () => void;
 }
@@ -63,12 +66,14 @@ export function ConnectionPanel({
   showPrompt,
   onSceneCommit,
   startMode,
+  savedOrigin,
   onOpenStartWizard,
   onSaveOrigin,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
   const [isSimulator, setIsSimulator] = useState(false);
+  const [showSimulator, setShowSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
   const [manualCmd, setManualCmd] = useState('');
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
@@ -81,6 +86,24 @@ export function ConnectionPanel({
   /** Same object as currentReplay while a job is recording; set before sendJob so sync TX callbacks see it */
   const activeReplayRef = useRef<JobReplay | null>(null);
   const currentLogRef = useRef<JobLog | null>(null);
+  const simulatorListenersRef = useRef(new Set<(line: string) => void>());
+
+  const notifySimulatorTx = useCallback((cmd: string) => {
+    for (const fn of simulatorListenersRef.current) {
+      try {
+        fn(cmd);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const onSimulatorSubscribe = useCallback((cb: (line: string) => void) => {
+    simulatorListenersRef.current.add(cb);
+    return () => {
+      simulatorListenersRef.current.delete(cb);
+    };
+  }, []);
 
   useEffect(() => {
     currentLogRef.current = currentLog;
@@ -187,6 +210,16 @@ export function ConnectionPanel({
     [boundsMinX, boundsMinY, boundsMaxX, boundsMaxY],
   );
 
+  const workFrame = useMemo(() => {
+    const o = computeGcodeOffset(startMode, { minX: sceneBounds.minX, minY: sceneBounds.minY }, savedOrigin);
+    return {
+      minX: sceneBounds.minX + o.x,
+      minY: sceneBounds.minY + o.y,
+      maxX: sceneBounds.maxX + o.x,
+      maxY: sceneBounds.maxY + o.y,
+    };
+  }, [startMode, savedOrigin, sceneBounds.minX, sceneBounds.minY, sceneBounds.maxX, sceneBounds.maxY]);
+
   const canFrame = isConnected && !isRunning;
 
   // ─── Connection handlers ─────────────────────────────────
@@ -232,13 +265,19 @@ export function ConnectionPanel({
   const handleDisconnect = async () => {
     await controllerRef.current?.disconnect();
     portRef.current = null;
+    setShowSimulator(false);
     setMessages(prev => [...prev, 'Disconnected']);
   };
 
   // ─── Machine control ────────────────────────────────────
 
   const sendCmd = (cmd: string) => {
-    try { controllerRef.current?.sendCommand(cmd); } catch { /* ignore */ }
+    notifySimulatorTx(cmd);
+    try {
+      controllerRef.current?.sendCommand(cmd);
+    } catch {
+      /* ignore */
+    }
   };
 
   const handleStartJob = async () => {
@@ -312,6 +351,7 @@ export function ConnectionPanel({
       activeReplayRef.current = replay;
       setCurrentReplay(replay);
 
+      for (const line of lines) notifySimulatorTx(line);
       controllerRef.current.sendJob(lines);
     } catch (e: any) {
       activeReplayRef.current = null;
@@ -322,10 +362,10 @@ export function ConnectionPanel({
   };
 
   const confirmFrameBounds = useCallback(async (): Promise<boolean> => {
-    const x1 = sceneBounds.minX;
-    const y1 = sceneBounds.minY;
-    const x2 = sceneBounds.maxX;
-    const y2 = sceneBounds.maxY;
+    const x1 = workFrame.minX;
+    const y1 = workFrame.minY;
+    const x2 = workFrame.maxX;
+    const y2 = workFrame.maxY;
 
     const warnings: string[] = [];
     if (x1 < 0 || y1 < 0) warnings.push('Design has negative coordinates — laser may hit limit switches');
@@ -343,14 +383,20 @@ export function ConnectionPanel({
       return ok;
     }
     return true;
-  }, [sceneBounds, bedWidth, bedHeight, showConfirm]);
+  }, [workFrame, bedWidth, bedHeight, showConfirm]);
 
-  const sendFrameLine = useCallback(async (ctrl: GrblController, line: string) => {
-    try {
-      ctrl.sendCommand(line);
-    } catch { /* ignore */ }
-    await new Promise(r => setTimeout(r, 50));
-  }, []);
+  const sendFrameLine = useCallback(
+    async (ctrl: GrblController, line: string) => {
+      notifySimulatorTx(line);
+      try {
+        ctrl.sendCommand(line);
+      } catch {
+        /* ignore */
+      }
+      await new Promise(r => setTimeout(r, 50));
+    },
+    [notifySimulatorTx],
+  );
 
   const handleFrameSafe = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -359,18 +405,18 @@ export function ConnectionPanel({
     if (!(await confirmFrameBounds())) return;
 
     setMessages(prev => [...prev,
-      `Framing (safe): X${sceneBounds.minX.toFixed(0)}-${sceneBounds.maxX.toFixed(0)} Y${sceneBounds.minY.toFixed(0)}-${sceneBounds.maxY.toFixed(0)}`,
+      `Framing (safe): X${workFrame.minX.toFixed(0)}-${workFrame.maxX.toFixed(0)} Y${workFrame.minY.toFixed(0)}-${workFrame.maxY.toFixed(0)}`,
     ]);
 
     const lines: string[] = [
       'G90',
       'G21',
       'M5 S0',
-      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
-      `G0 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
-      `G0 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)}`,
-      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)}`,
-      `G0 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)}`,
+      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
+      `G0 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
+      `G0 X${workFrame.maxX.toFixed(3)} Y${workFrame.maxY.toFixed(3)}`,
+      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.maxY.toFixed(3)}`,
+      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
       'M5 S0',
     ];
 
@@ -379,7 +425,7 @@ export function ConnectionPanel({
     }
 
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, sendFrameLine]);
+  }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
 
   const handleFrameDot = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -400,17 +446,17 @@ export function ConnectionPanel({
     }
 
     setMessages(prev => [...prev,
-      `Framing (laser dot): X${sceneBounds.minX.toFixed(0)}-${sceneBounds.maxX.toFixed(0)} Y${sceneBounds.minY.toFixed(0)}-${sceneBounds.maxY.toFixed(0)}`,
+      `Framing (laser dot): X${workFrame.minX.toFixed(0)}-${workFrame.maxX.toFixed(0)} Y${workFrame.minY.toFixed(0)}-${workFrame.maxY.toFixed(0)}`,
     ]);
 
     const lines: string[] = [
       'G90', 'G21',
       'M4 S5',
-      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
-      `G1 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
-      `G1 X${sceneBounds.maxX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)} F3000`,
-      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.maxY.toFixed(3)} F3000`,
-      `G1 X${sceneBounds.minX.toFixed(3)} Y${sceneBounds.minY.toFixed(3)} F3000`,
+      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
+      `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
+      `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.maxY.toFixed(3)} F3000`,
+      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.maxY.toFixed(3)} F3000`,
+      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
       'M5 S0',
     ];
 
@@ -419,7 +465,7 @@ export function ConnectionPanel({
     }
 
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, sendFrameLine]);
+  }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
 
   const handleTestFire = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -440,13 +486,19 @@ export function ConnectionPanel({
     }
 
     try {
+      notifySimulatorTx('M4 S20');
       ctrl.sendCommand('M4 S20');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     await new Promise(resolve => setTimeout(resolve, 200));
     try {
+      notifySimulatorTx('M5 S0');
       ctrl.sendCommand('M5 S0');
-    } catch { /* ignore */ }
-  }, []);
+    } catch {
+      /* ignore */
+    }
+  }, [notifySimulatorTx]);
 
   const handleProofRun = async () => {
     if (!gcode || !controllerRef.current) return;
@@ -549,6 +601,7 @@ export function ConnectionPanel({
     ]);
 
     try {
+      for (const line of proofLines) notifySimulatorTx(line);
       controllerRef.current.sendJob(proofLines);
     } catch (e: any) {
       setMessages(prev => [...prev, `Proof run failed: ${e.message}`]);
@@ -638,6 +691,14 @@ export function ConnectionPanel({
       // Disconnect
       isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', justifyContent: 'flex-end' } },
         React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
+      ),
+
+      isSimulator && isConnected && React.createElement('div', { style: { padding: '4px 18px 8px', borderBottom: '1px solid #1a1a2e' } },
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => setShowSimulator(v => !v),
+          style: { ...btnStyle('255, 212, 68'), width: '100%', fontSize: 10, padding: '6px' },
+        }, showSimulator ? 'Hide Simulator' : 'Show Simulator'),
       ),
 
       isConnected && React.createElement(DeviceProfileSelector, {
@@ -841,20 +902,11 @@ export function ConnectionPanel({
                 if (!ctrl) return;
 
                 try {
-                  // Soft reset (realtime 0x18 via controller — sendCommand('\\x18') would wrongly buffer as G-code)
-                  ctrl.stop();
-                  await new Promise(r => setTimeout(r, 1000));
-
-                  ctrl.sendCommand('$X');
-                  await new Promise(r => setTimeout(r, 500));
-
-                  ctrl.sendCommand('G10 L20 P1 X0 Y0');
+                  sendCmd('$X');
                   await new Promise(r => setTimeout(r, 200));
-
-                  ctrl.sendCommand('G21');
-                  ctrl.sendCommand('G90');
-
-                  setMessages(prev => [...prev, '✓ Position synced and zeroed — laser will cut from here']);
+                  sendCmd('G10 L20 P1 X0 Y0');
+                  ctrl.requestStatusReport();
+                  setMessages(prev => [...prev, '✓ Work origin set at current position — matches “Where Head Is” G-code mode']);
                 } catch {
                   setMessages(prev => [...prev, 'Zero failed — try again']);
                 }
@@ -1068,6 +1120,21 @@ export function ConnectionPanel({
         React.createElement('button', { onClick: () => { sendCmd(manualCmd); setManualCmd(''); }, style: btnStyle('0,212,255') }, 'Send'),
       ),
 
+      showSimulator && isSimulator && isConnected && React.createElement('div', {
+        style: { height: 300, borderTop: '1px solid #1a1a2e', minHeight: 200 },
+      },
+        React.createElement(SimulatorView, {
+          onSubscribe: onSimulatorSubscribe,
+          bedWidth,
+          bedHeight,
+          liveHead:
+            machineState && machineState.status !== 'disconnected' && machineState.status !== 'connecting'
+              ? { x: machineState.position.x, y: machineState.position.y }
+              : null,
+          jobRunning: isRunning,
+        }),
+      ),
+
       // Footer (scrollable)
       React.createElement('div', {
         style: { padding: '8px 18px', borderTop: '1px solid #1a1a2e', fontSize: 10, color: '#444460' },
@@ -1084,7 +1151,12 @@ export function ConnectionPanel({
         React.createElement('button', {
           onClick: () => {
             controllerRef.current?.stop();
-            try { controllerRef.current?.sendCommand('M5 S0'); } catch { /* ignore */ }
+            try {
+              notifySimulatorTx('M5 S0');
+              controllerRef.current?.sendCommand('M5 S0');
+            } catch {
+              /* ignore */
+            }
             setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
           },
           style: {

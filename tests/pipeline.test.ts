@@ -555,7 +555,7 @@ const grblStrategy = getOutputStrategy('grbl');
 assert(grblStrategy !== undefined, 'GRBL strategy is registered');
 
 if (grblStrategy) {
-  const output = grblStrategy.generate(plan, job);
+  const output = grblStrategy.generate(plan, job, { startMode: 'absolute' });
   
   assert(output.format === 'grbl', 'Output format is GRBL');
   assert(output.text !== null, 'Output has text content');

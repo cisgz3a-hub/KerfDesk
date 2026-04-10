@@ -8,6 +8,7 @@
  */
 
 export * from './Output';
+export * from './GcodeOrigin';
 
 // Import strategies to trigger self-registration
 import './GrblStrategy';

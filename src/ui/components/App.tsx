@@ -136,7 +136,7 @@ export function App() {
       const raw = localStorage.getItem('laserforge_start_mode');
       if (raw === 'absolute' || raw === 'current' || raw === 'savedOrigin') return raw;
     } catch { /* ignore */ }
-    return 'absolute';
+    return 'current';
   });
   const [savedOrigin, setSavedOrigin] = useState<{ x: number; y: number } | null>(() => {
     try {
@@ -355,7 +355,7 @@ export function App() {
     setScene(newScene);
   }, []);
 
-  const { currentGcode, setCurrentGcode, compileGcode } = useGcodeExport();
+  const { currentGcode, setCurrentGcode, compileGcode } = useGcodeExport(startMode, savedOrigin);
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
     selectedIds,
@@ -1444,6 +1444,7 @@ export function App() {
       startMode,
       onOpenStartWizard: () => setShowStartWizard(true),
       onSaveOrigin: handleSaveOrigin,
+      savedOrigin,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
