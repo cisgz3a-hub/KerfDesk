@@ -33,6 +33,7 @@ import { useGcodeExport } from '../hooks/useGcodeExport';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
+import { useGrblConnection } from '../hooks/useGrblConnection';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -56,10 +57,6 @@ import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { QuickActions } from './QuickActions';
-import { GrblController } from '../../controllers/grbl/GrblController';
-import { MockSerialPort } from '../../communication/SerialPort';
-import { WebSerialPort } from '../../communication/WebSerialPort';
-import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
@@ -125,14 +122,10 @@ export function App() {
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
-  const [machineState, setMachineState] = useState<MachineState | null>(null);
-  const [jobProgress, setJobProgress] = useState<JobProgress | null>(null);
-  const grblControllerRef = useRef<GrblController | null>(null);
-  const serialPortRef = useRef<WebSerialPort | MockSerialPort | null>(null);
+  const grbl = useGrblConnection();
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
   const saveCountRef = useRef(0);
-  const [grblReady, setGrblReady] = useState(false);
   const [productionMode, setProductionMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('laserforge_production_mode') === 'true';
@@ -184,24 +177,6 @@ export function App() {
     setTextPlacementPt(null);
     setSelectedIds(new Set([obj.id]));
   }, [dialogs.openTextEdit]);
-
-  useEffect(() => {
-    const ctrl = new GrblController();
-    ctrl.onStateChange((state) => setMachineState({ ...state }));
-    ctrl.onProgress((prog) => setJobProgress({ ...prog }));
-    grblControllerRef.current = ctrl;
-    setGrblReady(true);
-
-    return () => {
-      try {
-        if (ctrl.isJobRunning) {
-          ctrl.stop();
-        }
-        ctrl.sendCommand('M5 S0');
-      } catch { /* ignore */ }
-      void ctrl.disconnect();
-    };
-  }, []);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -1211,11 +1186,11 @@ export function App() {
       onClose: () => dialogs.setShowShortcuts(false),
     }),
 
-    dialogs.showConnection && grblReady && React.createElement(ConnectionPanel, {
-      controller: grblControllerRef.current!,
-      portRef: serialPortRef,
-      machineState,
-      jobProgress,
+    dialogs.showConnection && grbl.grblReady && React.createElement(ConnectionPanel, {
+      controller: grbl.controller!,
+      portRef: grbl.portRef,
+      machineState: grbl.machineState,
+      jobProgress: grbl.jobProgress,
       scene,
       productionMode,
       gcode: currentGcode,
