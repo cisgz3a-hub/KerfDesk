@@ -61,6 +61,7 @@ import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
+import { StartPositionWizard, type StartMode } from './StartPositionWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
@@ -126,9 +127,48 @@ export function App() {
   const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
+  const [showStartWizard, setShowStartWizard] = useState(false);
+  const [startMode, setStartMode] = useState<StartMode>(() => {
+    try {
+      const raw = localStorage.getItem('laserforge_start_mode');
+      if (raw === 'absolute' || raw === 'current' || raw === 'savedOrigin') return raw;
+    } catch { /* ignore */ }
+    return 'absolute';
+  });
+  const [savedOrigin, setSavedOrigin] = useState<{ x: number; y: number } | null>(() => {
+    try {
+      const raw = localStorage.getItem('laserforge_saved_origin');
+      return raw ? JSON.parse(raw) as { x: number; y: number } : null;
+    } catch {
+      return null;
+    }
+  });
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const grbl = useGrblConnection();
+
+  const machinePositionForStartWizard = useMemo(() => {
+    const s = grbl.machineState;
+    if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
+    return { x: s.position.x, y: s.position.y };
+  }, [grbl.machineState]);
+
+  const handleSelectStartMode = useCallback((mode: StartMode) => {
+    setStartMode(mode);
+    try {
+      localStorage.setItem('laserforge_start_mode', mode);
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSaveOrigin = useCallback(() => {
+    const pos = grbl.machineState?.position;
+    if (!pos) return;
+    const origin = { x: pos.x, y: pos.y };
+    setSavedOrigin(origin);
+    try {
+      localStorage.setItem('laserforge_saved_origin', JSON.stringify(origin));
+    } catch { /* ignore */ }
+  }, [grbl.machineState]);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
   const [productionMode, setProductionMode] = useState<boolean>(() => {
@@ -1289,6 +1329,15 @@ export function App() {
       onPositionDesign: handleCameraPositionDesign,
     }),
 
+    showStartWizard && React.createElement(StartPositionWizard, {
+      scene,
+      currentMode: startMode,
+      onSelectMode: handleSelectStartMode,
+      onClose: () => setShowStartWizard(false),
+      machinePosition: machinePositionForStartWizard,
+      savedOrigin,
+    }),
+
     dialogs.showTemplates && React.createElement(TemplateBrowser, {
       onSelect: handleTemplateSelect,
       onClose: () => dialogs.setShowTemplates(false),
@@ -1328,6 +1377,9 @@ export function App() {
       showConfirm,
       showPrompt,
       onSceneCommit: handleSceneCommit,
+      startMode,
+      onOpenStartWizard: () => setShowStartWizard(true),
+      onSaveOrigin: handleSaveOrigin,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

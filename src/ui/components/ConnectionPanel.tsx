@@ -17,6 +17,7 @@ import {
   type JobLog,
 } from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
+import { type StartMode } from './StartPositionWizard';
 
 interface ConnectionPanelProps {
   controller: GrblController;
@@ -37,6 +38,9 @@ interface ConnectionPanelProps {
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
   onSceneCommit: (scene: Scene) => void;
+  startMode: StartMode;
+  onOpenStartWizard: () => void;
+  onSaveOrigin: () => void;
 }
 
 export function ConnectionPanel({
@@ -58,6 +62,9 @@ export function ConnectionPanel({
   showConfirm,
   showPrompt,
   onSceneCommit,
+  startMode,
+  onOpenStartWizard,
+  onSaveOrigin,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -879,6 +886,25 @@ export function ConnectionPanel({
 
       // Time estimate + job buttons
       isConnected && React.createElement('div', { style: { padding: '8px 18px' } },
+        React.createElement('button', {
+          onClick: onOpenStartWizard,
+          style: {
+            padding: '6px 12px', marginBottom: 6,
+            background: 'rgba(0,212,255,0.06)', border: '1px solid #252540',
+            borderRadius: 6, color: '#8888aa', fontSize: 10, cursor: 'pointer',
+            fontFamily: font, width: '100%',
+          },
+        }, `📍 Start Position: ${startMode === 'absolute' ? 'Place on Bed' : startMode === 'current' ? 'Where Head Is' : 'Saved Origin'}`),
+        React.createElement('button', {
+          onClick: onSaveOrigin,
+          title: 'Store current head X/Y as the saved bed reference (for “Use Saved Origin”)',
+          style: {
+            padding: '4px 12px', marginBottom: 8,
+            background: 'transparent', border: '1px solid #252540',
+            borderRadius: 6, color: '#555570', fontSize: 9, cursor: 'pointer',
+            fontFamily: font, width: '100%',
+          },
+        }, '⚑ Save origin at head'),
         gcode && React.createElement('div', {
           style: { padding: '6px 12px', marginBottom: 6, background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', fontSize: 11 },
         },
