@@ -1119,6 +1119,7 @@ export function App() {
       onCamera: () => setShowCamera(true),
       onDepthPreview: () => setShowDepthPreview(true),
       onStartPosition: () => setShowStartWizard(true),
+      startMode,
       onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {

@@ -19,6 +19,7 @@ import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
+import { type StartMode } from './StartPositionWizard';
 // ─── PROPS ───────────────────────────────────────────────────────
 
 interface FileToolbarProps {
@@ -43,6 +44,8 @@ interface FileToolbarProps {
   onDepthPreview?: () => void;
   /** Open start position / work origin wizard */
   onStartPosition?: () => void;
+  /** Active G-code start / work origin mode (toolbar label). */
+  startMode?: StartMode;
   /** Toolbar image import — shared pipeline with drag-drop (IndexedDB threshold, geometry). */
   onImportImageFile?: (file: File) => Promise<void>;
   onTemplates?: () => void;
@@ -82,6 +85,7 @@ export function FileToolbar({
   onCamera,
   onDepthPreview,
   onStartPosition,
+  startMode = 'absolute',
   onImportImageFile,
   onBoxGenerator,
   onAutoNest,
@@ -406,7 +410,14 @@ export function FileToolbar({
       },
     },
     toolbarBtn('📷 Camera', 'Camera alignment', () => onCamera?.(), { dimmed: easyDim }),
-    toolbarBtn('🎯 Position', 'Start position wizard', () => onStartPosition?.(), { dimmed: easyDim }),
+    toolbarBtn(
+      startMode === 'current' ? '🎯 Start at Head'
+        : startMode === 'savedOrigin' ? '📌 Saved Origin'
+          : '📍 Place on Bed',
+      'Change where the laser starts cutting',
+      () => onStartPosition?.(),
+      { dimmed: easyDim },
+    ),
     toolbarBtn('⚄ Auto-Pack', 'Pack shapes to save material', () => onAutoNest?.(), { dimmed: easyDim }),
     toolbarBtn('⊞ Box', 'Finger-joint box generator', () => onBoxGenerator?.(), { dimmed: easyDim }),
     productionMode &&

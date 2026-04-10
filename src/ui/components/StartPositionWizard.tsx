@@ -214,10 +214,11 @@ export function StartPositionWizard({
               React.createElement('span', { style: { fontSize: 22 } }, icon),
               React.createElement('span', { style: { flex: 1, color: '#e0e0ec', fontSize: 13, fontWeight: 600 } }, title),
               React.createElement('button', {
-                onClick: () => {
+                onClick: async () => {
                   if (disabled) return;
-                  if (preview) {
-                    onSelectMode(mode, { x: preview.designX, y: preview.designY });
+                  const p = previewForMode(mode, designBounds, machinePosition, savedOrigin);
+                  if (p) {
+                    onSelectMode(mode, { x: p.designX, y: p.designY });
                   }
                   onClose();
                 },

@@ -1109,6 +1109,29 @@ export function ConnectionPanel({
               },
             }, '◉ Frame (Laser Dot)'),
           ),
+          React.createElement('div', {
+            style: {
+              padding: '6px 12px', marginBottom: 6,
+              background: 'rgba(0,212,255,0.03)',
+              border: '1px solid #1a1a2e',
+              borderRadius: 6,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            },
+          },
+            React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } },
+              startMode === 'current' ? '🎯 Cutting at head position'
+                : startMode === 'savedOrigin' ? '📌 Cutting at saved origin'
+                  : '📍 Cutting at bed position',
+            ),
+            React.createElement('button', {
+              onClick: onOpenStartWizard,
+              style: {
+                background: 'none', border: 'none', color: '#00d4ff',
+                fontSize: 9, cursor: 'pointer', textDecoration: 'underline',
+                fontFamily: font, padding: 0,
+              },
+            }, 'Change'),
+          ),
           React.createElement('div', { style: { display: 'flex', gap: 6 } },
             React.createElement('button', {
               onClick: handleProofRun, disabled: !gcode || isRunning,
