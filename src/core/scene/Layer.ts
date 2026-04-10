@@ -73,6 +73,17 @@ export interface LaserSettings {
     insideFirst: boolean;   // cut inner shapes before outer
   };
 
+  /**
+   * Beginner "keep parts attached" — when `enabled`, job compiler uses these
+   * instead of `cut.tabCount` / `cut.tabWidth`. `height` is informational (mm bridge depth).
+   */
+  tabs?: {
+    enabled: boolean;
+    count: number;
+    width: number;
+    height: number;
+  };
+
   // Image settings
   image: {
     dithering: DitherMode;

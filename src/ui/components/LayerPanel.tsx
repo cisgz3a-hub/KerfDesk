@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import {
@@ -40,6 +40,21 @@ function updateLayer(
 
 export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, materialLibraryRev = 0, onMaterialLibraryBump }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
+  const [showTabsCustomize, setShowTabsCustomize] = useState(false);
+
+  useEffect(() => {
+    setShowTabsCustomize(false);
+  }, [scene.activeLayerId]);
+
+  const simpleTabsOn = activeLayer?.settings.tabs?.enabled === true;
+  const detailTabCount =
+    activeLayer && simpleTabsOn && activeLayer.settings.tabs
+      ? activeLayer.settings.tabs.count
+      : activeLayer?.settings.cut.tabCount ?? 0;
+  const detailTabWidth =
+    activeLayer && simpleTabsOn && activeLayer.settings.tabs
+      ? activeLayer.settings.tabs.width
+      : activeLayer?.settings.cut.tabWidth ?? 0;
 
   const setActiveLayer = (layerId: string) => {
     if (scene.activeLayerId === layerId) return;
@@ -642,6 +657,140 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
           },
         }),
       ),
+      activeLayer.settings.mode === 'cut' && React.createElement('div', {
+        style: { padding: '8px 0', borderTop: '1px solid #1a1a2e' },
+      },
+        React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 },
+        },
+          React.createElement('button', {
+            type: 'button',
+            onClick: () => {
+              const current = activeLayer.settings.tabs?.enabled ?? false;
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => {
+                if (current) {
+                  return {
+                    ...l,
+                    settings: {
+                      ...l.settings,
+                      tabs: l.settings.tabs
+                        ? { ...l.settings.tabs, enabled: false }
+                        : { enabled: false, count: 4, width: 2, height: 0.5 },
+                      cut: { ...l.settings.cut, tabCount: 0 },
+                    },
+                  };
+                }
+                const base = l.settings.tabs || { count: 4, width: 2, height: 0.5 };
+                const next = { ...base, enabled: true as const };
+                return {
+                  ...l,
+                  settings: {
+                    ...l.settings,
+                    tabs: next,
+                    cut: { ...l.settings.cut, tabCount: next.count, tabWidth: next.width },
+                  },
+                };
+              }));
+            },
+            style: {
+              width: 18, height: 18, borderRadius: 4, cursor: 'pointer',
+              background: activeLayer.settings.tabs?.enabled
+                ? 'rgba(45,212,160,0.2)' : '#0a0a14',
+              border: activeLayer.settings.tabs?.enabled
+                ? '1px solid #2dd4a0' : '1px solid #252540',
+              color: activeLayer.settings.tabs?.enabled ? '#2dd4a0' : '#555570',
+              fontSize: 11, lineHeight: '16px', textAlign: 'center' as const,
+              padding: 0, fontFamily: theme.font.ui,
+            },
+          }, activeLayer.settings.tabs?.enabled ? '✓' : ''),
+          React.createElement('span', {
+            style: { fontSize: 11, color: '#c0c0d0', cursor: 'pointer' },
+            onClick: () => {
+              const current = activeLayer.settings.tabs?.enabled ?? false;
+              onSceneCommit(updateLayer(scene, activeLayer.id, l => {
+                if (current) {
+                  return {
+                    ...l,
+                    settings: {
+                      ...l.settings,
+                      tabs: l.settings.tabs
+                        ? { ...l.settings.tabs, enabled: false }
+                        : { enabled: false, count: 4, width: 2, height: 0.5 },
+                      cut: { ...l.settings.cut, tabCount: 0 },
+                    },
+                  };
+                }
+                const base = l.settings.tabs || { count: 4, width: 2, height: 0.5 };
+                const next = { ...base, enabled: true as const };
+                return {
+                  ...l,
+                  settings: {
+                    ...l.settings,
+                    tabs: next,
+                    cut: { ...l.settings.cut, tabCount: next.count, tabWidth: next.width },
+                  },
+                };
+              }));
+            },
+          }, 'Keep parts attached'),
+        ),
+        activeLayer.settings.tabs?.enabled && React.createElement('div', {
+          style: { display: 'flex', gap: 4, marginBottom: 6 },
+        },
+          ...([
+            { label: 'Light', count: 2, width: 1, height: 0.3 },
+            { label: 'Medium', count: 4, width: 2, height: 0.5 },
+            { label: 'Strong', count: 6, width: 3, height: 0.8 },
+          ] as const).map(preset => {
+            const t = activeLayer.settings.tabs;
+            const isActive = !!t?.enabled && t.count === preset.count && t.width === preset.width;
+            return React.createElement('button', {
+              key: preset.label,
+              type: 'button',
+              onClick: () => {
+                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
+                  ...l,
+                  settings: {
+                    ...l.settings,
+                    tabs: {
+                      enabled: true,
+                      count: preset.count,
+                      width: preset.width,
+                      height: preset.height,
+                    },
+                    cut: {
+                      ...l.settings.cut,
+                      tabCount: preset.count,
+                      tabWidth: preset.width,
+                    },
+                  },
+                })));
+              },
+              style: {
+                flex: 1, padding: '4px 6px', fontSize: 10, borderRadius: 4,
+                cursor: 'pointer', fontFamily: theme.font.ui,
+                background: isActive ? 'rgba(45,212,160,0.1)' : '#0a0a14',
+                border: isActive ? '1px solid #2dd4a0' : '1px solid #252540',
+                color: isActive ? '#2dd4a0' : '#555570',
+              },
+            }, preset.label);
+          }),
+        ),
+        activeLayer.settings.tabs?.enabled && React.createElement('div', {
+          style: { fontSize: 9, color: '#555570', lineHeight: 1.5 },
+        },
+          `${activeLayer.settings.tabs.count} tabs, ${activeLayer.settings.tabs.width}mm wide, ${activeLayer.settings.tabs.height}mm tall`,
+        ),
+        activeLayer.settings.tabs?.enabled && productionMode && isProUnlocked() && React.createElement('button', {
+          type: 'button',
+          onClick: () => setShowTabsCustomize(v => !v),
+          style: {
+            background: 'none', border: 'none', color: '#555570',
+            fontSize: 9, cursor: 'pointer', fontFamily: theme.font.ui,
+            marginTop: 4, padding: 0, textDecoration: 'underline' as const,
+          },
+        }, showTabsCustomize ? 'Hide tab details…' : 'Customize tab positions…'),
+      ),
       productionMode && React.createElement('div', {
         style: { marginTop: 8, padding: '8px 0', borderTop: '1px solid #1a1a2e' },
       },
@@ -836,40 +985,70 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
               },
             }),
           ),
-          React.createElement('div', { style: { marginTop: 6 } },
-            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
-            React.createElement(NumberInput, {
-              value: activeLayer.settings.cut.tabCount,
-              min: 0,
-              max: 100,
-              integer: true,
-              inputMode: 'numeric',
-              defaultValue: activeLayer.settings.cut.tabCount,
-              style: numberInputStyle,
-              onCommit: (n: number) => {
-                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                  ...l,
-                  settings: { ...l.settings, cut: { ...l.settings.cut, tabCount: n } },
-                })));
-              },
-            }),
-          ),
-          React.createElement('div', { style: { marginTop: 6 } },
-            React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab width (mm)'),
-            React.createElement(NumberInput, {
-              value: activeLayer.settings.cut.tabWidth,
-              min: 0,
-              max: 100,
-              defaultValue: activeLayer.settings.cut.tabWidth,
-              style: numberInputStyle,
-              onCommit: (n: number) => {
-                onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
-                  ...l,
-                  settings: { ...l.settings, cut: { ...l.settings.cut, tabWidth: n } },
-                })));
-              },
-            }),
-          ),
+          ...(simpleTabsOn && !showTabsCustomize
+            ? []
+            : [
+                React.createElement('div', { key: 'tab-count', style: { marginTop: 6 } },
+                  React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
+                  React.createElement(NumberInput, {
+                    value: detailTabCount,
+                    min: 0,
+                    max: 100,
+                    integer: true,
+                    inputMode: 'numeric',
+                    defaultValue: detailTabCount,
+                    style: numberInputStyle,
+                    onCommit: (n: number) => {
+                      onSceneCommit(updateLayer(scene, activeLayer.id, l => {
+                        if (l.settings.tabs?.enabled) {
+                          const prev = l.settings.tabs;
+                          return {
+                            ...l,
+                            settings: {
+                              ...l.settings,
+                              tabs: { ...prev, count: n },
+                              cut: { ...l.settings.cut, tabCount: n },
+                            },
+                          };
+                        }
+                        return {
+                          ...l,
+                          settings: { ...l.settings, cut: { ...l.settings.cut, tabCount: n } },
+                        };
+                      }));
+                    },
+                  }),
+                ),
+                React.createElement('div', { key: 'tab-width', style: { marginTop: 6 } },
+                  React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab width (mm)'),
+                  React.createElement(NumberInput, {
+                    value: detailTabWidth,
+                    min: 0,
+                    max: 100,
+                    defaultValue: detailTabWidth,
+                    style: numberInputStyle,
+                    onCommit: (n: number) => {
+                      onSceneCommit(updateLayer(scene, activeLayer.id, l => {
+                        if (l.settings.tabs?.enabled) {
+                          const prev = l.settings.tabs;
+                          return {
+                            ...l,
+                            settings: {
+                              ...l.settings,
+                              tabs: { ...prev, width: n },
+                              cut: { ...l.settings.cut, tabWidth: n },
+                            },
+                          };
+                        }
+                        return {
+                          ...l,
+                          settings: { ...l.settings, cut: { ...l.settings.cut, tabWidth: n } },
+                        };
+                      }));
+                    },
+                  }),
+                ),
+              ]),
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Inside first'),
             React.createElement('button', {

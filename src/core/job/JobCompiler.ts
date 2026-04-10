@@ -148,8 +148,12 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
 
     overcut: Math.max(0, s.cut.overcut),
     leadIn: Math.max(0, s.cut.leadIn),
-    tabCount: Math.max(0, Math.floor(s.cut.tabCount)),
-    tabWidth: Math.max(0, s.cut.tabWidth),
+    tabCount: s.tabs?.enabled === true
+      ? Math.max(0, Math.floor(Number(s.tabs?.count) || 0))
+      : Math.max(0, Math.floor(s.cut.tabCount)),
+    tabWidth: s.tabs?.enabled === true
+      ? Math.max(0, Number(s.tabs?.width) || 0)
+      : Math.max(0, s.cut.tabWidth),
     insideFirst: s.cut.insideFirst,
 
     airAssist: s.airAssist,
