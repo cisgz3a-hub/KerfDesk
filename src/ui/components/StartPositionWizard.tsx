@@ -7,16 +7,36 @@ export type StartMode = 'absolute' | 'current' | 'savedOrigin';
 interface StartPositionWizardProps {
   scene: Scene;
   currentMode: StartMode;
-  onSelectMode: (mode: StartMode) => void;
+  onSelectMode: (mode: StartMode, origin: { x: number; y: number }) => void;
   onClose: () => void;
+  onSaveOrigin?: () => void;
   machinePosition?: { x: number; y: number } | null;
   savedOrigin?: { x: number; y: number } | null;
 }
 
+function previewCoords(
+  mode: StartMode,
+  designBounds: { minX: number; minY: number; maxX: number; maxY: number },
+  machinePosition: { x: number; y: number } | null | undefined,
+  savedOrigin: { x: number; y: number } | null | undefined,
+): { designX: number; designY: number } {
+  let designX = designBounds.minX;
+  let designY = designBounds.minY;
+  if (mode === 'current' && machinePosition) {
+    designX = machinePosition.x;
+    designY = machinePosition.y;
+  } else if (mode === 'savedOrigin' && savedOrigin) {
+    designX = savedOrigin.x;
+    designY = savedOrigin.y;
+  }
+  return { designX, designY };
+}
+
 export function StartPositionWizard({
-  scene, currentMode, onSelectMode, onClose, machinePosition, savedOrigin,
+  scene, currentMode, onSelectMode, onClose, onSaveOrigin, machinePosition, savedOrigin,
 }: StartPositionWizardProps) {
   const [hoveredMode, setHoveredMode] = useState<StartMode | null>(null);
+  const [selectedMode, setSelectedMode] = useState<StartMode | null>(null);
 
   const font = "'DM Sans', system-ui, sans-serif";
 
@@ -72,8 +92,9 @@ export function StartPositionWizard({
     },
   ];
 
-  const previewMode = hoveredMode || currentMode;
-  const renderPreview = () => {
+  const previewMode = hoveredMode ?? selectedMode ?? currentMode;
+
+  const renderPreviewSvg = (mode: StartMode) => {
     const bedW = scene.canvas.width;
     const bedH = scene.canvas.height;
     const svgW = 220;
@@ -83,15 +104,7 @@ export function StartPositionWizard({
     const offsetX = (svgW - bedW * scale) / 2;
     const offsetY = (svgH - bedH * scale) / 2;
 
-    let designX = designBounds.minX;
-    let designY = designBounds.minY;
-    if (previewMode === 'current' && machinePosition) {
-      designX = machinePosition.x;
-      designY = machinePosition.y;
-    } else if (previewMode === 'savedOrigin' && savedOrigin) {
-      designX = savedOrigin.x;
-      designY = savedOrigin.y;
-    }
+    const { designX, designY } = previewCoords(mode, designBounds, machinePosition, savedOrigin);
 
     const dw = designBounds.maxX - designBounds.minX;
     const dh = designBounds.maxY - designBounds.minY;
@@ -111,11 +124,11 @@ export function StartPositionWizard({
         y: offsetY + designY * scale,
         width: Math.max(dw * scale, 8),
         height: Math.max(dh * scale, 8),
-        fill: previewMode === currentMode ? 'rgba(0,212,255,0.2)' : 'rgba(255,212,68,0.2)',
-        stroke: previewMode === currentMode ? '#00d4ff' : '#ffd444',
+        fill: mode === currentMode ? 'rgba(0,212,255,0.2)' : 'rgba(255,212,68,0.2)',
+        stroke: mode === currentMode ? '#00d4ff' : '#ffd444',
         strokeWidth: 1.5, rx: 2,
       }),
-      previewMode !== 'absolute' && React.createElement('circle', {
+      mode !== 'absolute' && React.createElement('circle', {
         cx: offsetX + designX * scale,
         cy: offsetY + designY * scale,
         r: 4, fill: '#ff4466', stroke: '#ff4466', strokeWidth: 1,
@@ -154,47 +167,103 @@ export function StartPositionWizard({
 
       React.createElement('div', {
         style: { padding: '16px 20px', background: '#08080f', borderBottom: '1px solid #1a1a2e' },
-      }, renderPreview()),
+      }, renderPreviewSvg(previewMode)),
 
       React.createElement('div', { style: { padding: '8px 12px' } },
-        ...modes.map(mode =>
-          React.createElement('button', {
-            key: mode.id,
-            onClick: () => { onSelectMode(mode.id); onClose(); },
-            onMouseEnter: () => setHoveredMode(mode.id),
+        ...modes.map(m => {
+          const disabled = m.id === 'current' && !machinePosition;
+          return React.createElement('button', {
+            key: m.id,
+            onClick: () => {
+              if (disabled) return;
+              setSelectedMode(m.id);
+            },
+            onMouseEnter: () => setHoveredMode(m.id),
             onMouseLeave: () => setHoveredMode(null),
-            disabled: mode.id === 'current' && !machinePosition,
+            disabled,
             style: {
               width: '100%', padding: '14px 16px', marginBottom: 4,
-              background: currentMode === mode.id ? 'rgba(0,212,255,0.08)' : 'transparent',
-              border: currentMode === mode.id ? '1px solid rgba(0,212,255,0.3)' : '1px solid transparent',
-              borderRadius: 10, cursor: mode.id === 'current' && !machinePosition ? 'default' : 'pointer',
+              background: selectedMode === m.id
+                ? 'rgba(0,212,255,0.08)'
+                : hoveredMode === m.id && !disabled
+                  ? 'rgba(0,212,255,0.04)'
+                  : '#0a0a14',
+              border: selectedMode === m.id
+                ? '1px solid #00d4ff'
+                : hoveredMode === m.id && !disabled
+                  ? '1px solid rgba(0,212,255,0.3)'
+                  : '1px solid #1a1a2e',
+              borderRadius: 10, cursor: disabled ? 'default' : 'pointer',
               textAlign: 'left' as const,
-              opacity: mode.id === 'current' && !machinePosition ? 0.4 : 1,
-              display: 'flex', gap: 14, alignItems: 'flex-start',
+              opacity: disabled ? 0.4 : 1,
+              display: 'flex', flexDirection: 'column' as const, gap: 8,
               transition: 'background 0.15s, border-color 0.15s',
             },
           },
-            React.createElement('div', { style: { fontSize: 24, lineHeight: '1', flexShrink: 0, marginTop: 2 } }, mode.icon),
-            React.createElement('div', { style: { flex: 1 } },
-              React.createElement('div', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600, marginBottom: 3 } }, mode.title),
-              React.createElement('div', { style: { color: '#8888aa', fontSize: 12, marginBottom: 4 } }, mode.description),
-              React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, mode.detail),
+            React.createElement('div', {
+              style: { display: 'flex', gap: 14, alignItems: 'flex-start', width: '100%',
+              },
+            },
+              React.createElement('div', { style: { fontSize: 24, lineHeight: '1', flexShrink: 0, marginTop: 2 } }, m.icon),
+              React.createElement('div', { style: { flex: 1 } },
+                React.createElement('div', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600, marginBottom: 3 } }, m.title),
+                React.createElement('div', { style: { color: '#8888aa', fontSize: 12, marginBottom: 4 } }, m.description),
+                React.createElement('div', { style: { color: '#555570', fontSize: 10 } }, m.detail),
+              ),
+              selectedMode === m.id && React.createElement('div', {
+                style: { color: '#00d4ff', fontSize: 11, fontWeight: 600, flexShrink: 0, marginTop: 4 },
+              }, 'Selected'),
+              selectedMode === null && currentMode === m.id && React.createElement('div', {
+                style: { color: '#555570', fontSize: 11, fontWeight: 600, flexShrink: 0, marginTop: 4 },
+              }, '✓ Active'),
             ),
-            currentMode === mode.id && React.createElement('div', {
-              style: { color: '#00d4ff', fontSize: 11, fontWeight: 600, flexShrink: 0, marginTop: 4 },
-            }, '✓ Active'),
-          ),
-        ),
+            (hoveredMode === m.id || selectedMode === m.id) && !disabled && renderPreviewSvg(m.id),
+          );
+        }),
       ),
 
       React.createElement('div', {
-        style: { padding: '12px 20px', borderTop: '1px solid #1a1a2e', display: 'flex', justifyContent: 'flex-end' },
+        style: { padding: '12px 20px', borderTop: '1px solid #1a1a2e', display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' },
       },
+        machinePosition && onSaveOrigin && React.createElement('button', {
+          onClick: () => { onSaveOrigin(); },
+          style: {
+            padding: '6px 14px', background: 'rgba(45,212,160,0.08)',
+            border: '1px solid rgba(45,212,160,0.2)', borderRadius: 6,
+            color: '#2dd4a0', fontSize: 11, cursor: 'pointer', fontFamily: font,
+          },
+        }, '📌 Save current position as origin'),
+
+        React.createElement('div', { style: { flex: 1 } }),
+
         React.createElement('button', {
           onClick: onClose,
-          style: { padding: '8px 18px', background: '#0a0a14', border: '1px solid #252540', borderRadius: 6, color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: font },
-        }, 'Close'),
+          style: {
+            padding: '8px 18px', background: '#0a0a14',
+            border: '1px solid #252540', borderRadius: 6,
+            color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: font,
+          },
+        }, 'Cancel'),
+
+        React.createElement('button', {
+          onClick: () => {
+            if (!selectedMode) return;
+            const p = previewCoords(selectedMode, designBounds, machinePosition, savedOrigin);
+            onSelectMode(selectedMode, { x: p.designX, y: p.designY });
+            onClose();
+          },
+          disabled: !selectedMode,
+          style: {
+            padding: '8px 18px',
+            background: selectedMode ? 'rgba(0,212,255,0.1)' : '#1a1a2e',
+            border: selectedMode ? '1px solid #00d4ff' : '1px solid #252540',
+            borderRadius: 6,
+            color: selectedMode ? '#00d4ff' : '#333355',
+            fontSize: 12, fontWeight: 600,
+            cursor: selectedMode ? 'pointer' : 'default',
+            fontFamily: font,
+          },
+        }, 'Confirm'),
       ),
     ),
   );

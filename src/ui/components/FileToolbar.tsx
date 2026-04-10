@@ -32,6 +32,8 @@ interface FileToolbarProps {
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   onConnect?: () => void;
+  /** Close app (Electron quit or browser navigate away) */
+  onExit?: () => void;
   onSetup?: () => void;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
@@ -75,6 +77,7 @@ export function FileToolbar({
   showAlert,
   showConfirm,
   onConnect,
+  onExit,
   onMaterialTest,
   onCamera,
   onDepthPreview,
@@ -372,16 +375,17 @@ export function FileToolbar({
     toolbarBtn('Image', 'Import image (PNG, JPG)', handleImportImageClick),
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
+    spacer(),
     onConnect
-      ? [
-        spacer(),
-        toolbarBtn(
-          isConnected ? '⚡ Connected' : '⚡ Connect',
-          isConnected ? 'Laser connected' : 'Connect to laser',
-          () => onConnect(),
-          { active: isConnected, color: isConnected ? '#2dd4a0' : '#c0c0d0' },
-        ),
-      ]
+      ? toolbarBtn(
+        isConnected ? '⚡ Connected' : '⚡ Connect',
+        isConnected ? 'Laser connected' : 'Connect to laser',
+        () => onConnect(),
+        { active: isConnected, color: isConnected ? '#2dd4a0' : '#c0c0d0' },
+      )
+      : null,
+    onExit
+      ? toolbarBtn('✕ Exit', 'Close LaserForge', () => onExit())
       : null,
   );
 

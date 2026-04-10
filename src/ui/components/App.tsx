@@ -163,13 +163,6 @@ export function App() {
     return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
   }, [grbl.machineState]);
 
-  const handleSelectStartMode = useCallback((mode: StartMode) => {
-    setStartMode(mode);
-    try {
-      localStorage.setItem('laserforge_start_mode', mode);
-    } catch { /* ignore */ }
-  }, []);
-
   const handleSaveOrigin = useCallback(() => {
     const pos = grbl.machineState?.position;
     if (!pos) return;
@@ -303,6 +296,31 @@ export function App() {
     sceneIsDirtyRef.current = true;
     historyRef.current.push(newScene);
     setScene(newScene);
+  }, []);
+
+  const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
+    setStartMode(mode);
+    try {
+      localStorage.setItem('laserforge_start_mode', mode);
+    } catch { /* ignore */ }
+    handleSceneCommit({
+      ...scene,
+      startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
+    });
+  }, [scene, handleSceneCommit]);
+
+  const handleExit = useCallback(() => {
+    if (sceneIsDirtyRef.current) {
+      const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
+      if (!confirmed) return;
+    }
+
+    if (window.electronAPI?.quit) {
+      void window.electronAPI.quit();
+      return;
+    }
+
+    window.location.href = '/landing.html';
   }, []);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
@@ -1127,6 +1145,7 @@ export function App() {
       onShowShortcuts: () => dialogs.setShowShortcuts(true),
       productionMode,
       onToggleProductionMode: handleToggleProductionMode,
+      onExit: handleExit,
       onToolpathPreview: async () => {
         try {
           const gc = compileGcode(scene);
@@ -1419,6 +1438,7 @@ export function App() {
       scene,
       currentMode: startMode,
       onSelectMode: handleSelectStartMode,
+      onSaveOrigin: handleSaveOrigin,
       onClose: () => setShowStartWizard(false),
       machinePosition: machinePositionForStartWizard,
       savedOrigin,

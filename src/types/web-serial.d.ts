@@ -3,6 +3,22 @@
 export {};
 
 declare global {
+  interface ElectronAPI {
+    saveFile?: (defaultName: string, content: string) => Promise<boolean>;
+    saveGcode?: (defaultName: string, content: string) => Promise<boolean>;
+    openFile?: () => Promise<{ filePath: string; content: string; ext: string } | null>;
+    isElectron?: boolean;
+    listPorts?: () => Promise<{ path: string; manufacturer?: string }[]>;
+    connectPort?: (portPath: string, baudRate: number) => Promise<boolean>;
+    disconnectPort?: () => Promise<void>;
+    sendGcode?: (cmd: string) => Promise<void>;
+    quit?: () => Promise<void>;
+  }
+
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+
   interface SerialPort {
     readonly readable: ReadableStream<Uint8Array> | null;
     readonly writable: WritableStream<Uint8Array> | null;

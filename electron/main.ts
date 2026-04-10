@@ -166,3 +166,7 @@ ipcMain.handle('serial:send', async (_event, line: unknown) => {
   if (/[\r\n]/.test(line)) return;
   await writeSerialLine(line);
 });
+
+ipcMain.handle('app:quit', () => {
+  app.quit();
+});

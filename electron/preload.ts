@@ -13,4 +13,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('serial:connect', portPath, baudRate) as Promise<boolean>,
   disconnectPort: () => ipcRenderer.invoke('serial:disconnect') as Promise<void>,
   sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,
+  quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
 });
