@@ -474,6 +474,7 @@ export function ConnectionPanel({
 
     const lines: string[] = [
       'G90', 'G21',
+      // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
       'M4 S5',
       `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
       `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
@@ -508,9 +509,16 @@ export function ConnectionPanel({
       localStorage.setItem('laserforge_testfire_acknowledged', 'true');
     }
 
+    // M3 = constant spindle mode — fires laser even when stationary
+    // M4 = dynamic laser mode — only fires during movement (G1/G2/G3); GRBL $32=1 safety
+    // Test fire needs M3 because the machine is not moving
+    //
+    // S20 = low power pulse. If $30=1000, this is 2%. If $30=255, this is ~8%.
+    // Both should produce a visible dot on most diode lasers.
+    // If the dot is too weak, the user can adjust $30 or we can increase S value.
     try {
-      notifySimulatorTx('M4 S20');
-      ctrl.sendCommand('M4 S20');
+      notifySimulatorTx('M3 S20');
+      ctrl.sendCommand('M3 S20');
     } catch (err: unknown) {
       console.warn('[Command blocked]', err instanceof Error ? err.message : err);
     }
