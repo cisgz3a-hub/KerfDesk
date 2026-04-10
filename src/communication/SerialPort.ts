@@ -22,13 +22,26 @@ export class MockSerialPort implements SerialPortLike {
   private _dataCallback: ((line: string) => void) | null = null;
   private _errorCallback: ((error: Error) => void) | null = null;
   private _closeCallback: (() => void) | null = null;
-  private _responseGenerator: (line: string) => string[];
+  private _responseGenerator: ((line: string) => string[]) | null;
+
+  /** Simulated machine position (mm), used when no custom responseGenerator is set */
+  private _simPosX = 0;
+  private _simPosY = 0;
+  /** Work coordinate offset: MPos = W + offset → WPos = MPos - offset */
+  private _workOffsetX = 0;
+  private _workOffsetY = 0;
+  /** G-code modal: true = absolute work coordinates on G0/G1 */
+  private _modalG90 = true;
+  private readonly _maxX: number;
+  private readonly _maxY: number;
 
   readonly received: string[] = [];
   readonly sent: string[] = [];
 
-  constructor(responseGenerator?: (line: string) => string[]) {
-    this._responseGenerator = responseGenerator || defaultGrblResponder;
+  constructor(responseGenerator?: (line: string) => string[], bed?: { width: number; height: number }) {
+    this._responseGenerator = responseGenerator ?? null;
+    this._maxX = bed?.width ?? 10000;
+    this._maxY = bed?.height ?? 10000;
   }
 
   get isOpen(): boolean { return this._isOpen; }
@@ -42,7 +55,9 @@ export class MockSerialPort implements SerialPortLike {
     if (!this._isOpen) throw new Error('Port is not open');
     const line = data.replace(/[\r\n]+$/, '');
     this.received.push(line);
-    const responses = this._responseGenerator(line);
+    const responses = this._responseGenerator
+      ? this._responseGenerator(line)
+      : this._defaultHandleLine(line);
     for (const resp of responses) {
       this.injectResponse(resp);
     }
@@ -51,7 +66,15 @@ export class MockSerialPort implements SerialPortLike {
   writeByte(byte: number): void {
     if (!this._isOpen) throw new Error('Port is not open');
     if (byte === 0x3F) {
-      this.injectResponse('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      if (this._responseGenerator) {
+        this.injectResponse('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
+      } else {
+        const wx = this._simPosX - this._workOffsetX;
+        const wy = this._simPosY - this._workOffsetY;
+        this.injectResponse(
+          `<Idle|MPos:${this._simPosX.toFixed(3)},${this._simPosY.toFixed(3)},0.000|WPos:${wx.toFixed(3)},${wy.toFixed(3)},0.000|FS:0,0>`,
+        );
+      }
     }
   }
 
@@ -77,14 +100,73 @@ export class MockSerialPort implements SerialPortLike {
   simulateError(message: string): void {
     this._errorCallback?.(new Error(message));
   }
-}
 
-function defaultGrblResponder(line: string): string[] {
-  if (line === '') return ['ok'];
-  if (line.startsWith(';')) return [];
-  if (line.startsWith('$')) return ['ok'];
-  if (line.startsWith('G') || line.startsWith('M') || line.startsWith('F') || line.startsWith('S')) {
-    return ['ok'];
+  private _defaultHandleLine(line: string): string[] {
+    if (line === '') return ['ok'];
+    if (line.startsWith(';')) return [];
+
+    if (line.startsWith('$J=')) {
+      const upper = line.toUpperCase();
+      const xMatch = line.match(/[Xx]([0-9.-]+)/);
+      const yMatch = line.match(/[Yy]([0-9.-]+)/);
+      const isIncremental = upper.includes('G91');
+      if (isIncremental) {
+        if (xMatch) this._simPosX += parseFloat(xMatch[1]);
+        if (yMatch) this._simPosY += parseFloat(yMatch[1]);
+      } else {
+        if (xMatch) this._simPosX = parseFloat(xMatch[1]) + this._workOffsetX;
+        if (yMatch) this._simPosY = parseFloat(yMatch[1]) + this._workOffsetY;
+      }
+      this._simPosX = Math.max(0, Math.min(this._maxX, this._simPosX));
+      this._simPosY = Math.max(0, Math.min(this._maxY, this._simPosY));
+      return ['ok'];
+    }
+
+    if (line.startsWith('$')) return ['ok'];
+
+    const u = line.toUpperCase();
+    if (u.includes('G10') && u.includes('L20')) {
+      const xm = line.match(/[Xx]([0-9.-]+)/);
+      const ym = line.match(/[Yy]([0-9.-]+)/);
+      if (xm) this._workOffsetX = this._simPosX - parseFloat(xm[1]);
+      if (ym) this._workOffsetY = this._simPosY - parseFloat(ym[1]);
+      return ['ok'];
+    }
+
+    // G0/G1: work coordinates when absolute; MPos = W + work offset
+    if (/\bG0\b|\bG00\b|\bG1\b|\bG01\b/.test(u)) {
+      const xMatch = line.match(/[Xx]([0-9.-]+)/);
+      const yMatch = line.match(/[Yy]([0-9.-]+)/);
+      const hadG90 = /\bG90\b/.test(u);
+      const hadG91 = /\bG91\b/.test(u);
+      let incremental: boolean;
+      if (hadG91) incremental = true;
+      else if (hadG90) incremental = false;
+      else incremental = !this._modalG90;
+      if (incremental) {
+        if (xMatch) this._simPosX += parseFloat(xMatch[1]);
+        if (yMatch) this._simPosY += parseFloat(yMatch[1]);
+      } else {
+        if (xMatch) this._simPosX = parseFloat(xMatch[1]) + this._workOffsetX;
+        if (yMatch) this._simPosY = parseFloat(yMatch[1]) + this._workOffsetY;
+      }
+      this._simPosX = Math.max(0, Math.min(this._maxX, this._simPosX));
+      this._simPosY = Math.max(0, Math.min(this._maxY, this._simPosY));
+      if (hadG91) this._modalG90 = false;
+      if (hadG90) this._modalG90 = true;
+      return ['ok'];
+    }
+
+    // G90 / G91 without a move (e.g. job header)
+    if (!/\bG0\b|\bG00\b|\bG1\b|\bG01\b/.test(u)) {
+      if (/\bG90\b/.test(u)) this._modalG90 = true;
+      if (/\bG91\b/.test(u)) this._modalG90 = false;
+    }
+
+    if (line.startsWith('G') || line.startsWith('M') || line.startsWith('F') || line.startsWith('S')) {
+      return ['ok'];
+    }
+
+    return ['error:20'];
   }
-  return ['error:20'];
 }

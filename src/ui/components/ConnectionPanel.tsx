@@ -228,7 +228,7 @@ export function ConnectionPanel({
     const ctrl = controllerRef.current;
     if (!ctrl) return;
 
-    const mock = new MockSerialPort();
+    const mock = new MockSerialPort(undefined, { width: bedWidth, height: bedHeight });
     portRef.current = mock;
     mock.open();
     try {
@@ -279,6 +279,29 @@ export function ConnectionPanel({
       /* ignore */
     }
   };
+
+  const handleJog = useCallback(
+    (axis: 'X' | 'Y', distance: number) => {
+      const c = controllerRef.current;
+      if (!c) return;
+      const feedRate = 3000;
+      const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
+      notifySimulatorTx(cmd);
+      try {
+        c.sendCommand(cmd);
+      } catch {
+        /* ignore */
+      }
+      setTimeout(() => {
+        try {
+          c.requestStatusReport();
+        } catch {
+          /* ignore */
+        }
+      }, 100);
+    },
+    [notifySimulatorTx],
+  );
 
   const handleStartJob = async () => {
     if (!gcode || !controllerRef.current) return;
@@ -893,9 +916,9 @@ export function ConnectionPanel({
         React.createElement('div', { style: { display: 'flex', gap: 4, justifyContent: 'center' } },
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 36px)', gap: 3 } },
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y-${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↑'),
+            React.createElement('button', { onClick: () => handleJog('Y', -jogStep), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↑'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X-${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
+            React.createElement('button', { onClick: () => handleJog('X', -jogStep), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '←'),
             React.createElement('button', {
               onClick: async () => {
                 const ctrl = controllerRef.current;
@@ -914,9 +937,9 @@ export function ConnectionPanel({
               title: 'Step 3: Set this position as the starting point (0,0) — jog here first, then press ZERO',
               style: { ...btnStyle('0,212,255'), padding: '6px', fontSize: 8, fontWeight: 700 },
             }, 'ZERO'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 X${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '→'),
+            React.createElement('button', { onClick: () => handleJog('X', jogStep), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '→'),
             React.createElement('div'),
-            React.createElement('button', { onClick: () => sendCmd(`$J=G91 Y${jogStep} F1000`), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↓'),
+            React.createElement('button', { onClick: () => handleJog('Y', jogStep), title: 'Step 2: Move the laser to your workpiece corner', style: { ...btnStyle('136,136,170'), padding: '6px', fontSize: 12 } }, '↓'),
             React.createElement('div'),
           ),
           React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 3, marginLeft: 12 } },
