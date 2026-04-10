@@ -74,17 +74,101 @@ function drawEngraveObject(
   ctx.restore();
 }
 
+function heightDataToDisplacementUint8(heightData: Float32Array): Uint8Array {
+  const out = new Uint8Array(heightData.length);
+  for (let i = 0; i < heightData.length; i++) {
+    out[i] = Math.round(Math.min(1, Math.max(0, heightData[i]!)) * 255);
+  }
+  return out;
+}
+
+function generateNormalMap(heightData: Float32Array, width: number, height: number): THREE.DataTexture {
+  const normals = new Uint8Array(width * height * 4);
+  const strength = 2.0;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const idx = y * width + x;
+      const left = heightData[y * width + Math.max(0, x - 1)]!;
+      const right = heightData[y * width + Math.min(width - 1, x + 1)]!;
+      const up = heightData[Math.max(0, y - 1) * width + x]!;
+      const down = heightData[Math.min(height - 1, y + 1) * width + x]!;
+
+      const dx = (left - right) * strength;
+      const dy = (up - down) * strength;
+      const dz = 1.0;
+      const len = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
+
+      normals[idx * 4 + 0] = Math.round(((dx / len) * 0.5 + 0.5) * 255);
+      normals[idx * 4 + 1] = Math.round(((dy / len) * 0.5 + 0.5) * 255);
+      normals[idx * 4 + 2] = Math.round(((dz / len) * 0.5 + 0.5) * 255);
+      normals[idx * 4 + 3] = 255;
+    }
+  }
+
+  const tex = new THREE.DataTexture(normals, width, height, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
+function generateBurnTexture(
+  heightData: Float32Array,
+  width: number,
+  height: number,
+  baseColor: THREE.Color,
+): THREE.DataTexture {
+  const pixels = new Uint8Array(width * height * 4);
+
+  for (let i = 0; i < width * height; i++) {
+    const depth = heightData[i]!;
+
+    const burnColor = new THREE.Color(baseColor);
+    burnColor.multiplyScalar(1 - depth * 0.7);
+    burnColor.r = burnColor.r * (1 - depth * 0.3) + depth * 0.15;
+    burnColor.g = burnColor.g * (1 - depth * 0.5);
+    burnColor.b = burnColor.b * (1 - depth * 0.6);
+
+    pixels[i * 4 + 0] = Math.round(Math.min(255, burnColor.r * 255));
+    pixels[i * 4 + 1] = Math.round(Math.min(255, burnColor.g * 255));
+    pixels[i * 4 + 2] = Math.round(Math.min(255, burnColor.b * 255));
+    pixels[i * 4 + 3] = 255;
+  }
+
+  const tex = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat);
+  tex.needsUpdate = true;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function generateRoughnessMap(heightData: Float32Array, width: number, height: number): THREE.DataTexture {
+  const pixels = new Uint8Array(width * height);
+  for (let i = 0; i < width * height; i++) {
+    const depth = heightData[i]!;
+    pixels[i] = Math.round((0.6 + depth * 0.35) * 255);
+  }
+  const tex = new THREE.DataTexture(pixels, width, height, THREE.RedFormat);
+  tex.needsUpdate = true;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
 export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
-  const sceneRef = useRef<THREE.Scene | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const meshRef = useRef<THREE.Mesh | null>(null);
+  const bgMeshRef = useRef<THREE.Mesh | null>(null);
   const frameIdRef = useRef<number>(0);
+
+  const sphericalRef = useRef({ theta: 0.5, phi: 1.0, radius: 120 });
+  const targetSphericalRef = useRef({ theta: 0.5, phi: 1.0, radius: 120 });
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef({ x: 0, y: 0 });
-  const rotationRef = useRef({ x: -0.6, y: 0.3 });
-  const zoomRef = useRef(1.0);
   const depthScaleRef = useRef(5);
 
   const [depthScale, setDepthScale] = useState(5);
@@ -180,13 +264,59 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     [scene],
   );
 
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingRef.current = true;
+    setIsDragging(true);
+    lastMouseRef.current = { x: e.clientX, y: e.clientY };
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    const dx = e.clientX - lastMouseRef.current.x;
+    const dy = e.clientY - lastMouseRef.current.y;
+    lastMouseRef.current = { x: e.clientX, y: e.clientY };
+
+    const t = targetSphericalRef.current;
+    t.theta -= dx * 0.005;
+    t.phi = Math.max(0.1, Math.min(Math.PI * 0.45, t.phi - dy * 0.005));
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    isDraggingRef.current = false;
+    setIsDragging(false);
+  }, []);
+
+  const setView = useCallback((view: 'angle' | 'front' | 'top') => {
+    const t = targetSphericalRef.current;
+    switch (view) {
+      case 'angle':
+        t.theta = 0.5;
+        t.phi = 1.0;
+        t.radius = 120;
+        break;
+      case 'front':
+        t.theta = 0;
+        t.phi = Math.PI * 0.45;
+        t.radius = 140;
+        break;
+      case 'top':
+        t.theta = 0;
+        t.phi = 0.1;
+        t.radius = 100;
+        break;
+    }
+    setViewAngle(view);
+  }, []);
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el || !hasEngraveObjects) return;
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      zoomRef.current = Math.max(0.3, Math.min(3, zoomRef.current + e.deltaY * 0.001));
+      const t = targetSphericalRef.current;
+      t.radius = Math.max(40, Math.min(300, t.radius + e.deltaY * 0.2));
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
@@ -199,31 +329,50 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     const width = container.clientWidth;
     const height = container.clientHeight;
 
+    const s0 = sphericalRef.current;
+    const t0 = targetSphericalRef.current;
+    s0.theta = t0.theta;
+    s0.phi = t0.phi;
+    s0.radius = t0.radius;
+
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x08080f, 1);
+    renderer.setClearColor(0x0a0a14, 1);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
     const root = new THREE.Scene();
-    sceneRef.current = root;
 
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, -80, 60);
-    camera.lookAt(0, 0, 0);
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
+    camera.up.set(0, 0, 1);
     cameraRef.current = camera;
 
-    root.add(new THREE.AmbientLight(0x404040, 0.6));
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    dirLight.position.set(50, -50, 80);
-    root.add(dirLight);
-    const fillLight = new THREE.DirectionalLight(0x4488aa, 0.3);
-    fillLight.position.set(-30, 30, 40);
+    const hemiLight = new THREE.HemisphereLight(0xc0d0e0, 0x806040, 0.6);
+    root.add(hemiLight);
+
+    const mainLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+    mainLight.position.set(40, -30, 60);
+    root.add(mainLight);
+
+    const fillLight = new THREE.DirectionalLight(0xc0d0e0, 0.4);
+    fillLight.position.set(-30, 20, 40);
     root.add(fillLight);
 
+    const rimLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    rimLight.position.set(-10, 40, -20);
+    root.add(rimLight);
+
+    const bgGeo = new THREE.PlaneGeometry(500, 500);
+    const bgMat = new THREE.MeshBasicMaterial({ color: 0x12121e, side: THREE.BackSide });
+    const bgMesh = new THREE.Mesh(bgGeo, bgMat);
+    bgMesh.position.z = -35;
+    root.add(bgMesh);
+    bgMeshRef.current = bgMesh;
+
     const heightmap = generateHeightmap();
-    const scale = depthScaleRef.current;
+    const dispScale = depthScaleRef.current;
 
     if (heightmap) {
       const { data, width: hmW, height: hmH, worldWidth, worldHeight } = heightmap;
@@ -231,59 +380,62 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
       const planeWidth = 60 * (aspect >= 1 ? 1 : aspect);
       const planeHeight = 60 * (aspect >= 1 ? 1 / aspect : 1);
 
+      const heightUint8 = heightDataToDisplacementUint8(data);
+      const heightTexture = new THREE.DataTexture(heightUint8, hmW, hmH, THREE.RedFormat);
+      heightTexture.needsUpdate = true;
+      heightTexture.wrapS = THREE.ClampToEdgeWrapping;
+      heightTexture.wrapT = THREE.ClampToEdgeWrapping;
+
+      const normalTex = generateNormalMap(data, hmW, hmH);
+
+      const baseCol = new THREE.Color(materialColor);
+      const burnTex = generateBurnTexture(data, hmW, hmH, baseCol);
+
+      const roughTex = generateRoughnessMap(data, hmW, hmH);
+
       const geometry = new THREE.PlaneGeometry(planeWidth, planeHeight, hmW - 1, hmH - 1);
-      const positions = geometry.attributes.position;
-      const posArr = positions.array as Float32Array;
 
-      for (let i = 0; i < positions.count; i++) {
-        const depth = data[i] ?? 0;
-        posArr[i * 3 + 2] = -depth * scale;
-      }
-      geometry.computeVertexNormals();
-
-      const color = new THREE.Color(materialColor);
-      const material = new THREE.MeshPhongMaterial({
-        color,
-        shininess: 20,
+      const material = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(0xffffff),
+        roughness: 0.85,
+        metalness: 0,
+        map: burnTex,
+        displacementMap: heightTexture,
+        displacementScale: -dispScale,
+        displacementBias: 0,
+        normalMap: normalTex,
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        roughnessMap: roughTex,
         flatShading: false,
         side: THREE.DoubleSide,
       });
 
-      const colors = new Float32Array(positions.count * 3);
-      for (let i = 0; i < positions.count; i++) {
-        const depth = data[i] ?? 0;
-        const burnDarken = 1 - depth * 0.6;
-        colors[i * 3] = color.r * burnDarken;
-        colors[i * 3 + 1] = color.g * burnDarken * 0.8;
-        colors[i * 3 + 2] = color.b * burnDarken * 0.5;
-      }
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-      material.vertexColors = true;
-
       const mesh = new THREE.Mesh(geometry, material);
       root.add(mesh);
       meshRef.current = mesh;
-
-      const edgeGeo = new THREE.EdgesGeometry(geometry, 15);
-      const edgeMat = new THREE.LineBasicMaterial({ color: 0x1a1a2e, opacity: 0.15, transparent: true });
-      const edges = new THREE.LineSegments(edgeGeo, edgeMat);
-      mesh.add(edges);
     }
 
     const animate = () => {
       frameIdRef.current = requestAnimationFrame(animate);
-      if (cameraRef.current) {
-        const radius = 100 * zoomRef.current;
-        const rx = rotationRef.current.x;
-        const ry = rotationRef.current.y;
-        cameraRef.current.position.set(
-          radius * Math.sin(ry) * Math.cos(rx),
-          radius * Math.cos(ry) * Math.cos(rx),
-          radius * Math.sin(rx) + 20,
-        );
-        cameraRef.current.lookAt(0, 0, 0);
-      }
-      renderer.render(root, camera);
+      const cam = cameraRef.current;
+      if (!cam) return;
+
+      const s = sphericalRef.current;
+      const t = targetSphericalRef.current;
+      s.theta += (t.theta - s.theta) * 0.08;
+      s.phi += (t.phi - s.phi) * 0.08;
+      s.radius += (t.radius - s.radius) * 0.08;
+
+      const ds = depthScaleRef.current;
+      cam.position.set(
+        s.radius * Math.sin(s.phi) * Math.cos(s.theta),
+        s.radius * Math.sin(s.phi) * Math.sin(s.theta),
+        s.radius * Math.cos(s.phi),
+      );
+      cam.lookAt(0, 0, -ds * 0.3);
+      cam.up.set(0, 0, 1);
+
+      renderer.render(root, cam);
     };
     animate();
 
@@ -300,70 +452,35 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     return () => {
       window.removeEventListener('resize', handleResize);
       cancelAnimationFrame(frameIdRef.current);
+
       const m = meshRef.current;
       meshRef.current = null;
       if (m) {
-        m.traverse(obj => {
-          if (obj instanceof THREE.Mesh) {
-            obj.geometry?.dispose();
-            const mat = obj.material;
-            if (Array.isArray(mat)) mat.forEach(mm => mm.dispose());
-            else (mat as THREE.Material)?.dispose();
-          }
-          if (obj instanceof THREE.LineSegments) {
-            obj.geometry?.dispose();
-            (obj.material as THREE.Material)?.dispose();
-          }
-        });
+        const mat = m.material as THREE.MeshStandardMaterial;
+        for (const tex of [mat.map, mat.displacementMap, mat.normalMap, mat.roughnessMap]) {
+          tex?.dispose();
+        }
+        mat.dispose();
+        m.geometry?.dispose();
         root.remove(m);
       }
+
+      const bg = bgMeshRef.current;
+      bgMeshRef.current = null;
+      if (bg) {
+        bg.geometry?.dispose();
+        (bg.material as THREE.Material).dispose();
+        root.remove(bg);
+      }
+
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
       }
       rendererRef.current = null;
-      sceneRef.current = null;
       cameraRef.current = null;
     };
   }, [generateHeightmap, depthScale, materialColor, resolution, hasEngraveObjects]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    isDraggingRef.current = true;
-    setIsDragging(true);
-    lastMouseRef.current = { x: e.clientX, y: e.clientY };
-  }, []);
-
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDraggingRef.current) return;
-    const dx = e.clientX - lastMouseRef.current.x;
-    const dy = e.clientY - lastMouseRef.current.y;
-    rotationRef.current.y += dx * 0.01;
-    rotationRef.current.x = Math.max(-1.5, Math.min(0.1, rotationRef.current.x + dy * 0.01));
-    lastMouseRef.current = { x: e.clientX, y: e.clientY };
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    isDraggingRef.current = false;
-    setIsDragging(false);
-  }, []);
-
-  const setView = useCallback((view: 'angle' | 'front' | 'top') => {
-    setViewAngle(view);
-    switch (view) {
-      case 'angle':
-        rotationRef.current = { x: -0.6, y: 0.3 };
-        zoomRef.current = 1.0;
-        break;
-      case 'front':
-        rotationRef.current = { x: -0.05, y: 0 };
-        zoomRef.current = 1.2;
-        break;
-      case 'top':
-        rotationRef.current = { x: -1.5, y: 0 };
-        zoomRef.current = 0.8;
-        break;
-    }
-  }, []);
 
   const materialPresets = [
     { label: 'Birch', color: '#c4956a' },
