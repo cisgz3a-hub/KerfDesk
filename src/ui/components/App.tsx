@@ -46,7 +46,6 @@ import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
-import { pruneUnusedImages } from '../../io/ImageStore';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { type BooleanOp } from '../../geometry/BooleanOps';
@@ -68,7 +67,7 @@ import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Template } from '../../templates/TemplateLibrary';
-import { gatedFeature } from '../utils/proGate';
+import { gatedFeature, isProUnlocked } from '../utils/proGate';
 
 /** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
 function getSetupStorageKey(): string {
@@ -133,7 +132,6 @@ export function App() {
   const grbl = useGrblConnection();
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
-  const saveCountRef = useRef(0);
   const [productionMode, setProductionMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('laserforge_production_mode') === 'true';
@@ -142,11 +140,32 @@ export function App() {
     }
   });
   const handleToggleProductionMode = useCallback(() => {
-    const newMode = !productionMode;
-    setProductionMode(newMode);
+    if (productionMode) {
+      setProductionMode(false);
+      try {
+        localStorage.setItem('laserforge_production_mode', 'false');
+      } catch { /* ignore */ }
+      return;
+    }
+    if (!isProUnlocked()) {
+      if (confirm('PRO mode is a paid feature ($30 one-time).\n\nClick OK to learn more.')) {
+        window.open('https://laserforge.pages.dev/landing.html', '_blank');
+      }
+      return;
+    }
+    setProductionMode(true);
     try {
-      localStorage.setItem('laserforge_production_mode', String(newMode));
+      localStorage.setItem('laserforge_production_mode', 'true');
     } catch { /* ignore */ }
+  }, [productionMode]);
+
+  useEffect(() => {
+    if (productionMode && !isProUnlocked()) {
+      setProductionMode(false);
+      try {
+        localStorage.setItem('laserforge_production_mode', 'false');
+      } catch { /* ignore */ }
+    }
   }, [productionMode]);
   const [showRecover, setShowRecover] = useState(() => {
     try {
@@ -313,7 +332,6 @@ export function App() {
       if (saved) {
         const recovered = deserializeScene(saved);
         handleNewProject(recovered);
-        pruneUnusedImages(recovered.objects).catch(() => {});
       }
     } catch (e) {
       console.error('Recovery failed:', e);
@@ -337,10 +355,6 @@ export function App() {
         localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
         lastSavedSceneRef.current = json;
         sceneIsDirtyRef.current = false;
-        saveCountRef.current += 1;
-        if (saveCountRef.current % 5 === 0) {
-          pruneUnusedImages(scene.objects).catch(() => {});
-        }
       } catch (e) {
         console.warn('[LaserForge] Autosave failed:', e);
       }
@@ -532,7 +546,6 @@ export function App() {
         const text = await file.text();
         const loadedScene = deserializeScene(text);
         handleNewProject(loadedScene);
-        pruneUnusedImages(loadedScene.objects).catch(() => {});
       } catch (err) {
         await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
       }

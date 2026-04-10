@@ -152,8 +152,13 @@ export async function clearImageStore(): Promise<void> {
 }
 
 /**
- * Remove images from IndexedDB that are not referenced by any object in the scene.
- * Call on project load and periodically to prevent unbounded storage growth.
+ * ⚠️ DANGER: Do not call this automatically.
+ * This function deletes images from IndexedDB that aren't referenced by the
+ * passed scene. But IndexedDB is shared across ALL projects, so calling this
+ * with Project B's objects will delete Project A's images.
+ *
+ * Only call this from a manual "Clean Up Storage" action with a clear user
+ * warning and confirmation dialog.
  */
 export async function pruneUnusedImages(sceneObjects: Array<{ geometry: { src?: string } }>): Promise<number> {
   try {

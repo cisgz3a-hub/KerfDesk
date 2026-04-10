@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
+export { isProUnlocked } from '../utils/proGate';
+
 const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 
@@ -89,15 +91,6 @@ async function validateAccess(code: string): Promise<AccessInfo | null> {
   } catch (err) {
     console.error('[TrialGuard] License verification failed:', err);
     return null;
-  }
-}
-
-/** Check if PRO features should be unlocked */
-export function isProUnlocked(): boolean {
-  try {
-    return localStorage.getItem(PRO_FLAG_KEY) === 'true';
-  } catch {
-    return false;
   }
 }
 

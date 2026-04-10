@@ -1,4 +1,12 @@
-import { isProUnlocked } from '../components/TrialGuard';
+const PRO_FLAG_KEY = 'laserforge_pro';
+
+export function isProUnlocked(): boolean {
+  try {
+    return localStorage.getItem(PRO_FLAG_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 const PRO_FEATURES = [
   'box_generator',
