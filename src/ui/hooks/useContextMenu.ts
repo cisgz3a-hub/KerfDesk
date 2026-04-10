@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import { gatedFeature } from '../utils/proGate';
 
 interface ContextMenuItem {
   label: string;
@@ -102,11 +103,14 @@ export function useContextMenu(
         });
         items.push({
           label: 'Text to Path',
-          action: () => void actions.convertTextToPath(),
+          action: () => {
+            if (gatedFeature('text_to_path')) void actions.convertTextToPath();
+          },
         });
         items.push({
           label: 'Variable Text / Serial Numbers',
           action: () => {
+            if (!gatedFeature('variable_text')) return;
             const textObj = selectedObjs.find(o => o.geometry.type === 'text');
             if (textObj) {
               actions.setVariableTextSource(textObj);
@@ -153,9 +157,9 @@ export function useContextMenu(
       if (selectedObjs.length >= 2) {
         items.push({ label: '', action: () => {}, separator: true });
         items.push({ label: '─ Combine ─', action: () => {}, disabled: true });
-        items.push({ label: 'Union', action: () => actions.performBoolean('union') });
-        items.push({ label: 'Subtract', action: () => actions.performBoolean('subtract') });
-        items.push({ label: 'Intersect', action: () => actions.performBoolean('intersect') });
+        items.push({ label: 'Union', action: () => { if (gatedFeature('boolean_ops')) actions.performBoolean('union'); } });
+        items.push({ label: 'Subtract', action: () => { if (gatedFeature('boolean_ops')) actions.performBoolean('subtract'); } });
+        items.push({ label: 'Intersect', action: () => { if (gatedFeature('boolean_ops')) actions.performBoolean('intersect'); } });
       }
 
       if (hasSelection) {

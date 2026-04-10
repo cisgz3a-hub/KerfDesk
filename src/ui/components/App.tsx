@@ -66,6 +66,7 @@ import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Template } from '../../templates/TemplateLibrary';
+import { gatedFeature } from '../utils/proGate';
 
 /** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
 function getSetupStorageKey(): string {
@@ -948,8 +949,16 @@ export function App() {
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onTemplates: () => dialogs.setShowTemplates(true),
-      onBoxGenerator: () => dialogs.setShowBoxGenerator(true),
-      onAutoNest: () => setShowNesting(true),
+      onBoxGenerator: () => {
+        if (gatedFeature('box_generator')) {
+          dialogs.setShowBoxGenerator(true);
+        }
+      },
+      onAutoNest: () => {
+        if (gatedFeature('nesting')) {
+          setShowNesting(true);
+        }
+      },
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
       onUndo: handleUndo,

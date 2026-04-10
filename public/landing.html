@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LaserForge — Laser CAM Software That Prevents Mistakes</title>
+  <meta name="description" content="Professional laser cutting and engraving software. Prevents costly mistakes before they happen. Free EASY mode, PRO for $30.">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, 'Segoe UI', system-ui, sans-serif;
+      background: #08080f;
+      color: #e0e0ec;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+    }
+    .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+    /* Hero */
+    .hero {
+      padding: 80px 0 60px;
+      text-align: center;
+      background: radial-gradient(circle at 50% 0%, rgba(0, 212, 255, 0.08), transparent 60%);
+    }
+    .logo { font-size: 48px; margin-bottom: 8px; }
+    h1 {
+      font-size: 56px;
+      font-weight: 800;
+      letter-spacing: -1.5px;
+      margin-bottom: 16px;
+      background: linear-gradient(135deg, #fff 0%, #00d4ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .tagline {
+      font-size: 20px;
+      color: #8888aa;
+      margin-bottom: 32px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .cta-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .btn {
+      padding: 14px 28px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      text-decoration: none;
+      display: inline-block;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+    .btn:hover { transform: translateY(-2px); }
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%);
+      color: #08080f;
+      box-shadow: 0 4px 24px rgba(0, 212, 255, 0.3);
+    }
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      color: #e0e0ec;
+      border: 1px solid #252540;
+    }
+    .btn-secondary:hover { border-color: #00d4ff; }
+    .hero-note { color: #555570; font-size: 12px; }
+
+    /* Section */
+    section { padding: 80px 0; border-top: 1px solid #12121e; }
+    h2 {
+      font-size: 36px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      text-align: center;
+    }
+    .section-subtitle {
+      color: #8888aa;
+      font-size: 16px;
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 48px;
+    }
+
+    /* Features grid */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .feature {
+      padding: 28px;
+      background: #0d0d18;
+      border: 1px solid #1a1a2e;
+      border-radius: 12px;
+      transition: border-color 0.2s;
+    }
+    .feature:hover { border-color: #00d4ff; }
+    .feature-icon { font-size: 32px; margin-bottom: 12px; }
+    .feature h3 { font-size: 18px; margin-bottom: 8px; color: #e0e0ec; }
+    .feature p { color: #8888aa; font-size: 14px; }
+
+    /* Pricing */
+    .pricing {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    @media (max-width: 700px) { .pricing { grid-template-columns: 1fr; } }
+    .plan {
+      padding: 36px 32px;
+      background: #0d0d18;
+      border: 1px solid #1a1a2e;
+      border-radius: 16px;
+      position: relative;
+    }
+    .plan-pro {
+      border-color: #00d4ff;
+      background: linear-gradient(180deg, rgba(0, 212, 255, 0.04) 0%, #0d0d18 100%);
+    }
+    .plan-badge {
+      position: absolute;
+      top: -12px;
+      right: 24px;
+      background: #00d4ff;
+      color: #08080f;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+    .plan-name { font-size: 14px; color: #8888aa; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .plan-price { font-size: 48px; font-weight: 800; margin-bottom: 4px; }
+    .plan-price small { font-size: 16px; color: #8888aa; font-weight: 400; }
+    .plan-desc { color: #8888aa; font-size: 13px; margin-bottom: 24px; }
+    .plan-features { list-style: none; margin-bottom: 28px; }
+    .plan-features li {
+      padding: 8px 0;
+      color: #c0c0d0;
+      font-size: 14px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      border-bottom: 1px solid #12121e;
+    }
+    .plan-features li:last-child { border: none; }
+    .plan-features .check { color: #2dd4a0; }
+    .plan-features .x { color: #555570; }
+    .plan .btn { width: 100%; text-align: center; }
+
+    /* Comparison */
+    .comparison {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #0d0d18;
+      border: 1px solid #1a1a2e;
+      border-radius: 12px;
+      padding: 24px;
+    }
+    .comparison h3 { font-size: 16px; margin-bottom: 12px; }
+    .comparison-row {
+      display: grid;
+      grid-template-columns: 1fr 80px 80px;
+      padding: 10px 0;
+      border-bottom: 1px solid #12121e;
+      align-items: center;
+      font-size: 13px;
+    }
+    .comparison-row:last-child { border: none; }
+    .comparison-row .label { color: #c0c0d0; }
+    .comparison-row .easy, .comparison-row .pro { text-align: center; font-weight: 600; }
+    .comparison-row .easy.yes, .comparison-row .pro.yes { color: #2dd4a0; }
+    .comparison-row .easy.no { color: #555570; }
+    .comparison-row .pro.yes { color: #00d4ff; }
+
+    /* Footer */
+    footer {
+      padding: 40px 0;
+      text-align: center;
+      color: #555570;
+      font-size: 12px;
+      border-top: 1px solid #12121e;
+    }
+    footer a { color: #8888aa; text-decoration: none; margin: 0 12px; }
+  </style>
+</head>
+<body>
+  <div class="hero">
+    <div class="container">
+      <div class="logo">⚡</div>
+      <h1>LaserForge</h1>
+      <p class="tagline">The laser app that helps you avoid mistakes before they happen</p>
+      <div class="cta-buttons">
+        <a href="/" class="btn btn-primary">Start Free →</a>
+        <a href="#pricing" class="btn btn-secondary">See Pricing</a>
+      </div>
+      <p class="hero-note">No download. No install. Runs in your browser.</p>
+    </div>
+  </div>
+
+  <section>
+    <div class="container">
+      <h2>Built for Real Laser Users</h2>
+      <p class="section-subtitle">Designed by people who actually cut things. Every feature exists because something went wrong without it.</p>
+      <div class="features">
+        <div class="feature">
+          <div class="feature-icon">🎯</div>
+          <h3>Machine Readiness Score</h3>
+          <p>Live preflight check catches problems before you press Start. No more wasted material from forgotten settings.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">👁</div>
+          <h3>Proof Mode</h3>
+          <p>Run the entire job with the laser off. Verify every move on real hardware before burning anything.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📋</div>
+          <h3>Job Replay Log</h3>
+          <p>Every cut is logged with settings, errors, and timing. Know exactly why something failed.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">⚙️</div>
+          <h3>22 Material Presets</h3>
+          <p>Wattage-aware presets for wood, plywood, MDF, acrylic, leather, and more. Tested for diode and CO2 lasers.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">🧠</div>
+          <h3>Self-Learning Materials</h3>
+          <p>Rate your jobs. LaserForge learns your preferred settings and suggests them next time.</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon">📦</div>
+          <h3>Box Generator</h3>
+          <p>Parametric finger-joint boxes. Type dimensions, click Generate, ready to cut.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="pricing">
+    <div class="container">
+      <h2>Simple Pricing</h2>
+      <p class="section-subtitle">Free for hobbyists. $30 once for everything.</p>
+      <div class="pricing">
+        <div class="plan">
+          <div class="plan-name">Free</div>
+          <div class="plan-price">$0</div>
+          <p class="plan-desc">Everything you need to design and cut.</p>
+          <ul class="plan-features">
+            <li><span class="check">✓</span> Canvas, shapes, paths, text</li>
+            <li><span class="check">✓</span> SVG, DXF, image import</li>
+            <li><span class="check">✓</span> Cut + engrave layers</li>
+            <li><span class="check">✓</span> Material presets</li>
+            <li><span class="check">✓</span> Templates library</li>
+            <li><span class="check">✓</span> G-code export</li>
+            <li><span class="check">✓</span> Direct laser connection</li>
+            <li><span class="check">✓</span> Machine readiness score</li>
+            <li><span class="check">✓</span> Proof mode</li>
+          </ul>
+          <a href="/" class="btn btn-secondary">Start Free</a>
+        </div>
+
+        <div class="plan plan-pro">
+          <div class="plan-badge">PRO</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price">$30 <small>once</small></div>
+          <p class="plan-desc">Unlock everything. Pay once, own forever.</p>
+          <ul class="plan-features">
+            <li><span class="check">✓</span> Everything in Free</li>
+            <li><span class="check">✓</span> Box generator (finger joints)</li>
+            <li><span class="check">✓</span> Auto-nesting (save material)</li>
+            <li><span class="check">✓</span> Variable text / serial numbers</li>
+            <li><span class="check">✓</span> Material test grid</li>
+            <li><span class="check">✓</span> Cross-hatch fill mode</li>
+            <li><span class="check">✓</span> Multiple device profiles</li>
+            <li><span class="check">✓</span> Advanced cut: overcut, lead-in, tabs</li>
+            <li><span class="check">✓</span> Boolean operations + offsets</li>
+          </ul>
+          <a href="https://gumroad.com/l/laserforge" class="btn btn-primary">Buy Now — $30</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="container">
+      <h2>Free vs PRO</h2>
+      <div class="comparison">
+        <div class="comparison-row">
+          <div class="label" style="color: #555570; font-size: 11px; text-transform: uppercase;">Feature</div>
+          <div class="easy" style="color: #555570; font-size: 11px;">Free</div>
+          <div class="pro" style="color: #555570; font-size: 11px;">PRO</div>
+        </div>
+        <div class="comparison-row"><div class="label">Design canvas</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">SVG / DXF / Image import</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">G-code export</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Cut + Engrave layers</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Material presets</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Templates library</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Laser connection</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Machine readiness score</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Proof mode</div><div class="easy yes">✓</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Box generator</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Auto-nesting</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Variable text</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Cross-hatch fill</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Boolean operations</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Overcut / lead-in / tabs</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+        <div class="comparison-row"><div class="label">Device profiles</div><div class="easy no">—</div><div class="pro yes">✓</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="text-align: center;">
+    <div class="container">
+      <h2>Ready to Cut?</h2>
+      <p class="section-subtitle">No download. No account. Just open and start designing.</p>
+      <div class="cta-buttons">
+        <a href="/" class="btn btn-primary">Open LaserForge →</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>© 2026 LaserForge</p>
+      <p style="margin-top: 8px;">
+        <a href="/">App</a> ·
+        <a href="mailto:support@laserforge.app">Contact</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

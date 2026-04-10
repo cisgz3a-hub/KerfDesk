@@ -7,6 +7,7 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
+import { isProUnlocked } from './TrialGuard';
 
 interface PropertiesPanelProps {
   scene: Scene;
@@ -453,7 +454,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       );
     })(),
 
-    productionMode && React.createElement('div', { style: { marginTop: 8 } },
+    isProUnlocked() && productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
       React.createElement(NumberInput, {
         value: Math.round((obj.powerScale ?? 1) * 100),

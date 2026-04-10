@@ -10,6 +10,7 @@ import {
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
 import { NumberInput } from './NumberInput';
+import { isProUnlocked } from './TrialGuard';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -629,6 +630,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
               const v = e.target.value as FillMode;
               if (v === 'offset') return;
+              if (v === 'cross-hatch' && !isProUnlocked()) return;
               onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
                 ...l,
                 settings: { ...l.settings, fill: { ...l.settings.fill, mode: v } },
@@ -638,7 +640,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           },
             React.createElement('option', { value: 'line' }, 'Lines (scanline fill)'),
             React.createElement('option', { value: 'offset', disabled: true }, 'Offset fill (coming soon)'),
-            React.createElement('option', { value: 'cross-hatch' }, 'Cross-hatch'),
+            React.createElement('option', { value: 'cross-hatch', disabled: !isProUnlocked() }, isProUnlocked() ? 'Cross-hatch' : 'Cross-hatch (PRO)'),
           ),
         ),
         React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
@@ -711,7 +713,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
             }),
           ),
       ),
-      productionMode && (activeLayer.settings.mode === 'cut' || activeLayer.settings.mode === 'score') && React.createElement('div', {
+      isProUnlocked() && productionMode && (activeLayer.settings.mode === 'cut' || activeLayer.settings.mode === 'score') && React.createElement('div', {
         style: { marginTop: 8, padding: '8px 0', borderTop: '1px solid #1a1a2e' },
       },
         React.createElement('div', {
