@@ -1475,6 +1475,7 @@ export function App() {
       productionMode,
       gcode: currentGcode,
       onClose: () => dialogs.setShowConnection(false),
+      onDisconnect: () => dialogs.setShowConnection(false),
       bedWidth: scene.canvas.width,
       bedHeight: scene.canvas.height,
       boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,

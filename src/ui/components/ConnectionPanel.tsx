@@ -35,6 +35,8 @@ interface ConnectionPanelProps {
   boundsMaxX?: number;
   boundsMaxY?: number;
   onClose: () => void;
+  /** Called after a successful disconnect cleanup so the host can hide the panel */
+  onDisconnect?: () => void;
   productionMode?: boolean;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
@@ -60,6 +62,7 @@ export function ConnectionPanel({
   boundsMaxX,
   boundsMaxY,
   onClose,
+  onDisconnect,
   productionMode = false,
   showAlert,
   showConfirm,
@@ -106,6 +109,11 @@ export function ConnectionPanel({
     return () => {
       simulatorListenersRef.current.delete(cb);
     };
+  }, []);
+
+  useEffect(() => {
+    setMessages([]);
+    setShowSimulator(false);
   }, []);
 
   useEffect(() => {
@@ -269,25 +277,52 @@ export function ConnectionPanel({
     }
   };
 
-  const handleDisconnect = async () => {
-    if (testFireTimeoutRef.current) {
-      clearTimeout(testFireTimeoutRef.current);
-      testFireTimeoutRef.current = null;
-    }
-    if (isTestFiring) {
+  const handleDisconnect = useCallback(async () => {
+    const ctrl = controllerRef.current;
+    try {
+      if (ctrl?.isJobRunning) {
+        try {
+          ctrl.stop();
+        } catch {
+          /* ignore */
+        }
+      }
+
+      if (testFireTimeoutRef.current) {
+        clearTimeout(testFireTimeoutRef.current);
+        testFireTimeoutRef.current = null;
+      }
+      if (isTestFiring) {
+        notifySimulatorTx('M5 S0');
+        try {
+          ctrl?.sendCommand('M5 S0');
+        } catch {
+          /* ignore */
+        }
+      }
+      setIsTestFiring(false);
+
       notifySimulatorTx('M5 S0');
       try {
-        controllerRef.current?.sendCommand('M5 S0');
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+        ctrl?.sendCommand('M5 S0');
+      } catch {
+        /* may already be disconnected */
       }
+
+      try {
+        await ctrl?.disconnect();
+      } catch {
+        /* ignore */
+      }
+    } catch {
+      /* best effort — still reset local state and close panel */
     }
-    setIsTestFiring(false);
-    await controllerRef.current?.disconnect();
+
     portRef.current = null;
     setShowSimulator(false);
-    setMessages(prev => [...prev, 'Disconnected']);
-  };
+    setMessages([]);
+    onDisconnect?.();
+  }, [isTestFiring, notifySimulatorTx, onDisconnect]);
 
   // ─── Machine control ────────────────────────────────────
 
@@ -807,7 +842,7 @@ export function ConnectionPanel({
 
       // Disconnect
       isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', justifyContent: 'flex-end' } },
-        React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
+        React.createElement('button', { onClick: () => void handleDisconnect(), style: btnStyle('255, 68, 102') }, 'Disconnect'),
       ),
 
       isSimulator && isConnected && React.createElement('div', { style: { padding: '4px 18px 8px', borderBottom: '1px solid #1a1a2e' } },
