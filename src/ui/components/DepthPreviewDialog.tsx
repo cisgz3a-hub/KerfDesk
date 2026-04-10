@@ -11,7 +11,57 @@ import { geometryToPoints } from '../../core/job/JobCompiler';
 
 interface DepthPreviewDialogProps {
   scene: Scene;
+  /** Currently selected preset / material name */
+  materialPresetName?: string;
+  /** Color from the preset (e.g. '#c4956a' for birch) */
+  materialPresetColor?: string;
   onClose: () => void;
+}
+
+const MATERIAL_PREVIEW_PRESETS = [
+  { label: 'Birch Plywood', color: '#d4b896' },
+  { label: 'Baltic Birch', color: '#e0c8a0' },
+  { label: 'Walnut', color: '#5c3a1e' },
+  { label: 'Cherry', color: '#8b4513' },
+  { label: 'Maple', color: '#d2b48c' },
+  { label: 'Oak', color: '#b8860b' },
+  { label: 'Bamboo', color: '#d4c490' },
+  { label: 'MDF', color: '#a08060' },
+  { label: 'Poplar', color: '#c8b878' },
+  { label: 'Pine', color: '#deb887' },
+  { label: 'Cork', color: '#c49a6c' },
+  { label: 'Leather (Tan)', color: '#8b6914' },
+  { label: 'Leather (Dark)', color: '#3c1e0a' },
+  { label: 'Slate', color: '#505560' },
+  { label: 'Acrylic (White)', color: '#e8e8f0' },
+  { label: 'Acrylic (Black)', color: '#1a1a1a' },
+  { label: 'Anodized Aluminum', color: '#2a2a2e' },
+  { label: 'Cardboard', color: '#b89a6a' },
+] as const;
+
+function resolveInitialMaterialColor(
+  materialPresetColor: string | undefined,
+  materialPresetName: string | undefined,
+): string {
+  const hexOk = (c: string) => /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(c.trim());
+  if (materialPresetColor && hexOk(materialPresetColor)) {
+    return materialPresetColor.trim();
+  }
+  if (!materialPresetName) return '#d4b896';
+  const n = materialPresetName.toLowerCase();
+  const byLabel = MATERIAL_PREVIEW_PRESETS.find(p =>
+    p.label.toLowerCase().includes(n),
+  );
+  if (byLabel) return byLabel.color;
+  const byName = MATERIAL_PREVIEW_PRESETS.find(p =>
+    n.includes(p.label.toLowerCase()),
+  );
+  if (byName) return byName.color;
+  const byWord = MATERIAL_PREVIEW_PRESETS.find(p => {
+    const first = p.label.toLowerCase().split(/\s+/)[0] ?? '';
+    return first.length > 2 && n.includes(first);
+  });
+  return byWord?.color ?? '#d4b896';
 }
 
 const resolution = 256; // Fixed — no need for user control
@@ -109,6 +159,7 @@ function generateNormalMap(heightData: Float32Array, width: number, height: numb
   }
 
   const tex = new THREE.DataTexture(normals, width, height, THREE.RGBAFormat);
+  tex.flipY = true;
   tex.needsUpdate = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -139,6 +190,7 @@ function generateBurnTexture(
   }
 
   const tex = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat);
+  tex.flipY = true;
   tex.needsUpdate = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
@@ -153,13 +205,19 @@ function generateRoughnessMap(heightData: Float32Array, width: number, height: n
     pixels[i] = Math.round((0.6 + depth * 0.35) * 255);
   }
   const tex = new THREE.DataTexture(pixels, width, height, THREE.RedFormat);
+  tex.flipY = true;
   tex.needsUpdate = true;
   tex.wrapS = THREE.ClampToEdgeWrapping;
   tex.wrapT = THREE.ClampToEdgeWrapping;
   return tex;
 }
 
-export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) {
+export function DepthPreviewDialog({
+  scene,
+  materialPresetName,
+  materialPresetColor,
+  onClose,
+}: DepthPreviewDialogProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
@@ -167,15 +225,17 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
   const bgMeshRef = useRef<THREE.Mesh | null>(null);
   const frameIdRef = useRef<number>(0);
 
-  const sphericalRef = useRef({ theta: 0.5, phi: 1.0, radius: 120 });
-  const targetSphericalRef = useRef({ theta: 0.5, phi: 1.0, radius: 120 });
+  const sphericalRef = useRef({ theta: -0.5, phi: 0.8, radius: 120 });
+  const targetSphericalRef = useRef({ theta: -0.5, phi: 0.8, radius: 120 });
   const isDraggingRef = useRef(false);
   const lastMouseRef = useRef({ x: 0, y: 0 });
   const depthScaleRef = useRef(5);
 
   const [depthScale, setDepthScale] = useState(5);
   const [viewAngle, setViewAngle] = useState<'angle' | 'front' | 'top'>('angle');
-  const [materialColor, setMaterialColor] = useState('#c4956a');
+  const [materialColor, setMaterialColor] = useState(() =>
+    resolveInitialMaterialColor(materialPresetColor, materialPresetName),
+  );
   const [isDragging, setIsDragging] = useState(false);
 
   depthScaleRef.current = depthScale;
@@ -230,6 +290,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     ctx.scale(scaleX, scaleY);
     ctx.translate(-minX, -minY);
 
+    ctx.globalCompositeOperation = 'darken';
     for (const obj of engraveObjects) {
       const layer = engraveLayers.find(l => l.id === obj.layerId);
       const power = layer?.settings.power.max ?? 100;
@@ -239,6 +300,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
 
       drawEngraveObject(ctx, obj, gray);
     }
+    ctx.globalCompositeOperation = 'source-over';
     ctx.restore();
 
     const imageData = ctx.getImageData(0, 0, res, res);
@@ -280,7 +342,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
 
     const t = targetSphericalRef.current;
     t.theta -= dx * 0.005;
-    t.phi = Math.max(0.1, Math.min(Math.PI * 0.45, t.phi - dy * 0.005));
+    t.phi = Math.max(0.01, Math.min(Math.PI * 0.45, t.phi - dy * 0.005));
   }, []);
 
   const handleMouseUp = useCallback(() => {
@@ -292,8 +354,8 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     const t = targetSphericalRef.current;
     switch (view) {
       case 'angle':
-        t.theta = 0.5;
-        t.phi = 1.0;
+        t.theta = -0.5;
+        t.phi = 0.8;
         t.radius = 120;
         break;
       case 'front':
@@ -303,7 +365,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
         break;
       case 'top':
         t.theta = 0;
-        t.phi = 0.1;
+        t.phi = 0.01;
         t.radius = 100;
         break;
     }
@@ -347,7 +409,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     const root = new THREE.Scene();
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 2000);
-    camera.up.set(0, 0, 1);
+    camera.up.set(0, -1, 0);
     cameraRef.current = camera;
 
     const hemiLight = new THREE.HemisphereLight(0xc0d0e0, 0x806040, 0.6);
@@ -383,6 +445,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
 
       const heightUint8 = heightDataToDisplacementUint8(data);
       const heightTexture = new THREE.DataTexture(heightUint8, hmW, hmH, THREE.RedFormat);
+      heightTexture.flipY = true;
       heightTexture.needsUpdate = true;
       heightTexture.wrapS = THREE.ClampToEdgeWrapping;
       heightTexture.wrapT = THREE.ClampToEdgeWrapping;
@@ -434,7 +497,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
         s.radius * Math.cos(s.phi),
       );
       cam.lookAt(0, 0, -ds * 0.3);
-      cam.up.set(0, 0, 1);
+      cam.up.set(0, -1, 0);
 
       renderer.render(root, cam);
     };
@@ -482,17 +545,6 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
       cameraRef.current = null;
     };
   }, [generateHeightmap, depthScale, materialColor, hasEngraveObjects]);
-
-  const materialPresets = [
-    { label: 'Birch', color: '#c4956a' },
-    { label: 'Walnut', color: '#5c3a1e' },
-    { label: 'MDF', color: '#a08060' },
-    { label: 'Plywood', color: '#d4a86a' },
-    { label: 'Bamboo', color: '#d4c490' },
-    { label: 'Leather', color: '#6b3a2a' },
-    { label: 'Slate', color: '#505560' },
-    { label: 'Acrylic', color: '#e8e8f0' },
-  ];
 
   return React.createElement('div', {
     style: {
@@ -548,6 +600,17 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
         React.createElement('div', {
           style: { width: 180, padding: '12px 14px', borderLeft: '1px solid #1a1a2e', overflowY: 'auto' as const, flexShrink: 0 },
         },
+          materialPresetName && React.createElement('div', {
+            style: {
+              padding: '8px 10px', marginBottom: 12,
+              background: 'rgba(0,212,255,0.04)', border: '1px solid #1a1a2e',
+              borderRadius: 6, textAlign: 'center' as const,
+            },
+          },
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', textTransform: 'uppercase' as const } }, 'Previewing on'),
+            React.createElement('div', { style: { fontSize: 12, color: '#e0e0ec', fontWeight: 600, marginTop: 2 } }, materialPresetName),
+          ),
+
           React.createElement('div', { style: { marginBottom: 14 } },
             React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const } }, 'View'),
             React.createElement('div', { style: { display: 'flex', gap: 3 } },
@@ -586,24 +649,37 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
 
           React.createElement('div', { style: { marginBottom: 14 } },
             React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const } }, 'Material'),
-            React.createElement('div', { style: { display: 'flex', flexWrap: 'wrap' as const, gap: 4 } },
-              ...materialPresets.map(p =>
+            React.createElement('div', { style: { display: 'flex', flexDirection: 'column' as const, gap: 2, maxHeight: 180, overflowY: 'auto' as const } },
+              ...MATERIAL_PREVIEW_PRESETS.map(p =>
                 React.createElement('button', {
                   key: p.label,
                   type: 'button',
                   onClick: () => setMaterialColor(p.color),
-                  title: p.label,
                   style: {
-                    width: 28, height: 28, borderRadius: 6, cursor: 'pointer',
-                    background: p.color,
-                    border: materialColor === p.color ? '2px solid #00d4ff' : '2px solid #252540',
-                    padding: 0,
+                    display: 'flex', alignItems: 'center', gap: 8,
+                    padding: '4px 8px', borderRadius: 4, cursor: 'pointer',
+                    background: materialColor === p.color ? 'rgba(0,212,255,0.06)' : 'transparent',
+                    border: materialColor === p.color ? '1px solid rgba(0,212,255,0.3)' : '1px solid transparent',
+                    width: '100%', textAlign: 'left' as const,
                   },
-                }),
+                  onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+                    if (materialColor !== p.color) e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+                  },
+                  onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+                    if (materialColor !== p.color) e.currentTarget.style.background = 'transparent';
+                  },
+                },
+                  React.createElement('div', {
+                    style: {
+                      width: 16, height: 16, borderRadius: 3, flexShrink: 0,
+                      background: p.color, border: '1px solid rgba(255,255,255,0.1)',
+                    },
+                  }),
+                  React.createElement('span', {
+                    style: { fontSize: 10, color: materialColor === p.color ? '#e0e0ec' : '#8888aa' },
+                  }, p.label),
+                ),
               ),
-            ),
-            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 4 } },
-              materialPresets.find(p => p.color === materialColor)?.label || 'Custom',
             ),
           ),
 

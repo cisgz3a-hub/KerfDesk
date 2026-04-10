@@ -205,6 +205,39 @@ export function fitToBounds(
 }
 
 /**
+ * Center the laser bed (world 0..bedW × 0..bedH) in the viewport with margin,
+ * zooming out to fit if needed but not past 1:1 (1 screen px per mm).
+ */
+export function fitBedInViewport(
+  bedWidthMm: number,
+  bedHeightMm: number,
+  viewportWidth: number,
+  viewportHeight: number,
+): ViewportState {
+  if (!Number.isFinite(bedWidthMm) || !Number.isFinite(bedHeightMm) ||
+      bedWidthMm <= 0 || bedHeightMm <= 0) {
+    return DEFAULT_VIEWPORT;
+  }
+
+  const margin = 80;
+  const availW = Math.max(1, viewportWidth - margin);
+  const availH = Math.max(1, viewportHeight - margin);
+
+  const initialZoom = Math.min(
+    availW / bedWidthMm,
+    availH / bedHeightMm,
+    1,
+  );
+  const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, initialZoom));
+
+  return {
+    zoom,
+    offsetX: (viewportWidth - bedWidthMm * zoom) / 2,
+    offsetY: (viewportHeight - bedHeightMm * zoom) / 2,
+  };
+}
+
+/**
  * Calculate viewport that fits an AABB into the canvas.
  * Convenience wrapper over fitToBounds.
  *

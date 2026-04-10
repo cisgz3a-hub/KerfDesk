@@ -402,7 +402,6 @@ export function FileToolbar({
       },
     },
     toolbarBtn('📷 Camera', 'Camera alignment', () => onCamera?.(), { dimmed: easyDim }),
-    toolbarBtn('🗻 Depth', 'Preview engrave depth as 3D relief', () => onDepthPreview?.()),
     toolbarBtn('🎯 Position', 'Start position wizard', () => onStartPosition?.(), { dimmed: easyDim }),
     toolbarBtn('⚄ Auto-Pack', 'Pack shapes to save material', () => onAutoNest?.(), { dimmed: easyDim }),
     toolbarBtn('⊞ Box', 'Finger-joint box generator', () => onBoxGenerator?.(), { dimmed: easyDim }),
@@ -434,6 +433,7 @@ export function FileToolbar({
         `🪵 ${materialName}`,
       )
       : null,
+    toolbarBtn('👁 Preview', 'See how your engrave will look on the selected material', () => onDepthPreview?.()),
   );
 
   return React.createElement(

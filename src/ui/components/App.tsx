@@ -1407,6 +1407,11 @@ export function App() {
 
     showDepthPreview && React.createElement(DepthPreviewDialog, {
       scene,
+      materialPresetName: scene.material?.name || undefined,
+      materialPresetColor:
+        scene.material?.color && /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(scene.material.color.trim())
+          ? scene.material.color.trim()
+          : undefined,
       onClose: () => setShowDepthPreview(false),
     }),
 

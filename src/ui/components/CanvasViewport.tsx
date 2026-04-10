@@ -23,13 +23,13 @@ import { moveObjects } from '../../core/scene/SceneOps';
 import { type SimulationResult } from '../../core/plan/Simulation';
 import {
   type ViewportState,
-  DEFAULT_VIEWPORT,
   Transform,
   zoomAt,
   wheelToZoomFactor,
   pan,
   fitToAABB,
   fitToBounds,
+  fitBedInViewport,
 } from '../viewport';
 import { computeFitBounds, computeObjectBounds } from '../../geometry/bounds';
 import { aabbIntersects, type Matrix3x2 } from '../../core/types';
@@ -269,7 +269,9 @@ export function CanvasViewport({
   onEditText,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [viewport, setViewport] = useState<ViewportState>(DEFAULT_VIEWPORT);
+  const [viewport, setViewport] = useState<ViewportState>(() =>
+    fitBedInViewport(scene.canvas.width, scene.canvas.height, width, height),
+  );
   const [isPanning, setIsPanning] = useState(false);
   const isPanningRef = useRef(false);
   const [panStart, setPanStart] = useState<{ x: number; y: number; vp: ViewportState } | null>(null);
@@ -377,6 +379,13 @@ export function CanvasViewport({
       actionsRef.current = null;
     };
   }, [actionsRef, scene.canvas.width, scene.canvas.height, width, height]);
+
+  // Center bed on first load, when bed size changes (e.g. setup wizard), and when viewport size changes
+  useEffect(() => {
+    const next = fitBedInViewport(scene.canvas.width, scene.canvas.height, width, height);
+    setViewport(next);
+    onZoomChangeRef.current?.(Math.round(next.zoom * 100));
+  }, [scene.canvas.width, scene.canvas.height, width, height]);
 
   useEffect(() => {
     isPanningRef.current = isPanning;
@@ -1502,15 +1511,6 @@ export function CanvasViewport({
     const bounds = computeFitBounds(scene, simulation);
     setViewport(fitToAABB(bounds, width, height, 0.1));
   }, [scene, simulation, width, height]);
-
-  // Fit to content on initial load and when scene/simulation changes
-  const didInitialFit = useRef(false);
-  useEffect(() => {
-    if (!didInitialFit.current) {
-      handleFitView();
-      didInitialFit.current = true;
-    }
-  }, [handleFitView]);
 
   // ─── JSX ─────────────────────────────────────────────────────
 
