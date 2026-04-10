@@ -44,6 +44,7 @@ import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
+import { pruneUnusedImages } from '../../io/ImageStore';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
@@ -211,6 +212,7 @@ export function App() {
   const serialPortRef = useRef<WebSerialPort | MockSerialPort | null>(null);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
+  const saveCountRef = useRef(0);
   const [grblReady, setGrblReady] = useState(false);
   const [productionMode, setProductionMode] = useState<boolean>(() => {
     try {
@@ -358,6 +360,7 @@ export function App() {
       if (saved) {
         const recovered = deserializeScene(saved);
         handleNewProject(recovered);
+        pruneUnusedImages(recovered.objects).catch(() => {});
       }
     } catch (e) {
       console.error('Recovery failed:', e);
@@ -381,6 +384,10 @@ export function App() {
         localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
         lastSavedSceneRef.current = json;
         sceneIsDirtyRef.current = false;
+        saveCountRef.current += 1;
+        if (saveCountRef.current % 5 === 0) {
+          pruneUnusedImages(scene.objects).catch(() => {});
+        }
       } catch (e) {
         console.warn('[LaserForge] Autosave failed:', e);
       }
@@ -535,7 +542,9 @@ export function App() {
       if (!file) return;
       try {
         const text = await file.text();
-        handleNewProject(deserializeScene(text));
+        const loadedScene = deserializeScene(text);
+        handleNewProject(loadedScene);
+        pruneUnusedImages(loadedScene.objects).catch(() => {});
       } catch (err) {
         await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
       }

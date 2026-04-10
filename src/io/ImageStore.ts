@@ -35,16 +35,28 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
-/** Generate a simple hash ID from a data URI */
+/** Generate a collision-resistant hash ID from a data URI */
 export function hashDataUri(dataUri: string): string {
-  let hash = 0;
-  const sample = dataUri.slice(0, 10000) + dataUri.slice(-10000);
-  for (let i = 0; i < sample.length; i++) {
-    const char = sample.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
+  const len = dataUri.length;
+
+  const sampleSize = Math.min(2000, len);
+  const step = Math.max(1, Math.floor(len / sampleSize));
+
+  let hash1 = 0;
+  let hash2 = 0;
+  let sampled = 0;
+
+  for (let i = 0; i < len && sampled < sampleSize; i += step) {
+    const char = dataUri.charCodeAt(i);
+    hash1 = ((hash1 << 5) - hash1 + char) | 0;
+    hash2 = ((hash2 << 7) + hash2 + char + 7) | 0;
+    sampled++;
   }
-  return `img_${Math.abs(hash).toString(36)}_${dataUri.length}`;
+
+  const h1 = Math.abs(hash1).toString(36);
+  const h2 = Math.abs(hash2).toString(36);
+
+  return `img_${h1}_${h2}_${len}`;
 }
 
 /** Store an image and return its ID */
@@ -137,4 +149,39 @@ export async function clearImageStore(): Promise<void> {
     req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
+}
+
+/**
+ * Remove images from IndexedDB that are not referenced by any object in the scene.
+ * Call on project load and periodically to prevent unbounded storage growth.
+ */
+export async function pruneUnusedImages(sceneObjects: Array<{ geometry: { src?: string } }>): Promise<number> {
+  try {
+    const referencedIds = new Set<string>();
+    for (const obj of sceneObjects) {
+      const src = obj.geometry?.src;
+      if (typeof src === 'string' && src.startsWith('indexeddb://')) {
+        referencedIds.add(src.replace('indexeddb://', ''));
+      }
+    }
+
+    const stored = await listImages();
+    let pruned = 0;
+
+    for (const img of stored) {
+      if (!referencedIds.has(img.id)) {
+        await deleteImage(img.id);
+        pruned++;
+      }
+    }
+
+    if (pruned > 0) {
+      console.log(`[ImageStore] Pruned ${pruned} unused image(s)`);
+    }
+
+    return pruned;
+  } catch (err) {
+    console.warn('[ImageStore] Prune failed:', err);
+    return 0;
+  }
 }

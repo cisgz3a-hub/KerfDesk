@@ -5,17 +5,8 @@ import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
-import {
-  getDeviceProfiles,
-  saveDeviceProfile,
-  deleteDeviceProfile,
-  getActiveProfileId,
-  setActiveProfileId as persistActiveProfileId,
-  getActiveProfile,
-  profileFromScene,
-  applyProfileToScene,
-  type DeviceProfile,
-} from '../../core/devices/DeviceProfile';
+import { DeviceProfileSelector } from './DeviceProfileSelector';
+import { JobLogViewer } from './JobLogViewer';
 import { runPreflight, type PreflightResult } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
 import {
@@ -23,8 +14,6 @@ import {
   addLogEntry,
   finalizeLog,
   saveJobLog,
-  getJobLogs,
-  clearJobLogs,
   type JobLog,
 } from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
@@ -46,6 +35,7 @@ interface ConnectionPanelProps {
   productionMode?: boolean;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
+  onSceneCommit: (scene: Scene) => void;
 }
 
 export function ConnectionPanel({
@@ -75,9 +65,6 @@ export function ConnectionPanel({
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
   const [showOutcome, setShowOutcome] = useState(false);
   const [currentLog, setCurrentLog] = useState<JobLog | null>(null);
-  const [showLogHistory, setShowLogHistory] = useState(false);
-  const [profiles, setProfiles] = useState<DeviceProfile[]>(() => getDeviceProfiles());
-  const [activeProfileId, setActiveProfileId] = useState<string | null>(() => getActiveProfileId());
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -553,79 +540,12 @@ export function ConnectionPanel({
         React.createElement('button', { onClick: handleDisconnect, style: btnStyle('255, 68, 102') }, 'Disconnect'),
       ),
 
-      isConnected && React.createElement('div', {
-        style: { padding: '8px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 6, alignItems: 'center' },
-      },
-        React.createElement('select', {
-          value: activeProfileId || '',
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-            const id = e.target.value;
-            if (id === '__new__') {
-              const name = prompt('Profile name:');
-              if (!name) return;
-              const profile = profileFromScene(name, scene);
-              saveDeviceProfile(profile);
-              persistActiveProfileId(profile.id);
-              setActiveProfileId(profile.id);
-              setProfiles(getDeviceProfiles());
-              return;
-            }
-            if (id === '__save__') {
-              const active = getActiveProfile();
-              if (active) {
-                const updated = profileFromScene(active.name, scene);
-                updated.id = active.id;
-                updated.createdAt = active.createdAt;
-                saveDeviceProfile(updated);
-                setProfiles(getDeviceProfiles());
-                setMessages(prev => [...prev, `✓ Profile "${active.name}" updated`]);
-              }
-              return;
-            }
-            if (id) {
-              persistActiveProfileId(id);
-              setActiveProfileId(id);
-              const profile = getDeviceProfiles().find(p => p.id === id);
-              if (profile) {
-                const newScene = applyProfileToScene(profile, scene);
-                onSceneCommit(newScene);
-                setMessages(prev => [...prev, `✓ Switched to "${profile.name}"`]);
-              }
-            } else {
-              persistActiveProfileId(null);
-              setActiveProfileId(null);
-            }
-          },
-          style: {
-            flex: 1, padding: '4px 8px', fontSize: 10,
-            background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
-            color: '#e0e0ec', fontFamily: font,
-            outline: 'none',
-          },
-        },
-          React.createElement('option', { value: '' }, 'No device profile'),
-          ...profiles.map(p =>
-            React.createElement('option', { key: p.id, value: p.id },
-              `${p.name} (${p.machineType} ${p.watts}W)`,
-            ),
-          ),
-          React.createElement('option', { value: '__save__', disabled: !activeProfileId }, '↻ Update current profile'),
-          React.createElement('option', { value: '__new__' }, '+ Save new profile'),
-        ),
-        activeProfileId && React.createElement('button', {
-          onClick: () => {
-            const profile = profiles.find(p => p.id === activeProfileId);
-            if (profile && confirm(`Delete profile "${profile.name}"?`)) {
-              deleteDeviceProfile(activeProfileId);
-              persistActiveProfileId(null);
-              setActiveProfileId(null);
-              setProfiles(getDeviceProfiles());
-            }
-          },
-          title: 'Delete this profile',
-          style: { background: 'none', border: 'none', color: '#555570', fontSize: 14, cursor: 'pointer', padding: '0 4px' },
-        }, '×'),
-      ),
+      isConnected && React.createElement(DeviceProfileSelector, {
+        scene,
+        onSceneCommit,
+        onMessage: (msg: string) => setMessages(prev => [...prev, msg]),
+        showConfirm,
+      }),
 
       // Step-by-step workflow guide — highlights current step based on state
       isConnected && React.createElement('div', {
@@ -997,71 +917,10 @@ export function ConnectionPanel({
           : 'Waiting for connection...',
       ),
 
-      productionMode && React.createElement('div', { style: { padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-        React.createElement('button', {
-          onClick: () => setShowLogHistory(!showLogHistory),
-          style: { ...btnStyle('136,136,170'), fontSize: 10, padding: '4px 10px' },
-        }, showLogHistory ? 'Hide History' : `Job History (${getJobLogs().length})`),
-        getJobLogs().length > 0 && React.createElement('button', {
-          onClick: async () => {
-            const ok = await showConfirm('Clear logs', 'Clear all job logs?');
-            if (!ok) return;
-            clearJobLogs();
-            setShowLogHistory(false);
-          },
-          style: { background: 'none', border: 'none', color: '#333355', fontSize: 9, cursor: 'pointer' },
-        }, 'Clear'),
-      ),
-
-      productionMode && showLogHistory && React.createElement('div', {
-        style: { padding: '0 18px 12px', maxHeight: 200, overflowY: 'auto' as const },
-      },
-        ...getJobLogs().map(log =>
-          React.createElement('div', {
-            key: log.id,
-            style: {
-              padding: '8px 10px', marginBottom: 4,
-              background: '#0a0a14', borderRadius: 6,
-              border: `1px solid ${log.status === 'completed' ? '#1a2e1a' : log.status === 'failed' ? '#2e1a1a' : '#1a1a2e'}`,
-              fontSize: 10, cursor: 'pointer',
-            },
-            onClick: () => {
-              setMessages([
-                `═══ JOB REPLAY: ${log.projectName} ═══`,
-                `Status: ${log.status.toUpperCase()}`,
-                `Started: ${new Date(log.startedAt).toLocaleString()}`,
-                `Duration: ${(log.actualDuration / 1000).toFixed(0)}s`,
-                `Lines: ${log.linesCompleted}/${log.gcodeLines}`,
-                `Errors: ${log.errors}`,
-                `Layers: ${log.layers.map(l => `${l.name} (${l.mode} ${l.power}% ${l.speed}mm/min)`).join(', ')}`,
-                `Start position: X${log.startPosition.x.toFixed(1)} Y${log.startPosition.y.toFixed(1)}`,
-                '',
-                ...log.entries.slice(-100).map(e => {
-                  const time = new Date(e.timestamp).toLocaleTimeString();
-                  const prefix = e.type === 'error' ? '✗' : e.type === 'milestone' ? '★' : e.type === 'sent' ? '>' : '<';
-                  return `[${time}] ${prefix} ${e.message}`;
-                }),
-              ]);
-            },
-          },
-            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 2 } },
-              React.createElement('span', { style: { color: '#e0e0ec', fontWeight: 500 } }, log.projectName),
-              React.createElement('span', {
-                style: {
-                  color: log.status === 'completed' ? '#2dd4a0' : log.status === 'failed' ? '#ff4466' : '#ffd444',
-                  fontWeight: 600,
-                },
-              }, log.status.toUpperCase()),
-            ),
-            React.createElement('div', { style: { color: '#555570', display: 'flex', gap: 8 } },
-              React.createElement('span', null, new Date(log.startedAt).toLocaleDateString()),
-              React.createElement('span', null, `${(log.actualDuration / 1000).toFixed(0)}s`),
-              React.createElement('span', null, `${log.linesCompleted}/${log.gcodeLines} lines`),
-              log.errors > 0 && React.createElement('span', { style: { color: '#ff4466' } }, `${log.errors} errors`),
-            ),
-          ),
-        ),
-      ),
+      productionMode && React.createElement(JobLogViewer, {
+        onLoadLog: (entries: string[]) => setMessages(entries),
+        showConfirm,
+      }),
 
       // Manual command — Production mode only
       isConnected && productionMode && React.createElement('div', { style: { padding: '8px 18px 12px', display: 'flex', gap: 6 } },

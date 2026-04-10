@@ -36,6 +36,9 @@ export interface JobLog {
   // Timeline
   entries: JobLogEntry[];
 
+  /** Internal: entry list was truncated to cap memory */
+  _truncated?: boolean;
+
   // Summary
   linesCompleted: number;
   errors: number;
@@ -77,6 +80,23 @@ export function addLogEntry(
   type: JobLogEntry['type'],
   message: string,
 ): void {
+  // Cap entries to prevent memory bloat on long engrave jobs
+  if (log.entries.length >= 1000) {
+    if (!log._truncated) {
+      log.entries = [
+        ...log.entries.slice(0, 10),
+        { timestamp: Date.now(), type: 'info', message: `--- ${log.entries.length - 10} earlier entries truncated ---` },
+      ];
+      log._truncated = true;
+    }
+    if (log.entries.length >= 1100) {
+      log.entries = [
+        ...log.entries.slice(0, 11),
+        ...log.entries.slice(-989),
+      ];
+    }
+  }
+
   log.entries.push({
     timestamp: Date.now(),
     type,
@@ -101,9 +121,24 @@ export function finalizeLog(
 /** Save log to localStorage */
 export function saveJobLog(log: JobLog): void {
   try {
+    const compactedLog = { ...log, entries: [...log.entries] };
+    if (compactedLog.entries.length > 200) {
+      compactedLog.entries = compactedLog.entries.filter(e =>
+        e.type === 'milestone' || e.type === 'error' || e.type === 'warning',
+      );
+      const rawEntries = log.entries.filter(e => e.type === 'sent' || e.type === 'received');
+      const keptRaw = [
+        ...rawEntries.slice(0, 25),
+        ...rawEntries.slice(-25),
+      ];
+      compactedLog.entries = [
+        ...compactedLog.entries,
+        ...keptRaw,
+      ].sort((a, b) => a.timestamp - b.timestamp);
+    }
+
     const logs = getJobLogs();
-    logs.unshift(log);
-    // Keep last 20 logs
+    logs.unshift(compactedLog);
     const trimmed = logs.slice(0, 20);
     localStorage.setItem('laserforge_job_logs', JSON.stringify(trimmed));
   } catch {

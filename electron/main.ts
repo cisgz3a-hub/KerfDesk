@@ -51,6 +51,29 @@ function createWindow() {
   mainWindow.setMenuBarVisibility(false);
   mainWindow.removeMenu();
 
+  // Content Security Policy — reduces XSS impact in the renderer
+  mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          [
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data: blob: indexeddb:",
+            "font-src 'self' data:",
+            "connect-src 'self' ws: wss: https:",
+            "worker-src 'self' blob:",
+            "object-src 'none'",
+            "frame-src 'none'",
+            "base-uri 'self'",
+          ].join('; '),
+        ],
+      },
+    });
+  });
+
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
     mainWindow.webContents.openDevTools({ mode: 'detach' });
