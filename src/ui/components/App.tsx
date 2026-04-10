@@ -60,6 +60,7 @@ import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
+import { NestingDialog } from './NestingDialog';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
@@ -118,6 +119,7 @@ export function App() {
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [isDragOver, setIsDragOver] = useState(false);
   const [showGridArray, setShowGridArray] = useState(false);
+  const [showNesting, setShowNesting] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
@@ -649,6 +651,11 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
+  const handleNestingApply = useCallback((newObjects: SceneObject[]) => {
+    const newScene = { ...scene, objects: newObjects };
+    handleSceneCommit(newScene);
+  }, [scene, handleSceneCommit]);
+
   useEffect(() => {
     const onBoolean = (e: Event) => {
       const op = (e as CustomEvent<{ op: BooleanOp }>).detail?.op;
@@ -942,6 +949,7 @@ export function App() {
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => dialogs.setShowBoxGenerator(true),
+      onAutoNest: () => setShowNesting(true),
       onPreviewToggle: () => setPreviewMode(p => !p),
       previewMode,
       onUndo: handleUndo,
@@ -1176,6 +1184,12 @@ export function App() {
     showMaterialTest && React.createElement(MaterialTestDialog, {
       onConfirm: handleMaterialTestConfirm,
       onCancel: () => setShowMaterialTest(false),
+    }),
+
+    showNesting && React.createElement(NestingDialog, {
+      scene,
+      onApply: handleNestingApply,
+      onClose: () => setShowNesting(false),
     }),
 
     dialogs.showVariableText && dialogs.variableTextSource && React.createElement(VariableTextDialog, {

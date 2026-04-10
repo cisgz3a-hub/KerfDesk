@@ -41,6 +41,7 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onTemplates?: () => void;
   onBoxGenerator?: () => void;
+  onAutoNest?: () => void;
   onPreviewToggle?: () => void;
   previewMode?: boolean;
   onUndo?: () => void;
@@ -72,6 +73,7 @@ export function FileToolbar({
   onMaterialSetup,
   onTemplates,
   onBoxGenerator,
+  onAutoNest,
   onPreviewToggle,
   previewMode = false,
   onUndo,
@@ -540,6 +542,7 @@ export function FileToolbar({
 
     iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
     iconBtn('⊞ Box', 'Generate a finger-joint box', () => onBoxGenerator?.()),
+    iconBtn('⚄ Nest', 'Auto-pack shapes to save material', () => onAutoNest?.()),
 
     React.createElement('div', { style: { flex: 1 } }),
 
