@@ -37,6 +37,8 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
   onCamera?: () => void;
+  /** Estimated 3D relief preview for engrave layers */
+  onDepthPreview?: () => void;
   /** Open start position / work origin wizard */
   onStartPosition?: () => void;
   /** Toolbar image import — shared pipeline with drag-drop (IndexedDB threshold, geometry). */
@@ -75,6 +77,7 @@ export function FileToolbar({
   onConnect,
   onMaterialTest,
   onCamera,
+  onDepthPreview,
   onStartPosition,
   onImportImageFile,
   onBoxGenerator,
@@ -399,6 +402,7 @@ export function FileToolbar({
       },
     },
     toolbarBtn('📷 Camera', 'Camera alignment', () => onCamera?.(), { dimmed: easyDim }),
+    toolbarBtn('🗻 Depth', 'Preview engrave depth as 3D relief', () => onDepthPreview?.()),
     toolbarBtn('🎯 Position', 'Start position wizard', () => onStartPosition?.(), { dimmed: easyDim }),
     toolbarBtn('⚄ Auto-Pack', 'Pack shapes to save material', () => onAutoNest?.(), { dimmed: easyDim }),
     toolbarBtn('⊞ Box', 'Finger-joint box generator', () => onBoxGenerator?.(), { dimmed: easyDim }),

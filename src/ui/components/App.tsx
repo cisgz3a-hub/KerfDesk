@@ -62,6 +62,7 @@ import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
+import { DepthPreviewDialog } from './DepthPreviewDialog';
 import { StartPositionWizard, type StartMode } from './StartPositionWizard';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
@@ -129,6 +130,7 @@ export function App() {
   const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
+  const [showDepthPreview, setShowDepthPreview] = useState(false);
   const [showKerfWizard, setShowKerfWizard] = useState(false);
   const [showStartWizard, setShowStartWizard] = useState(false);
   const [startMode, setStartMode] = useState<StartMode>(() => {
@@ -534,6 +536,7 @@ export function App() {
       flipSelected: sceneOps.flipSelected,
       toggleLock: sceneOps.toggleLock,
       toggleVisibility: sceneOps.toggleVisibility,
+      openDepthPreview: () => setShowDepthPreview(true),
     }),
     [
       handleSceneCommit,
@@ -565,6 +568,7 @@ export function App() {
       sceneOps.flipSelected,
       sceneOps.toggleLock,
       sceneOps.toggleVisibility,
+      setShowDepthPreview,
       setShowGridArray,
       setShowMaterialTest,
       setShowKerfWizard,
@@ -1094,6 +1098,7 @@ export function App() {
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
+      onDepthPreview: () => setShowDepthPreview(true),
       onStartPosition: () => setShowStartWizard(true),
       onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
@@ -1398,6 +1403,11 @@ export function App() {
       scene,
       onClose: () => setShowCamera(false),
       onPositionDesign: handleCameraPositionDesign,
+    }),
+
+    showDepthPreview && React.createElement(DepthPreviewDialog, {
+      scene,
+      onClose: () => setShowDepthPreview(false),
     }),
 
     showStartWizard && React.createElement(StartPositionWizard, {
