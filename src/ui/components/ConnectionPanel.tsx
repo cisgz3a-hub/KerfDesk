@@ -44,7 +44,8 @@ interface ConnectionPanelProps {
   onSceneCommit: (scene: Scene) => void;
   startMode: StartMode;
   savedOrigin: { x: number; y: number } | null;
-  onOpenStartWizard: () => void;
+  machinePosition: { x: number; y: number } | null;
+  onSelectMode: (mode: StartMode) => void;
   onSaveOrigin: () => void;
 }
 
@@ -70,7 +71,8 @@ export function ConnectionPanel({
   onSceneCommit,
   startMode,
   savedOrigin,
-  onOpenStartWizard,
+  machinePosition,
+  onSelectMode,
   onSaveOrigin,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -236,6 +238,47 @@ export function ConnectionPanel({
   }, [startMode, savedOrigin, sceneBounds.minX, sceneBounds.minY, sceneBounds.maxX, sceneBounds.maxY]);
 
   const canFrame = isConnected && !isRunning;
+
+  const fmtMm = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '—');
+
+  const startPositionStatus =
+    startMode === 'absolute'
+      ? `Job starts at X${fmtMm(sceneBounds.minX)}, Y${fmtMm(sceneBounds.minY)} (canvas position)`
+      : startMode === 'current' && machinePosition
+        ? `Job starts at X${fmtMm(machinePosition.x)}, Y${fmtMm(machinePosition.y)} (head now)`
+        : startMode === 'current'
+          ? 'Connect to laser to use this mode'
+          : savedOrigin
+            ? `Job starts at X${fmtMm(savedOrigin.x)}, Y${fmtMm(savedOrigin.y)} (saved)`
+            : 'No origin saved — save one below';
+
+  const modeBtn = (active: boolean, dimmed: boolean): React.CSSProperties => ({
+    flex: 1,
+    padding: '6px 4px',
+    borderRadius: 6,
+    fontSize: 10,
+    fontFamily: font,
+    fontWeight: 600,
+    cursor: dimmed ? 'default' : 'pointer',
+    ...(dimmed
+      ? {
+          background: '#15151e',
+          border: '1px solid #252540',
+          color: '#555570',
+          opacity: 0.45,
+        }
+      : active
+        ? {
+            background: 'rgba(0,212,255,0.1)',
+            border: '1px solid #00d4ff',
+            color: '#00d4ff',
+          }
+        : {
+            background: 'rgba(0,0,0,0.2)',
+            border: '1px solid #252540',
+            color: '#8888aa',
+          }),
+  });
 
   // ─── Connection handlers ─────────────────────────────────
 
@@ -1100,25 +1143,48 @@ export function ConnectionPanel({
 
       // Time estimate + job buttons
       isConnected && React.createElement('div', { style: { padding: '8px 18px' } },
-        React.createElement('button', {
-          onClick: onOpenStartWizard,
-          style: {
-            padding: '6px 12px', marginBottom: 6,
-            background: 'rgba(0,212,255,0.06)', border: '1px solid #252540',
-            borderRadius: 6, color: '#8888aa', fontSize: 10, cursor: 'pointer',
-            fontFamily: font, width: '100%',
-          },
-        }, `📍 Start Position: ${startMode === 'absolute' ? 'Place on Bed' : startMode === 'current' ? 'Where Head Is' : 'Saved Origin'}`),
-        React.createElement('button', {
-          onClick: onSaveOrigin,
-          title: 'Store current head X/Y as the saved bed reference (for “Use Saved Origin”)',
-          style: {
-            padding: '4px 12px', marginBottom: 8,
-            background: 'transparent', border: '1px solid #252540',
-            borderRadius: 6, color: '#555570', fontSize: 9, cursor: 'pointer',
-            fontFamily: font, width: '100%',
-          },
-        }, '⚑ Save origin at head'),
+        React.createElement('div', { style: { marginBottom: 6 } },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, fontWeight: 600 } }, 'Start Position'),
+          React.createElement('div', { style: { display: 'flex', gap: 4, width: '100%' } },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => onSelectMode('absolute'),
+              title: 'Design cuts exactly where placed on canvas',
+              style: modeBtn(startMode === 'absolute', false),
+            }, '📍 Bed'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => { if (machinePosition) onSelectMode('current'); },
+              disabled: !machinePosition,
+              title: 'Job starts at current laser position',
+              style: modeBtn(startMode === 'current', !machinePosition),
+            }, '🎯 Head'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => onSelectMode('savedOrigin'),
+              title: 'Job starts at your saved reference point',
+              style: modeBtn(startMode === 'savedOrigin', false),
+            }, '⚑ Origin'),
+          ),
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 4, lineHeight: 1.35 } }, startPositionStatus),
+          startMode === 'savedOrigin' && React.createElement('button', {
+            type: 'button',
+            onClick: onSaveOrigin,
+            title: 'Store current head X/Y as the saved reference',
+            style: {
+              marginTop: 6,
+              padding: 0,
+              background: 'none',
+              border: 'none',
+              color: '#00d4ff',
+              fontSize: 9,
+              cursor: 'pointer',
+              fontFamily: font,
+              textDecoration: 'underline',
+              textAlign: 'left' as const,
+            },
+          }, '📌 Save current head position as origin'),
+        ),
         gcode && React.createElement('div', {
           style: { padding: '6px 12px', marginBottom: 6, background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', fontSize: 11 },
         },
@@ -1143,29 +1209,6 @@ export function ConnectionPanel({
                 ...(canFrame ? { border: '2px solid rgba(255,212,68,0.55)' } : {}),
               },
             }, '◉ Frame (Laser Dot)'),
-          ),
-          React.createElement('div', {
-            style: {
-              padding: '6px 12px', marginBottom: 6,
-              background: 'rgba(0,212,255,0.03)',
-              border: '1px solid #1a1a2e',
-              borderRadius: 6,
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-            },
-          },
-            React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } },
-              startMode === 'current' ? '🎯 Cutting at head position'
-                : startMode === 'savedOrigin' ? '📌 Cutting at saved origin'
-                  : '📍 Cutting at bed position',
-            ),
-            React.createElement('button', {
-              onClick: onOpenStartWizard,
-              style: {
-                background: 'none', border: 'none', color: '#00d4ff',
-                fontSize: 9, cursor: 'pointer', textDecoration: 'underline',
-                fontFamily: font, padding: 0,
-              },
-            }, 'Change'),
           ),
           React.createElement('div', { style: { display: 'flex', gap: 6 } },
             React.createElement('button', {

@@ -163,6 +163,15 @@ export function App() {
     return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
   }, [grbl.machineState]);
 
+  useEffect(() => {
+    if (grbl.machineState?.status === 'disconnected' && startMode === 'current') {
+      setStartMode('absolute');
+      try {
+        localStorage.setItem('laserforge_start_mode', 'absolute');
+      } catch { /* ignore */ }
+    }
+  }, [grbl.machineState?.status, startMode]);
+
   const handleSaveOrigin = useCallback(() => {
     const pos = grbl.machineState?.position;
     if (!pos) return;
@@ -1222,6 +1231,10 @@ export function App() {
         actionsRef: viewportActionsRef,
         onZoomChange: setZoomLevel,
         previewMode,
+        laserConnected: toolbarLaserConnected,
+        startMode,
+        savedOrigin,
+        machinePosition: machinePositionForStartWizard,
         onSelectionScreenPos: setQuickActionPos,
         onRequestTextPlacement: handleRequestTextPlacement,
         onActiveTool: setActiveTool,
@@ -1487,9 +1500,10 @@ export function App() {
       showPrompt,
       onSceneCommit: handleSceneCommit,
       startMode,
-      onOpenStartWizard: () => setShowStartWizard(true),
-      onSaveOrigin: handleSaveOrigin,
       savedOrigin,
+      machinePosition: machinePositionForStartWizard,
+      onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
+      onSaveOrigin: handleSaveOrigin,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
