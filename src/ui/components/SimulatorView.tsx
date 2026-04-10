@@ -10,11 +10,16 @@ interface SimulatorViewProps {
 }
 
 interface MachineState {
+  /** Machine position (MPos), mm — drawing / cut paths use this space */
   x: number;
   y: number;
   laserOn: boolean;
   laserPower: number;
   feedRate: number;
+  workOffsetX: number;
+  workOffsetY: number;
+  /** G90 absolute work coords vs G91 incremental machine deltas */
+  isAbsolute: boolean;
 }
 
 export function SimulatorView({
@@ -31,6 +36,9 @@ export function SimulatorView({
     laserOn: false,
     laserPower: 0,
     feedRate: 1000,
+    workOffsetX: 0,
+    workOffsetY: 0,
+    isAbsolute: true,
   });
   const pathRef = useRef<Array<{ from: { x: number; y: number }; to: { x: number; y: number }; power: number }>>([]);
   const zeroRef = useRef<{ x: number; y: number } | null>(null);
@@ -132,9 +140,12 @@ export function SimulatorView({
     ctx.arc(hx, hy, 4, 0, Math.PI * 2);
     ctx.stroke();
 
+    const wpx = state.x - state.workOffsetX;
+    const wpy = state.y - state.workOffsetY;
     ctx.fillStyle = '#555570';
     ctx.font = `10px ${mono}`;
-    ctx.fillText(`WPos: X${state.x.toFixed(1)} Y${state.y.toFixed(1)}`, 8, h - 16);
+    ctx.fillText(`MPos: X${state.x.toFixed(1)} Y${state.y.toFixed(1)}`, 8, h - 28);
+    ctx.fillText(`WPos: X${wpx.toFixed(1)} Y${wpy.toFixed(1)}`, 8, h - 16);
     ctx.fillText(`Laser: ${state.laserOn ? `ON S${state.laserPower}` : 'OFF'} F${state.feedRate}`, 8, h - 4);
     ctx.fillStyle = '#333355';
     ctx.fillText(`${pathRef.current.length} cut segs`, w - 80, h - 4);
@@ -147,13 +158,35 @@ export function SimulatorView({
       const state = stateRef.current;
       const upper = line.trim().toUpperCase();
       if (!upper || upper.startsWith(';')) return;
-      if (upper.startsWith('$') && !upper.startsWith('$J')) return;
       if (upper === '?' || upper === '') return;
 
+      if (upper.startsWith('$J=')) {
+        const xMatch = upper.match(/X([-\d.]+)/);
+        const yMatch = upper.match(/Y([-\d.]+)/);
+        const isInc = upper.includes('G91');
+        let newX = state.x;
+        let newY = state.y;
+        if (isInc) {
+          if (xMatch) newX += parseFloat(xMatch[1]);
+          if (yMatch) newY += parseFloat(yMatch[1]);
+        } else {
+          if (xMatch) newX = parseFloat(xMatch[1]) + state.workOffsetX;
+          if (yMatch) newY = parseFloat(yMatch[1]) + state.workOffsetY;
+        }
+        state.x = newX;
+        state.y = newY;
+        drawRef.current();
+        return;
+      }
+
+      if (upper.startsWith('$')) return;
+
       if (upper.includes('G10') && upper.includes('L20')) {
+        const xMatch = upper.match(/X([-\d.]+)/);
+        const yMatch = upper.match(/Y([-\d.]+)/);
+        if (xMatch) state.workOffsetX = state.x - parseFloat(xMatch[1]);
+        if (yMatch) state.workOffsetY = state.y - parseFloat(yMatch[1]);
         zeroRef.current = { x: state.x, y: state.y };
-        state.x = 0;
-        state.y = 0;
         drawRef.current();
         return;
       }
@@ -161,10 +194,15 @@ export function SimulatorView({
       if (upper.includes('G92')) {
         const xMatch = upper.match(/X([-\d.]+)/);
         const yMatch = upper.match(/Y([-\d.]+)/);
-        if (xMatch) state.x = parseFloat(xMatch[1]);
-        if (yMatch) state.y = parseFloat(yMatch[1]);
+        if (xMatch) state.workOffsetX = state.x - parseFloat(xMatch[1]);
+        if (yMatch) state.workOffsetY = state.y - parseFloat(yMatch[1]);
         drawRef.current();
         return;
+      }
+
+      if (!/\bG0\b|\bG00\b|\bG1\b|\bG01\b/.test(upper)) {
+        if (upper.includes('G90')) state.isAbsolute = true;
+        if (upper.includes('G91')) state.isAbsolute = false;
       }
 
       if (/M\s*3\b/.test(upper) || /M\s*4\b/.test(upper)) {
@@ -183,15 +221,33 @@ export function SimulatorView({
       const isG0 = /\bG0\b/.test(upper) || /\bG00\b/.test(upper);
       const isG1 = /\bG1\b/.test(upper) || /\bG01\b/.test(upper);
       if (isG0 || isG1 || /^[XY]/.test(upper.trim())) {
+        const hadG90 = upper.includes('G90');
+        const hadG91 = upper.includes('G91');
+        let incremental: boolean;
+        if (hadG91) incremental = true;
+        else if (hadG90) incremental = false;
+        else incremental = !state.isAbsolute;
+
         const xMatch = upper.match(/X([-\d.]+)/);
         const yMatch = upper.match(/Y([-\d.]+)/);
         const inlineS = upper.match(/S([-\d.]+)/);
         if (inlineS) state.laserPower = parseFloat(inlineS[1]);
 
-        const newX = xMatch ? parseFloat(xMatch[1]) : state.x;
-        const newY = yMatch ? parseFloat(yMatch[1]) : state.y;
+        let newX = state.x;
+        let newY = state.y;
+        if (incremental) {
+          if (xMatch) newX += parseFloat(xMatch[1]);
+          if (yMatch) newY += parseFloat(yMatch[1]);
+        } else {
+          if (xMatch) newX = parseFloat(xMatch[1]) + state.workOffsetX;
+          if (yMatch) newY = parseFloat(yMatch[1]) + state.workOffsetY;
+        }
 
-        if (isG1 && state.laserOn && state.laserPower > 0) {
+        if (hadG91) state.isAbsolute = false;
+        if (hadG90) state.isAbsolute = true;
+
+        const isG1Move = isG1 || (!isG0 && state.laserOn);
+        if (isG1Move && state.laserOn && state.laserPower > 0) {
           pathRef.current.push({
             from: { x: state.x, y: state.y },
             to: { x: newX, y: newY },
@@ -214,8 +270,9 @@ export function SimulatorView({
 
   useEffect(() => {
     if (jobRunning || !liveHead) return;
-    stateRef.current.x = liveHead.x;
-    stateRef.current.y = liveHead.y;
+    const s = stateRef.current;
+    s.x = liveHead.x + s.workOffsetX;
+    s.y = liveHead.y + s.workOffsetY;
     drawRef.current();
   }, [liveHead?.x, liveHead?.y, jobRunning]);
 
@@ -259,6 +316,9 @@ export function SimulatorView({
               laserOn: false,
               laserPower: 0,
               feedRate: 1000,
+              workOffsetX: 0,
+              workOffsetY: 0,
+              isAbsolute: true,
             };
             drawRef.current();
           },
