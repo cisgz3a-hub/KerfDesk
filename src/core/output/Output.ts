@@ -45,11 +45,7 @@ export interface Output {
 
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
-import {
-  type GcodeGenerateOptions,
-  computeGcodeOffset,
-  designMinFromJob,
-} from './GcodeOrigin';
+import { type GcodeGenerateOptions } from './GcodeOrigin';
 
 export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 
@@ -106,12 +102,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   private gcodeOffsetX = 0;
   private gcodeOffsetY = 0;
 
-  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
-    const startMode = options?.startMode ?? 'current';
-    const db = designMinFromJob(job);
-    const off = computeGcodeOffset(startMode, db, options?.savedOrigin ?? null);
-    this.gcodeOffsetX = off.x;
-    this.gcodeOffsetY = off.y;
+  generate(plan: Plan, job: Job, _options?: GcodeGenerateOptions): Output {
+    const { minX: designMinX, minY: designMinY } = this.designMinFromPlan(plan);
+    this.gcodeOffsetX = -designMinX;
+    this.gcodeOffsetY = -designMinY;
     this.currentSpeed = 0;
 
     try {
@@ -197,14 +191,28 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return `G0 Z${z.toFixed(3)}`;
   }
 
-  encodeFooter(job: Job): string {
-    const startX = (job.metadata.startPositionX ?? 0) + this.gcodeOffsetX;
-    const startY = (job.metadata.startPositionY ?? 0) + this.gcodeOffsetY;
+  encodeFooter(_job: Job): string {
     return [
       this.encodeLaserOff(),
-      `G0 X${startX.toFixed(3)} Y${startY.toFixed(3)} ; return to start`,
+      'G0 X0.000 Y0.000 ; return to work origin',
       'M2 ; program end',
     ].join('\n');
+  }
+
+  /** Min X/Y of all rapid/linear destinations — shift G-code so this corner is (0,0) in work space. */
+  private designMinFromPlan(plan: Plan): { minX: number; minY: number } {
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const op of plan.operations) {
+      for (const move of op.moves) {
+        if (move.type === 'rapid' || move.type === 'linear') {
+          minX = Math.min(minX, move.to.x);
+          minY = Math.min(minY, move.to.y);
+        }
+      }
+    }
+    if (!Number.isFinite(minX)) return { minX: 0, minY: 0 };
+    return { minX, minY };
   }
 
   private encodeMove(move: Move): string {
