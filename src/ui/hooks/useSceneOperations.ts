@@ -317,6 +317,20 @@ export function useSceneOperations({
     setSelectedIds(new Set(newObjects.map(o => o.id)));
   }, [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert]);
 
+  const alignObjects = useCallback(
+    (mode: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY') => {
+      switch (mode) {
+        case 'left': alignLeft(); break;
+        case 'right': alignRight(); break;
+        case 'top': alignTop(); break;
+        case 'bottom': alignBottom(); break;
+        case 'centerX': alignCenterH(); break;
+        case 'centerY': alignCenterV(); break;
+      }
+    },
+    [alignLeft, alignRight, alignTop, alignBottom, alignCenterH, alignCenterV],
+  );
+
   return {
     alignLeft,
     alignRight,
@@ -324,10 +338,13 @@ export function useSceneOperations({
     alignBottom,
     alignCenterH,
     alignCenterV,
+    alignObjects,
     centerOnCanvas,
     centerOnMaterial,
     performBoolean,
     offsetShapes,
+    offsetSelected: offsetShapes,
     textToPath,
+    convertTextToPath: textToPath,
   };
 }

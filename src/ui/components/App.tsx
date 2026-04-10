@@ -400,6 +400,12 @@ export function App() {
       setTextPlacementPt,
       setShowVariableText: dialogs.setShowVariableText,
       setVariableTextSource: dialogs.setVariableTextSource,
+      alignObjects: sceneOps.alignObjects,
+      centerOnCanvas: sceneOps.centerOnCanvas,
+      performBoolean: sceneOps.performBoolean,
+      offsetSelected: sceneOps.offsetSelected,
+      convertTextToPath: sceneOps.convertTextToPath,
+      showAlert,
     }),
     [
       handleSceneCommit,
@@ -417,6 +423,12 @@ export function App() {
       setTextPlacementPt,
       dialogs.setShowVariableText,
       dialogs.setVariableTextSource,
+      sceneOps.alignObjects,
+      sceneOps.centerOnCanvas,
+      sceneOps.performBoolean,
+      sceneOps.offsetSelected,
+      sceneOps.convertTextToPath,
+      showAlert,
     ],
   );
 

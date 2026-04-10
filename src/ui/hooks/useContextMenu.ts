@@ -33,6 +33,12 @@ export interface ContextMenuActions {
   setTextPlacementPt: (pt: { x: number; y: number } | null) => void;
   setShowVariableText: (show: boolean) => void;
   setVariableTextSource: (obj: SceneObject | null) => void;
+  alignObjects: (mode: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY') => void;
+  centerOnCanvas: () => void;
+  performBoolean: (op: 'union' | 'subtract' | 'intersect') => void;
+  offsetSelected: (distance: number) => void;
+  convertTextToPath: () => void;
+  showAlert: (title: string, msg: string) => Promise<void>;
 }
 
 export function useContextMenu(
@@ -86,13 +92,7 @@ export function useContextMenu(
         });
         items.push({
           label: 'Text to Path',
-          action: () => {
-            const textObjs = selectedObjs.filter(o => o.geometry.type === 'text');
-            if (textObjs.length === 0) return;
-            window.dispatchEvent(
-              new CustomEvent('laserforge:textToPath', { detail: { objectIds: textObjs.map(o => o.id) } }),
-            );
-          },
+          action: () => void actions.convertTextToPath(),
         });
         items.push({
           label: 'Variable Text / Serial Numbers',
@@ -103,25 +103,6 @@ export function useContextMenu(
               actions.setShowVariableText(true);
             }
           },
-        });
-        items.push({ label: '', action: () => {}, separator: true });
-      }
-
-      if (selectedObjs.length >= 2) {
-        items.push({
-          label: 'Union',
-          action: () =>
-            window.dispatchEvent(new CustomEvent('laserforge:boolean', { detail: { op: 'union' } })),
-        });
-        items.push({
-          label: 'Subtract',
-          action: () =>
-            window.dispatchEvent(new CustomEvent('laserforge:boolean', { detail: { op: 'subtract' } })),
-        });
-        items.push({
-          label: 'Intersect',
-          action: () =>
-            window.dispatchEvent(new CustomEvent('laserforge:boolean', { detail: { op: 'intersect' } })),
         });
         items.push({ label: '', action: () => {}, separator: true });
       }
@@ -143,9 +124,57 @@ export function useContextMenu(
         }
       }
 
+      if (selectedObjs.length >= 2) {
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({ label: '─ Align ─', action: () => {}, disabled: true });
+        items.push({ label: 'Align Left', action: () => actions.alignObjects('left') });
+        items.push({ label: 'Align Right', action: () => actions.alignObjects('right') });
+        items.push({ label: 'Align Top', action: () => actions.alignObjects('top') });
+        items.push({ label: 'Align Bottom', action: () => actions.alignObjects('bottom') });
+        items.push({ label: 'Align Center X', action: () => actions.alignObjects('centerX') });
+        items.push({ label: 'Align Center Y', action: () => actions.alignObjects('centerY') });
+      }
+
+      if (hasSelection) {
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({ label: 'Center on Canvas', action: actions.centerOnCanvas });
+      }
+
+      if (selectedObjs.length >= 2) {
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({ label: '─ Combine ─', action: () => {}, disabled: true });
+        items.push({ label: 'Union', action: () => actions.performBoolean('union') });
+        items.push({ label: 'Subtract', action: () => actions.performBoolean('subtract') });
+        items.push({ label: 'Intersect', action: () => actions.performBoolean('intersect') });
+      }
+
+      if (hasSelection) {
+        items.push({ label: '', action: () => {}, separator: true });
+        items.push({
+          label: 'Offset Outward (+2mm)',
+          action: () => void actions.offsetSelected(2),
+        });
+        items.push({
+          label: 'Offset Inward (-2mm)',
+          action: () => void actions.offsetSelected(-2),
+        });
+        items.push({
+          label: 'Offset Custom...',
+          action: () => {
+            void (async () => {
+              const input = window.prompt('Offset distance in mm (negative for inward):', '5');
+              if (input === null) return;
+              const distance = parseFloat(input);
+              if (Number.isNaN(distance)) return;
+              await actions.offsetSelected(distance);
+            })();
+          },
+        });
+      }
+
       const menuWidth = 220;
       const menuHeight =
-        items.filter(i => !i.separator).length * 32 + items.filter(i => i.separator).length * 8 + 16;
+        items.filter(i => !i.separator).length * 28 + items.filter(i => i.separator).length * 8 + 16;
       const clampedX = Math.max(4, Math.min(x, window.innerWidth - menuWidth - 8));
       const clampedY = Math.max(4, Math.min(y, window.innerHeight - menuHeight - 8));
 
