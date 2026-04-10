@@ -62,6 +62,7 @@ import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
+import { CameraDialog } from './CameraDialog';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
@@ -126,6 +127,7 @@ export function App() {
   const [showMaterialTest, setShowMaterialTest] = useState(false);
   const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
+  const [showCamera, setShowCamera] = useState(false);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const grbl = useGrblConnection();
@@ -234,6 +236,49 @@ export function App() {
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
+
+  const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
+    if (selectedIds.size === 0) {
+      let minX = Infinity;
+      let minY = Infinity;
+      for (const obj of scene.objects) {
+        if (!obj.visible) continue;
+        minX = Math.min(minX, obj.transform.tx);
+        minY = Math.min(minY, obj.transform.ty);
+      }
+      if (!Number.isFinite(minX)) return;
+      const dx = worldX - minX;
+      const dy = worldY - minY;
+      const newScene: Scene = {
+        ...scene,
+        objects: scene.objects.map(o => ({
+          ...o,
+          transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+        })),
+      };
+      handleSceneCommit(newScene);
+      return;
+    }
+
+    const selected = scene.objects.filter(o => selectedIds.has(o.id));
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const o of selected) {
+      minX = Math.min(minX, o.transform.tx);
+      minY = Math.min(minY, o.transform.ty);
+    }
+    const dx = worldX - minX;
+    const dy = worldY - minY;
+    const newScene: Scene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        selectedIds.has(o.id)
+          ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
+          : o
+      ),
+    };
+    handleSceneCommit(newScene);
+  }, [scene, selectedIds, handleSceneCommit]);
 
   const sceneOps = useSceneOperations({
     scene,
@@ -952,6 +997,7 @@ export function App() {
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
+      onCamera: () => setShowCamera(true),
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
         if (gatedFeature('box_generator')) {
@@ -1233,6 +1279,12 @@ export function App() {
       scene,
       onClose: () => setShowMaterialLibrary(false),
       onMaterialApplied: () => setMaterialLibraryRev(r => r + 1),
+    }),
+
+    showCamera && React.createElement(CameraDialog, {
+      scene,
+      onClose: () => setShowCamera(false),
+      onPositionDesign: handleCameraPositionDesign,
     }),
 
     dialogs.showTemplates && React.createElement(TemplateBrowser, {

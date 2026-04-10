@@ -40,6 +40,7 @@ interface FileToolbarProps {
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
+  onCamera?: () => void;
   onTemplates?: () => void;
   onBoxGenerator?: () => void;
   onAutoNest?: () => void;
@@ -73,6 +74,7 @@ export function FileToolbar({
   onMaterialTest: _onMaterialTest,
   onMaterialSetup,
   onMaterialLibrary,
+  onCamera,
   onTemplates,
   onBoxGenerator,
   onAutoNest,
@@ -575,6 +577,7 @@ export function FileToolbar({
       },
     }, materialName || '⊞ Material'),
     iconBtn('📚 Library', 'Manage custom material library', () => onMaterialLibrary?.()),
+    iconBtn('📷 Camera', 'Camera alignment — click on bed to position', () => onCamera?.()),
     iconBtn('Setup', 'Machine setup', () => onSetup?.()),
 
     iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
