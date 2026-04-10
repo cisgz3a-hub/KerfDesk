@@ -466,7 +466,7 @@ export function FileToolbar({
       },
     }, materialName || '⊞ Material'),
     iconBtn('📚 Library', 'Manage custom material library', () => onMaterialLibrary?.()),
-    iconBtn('📷 Camera', 'Camera alignment — click on bed to position', () => onCamera?.()),
+    iconBtn('📷 Camera', 'Camera alignment — click on bed to position designs', () => onCamera?.()),
     iconBtn('Setup', 'Machine setup', () => onSetup?.()),
 
     iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
