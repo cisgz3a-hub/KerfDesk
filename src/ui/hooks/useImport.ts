@@ -8,14 +8,167 @@ import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer } from '../../core/scene/Layer';
 
+const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB — inline below, IndexedDB above
+
 export interface UseImportDeps {
   handleSceneCommit: (scene: Scene) => void;
   handleNewProject: (scene: Scene) => void;
   setIsDragOver: (v: boolean) => void;
+  showAlert: (title: string, message: string, details?: string) => Promise<void>;
 }
 
 export function useImport(scene: Scene, deps: UseImportDeps) {
-  const { handleSceneCommit, handleNewProject, setIsDragOver } = deps;
+  const { handleSceneCommit, handleNewProject, setIsDragOver, showAlert } = deps;
+
+  /**
+   * Build a scene with one new image object (layer + grayscale + placement).
+   * Large images go to IndexedDB; small ones stay inline data URIs.
+   */
+  const importImageUnified = useCallback(async (
+    source: File | string,
+    fileName?: string,
+  ): Promise<Scene | null> => {
+    try {
+      let dataUri: string;
+      let displayName: string;
+
+      if (typeof source === 'string') {
+        dataUri = source;
+        displayName = (fileName || 'image').replace(/\.[^.]+$/, '');
+      } else {
+        dataUri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error('Failed to read file'));
+          reader.readAsDataURL(source);
+        });
+        displayName = source.name.replace(/\.[^.]+$/, '');
+      }
+
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to decode image'));
+        img.src = dataUri;
+      });
+
+      let imageSrc = dataUri;
+      if (dataUri.length > IMAGE_INDEXEDDB_THRESHOLD) {
+        try {
+          const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
+          imageSrc = `indexeddb://${imageId}`;
+        } catch {
+          imageSrc = dataUri;
+        }
+      }
+
+      const dpi = 96;
+      const physicalWidth = (img.width / dpi) * 25.4;
+      const physicalHeight = (img.height / dpi) * 25.4;
+
+      const maxW = scene.canvas.width * 0.8;
+      const maxH = scene.canvas.height * 0.8;
+      let fitScale = 1;
+      if (physicalWidth > maxW || physicalHeight > maxH) {
+        fitScale = Math.min(maxW / physicalWidth, maxH / physicalHeight);
+      }
+      const finalWidth = physicalWidth * fitScale;
+      const finalHeight = physicalHeight * fitScale;
+      const centerX = scene.material
+        ? scene.material.x + scene.material.width / 2
+        : scene.canvas.width / 2;
+      const centerY = scene.material
+        ? scene.material.y + scene.material.height / 2
+        : scene.canvas.height / 2;
+      const cx = centerX - finalWidth / 2;
+      const cy = centerY - finalHeight / 2;
+
+      const maxDim = 1000;
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      const gsWidth = Math.round(img.width * scale);
+      const gsHeight = Math.round(img.height * scale);
+      const offscreen = document.createElement('canvas');
+      offscreen.width = gsWidth;
+      offscreen.height = gsHeight;
+      const offCtx = offscreen.getContext('2d')!;
+      offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
+      const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
+      const grayscaleData = new Uint8Array(gsWidth * gsHeight);
+      for (let i = 0; i < grayscaleData.length; i++) {
+        const r = imageData.data[i * 4];
+        const g = imageData.data[i * 4 + 1];
+        const b = imageData.data[i * 4 + 2];
+        const a = imageData.data[i * 4 + 3];
+        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+        grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
+      }
+
+      const previousActiveLayerId = scene.activeLayerId;
+      let targetScene = scene;
+      let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
+      if (!layerId) {
+        const newLayer = createLayer(scene.layers.length, 'image', 'Image');
+        targetScene = {
+          ...scene,
+          layers: [...scene.layers, newLayer],
+        };
+        layerId = newLayer.id;
+      }
+
+      const imageObj: SceneObject = {
+        id: generateId(),
+        type: 'image',
+        name: displayName,
+        layerId,
+        parentId: null,
+        transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
+        geometry: {
+          type: 'image',
+          src: imageSrc,
+          originalWidth: img.width,
+          originalHeight: img.height,
+          cropX: 0,
+          cropY: 0,
+          cropWidth: img.width,
+          cropHeight: img.height,
+          grayscaleData,
+          grayscaleWidth: gsWidth,
+          grayscaleHeight: gsHeight,
+        } as ImageGeometry,
+        visible: true,
+        locked: false,
+        powerScale: 1,
+        _bounds: null,
+        _worldTransform: null,
+      };
+
+      const newScene = {
+        ...targetScene,
+        objects: [...targetScene.objects, imageObj],
+      };
+      const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
+      const priorStillValid =
+        previousActiveLayerId != null &&
+        newScene.layers.some(l => l.id === previousActiveLayerId);
+      newScene.activeLayerId = priorStillValid
+        ? previousActiveLayerId
+        : (cutLayer?.id ?? newScene.layers[0].id);
+
+      return newScene;
+    } catch (err) {
+      console.error('[useImport] Image import failed:', err);
+      return null;
+    }
+  }, [scene]);
+
+  const handleImageImport = useCallback(async (file: File) => {
+    const newScene = await importImageUnified(file, file.name);
+    if (!newScene) {
+      await showAlert('Import Failed', 'Could not import the image file.');
+      return;
+    }
+    handleSceneCommit(newScene);
+  }, [importImageUnified, handleSceneCommit, showAlert]);
 
   const handleDragOver = useCallback((e: DragEvent) => {
     e.preventDefault();
@@ -72,129 +225,17 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
           const updated = importDxfIntoScene(text, scene);
           handleSceneCommit(updated);
         } else if (file.type.startsWith('image/')) {
-          const previousActiveLayerId = scene.activeLayerId;
-          const dataUri = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error('Failed to read file'));
-            reader.readAsDataURL(file);
-          });
-
-          const img = new Image();
-          await new Promise<void>((resolve, reject) => {
-            img.onload = () => resolve();
-            img.onerror = () => reject(new Error('Failed to decode image'));
-            img.src = dataUri;
-          });
-
-          let imageSrc = dataUri;
-          if (dataUri.length > 100000) {
-            try {
-              const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
-              imageSrc = `indexeddb://${imageId}`;
-            } catch {
-              imageSrc = dataUri;
-            }
+          const newScene = await importImageUnified(file, file.name);
+          if (newScene) {
+            handleSceneCommit(newScene);
           }
-
-          const dpi = 96;
-          const physicalWidth = (img.width / dpi) * 25.4;
-          const physicalHeight = (img.height / dpi) * 25.4;
-
-          const maxW = scene.canvas.width * 0.8;
-          const maxH = scene.canvas.height * 0.8;
-          let fitScale = 1;
-          if (physicalWidth > maxW || physicalHeight > maxH) {
-            fitScale = Math.min(maxW / physicalWidth, maxH / physicalHeight);
-          }
-          const finalWidth = physicalWidth * fitScale;
-          const finalHeight = physicalHeight * fitScale;
-          const centerX = scene.material
-            ? scene.material.x + scene.material.width / 2
-            : scene.canvas.width / 2;
-          const centerY = scene.material
-            ? scene.material.y + scene.material.height / 2
-            : scene.canvas.height / 2;
-          const cx = centerX - finalWidth / 2;
-          const cy = centerY - finalHeight / 2;
-
-          const maxDim = 1000;
-          const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-          const gsWidth = Math.round(img.width * scale);
-          const gsHeight = Math.round(img.height * scale);
-          const offscreen = document.createElement('canvas');
-          offscreen.width = gsWidth;
-          offscreen.height = gsHeight;
-          const offCtx = offscreen.getContext('2d')!;
-          offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
-          const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
-          const grayscaleData = new Uint8Array(gsWidth * gsHeight);
-          for (let i = 0; i < grayscaleData.length; i++) {
-            const r = imageData.data[i * 4];
-            const g = imageData.data[i * 4 + 1];
-            const b = imageData.data[i * 4 + 2];
-            const a = imageData.data[i * 4 + 3];
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
-          }
-
-          let targetScene = scene;
-          let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
-          if (!layerId) {
-            const newLayer = createLayer(scene.layers.length, 'image', 'Image');
-            targetScene = {
-              ...scene,
-              layers: [...scene.layers, newLayer],
-            };
-            layerId = newLayer.id;
-          }
-
-          const imageObj: SceneObject = {
-            id: generateId(),
-            type: 'image',
-            name: file.name.replace(/\.[^.]+$/, ''),
-            layerId,
-            parentId: null,
-            transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
-            geometry: {
-              type: 'image',
-              src: imageSrc,
-              originalWidth: img.width,
-              originalHeight: img.height,
-              cropX: 0,
-              cropY: 0,
-              cropWidth: img.width,
-              cropHeight: img.height,
-              grayscaleData,
-              grayscaleWidth: gsWidth,
-              grayscaleHeight: gsHeight,
-            } as ImageGeometry,
-            visible: true,
-            locked: false,
-            powerScale: 1,
-            _bounds: null,
-            _worldTransform: null,
-          };
-
-          const newScene = {
-            ...targetScene,
-            objects: [...targetScene.objects, imageObj],
-          };
-          const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
-          const priorStillValid =
-            previousActiveLayerId != null &&
-            newScene.layers.some(l => l.id === previousActiveLayerId);
-          newScene.activeLayerId = priorStillValid
-            ? previousActiveLayerId
-            : (cutLayer?.id ?? newScene.layers[0].id);
-          handleSceneCommit(newScene);
         }
       } catch (err) {
         console.error('Drop import failed:', err);
       }
     },
-    [scene, handleSceneCommit, handleNewProject, setIsDragOver],
+    [scene, handleSceneCommit, handleNewProject, setIsDragOver, importImageUnified],
   );
 
-  return { handleDragOver, handleDragLeave, handleDrop };
+  return { handleDragOver, handleDragLeave, handleDrop, handleImageImport };
 }

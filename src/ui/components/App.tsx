@@ -320,10 +320,11 @@ export function App() {
     handleSceneCommit,
     (ids) => setSelectedIds(ids),
   );
-  const { handleDragOver, handleDragLeave, handleDrop } = useImport(scene, {
+  const { handleDragOver, handleDragLeave, handleDrop, handleImageImport } = useImport(scene, {
     handleSceneCommit,
     handleNewProject,
     setIsDragOver,
+    showAlert,
   });
 
   const handleRecover = useCallback(() => {
@@ -1011,6 +1012,7 @@ export function App() {
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
+      onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
         if (gatedFeature('box_generator')) {

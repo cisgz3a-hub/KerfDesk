@@ -17,8 +17,6 @@ import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
-import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
-import { generateId } from '../../core/types';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { exportSceneToSvg } from '../../io/SvgExporter';
@@ -41,6 +39,8 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
   onCamera?: () => void;
+  /** Toolbar image import — shared pipeline with drag-drop (IndexedDB threshold, geometry). */
+  onImportImageFile?: (file: File) => Promise<void>;
   onTemplates?: () => void;
   onBoxGenerator?: () => void;
   onAutoNest?: () => void;
@@ -75,6 +75,7 @@ export function FileToolbar({
   onMaterialSetup,
   onMaterialLibrary,
   onCamera,
+  onImportImageFile,
   onTemplates,
   onBoxGenerator,
   onAutoNest,
@@ -166,131 +167,19 @@ export function FileToolbar({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const previousActiveLayerId = scene.activeLayerId;
-
     try {
-      const dataUri = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsDataURL(file);
-      });
-
-      // Load image to get dimensions
-      const img = new Image();
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('Failed to decode image'));
-        img.src = dataUri;
-      });
-
-      // Convert pixel dimensions to mm (assume 96 DPI)
-      const dpi = 96;
-      const physicalWidth = (img.width / dpi) * 25.4;
-      const physicalHeight = (img.height / dpi) * 25.4;
-
-      const maxDim = 1000;
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-      const gsWidth = Math.round(img.width * scale);
-      const gsHeight = Math.round(img.height * scale);
-      const offscreen = document.createElement('canvas');
-      offscreen.width = gsWidth;
-      offscreen.height = gsHeight;
-      const offCtx = offscreen.getContext('2d')!;
-      offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
-      const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
-      const grayscaleData = new Uint8Array(gsWidth * gsHeight);
-      for (let i = 0; i < grayscaleData.length; i++) {
-        const r = imageData.data[i * 4];
-        const g = imageData.data[i * 4 + 1];
-        const b = imageData.data[i * 4 + 2];
-        const a = imageData.data[i * 4 + 3];
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
+      if (onImportImageFile) {
+        await onImportImageFile(file);
       }
-
-      // Scale to fit canvas if image is larger than bed (with 10% padding)
-      const maxW = scene.canvas.width * 0.8;
-      const maxH = scene.canvas.height * 0.8;
-      let fitScale = 1;
-      if (physicalWidth > maxW || physicalHeight > maxH) {
-        fitScale = Math.min(maxW / physicalWidth, maxH / physicalHeight);
-      }
-      const finalWidth = physicalWidth * fitScale;
-      const finalHeight = physicalHeight * fitScale;
-
-      // Center on material if present, otherwise center on bed
-      const centerX = scene.material
-        ? scene.material.x + scene.material.width / 2
-        : scene.canvas.width / 2;
-      const centerY = scene.material
-        ? scene.material.y + scene.material.height / 2
-        : scene.canvas.height / 2;
-      const cx = centerX - finalWidth / 2;
-      const cy = centerY - finalHeight / 2;
-
-      // Find or create an image layer
-      let targetScene = scene;
-      let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
-      if (!layerId) {
-        const { createLayer } = await import('../../core/scene/Layer');
-        const newLayer = createLayer(scene.layers.length, 'image', 'Image');
-        targetScene = {
-          ...scene,
-          layers: [...scene.layers, newLayer],
-        };
-        layerId = newLayer.id;
-      }
-
-      const imageObj: SceneObject = {
-        id: generateId(),
-        type: 'image',
-        name: file.name.replace(/\.[^.]+$/, ''),
-        layerId,
-        parentId: null,
-        transform: { a: fitScale, b: 0, c: 0, d: fitScale, tx: cx, ty: cy },
-        geometry: {
-          type: 'image',
-          src: dataUri,
-          originalWidth: img.width,
-          originalHeight: img.height,
-          cropX: 0,
-          cropY: 0,
-          cropWidth: img.width,
-          cropHeight: img.height,
-          grayscaleData,
-          grayscaleWidth: gsWidth,
-          grayscaleHeight: gsHeight,
-        } as ImageGeometry,
-        visible: true,
-        locked: false,
-        powerScale: 1,
-        _bounds: null,
-        _worldTransform: null,
-      };
-
-      const newScene = {
-        ...targetScene,
-        objects: [...targetScene.objects, imageObj],
-      };
-      const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
-      const priorStillValid =
-        previousActiveLayerId != null &&
-        newScene.layers.some(l => l.id === previousActiveLayerId);
-      newScene.activeLayerId = priorStillValid
-        ? previousActiveLayerId
-        : (cutLayer?.id ?? newScene.layers[0].id);
-      onSceneChange(newScene);
-      onSceneCommit(newScene);
-    } catch (e) {
-      console.error('Image import failed:', e);
-      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
+    } catch (err) {
+      console.error('Image import failed:', err);
+      await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
     }
 
     if (imageInputRef.current) {
       imageInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit, showAlert]);
+  }, [onImportImageFile, showAlert]);
 
   const handleImportDxfClick = useCallback(() => {
     dxfInputRef.current?.click();
