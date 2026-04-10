@@ -14,6 +14,8 @@ interface DepthPreviewDialogProps {
   onClose: () => void;
 }
 
+const resolution = 256; // Fixed — no need for user control
+
 function boundsValid(b: { minX: number; minY: number; maxX: number; maxY: number }): boolean {
   return Number.isFinite(b.minX) && Number.isFinite(b.maxX) &&
     Number.isFinite(b.minY) && Number.isFinite(b.maxY) &&
@@ -174,7 +176,6 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
   const [depthScale, setDepthScale] = useState(5);
   const [viewAngle, setViewAngle] = useState<'angle' | 'front' | 'top'>('angle');
   const [materialColor, setMaterialColor] = useState('#c4956a');
-  const [resolution, setResolution] = useState(256);
   const [isDragging, setIsDragging] = useState(false);
 
   depthScaleRef.current = depthScale;
@@ -252,7 +253,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
     }
 
     return { data: heightData, width: res, height: res, worldWidth, worldHeight };
-  }, [scene, resolution]);
+  }, [scene]);
 
   const hasEngraveObjects = useMemo(
     () =>
@@ -480,7 +481,7 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
       rendererRef.current = null;
       cameraRef.current = null;
     };
-  }, [generateHeightmap, depthScale, materialColor, resolution, hasEngraveObjects]);
+  }, [generateHeightmap, depthScale, materialColor, hasEngraveObjects]);
 
   const materialPresets = [
     { label: 'Birch', color: '#c4956a' },
@@ -580,23 +581,6 @@ export function DepthPreviewDialog({ scene, onClose }: DepthPreviewDialogProps) 
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355' } },
               React.createElement('span', null, 'Flat'),
               React.createElement('span', null, 'Deep'),
-            ),
-          ),
-
-          React.createElement('div', { style: { marginBottom: 14 } },
-            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const } },
-              `Detail: ${resolution}px`,
-            ),
-            React.createElement('input', {
-              type: 'range',
-              min: 64, max: 512, step: 64,
-              value: resolution,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setResolution(parseInt(e.target.value, 10)),
-              style: { width: '100%', accentColor: '#00d4ff' },
-            }),
-            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355' } },
-              React.createElement('span', null, 'Fast'),
-              React.createElement('span', null, 'Sharp'),
             ),
           ),
 
