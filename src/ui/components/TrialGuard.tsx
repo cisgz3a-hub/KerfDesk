@@ -5,14 +5,19 @@ const PRO_FLAG_KEY = 'laserforge_pro';
 
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
+type TrialEntry =
+  | { name: string; unlimited: true }
+  | { name: string; created: string; days: number };
+
 /**
- * Trial codes — for testers, expire after N days from creation date.
+ * Trial codes — for testers; timed entries expire N days after `created`, or `unlimited: true`.
  */
-const TRIAL_CODES: Record<string, { name: string; created: string; days: number }> = {
+const TRIAL_CODES: Record<string, TrialEntry> = {
   'TESTER-ALPHA-2026': { name: 'Alpha Tester', created: '2026-04-10', days: 14 },
   'TESTER-BETA-2026': { name: 'Beta Tester', created: '2026-04-10', days: 14 },
   'TESTER-GAMMA-2026': { name: 'Gamma Tester', created: '2026-04-10', days: 14 },
   'DEMO-REVIEW-2026': { name: 'Demo Review', created: '2026-04-10', days: 30 },
+  'WILLEM6209': { name: 'Willem', unlimited: true },
 };
 
 interface AccessInfo {
@@ -29,6 +34,14 @@ async function validateAccess(code: string): Promise<AccessInfo | null> {
   // Check trial codes first (no API call needed)
   if (TRIAL_CODES[upper]) {
     const entry = TRIAL_CODES[upper];
+    if ('unlimited' in entry && entry.unlimited) {
+      return {
+        type: 'trial',
+        code: upper,
+        name: entry.name,
+        expired: false,
+      };
+    }
     const started = new Date(entry.created);
     const expires = new Date(started.getTime() + entry.days * 24 * 60 * 60 * 1000);
     const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
