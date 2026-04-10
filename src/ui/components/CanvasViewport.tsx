@@ -41,6 +41,7 @@ import {
   renderTrail,
 } from '../renderers/SimulationRenderer';
 import { type ToolType } from './ToolBar';
+import { CanvasRenderer } from './canvas/CanvasRenderer';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 
 function defaultCursorForTool(activeTool: ToolType): string {
@@ -656,14 +657,11 @@ export function CanvasViewport({
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
   }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode]);
 
-  useEffect(() => { render(); }, [render]);
-
   useEffect(() => {
     if (activeTool !== 'node') {
       nodeTargetIdRef.current = null;
     }
-    render();
-  }, [activeTool, render]);
+  }, [activeTool]);
 
   // ─── ANIMATION PLAYBACK ──────────────────────────────────────
 
@@ -1521,12 +1519,12 @@ export function CanvasViewport({
   return React.createElement('div', {
     style: { position: 'relative', width: '100%', height: '100%', background: '#06060c' },
   },
-    React.createElement('canvas', {
-      ref: canvasRef, width, height,
-      style: {
-        display: 'block',
-        cursor: isPanning ? 'grabbing' : isDragging ? 'move' : defaultCursorForTool(activeTool),
-      },
+    React.createElement(CanvasRenderer, {
+      canvasRef,
+      width,
+      height,
+      cursor: isPanning ? 'grabbing' : isDragging ? 'move' : defaultCursorForTool(activeTool),
+      renderFrame: render,
       onMouseDown: handleMouseDown,
       onMouseMove: handleMouseMove,
       onMouseUp: handleMouseUp,
