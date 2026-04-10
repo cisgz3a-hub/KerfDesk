@@ -40,7 +40,7 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
-import { MaterialTestDialog, type MaterialTestConfig } from './MaterialTestDialog';
+import { MaterialTestDialog } from './MaterialTestDialog';
 import { GcodePreview } from './GcodePreview';
 import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
@@ -48,7 +48,7 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { createLayer } from '../../core/scene/Layer';
+import { createLayer, type Layer } from '../../core/scene/Layer';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
@@ -514,7 +514,9 @@ export function App() {
       showPrompt,
       distributeObjects: sceneOps.distributeObjects,
       openGridArray: () => setShowGridArray(true),
-      openMaterialTest: () => setShowMaterialTest(true),
+      openMaterialTest: () => {
+        if (gatedFeature('material_test')) setShowMaterialTest(true);
+      },
       moveToCorner: sceneOps.moveToCorner,
       moveToMaterialOrigin: sceneOps.moveToMaterialOrigin,
       rotateSelected: sceneOps.rotateSelected,
@@ -760,64 +762,54 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, handleSceneCommit]);
 
-  const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
-    setShowMaterialTest(false);
+  const handleMaterialTestApply = useCallback((
+    rawObjects: SceneObject[],
+    layerSettings: Array<{ power: number; speed: number }>,
+    testMode: 'cut' | 'engrave',
+  ) => {
+    const baseOrder = scene.layers.length;
+    const newLayers: Layer[] = layerSettings.map((ls, i) => {
+      const layer = createLayer(baseOrder + i, testMode, `Test P${ls.power} S${ls.speed}`);
+      const p = Math.max(0, Math.min(100, ls.power));
+      const sp = Math.max(1, ls.speed);
+      return {
+        ...layer,
+        order: baseOrder + i,
+        settings: {
+          ...layer.settings,
+          mode: testMode,
+          power: { min: 0, max: p },
+          speed: sp,
+          fill: {
+            ...layer.settings.fill,
+            enabled: testMode === 'engrave',
+          },
+          airAssist: testMode === 'cut',
+        },
+      };
+    });
 
-    // Use existing engrave layer or create one
-    let targetScene = scene;
-    let layerId = scene.layers.find(l => l.settings.mode === 'engrave')?.id;
-    if (!layerId) {
-      const newLayer = createLayer(scene.layers.length, 'engrave', 'Material Test');
-      targetScene = { ...scene, layers: [...scene.layers, newLayer] };
-      layerId = newLayer.id;
-    }
-
-    const objects: typeof scene.objects = [];
-    const startX = 10;
-    const startY = 10;
-
-    for (let r = 0; r < config.rows; r++) {
-      for (let c = 0; c < config.cols; c++) {
-        const x = startX + c * (config.cellSize + config.spacing);
-        const y = startY + r * (config.cellSize + config.spacing);
-        const power = config.rows === 1 ? config.powerMin :
-          Math.round(config.powerMin + (r / (config.rows - 1)) * (config.powerMax - config.powerMin));
-        const speed = config.cols === 1 ? config.speedMax :
-          Math.round(config.speedMax - (c / (config.cols - 1)) * (config.speedMax - config.speedMin));
-
-        // Filled rectangle
-        objects.push({
-          id: generateId(),
-          type: 'rect' as any,
-          name: `P${power} S${speed}`,
-          layerId,
-          parentId: null,
-          transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y },
-          geometry: { type: 'rect', x: 0, y: 0, width: config.cellSize, height: config.cellSize } as any,
-          visible: true, locked: false, powerScale: 1, _bounds: null, _worldTransform: null,
-        });
-
-        // Label below each cell
-        objects.push({
-          id: generateId(),
-          type: 'text' as any,
-          name: `Label`,
-          layerId,
-          parentId: null,
-          transform: { a: 1, b: 0, c: 0, d: 1, tx: x + 0.5, ty: y + config.cellSize + 1 },
-          geometry: {
-            type: 'text',
-            text: `${power}%/${speed}`,
-            fontFamily: 'Arial',
-            fontSize: Math.min(config.cellSize * 0.25, 2.5),
-            bold: false, italic: false,
-          } as any,
-          visible: true, locked: false, powerScale: 1, _bounds: null, _worldTransform: null,
-        });
+    const layerIds = newLayers.map(l => l.id);
+    let squareIndex = 0;
+    const remapped = rawObjects.map(obj => {
+      if (obj.name.startsWith('Test P')) {
+        const lid = layerIds[squareIndex] ?? layerIds[0];
+        squareIndex += 1;
+        return { ...obj, layerId: lid };
       }
-    }
+      if (obj.name.startsWith('Label P')) {
+        const lid = layerIds[Math.max(0, squareIndex - 1)] ?? layerIds[0];
+        return { ...obj, layerId: lid };
+      }
+      const lid = layerIds[0] ?? scene.layers[0]?.id ?? '';
+      return { ...obj, layerId: lid };
+    });
 
-    handleSceneCommit({ ...targetScene, objects: [...targetScene.objects, ...objects] });
+    handleSceneCommit({
+      ...scene,
+      layers: [...scene.layers, ...newLayers],
+      objects: [...scene.objects, ...remapped],
+    });
   }, [scene, handleSceneCommit]);
 
   const handleMaterialConfirm = useCallback((config: MaterialConfig) => {
@@ -1035,7 +1027,9 @@ export function App() {
       showConfirm,
       onConnect: handleConnect,
       onSetup: () => dialogs.setShowSetup(true),
-      onMaterialTest: () => setShowMaterialTest(true),
+      onMaterialTest: () => {
+        if (gatedFeature('material_test')) setShowMaterialTest(true);
+      },
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
@@ -1158,6 +1152,7 @@ export function App() {
           onSceneCommit: handleSceneCommit,
           productionMode,
           materialLibraryRev,
+          onMaterialLibraryBump: () => setMaterialLibraryRev(r => r + 1),
         }),
         React.createElement('div', {
           style: {
@@ -1284,8 +1279,9 @@ export function App() {
     }),
 
     showMaterialTest && React.createElement(MaterialTestDialog, {
-      onConfirm: handleMaterialTestConfirm,
-      onCancel: () => setShowMaterialTest(false),
+      scene,
+      onApply: handleMaterialTestApply,
+      onClose: () => setShowMaterialTest(false),
     }),
 
     showNesting && React.createElement(NestingDialog, {

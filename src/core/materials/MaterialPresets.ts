@@ -492,6 +492,34 @@ export function exportUserMaterials(): string {
   return JSON.stringify(exportData, null, 2);
 }
 
+/**
+ * Import from a full LaserForge export JSON or a bare array of user material objects.
+ * @throws Error if the JSON is not valid for import
+ */
+export function importMaterialsFromJsonLoose(jsonString: string): number {
+  const parsed = JSON.parse(jsonString) as unknown;
+  if (
+    parsed &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    (parsed as { format?: string }).format === 'laserforge_materials'
+  ) {
+    return importUserMaterials(jsonString);
+  }
+  if (Array.isArray(parsed) && parsed.length > 0) {
+    return importUserMaterials(
+      JSON.stringify({
+        format: 'laserforge_materials',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        materialCount: parsed.length,
+        materials: parsed,
+      }),
+    );
+  }
+  throw new Error('Invalid preset file');
+}
+
 /** Import materials from a JSON file. Returns count imported. */
 export function importUserMaterials(jsonString: string): number {
   try {

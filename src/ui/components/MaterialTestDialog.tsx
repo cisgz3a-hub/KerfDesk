@@ -1,241 +1,343 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { type Scene } from '../../core/scene/Scene';
+import { type SceneObject } from '../../core/scene/SceneObject';
+import { generateId } from '../../core/types';
 import { NumberInput } from './NumberInput';
 
-export interface MaterialTestConfig {
-  rows: number;
-  cols: number;
-  cellSize: number;
-  spacing: number;
-  powerMin: number;
-  powerMax: number;
-  speedMin: number;
-  speedMax: number;
-}
-
 interface MaterialTestDialogProps {
-  onConfirm: (config: MaterialTestConfig) => void;
-  onCancel: () => void;
+  scene: Scene;
+  onApply: (objects: SceneObject[], layerSettings: Array<{ power: number; speed: number }>, mode: 'cut' | 'engrave') => void;
+  onClose: () => void;
 }
 
-export function MaterialTestDialog({ onConfirm, onCancel }: MaterialTestDialogProps) {
+export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDialogProps) {
+  const [powerMin, setPowerMin] = useState(20);
+  const [powerMax, setPowerMax] = useState(100);
+  const [speedMin, setSpeedMin] = useState(200);
+  const [speedMax, setSpeedMax] = useState(2000);
   const [rows, setRows] = useState(5);
   const [cols, setCols] = useState(5);
-  const [cellSize, setCellSize] = useState(10);
-  const [spacing, setSpacing] = useState(2);
-  const [powerMin, setPowerMin] = useState(10);
-  const [powerMax, setPowerMax] = useState(100);
-  const [speedMin, setSpeedMin] = useState(100);
-  const [speedMax, setSpeedMax] = useState(1000);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [squareSize, setSquareSize] = useState(10);
+  const [gap, setGap] = useState(3);
+  const [mode, setMode] = useState<'cut' | 'engrave'>('engrave');
 
-  const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
-  const mono = "'JetBrains Mono', 'Consolas', monospace";
-
-  // Draw preview
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-    const dpr = window.devicePixelRatio || 1;
-    const cw = 340;
-    const ch = 220;
-    canvas.width = cw * dpr;
-    canvas.height = ch * dpr;
-    canvas.style.width = `${cw}px`;
-    canvas.style.height = `${ch}px`;
-    ctx.scale(dpr, dpr);
-
-    ctx.fillStyle = '#0a0a14';
-    ctx.fillRect(0, 0, cw, ch);
-
-    const totalW = cols * cellSize + (cols - 1) * spacing;
-    const totalH = rows * cellSize + (rows - 1) * spacing;
-    const labelPad = 30;
-    const scale = Math.min((cw - labelPad - 20) / totalW, (ch - labelPad - 20) / totalH, 3);
-    const ox = labelPad + (cw - labelPad - totalW * scale) / 2;
-    const oy = labelPad + (ch - labelPad - totalH * scale) / 2;
-
-    // Draw axis labels
-    ctx.font = '10px ' + mono;
-    ctx.fillStyle = '#555570';
-
-    // Speed label (top)
-    ctx.textAlign = 'center';
-    ctx.fillText('Speed (mm/min) →', cw / 2, 10);
-
-    // Power label (left)
-    ctx.save();
-    ctx.translate(10, ch / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = 'center';
-    ctx.fillText('Power (%) →', 0, 0);
-    ctx.restore();
-
-    // Draw grid cells
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const x = ox + c * (cellSize + spacing) * scale;
-        const y = oy + r * (cellSize + spacing) * scale;
-        const w = cellSize * scale;
-        const h = cellSize * scale;
-
-        // Compute power and speed for this cell
-        const power = rows === 1 ? powerMin : powerMin + (r / (rows - 1)) * (powerMax - powerMin);
-        const speed = cols === 1 ? speedMax : speedMax - (c / (cols - 1)) * (speedMax - speedMin);
-
-        // Color intensity based on power/speed ratio (higher power + lower speed = darker)
-        const speedFactor = 1 - (speed - speedMin) / (speedMax - speedMin || 1);
-        const intensity = (power / 100) * (0.3 + speedFactor * 0.7);
-        const gray = Math.round(255 * (1 - intensity));
-
-        ctx.fillStyle = `rgb(${gray}, ${Math.round(gray * 0.7)}, ${Math.round(gray * 0.5)})`;
-        ctx.fillRect(x, y, w, h);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(x, y, w, h);
-      }
-    }
-
-    // Column speed labels
-    ctx.font = '8px ' + mono;
-    ctx.fillStyle = '#555570';
-    ctx.textAlign = 'center';
-    for (let c = 0; c < cols; c++) {
-      const speed = cols === 1 ? speedMax : speedMax - (c / (cols - 1)) * (speedMax - speedMin);
-      const x = ox + c * (cellSize + spacing) * scale + cellSize * scale / 2;
-      ctx.fillText(Math.round(speed).toString(), x, oy - 4);
-    }
-
-    // Row power labels
-    ctx.textAlign = 'right';
-    for (let r = 0; r < rows; r++) {
-      const power = rows === 1 ? powerMin : powerMin + (r / (rows - 1)) * (powerMax - powerMin);
-      const y = oy + r * (cellSize + spacing) * scale + cellSize * scale / 2 + 3;
-      ctx.fillText(Math.round(power) + '%', ox - 4, y);
-    }
-
-  }, [rows, cols, cellSize, spacing, powerMin, powerMax, speedMin, speedMax]);
+  const font = "'DM Sans', system-ui, sans-serif";
+  const mono = "'JetBrains Mono', monospace";
 
   const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '4px 6px',
-    background: '#0a0a14', border: '1px solid #252540', borderRadius: 4,
-    color: '#e0e0ec', fontSize: 11, fontFamily: mono, outline: 'none',
-    textAlign: 'center' as const,
+    width: '100%', padding: '5px 7px',
+    background: '#0a0a14', border: '1px solid #252540', borderRadius: 5,
+    color: '#e0e0ec', fontSize: 11, outline: 'none', fontFamily: mono,
   };
 
-  const labelStyle: React.CSSProperties = {
-    fontSize: 10, color: '#8888aa', marginBottom: 2,
-    fontFamily: font,
-  };
+  const grid = useMemo(() => {
+    const cells: Array<{ row: number; col: number; power: number; speed: number }> = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const power = rows === 1 ? powerMin : powerMin + (powerMax - powerMin) * (r / (rows - 1));
+        const speed = cols === 1 ? speedMin : speedMin + (speedMax - speedMin) * (c / (cols - 1));
+        cells.push({ row: r, col: c, power: Math.round(power), speed: Math.round(speed) });
+      }
+    }
+    return cells;
+  }, [rows, cols, powerMin, powerMax, speedMin, speedMax]);
 
-  const field = (
-    label: string,
-    value: number,
-    setValue: (v: number) => void,
-    min: number,
-    max: number,
-    opts?: { int?: boolean }
-  ) =>
-    React.createElement('div', { style: { flex: 1 } },
-      React.createElement('div', { style: labelStyle }, label),
-      React.createElement(NumberInput, {
-        value,
-        min,
-        max,
-        integer: opts?.int,
-        inputMode: opts?.int ? 'numeric' : 'decimal',
-        defaultValue: value,
-        style: inputStyle,
-        onChange: (v: number) => setValue(v),
-        onCommit: (v: number) => setValue(v),
-      }),
-    );
+  const totalWidth = cols * squareSize + (cols - 1) * gap;
+  const totalHeight = rows * squareSize + (rows - 1) * gap;
+  const labelHeight = 12;
+
+  const previewW = 280;
+  const previewH = 220;
+  const svgTotalW = totalWidth + labelHeight + 5;
+  const svgTotalH = totalHeight + labelHeight + 5;
+  const scale = Math.min((previewW - 20) / svgTotalW, (previewH - 20) / svgTotalH);
+  const offsetX = (previewW - svgTotalW * scale) / 2;
+  const offsetY = (previewH - svgTotalH * scale) / 2;
+
+  const handleApply = useCallback(() => {
+    const objects: SceneObject[] = [];
+    const layerSettings: Array<{ power: number; speed: number }> = [];
+
+    const uid = () => generateId();
+
+    const startX = scene.material
+      ? scene.material.x + (scene.material.width - totalWidth) / 2
+      : (scene.canvas.width - totalWidth) / 2;
+    const startY = scene.material
+      ? scene.material.y + (scene.material.height - totalHeight) / 2
+      : (scene.canvas.height - totalHeight) / 2;
+
+    const defaultLayerId = scene.layers[0]?.id ?? '';
+
+    for (const cell of grid) {
+      const x = startX + cell.col * (squareSize + gap);
+      const y = startY + cell.row * (squareSize + gap);
+
+      objects.push({
+        id: uid(),
+        type: 'rect',
+        name: `Test P${cell.power} S${cell.speed}`,
+        visible: true,
+        locked: false,
+        layerId: defaultLayerId,
+        parentId: null,
+        transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y },
+        geometry: {
+          type: 'rect',
+          x: 0,
+          y: 0,
+          width: squareSize,
+          height: squareSize,
+          cornerRadius: 0,
+        },
+        powerScale: 1,
+        _bounds: null,
+        _worldTransform: null,
+      });
+
+      objects.push({
+        id: uid(),
+        type: 'text',
+        name: `Label P${cell.power} S${cell.speed}`,
+        visible: true,
+        locked: false,
+        layerId: defaultLayerId,
+        parentId: null,
+        transform: { a: 1, b: 0, c: 0, d: 1, tx: x, ty: y + squareSize + 0.5 },
+        geometry: {
+          type: 'text',
+          text: `${cell.power}%\n${cell.speed}`,
+          fontSize: 1.8,
+          fontFamily: 'sans-serif',
+          bold: false,
+          italic: false,
+        },
+        powerScale: 1,
+        _bounds: null,
+        _worldTransform: null,
+      });
+
+      layerSettings.push({ power: cell.power, speed: cell.speed });
+    }
+
+    objects.push({
+      id: uid(),
+      type: 'text',
+      name: 'Speed Label',
+      visible: true,
+      locked: false,
+      layerId: defaultLayerId,
+      parentId: null,
+      transform: { a: 1, b: 0, c: 0, d: 1, tx: startX + totalWidth / 2 - 8, ty: startY - 5 },
+      geometry: {
+        type: 'text',
+        text: `Speed → (${speedMin}–${speedMax} mm/min)`,
+        fontSize: 2.5,
+        fontFamily: 'sans-serif',
+        bold: true,
+        italic: false,
+      },
+      powerScale: 1,
+      _bounds: null,
+      _worldTransform: null,
+    });
+
+    objects.push({
+      id: uid(),
+      type: 'text',
+      name: 'Power Label',
+      visible: true,
+      locked: false,
+      layerId: defaultLayerId,
+      parentId: null,
+      transform: { a: 0, b: -1, c: 1, d: 0, tx: startX - 5, ty: startY + totalHeight / 2 + 8 },
+      geometry: {
+        type: 'text',
+        text: `Power ↓ (${powerMin}–${powerMax}%)`,
+        fontSize: 2.5,
+        fontFamily: 'sans-serif',
+        bold: true,
+        italic: false,
+      },
+      powerScale: 1,
+      _bounds: null,
+      _worldTransform: null,
+    });
+
+    onApply(objects, layerSettings, mode);
+    onClose();
+  }, [scene, grid, squareSize, gap, totalWidth, totalHeight, speedMin, speedMax, powerMin, powerMax, mode, onApply, onClose]);
 
   return React.createElement('div', {
     style: {
-      position: 'fixed', inset: 0,
-      background: 'rgba(0, 0, 0, 0.7)',
-      backdropFilter: 'blur(8px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      zIndex: 2000, fontFamily: font,
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
+      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', zIndex: 2000, fontFamily: font,
     },
-    onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onCancel(); },
+    onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
     React.createElement('div', {
       style: {
-        background: '#12121e', border: '1px solid #252540', borderRadius: 12,
-        width: 400, boxShadow: '0 20px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
+        background: '#12121e', border: '1px solid #252540', borderRadius: 14,
+        width: 620, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const,
+        boxShadow: '0 20px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
       },
     },
-      // Header
       React.createElement('div', {
-        style: {
-          padding: '14px 18px', borderBottom: '1px solid #1a1a2e',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        },
+        style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
       },
-        React.createElement('div', null,
-          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Material Test Generator'),
-          React.createElement('div', { style: { color: '#555570', fontSize: 10, marginTop: 2 } }, 'Find optimal power & speed for your material'),
+        React.createElement('div', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Material Test Grid'),
+        React.createElement('div', { style: { color: '#555570', fontSize: 10, marginTop: 2 } },
+          'Generate a grid of test squares with varying power and speed to find optimal settings',
         ),
+      ),
+
+      React.createElement('div', {
+        style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 },
+      },
+        React.createElement('div', {
+          style: { width: 260, padding: '12px 16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const, display: 'flex', flexDirection: 'column' as const, gap: 10 },
+        },
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Test Mode'),
+            React.createElement('div', { style: { display: 'flex', gap: 4 } },
+              React.createElement('button', {
+                onClick: () => setMode('engrave'),
+                style: {
+                  flex: 1, padding: '5px', fontSize: 11, borderRadius: 4, cursor: 'pointer', fontFamily: font,
+                  background: mode === 'engrave' ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                  border: mode === 'engrave' ? '1px solid #00d4ff' : '1px solid #252540',
+                  color: mode === 'engrave' ? '#00d4ff' : '#555570',
+                },
+              }, 'Engrave'),
+              React.createElement('button', {
+                onClick: () => setMode('cut'),
+                style: {
+                  flex: 1, padding: '5px', fontSize: 11, borderRadius: 4, cursor: 'pointer', fontFamily: font,
+                  background: mode === 'cut' ? 'rgba(255,68,102,0.1)' : '#0a0a14',
+                  border: mode === 'cut' ? '1px solid #ff4466' : '1px solid #252540',
+                  color: mode === 'cut' ? '#ff4466' : '#555570',
+                },
+              }, 'Cut'),
+            ),
+          ),
+
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Power Range (%)'),
+            React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+              React.createElement(NumberInput, { value: powerMin, min: 1, max: 100, integer: true, inputMode: 'numeric', defaultValue: 20, style: inputStyle, onCommit: setPowerMin }),
+              React.createElement('span', { style: { color: '#555570', fontSize: 10 } }, '→'),
+              React.createElement(NumberInput, { value: powerMax, min: 1, max: 100, integer: true, inputMode: 'numeric', defaultValue: 100, style: inputStyle, onCommit: setPowerMax }),
+            ),
+          ),
+
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Speed Range (mm/min)'),
+            React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+              React.createElement(NumberInput, { value: speedMin, min: 10, max: 10000, integer: true, inputMode: 'numeric', defaultValue: 200, style: inputStyle, onCommit: setSpeedMin }),
+              React.createElement('span', { style: { color: '#555570', fontSize: 10 } }, '→'),
+              React.createElement(NumberInput, { value: speedMax, min: 10, max: 10000, integer: true, inputMode: 'numeric', defaultValue: 2000, style: inputStyle, onCommit: setSpeedMax }),
+            ),
+          ),
+
+          React.createElement('div', null,
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Grid Size (rows × columns)'),
+            React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+              React.createElement(NumberInput, { value: rows, min: 1, max: 10, integer: true, inputMode: 'numeric', defaultValue: 5, style: inputStyle, onCommit: setRows }),
+              React.createElement('span', { style: { color: '#555570', fontSize: 10 } }, '×'),
+              React.createElement(NumberInput, { value: cols, min: 1, max: 10, integer: true, inputMode: 'numeric', defaultValue: 5, style: inputStyle, onCommit: setCols }),
+            ),
+          ),
+
+          React.createElement('div', { style: { display: 'flex', gap: 8 } },
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Square (mm)'),
+              React.createElement(NumberInput, { value: squareSize, min: 3, max: 50, defaultValue: 10, style: inputStyle, onCommit: setSquareSize }),
+            ),
+            React.createElement('div', { style: { flex: 1 } },
+              React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, textTransform: 'uppercase' as const } }, 'Gap (mm)'),
+              React.createElement(NumberInput, { value: gap, min: 1, max: 20, integer: true, inputMode: 'numeric', defaultValue: 3, style: inputStyle, onCommit: setGap }),
+            ),
+          ),
+
+          React.createElement('div', {
+            style: { padding: '8px 10px', background: '#08080f', borderRadius: 6, border: '1px solid #1a1a2e', marginTop: 4 },
+          },
+            React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const } }, 'Summary'),
+            React.createElement('div', { style: { fontSize: 11, color: '#e0e0ec' } }, `${rows * cols} test squares`),
+            React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginTop: 2 } }, `Grid: ${totalWidth.toFixed(0)} × ${totalHeight.toFixed(0)} mm`),
+            React.createElement('div', { style: { fontSize: 10, color: '#8888aa' } }, `Power: ${powerMin}% → ${powerMax}%`),
+            React.createElement('div', { style: { fontSize: 10, color: '#8888aa' } }, `Speed: ${speedMin} → ${speedMax} mm/min`),
+          ),
+        ),
+
+        React.createElement('div', {
+          style: { flex: 1, padding: '12px 16px', display: 'flex', flexDirection: 'column' as const, alignItems: 'center', justifyContent: 'center' },
+        },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const } }, 'Preview'),
+          React.createElement('svg', {
+            width: previewW, height: previewH,
+            style: { background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e' },
+          },
+            ...grid.map(cell => {
+              const x = offsetX + (labelHeight + 5 + cell.col * (squareSize + gap)) * scale;
+              const y = offsetY + (labelHeight + 5 + cell.row * (squareSize + gap)) * scale;
+              const intensity = cell.power / 100;
+              return React.createElement('rect', {
+                key: `${cell.row}-${cell.col}`,
+                x, y,
+                width: squareSize * scale,
+                height: squareSize * scale,
+                fill: mode === 'engrave'
+                  ? `rgba(0, 212, 255, ${0.1 + intensity * 0.5})`
+                  : `rgba(255, 68, 102, ${0.1 + intensity * 0.5})`,
+                stroke: mode === 'engrave' ? '#00d4ff' : '#ff4466',
+                strokeWidth: 0.5,
+              });
+            }),
+            ...Array.from({ length: cols }, (_, c) => {
+              const speed = cols === 1 ? speedMin : speedMin + (speedMax - speedMin) * (c / (cols - 1));
+              const x = offsetX + (labelHeight + 5 + c * (squareSize + gap) + squareSize / 2) * scale;
+              const y = offsetY + labelHeight * scale * 0.7;
+              return React.createElement('text', {
+                key: `col-${c}`,
+                x, y, textAnchor: 'middle',
+                fill: '#555570', fontSize: 7, fontFamily: mono,
+              }, Math.round(speed).toString());
+            }),
+            ...Array.from({ length: rows }, (_, r) => {
+              const power = rows === 1 ? powerMin : powerMin + (powerMax - powerMin) * (r / (rows - 1));
+              const x = offsetX + labelHeight * scale * 0.5;
+              const y = offsetY + (labelHeight + 5 + r * (squareSize + gap) + squareSize / 2) * scale + 3;
+              return React.createElement('text', {
+                key: `row-${r}`,
+                x, y, textAnchor: 'middle',
+                fill: '#555570', fontSize: 7, fontFamily: mono,
+              }, `${Math.round(power)}%`);
+            }),
+          ),
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 6 } },
+            'Rows = power ↓  Columns = speed →',
+          ),
+        ),
+      ),
+
+      React.createElement('div', {
+        style: { padding: '12px 18px', borderTop: '1px solid #1a1a2e', display: 'flex', gap: 8, flexShrink: 0 },
+      },
         React.createElement('button', {
-          onClick: onCancel,
-          style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer', padding: '0 4px' },
-        }, '×'),
-      ),
-
-      // Preview
-      React.createElement('div', { style: { padding: '12px 18px 8px', borderBottom: '1px solid #1a1a2e' } },
-        React.createElement('canvas', {
-          ref: canvasRef,
-          style: { width: '100%', height: 220, borderRadius: 8 },
-        }),
-      ),
-
-      // Controls
-      React.createElement('div', { style: { padding: '12px 18px', display: 'flex', flexDirection: 'column' as const, gap: 8 } },
-        // Grid size
-        React.createElement('div', { style: { display: 'flex', gap: 8 } },
-          field('Columns', cols, setCols, 2, 10, { int: true }),
-          field('Rows', rows, setRows, 2, 10, { int: true }),
-          field('Cell (mm)', cellSize, setCellSize, 5, 30),
-          field('Gap (mm)', spacing, setSpacing, 1, 10),
-        ),
-        // Power range
-        React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'flex-end' } },
-          field('Power Min %', powerMin, setPowerMin, 1, 99, { int: true }),
-          React.createElement('span', { style: { color: '#555570', paddingBottom: 6, fontSize: 12 } }, '→'),
-          field('Power Max %', powerMax, setPowerMax, 2, 100, { int: true }),
-        ),
-        // Speed range
-        React.createElement('div', { style: { display: 'flex', gap: 8, alignItems: 'flex-end' } },
-          field('Speed Min', speedMin, setSpeedMin, 10, 9999, { int: true }),
-          React.createElement('span', { style: { color: '#555570', paddingBottom: 6, fontSize: 12 } }, '→'),
-          field('Speed Max', speedMax, setSpeedMax, 20, 10000, { int: true }),
-        ),
-      ),
-
-      // Footer
-      React.createElement('div', {
-        style: {
-          padding: '12px 18px', borderTop: '1px solid #1a1a2e',
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        },
-      },
-        React.createElement('span', { style: { fontSize: 10, color: '#555570' } },
-          `${rows * cols} squares · ${(cols * (cellSize + spacing) - spacing).toFixed(0)}×${(rows * (cellSize + spacing) - spacing).toFixed(0)} mm`
-        ),
-        React.createElement('div', { style: { display: 'flex', gap: 8 } },
-          React.createElement('button', {
-            onClick: onCancel,
-            style: { padding: '7px 16px', background: '#1a1a2e', border: '1px solid #252540', borderRadius: 6, color: '#8888aa', fontSize: 12, cursor: 'pointer', fontFamily: font },
-          }, 'Cancel'),
-          React.createElement('button', {
-            onClick: () => onConfirm({ rows, cols, cellSize, spacing, powerMin, powerMax, speedMin, speedMax }),
-            style: { padding: '7px 20px', background: 'rgba(0, 212, 255, 0.12)', border: '1px solid #00d4ff', borderRadius: 6, color: '#00d4ff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font },
-          }, 'Generate Test'),
-        ),
+          onClick: onClose,
+          style: { flex: 1, padding: '10px', background: '#0a0a14', border: '1px solid #252540', borderRadius: 8, color: '#8888aa', fontSize: 13, cursor: 'pointer', fontFamily: font },
+        }, 'Cancel'),
+        React.createElement('button', {
+          onClick: handleApply,
+          style: {
+            flex: 2, padding: '10px',
+            background: 'rgba(0,212,255,0.1)', border: '1px solid #00d4ff',
+            borderRadius: 8, color: '#00d4ff', fontSize: 13, fontWeight: 600,
+            cursor: 'pointer', fontFamily: font,
+          },
+        }, `Generate ${rows * cols} Test Squares`),
       ),
     ),
   );

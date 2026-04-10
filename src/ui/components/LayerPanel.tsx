@@ -8,6 +8,8 @@ import {
   getPresetSettings,
   getAllMaterials,
   getUserMaterials,
+  exportUserMaterials,
+  importMaterialsFromJsonLoose,
 } from '../../core/materials/MaterialPresets';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
@@ -21,6 +23,8 @@ interface LayerPanelProps {
   productionMode: boolean;
   /** Bumps when custom material library changes so preset list refreshes. */
   materialLibraryRev?: number;
+  /** Call after user materials are imported so preset dropdown refreshes. */
+  onMaterialLibraryBump?: () => void;
 }
 
 function updateLayer(
@@ -34,7 +38,7 @@ function updateLayer(
   };
 }
 
-export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, materialLibraryRev = 0 }: LayerPanelProps) {
+export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, materialLibraryRev = 0, onMaterialLibraryBump }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
 
   const setActiveLayer = (layerId: string) => {
@@ -106,6 +110,37 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
     };
     onSceneCommit(newScene);
   }, [scene, onSceneCommit]);
+
+  const handleExportPresets = useCallback(() => {
+    const json = exportUserMaterials();
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'laserforge-material-presets.json';
+    a.click();
+    URL.revokeObjectURL(url);
+  }, []);
+
+  const handleImportPresets = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = () => {
+      void (async () => {
+        const file = input.files?.[0];
+        if (!file) return;
+        try {
+          const text = await file.text();
+          importMaterialsFromJsonLoose(text);
+          onMaterialLibraryBump?.();
+        } catch {
+          alert('Invalid preset file');
+        }
+      })();
+    };
+    input.click();
+  }, [onMaterialLibraryBump]);
 
   const handleRemoveLayer = useCallback(() => {
     if (scene.layers.length <= 1) return;
@@ -380,11 +415,12 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
       ),
       React.createElement('div', { style: { marginTop: 6 } },
         React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Material Preset'),
-        React.createElement('select', {
-          key: `material-preset-select-${materialLibraryRev}`,
-          value: '',
-          style: selectStyle,
-          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+        React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
+          React.createElement('select', {
+            key: `material-preset-select-${materialLibraryRev}`,
+            value: '',
+            style: { ...selectStyle, flex: 1, minWidth: 0 },
+            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
             const presetName = e.target.value;
             if (!presetName || !activeLayer) return;
 
@@ -442,25 +478,60 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
             onSceneCommit({ ...scene, layers: newLayers, material: updatedMaterial });
           },
         },
-          React.createElement('option', { value: '' }, '— Select material —'),
-          ...MATERIAL_CATEGORIES.map(cat => {
-            const presets = MATERIAL_PRESETS.filter(p => p.category === cat);
-            if (presets.length === 0) return null;
-            return React.createElement('optgroup', { key: `builtin-${cat}`, label: cat },
-              ...presets.map(p =>
-                React.createElement('option', { key: p.name, value: p.name }, p.name),
-              ),
-            );
-          }).filter(Boolean),
-          (() => {
-            const userMats = getUserMaterials();
-            if (userMats.length === 0) return null;
-            return React.createElement('optgroup', { key: `user-${materialLibraryRev}`, label: 'My Materials' },
-              ...userMats.map(m =>
-                React.createElement('option', { key: m.id, value: m.name }, `★ ${m.name} (${m.thickness}mm)`),
-              ),
-            );
-          })(),
+            React.createElement('option', { value: '' }, '— Select material —'),
+            ...MATERIAL_CATEGORIES.map(cat => {
+              const presets = MATERIAL_PRESETS.filter(p => p.category === cat);
+              if (presets.length === 0) return null;
+              return React.createElement('optgroup', { key: `builtin-${cat}`, label: cat },
+                ...presets.map(p =>
+                  React.createElement('option', { key: p.name, value: p.name }, p.name),
+                ),
+              );
+            }).filter(Boolean),
+            (() => {
+              const userMats = getUserMaterials();
+              if (userMats.length === 0) return null;
+              return React.createElement('optgroup', { key: `user-${materialLibraryRev}`, label: 'My Materials' },
+                ...userMats.map(m =>
+                  React.createElement('option', { key: m.id, value: m.name }, `★ ${m.name} (${m.thickness}mm)`),
+                ),
+              );
+            })(),
+          ),
+          React.createElement('button', {
+            type: 'button',
+            onClick: handleExportPresets,
+            title: 'Export material presets as JSON',
+            style: {
+              flexShrink: 0,
+              width: 28,
+              padding: '4px 0',
+              background: '#0a0a14',
+              border: '1px solid #252540',
+              borderRadius: 4,
+              color: '#8888aa',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: theme.font.ui,
+            },
+          }, '↓'),
+          React.createElement('button', {
+            type: 'button',
+            onClick: handleImportPresets,
+            title: 'Import material presets from JSON',
+            style: {
+              flexShrink: 0,
+              width: 28,
+              padding: '4px 0',
+              background: '#0a0a14',
+              border: '1px solid #252540',
+              borderRadius: 4,
+              color: '#8888aa',
+              fontSize: 12,
+              cursor: 'pointer',
+              fontFamily: theme.font.ui,
+            },
+          }, '↑'),
         ),
         (() => {
           const selectedPresetName = scene.material?.name || '';
