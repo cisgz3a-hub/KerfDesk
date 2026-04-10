@@ -15,23 +15,6 @@ const TRIAL_CODES: Record<string, { name: string; created: string; days: number 
   'DEMO-REVIEW-2026': { name: 'Demo Review', created: '2026-04-10', days: 30 },
 };
 
-/**
- * License keys — permanent access, sold via Gumroad.
- * Format: LF-XXXX-XXXX-XXXX (16 chars + dashes)
- *
- * For now, hardcoded list. When you launch, replace with server-side validation
- * via Gumroad's license verification API.
- *
- * To add a buyer:
- * 1. Generate a unique key in Gumroad
- * 2. Add it here with the buyer's name
- * 3. Push the change
- */
-const LICENSE_KEYS: Record<string, string> = {
-  'LF-TEST-DEMO-0001': 'Test License',
-  // 'LF-XXXX-XXXX-XXXX': 'Buyer Name',
-};
-
 interface AccessInfo {
   type: 'trial' | 'license' | 'free';
   code: string;
@@ -40,19 +23,10 @@ interface AccessInfo {
   expired?: boolean;
 }
 
-function validateAccess(code: string): AccessInfo | null {
+async function validateAccess(code: string): Promise<AccessInfo | null> {
   const upper = code.toUpperCase().trim();
 
-  // Check license keys first (permanent)
-  if (LICENSE_KEYS[upper]) {
-    return {
-      type: 'license',
-      code: upper,
-      name: LICENSE_KEYS[upper],
-    };
-  }
-
-  // Check trial codes
+  // Check trial codes first (no API call needed)
   if (TRIAL_CODES[upper]) {
     const entry = TRIAL_CODES[upper];
     const started = new Date(entry.created);
@@ -67,7 +41,42 @@ function validateAccess(code: string): AccessInfo | null {
     };
   }
 
-  return null;
+  // Validate license key format before hitting API
+  if (!/^[A-Z0-9-]{16,40}$/.test(upper)) {
+    return null;
+  }
+
+  // Verify against Gumroad API
+  try {
+    const formData = new FormData();
+    formData.append('product_id', GUMROAD_PRODUCT_ID);
+    formData.append('license_key', upper);
+    formData.append('increment_uses_count', 'false');
+
+    const response = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    if (!data.success || !data.purchase) return null;
+
+    // Reject refunded or disputed purchases
+    if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
+      return null;
+    }
+
+    return {
+      type: 'license',
+      code: upper,
+      name: data.purchase.email || 'PRO User',
+    };
+  } catch (err) {
+    console.error('[TrialGuard] License verification failed:', err);
+    return null;
+  }
 }
 
 /** Check if PRO features should be unlocked */
@@ -93,11 +102,10 @@ export function TrialGuard({ children }: TrialGuardProps) {
   const font = "'DM Sans', system-ui, sans-serif";
 
   useEffect(() => {
-    // Check saved code
-    try {
+    const loadSavedAccess = async () => {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const info = validateAccess(saved);
+        const info = await validateAccess(saved);
         if (info) {
           setAccessInfo(info);
           if (info.type === 'license' || (info.type === 'trial' && !info.expired)) {
@@ -111,28 +119,30 @@ export function TrialGuard({ children }: TrialGuardProps) {
         }
       }
 
-      // Check URL parameter
+      // Check URL parameter for ?code= or ?license=
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('license');
       if (urlCode) {
-        const info = validateAccess(urlCode);
+        const info = await validateAccess(urlCode);
         if (info) {
           setAccessInfo(info);
           localStorage.setItem(STORAGE_KEY, urlCode.toUpperCase().trim());
-          if (info.type === 'license' || (info.type === 'trial' && !info.expired)) {
+          if (info.type === 'license' || !info.expired) {
             localStorage.setItem(PRO_FLAG_KEY, 'true');
           }
           window.history.replaceState({}, '', window.location.pathname);
         }
       }
-    } catch { /* ignore */ }
 
-    setInitialized(true);
+      setInitialized(true);
+    };
+
+    loadSavedAccess();
   }, []);
 
-  const handleSubmitCode = () => {
+  const handleSubmitCode = async () => {
     setError('');
-    const info = validateAccess(codeInput);
+    const info = await validateAccess(codeInput);
 
     if (!info) {
       setError('Invalid code or license key');
@@ -145,12 +155,10 @@ export function TrialGuard({ children }: TrialGuardProps) {
     }
 
     setAccessInfo(info);
-    try {
-      localStorage.setItem(STORAGE_KEY, codeInput.toUpperCase().trim());
-      if (info.type === 'license' || (info.type === 'trial' && !info.expired)) {
-        localStorage.setItem(PRO_FLAG_KEY, 'true');
-      }
-    } catch { /* ignore */ }
+    localStorage.setItem(STORAGE_KEY, codeInput.toUpperCase().trim());
+    if (info.type === 'license' || !info.expired) {
+      localStorage.setItem(PRO_FLAG_KEY, 'true');
+    }
   };
 
   const handleContinueFree = () => {
