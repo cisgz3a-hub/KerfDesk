@@ -133,9 +133,15 @@ export class GrblController implements LaserController {
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._linesAcknowledged = 0;
-    this._isJobRunning = true;
     this._jobStartTime = Date.now();
 
+    // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
+    if (this._jobLines.length === 0) {
+      this._emitProgress();
+      return;
+    }
+
+    this._isJobRunning = true;
     this._updateStatus('run');
     this._emitProgress();
     this._drainQueue();
