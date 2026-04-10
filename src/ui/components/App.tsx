@@ -156,6 +156,11 @@ export function App() {
     return { x: s.position.x, y: s.position.y };
   }, [grbl.machineState]);
 
+  const toolbarLaserConnected = useMemo(() => {
+    const s = grbl.machineState;
+    return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
+  }, [grbl.machineState]);
+
   const handleSelectStartMode = useCallback((mode: StartMode) => {
     setStartMode(mode);
     try {
@@ -1112,6 +1117,7 @@ export function App() {
       canUndo: historyAvail.canUndo,
       canRedo: historyAvail.canRedo,
       projectName: scene.metadata?.name,
+      isConnected: toolbarLaserConnected,
       materialName: scene.material?.name ?? null,
       onShowShortcuts: () => dialogs.setShowShortcuts(true),
       productionMode,
