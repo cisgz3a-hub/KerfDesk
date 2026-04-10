@@ -80,6 +80,7 @@ export function ConnectionPanel({
   const [showOutcome, setShowOutcome] = useState(false);
   const [currentLog, setCurrentLog] = useState<JobLog | null>(null);
   const [isTestFiring, setIsTestFiring] = useState(false);
+  const isTestFiringRef = useRef(false);
   const testFireTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const controllerRef = useRef(controller);
@@ -110,6 +111,10 @@ export function ConnectionPanel({
   useEffect(() => {
     currentLogRef.current = currentLog;
   }, [currentLog]);
+
+  useEffect(() => {
+    isTestFiringRef.current = isTestFiring;
+  }, [isTestFiring]);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -539,6 +544,8 @@ export function ConnectionPanel({
       return;
     }
 
+    if (machineState?.status === 'alarm') return;
+
     const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
     if (!acknowledged) {
       const ok = confirm(
@@ -576,7 +583,7 @@ export function ConnectionPanel({
       }
       setIsTestFiring(false);
     }, 10000);
-  }, [notifySimulatorTx, isTestFiring]);
+  }, [notifySimulatorTx, isTestFiring, machineState?.status]);
 
   useEffect(() => {
     return () => {
@@ -584,8 +591,16 @@ export function ConnectionPanel({
         clearTimeout(testFireTimeoutRef.current);
         testFireTimeoutRef.current = null;
       }
+      if (isTestFiringRef.current) {
+        notifySimulatorTx('M5 S0');
+        try {
+          controllerRef.current?.sendCommand('M5 S0');
+        } catch (err: unknown) {
+          console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+        }
+      }
     };
-  }, []);
+  }, [notifySimulatorTx]);
 
   const handleProofRun = async () => {
     if (!gcode || !controllerRef.current) return;

@@ -192,6 +192,7 @@ export function TrialGuard({ children }: TrialGuardProps) {
       const params = new URLSearchParams(window.location.search);
       const urlCode = params.get('code') || params.get('license');
       if (urlCode) {
+        window.history.replaceState({}, '', window.location.pathname);
         const info = await validateAccess(urlCode);
         if (info) {
           setAccessInfo(info);
@@ -199,7 +200,6 @@ export function TrialGuard({ children }: TrialGuardProps) {
           if (info.type === 'license' || !info.expired) {
             localStorage.setItem(PRO_FLAG_KEY, 'true');
           }
-          window.history.replaceState({}, '', window.location.pathname);
         }
       }
 

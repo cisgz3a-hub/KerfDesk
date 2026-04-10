@@ -287,6 +287,7 @@ export function CanvasViewport({
   const spaceHeldRef = useRef(false);
   const nodeTargetIdRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const prevBedRef = useRef<{ w: number; h: number } | null>(null);
 
   const onZoomChangeRef = useRef(onZoomChange);
   onZoomChangeRef.current = onZoomChange;
@@ -380,9 +381,14 @@ export function CanvasViewport({
     };
   }, [actionsRef, scene.canvas.width, scene.canvas.height, width, height]);
 
-  // Center bed on first load, when bed size changes (e.g. setup wizard), and when viewport size changes
+  // Center bed on first load and when scene canvas (bed) size changes — not when only the viewport panel is resized
   useEffect(() => {
-    const next = fitBedInViewport(scene.canvas.width, scene.canvas.height, width, height);
+    const w = scene.canvas.width;
+    const h = scene.canvas.height;
+    const prev = prevBedRef.current;
+    if (prev !== null && prev.w === w && prev.h === h) return;
+    prevBedRef.current = { w, h };
+    const next = fitBedInViewport(w, h, width, height);
     setViewport(next);
     onZoomChangeRef.current?.(Math.round(next.zoom * 100));
   }, [scene.canvas.width, scene.canvas.height, width, height]);

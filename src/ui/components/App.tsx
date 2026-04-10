@@ -376,6 +376,7 @@ export function App() {
 
   /** New project: reset history entirely and start fresh. */
   const handleNewProject = useCallback((newScene: Scene) => {
+    sceneIsDirtyRef.current = false;
     historyRef.current.reset(newScene);
     setScene(newScene);
   }, []);
