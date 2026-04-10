@@ -435,7 +435,7 @@ export function FileToolbar({
 
     iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
     iconBtn('⊞ Box', 'Generate a finger-joint box', () => onBoxGenerator?.()),
-    iconBtn('⚄ Nest', 'Auto-pack shapes to save material', () => onAutoNest?.()),
+    iconBtn('⚄ Auto-Pack', 'Auto-pack shapes to save material', () => onAutoNest?.()),
 
     React.createElement('div', { style: { flex: 1 } }),
 

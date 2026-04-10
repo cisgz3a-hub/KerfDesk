@@ -1,5 +1,5 @@
 /**
- * Shape nesting / auto-layout — packs scene objects efficiently onto material
+ * Shape auto-packing / auto-layout — packs scene objects efficiently onto material
  * using a bin-packing algorithm. Reduces material waste by automatically
  * arranging shapes to minimize space.
  *
