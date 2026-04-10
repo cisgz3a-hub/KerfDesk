@@ -32,6 +32,7 @@ import { useImport } from '../hooks/useImport';
 import { useGcodeExport } from '../hooks/useGcodeExport';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
+import { useSceneOperations } from '../hooks/useSceneOperations';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
@@ -47,11 +48,9 @@ import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { pruneUnusedImages } from '../../io/ImageStore';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
-import { textToPath } from '../../geometry/TextToPath';
-import { offsetObject } from '../../geometry/OffsetPath';
+import { type BooleanOp } from '../../geometry/BooleanOps';
 import { createLayer } from '../../core/scene/Layer';
-import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
@@ -78,86 +77,6 @@ function getSetupStorageKey(): string {
     }
   } catch { /* ignore */ }
   return 'laserforge_setup_complete';
-}
-
-function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
-  const selected = scn.objects.filter(o => selIds.has(o.id));
-  if (selected.length === 0) return scn;
-
-  // computeObjectBounds returns LOCAL space bounds (before transform)
-  // But we were multiplying by transform again — double transform!
-  // Instead, compute world bounds manually from tx/ty and local bounds * scale
-
-  let wMinX = Infinity, wMinY = Infinity, wMaxX = -Infinity, wMaxY = -Infinity;
-
-  for (const o of selected) {
-    const b = computeObjectBounds(o);
-    if (!b) continue;
-    const t = o.transform;
-
-    // World position = local * scale + translate
-    // But bounds might ALREADY be in world space if computeObjectBounds applies transform
-    // Use bounds directly as world coords (don't multiply by transform)
-    const x1 = b.minX;
-    const y1 = b.minY;
-    const x2 = b.maxX;
-    const y2 = b.maxY;
-
-    wMinX = Math.min(wMinX, x1);
-    wMinY = Math.min(wMinY, y1);
-    wMaxX = Math.max(wMaxX, x2);
-    wMaxY = Math.max(wMaxY, y2);
-  }
-
-  if (!isFinite(wMinX)) return scn;
-
-  let dx = 0, dy = 0;
-
-  switch (alignment) {
-    case 'center': {
-      const targetCx = scn.material
-        ? scn.material.x + scn.material.width / 2
-        : scn.canvas.width / 2;
-      const targetCy = scn.material
-        ? scn.material.y + scn.material.height / 2
-        : scn.canvas.height / 2;
-      dx = targetCx - (wMinX + wMaxX) / 2;
-      dy = targetCy - (wMinY + wMaxY) / 2;
-      break;
-    }
-    case 'left': {
-      const edge = scn.material?.enabled ? scn.material.x : 0;
-      dx = edge - wMinX;
-      break;
-    }
-    case 'right': {
-      const edge = scn.material?.enabled ? scn.material.x + scn.material.width : scn.canvas.width;
-      dx = edge - wMaxX;
-      break;
-    }
-    case 'top': {
-      const edge = scn.material?.enabled ? scn.material.y : 0;
-      dy = edge - wMinY;
-      break;
-    }
-    case 'bottom': {
-      const edge = scn.material?.enabled ? scn.material.y + scn.material.height : scn.canvas.height;
-      dy = edge - wMaxY;
-      break;
-    }
-  }
-
-  return {
-    ...scn,
-    objects: scn.objects.map(o => {
-      if (!selIds.has(o.id)) return o;
-      return {
-        ...o,
-        transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
-        _bounds: null, _worldTransform: null,
-      };
-    }),
-  };
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -334,6 +253,14 @@ export function App() {
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
+
+  const sceneOps = useSceneOperations({
+    scene,
+    selectedIds,
+    handleSceneCommit,
+    setSelectedIds: (ids) => setSelectedIds(ids),
+    showAlert,
+  });
 
   /** New project: reset history entirely and start fresh. */
   const handleNewProject = useCallback((newScene: Scene) => {
@@ -604,8 +531,8 @@ export function App() {
 
   const handleQuickActionCenter = useCallback(() => {
     if (selectedIds.size === 0) return;
-    handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
-  }, [scene, selectedIds, handleSceneCommit]);
+    sceneOps.centerOnMaterial();
+  }, [selectedIds.size, sceneOps.centerOnMaterial]);
 
   const handleContextMenu = useCallback(
     (e: MouseEvent) => {
@@ -712,165 +639,19 @@ export function App() {
     handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
-  const handleBooleanOp = useCallback(async (op: BooleanOp) => {
-    const ids = [...selectedIds];
-    if (ids.length !== 2) {
-      await showAlert('Boolean', 'Select exactly 2 objects for boolean operations.');
-      return;
-    }
-
-    const objA = scene.objects.find(o => o.id === ids[0]);
-    const objB = scene.objects.find(o => o.id === ids[1]);
-    if (!objA || !objB) return;
-
-    const resultGeom = booleanOperation(objA, objB, op);
-
-    if (!resultGeom) {
-      await showAlert('Boolean', 'Boolean operation failed — shapes may not overlap.');
-      return;
-    }
-
-    const newId = generateId();
-    const newObj: SceneObject = {
-      id: newId,
-      type: 'path',
-      name: `${op} result`,
-      layerId: objA.layerId,
-      parentId: null,
-      transform: { ...IDENTITY_MATRIX },
-      geometry: resultGeom,
-      visible: true,
-      locked: false,
-      powerScale: 1,
-      _bounds: null,
-      _worldTransform: null,
-    };
-
-    const newScene = {
-      ...scene,
-      objects: [
-        ...scene.objects.filter(o => !selectedIds.has(o.id)),
-        newObj,
-      ],
-    };
-
-    handleSceneCommit(newScene);
-    setSelectedIds(new Set([newId]));
-  }, [scene, selectedIds, handleSceneCommit, showAlert]);
-
-  const handleTextToPath = useCallback(async () => {
-    const textObjs = scene.objects.filter(
-      o => selectedIds.has(o.id) && o.geometry.type === 'text'
-    );
-
-    if (textObjs.length === 0) {
-      await showAlert('Text to Path', 'Select a text object first.');
-      return;
-    }
-
-    const newObjects: SceneObject[] = [];
-    const removeIds = new Set<string>();
-
-    for (const obj of textObjs) {
-      const geom = obj.geometry as TextGeometry;
-      const result = await textToPath(
-        geom.text || '',
-        geom.fontFamily || 'Arial',
-        geom.fontSize || 20,
-        geom.bold ?? false
-      );
-
-      if (!result) continue;
-
-      removeIds.add(obj.id);
-
-      newObjects.push({
-        id: generateId(),
-        type: 'path',
-        name: `Path: "${geom.text}"`,
-        layerId: obj.layerId,
-        parentId: null,
-        transform: { ...obj.transform },
-        geometry: {
-          type: 'path',
-          subPaths: result.subPaths,
-        },
-        visible: true,
-        locked: false,
-        powerScale: obj.powerScale ?? 1,
-        _bounds: null,
-        _worldTransform: null,
-      });
-    }
-
-    if (newObjects.length === 0) {
-      await showAlert('Text to Path', 'Text to path conversion failed.');
-      return;
-    }
-
-    const newScene = {
-      ...scene,
-      objects: [
-        ...scene.objects.filter(o => !removeIds.has(o.id)),
-        ...newObjects,
-      ],
-    };
-
-    handleSceneCommit(newScene);
-    setSelectedIds(new Set(newObjects.map(o => o.id)));
-  }, [scene, selectedIds, handleSceneCommit, showAlert]);
-
   useEffect(() => {
     const onBoolean = (e: Event) => {
       const op = (e as CustomEvent<{ op: BooleanOp }>).detail?.op;
-      if (op) void handleBooleanOp(op);
+      if (op) void sceneOps.performBoolean(op);
     };
-    const onTextToPath = () => void handleTextToPath();
+    const onTextToPath = () => void sceneOps.textToPath();
     window.addEventListener('laserforge:boolean', onBoolean as EventListener);
     window.addEventListener('laserforge:textToPath', onTextToPath);
     return () => {
       window.removeEventListener('laserforge:boolean', onBoolean as EventListener);
       window.removeEventListener('laserforge:textToPath', onTextToPath);
     };
-  }, [handleBooleanOp, handleTextToPath]);
-
-  const handleOffset = useCallback(async (distance: number) => {
-    if (selectedIds.size === 0) return;
-
-    const newObjects: typeof scene.objects = [];
-
-    for (const obj of scene.objects) {
-      if (!selectedIds.has(obj.id)) continue;
-
-      const resultGeom = offsetObject(obj, distance);
-      if (!resultGeom) continue;
-
-      newObjects.push({
-        id: generateId(),
-        type: 'path',
-        name: `${distance > 0 ? 'Outset' : 'Inset'} ${Math.abs(distance)}mm`,
-        layerId: obj.layerId,
-        parentId: null,
-        transform: { ...IDENTITY_MATRIX },
-        geometry: resultGeom,
-        visible: true,
-        locked: false,
-        powerScale: obj.powerScale ?? 1,
-        _bounds: null,
-        _worldTransform: null,
-      });
-    }
-
-    if (newObjects.length === 0) {
-      await showAlert('Offset', 'Offset failed — shape may be too small or complex.');
-      return;
-    }
-
-    handleSceneCommit({
-      ...scene,
-      objects: [...scene.objects, ...newObjects],
-    });
-  }, [scene, selectedIds, handleSceneCommit, showAlert]);
+  }, [sceneOps.performBoolean, sceneOps.textToPath]);
 
   const handleMaterialTestConfirm = useCallback((config: MaterialTestConfig) => {
     setShowMaterialTest(false);
@@ -1063,12 +844,12 @@ export function App() {
         onNudge: handleNudge,
         selectionCount: selectedIds.size,
         clipboardItemCount: clipboard.length,
-        onBooleanUnion: () => void handleBooleanOp('union'),
-        onBooleanSubtract: () => void handleBooleanOp('subtract'),
-        onBooleanIntersect: () => void handleBooleanOp('intersect'),
+        onBooleanUnion: () => void sceneOps.performBoolean('union'),
+        onBooleanSubtract: () => void sceneOps.performBoolean('subtract'),
+        onBooleanIntersect: () => void sceneOps.performBoolean('intersect'),
         onAlignSelectionCenter: () => {
           if (selectedIds.size === 0) return;
-          handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
+          sceneOps.centerOnMaterial();
         },
         onGridArray: handleGridArray,
       }),
@@ -1085,7 +866,8 @@ export function App() {
         handleDuplicate,
         handleClearSelection,
         handleNudge,
-        handleBooleanOp,
+        sceneOps.performBoolean,
+        sceneOps.centerOnMaterial,
         handleGridArray,
         compileGcode,
         scene,
@@ -1271,7 +1053,7 @@ export function App() {
             onSceneChange: handleSceneChange,
             onSelectionChange: setSelectedIds,
             showAlert,
-            handleTextToPath: () => void handleTextToPath(),
+            handleTextToPath: () => void sceneOps.textToPath(),
             productionMode,
           }),
         ),
@@ -1458,7 +1240,7 @@ export function App() {
       onCenter: handleQuickActionCenter,
       onGridArray: handleGridArray,
       hasSelectedText,
-      handleTextToPath: () => void handleTextToPath(),
+      handleTextToPath: () => void sceneOps.textToPath(),
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {
