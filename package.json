@@ -58,6 +58,7 @@
     }
   },
   "devDependencies": {
+    "@types/dompurify": "^3.0.5",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -70,6 +71,7 @@
   },
   "dependencies": {
     "@xmldom/xmldom": "^0.9.9",
+    "dompurify": "^3.3.3",
     "polygon-clipping": "^0.15.7",
     "polygon-offset": "^0.3.2",
     "potrace-js": "^0.0.6",

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import DOMPurify from 'dompurify';
 import { TEMPLATE_CATEGORIES, getTemplatesByCategory, searchTemplates, type Template } from '../../templates/TemplateLibrary';
 
 interface TemplateBrowserProps {
@@ -116,11 +117,14 @@ export function TemplateBrowser({ onSelect, onClose }: TemplateBrowserProps) {
                     transform: hoveredId === t.id ? 'scale(1.15)' : 'scale(1)',
                   },
                   dangerouslySetInnerHTML: {
-                    __html: t.svg.replace(/stroke="red"/g, 'stroke="#ff4466"')
-                      .replace(/stroke="blue"/g, 'stroke="#4488ff"')
-                      .replace(/stroke="green"/g, 'stroke="#44cc66"')
-                      .replace(/fill="blue"/g, 'fill="#4488ff"')
-                      .replace(/<svg /, '<svg style="max-width:100%;max-height:66px;width:auto;height:auto;" '),
+                    __html: DOMPurify.sanitize(
+                      t.svg.replace(/stroke="red"/g, 'stroke="#ff4466"')
+                        .replace(/stroke="blue"/g, 'stroke="#4488ff"')
+                        .replace(/stroke="green"/g, 'stroke="#44cc66"')
+                        .replace(/fill="blue"/g, 'fill="#4488ff"')
+                        .replace(/<svg /, '<svg style="max-width:100%;max-height:66px;width:auto;height:auto;" '),
+                      { USE_PROFILES: { svg: true } },
+                    ),
                   },
                 }),
                 // Info section

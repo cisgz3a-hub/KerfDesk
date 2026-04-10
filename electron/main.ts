@@ -160,6 +160,9 @@ ipcMain.handle('serial:disconnect', async () => {
   await closeSerial();
 });
 
-ipcMain.handle('serial:send', async (_event, line: string) => {
+ipcMain.handle('serial:send', async (_event, line: unknown) => {
+  if (typeof line !== 'string') return;
+  if (line.length === 0 || line.length > 127) return;
+  if (/[\r\n]/.test(line)) return;
   await writeSerialLine(line);
 });
