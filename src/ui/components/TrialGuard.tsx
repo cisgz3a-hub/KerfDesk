@@ -9,12 +9,20 @@ const CODE_STORAGE_KEY = 'laserforge_access_code';
  * To add a new tester: add a line with their code and today's date.
  * To extend a trial: update the date.
  * To revoke access: remove their line.
+ *
+ * Use `{ noExpiry: true }` instead of `days` for accounts that never expire.
  */
-const ACCESS_CODES: Record<string, { name: string; created: string; days: number }> = {
+type AccessEntry =
+  | { name: string; created: string; days: number }
+  | { name: string; created: string; noExpiry: true };
+
+const ACCESS_CODES: Record<string, AccessEntry> = {
   'TESTER-ALPHA-2026': { name: 'Alpha Tester', created: '2026-04-10', days: 14 },
   'TESTER-BETA-2026': { name: 'Beta Tester', created: '2026-04-10', days: 14 },
   'TESTER-GAMMA-2026': { name: 'Gamma Tester', created: '2026-04-10', days: 14 },
   'DEMO-REVIEW-2026': { name: 'Demo Review', created: '2026-04-10', days: 30 },
+  'JOHN-LASER-2026': { name: 'John', created: '2026-04-10', days: 14 },
+  'WILLEM': { name: 'Willem', created: '2026-04-10', noExpiry: true },
   // Add more codes here as needed:
   // 'UNIQUE-CODE-HERE': { name: 'Tester Name', created: 'YYYY-MM-DD', days: 14 },
 };
@@ -26,18 +34,35 @@ interface TrialInfo {
   expires: Date;
   daysLeft: number;
   expired: boolean;
+  /** No end date — skip trial countdown banners */
+  unlimited?: boolean;
 }
 
 function validateCode(code: string): TrialInfo | null {
-  const entry = ACCESS_CODES[code.toUpperCase().trim()];
+  const key = code.toUpperCase().trim();
+  const entry = ACCESS_CODES[key];
   if (!entry) return null;
 
   const started = new Date(entry.created);
-  const expires = new Date(started.getTime() + entry.days * 24 * 60 * 60 * 1000);
+
+  if ('noExpiry' in entry && entry.noExpiry) {
+    return {
+      code: key,
+      name: entry.name,
+      started,
+      expires: new Date('9999-12-31T23:59:59Z'),
+      daysLeft: 0,
+      expired: false,
+      unlimited: true,
+    };
+  }
+
+  const days = entry.days;
+  const expires = new Date(started.getTime() + days * 24 * 60 * 60 * 1000);
   const daysLeft = Math.max(0, Math.ceil((expires.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
 
   return {
-    code: code.toUpperCase().trim(),
+    code: key,
     name: entry.name,
     started,
     expires,
@@ -136,15 +161,15 @@ export function TrialGuard({ children }: TrialGuardProps) {
           value: codeInput,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => { setCodeInput(e.target.value); setError(''); },
           onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') handleSubmitCode(); },
-          placeholder: 'ACCESS-CODE-HERE',
+          placeholder: 'Access code',
           autoFocus: true,
           style: {
             width: '100%', padding: '14px 16px', marginBottom: 12,
             background: '#12121e', border: error ? '1px solid #ff4466' : '1px solid #252540',
             borderRadius: 10, color: '#e0e0ec', fontSize: 16,
-            textAlign: 'center' as const, letterSpacing: 2,
+            textAlign: 'center' as const, letterSpacing: 1,
             fontFamily: "'JetBrains Mono', monospace",
-            outline: 'none', textTransform: 'uppercase' as const,
+            outline: 'none',
           },
         }),
 
@@ -219,7 +244,19 @@ export function TrialGuard({ children }: TrialGuardProps) {
   }
 
   return React.createElement(React.Fragment, null,
-    trialInfo.daysLeft <= 7 && React.createElement('div', {
+    trialInfo.unlimited && React.createElement('div', {
+      style: {
+        background: 'rgba(0,212,255,0.03)', borderBottom: '1px solid #1a1a2e',
+        padding: '4px 18px', display: 'flex', justifyContent: 'center', alignItems: 'center',
+        fontFamily: font, fontSize: 10, flexShrink: 0,
+      },
+    },
+      React.createElement('span', { style: { color: '#555570' } },
+        `Welcome ${trialInfo.name} — full access (no expiration)`,
+      ),
+    ),
+
+    !trialInfo.unlimited && trialInfo.daysLeft <= 7 && React.createElement('div', {
       style: {
         background: trialInfo.daysLeft <= 3 ? 'rgba(255,68,102,0.08)' : 'rgba(255,212,68,0.06)',
         borderBottom: trialInfo.daysLeft <= 3 ? '1px solid rgba(255,68,102,0.2)' : '1px solid rgba(255,212,68,0.15)',
@@ -236,7 +273,7 @@ export function TrialGuard({ children }: TrialGuardProps) {
       }, 'Get License'),
     ),
 
-    trialInfo.daysLeft > 7 && React.createElement('div', {
+    !trialInfo.unlimited && trialInfo.daysLeft > 7 && React.createElement('div', {
       style: {
         background: 'rgba(0,212,255,0.03)', borderBottom: '1px solid #1a1a2e',
         padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
