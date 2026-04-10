@@ -12,7 +12,7 @@
  * Last updated: UI Wiring — File Toolbar
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
@@ -39,6 +39,8 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
   onCamera?: () => void;
+  /** Open start position / work origin wizard */
+  onStartPosition?: () => void;
   /** Toolbar image import — shared pipeline with drag-drop (IndexedDB threshold, geometry). */
   onImportImageFile?: (file: File) => Promise<void>;
   onTemplates?: () => void;
@@ -72,10 +74,11 @@ export function FileToolbar({
   showConfirm,
   onConnect,
   onSetup,
-  onMaterialTest: _onMaterialTest,
+  onMaterialTest,
   onMaterialSetup,
   onMaterialLibrary,
   onCamera,
+  onStartPosition,
   onImportImageFile,
   onTemplates,
   onBoxGenerator,
@@ -94,6 +97,7 @@ export function FileToolbar({
   productionMode = false,
   onToggleProductionMode,
 }: FileToolbarProps) {
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -308,8 +312,8 @@ export function FileToolbar({
       title,
       disabled: opts?.disabled,
       style: {
-        padding: '4px 8px',
-        fontSize: 11,
+        padding: '3px 8px',
+        fontSize: 10,
         cursor: opts?.disabled ? 'default' : 'pointer',
         background: opts?.bg || 'transparent',
         border: 'none',
@@ -335,6 +339,111 @@ export function FileToolbar({
       style: { width: 1, height: 18, background: '#1a1a2e', margin: '0 4px', flexShrink: 0 },
     });
 
+  const toolMenuItems: Array<{ label: string; action?: () => void; show: boolean }> = [
+    { label: '📷 Camera', action: onCamera, show: true },
+    { label: '🎯 Position', action: onStartPosition, show: true },
+    { label: '⚄ Auto-Pack', action: onAutoNest, show: true },
+    { label: '⊞ Box Generator', action: onBoxGenerator, show: true },
+    { label: '📐 Kerf Wizard', action: onKerfWizard, show: productionMode },
+    { label: '🧪 Material Test', action: onMaterialTest, show: productionMode },
+    { label: '✦ Templates', action: onTemplates, show: true },
+    { label: '📚 Material Library', action: onMaterialLibrary, show: true },
+    { label: 'Export SVG', action: () => { void handleExportSvg(); }, show: true },
+    { label: '⎘ Toolpath', action: () => { void onToolpathPreview?.(); }, show: true },
+    {
+      label: previewMode ? '● Burn preview (on)' : '○ Burn preview (off)',
+      action: onPreviewToggle,
+      show: !!onPreviewToggle,
+    },
+    { label: 'DXF import', action: handleImportDxfClick, show: productionMode },
+    { label: 'Setup', action: onSetup, show: true },
+    { label: '? Shortcuts', action: onShowShortcuts, show: true },
+  ];
+
+  const toolsMenu = React.createElement(
+    'div',
+    { style: { position: 'relative' as const, flexShrink: 0, zIndex: showToolsMenu ? 1002 : undefined } },
+    showToolsMenu &&
+      React.createElement('div', {
+        style: { position: 'fixed' as const, inset: 0, zIndex: 999, background: 'transparent' },
+        onClick: () => setShowToolsMenu(false),
+      }),
+    React.createElement(
+      'button',
+      {
+        type: 'button',
+        onClick: () => setShowToolsMenu(v => !v),
+        style: {
+          padding: '3px 8px',
+          fontSize: 10,
+          cursor: 'pointer',
+          background: showToolsMenu ? 'rgba(0,212,255,0.1)' : 'transparent',
+          border: showToolsMenu ? '1px solid #00d4ff' : '1px solid #252540',
+          borderRadius: 5,
+          color: showToolsMenu ? '#00d4ff' : '#c0c0d0',
+          fontFamily: font,
+          whiteSpace: 'nowrap' as const,
+          flexShrink: 0,
+        },
+      },
+      '⚙ Tools ▾',
+    ),
+    showToolsMenu &&
+      React.createElement(
+        'div',
+        {
+          style: {
+            position: 'absolute' as const,
+            top: '100%',
+            right: 0,
+            marginTop: 4,
+            background: '#12121e',
+            border: '1px solid #252540',
+            borderRadius: 8,
+            padding: '4px 0',
+            zIndex: 1001,
+            minWidth: 180,
+            boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+          },
+        },
+        ...toolMenuItems
+          .filter(item => item.show && item.action)
+          .map(item =>
+            React.createElement(
+              'button',
+              {
+                key: item.label,
+                type: 'button',
+                onClick: () => {
+                  item.action?.();
+                  setShowToolsMenu(false);
+                },
+                style: {
+                  display: 'block',
+                  width: '100%',
+                  padding: '7px 14px',
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#c0c0d0',
+                  fontSize: 11,
+                  cursor: 'pointer',
+                  textAlign: 'left' as const,
+                  fontFamily: font,
+                  whiteSpace: 'nowrap' as const,
+                },
+                onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.background = 'rgba(0,212,255,0.06)';
+                },
+                onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
+                  e.currentTarget.style.background = 'transparent';
+                },
+              },
+              item.label,
+            ),
+          ),
+      ),
+  );
+
   return React.createElement('div', {
     style: {
       display: 'flex',
@@ -343,10 +452,11 @@ export function FileToolbar({
       background: '#0d0d18',
       borderBottom: '1px solid #1a1a2e',
       padding: '0 8px',
-      gap: 1,
+      gap: 4,
       fontFamily: font,
       flexShrink: 0,
       overflow: 'hidden',
+      flexWrap: 'nowrap' as const,
     },
   },
     React.createElement('button', {
@@ -396,51 +506,13 @@ export function FileToolbar({
 
     iconBtn('SVG', 'Import SVG file', handleImportClick),
     iconBtn('IMG', 'Import image (PNG/JPG)', handleImportImageClick),
-    productionMode && iconBtn('DXF', 'Import DXF file', handleImportDxfClick),
 
     sep(),
 
     iconBtn('G-code', 'Export G-code file', handleGenerateGcode, { color: '#2dd4a0' }),
-    iconBtn('Export', 'Export as SVG', handleExportSvg),
-
-    sep(),
-
-    iconBtn('⎘ Toolpath', 'Preview laser toolpath (Ctrl+P)', () => { void onToolpathPreview?.(); }, { color: '#00d4ff' }),
-    React.createElement('button', {
-      onClick: () => onPreviewToggle?.(),
-      title: 'Toggle burn preview — see how it will look on material',
-      style: {
-        padding: '4px 8px',
-        fontSize: 11,
-        cursor: 'pointer',
-        background: previewMode ? 'rgba(45,212,160,0.12)' : 'transparent',
-        border: 'none',
-        borderRadius: 4,
-        color: previewMode ? '#2dd4a0' : '#8888aa',
-        fontFamily: font,
-        fontWeight: 600,
-        flexShrink: 0,
-        transition: 'background 0.1s',
-      },
-      onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = previewMode ? 'rgba(45,212,160,0.2)' : 'rgba(255,255,255,0.05)';
-      },
-      onMouseLeave: (e: React.MouseEvent<HTMLButtonElement>) => {
-        const el = e.currentTarget;
-        el.style.background = previewMode ? 'rgba(45,212,160,0.12)' : 'transparent';
-      },
-    }, previewMode ? '● Preview' : '○ Preview'),
     iconBtn('⌁ Connect', 'Connect to laser', () => onConnect?.(), { color: '#00d4ff', bold: true }),
 
-    sep(),
-
-    iconBtn('✦ Templates', 'Browse starter designs', () => onTemplates?.()),
-    iconBtn('⊞ Box', 'Generate a finger-joint box', () => onBoxGenerator?.()),
-    iconBtn('⚄ Auto-Pack', 'Auto-pack shapes to save material', () => onAutoNest?.()),
-    productionMode && iconBtn('📐 Kerf', 'Calibrate kerf for tight-fitting joints', () => onKerfWizard?.()),
-
-    React.createElement('div', { style: { flex: 1 } }),
+    React.createElement('div', { style: { flex: 1, minWidth: 0 } }),
 
     React.createElement('button', {
       onClick: () => onMaterialSetup?.(),
@@ -468,11 +540,8 @@ export function FileToolbar({
         (e.target as HTMLElement).style.background = materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent';
       },
     }, materialName || '⊞ Material'),
-    iconBtn('📚 Library', 'Manage custom material library', () => onMaterialLibrary?.()),
-    iconBtn('📷 Camera', 'Camera alignment — click on bed to position designs', () => onCamera?.()),
-    iconBtn('Setup', 'Machine setup', () => onSetup?.()),
 
-    iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
+    toolsMenu,
 
     // Hidden file input for SVG import
     React.createElement('input', {

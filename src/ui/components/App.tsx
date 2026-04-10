@@ -1089,6 +1089,7 @@ export function App() {
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
+      onStartPosition: () => setShowStartWizard(true),
       onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
