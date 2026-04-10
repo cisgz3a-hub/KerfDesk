@@ -23,6 +23,16 @@ export interface MaterialPreset {
   };
 }
 
+export interface UserMaterial extends MaterialPreset {
+  id: string;
+  isUser: true;
+  createdAt: string;
+  updatedAt: string;
+  notes?: string;
+}
+
+const USER_MATERIALS_KEY = 'laserforge_user_materials';
+
 interface LaserOp {
   power: number;
   speed: number;
@@ -391,6 +401,153 @@ export function getMachineSettingsKey(machineType: string, watts: string): strin
   return 'diode_5w';
 }
 
+/** Get all user-created materials from localStorage */
+export function getUserMaterials(): UserMaterial[] {
+  try {
+    const raw = localStorage.getItem(USER_MATERIALS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((m): m is UserMaterial =>
+      m != null && typeof m === 'object' && 'id' in m && 'name' in m && 'settings' in m,
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** Save a user material (create or update) */
+export function saveUserMaterial(material: UserMaterial): void {
+  const all = getUserMaterials();
+  const idx = all.findIndex(m => m.id === material.id);
+  material.updatedAt = new Date().toISOString();
+  if (idx >= 0) {
+    all[idx] = material;
+  } else {
+    material.createdAt = material.createdAt || new Date().toISOString();
+    all.push(material);
+  }
+  localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(all));
+}
+
+/** Delete a user material by ID */
+export function deleteUserMaterial(id: string): void {
+  const all = getUserMaterials().filter(m => m.id !== id);
+  localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(all));
+}
+
+/** Create a new user material from current layer settings */
+export function createUserMaterialFromLayer(
+  name: string,
+  category: string,
+  thickness: number,
+  machineType: string,
+  machineWatts: string,
+  cutSettings: { power: number; speed: number; passes: number },
+  engraveSettings: { power: number; speed: number; passes: number },
+  notes?: string,
+): UserMaterial {
+  const machineKey = getMachineSettingsKey(machineType, machineWatts) as keyof MaterialPreset['settings'];
+
+  const emptyOp: LaserOp = { power: 0, speed: 0, passes: 0 };
+  const settings: MaterialPreset['settings'] = {
+    diode_5w: { cut: emptyOp, engrave: emptyOp },
+    diode_10w: { cut: emptyOp, engrave: emptyOp },
+    diode_20w: { cut: emptyOp, engrave: emptyOp },
+    diode_40w: { cut: emptyOp, engrave: emptyOp },
+    co2_40w: { cut: emptyOp, engrave: emptyOp },
+    co2_60w: { cut: emptyOp, engrave: emptyOp },
+    co2_80w: { cut: emptyOp, engrave: emptyOp },
+  };
+
+  settings[machineKey] = {
+    cut: cutSettings,
+    engrave: engraveSettings,
+  };
+
+  const now = new Date().toISOString();
+  return {
+    id: `user_mat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    name,
+    category,
+    thickness,
+    settings,
+    isUser: true,
+    createdAt: now,
+    updatedAt: now,
+    notes,
+  };
+}
+
+/** Export all user materials as a downloadable JSON file */
+export function exportUserMaterials(): string {
+  const all = getUserMaterials();
+  const exportData = {
+    format: 'laserforge_materials',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    materialCount: all.length,
+    materials: all,
+  };
+  return JSON.stringify(exportData, null, 2);
+}
+
+/** Import materials from a JSON file. Returns count imported. */
+export function importUserMaterials(jsonString: string): number {
+  try {
+    const data = JSON.parse(jsonString) as {
+      format?: string;
+      materials?: unknown[];
+    };
+
+    if (data.format !== 'laserforge_materials') {
+      throw new Error('Not a LaserForge material library file');
+    }
+
+    if (!Array.isArray(data.materials)) {
+      throw new Error('Invalid material data');
+    }
+
+    const existing = [...getUserMaterials()];
+    const existingIds = new Set(existing.map(m => m.id));
+    let imported = 0;
+
+    for (const mat of data.materials) {
+      if (mat == null || typeof mat !== 'object') continue;
+      const m = mat as Record<string, unknown>;
+      if (typeof m.name !== 'string' || typeof m.category !== 'string' || m.settings == null || typeof m.settings !== 'object') {
+        continue;
+      }
+
+      const idBase = typeof m.id === 'string' ? m.id : `import_${imported}`;
+      const newId = existingIds.has(idBase) ? `user_mat_${Date.now()}_${imported}_${Math.random().toString(36).slice(2, 5)}` : idBase;
+      existingIds.add(newId);
+
+      const newMat: UserMaterial = {
+        ...(m as unknown as UserMaterial),
+        id: newId,
+        isUser: true,
+        createdAt: typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      existing.push(newMat);
+      imported++;
+    }
+
+    localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(existing));
+    return imported;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Import failed: ${msg}`);
+  }
+}
+
+/** Get all available materials (built-in + user) for the dropdown */
+export function getAllMaterials(): Array<MaterialPreset | UserMaterial> {
+  return [...MATERIAL_PRESETS, ...getUserMaterials()];
+}
+
 /**
  * Get recommended settings for a material, machine type, and wattage.
  */
@@ -399,7 +556,12 @@ export function getPresetSettings(
   machineType: string,
   machineWatts: string = '10',
 ): { cut: LaserOp; engrave: LaserOp } | null {
-  const preset = MATERIAL_PRESETS.find(p => p.name === presetName);
+  let preset: MaterialPreset | UserMaterial | undefined = MATERIAL_PRESETS.find(p => p.name === presetName);
+
+  if (!preset) {
+    preset = getUserMaterials().find(m => m.name === presetName);
+  }
+
   if (!preset) return null;
 
   const key = getMachineSettingsKey(machineType, machineWatts) as keyof MaterialPreset['settings'];

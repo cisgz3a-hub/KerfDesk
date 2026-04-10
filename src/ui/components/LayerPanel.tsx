@@ -6,6 +6,8 @@ import {
   MATERIAL_PRESETS,
   canCutMaterial,
   getPresetSettings,
+  getAllMaterials,
+  getUserMaterials,
 } from '../../core/materials/MaterialPresets';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
@@ -17,6 +19,8 @@ interface LayerPanelProps {
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
   productionMode: boolean;
+  /** Bumps when custom material library changes so preset list refreshes. */
+  materialLibraryRev?: number;
 }
 
 function updateLayer(
@@ -30,7 +34,7 @@ function updateLayer(
   };
 }
 
-export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }: LayerPanelProps) {
+export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, materialLibraryRev = 0 }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
 
   const setActiveLayer = (layerId: string) => {
@@ -377,6 +381,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
       React.createElement('div', { style: { marginTop: 6 } },
         React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Material Preset'),
         React.createElement('select', {
+          key: `material-preset-select-${materialLibraryRev}`,
           value: '',
           style: selectStyle,
           onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -404,7 +409,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
                 : l
             );
 
-            const preset = MATERIAL_PRESETS.find(p => p.name === presetName);
+            const preset = getAllMaterials().find(p => p.name === presetName);
             const categoryToSceneMaterialType = (category: string): NonNullable<typeof scene.material>['type'] => {
               if (category === 'Acrylic') return 'acrylic';
               if (category === 'Leather') return 'leather';
@@ -441,12 +446,21 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode }
           ...MATERIAL_CATEGORIES.map(cat => {
             const presets = MATERIAL_PRESETS.filter(p => p.category === cat);
             if (presets.length === 0) return null;
-            return React.createElement('optgroup', { key: cat, label: cat },
+            return React.createElement('optgroup', { key: `builtin-${cat}`, label: cat },
               ...presets.map(p =>
                 React.createElement('option', { key: p.name, value: p.name }, p.name),
               ),
             );
           }).filter(Boolean),
+          (() => {
+            const userMats = getUserMaterials();
+            if (userMats.length === 0) return null;
+            return React.createElement('optgroup', { key: `user-${materialLibraryRev}`, label: 'My Materials' },
+              ...userMats.map(m =>
+                React.createElement('option', { key: m.id, value: m.name }, `★ ${m.name} (${m.thickness}mm)`),
+              ),
+            );
+          })(),
         ),
         (() => {
           const selectedPresetName = scene.material?.name || '';

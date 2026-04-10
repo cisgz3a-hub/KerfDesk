@@ -61,6 +61,7 @@ import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
+import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
@@ -123,6 +124,8 @@ export function App() {
   const [showNesting, setShowNesting] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
+  const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
+  const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const grbl = useGrblConnection();
@@ -948,6 +951,7 @@ export function App() {
       onSetup: () => dialogs.setShowSetup(true),
       onMaterialTest: () => setShowMaterialTest(true),
       onMaterialSetup: () => dialogs.setShowMaterial(true),
+      onMaterialLibrary: () => setShowMaterialLibrary(true),
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
         if (gatedFeature('box_generator')) {
@@ -1065,6 +1069,7 @@ export function App() {
           selectedIds,
           onSceneCommit: handleSceneCommit,
           productionMode,
+          materialLibraryRev,
         }),
         React.createElement('div', {
           style: {
@@ -1222,6 +1227,12 @@ export function App() {
       onConfirm: handleMaterialConfirm,
       onClear: handleMaterialClear,
       onCancel: () => dialogs.setShowMaterial(false),
+    }),
+
+    showMaterialLibrary && React.createElement(MaterialLibraryDialog, {
+      scene,
+      onClose: () => setShowMaterialLibrary(false),
+      onMaterialApplied: () => setMaterialLibraryRev(r => r + 1),
     }),
 
     dialogs.showTemplates && React.createElement(TemplateBrowser, {

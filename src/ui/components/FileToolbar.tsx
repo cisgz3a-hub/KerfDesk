@@ -39,6 +39,7 @@ interface FileToolbarProps {
   onSetup?: () => void;
   onMaterialTest?: () => void;
   onMaterialSetup?: () => void;
+  onMaterialLibrary?: () => void;
   onTemplates?: () => void;
   onBoxGenerator?: () => void;
   onAutoNest?: () => void;
@@ -71,6 +72,7 @@ export function FileToolbar({
   onSetup,
   onMaterialTest: _onMaterialTest,
   onMaterialSetup,
+  onMaterialLibrary,
   onTemplates,
   onBoxGenerator,
   onAutoNest,
@@ -572,6 +574,7 @@ export function FileToolbar({
         (e.target as HTMLElement).style.background = materialName ? 'rgba(255, 170, 50, 0.08)' : 'transparent';
       },
     }, materialName || '⊞ Material'),
+    iconBtn('📚 Library', 'Manage custom material library', () => onMaterialLibrary?.()),
     iconBtn('Setup', 'Machine setup', () => onSetup?.()),
 
     iconBtn('?', 'Keyboard shortcuts', () => onShowShortcuts?.()),
