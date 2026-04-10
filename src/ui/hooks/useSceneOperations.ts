@@ -420,32 +420,50 @@ export function useSceneOperations({
       objects: scene.objects.map(o => {
         if (!selectedIds.has(o.id)) return o;
 
-        // Compute bounding box center
+        // Get current bounds in world space BEFORE flip
         const bounds = computeObjectBounds(o);
         if (!bounds) return o;
-        const cx = (bounds.minX + bounds.maxX) / 2;
-        const cy = (bounds.minY + bounds.maxY) / 2;
 
         const t = o.transform;
-
-        // Flip horizontal: scale by (-1, 1) around (cx, cy)
-        // Flip vertical:   scale by (1, -1) around (cx, cy)
         const sx = axis === 'horizontal' ? -1 : 1;
         const sy = axis === 'vertical' ? -1 : 1;
 
-        // Apply the flip to the linear part
+        // Apply negative scale to the linear part
         const newA = sx * t.a;
         const newB = sx * t.b;
         const newC = sy * t.c;
         const newD = sy * t.d;
 
-        // Adjust translation so the object's center stays at (cx, cy)
-        const newTx = sx * (t.tx - cx) + cx;
-        const newTy = sy * (t.ty - cy) + cy;
+        // Compute what the new bounds WOULD be with this flipped transform
+        // and adjust translation to keep the object in the same world position
+        const flippedObj = {
+          ...o,
+          transform: { a: newA, b: newB, c: newC, d: newD, tx: t.tx, ty: t.ty },
+          _bounds: null,
+          _worldTransform: null,
+        };
+        const newBounds = computeObjectBounds(flippedObj);
+        if (!newBounds) return o;
+
+        // Calculate offset needed to align centers
+        const oldCx = (bounds.minX + bounds.maxX) / 2;
+        const oldCy = (bounds.minY + bounds.maxY) / 2;
+        const newCx = (newBounds.minX + newBounds.maxX) / 2;
+        const newCy = (newBounds.minY + newBounds.maxY) / 2;
+
+        const dx = oldCx - newCx;
+        const dy = oldCy - newCy;
 
         return {
           ...o,
-          transform: { a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy },
+          transform: {
+            a: newA,
+            b: newB,
+            c: newC,
+            d: newD,
+            tx: t.tx + dx,
+            ty: t.ty + dy,
+          },
           _bounds: null,
           _worldTransform: null,
         };
