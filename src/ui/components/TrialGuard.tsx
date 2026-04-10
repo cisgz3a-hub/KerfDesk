@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 
+const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
+
 /**
  * Trial codes — for testers, expire after N days from creation date.
  */
