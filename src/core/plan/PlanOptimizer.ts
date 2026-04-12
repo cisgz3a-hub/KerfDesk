@@ -418,7 +418,7 @@ function planFillOperation(
   const fillAngles: number[] =
     fillMode === 'cross-hatch' ? [baseAngle, baseAngle + 90] : [baseAngle];
 
-  const interval = Math.max(0.01, settings.fillInterval);
+  const interval = Math.max(0.01, settings.fillInterval > 0 ? settings.fillInterval : 0.1);
 
   const scanlines: ScanlineSegment[] = [];
   for (const angle of fillAngles) {

@@ -129,9 +129,12 @@ function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType 
  */
 function resolveSettings(layer: Layer): ResolvedLaserSettings {
   const s = layer.settings;
+  /** Engrave always needs scanline spacing; do not rely only on fill.enabled. */
+  const fillActiveForEngrave = s.fill.enabled || s.mode === 'engrave';
+  const rawIv = Number(s.fill.interval);
   const engraveFillInterval =
-    layer.settings.mode === 'engrave'
-      ? Math.max(0.01, s.fill.interval > 0 ? s.fill.interval : 0.1)
+    s.mode === 'engrave' && fillActiveForEngrave
+      ? Math.max(0.01, Number.isFinite(rawIv) && rawIv > 0 ? rawIv : 0.1)
       : 0;
   return {
     powerMin: Math.max(0, Math.min(100, s.power.min)),

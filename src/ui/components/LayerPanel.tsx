@@ -105,7 +105,7 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
       const s = layer.settings;
       let powerMax = s.power.max;
       let speed = s.speed;
-      const fill = { ...s.fill, enabled: newMode === 'engrave' || newMode === 'image' };
+      let fill = { ...s.fill, enabled: newMode === 'engrave' || newMode === 'image' };
 
       if (newMode === 'engrave' && oldMode === 'cut') {
         if (powerMax >= 60) powerMax = Math.round(powerMax * 0.4);
@@ -135,6 +135,20 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
 
       powerMax = Math.max(0, Math.min(100, powerMax));
       speed = Math.max(1, speed);
+
+      if (newMode === 'engrave') {
+        const rawIv = Number(s.fill.interval);
+        const interval = Number.isFinite(rawIv) && rawIv > 0 ? rawIv : 0.1;
+        const modeFill = s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line';
+        fill = {
+          enabled: true,
+          interval,
+          angle: Number.isFinite(s.fill.angle) ? s.fill.angle % 360 : 0,
+          mode: modeFill,
+          biDirectional: s.fill.biDirectional,
+          overscanning: Math.max(0, Number.isFinite(s.fill.overscanning) ? s.fill.overscanning : 2.5),
+        };
+      }
 
       return {
         ...layer,

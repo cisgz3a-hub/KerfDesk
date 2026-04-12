@@ -55,7 +55,6 @@ export function generateFillScanlines(
   // Filter to closed paths only — open paths can't define a fill region
   const closed = paths.filter(p => p.closed);
   if (closed.length === 0) return [];
-  if (settings.interval <= 0) return [];
 
   const angleRad = (settings.angle * Math.PI) / 180;
 
@@ -81,7 +80,11 @@ export function generateFillScanlines(
   const MIN_FILL_INTERVAL = 0.01; // mm — finer than any laser can achieve
   const MAX_SCANLINES = 50000;
 
-  let safeInterval = Math.max(MIN_FILL_INTERVAL, settings.interval);
+  const rawInterval = Number(settings.interval);
+  let safeInterval = Math.max(
+    MIN_FILL_INTERVAL,
+    Number.isFinite(rawInterval) && rawInterval > 0 ? rawInterval : 0.1,
+  );
 
   const spanY = maxY - minY;
   const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
