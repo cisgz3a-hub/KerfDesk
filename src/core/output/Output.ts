@@ -100,12 +100,13 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   private currentSpeed = 0;
   private gcodeOffsetX = 0;
-  private gcodeOffsetY = 0;
+  /** Canvas max Y among all moves — used to flip Y (canvas Y-down → machine Y-up). */
+  private designMaxY = 0;
 
   generate(plan: Plan, job: Job, _options?: GcodeGenerateOptions): Output {
-    const { minX: designMinX, minY: designMinY } = this.designMinFromPlan(plan);
-    this.gcodeOffsetX = -designMinX;
-    this.gcodeOffsetY = -designMinY;
+    const b = this.designBoundsFromPlan(plan);
+    this.gcodeOffsetX = -b.minX;
+    this.designMaxY = b.maxY;
     this.currentSpeed = 0;
 
     try {
@@ -145,7 +146,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       };
     } finally {
       this.gcodeOffsetX = 0;
-      this.gcodeOffsetY = 0;
+      this.designMaxY = 0;
     }
   }
 
@@ -163,13 +164,13 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   encodeRapid(to: { x: number; y: number }): string {
     const x = to.x + this.gcodeOffsetX;
-    const y = to.y + this.gcodeOffsetY;
+    const y = this.designMaxY - to.y;
     return `G0 X${x.toFixed(3)} Y${y.toFixed(3)}`;
   }
 
   encodeLinear(to: { x: number; y: number }, power: number, speed: number): string {
     const x = to.x + this.gcodeOffsetX;
-    const y = to.y + this.gcodeOffsetY;
+    const y = this.designMaxY - to.y;
     const parts = [`G1 X${x.toFixed(3)} Y${y.toFixed(3)}`];
     if (speed !== this.currentSpeed) {
       parts.push(`F${speed.toFixed(0)}`);
@@ -199,20 +200,25 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     ].join('\n');
   }
 
-  /** Min X/Y of all rapid/linear destinations — shift G-code so this corner is (0,0) in work space. */
-  private designMinFromPlan(plan: Plan): { minX: number; minY: number } {
+  /** Bounds of all rapid/linear destinations — X shifted to 0 at minX; Y flipped about maxY. */
+  private designBoundsFromPlan(plan: Plan): { minX: number; minY: number; maxX: number; maxY: number } {
     let minX = Infinity;
     let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     for (const op of plan.operations) {
       for (const move of op.moves) {
         if (move.type === 'rapid' || move.type === 'linear') {
           minX = Math.min(minX, move.to.x);
           minY = Math.min(minY, move.to.y);
+          maxX = Math.max(maxX, move.to.x);
+          maxY = Math.max(maxY, move.to.y);
         }
       }
     }
-    if (!Number.isFinite(minX)) return { minX: 0, minY: 0 };
-    return { minX, minY };
+    if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    if (!Number.isFinite(maxY)) return { minX, minY, maxX: minX, maxY: minY };
+    return { minX, minY, maxX, maxY };
   }
 
   private encodeMove(move: Move): string {

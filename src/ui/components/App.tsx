@@ -153,21 +153,35 @@ export function App() {
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
-  const [activeJobPlanMin, setActiveJobPlanMin] = useState<{ minX: number; minY: number } | null>(null);
+  const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  } | null>(null);
   const grbl = useGrblConnection();
   const wasJobRunningRef = useRef(false);
 
-  function computePlanMoveMinFromMoves(moves: readonly Move[]): { minX: number; minY: number } {
+  function computePlanMoveBoundsFromMoves(moves: readonly Move[]): {
+    minX: number;
+    minY: number;
+    maxX: number;
+    maxY: number;
+  } {
     let minX = Infinity;
     let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
     for (const m of moves) {
       if (m.type === 'rapid' || m.type === 'linear') {
         minX = Math.min(minX, m.to.x);
         minY = Math.min(minY, m.to.y);
+        maxX = Math.max(maxX, m.to.x);
+        maxY = Math.max(maxY, m.to.y);
       }
     }
-    if (!Number.isFinite(minX)) return { minX: 0, minY: 0 };
-    return { minX, minY };
+    if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    return { minX, minY, maxX, maxY };
   }
 
   useEffect(() => {
@@ -181,23 +195,23 @@ export function App() {
           const job = compileJob(sceneForJob);
           if (job.operations.length === 0) {
             setActiveJobMoves(null);
-            setActiveJobPlanMin(null);
+            setActiveJobPlanBounds(null);
           } else {
             const plan = optimizePlan(job);
             const moves = plan.operations.flatMap(op => op.moves);
             setActiveJobMoves(moves);
-            setActiveJobPlanMin(computePlanMoveMinFromMoves(moves));
+            setActiveJobPlanBounds(computePlanMoveBoundsFromMoves(moves));
           }
         } catch {
           if (!cancelled) {
             setActiveJobMoves(null);
-            setActiveJobPlanMin(null);
+            setActiveJobPlanBounds(null);
           }
         }
       })();
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
       setActiveJobMoves(null);
-      setActiveJobPlanMin(null);
+      setActiveJobPlanBounds(null);
     }
     wasJobRunningRef.current = grbl.isJobRunning;
 
@@ -217,14 +231,15 @@ export function App() {
     const s = grbl.machineState;
     if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
     const wp = s.position;
-    if (activeJobPlanMin) {
+    if (activeJobPlanBounds) {
+      const b = activeJobPlanBounds;
       return {
-        x: wp.x + activeJobPlanMin.minX,
-        y: wp.y + activeJobPlanMin.minY,
+        x: wp.x + b.minX,
+        y: b.maxY - wp.y,
       };
     }
     return { x: wp.x, y: wp.y };
-  }, [grbl.isJobRunning, grbl.machineState, activeJobPlanMin]);
+  }, [grbl.isJobRunning, grbl.machineState, activeJobPlanBounds]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
   const connectionSidebarWidth = connectionSidebarOpen ? 450 : 0;
