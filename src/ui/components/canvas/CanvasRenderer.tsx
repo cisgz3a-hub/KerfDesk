@@ -35,6 +35,14 @@ export function CanvasRenderer({
     renderFrame();
   }, [renderFrame]);
 
+  useEffect(() => {
+    const repaint = () => {
+      renderFrame();
+    };
+    window.addEventListener('laserforge-canvas-repaint', repaint);
+    return () => window.removeEventListener('laserforge-canvas-repaint', repaint);
+  }, [renderFrame]);
+
   return React.createElement('canvas', {
     ref: canvasRef,
     width,

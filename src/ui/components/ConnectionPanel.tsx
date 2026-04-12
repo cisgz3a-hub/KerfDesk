@@ -934,7 +934,7 @@ export function ConnectionPanel({
   const connectSection = React.createElement('div', {
     style: {
       padding: '30px 20px', display: 'flex', flexDirection: 'column' as const, gap: 10, alignItems: 'center', flex: 1,
-      justifyContent: 'center',
+      justifyContent: 'center', minHeight: 0,
     },
   },
     React.createElement('div', { style: { fontSize: 36, marginBottom: 8 } }, '⚡'),
@@ -997,22 +997,22 @@ export function ConnectionPanel({
       {
         num: 3,
         label: 'Frame the job',
-        description: 'Preview where the laser will cut',
+        description: 'Preview where the laser will cut — use Frame below',
         done: step3Done,
-        action: () => { void handleFrameSafe(); },
-        actionLabel: '⬚ Frame',
+        action: undefined as (() => void) | undefined,
+        actionLabel: '',
         primary: false,
-        disabled: !canFrame,
+        disabled: false,
       },
       {
         num: 4,
         label: 'Start job',
         description: startJobDesc,
         done: false,
-        action: canStartJob ? () => { void handleStartJob(); } : undefined,
-        actionLabel: `▶ START${isSimulator ? ' (Sim)' : ''}`,
+        action: undefined as (() => void) | undefined,
+        actionLabel: '',
         primary: true,
-        disabled: !canStartJob,
+        disabled: false,
       },
     ] as const).map(step =>
       React.createElement('div', {
@@ -1021,7 +1021,7 @@ export function ConnectionPanel({
           display: 'flex', alignItems: 'center', gap: 10,
           padding: '8px 0',
           borderBottom: step.num < 4 ? '1px solid #12121e' : 'none',
-          opacity: step.num === 4 && !canStartJob ? 0.5 : 1,
+          opacity: step.num === 4 && !canStartJob ? 0.55 : 1,
         },
       },
         React.createElement('div', {
@@ -1226,7 +1226,7 @@ export function ConnectionPanel({
   );
 
   const issuesSection = isConnected && !isRunning && !displayPaused && (issues.length > 0 || readinessScore != null) && React.createElement('div', {
-    style: { padding: '10px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0, flex: 1, minHeight: 0, overflowY: 'auto' as const },
+    style: { padding: '10px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
   },
     React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1 } }, 'Issues'),
     ...issues.map((issue: PreflightIssue, i: number) =>
@@ -1340,7 +1340,7 @@ export function ConnectionPanel({
   );
 
   const jobProgressSection = isConnected && (isRunning || displayPaused) && React.createElement('div', {
-    style: { padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 12, minHeight: 0 },
+    style: { padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: 12, flexShrink: 0 },
   },
     React.createElement('div', { style: { textAlign: 'center' as const } },
       React.createElement('div', {
@@ -1379,13 +1379,54 @@ export function ConnectionPanel({
       estimatedRemaining != null && estimatedRemaining > 0 &&
         React.createElement('span', null, `~${formatJobTime(estimatedRemaining)} left`),
     ),
-    React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
+  );
+
+  const footerSection = isConnected && React.createElement('div', {
+    style: {
+      padding: '10px 16px',
+      borderTop: '1px solid #1a1a2e',
+      background: '#0d0d18',
+      flexShrink: 0,
+    },
+  },
+    !isRunning && !displayPaused && React.createElement('div', {
+      style: { display: 'flex', gap: 6 },
+    },
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handleFrameSafe(); },
+        disabled: !canFrame,
+        style: {
+          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
+          borderRadius: 8, cursor: canFrame ? 'pointer' : 'default',
+          fontFamily: font,
+          background: '#0a0a14', border: '1px solid #252540', color: '#c0c0d0',
+          opacity: canFrame ? 1 : 0.4,
+        },
+      }, '⬚ Frame'),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handleStartJob(); },
+        disabled: !canStartJob,
+        style: {
+          flex: 2, padding: '12px', fontSize: 14, fontWeight: 700,
+          borderRadius: 8, cursor: canStartJob ? 'pointer' : 'default',
+          fontFamily: font,
+          background: canStartJob ? 'rgba(45,212,160,0.12)' : '#1a1a2e',
+          border: canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
+          color: canStartJob ? '#2dd4a0' : '#333355',
+        },
+      }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
+    ),
+    (isRunning || displayPaused) && React.createElement('div', {
+      style: { display: 'flex', gap: 6 },
+    },
       React.createElement('button', {
         type: 'button',
         onClick: () => { void handlePauseResume(); },
         style: {
-          flex: 1, padding: '16px', fontSize: 14, fontWeight: 700,
-          borderRadius: 10, cursor: 'pointer', fontFamily: font,
+          flex: 1, padding: '14px', fontSize: 13, fontWeight: 700,
+          borderRadius: 8, cursor: 'pointer', fontFamily: font,
           background: displayPaused ? 'rgba(45,212,160,0.1)' : 'rgba(255,212,68,0.08)',
           border: displayPaused ? '2px solid #2dd4a0' : '2px solid rgba(255,212,68,0.4)',
           color: displayPaused ? '#2dd4a0' : '#ffd444',
@@ -1395,8 +1436,8 @@ export function ConnectionPanel({
         type: 'button',
         onClick: () => { void handleStop(); },
         style: {
-          flex: 1, padding: '16px', fontSize: 14, fontWeight: 700,
-          borderRadius: 10, cursor: 'pointer', fontFamily: font,
+          flex: 1, padding: '14px', fontSize: 13, fontWeight: 700,
+          borderRadius: 8, cursor: 'pointer', fontFamily: font,
           background: 'rgba(255,68,102,0.08)',
           border: '2px solid rgba(255,68,102,0.4)',
           color: '#ff4466',
@@ -1527,7 +1568,14 @@ export function ConnectionPanel({
       statusSection,
       !isConnected && connectSection,
       isConnected && React.createElement('div', {
-        style: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
+        style: {
+          flex: 1,
+          minHeight: 0,
+          overflowY: 'auto' as const,
+          overflowX: 'hidden' as const,
+          display: 'flex',
+          flexDirection: 'column' as const,
+        },
       },
         !isRunning && !displayPaused && workflowSection,
         !isRunning && !displayPaused && controlsSection,
@@ -1535,9 +1583,10 @@ export function ConnectionPanel({
         gcodeWarning,
         issuesSection,
         outcomeExtrasSection,
+        moreSection,
+        simulatorView,
       ),
-      moreSection,
-      simulatorView,
+      footerSection,
       isConnected && React.createElement('div', {
         style: {
           padding: '8px 14px 12px', borderTop: '1px solid #1a1a2e',

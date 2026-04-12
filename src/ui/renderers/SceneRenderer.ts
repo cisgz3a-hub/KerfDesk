@@ -25,6 +25,13 @@ import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { getImage } from '../../io/ImageStore';
 
+/** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
+const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
+
+function dispatchCanvasRepaint(): void {
+  window.dispatchEvent(new Event(CANVAS_REPAINT_EVENT));
+}
+
 // Renderer-private caches — not stored on scene objects
 const imageCacheMap = new WeakMap<object, Map<string, HTMLImageElement>>();
 const ditherCacheMap = new WeakMap<object, { key: string; canvas: HTMLCanvasElement }>();
@@ -679,7 +686,7 @@ function drawGeometry(
               pending!.delete(geom.src);
               if (uri) {
                 rmap!.set(geom.src, uri);
-                window.dispatchEvent(new Event('resize'));
+                dispatchCanvasRepaint();
               }
             });
           }
@@ -705,7 +712,7 @@ function drawGeometry(
         img.src = loadSrc;
         imgCache.set(loadSrc, img);
         img.onload = () => {
-          window.dispatchEvent(new Event('resize'));
+          dispatchCanvasRepaint();
         };
       }
 
