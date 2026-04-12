@@ -553,6 +553,7 @@ export function App() {
     } catch { /* ignore */ }
   }, []);
 
+  /** Connection sidebar edits arbitrary layers; LayerPanel’s mode UI is for `activeLayerId` only — align selection here. */
   const handleConnectionUpdateLayerMode = useCallback(
     (layerId: string, mode: LayerMode) => {
       const layer = scene.layers.find(l => l.id === layerId);
@@ -560,6 +561,7 @@ export function App() {
       const next = applyLayerModeChange(layer, mode);
       handleSceneCommit({
         ...scene,
+        activeLayerId: layerId,
         layers: scene.layers.map(l => (l.id === layerId ? next : l)),
       });
       if (connectionSidebarOpen) setGcodeStale(true);
@@ -572,6 +574,7 @@ export function App() {
     (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => {
       handleSceneCommit({
         ...scene,
+        activeLayerId: layerId,
         layers: scene.layers.map(l => {
           if (l.id !== layerId) return l;
           if (key === 'powerMax') {
@@ -596,6 +599,7 @@ export function App() {
     (layerId: string, fillMode: FillMode) => {
       handleSceneCommit({
         ...scene,
+        activeLayerId: layerId,
         layers: scene.layers.map(l => {
           if (l.id !== layerId) return l;
           const f = l.settings.fill;
@@ -625,6 +629,7 @@ export function App() {
       const interval = Math.max(0.02, Math.min(1, Number.isFinite(intervalMm) ? intervalMm : 0.1));
       handleSceneCommit({
         ...scene,
+        activeLayerId: layerId,
         layers: scene.layers.map(l => {
           if (l.id !== layerId) return l;
           const f = l.settings.fill;
@@ -651,6 +656,7 @@ export function App() {
     (layerId: string, bidirectional: boolean) => {
       handleSceneCommit({
         ...scene,
+        activeLayerId: layerId,
         layers: scene.layers.map(l => {
           if (l.id !== layerId) return l;
           const f = l.settings.fill;
