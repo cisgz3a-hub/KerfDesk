@@ -19,7 +19,12 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene>
     const g = obj.geometry;
     const result = await textGeometryToPath(g);
     if (!result?.subPaths.length) {
-      objects.push(obj);
+      objects.push({
+        ...obj,
+        geometry: { ...g, outlineSubPaths: undefined },
+        _bounds: null,
+        _worldTransform: null,
+      });
       continue;
     }
     changed = true;

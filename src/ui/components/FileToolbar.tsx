@@ -361,12 +361,25 @@ export function FileToolbar({
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
     onTogglePreview
-      ? toolbarBtn(
-        showToolpathPreview ? '👁 Preview ✓' : '👁 Preview',
-        'Toggle toolpath preview overlay',
-        () => onTogglePreview(),
-        { active: showToolpathPreview },
-      )
+      ? React.createElement('button', {
+        type: 'button',
+        onClick: () => onTogglePreview(),
+        title: 'Toggle toolpath preview overlay',
+        style: {
+          padding: '4px 10px',
+          fontSize: 11,
+          borderRadius: 5,
+          cursor: 'pointer',
+          fontFamily: font,
+          whiteSpace: 'nowrap' as const,
+          lineHeight: '20px',
+          flexShrink: 0,
+          background: showToolpathPreview ? 'rgba(0,140,255,0.15)' : 'transparent',
+          border: showToolpathPreview ? '1px solid #008cff' : '1px solid transparent',
+          color: showToolpathPreview ? '#008cff' : '#c0c0d0',
+          fontWeight: showToolpathPreview ? 600 : 400,
+        },
+      }, showToolpathPreview ? '👁 Preview ON' : '👁 Preview')
       : null,
     spacer(),
     onConnect

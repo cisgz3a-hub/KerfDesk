@@ -38,7 +38,7 @@ function lineSpacingPx(g: TextGeometry, fontSize: number): number {
 }
 
 function wordSpacingExtraPx(g: TextGeometry, fontSize: number): number {
-  return ((pctOrDefault(g.wordSpacing, 100) - 100) / 100) * fontSize * 0.25;
+  return ((pctOrDefault(g.wordSpacing, 100) - 100) / 100) * fontSize * 0.3;
 }
 
 /** Pixel width of one line including letter and word spacing. */
@@ -46,6 +46,9 @@ export function measureTextLineWidth(ctx: CanvasRenderingContext2D, g: TextGeome
   const fontSize = applyTextGeometryFont(ctx, g);
   const ls = letterSpacingPx(g, fontSize);
   const ws = wordSpacingExtraPx(g, fontSize);
+  if (Math.abs(ls) < 1e-9 && Math.abs(ws) < 1e-9) {
+    return ctx.measureText(line).width;
+  }
   let x = 0;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
@@ -97,12 +100,16 @@ export function fillTextGeometry(
     if (align === 'center') startX = ox + (blockW - lineW) / 2;
     else if (align === 'right') startX = ox + blockW - lineW;
 
-    let x = startX;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      ctx.fillText(ch, x, y);
-      x += ctx.measureText(ch).width + ls;
-      if (ch === ' ') x += ws;
+    if (Math.abs(ls) < 1e-9 && Math.abs(ws) < 1e-9) {
+      ctx.fillText(line, startX, y);
+    } else {
+      let x = startX;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        ctx.fillText(ch, x, y);
+        x += ctx.measureText(ch).width + ls;
+        if (ch === ' ') x += ws;
+      }
     }
   }
 

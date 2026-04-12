@@ -511,6 +511,7 @@ export function App() {
     setShowToolpathPreview(p => !p);
   }, []);
 
+  // Toolpath overlay follows the same `scene` as the canvas (fingerprint includes geometry, layers, transforms).
   useEffect(() => {
     if (!showToolpathPreview) {
       setToolpathPreviewMoves(null);
@@ -528,7 +529,7 @@ export function App() {
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, toolpathCompileKey, compileToolpathMoves, scene, showAlert]);
+  }, [showToolpathPreview, toolpathCompileKey, compileToolpathMoves, showAlert]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;

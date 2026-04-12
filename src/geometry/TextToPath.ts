@@ -26,6 +26,22 @@ interface PotraceItem {
   y2?: number;
 }
 
+/** Collapse anti-aliased glyph edges so potrace follows a thinner stroke. */
+function hardThresholdInk(ctx: CanvasRenderingContext2D, w: number, h: number): void {
+  const img = ctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    const darkness = 255 - lum;
+    const ink = darkness > 170 ? 0 : 255;
+    d[i] = ink;
+    d[i + 1] = ink;
+    d[i + 2] = ink;
+    d[i + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+
 function contourToSubPath(
   items: PotraceItem[],
   invScale: number,
@@ -102,10 +118,11 @@ export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResul
 
   ctx.fillStyle = 'black';
   fillTextGeometry(ctx, gScaled, padding, padding);
+  hardThresholdInk(ctx, canvasW, canvasH);
 
   try {
     const pathList = traceCanvas(canvas, {
-      turdsize: 2,
+      turdsize: 1,
       alphamax: 1.0,
       opttolerance: 0.2,
       optcurve: true,
