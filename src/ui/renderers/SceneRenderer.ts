@@ -18,11 +18,12 @@
  */
 
 import { type Scene } from '../../core/scene/Scene';
-import { type SceneObject, type Geometry } from '../../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type TextGeometry } from '../../core/scene/SceneObject';
 import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
+import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
@@ -559,13 +560,8 @@ function drawObjectPath(ctx: CanvasRenderingContext2D, obj: SceneObject): void {
       if (geom.closed) ctx.closePath();
     }
   } else if (geom.type === 'text') {
-    const fontSize = geom.fontSize || 10;
-    const bold = geom.bold ? 'bold ' : '';
-    const italic = geom.italic ? 'italic ' : '';
-    ctx.font = `${italic}${bold}${fontSize}px ${geom.fontFamily || 'Arial'}`;
     ctx.fillStyle = ctx.strokeStyle as string;
-    ctx.textBaseline = 'top';
-    ctx.fillText(geom.text, 0, 0);
+    fillTextGeometry(ctx, geom as TextGeometry, 0, 0);
     return;
   }
 
@@ -647,17 +643,9 @@ function drawGeometry(
       break;
 
     case 'text': {
-      const textGeom = geom;
-      const fontSize = textGeom.fontSize || 10;
-      const fontFamily = textGeom.fontFamily || 'Arial';
-      const bold = textGeom.bold ? 'bold ' : '';
-      const italic = textGeom.italic ? 'italic ' : '';
-
       ctx.save();
-      ctx.font = `${italic}${bold}${fontSize}px ${fontFamily}`;
       ctx.fillStyle = typeof ctx.strokeStyle === 'string' ? ctx.strokeStyle : '#ffffff';
-      ctx.textBaseline = 'top';
-      ctx.fillText(textGeom.text, 0, 0);
+      fillTextGeometry(ctx, geom, 0, 0);
       ctx.restore();
       return;
     }

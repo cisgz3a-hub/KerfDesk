@@ -1,13 +1,25 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { theme } from '../styles/theme';
-import { type ImageGeometry, type PathGeometry, type PolygonGeometry, type RectGeometry } from '../../core/scene/SceneObject';
+import {
+  type ImageGeometry,
+  type PathGeometry,
+  type PolygonGeometry,
+  type RectGeometry,
+  type TextGeometry,
+} from '../../core/scene/SceneObject';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, type DitherMode } from '../../import/Dithering';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
+
+const TEXT_FONT_OPTIONS = [
+  'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana',
+  'Trebuchet MS', 'Impact', 'Comic Sans MS', 'Palatino', 'Garamond',
+  'Bookman', 'Avant Garde',
+] as const;
 
 interface PropertiesPanelProps {
   scene: Scene;
@@ -256,6 +268,22 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
   }
 
   const obj = selectedObjects[0];
+
+  const patchTextGeometry = (updates: Partial<TextGeometry>) => {
+    if (obj.geometry.type !== 'text') return;
+    const prev = obj.geometry as TextGeometry;
+    const newGeom: TextGeometry = { ...prev, ...updates, type: 'text' };
+    const newScene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        o.id === obj.id
+          ? { ...o, geometry: newGeom, _bounds: null, _worldTransform: null }
+          : o
+      ),
+    };
+    (onSceneChange ?? onSceneCommit)(newScene);
+  };
+
   const bounds = computeObjectBounds(obj);
   const w = bounds.maxX - bounds.minX;
   const h = bounds.maxY - bounds.minY;
@@ -499,20 +527,252 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
     React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Type'),
     React.createElement('div', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, obj.type),
 
-    obj.geometry.type === 'text' && React.createElement('div', {
-      style: {
-        padding: '8px 12px', margin: '8px 0',
-        background: 'rgba(255, 170, 50, 0.08)',
-        border: '1px solid rgba(255, 170, 50, 0.2)',
-        borderRadius: 6, fontSize: 10, color: '#ffaa32', lineHeight: 1.5,
-      },
-    },
-      '⚠ Text must be converted to paths before cutting. ',
-      React.createElement('span', {
-        onClick: () => void handleTextToPath(),
-        style: { textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 },
-      }, 'Convert now'),
-    ),
+    obj.geometry.type === 'text' && (() => {
+      const tg = obj.geometry as TextGeometry;
+      const mono = theme.font.mono;
+      const font = theme.font.ui;
+      const textSectionStyle: React.CSSProperties = {
+        padding: '10px 0',
+        borderBottom: `1px solid ${theme.border.subtle}`,
+      };
+      const subLabel: React.CSSProperties = {
+        fontSize: 9,
+        color: theme.text.tertiary,
+        marginBottom: 3,
+      };
+      const alignBtn = (value: 'left' | 'center' | 'right', label: string, title: string) => {
+        const active = (tg.textAlign || 'left') === value;
+        return React.createElement('button', {
+          key: value,
+          type: 'button',
+          title,
+          onClick: () => patchTextGeometry({ textAlign: value }),
+          style: {
+            flex: 1,
+            padding: '5px',
+            fontSize: 11,
+            borderRadius: 3,
+            cursor: 'pointer',
+            fontFamily: font,
+            background: active ? 'rgba(0,212,255,0.1)' : theme.bg.base,
+            border: active ? `1px solid ${theme.accent.cyan}` : `1px solid ${theme.border.default}`,
+            color: active ? theme.accent.cyan : theme.text.tertiary,
+          },
+        }, label);
+      };
+      return React.createElement(React.Fragment, { key: 'text-props' },
+        React.createElement('div', { style: textSectionStyle },
+          React.createElement('div', {
+            style: { ...sectionHeaderStyle, marginBottom: 8 },
+          }, 'Text'),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', { style: subLabel }, 'Font'),
+            React.createElement('select', {
+              value: tg.fontFamily || 'Arial',
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                patchTextGeometry({ fontFamily: e.target.value });
+              },
+              style: { ...selectStyle, fontFamily: font },
+            },
+              ...(TEXT_FONT_OPTIONS as readonly string[]).includes(tg.fontFamily || 'Arial')
+                ? []
+                : [React.createElement('option', { key: '__ff', value: tg.fontFamily }, tg.fontFamily || 'Arial')],
+              ...TEXT_FONT_OPTIONS.map(f =>
+                React.createElement('option', { key: f, value: f, style: { fontFamily: f } }, f),
+              ),
+            ),
+          ),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', { style: subLabel }, 'Size (mm)'),
+            React.createElement('input', {
+              type: 'number',
+              value: tg.fontSize || 10,
+              min: 1,
+              max: 500,
+              step: 1,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = parseFloat(e.target.value);
+                patchTextGeometry({ fontSize: Number.isFinite(v) ? v : 10 });
+              },
+              style: { ...inputStyle, marginBottom: 0 },
+            }),
+          ),
+
+          React.createElement('div', { style: { display: 'flex', gap: 4, marginBottom: 8 } },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => patchTextGeometry({ bold: !tg.bold }),
+              style: {
+                flex: 1,
+                padding: '6px',
+                fontSize: 12,
+                fontWeight: 'bold',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'serif',
+                background: tg.bold ? 'rgba(0,212,255,0.1)' : theme.bg.base,
+                border: tg.bold ? `1px solid ${theme.accent.cyan}` : `1px solid ${theme.border.default}`,
+                color: tg.bold ? theme.accent.cyan : theme.text.tertiary,
+              },
+            }, 'B'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => patchTextGeometry({ italic: !tg.italic }),
+              style: {
+                flex: 1,
+                padding: '6px',
+                fontSize: 12,
+                fontStyle: 'italic',
+                borderRadius: 4,
+                cursor: 'pointer',
+                fontFamily: 'serif',
+                background: tg.italic ? 'rgba(0,212,255,0.1)' : theme.bg.base,
+                border: tg.italic ? `1px solid ${theme.accent.cyan}` : `1px solid ${theme.border.default}`,
+                color: tg.italic ? theme.accent.cyan : theme.text.tertiary,
+              },
+            }, 'I'),
+          ),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', { style: subLabel }, 'Align'),
+            React.createElement('div', { style: { display: 'flex', gap: 3 } },
+              alignBtn('left', 'L', 'Left align'),
+              alignBtn('center', 'C', 'Center align'),
+              alignBtn('right', 'R', 'Right align'),
+            ),
+          ),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', {
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 3,
+              },
+            },
+              React.createElement('span', { style: subLabel }, 'Letter Spacing (H-Space)'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
+                `${tg.letterSpacing ?? 0}%`,
+              ),
+            ),
+            React.createElement('input', {
+              type: 'range',
+              min: -50,
+              max: 200,
+              step: 5,
+              value: tg.letterSpacing ?? 0,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                patchTextGeometry({ letterSpacing: parseInt(e.target.value, 10) });
+              },
+              style: { width: '100%', accentColor: theme.accent.cyan },
+            }),
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355' },
+            },
+              React.createElement('span', null, 'Tight'),
+              React.createElement('span', null, 'Normal'),
+              React.createElement('span', null, 'Wide'),
+            ),
+          ),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', {
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 3,
+              },
+            },
+              React.createElement('span', { style: subLabel }, 'Line Spacing (V-Space)'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
+                `${tg.lineSpacing ?? 120}%`,
+              ),
+            ),
+            React.createElement('input', {
+              type: 'range',
+              min: 50,
+              max: 300,
+              step: 10,
+              value: tg.lineSpacing ?? 120,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                patchTextGeometry({ lineSpacing: parseInt(e.target.value, 10) });
+              },
+              style: { width: '100%', accentColor: theme.accent.cyan },
+            }),
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355' },
+            },
+              React.createElement('span', null, 'Tight'),
+              React.createElement('span', null, 'Normal'),
+              React.createElement('span', null, 'Spacious'),
+            ),
+          ),
+
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('div', {
+              style: {
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: 3,
+              },
+            },
+              React.createElement('span', { style: subLabel }, 'Word Spacing'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
+                `${tg.wordSpacing ?? 100}%`,
+              ),
+            ),
+            React.createElement('input', {
+              type: 'range',
+              min: 50,
+              max: 300,
+              step: 10,
+              value: tg.wordSpacing ?? 100,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                patchTextGeometry({ wordSpacing: parseInt(e.target.value, 10) });
+              },
+              style: { width: '100%', accentColor: theme.accent.cyan },
+            }),
+          ),
+
+          React.createElement('button', {
+            type: 'button',
+            disabled: true,
+            style: {
+              width: '100%',
+              padding: '6px',
+              fontSize: 10,
+              borderRadius: 4,
+              fontFamily: font,
+              background: theme.bg.base,
+              border: `1px solid ${theme.border.subtle}`,
+              color: '#333355',
+              cursor: 'default',
+              marginTop: 4,
+            },
+          }, '↺ Text on Path (coming soon)'),
+        ),
+
+        React.createElement('div', {
+          style: {
+            padding: '8px 12px', margin: '8px 0',
+            background: 'rgba(255, 170, 50, 0.08)',
+            border: '1px solid rgba(255, 170, 50, 0.2)',
+            borderRadius: 6, fontSize: 10, color: '#ffaa32', lineHeight: 1.5,
+          },
+        },
+          '⚠ Text must be converted to paths before cutting. ',
+          React.createElement('span', {
+            onClick: () => void handleTextToPath(),
+            style: { textDecoration: 'underline', cursor: 'pointer', fontWeight: 600 },
+          }, 'Convert now'),
+        ),
+      );
+    })(),
 
     obj.geometry.type === 'image' && React.createElement('div', { style: dividerStyle },
       React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),

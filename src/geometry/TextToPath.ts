@@ -7,7 +7,8 @@
  */
 
 import { getPaths, traceCanvas } from 'potrace-js';
-import type { SubPath, PathSegment } from '../core/scene/SceneObject';
+import type { SubPath, PathSegment, TextGeometry } from '../core/scene/SceneObject';
+import { fillTextGeometry, measureTextGeometrySize } from './textCanvasDraw';
 
 export interface TextPathResult {
   subPaths: SubPath[];
@@ -29,7 +30,7 @@ function contourToSubPath(
   items: PotraceItem[],
   invScale: number,
   ox: number,
-  oy: number
+  oy: number,
 ): SubPath | null {
   if (items.length < 2) return null;
   const segments: PathSegment[] = [];
@@ -67,34 +68,28 @@ function contourToSubPath(
 }
 
 /**
- * Render text to a canvas, then trace it to get vector outlines.
+ * Render TextGeometry to a canvas, then trace it to vector outlines.
  */
-export async function textToPath(
-  text: string,
-  fontFamily: string = 'Arial',
-  fontSize: number = 20,
-  bold: boolean = false,
-  italic: boolean = false,
-): Promise<TextPathResult | null> {
+export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResult | null> {
+  const text = g.text || '';
   if (!text.trim()) return null;
 
   const scale = 4;
-  const scaledSize = fontSize * scale;
+  const baseSize = g.fontSize || 10;
+  const gScaled: TextGeometry = {
+    ...g,
+    type: 'text',
+    fontSize: baseSize * scale,
+  };
 
   const measureCanvas = document.createElement('canvas');
   const measureCtx = measureCanvas.getContext('2d');
   if (!measureCtx) return null;
 
-  const fontStr = `${bold ? 'bold ' : ''}${italic ? 'italic ' : ''}${scaledSize}px ${fontFamily}`;
-  measureCtx.font = fontStr;
-  const metrics = measureCtx.measureText(text);
-
-  const textWidth = metrics.width;
-  const textHeight = scaledSize * 1.3;
-  const padding = scaledSize * 0.2;
-
-  const canvasW = Math.ceil(textWidth + padding * 2);
-  const canvasH = Math.ceil(textHeight + padding * 2);
+  const { width: wPx, height: hPx } = measureTextGeometrySize(measureCtx, gScaled);
+  const padding = baseSize * scale * 0.2;
+  const canvasW = Math.max(1, Math.ceil(wPx + padding * 2));
+  const canvasH = Math.max(1, Math.ceil(hPx + padding * 2));
 
   const canvas = document.createElement('canvas');
   canvas.width = canvasW;
@@ -106,9 +101,7 @@ export async function textToPath(
   ctx.fillRect(0, 0, canvasW, canvasH);
 
   ctx.fillStyle = 'black';
-  ctx.font = fontStr;
-  ctx.textBaseline = 'top';
-  ctx.fillText(text, padding, padding);
+  fillTextGeometry(ctx, gScaled, padding, padding);
 
   try {
     const pathList = traceCanvas(canvas, {
@@ -134,11 +127,31 @@ export async function textToPath(
 
     return {
       subPaths,
-      width: textWidth / scale,
-      height: textHeight / scale,
+      width: wPx / scale,
+      height: hPx / scale,
     };
   } catch (e) {
     console.error('Text to path failed:', e);
     return null;
   }
+}
+
+/**
+ * @deprecated Prefer textGeometryToPath with full TextGeometry for spacing/align.
+ */
+export async function textToPath(
+  text: string,
+  fontFamily: string = 'Arial',
+  fontSize: number = 20,
+  bold: boolean = false,
+  italic: boolean = false,
+): Promise<TextPathResult | null> {
+  return textGeometryToPath({
+    type: 'text',
+    text,
+    fontFamily,
+    fontSize,
+    bold,
+    italic,
+  });
 }

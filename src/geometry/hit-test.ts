@@ -23,9 +23,10 @@
 
 import { type Point, type Matrix3x2 } from '../core/types';
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject, type Geometry } from '../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type TextGeometry } from '../core/scene/SceneObject';
 import { type Layer } from '../core/scene/Layer';
 import { computeObjectBounds } from './bounds';
+import { measureTextGeometrySize } from './textCanvasDraw';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -248,10 +249,15 @@ function pathSegmentsToPoints(segments: any[]): Point[] {
 
 // ─── TEXT / IMAGE (BOUNDING BOX ONLY) ────────────────────────────
 
-function hitTestTextBounds(
-  p: Point,
-  geom: { text: string; fontSize: number }
-): boolean {
+function hitTestTextBounds(p: Point, geom: TextGeometry): boolean {
+  if (typeof document !== 'undefined') {
+    const c = document.createElement('canvas');
+    const ctx = c.getContext('2d');
+    if (ctx) {
+      const { width: w, height: h } = measureTextGeometrySize(ctx, geom);
+      return p.x >= 0 && p.x <= w && p.y >= 0 && p.y <= h;
+    }
+  }
   const w = geom.text.length * geom.fontSize * 0.6;
   const h = geom.fontSize;
   return p.x >= 0 && p.x <= w && p.y >= 0 && p.y <= h;

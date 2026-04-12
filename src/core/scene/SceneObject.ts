@@ -73,6 +73,13 @@ export interface TextGeometry {
   fontFamily: string;
   bold?: boolean;
   italic?: boolean;
+  textAlign?: 'left' | 'center' | 'right';
+  /** Percentage of font size; 0 = default tracking */
+  letterSpacing?: number;
+  /** Percentage of font height between baselines; default 120 */
+  lineSpacing?: number;
+  /** Percentage; 100 = default word gaps */
+  wordSpacing?: number;
   /** Ephemeral: filled before compileJob for engrave/cut; not required for scene persistence */
   outlineSubPaths?: SubPath[];
 }

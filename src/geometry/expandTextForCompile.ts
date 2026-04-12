@@ -5,7 +5,7 @@
 
 import { type Scene } from '../core/scene/Scene';
 import { type SceneObject } from '../core/scene/SceneObject';
-import { textToPath } from './TextToPath';
+import { textGeometryToPath } from './TextToPath';
 
 export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene> {
   const objects: SceneObject[] = [];
@@ -17,13 +17,7 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene>
       continue;
     }
     const g = obj.geometry;
-    const result = await textToPath(
-      g.text || '',
-      g.fontFamily || 'Arial',
-      g.fontSize || 10,
-      g.bold ?? false,
-      g.italic ?? false,
-    );
+    const result = await textGeometryToPath(g);
     if (!result?.subPaths.length) {
       objects.push(obj);
       continue;

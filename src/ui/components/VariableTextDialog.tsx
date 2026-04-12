@@ -147,7 +147,18 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
                 layerId: sourceObject.layerId,
                 parentId: null,
                 transform: { a: sourceObject.transform.a, b: 0, c: 0, d: sourceObject.transform.d, tx: baseX + col * itemWidth, ty: baseY + row * itemHeight },
-                geometry: { type: 'text', text, fontSize: geom.fontSize, fontFamily: geom.fontFamily, bold: geom.bold, italic: geom.italic } as any,
+                geometry: {
+                  type: 'text',
+                  text,
+                  fontSize: geom.fontSize,
+                  fontFamily: geom.fontFamily,
+                  bold: geom.bold,
+                  italic: geom.italic,
+                  textAlign: geom.textAlign,
+                  letterSpacing: geom.letterSpacing,
+                  lineSpacing: geom.lineSpacing,
+                  wordSpacing: geom.wordSpacing,
+                } as any,
                 visible: true, locked: false, powerScale: sourceObject.powerScale ?? 1.0, cutStartIndex: 0, _bounds: null, _worldTransform: null,
               } as any);
             }

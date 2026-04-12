@@ -3,7 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
-import { textToPath as geometryTextToPath } from '../../geometry/TextToPath';
+import { textGeometryToPath } from '../../geometry/TextToPath';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 
@@ -273,13 +273,7 @@ export function useSceneOperations({
 
     for (const obj of textObjs) {
       const geom = obj.geometry as TextGeometry;
-      const result = await geometryTextToPath(
-        geom.text || '',
-        geom.fontFamily || 'Arial',
-        geom.fontSize || 20,
-        geom.bold ?? false,
-        geom.italic ?? false,
-      );
+      const result = await textGeometryToPath(geom);
 
       if (!result) continue;
 

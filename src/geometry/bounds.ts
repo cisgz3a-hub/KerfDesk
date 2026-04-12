@@ -23,8 +23,9 @@ import {
   emptyAABB, expandAABB, mergeAABB,
 } from '../core/types';
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject, type Geometry } from '../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type TextGeometry } from '../core/scene/SceneObject';
 import { type SimulationResult } from '../core/plan/Simulation';
+import { measureTextGeometrySize } from './textCanvasDraw';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -176,12 +177,23 @@ function getGeometryCorners(geom: Geometry): Point[] {
       return pts;
     }
 
-    case 'text':
-      // Approximate: fontSize height, arbitrary width estimate
+    case 'text': {
+      if (typeof document !== 'undefined') {
+        const c = document.createElement('canvas');
+        const ctx = c.getContext('2d');
+        if (ctx) {
+          const { width, height } = measureTextGeometrySize(ctx, geom as TextGeometry);
+          return [
+            { x: 0, y: 0 },
+            { x: width, y: height },
+          ];
+        }
+      }
       return [
         { x: 0, y: 0 },
         { x: geom.text.length * geom.fontSize * 0.6, y: geom.fontSize },
       ];
+    }
 
     case 'image': {
       // Match SceneRenderer / import: pixel dims at 96 DPI → mm local space

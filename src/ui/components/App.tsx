@@ -54,7 +54,7 @@ import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type Layer, type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
-import { type SceneObject } from '../../core/scene/SceneObject';
+import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { theme } from '../styles/theme';
@@ -1891,6 +1891,7 @@ export function App() {
                           ...o,
                           name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
                           geometry: {
+                            ...(o.geometry as TextGeometry),
                             type: 'text' as const,
                             text: dialogs.textInput,
                             fontSize: dialogs.textSize,

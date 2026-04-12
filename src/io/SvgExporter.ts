@@ -39,12 +39,14 @@ export function exportSceneToSvg(scene: Scene): string {
     if (obj.geometry.type === 'text') {
       const geom = obj.geometry as TextGeometry;
       const fontSize = geom.fontSize || 20;
+      const letterPx = ((geom.letterSpacing ?? 0) / 100) * fontSize;
       const attrs: string[] = [
         'x="0"',
         `y="${fontSize.toFixed(2)}"`,
         `font-family="${escapeXml(geom.fontFamily || 'Arial')}"`,
         `font-size="${fontSize.toFixed(2)}"`,
       ];
+      if (letterPx !== 0) attrs.push(`letter-spacing="${letterPx.toFixed(3)}"`);
       if (geom.bold) attrs.push('font-weight="bold"');
       if (geom.italic) attrs.push('font-style="italic"');
       attrs.push('fill="none"');
