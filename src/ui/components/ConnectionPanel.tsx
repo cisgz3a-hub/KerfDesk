@@ -21,6 +21,37 @@ import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
 import { type StartMode } from './StartPositionWizard';
 import { SimulatorView } from './SimulatorView';
 
+function formatJobTime(seconds: number): string {
+  const s = Math.max(0, Math.floor(seconds));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+function playCompletionBeep(): void {
+  try {
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    const audioCtx = new AC();
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    oscillator.frequency.value = 880;
+    oscillator.type = 'sine';
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.12);
+    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.2);
+    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.32);
+
+    oscillator.start(audioCtx.currentTime);
+    oscillator.stop(audioCtx.currentTime + 0.4);
+  } catch {
+    /* Audio not available */
+  }
+}
+
 interface ConnectionPanelProps {
   controller: GrblController;
   portRef: React.MutableRefObject<WebSerialPort | MockSerialPort | null>;
@@ -91,6 +122,11 @@ export function ConnectionPanel({
   const [isTestFiring, setIsTestFiring] = useState(false);
   const isTestFiringRef = useRef(false);
   const testFireTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [jobStartTime, setJobStartTime] = useState<number | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [jobCompleted, setJobCompleted] = useState(false);
+  const [completedTime, setCompletedTime] = useState(0);
+  const [progressFlashGreen, setProgressFlashGreen] = useState(false);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -99,6 +135,10 @@ export function ConnectionPanel({
   const activeReplayRef = useRef<JobReplay | null>(null);
   const currentLogRef = useRef<JobLog | null>(null);
   const simulatorListenersRef = useRef(new Set<(line: string) => void>());
+  const jobStartTimeRef = useRef<number | null>(null);
+  const jobProgressRef = useRef<JobProgress | null>(null);
+  const elapsedSecondsRef = useRef(0);
+  const jobStoppedByUserRef = useRef(false);
 
   const notifySimulatorTx = useCallback((cmd: string) => {
     for (const fn of simulatorListenersRef.current) {
@@ -222,13 +262,62 @@ export function ConnectionPanel({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
 
+  jobProgressRef.current = jobProgress;
+
   const prevRunningRef = useRef(isRunning);
   useEffect(() => {
     if (prevRunningRef.current && !isRunning) {
       setIsPaused(false);
+
+      const stopped = jobStoppedByUserRef.current;
+      jobStoppedByUserRef.current = false;
+
+      const jp = jobProgressRef.current;
+      const t0 = jobStartTimeRef.current;
+      const elapsedAtEnd = t0 != null ? Math.floor((Date.now() - t0) / 1000) : elapsedSecondsRef.current;
+
+      const completedOk =
+        !stopped &&
+        jp != null &&
+        jp.totalLines > 0 &&
+        (jp.linesAcknowledged >= jp.totalLines ||
+          (jp.percentComplete != null && jp.percentComplete >= 99.5));
+
+      if (completedOk) {
+        playCompletionBeep();
+        setJobCompleted(true);
+        setCompletedTime(Math.max(0, elapsedAtEnd));
+        setProgressFlashGreen(true);
+        window.setTimeout(() => setProgressFlashGreen(false), 1400);
+      }
+
+      jobStartTimeRef.current = null;
+      setJobStartTime(null);
+      elapsedSecondsRef.current = 0;
+      setElapsedSeconds(0);
     }
     prevRunningRef.current = isRunning;
   }, [isRunning]);
+
+  useEffect(() => {
+    if (!isRunning || displayPaused) return;
+    const tick = () => {
+      const t0 = jobStartTimeRef.current;
+      if (!t0) return;
+      const e = Math.floor((Date.now() - t0) / 1000);
+      elapsedSecondsRef.current = e;
+      setElapsedSeconds(e);
+    };
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isRunning, displayPaused, jobStartTime]);
+
+  useEffect(() => {
+    if (!jobCompleted) return;
+    const t = window.setTimeout(() => setJobCompleted(false), 30000);
+    return () => clearTimeout(t);
+  }, [jobCompleted]);
 
   const sceneBounds = useMemo(
     () => ({
@@ -335,6 +424,7 @@ export function ConnectionPanel({
 
   const handleDisconnect = useCallback(async () => {
     const ctrl = controllerRef.current;
+    jobStoppedByUserRef.current = true;
     try {
       if (ctrl?.isJobRunning) {
         try {
@@ -417,6 +507,7 @@ export function ConnectionPanel({
   const handleStartJob = async () => {
     if (!gcode || !controllerRef.current) return;
     setIsPaused(false);
+    setJobCompleted(false);
 
     if (preflight && !preflight.canStart) {
       await showAlert(
@@ -502,10 +593,20 @@ export function ConnectionPanel({
 
       for (const line of lines) notifySimulatorTx(line);
       controllerRef.current.sendJob(lines);
+      jobStoppedByUserRef.current = false;
+      const t0 = Date.now();
+      jobStartTimeRef.current = t0;
+      setJobStartTime(t0);
+      setElapsedSeconds(0);
+      elapsedSecondsRef.current = 0;
     } catch (e: any) {
       activeReplayRef.current = null;
       currentLogRef.current = null;
       setCurrentLog(null);
+      jobStartTimeRef.current = null;
+      setJobStartTime(null);
+      setElapsedSeconds(0);
+      elapsedSecondsRef.current = 0;
       setMessages(prev => [...prev, `Failed to start: ${e.message}`]);
     }
   };
@@ -660,6 +761,7 @@ export function ConnectionPanel({
   const handleStop = useCallback(async () => {
     const ctrl = controllerRef.current;
     if (!ctrl) return;
+    jobStoppedByUserRef.current = true;
     try {
       ctrl.stop();
       await new Promise(r => setTimeout(r, 500));
@@ -773,6 +875,18 @@ export function ConnectionPanel({
   const canStart = !!gcode && !isRunning;
   const readinessScore = preflight?.score ?? null;
   const issues = (preflight?.issues ?? []).filter(i => i.severity !== 'info');
+
+  const estimatedRemaining = useMemo(() => {
+    if (!jobProgress || jobStartTime == null || jobProgress.linesAcknowledged < 2 || !jobProgress.totalLines) {
+      return null;
+    }
+    const elapsed = (Date.now() - jobStartTime) / 1000;
+    if (elapsed < 0.01) return null;
+    const rate = jobProgress.linesAcknowledged / elapsed;
+    if (!Number.isFinite(rate) || rate < 1e-6) return null;
+    const remaining = (jobProgress.totalLines - jobProgress.linesAcknowledged) / rate;
+    return Math.max(0, Math.round(remaining));
+  }, [jobProgress, jobStartTime, elapsedSeconds]);
 
   const jogBtnStyle: React.CSSProperties = {
     padding: '10px', fontSize: 16, borderRadius: 6, cursor: 'pointer',
@@ -1036,60 +1150,90 @@ export function ConnectionPanel({
       }, '◉ Frame with Laser Dot'),
     ),
 
-    isRunning && React.createElement(React.Fragment, null,
+    (isRunning || progressFlashGreen) && React.createElement(React.Fragment, null,
       React.createElement('div', {
         style: { marginTop: 4 },
       },
         React.createElement('div', {
           style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8888aa', marginBottom: 4 },
         },
-          React.createElement('span', null, displayPaused ? '⏸ Paused' : '▶ Running...'),
+          React.createElement('span', null,
+            isRunning
+              ? (displayPaused ? '⏸ Paused' : '▶ Running...')
+              : '✓ Complete',
+          ),
           React.createElement('span', { style: { fontFamily: mono } },
-            `${jobProgress?.percentComplete?.toFixed(0) ?? 0}%`,
+            `${isRunning ? (jobProgress?.percentComplete?.toFixed(0) ?? 0) : '100'}%`,
           ),
         ),
         React.createElement('div', {
-          style: { width: '100%', height: 8, background: '#1a1a2e', borderRadius: 4, overflow: 'hidden' },
+          style: {
+            width: '100%', height: 8, background: '#1a1a2e', borderRadius: 4, overflow: 'hidden',
+            boxShadow: progressFlashGreen ? '0 0 14px rgba(45,212,160,0.85)' : 'none',
+            transition: 'box-shadow 0.2s',
+          },
         },
           React.createElement('div', {
             style: {
-              width: `${jobProgress?.percentComplete ?? 0}%`,
+              width: `${isRunning ? (jobProgress?.percentComplete ?? 0) : (progressFlashGreen ? 100 : 0)}%`,
               height: '100%',
-              background: displayPaused ? '#ffd444' : '#2dd4a0',
+              background: progressFlashGreen ? '#4ade80' : displayPaused ? '#ffd444' : '#2dd4a0',
               borderRadius: 4,
-              transition: 'width 0.3s',
+              transition: 'width 0.3s, background 0.15s',
             },
           }),
         ),
-        React.createElement('div', {
+        isRunning && React.createElement('div', {
           style: { fontSize: 9, color: '#555570', marginTop: 4, fontFamily: mono },
         }, `${jobProgress?.linesAcknowledged ?? 0} / ${jobProgress?.totalLines ?? 0} lines`),
+        isRunning && React.createElement('div', {
+          style: { display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#555570', marginTop: 4, fontFamily: mono },
+        },
+          React.createElement('span', null, `Elapsed: ${formatJobTime(elapsedSeconds)}`),
+          estimatedRemaining != null && estimatedRemaining > 0 && React.createElement('span', null,
+            `~${formatJobTime(estimatedRemaining)} remaining`,
+          ),
+        ),
       ),
-      React.createElement('div', {
-        style: { display: 'flex', gap: 6, marginTop: 8 },
+    ),
+    isRunning && React.createElement('div', {
+      style: { display: 'flex', gap: 6, marginTop: 8 },
+    },
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handlePauseResume(); },
+        style: {
+          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
+          borderRadius: 8, cursor: 'pointer', fontFamily: font,
+          background: displayPaused ? 'rgba(45,212,160,0.1)' : 'rgba(255,212,68,0.08)',
+          border: displayPaused ? '1px solid #2dd4a0' : '1px solid rgba(255,212,68,0.3)',
+          color: displayPaused ? '#2dd4a0' : '#ffd444',
+        },
+      }, displayPaused ? '▶ Resume' : '⏸ Pause'),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handleStop(); },
+        style: {
+          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
+          borderRadius: 8, cursor: 'pointer', fontFamily: font,
+          background: 'rgba(255,68,102,0.08)',
+          border: '1px solid rgba(255,68,102,0.3)',
+          color: '#ff4466',
+        },
+      }, '⏹ Stop'),
+    ),
+
+    jobCompleted && React.createElement('div', {
+      style: {
+        padding: '12px', marginTop: 4,
+        background: 'rgba(45,212,160,0.08)', border: '1px solid rgba(45,212,160,0.3)',
+        borderRadius: 8, textAlign: 'center' as const,
       },
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { void handlePauseResume(); },
-          style: {
-            flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-            borderRadius: 8, cursor: 'pointer', fontFamily: font,
-            background: displayPaused ? 'rgba(45,212,160,0.1)' : 'rgba(255,212,68,0.08)',
-            border: displayPaused ? '1px solid #2dd4a0' : '1px solid rgba(255,212,68,0.3)',
-            color: displayPaused ? '#2dd4a0' : '#ffd444',
-          },
-        }, displayPaused ? '▶ Resume' : '⏸ Pause'),
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { void handleStop(); },
-          style: {
-            flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-            borderRadius: 8, cursor: 'pointer', fontFamily: font,
-            background: 'rgba(255,68,102,0.08)',
-            border: '1px solid rgba(255,68,102,0.3)',
-            color: '#ff4466',
-          },
-        }, '⏹ Stop'),
+    },
+      React.createElement('div', { style: { fontSize: 20, marginBottom: 4 } }, '✓'),
+      React.createElement('div', { style: { fontSize: 13, color: '#2dd4a0', fontWeight: 600 } }, 'Job Complete'),
+      React.createElement('div', { style: { fontSize: 10, color: '#555570', marginTop: 4, fontFamily: mono } },
+        `Finished in ${formatJobTime(completedTime)}`,
       ),
     ),
 
@@ -1319,6 +1463,7 @@ export function ConnectionPanel({
         React.createElement('button', {
           type: 'button',
           onClick: () => {
+            jobStoppedByUserRef.current = true;
             if (testFireTimeoutRef.current) {
               clearTimeout(testFireTimeoutRef.current);
               testFireTimeoutRef.current = null;
