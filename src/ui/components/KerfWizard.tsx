@@ -11,10 +11,9 @@ interface KerfWizardProps {
   onApplyKerf: (kerfMm: number, objectIds: string[]) => void;
   onSaveToPreset: (kerfMm: number) => void;
   onClose: () => void;
-  showAlert?: (title: string, message: string, details?: string) => Promise<void>;
 }
 
-type WizardStep = 'intro' | 'generate' | 'measure' | 'apply';
+type WizardStep = 'intro' | 'generate' | 'cut' | 'measure' | 'apply';
 
 function btnStyle(active: boolean, color: string = '#00d4ff'): React.CSSProperties {
   const rgb =
@@ -30,24 +29,6 @@ function btnStyle(active: boolean, color: string = '#00d4ff'): React.CSSProperti
   };
 }
 
-function readSavedTestSizeMm(): number {
-  try {
-    const saved = localStorage.getItem('laserforge_kerf_test_size');
-    if (saved) {
-      const n = parseFloat(saved);
-      if (Number.isFinite(n) && n > 0) return n;
-    }
-  } catch { /* ignore */ }
-  return 30;
-}
-
-function readInitialStep(): WizardStep {
-  try {
-    if (localStorage.getItem('laserforge_kerf_step') === 'measure') return 'measure';
-  } catch { /* ignore */ }
-  return 'intro';
-}
-
 export function KerfWizard({
   scene,
   selectedIds,
@@ -55,12 +36,11 @@ export function KerfWizard({
   onApplyKerf,
   onSaveToPreset,
   onClose,
-  showAlert,
 }: KerfWizardProps) {
-  const [step, setStep] = useState<WizardStep>(readInitialStep);
-  const [testSize, setTestSize] = useState(() => readSavedTestSizeMm());
-  const [measuredOuter, setMeasuredOuter] = useState(() => readSavedTestSizeMm());
-  const [measuredInner, setMeasuredInner] = useState(() => readSavedTestSizeMm());
+  const [step, setStep] = useState<WizardStep>('intro');
+  const [testSize, setTestSize] = useState(30);
+  const [measuredOuter, setMeasuredOuter] = useState(30);
+  const [measuredInner, setMeasuredInner] = useState(30);
   const [calculatedKerf, setCalculatedKerf] = useState<number | null>(null);
   const [applyMode, setApplyMode] = useState<'outward' | 'inward'>('outward');
   const [savedKerf, setSavedKerf] = useState<number>(() => {
@@ -73,27 +53,13 @@ export function KerfWizard({
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
 
-  const clearKerfTestProgress = useCallback(() => {
-    try {
-      localStorage.removeItem('laserforge_kerf_step');
-      localStorage.removeItem('laserforge_kerf_test_size');
-    } catch { /* ignore */ }
-  }, []);
-
-  const handleRequestClose = useCallback(() => {
-    if (step === 'generate') {
-      clearKerfTestProgress();
-    }
-    onClose();
-  }, [step, clearKerfTestProgress, onClose]);
-
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '6px 8px',
     background: '#0a0a14', border: '1px solid #252540', borderRadius: 5,
     color: '#e0e0ec', fontSize: 12, outline: 'none', fontFamily: mono,
   };
 
-  const handleGenerateTest = useCallback(async () => {
+  const handleGenerateTest = useCallback(() => {
     const uid = () => generateId();
 
     const startX = scene.material
@@ -172,34 +138,10 @@ export function KerfWizard({
     ];
 
     onGenerateTestPiece(objects);
-    try {
-      localStorage.setItem('laserforge_kerf_test_size', String(testSize));
-      localStorage.setItem('laserforge_kerf_step', 'measure');
-    } catch { /* ignore */ }
     setMeasuredOuter(testSize);
     setMeasuredInner(testSize);
-    onClose();
-
-    const msg =
-      'Test pieces added to your canvas.\n\n' +
-      '1. Connect to your laser and cut the test pieces\n' +
-      '2. Measure both squares with calipers\n' +
-      '3. Reopen the Kerf Wizard to enter your measurements';
-    if (showAlert) {
-      await new Promise<void>(r => setTimeout(r, 50));
-      await showAlert('Kerf Test', msg);
-    } else {
-      await new Promise<void>(r => setTimeout(r, 100));
-      window.alert(
-        'Test pieces added to canvas!\n\n' +
-          'Now:\n' +
-          '1. Connect to your laser\n' +
-          '2. Cut the test pieces\n' +
-          '3. Measure with calipers\n' +
-          '4. Reopen Kerf Wizard to enter measurements',
-      );
-    }
-  }, [scene, testSize, onGenerateTestPiece, onClose, showAlert]);
+    setStep('cut');
+  }, [scene, testSize, onGenerateTestPiece]);
 
   const handleCalculate = useCallback(() => {
     const outerDiff = testSize - measuredOuter;
@@ -218,8 +160,6 @@ export function KerfWizard({
 
     try {
       localStorage.setItem('laserforge_kerf', String(k));
-      localStorage.removeItem('laserforge_kerf_step');
-      localStorage.removeItem('laserforge_kerf_test_size');
     } catch { /* ignore */ }
     setSavedKerf(k);
 
@@ -239,15 +179,13 @@ export function KerfWizard({
     if (k === null || k <= 0) return;
     try {
       localStorage.setItem('laserforge_kerf', String(k));
-      localStorage.removeItem('laserforge_kerf_step');
-      localStorage.removeItem('laserforge_kerf_test_size');
     } catch { /* ignore */ }
     setSavedKerf(k);
     onSaveToPreset(k);
     onClose();
   }, [calculatedKerf, savedKerf, onSaveToPreset, onClose]);
 
-  const stepOrder: WizardStep[] = ['intro', 'generate', 'measure', 'apply'];
+  const stepOrder: WizardStep[] = ['intro', 'generate', 'cut', 'measure', 'apply'];
   const stepIdx = stepOrder.indexOf(step);
 
   return React.createElement('div', {
@@ -256,7 +194,7 @@ export function KerfWizard({
       backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
       justifyContent: 'center', zIndex: 2000, fontFamily: font,
     },
-    onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) handleRequestClose(); },
+    onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
   },
     React.createElement('div', {
       style: {
@@ -276,7 +214,7 @@ export function KerfWizard({
           ),
         ),
         React.createElement('button', {
-          onClick: handleRequestClose,
+          onClick: onClose,
           style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
         }, '×'),
       ),
@@ -370,22 +308,78 @@ export function KerfWizard({
           React.createElement('div', { style: { display: 'flex', gap: 8 } },
             React.createElement('button', {
               type: 'button',
-              onClick: () => {
-                clearKerfTestProgress();
-                setStep('intro');
-              },
+              onClick: () => setStep('intro'),
               style: btnStyle(false),
             }, '← Back'),
             React.createElement('button', {
               type: 'button',
-              onClick: () => { void handleGenerateTest(); },
+              onClick: handleGenerateTest,
               style: btnStyle(true),
             }, 'Add to Canvas'),
           ),
         ),
 
+        step === 'cut' && React.createElement('div', null,
+          React.createElement('div', {
+            style: { textAlign: 'center' as const, marginBottom: 20 },
+          },
+            React.createElement('div', { style: { fontSize: 36, marginBottom: 8 } }, '✓'),
+            React.createElement('h3', { style: { color: '#2dd4a0', fontSize: 16, marginBottom: 12 } },
+              'Test pieces added to canvas',
+            ),
+          ),
+
+          React.createElement('div', {
+            style: {
+              padding: '16px 20px', background: '#08080f',
+              borderRadius: 8, border: '1px solid #1a1a2e', marginBottom: 16,
+            },
+          },
+            React.createElement('div', { style: { fontSize: 12, color: '#e0e0ec', fontWeight: 600, marginBottom: 10 } },
+              'What to do now:',
+            ),
+            ...[
+              'Close this dialog (or leave it open)',
+              'Connect to your laser',
+              `Cut the two ${testSize}mm test squares`,
+              'Measure both pieces with calipers',
+              'Come back here and click the button below',
+            ].map((text, i) =>
+              React.createElement('div', {
+                key: i,
+                style: { fontSize: 11, color: '#8888aa', padding: '4px 0', display: 'flex', gap: 8, lineHeight: 1.5 },
+              },
+                React.createElement('span', { style: { color: '#555570', fontFamily: mono, flexShrink: 0 } }, `${i + 1}.`),
+                React.createElement('span', null, text),
+              ),
+            ),
+          ),
+
+          React.createElement('button', {
+            type: 'button',
+            onClick: () => setStep('measure'),
+            style: {
+              width: '100%', padding: '14px', fontSize: 13, fontWeight: 600,
+              borderRadius: 8, cursor: 'pointer', fontFamily: font,
+              background: 'rgba(0,212,255,0.1)', border: '1px solid #00d4ff',
+              color: '#00d4ff', marginBottom: 8,
+            },
+          }, '✂ I\'ve cut and measured them'),
+
+          React.createElement('button', {
+            type: 'button',
+            onClick: () => setStep('generate'),
+            style: {
+              width: '100%', padding: '8px', fontSize: 10,
+              borderRadius: 6, cursor: 'pointer', fontFamily: font,
+              background: 'transparent', border: '1px solid #1a1a2e',
+              color: '#555570',
+            },
+          }, '← Generate different test pieces'),
+        ),
+
         step === 'measure' && React.createElement('div', null,
-          React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 14, marginBottom: 8 } }, 'Step 2: Enter measurements'),
+          React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 14, marginBottom: 8 } }, 'Step 3: Enter measurements'),
 
           React.createElement('div', {
             style: {
@@ -434,12 +428,7 @@ export function KerfWizard({
 
           React.createElement('button', {
             type: 'button',
-            onClick: () => {
-              setStep('generate');
-              try {
-                localStorage.removeItem('laserforge_kerf_step');
-              } catch { /* ignore */ }
-            },
+            onClick: () => setStep('cut'),
             style: {
               background: 'none', border: 'none', color: '#555570',
               fontSize: 9, cursor: 'pointer', fontFamily: font,
@@ -450,12 +439,7 @@ export function KerfWizard({
           React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 12 } },
             React.createElement('button', {
               type: 'button',
-              onClick: () => {
-                try {
-                  localStorage.removeItem('laserforge_kerf_step');
-                } catch { /* ignore */ }
-                setStep('generate');
-              },
+              onClick: () => setStep('cut'),
               style: btnStyle(false),
             }, '← Back'),
             React.createElement('button', { type: 'button', onClick: handleCalculate, style: btnStyle(true, '#2dd4a0') }, 'Calculate Kerf →'),
@@ -463,7 +447,7 @@ export function KerfWizard({
         ),
 
         step === 'apply' && React.createElement('div', null,
-          React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 14, marginBottom: 12 } }, 'Step 3: Apply kerf compensation'),
+          React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 14, marginBottom: 12 } }, 'Step 4: Apply kerf compensation'),
 
           React.createElement('div', {
             style: {
