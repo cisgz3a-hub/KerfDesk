@@ -44,6 +44,7 @@ import { type ToolType } from './ToolBar';
 import { CanvasRenderer } from './canvas/CanvasRenderer';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { type JobProgress } from '../../controllers/ControllerInterface';
+import { type Move } from '../../core/plan/Plan';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -58,6 +59,71 @@ function defaultCursorForTool(activeTool: ToolType): string {
 }
 
 const GRID_SNAP = 1; // mm — snap to 1mm grid. Set to 0 to disable.
+
+/** Pen position after applying moves[0..lastMoveIndex] (rapid/linear update X/Y). */
+function penAfterMoveIndex(moves: readonly Move[], lastMoveIndex: number): { x: number; y: number } {
+  let x = 0;
+  let y = 0;
+  if (lastMoveIndex < 0) return { x: 0, y: 0 };
+  const lim = Math.min(lastMoveIndex, moves.length - 1);
+  for (let i = 0; i <= lim; i++) {
+    const m = moves[i];
+    if (m.type === 'rapid' || m.type === 'linear') {
+      x = m.to.x;
+      y = m.to.y;
+    }
+  }
+  return { x, y };
+}
+
+function drawJobToolpathRange(
+  ctx: CanvasRenderingContext2D,
+  transform: Transform,
+  moves: readonly Move[],
+  fromIdx: number,
+  toIdxExclusive: number,
+  strokeStyle: string,
+  lineWidthScreenPx: number,
+): void {
+  if (fromIdx >= toIdxExclusive || fromIdx >= moves.length) return;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = transform.screenPx(lineWidthScreenPx);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.beginPath();
+  let x = 0;
+  let y = 0;
+  if (fromIdx > 0) {
+    const p = penAfterMoveIndex(moves, fromIdx - 1);
+    x = p.x;
+    y = p.y;
+    ctx.moveTo(x, y);
+  }
+  let hasPen = fromIdx > 0;
+  for (let i = Math.max(0, fromIdx); i < toIdxExclusive && i < moves.length; i++) {
+    const m = moves[i];
+    if (m.type === 'rapid') {
+      x = m.to.x;
+      y = m.to.y;
+      ctx.moveTo(x, y);
+      hasPen = true;
+    } else if (m.type === 'linear') {
+      if (m.power > 0) {
+        if (!hasPen) {
+          ctx.moveTo(x, y);
+          hasPen = true;
+        }
+        ctx.lineTo(m.to.x, m.to.y);
+      } else {
+        ctx.moveTo(m.to.x, m.to.y);
+        hasPen = true;
+      }
+      x = m.to.x;
+      y = m.to.y;
+    }
+  }
+  ctx.stroke();
+}
 
 function snapToGrid(value: number, gridSize: number): number {
   if (gridSize <= 0) return value;
@@ -251,6 +317,8 @@ interface CanvasViewportProps {
   livePosition?: { x: number; y: number } | null;
   isJobRunning?: boolean;
   jobProgress?: JobProgress | null;
+  /** Flattened plan moves (canvas mm) for the job currently streaming to the machine. */
+  activeJobMoves?: readonly Move[] | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -275,6 +343,7 @@ export function CanvasViewport({
   livePosition = null,
   isJobRunning = false,
   jobProgress = null,
+  activeJobMoves = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -676,6 +745,19 @@ export function CanvasViewport({
       ctx.restore();
     }
 
+    if (isJobRunning && activeJobMoves && activeJobMoves.length > 0 && jobProgress && jobProgress.totalLines > 0) {
+      const ratio = Math.min(1, jobProgress.linesAcknowledged / Math.max(1, jobProgress.totalLines));
+      const split = Math.min(
+        activeJobMoves.length,
+        Math.max(0, Math.floor(ratio * activeJobMoves.length)),
+      );
+      ctx.save();
+      transform.applyToContext(ctx);
+      drawJobToolpathRange(ctx, transform, activeJobMoves, 0, split, 'rgba(255, 68, 102, 0.62)', 1.2);
+      drawJobToolpathRange(ctx, transform, activeJobMoves, split, activeJobMoves.length, 'rgba(0, 212, 255, 0.14)', 1);
+      ctx.restore();
+    }
+
     const monoUi = "'JetBrains Mono', monospace";
 
     if (isJobRunning && livePosition && Number.isFinite(livePosition.x) && Number.isFinite(livePosition.y)) {
@@ -730,7 +812,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

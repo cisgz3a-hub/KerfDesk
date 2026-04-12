@@ -30,6 +30,9 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useGcodeExport } from '../hooks/useGcodeExport';
+import { compileJob } from '../../core/job/JobCompiler';
+import { optimizePlan } from '../../core/plan/PlanOptimizer';
+import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
@@ -148,7 +151,47 @@ export function App() {
   });
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
+  const [activeJobPlanMin, setActiveJobPlanMin] = useState<{ minX: number; minY: number } | null>(null);
   const grbl = useGrblConnection();
+  const wasJobRunningRef = useRef(false);
+
+  function computePlanMoveMinFromMoves(moves: readonly Move[]): { minX: number; minY: number } {
+    let minX = Infinity;
+    let minY = Infinity;
+    for (const m of moves) {
+      if (m.type === 'rapid' || m.type === 'linear') {
+        minX = Math.min(minX, m.to.x);
+        minY = Math.min(minY, m.to.y);
+      }
+    }
+    if (!Number.isFinite(minX)) return { minX: 0, minY: 0 };
+    return { minX, minY };
+  }
+
+  useEffect(() => {
+    if (grbl.isJobRunning && !wasJobRunningRef.current) {
+      try {
+        const job = compileJob(scene);
+        if (job.operations.length === 0) {
+          setActiveJobMoves(null);
+          setActiveJobPlanMin(null);
+        } else {
+          const plan = optimizePlan(job);
+          const moves = plan.operations.flatMap(op => op.moves);
+          setActiveJobMoves(moves);
+          setActiveJobPlanMin(computePlanMoveMinFromMoves(moves));
+        }
+      } catch {
+        setActiveJobMoves(null);
+        setActiveJobPlanMin(null);
+      }
+    } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
+      setActiveJobMoves(null);
+      setActiveJobPlanMin(null);
+    }
+    wasJobRunningRef.current = grbl.isJobRunning;
+  }, [grbl.isJobRunning, scene]);
 
   const machinePositionForStartWizard = useMemo(() => {
     const s = grbl.machineState;
@@ -160,8 +203,15 @@ export function App() {
     if (!grbl.isJobRunning) return null;
     const s = grbl.machineState;
     if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
-    return { x: s.position.x, y: s.position.y };
-  }, [grbl.isJobRunning, grbl.machineState]);
+    const wp = s.position;
+    if (activeJobPlanMin) {
+      return {
+        x: wp.x + activeJobPlanMin.minX,
+        y: wp.y + activeJobPlanMin.minY,
+      };
+    }
+    return { x: wp.x, y: wp.y };
+  }, [grbl.isJobRunning, grbl.machineState, activeJobPlanMin]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
   const connectionSidebarWidth = connectionSidebarOpen ? 280 : 0;
@@ -1249,6 +1299,7 @@ export function App() {
           livePosition: liveJobCanvasPosition,
           isJobRunning: grbl.isJobRunning,
           jobProgress: grbl.jobProgress,
+          activeJobMoves,
         }),
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {
