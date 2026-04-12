@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
+import { type Move } from '../../core/plan/Plan';
 import { getOutputStrategy } from '../../core/output/Output';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import '../../core/output/GrblStrategy';
@@ -29,5 +30,22 @@ export function useGcodeExport(
     }
   }, [startMode, savedOrigin]);
 
-  return { currentGcode, setCurrentGcode, compileGcode };
+  const compileToolpathMoves = useCallback(async (targetScene: Scene): Promise<Move[] | null> => {
+    try {
+      const sceneForJob = await expandTextOutlinesForCompile(targetScene);
+      const job = compileJob(sceneForJob);
+      if (job.operations.length === 0) return null;
+      const plan = optimizePlan(job);
+      const moves: Move[] = [];
+      for (const op of plan.operations) {
+        moves.push(...op.moves);
+      }
+      return moves;
+    } catch (err) {
+      console.error('Toolpath compilation failed:', err);
+      return null;
+    }
+  }, []);
+
+  return { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves };
 }

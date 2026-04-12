@@ -151,6 +151,8 @@ export function App() {
     }
   });
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
+  const [showToolpathPreview, setShowToolpathPreview] = useState(false);
+  const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
   const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
   const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
@@ -483,7 +485,7 @@ export function App() {
     setScene(newScene);
   }, []);
 
-  const { currentGcode, setCurrentGcode, compileGcode } = useGcodeExport(startMode, savedOrigin);
+  const { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves } = useGcodeExport(startMode, savedOrigin);
 
   const lastCompiledSceneRef = useRef('');
   const [gcodeStale, setGcodeStale] = useState(false);
@@ -497,6 +499,34 @@ export function App() {
       }),
     [startMode, savedOrigin],
   );
+
+  const toolpathCompileKey = useMemo(
+    () => sceneCompileFingerprint(scene),
+    [scene, sceneCompileFingerprint],
+  );
+
+  const handleTogglePreview = useCallback(() => {
+    setShowToolpathPreview(p => !p);
+  }, []);
+
+  useEffect(() => {
+    if (!showToolpathPreview) {
+      setToolpathPreviewMoves(null);
+      return;
+    }
+    let cancelled = false;
+    void compileToolpathMoves(scene).then(m => {
+      if (cancelled) return;
+      if (m === null) {
+        void showAlert('No Objects', 'No objects to preview. Add objects to an output layer first.');
+        setShowToolpathPreview(false);
+        setToolpathPreviewMoves(null);
+        return;
+      }
+      setToolpathPreviewMoves(m);
+    });
+    return () => { cancelled = true; };
+  }, [showToolpathPreview, toolpathCompileKey, compileToolpathMoves, scene, showAlert]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;
@@ -1240,14 +1270,7 @@ export function App() {
         onToolNode: () => setActiveTool('node'),
         onToolPan: () => {},
         onToggleToolpath: () => {
-          void (async () => {
-            try {
-              const gc = await compileGcode(scene);
-              if (gc) setGcodePreview(gc);
-            } catch (err) {
-              console.error('G-code generation failed:', err);
-            }
-          })();
+          handleTogglePreview();
         },
         onToggleShortcuts: () => dialogs.setShowShortcuts(s => !s),
         onNudge: handleNudge,
@@ -1278,7 +1301,7 @@ export function App() {
         sceneOps.performBoolean,
         sceneOps.centerOnMaterial,
         handleGridArray,
-        compileGcode,
+        handleTogglePreview,
         scene,
         selectedIds,
         clipboard,
@@ -1371,14 +1394,8 @@ export function App() {
       productionMode,
       onToggleProductionMode: handleToggleProductionMode,
       onExit: handleExit,
-      onToolpathPreview: async () => {
-        try {
-          const gc = await compileGcode(scene);
-          if (gc) setGcodePreview(gc);
-        } catch (err) {
-          await showAlert('Preview Failed', 'Toolpath preview failed: ' + (err as Error).message);
-        }
-      },
+      onTogglePreview: handleTogglePreview,
+      showToolpathPreview,
     }),
 
     showRecover && !dialogs.showSetup && React.createElement('div', {
@@ -1456,6 +1473,8 @@ export function App() {
           isJobRunning: grbl.isJobRunning,
           jobProgress: grbl.jobProgress,
           activeJobMoves,
+          showToolpathPreview,
+          toolpathMoves: showToolpathPreview ? toolpathPreviewMoves : null,
         }),
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {

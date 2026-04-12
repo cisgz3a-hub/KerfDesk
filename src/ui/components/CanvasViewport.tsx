@@ -125,6 +125,38 @@ function drawJobToolpathRange(
   ctx.stroke();
 }
 
+/** Planned laser moves (canvas mm) — blue cut lines, dashed rapids. */
+function drawPlannedToolpathPreview(
+  ctx: CanvasRenderingContext2D,
+  transform: Transform,
+  moves: readonly Move[],
+): void {
+  if (moves.length === 0) return;
+  drawJobToolpathRange(ctx, transform, moves, 0, moves.length, 'rgba(0, 140, 255, 0.4)', 0.5);
+
+  ctx.strokeStyle = 'rgba(255, 68, 102, 0.15)';
+  ctx.lineWidth = transform.screenPx(0.5);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash([transform.screenPx(2), transform.screenPx(4)]);
+  ctx.beginPath();
+  let px = 0;
+  let py = 0;
+  for (const m of moves) {
+    if (m.type === 'rapid') {
+      ctx.moveTo(px, py);
+      ctx.lineTo(m.to.x, m.to.y);
+      px = m.to.x;
+      py = m.to.y;
+    } else if (m.type === 'linear') {
+      px = m.to.x;
+      py = m.to.y;
+    }
+  }
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
 function snapToGrid(value: number, gridSize: number): number {
   if (gridSize <= 0) return value;
   return Math.round(value / gridSize) * gridSize;
@@ -319,6 +351,9 @@ interface CanvasViewportProps {
   jobProgress?: JobProgress | null;
   /** Flattened plan moves (canvas mm) for the job currently streaming to the machine. */
   activeJobMoves?: readonly Move[] | null;
+  /** When true, draw compiled plan moves as a blue overlay (design space). */
+  showToolpathPreview?: boolean;
+  toolpathMoves?: readonly Move[] | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -344,6 +379,8 @@ export function CanvasViewport({
   isJobRunning = false,
   jobProgress = null,
   activeJobMoves = null,
+  showToolpathPreview = false,
+  toolpathMoves = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -758,6 +795,13 @@ export function CanvasViewport({
       ctx.restore();
     }
 
+    if (showToolpathPreview && toolpathMoves && toolpathMoves.length > 0) {
+      ctx.save();
+      transform.applyToContext(ctx);
+      drawPlannedToolpathPreview(ctx, transform, toolpathMoves);
+      ctx.restore();
+    }
+
     const monoUi = "'JetBrains Mono', monospace";
 
     if (isJobRunning && livePosition && Number.isFinite(livePosition.x) && Number.isFinite(livePosition.y)) {
@@ -812,7 +856,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

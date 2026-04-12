@@ -265,13 +265,9 @@ export function renderSceneObjects(
           if (geom.closed) ctx.closePath();
         }
       } else if (geom.type === 'text') {
-        const fontSize = geom.fontSize || 10;
-        const bold = geom.bold ? 'bold ' : '';
-        const italic = geom.italic ? 'italic ' : '';
-        ctx.font = `${italic}${bold}${fontSize}px ${geom.fontFamily || 'Arial'}`;
         ctx.textBaseline = 'top';
         ctx.fillStyle = `rgba(30, 15, 0, ${0.5 + power * 0.5})`;
-        ctx.fillText(geom.text || '', 0, 0);
+        fillTextGeometry(ctx, geom as TextGeometry, 0, 0);
         ctx.restore();
         continue;
       } else if (geom.type === 'image') {

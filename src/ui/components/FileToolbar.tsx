@@ -57,7 +57,9 @@ interface FileToolbarProps {
   /** Active material name from scene (toolbar display). */
   materialName?: string | null;
   onShowShortcuts?: () => void;
-  onToolpathPreview?: () => void;
+  /** Toggle compiled toolpath overlay on the design canvas. */
+  onTogglePreview?: () => void;
+  showToolpathPreview?: boolean;
   productionMode?: boolean;
   onToggleProductionMode?: () => void;
 }
@@ -89,6 +91,8 @@ export function FileToolbar({
   materialName,
   productionMode = false,
   onToggleProductionMode,
+  onTogglePreview,
+  showToolpathPreview = false,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -356,6 +360,14 @@ export function FileToolbar({
     toolbarBtn('Image', 'Import image (PNG, JPG)', handleImportImageClick),
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
+    onTogglePreview
+      ? toolbarBtn(
+        showToolpathPreview ? '👁 Preview ✓' : '👁 Preview',
+        'Toggle toolpath preview overlay',
+        () => onTogglePreview(),
+        { active: showToolpathPreview },
+      )
+      : null,
     spacer(),
     onConnect
       ? toolbarBtn(
