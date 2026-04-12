@@ -1,11 +1,110 @@
 import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject, type TextGeometry, type Geometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { textToPath as geometryTextToPath } from '../../geometry/TextToPath';
 import { offsetObject } from '../../geometry/OffsetPath';
-import { generateId, IDENTITY_MATRIX } from '../../core/types';
+import { generateId, IDENTITY_MATRIX, type Matrix3x2 } from '../../core/types';
+
+/** World point from local (lx, ly) using the same convention as computeObjectBounds. */
+function transformLocalToWorld(t: Matrix3x2, lx: number, ly: number): { x: number; y: number } {
+  return {
+    x: t.a * lx + t.c * ly + t.tx,
+    y: t.b * lx + t.d * ly + t.ty,
+  };
+}
+
+/** Axis-aligned center of geometry in local space (not control-point hull for curves). */
+function geometryLocalCenter(geom: Geometry): { x: number; y: number } | null {
+  switch (geom.type) {
+    case 'rect':
+      return { x: geom.x + geom.width / 2, y: geom.y + geom.height / 2 };
+    case 'ellipse':
+      return { x: geom.cx, y: geom.cy };
+    case 'line':
+      return { x: (geom.x1 + geom.x2) / 2, y: (geom.y1 + geom.y2) / 2 };
+    case 'polygon': {
+      const pts = geom.points;
+      if (pts.length === 0) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of pts) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    }
+    case 'path': {
+      const pts: { x: number; y: number }[] = [];
+      for (const sub of geom.subPaths) {
+        for (const seg of sub.segments) {
+          switch (seg.type) {
+            case 'move':
+            case 'line':
+              pts.push(seg.to);
+              break;
+            case 'cubic':
+              pts.push(seg.cp1, seg.cp2, seg.to);
+              break;
+            case 'quadratic':
+              pts.push(seg.cp, seg.to);
+              break;
+            default:
+              break;
+          }
+        }
+      }
+      if (pts.length === 0) return null;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      for (const p of pts) {
+        minX = Math.min(minX, p.x);
+        minY = Math.min(minY, p.y);
+        maxX = Math.max(maxX, p.x);
+        maxY = Math.max(maxY, p.y);
+      }
+      return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+    }
+    case 'text': {
+      const tw = geom.text.length * geom.fontSize * 0.6;
+      const th = geom.fontSize;
+      return { x: tw / 2, y: th / 2 };
+    }
+    case 'image': {
+      const dpi = 96;
+      const w = ((geom.cropWidth || geom.originalWidth) / dpi) * 25.4;
+      const h = ((geom.cropHeight || geom.originalHeight) / dpi) * 25.4;
+      return { x: w / 2, y: h / 2 };
+    }
+    default:
+      return null;
+  }
+}
+
+function singleObjectRotationCenterWorld(obj: SceneObject): { x: number; y: number } | null {
+  const lc = geometryLocalCenter(obj.geometry);
+  if (lc) {
+    return transformLocalToWorld(obj.transform, lc.x, lc.y);
+  }
+  const b = computeObjectBounds(obj);
+  if (!b || !Number.isFinite(b.minX) || b.minX > b.maxX || b.minY > b.maxY) return null;
+  return { x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2 };
+}
+
+function groupRotationCenterWorld(objects: SceneObject[]): { x: number; y: number } | null {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const obj of objects) {
+    const b = computeObjectBounds(obj);
+    if (!b || !Number.isFinite(b.minX) || b.minX > b.maxX || b.minY > b.maxY) continue;
+    minX = Math.min(minX, b.minX);
+    minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX);
+    maxY = Math.max(maxY, b.maxY);
+  }
+  if (!Number.isFinite(minX) || minX > maxX) return null;
+  return { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+}
 
 export function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -369,36 +468,34 @@ export function useSceneOperations({
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
+    let groupCx: number;
+    let groupCy: number;
+    if (selected.length === 1) {
+      const c = singleObjectRotationCenterWorld(selected[0]);
+      if (!c) return;
+      groupCx = c.x;
+      groupCy = c.y;
+    } else {
+      const c = groupRotationCenterWorld(selected);
+      if (!c) return;
+      groupCx = c.x;
+      groupCy = c.y;
+    }
+
     const newScene = {
       ...scene,
       objects: scene.objects.map(o => {
         if (!selectedIds.has(o.id)) return o;
 
-        // Compute object's bounding box center in world coordinates
-        const bounds = computeObjectBounds(o);
-        if (!bounds) return o;
-        const cx = (bounds.minX + bounds.maxX) / 2;
-        const cy = (bounds.minY + bounds.maxY) / 2;
-
         const t = o.transform;
 
-        // Rotation around (cx, cy) is equivalent to:
-        // 1. Translate so (cx, cy) is at origin
-        // 2. Rotate
-        // 3. Translate back
-        //
-        // For an affine transform M, the new transform is:
-        //   T(cx,cy) * R * T(-cx,-cy) * M
-        //
-        // The new linear part: rotation applied to current linear part
         const newA = cos * t.a - sin * t.c;
         const newB = cos * t.b - sin * t.d;
         const newC = sin * t.a + cos * t.c;
         const newD = sin * t.b + cos * t.d;
 
-        // The new translation: rotated point + center offset back
-        const newTx = cos * (t.tx - cx) - sin * (t.ty - cy) + cx;
-        const newTy = sin * (t.tx - cx) + cos * (t.ty - cy) + cy;
+        const newTx = cos * (t.tx - groupCx) - sin * (t.ty - groupCy) + groupCx;
+        const newTy = sin * (t.tx - groupCx) + cos * (t.ty - groupCy) + groupCy;
 
         return {
           ...o,

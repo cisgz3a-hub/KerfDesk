@@ -472,37 +472,6 @@ export function renderSceneObjects(
   ctx.restore();
 }
 
-/** Screen-space job origin marker at world position (mm). No-op if `jobOriginMm` is null/undefined. */
-export function renderJobOriginMarker(
-  ctx: CanvasRenderingContext2D,
-  transform: Transform,
-  jobOriginMm: { x: number; y: number } | null | undefined,
-): void {
-  if (!jobOriginMm) return;
-  const scr = transform.worldToScreen({ x: jobOriginMm.x, y: jobOriginMm.y });
-  const sx = scr.x;
-  const sy = scr.y;
-  ctx.save();
-  ctx.strokeStyle = 'rgba(0, 212, 255, 0.7)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(sx - 4, sy);
-  ctx.lineTo(sx + 4, sy);
-  ctx.moveTo(sx, sy - 4);
-  ctx.lineTo(sx, sy + 4);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.arc(sx, sy, 3, 0, Math.PI * 2);
-  ctx.fillStyle = '#00d4ff';
-  ctx.fill();
-  ctx.font = '9px "DM Sans", system-ui, sans-serif';
-  ctx.fillStyle = '#00d4ff';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'bottom';
-  ctx.fillText('Job origin', sx + 6, sy - 2);
-  ctx.restore();
-}
-
 export function renderScene(
   ctx: CanvasRenderingContext2D,
   scene: Scene,

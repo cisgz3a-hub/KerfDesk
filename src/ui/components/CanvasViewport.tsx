@@ -16,7 +16,7 @@
  * Last updated: Refactor — Transform, pure orchestration
  */
 
-import React, { useRef, useEffect, useState, useCallback, useMemo, type MutableRefObject } from 'react';
+import React, { useRef, useEffect, useState, useCallback, type MutableRefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { createRect, createEllipse, createLine, type SceneObject } from '../../core/scene/SceneObject';
 import { moveObjects } from '../../core/scene/SceneOps';
@@ -34,9 +34,7 @@ import {
 import { computeFitBounds, computeObjectBounds } from '../../geometry/bounds';
 import { aabbIntersects, type Matrix3x2 } from '../../core/types';
 import { hitTestPoint } from '../../geometry/hit-test';
-import { renderScene, renderSceneBackground, renderSceneObjects, renderJobOriginMarker } from '../renderers/SceneRenderer';
-import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
-import { type StartMode } from './StartPositionWizard';
+import { renderScene, renderSceneBackground, renderSceneObjects } from '../renderers/SceneRenderer';
 import {
   renderSimulationPath,
   renderLaserHead,
@@ -242,10 +240,6 @@ interface CanvasViewportProps {
   onZoomChange?: (zoom: number) => void;
   actionsRef?: MutableRefObject<ViewportActions | null>;
   previewMode?: boolean;
-  /** When true and not in preview/sim playback, draw the job origin marker on the canvas. */
-  laserConnected?: boolean;
-  startMode?: StartMode;
-  savedOrigin?: { x: number; y: number } | null;
   /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
   onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
   /** Text tool: user clicked canvas — open text dialog with this world position. */
@@ -270,9 +264,6 @@ export function CanvasViewport({
   onZoomChange,
   actionsRef,
   previewMode = false,
-  laserConnected = false,
-  startMode = 'absolute',
-  savedOrigin = null,
   onSelectionScreenPos,
   onRequestTextPlacement,
   onEditText,
@@ -306,28 +297,6 @@ export function CanvasViewport({
   }, [viewport.zoom]);
 
   const selectionKey = [...selectedIds].sort().join(',');
-
-  const sceneBoundsForOrigin = useMemo(() => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const obj of scene.objects) {
-      if (!obj.visible) continue;
-      const b = computeObjectBounds(obj);
-      if (!b) continue;
-      minX = Math.min(minX, b.minX);
-      minY = Math.min(minY, b.minY);
-      maxX = Math.max(maxX, b.maxX);
-      maxY = Math.max(maxY, b.maxY);
-    }
-    return { minX, minY, maxX, maxY };
-  }, [scene.objects]);
-
-  const jobOriginMm = useMemo(() => {
-    if (!laserConnected) return null;
-    const dbMinX = Number.isFinite(sceneBoundsForOrigin.minX) ? sceneBoundsForOrigin.minX : 0;
-    const dbMinY = Number.isFinite(sceneBoundsForOrigin.minY) ? sceneBoundsForOrigin.minY : 0;
-    const offset = computeGcodeOffset(startMode, { minX: dbMinX, minY: dbMinY }, savedOrigin);
-    return { x: dbMinX + offset.x, y: dbMinY + offset.y };
-  }, [laserConnected, startMode, sceneBoundsForOrigin.minX, sceneBoundsForOrigin.minY, savedOrigin]);
 
   useEffect(() => {
     if (!onSelectionScreenPos) return;
@@ -456,13 +425,6 @@ export function CanvasViewport({
       ctx.save();
       transform.applyToContext(ctx);
       renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
-      if (
-        !previewMode &&
-        jobOriginMm &&
-        (!simulation || simulation.frames.length <= 1)
-      ) {
-        renderJobOriginMarker(ctx, transform, jobOriginMm);
-      }
     }
 
     if (!previewMode) {
@@ -708,7 +670,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, jobOriginMm]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode]);
 
   useEffect(() => {
     if (activeTool !== 'node') {
