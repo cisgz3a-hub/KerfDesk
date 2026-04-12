@@ -214,7 +214,7 @@ export function App() {
   }, [grbl.isJobRunning, grbl.machineState, activeJobPlanMin]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
-  const connectionSidebarWidth = connectionSidebarOpen ? 280 : 0;
+  const connectionSidebarWidth = connectionSidebarOpen ? 340 : 0;
 
   const toolbarLaserConnected = useMemo(() => {
     const s = grbl.machineState;

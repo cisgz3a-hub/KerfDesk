@@ -24,6 +24,11 @@ export class MockSerialPort implements SerialPortLike {
   private _closeCallback: (() => void) | null = null;
   private _responseGenerator: ((line: string) => string[]) | null;
 
+  /** Last F feed rate (mm/min) from G-code stream; used when a move line has no F */
+  private _lastFeedRate = 3000;
+  /** Serialize delayed `ok` responses so order matches GRBL buffer drain */
+  private _pendingOkChain: Promise<void> = Promise.resolve();
+
   /** Simulated machine position (mm), used when no custom responseGenerator is set */
   private _simPosX = 0;
   private _simPosY = 0;
@@ -55,9 +60,15 @@ export class MockSerialPort implements SerialPortLike {
     if (!this._isOpen) throw new Error('Port is not open');
     const line = data.replace(/[\r\n]+$/, '');
     this.received.push(line);
-    const responses = this._responseGenerator
-      ? this._responseGenerator(line)
-      : this._defaultHandleLine(line);
+    if (this._responseGenerator) {
+      const responses = this._responseGenerator(line);
+      for (const resp of responses) {
+        this.injectResponse(resp);
+      }
+      return;
+    }
+    const responses = this._defaultHandleLine(line);
+    if (responses === null) return;
     for (const resp of responses) {
       this.injectResponse(resp);
     }
@@ -101,7 +112,24 @@ export class MockSerialPort implements SerialPortLike {
     this._errorCallback?.(new Error(message));
   }
 
-  private _defaultHandleLine(line: string): string[] {
+  /** Delay `ok` until after simulated move time; keeps oks ordered like real GRBL */
+  private _scheduleDelayedOk(delayMs: number, apply: () => void): void {
+    this._pendingOkChain = this._pendingOkChain.then(
+      () =>
+        new Promise<void>(resolve => {
+          setTimeout(() => {
+            try {
+              apply();
+              this.injectResponse('ok');
+            } finally {
+              resolve();
+            }
+          }, delayMs);
+        }),
+    );
+  }
+
+  private _defaultHandleLine(line: string): string[] | null {
     if (line === '') return ['ok'];
     if (line.startsWith(';')) return [];
 
@@ -133,8 +161,11 @@ export class MockSerialPort implements SerialPortLike {
       return ['ok'];
     }
 
-    // G0/G1: work coordinates when absolute; MPos = W + work offset
+    // G0/G1: work coordinates when absolute; MPos = W + work offset — delay ok like real execution
     if (/\bG0\b|\bG00\b|\bG1\b|\bG01\b/.test(u)) {
+      const fMatch = line.match(/[Ff]([0-9.]+)/);
+      if (fMatch) this._lastFeedRate = parseFloat(fMatch[1]);
+
       const xMatch = line.match(/[Xx]([0-9.-]+)/);
       const yMatch = line.match(/[Yy]([0-9.-]+)/);
       const hadG90 = /\bG90\b/.test(u);
@@ -143,18 +174,37 @@ export class MockSerialPort implements SerialPortLike {
       if (hadG91) incremental = true;
       else if (hadG90) incremental = false;
       else incremental = !this._modalG90;
+
+      let newX = this._simPosX;
+      let newY = this._simPosY;
       if (incremental) {
-        if (xMatch) this._simPosX += parseFloat(xMatch[1]);
-        if (yMatch) this._simPosY += parseFloat(yMatch[1]);
+        if (xMatch) newX += parseFloat(xMatch[1]);
+        if (yMatch) newY += parseFloat(yMatch[1]);
       } else {
-        if (xMatch) this._simPosX = parseFloat(xMatch[1]) + this._workOffsetX;
-        if (yMatch) this._simPosY = parseFloat(yMatch[1]) + this._workOffsetY;
+        if (xMatch) newX = parseFloat(xMatch[1]) + this._workOffsetX;
+        if (yMatch) newY = parseFloat(yMatch[1]) + this._workOffsetY;
       }
-      this._simPosX = Math.max(0, Math.min(this._maxX, this._simPosX));
-      this._simPosY = Math.max(0, Math.min(this._maxY, this._simPosY));
+      newX = Math.max(0, Math.min(this._maxX, newX));
+      newY = Math.max(0, Math.min(this._maxY, newY));
+
       if (hadG91) this._modalG90 = false;
       if (hadG90) this._modalG90 = true;
-      return ['ok'];
+
+      const oldX = this._simPosX;
+      const oldY = this._simPosY;
+      const dx = newX - oldX;
+      const dy = newY - oldY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      const feedRate = Math.max(1, this._lastFeedRate);
+      const moveTimeMs = (distance / feedRate) * 60000;
+      const SIMULATOR_SPEED = 10;
+      const delayMs = Math.max(1, Math.min(5000, moveTimeMs / SIMULATOR_SPEED));
+
+      this._scheduleDelayedOk(delayMs, () => {
+        this._simPosX = newX;
+        this._simPosY = newY;
+      });
+      return null;
     }
 
     // G90 / G91 without a move (e.g. job header)

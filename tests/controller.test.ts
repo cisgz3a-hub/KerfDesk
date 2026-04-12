@@ -43,6 +43,15 @@ function flush(): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, 10));
 }
 
+/** Wait until condition holds or timeout (MockSerialPort can delay move `ok` by tens of ms). */
+async function waitUntil(cond: () => boolean, timeoutMs: number, stepMs = 20): Promise<void> {
+  const t0 = Date.now();
+  while (Date.now() - t0 < timeoutMs) {
+    if (cond()) return;
+    await new Promise<void>(r => setTimeout(r, stepMs));
+  }
+}
+
 /** Create a minimal Output with G-code text. */
 function makeOutput(gcode: string): Output {
   return {
@@ -131,13 +140,14 @@ async function testSimpleStreaming() {
   await flush();
   await flush();
 
-  // Verify all lines were sent
-  // Mock received: the G-code lines (comments/empties filtered out)
+  // Verify all lines were sent (may stream before all move `ok`s return)
   const sentLines = port.received.filter(l =>
     l.endsWith('\n') ? l.slice(0, -1) : l
   );
 
   assert(sentLines.length >= 9, `All 9 G-code lines sent (got ${sentLines.length})`);
+
+  await waitUntil(() => !ctrl.isJobRunning, 30_000);
 
   // Verify job completed
   assert(!ctrl.isJobRunning, 'Job completed (no longer running)');
