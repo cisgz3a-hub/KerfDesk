@@ -77,7 +77,6 @@ interface ConnectionPanelProps {
   savedOrigin: { x: number; y: number } | null;
   machinePosition: { x: number; y: number } | null;
   onSelectMode: (mode: StartMode) => void;
-  onOpenStartWizard: () => void;
   onSaveOrigin: () => void;
 }
 
@@ -105,7 +104,6 @@ export function ConnectionPanel({
   savedOrigin,
   machinePosition,
   onSelectMode,
-  onOpenStartWizard: _onOpenStartWizard,
   onSaveOrigin,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);

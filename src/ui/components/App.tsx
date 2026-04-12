@@ -65,7 +65,7 @@ import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
-import { StartPositionWizard, type StartMode } from './StartPositionWizard';
+import { type StartMode } from './StartPositionWizard';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
@@ -133,7 +133,6 @@ export function App() {
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
   const [showKerfWizard, setShowKerfWizard] = useState(false);
-  const [showStartWizard, setShowStartWizard] = useState(false);
   const [startMode, setStartMode] = useState<StartMode>(() => {
     try {
       const raw = localStorage.getItem('laserforge_start_mode');
@@ -1186,8 +1185,6 @@ export function App() {
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
-      onStartPosition: () => setShowStartWizard(true),
-      startMode,
       onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
@@ -1327,7 +1324,6 @@ export function App() {
         savedOrigin,
         machinePosition: machinePositionForStartWizard,
         onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
-        onOpenStartWizard: () => setShowStartWizard(true),
         onSaveOrigin: handleSaveOrigin,
       }),
       !connectionSidebarOpen && React.createElement('div', {
@@ -1528,16 +1524,6 @@ export function App() {
       scene,
       onClose: () => setShowCamera(false),
       onPositionDesign: handleCameraPositionDesign,
-    }),
-
-    showStartWizard && React.createElement(StartPositionWizard, {
-      scene,
-      currentMode: startMode,
-      onSelectMode: handleSelectStartMode,
-      onSaveOrigin: handleSaveOrigin,
-      onClose: () => setShowStartWizard(false),
-      machinePosition: machinePositionForStartWizard,
-      savedOrigin,
     }),
 
     dialogs.showTemplates && React.createElement(TemplateBrowser, {
