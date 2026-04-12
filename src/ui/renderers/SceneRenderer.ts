@@ -173,6 +173,7 @@ export function renderSceneObjects(
 ): void {
   const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
 
+  // Fresh each frame — object colors follow the layer's current `settings.mode` (no stale cache).
   const layerMap = new Map<string, Layer>();
   for (const layer of scene.layers) {
     layerMap.set(layer.id, layer);

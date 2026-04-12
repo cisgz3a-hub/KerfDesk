@@ -282,6 +282,9 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
       ),
     };
     (onSceneChange ?? onSceneCommit)(newScene);
+    try {
+      window.dispatchEvent(new Event('laserforge-canvas-repaint'));
+    } catch { /* ignore */ }
   };
 
   const bounds = computeObjectBounds(obj);
@@ -645,6 +648,10 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           ),
 
           React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('span', { style: subLabel }, 'Letter Spacing'),
+            React.createElement('div', { style: { fontSize: 8, color: '#333355', marginBottom: 3 } },
+              'Space between each character',
+            ),
             React.createElement('div', {
               style: {
                 display: 'flex',
@@ -653,7 +660,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
                 marginBottom: 3,
               },
             },
-              React.createElement('span', { style: subLabel }, 'Letter Spacing (H-Space)'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.text.tertiary } }, 'Amount'),
               React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
                 `${tg.letterSpacing ?? 0}%`,
               ),
@@ -665,7 +672,8 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
               step: 5,
               value: tg.letterSpacing ?? 0,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                patchTextGeometry({ letterSpacing: parseInt(e.target.value, 10) });
+                const v = parseInt(e.target.value, 10);
+                patchTextGeometry({ letterSpacing: Number.isFinite(v) ? v : 0 });
               },
               style: { width: '100%', accentColor: theme.accent.cyan },
             }),
@@ -679,6 +687,10 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           ),
 
           React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('span', { style: subLabel }, 'Line Spacing'),
+            React.createElement('div', { style: { fontSize: 8, color: '#333355', marginBottom: 3 } },
+              'Space between text lines (multi-line)',
+            ),
             React.createElement('div', {
               style: {
                 display: 'flex',
@@ -687,7 +699,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
                 marginBottom: 3,
               },
             },
-              React.createElement('span', { style: subLabel }, 'Line Spacing (V-Space)'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.text.tertiary } }, 'Amount'),
               React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
                 `${tg.lineSpacing ?? 120}%`,
               ),
@@ -699,7 +711,8 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
               step: 10,
               value: tg.lineSpacing ?? 120,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                patchTextGeometry({ lineSpacing: parseInt(e.target.value, 10) });
+                const v = parseInt(e.target.value, 10);
+                patchTextGeometry({ lineSpacing: Number.isFinite(v) ? v : 120 });
               },
               style: { width: '100%', accentColor: theme.accent.cyan },
             }),
@@ -713,6 +726,10 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
           ),
 
           React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('span', { style: subLabel }, 'Word Spacing'),
+            React.createElement('div', { style: { fontSize: 8, color: '#333355', marginBottom: 3 } },
+              'Extra space between words',
+            ),
             React.createElement('div', {
               style: {
                 display: 'flex',
@@ -721,7 +738,7 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
                 marginBottom: 3,
               },
             },
-              React.createElement('span', { style: subLabel }, 'Word Spacing'),
+              React.createElement('span', { style: { fontSize: 9, color: theme.text.tertiary } }, 'Amount'),
               React.createElement('span', { style: { fontSize: 9, color: theme.accent.cyan, fontFamily: mono } },
                 `${tg.wordSpacing ?? 100}%`,
               ),
@@ -733,7 +750,8 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
               step: 10,
               value: tg.wordSpacing ?? 100,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                patchTextGeometry({ wordSpacing: parseInt(e.target.value, 10) });
+                const v = parseInt(e.target.value, 10);
+                patchTextGeometry({ wordSpacing: Number.isFinite(v) ? v : 100 });
               },
               style: { width: '100%', accentColor: theme.accent.cyan },
             }),

@@ -244,7 +244,9 @@ export function App() {
   }, [grbl.isJobRunning, grbl.machineState, activeJobPlanBounds]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
-  const connectionSidebarWidth = connectionSidebarOpen ? 450 : 0;
+  const connectionSidebarWidth = connectionSidebarOpen
+    ? Math.min(500, Math.floor(canvasSize.width * 0.45))
+    : 0;
   const layersPanelWidth = connectionSidebarOpen ? 0 : 240;
   const toolbarWidth = 36;
   const canvasViewportWidth =
@@ -545,6 +547,12 @@ export function App() {
     })();
   }, [scene, compileGcode, setCurrentGcode, sceneCompileFingerprint]);
 
+  const bumpCanvasRepaint = useCallback(() => {
+    try {
+      window.dispatchEvent(new Event('laserforge-canvas-repaint'));
+    } catch { /* ignore */ }
+  }, []);
+
   const handleConnectionUpdateLayerMode = useCallback(
     (layerId: string, mode: LayerMode) => {
       const layer = scene.layers.find(l => l.id === layerId);
@@ -555,8 +563,33 @@ export function App() {
         layers: scene.layers.map(l => (l.id === layerId ? next : l)),
       });
       if (connectionSidebarOpen) setGcodeStale(true);
+      bumpCanvasRepaint();
     },
-    [scene, handleSceneCommit, connectionSidebarOpen],
+    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
+  );
+
+  const handleConnectionUpdateLayerSetting = useCallback(
+    (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => {
+      handleSceneCommit({
+        ...scene,
+        layers: scene.layers.map(l => {
+          if (l.id !== layerId) return l;
+          if (key === 'powerMax') {
+            const v = Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 0)));
+            return { ...l, settings: { ...l.settings, power: { ...l.settings.power, max: v } } };
+          }
+          if (key === 'speed') {
+            const v = Math.max(10, Math.min(10000, Math.round(Number.isFinite(value) ? value : 1000)));
+            return { ...l, settings: { ...l.settings, speed: v } };
+          }
+          const v = Math.max(1, Math.min(99, Math.round(Number.isFinite(value) ? value : 1)));
+          return { ...l, settings: { ...l.settings, passes: v } };
+        }),
+      });
+      if (connectionSidebarOpen) setGcodeStale(true);
+      bumpCanvasRepaint();
+    },
+    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
   );
 
   const handleConnectionUpdateLayerFillMode = useCallback(
@@ -582,8 +615,9 @@ export function App() {
         }),
       });
       if (connectionSidebarOpen) setGcodeStale(true);
+      bumpCanvasRepaint();
     },
-    [scene, handleSceneCommit, connectionSidebarOpen],
+    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
   );
 
   const handleConnectionUpdateLayerFillInterval = useCallback(
@@ -608,8 +642,9 @@ export function App() {
         }),
       });
       if (connectionSidebarOpen) setGcodeStale(true);
+      bumpCanvasRepaint();
     },
-    [scene, handleSceneCommit, connectionSidebarOpen],
+    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
   );
 
   const handleConnectionUpdateLayerFillBidirectional = useCallback(
@@ -632,8 +667,9 @@ export function App() {
         }),
       });
       if (connectionSidebarOpen) setGcodeStale(true);
+      bumpCanvasRepaint();
     },
-    [scene, handleSceneCommit, connectionSidebarOpen],
+    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
   );
 
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
@@ -1483,6 +1519,7 @@ export function App() {
         machineState: grbl.machineState,
         jobProgress: grbl.jobProgress,
         scene,
+        sidebarWidth: connectionSidebarWidth,
         productionMode,
         gcode: currentGcode,
         onClose: () => dialogs.setShowConnection(false),
@@ -1508,6 +1545,7 @@ export function App() {
         onUpdateLayerFillMode: handleConnectionUpdateLayerFillMode,
         onUpdateLayerFillInterval: handleConnectionUpdateLayerFillInterval,
         onUpdateLayerFillBidirectional: handleConnectionUpdateLayerFillBidirectional,
+        onUpdateLayerSetting: handleConnectionUpdateLayerSetting,
       }),
       !connectionSidebarOpen && React.createElement('div', {
         style: {

@@ -4,8 +4,24 @@
 
 import type { TextGeometry } from '../core/scene/SceneObject';
 
+function pctOrDefault(v: unknown, fallback: number): number {
+  const n = typeof v === 'number' ? v : Number(v);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+/** Some browsers apply CSS `letterSpacing` on 2D context — reset so our manual spacing is exact. */
+function resetCanvasLetterSpacing(ctx: CanvasRenderingContext2D): void {
+  try {
+    const c = ctx as CanvasRenderingContext2D & { letterSpacing?: string };
+    if ('letterSpacing' in c) c.letterSpacing = '0px';
+  } catch {
+    /* ignore */
+  }
+}
+
 export function applyTextGeometryFont(ctx: CanvasRenderingContext2D, g: TextGeometry): number {
-  const fontSize = g.fontSize || 10;
+  resetCanvasLetterSpacing(ctx);
+  const fontSize = Math.max(0.01, g.fontSize || 10);
   const ff = g.fontFamily || 'Arial';
   const bold = g.bold ? 'bold ' : '';
   const italic = g.italic ? 'italic ' : '';
@@ -14,15 +30,15 @@ export function applyTextGeometryFont(ctx: CanvasRenderingContext2D, g: TextGeom
 }
 
 function letterSpacingPx(g: TextGeometry, fontSize: number): number {
-  return ((g.letterSpacing ?? 0) / 100) * fontSize;
+  return (pctOrDefault(g.letterSpacing, 0) / 100) * fontSize;
 }
 
 function lineSpacingPx(g: TextGeometry, fontSize: number): number {
-  return ((g.lineSpacing ?? 120) / 100) * fontSize;
+  return (pctOrDefault(g.lineSpacing, 120) / 100) * fontSize;
 }
 
 function wordSpacingExtraPx(g: TextGeometry, fontSize: number): number {
-  return (((g.wordSpacing ?? 100) - 100) / 100) * fontSize * 0.25;
+  return ((pctOrDefault(g.wordSpacing, 100) - 100) / 100) * fontSize * 0.25;
 }
 
 /** Pixel width of one line including letter and word spacing. */
@@ -30,7 +46,6 @@ export function measureTextLineWidth(ctx: CanvasRenderingContext2D, g: TextGeome
   const fontSize = applyTextGeometryFont(ctx, g);
   const ls = letterSpacingPx(g, fontSize);
   const ws = wordSpacingExtraPx(g, fontSize);
-  if (ls === 0 && ws === 0) return ctx.measureText(line).width;
   let x = 0;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
@@ -82,16 +97,12 @@ export function fillTextGeometry(
     if (align === 'center') startX = ox + (blockW - lineW) / 2;
     else if (align === 'right') startX = ox + blockW - lineW;
 
-    if (ls === 0 && ws === 0) {
-      ctx.fillText(line, startX, y);
-    } else {
-      let x = startX;
-      for (let i = 0; i < line.length; i++) {
-        const ch = line[i];
-        ctx.fillText(ch, x, y);
-        x += ctx.measureText(ch).width + ls;
-        if (ch === ' ') x += ws;
-      }
+    let x = startX;
+    for (let i = 0; i < line.length; i++) {
+      const ch = line[i];
+      ctx.fillText(ch, x, y);
+      x += ctx.measureText(ch).width + ls;
+      if (ch === ' ') x += ws;
     }
   }
 

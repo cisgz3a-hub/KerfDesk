@@ -85,6 +85,9 @@ interface ConnectionPanelProps {
   onUpdateLayerFillMode?: (layerId: string, fillMode: FillMode) => void;
   onUpdateLayerFillInterval?: (layerId: string, intervalMm: number) => void;
   onUpdateLayerFillBidirectional?: (layerId: string, bidirectional: boolean) => void;
+  onUpdateLayerSetting?: (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => void;
+  /** Panel width in px (host computes min(500, 45% window)). */
+  sidebarWidth?: number;
 }
 
 export function ConnectionPanel({
@@ -118,6 +121,8 @@ export function ConnectionPanel({
   onUpdateLayerFillMode,
   onUpdateLayerFillInterval,
   onUpdateLayerFillBidirectional,
+  onUpdateLayerSetting,
+  sidebarWidth = 500,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -1332,12 +1337,94 @@ export function ConnectionPanel({
           React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } }, 'Bidirectional scanning'),
           React.createElement('span', { style: { fontSize: 8, color: '#555570' } }, '(faster)'),
         ),
-        React.createElement('div', {
-          style: { display: 'flex', gap: 8, fontSize: 9, fontFamily: mono, color: '#555570' },
+        onUpdateLayerSetting && React.createElement('div', {
+          style: { display: 'flex', gap: 6, marginTop: 6 },
         },
-          React.createElement('span', null, `${layer.settings.power.max}%`),
-          React.createElement('span', null, `${layer.settings.speed}mm/min`),
-          React.createElement('span', null, `${layer.settings.passes}x`),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Power %'),
+            React.createElement('input', {
+              type: 'number',
+              value: layer.settings.power.max,
+              min: 0,
+              max: 100,
+              step: 5,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                onUpdateLayerSetting(layer.id, 'powerMax', parseInt(e.target.value, 10) || 0);
+              },
+              style: {
+                width: '100%',
+                padding: '5px 6px',
+                fontSize: 11,
+                fontFamily: mono,
+                background: '#0a0a14',
+                border: '1px solid #252540',
+                borderRadius: 4,
+                color: '#e0e0ec',
+                textAlign: 'center' as const,
+              },
+            }),
+          ),
+          React.createElement('div', { style: { flex: 1 } },
+            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Speed mm/min'),
+            React.createElement('input', {
+              type: 'number',
+              value: layer.settings.speed,
+              min: 10,
+              max: 10000,
+              step: 100,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                onUpdateLayerSetting(layer.id, 'speed', parseInt(e.target.value, 10) || 1000);
+              },
+              style: {
+                width: '100%',
+                padding: '5px 6px',
+                fontSize: 11,
+                fontFamily: mono,
+                background: '#0a0a14',
+                border: '1px solid #252540',
+                borderRadius: 4,
+                color: '#e0e0ec',
+                textAlign: 'center' as const,
+              },
+            }),
+          ),
+          React.createElement('div', { style: { flex: 0.6 } },
+            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Passes'),
+            React.createElement('input', {
+              type: 'number',
+              value: layer.settings.passes,
+              min: 1,
+              max: 99,
+              step: 1,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                onUpdateLayerSetting(layer.id, 'passes', parseInt(e.target.value, 10) || 1);
+              },
+              style: {
+                width: '100%',
+                padding: '5px 6px',
+                fontSize: 11,
+                fontFamily: mono,
+                background: '#0a0a14',
+                border: '1px solid #252540',
+                borderRadius: 4,
+                color: '#e0e0ec',
+                textAlign: 'center' as const,
+              },
+            }),
+          ),
+        ),
+        onUpdateLayerSetting && React.createElement('div', { style: { marginTop: 4 } },
+          React.createElement('input', {
+            type: 'range',
+            min: 0,
+            max: 100,
+            step: 5,
+            value: layer.settings.power.max,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              onUpdateLayerSetting(layer.id, 'powerMax', parseInt(e.target.value, 10));
+            },
+            style: { width: '100%', accentColor: modeColor, height: 4 },
+          }),
         ),
       ),
     );
@@ -1721,7 +1808,7 @@ export function ConnectionPanel({
     React.createElement('style', {}, '@keyframes laserforgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }'),
     React.createElement('div', {
       style: {
-        width: 450,
+        width: sidebarWidth,
         flexShrink: 0,
         height: '100%',
         minHeight: 0,
