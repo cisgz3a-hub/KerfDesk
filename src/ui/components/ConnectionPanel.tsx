@@ -7,7 +7,7 @@ import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
-import { runPreflight, type PreflightResult } from '../../core/preflight/PreflightChecker';
+import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
 import { createReplay, addReplayEntry, finalizeReplay, saveReplay, type JobReplay } from '../../core/replay/JobReplay';
 import {
   createJobLog,
@@ -78,6 +78,8 @@ interface ConnectionPanelProps {
   machinePosition: { x: number; y: number } | null;
   onSelectMode: (mode: StartMode) => void;
   onSaveOrigin: () => void;
+  gcodeStale?: boolean;
+  onRecompile?: () => void;
 }
 
 export function ConnectionPanel({
@@ -105,6 +107,8 @@ export function ConnectionPanel({
   machinePosition,
   onSelectMode,
   onSaveOrigin,
+  gcodeStale = false,
+  onRecompile,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -137,6 +141,9 @@ export function ConnectionPanel({
   const jobProgressRef = useRef<JobProgress | null>(null);
   const elapsedSecondsRef = useRef(0);
   const jobStoppedByUserRef = useRef(false);
+  const hasZeroed = useRef(false);
+  const hasFramed = useRef(false);
+  const [workflowVersion, setWorkflowVersion] = useState(0);
 
   const notifySimulatorTx = useCallback((cmd: string) => {
     for (const fn of simulatorListenersRef.current) {
@@ -260,6 +267,14 @@ export function ConnectionPanel({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
 
+  useEffect(() => {
+    if (isConnected) {
+      hasZeroed.current = false;
+      hasFramed.current = false;
+      setWorkflowVersion(v => v + 1);
+    }
+  }, [isConnected]);
+
   jobProgressRef.current = jobProgress;
 
   const prevRunningRef = useRef(isRunning);
@@ -351,34 +366,6 @@ export function ConnectionPanel({
           : savedOrigin
             ? `Job starts at X${fmtMm(savedOrigin.x)}, Y${fmtMm(savedOrigin.y)} (saved)`
             : 'No origin saved — save one below';
-
-  const modeBtn = (active: boolean, dimmed: boolean): React.CSSProperties => ({
-    flex: 1,
-    padding: '6px 4px',
-    borderRadius: 6,
-    fontSize: 10,
-    fontFamily: font,
-    fontWeight: 600,
-    cursor: dimmed ? 'default' : 'pointer',
-    ...(dimmed
-      ? {
-          background: '#15151e',
-          border: '1px solid #252540',
-          color: '#555570',
-          opacity: 0.45,
-        }
-      : active
-        ? {
-            background: 'rgba(0,212,255,0.1)',
-            border: '1px solid #00d4ff',
-            color: '#00d4ff',
-          }
-        : {
-            background: 'rgba(0,0,0,0.2)',
-            border: '1px solid #252540',
-            color: '#8888aa',
-          }),
-  });
 
   // ─── Connection handlers ─────────────────────────────────
 
@@ -672,6 +659,8 @@ export function ConnectionPanel({
       await sendFrameLine(ctrl, line);
     }
 
+    hasFramed.current = true;
+    setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
   }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
 
@@ -713,6 +702,8 @@ export function ConnectionPanel({
       await sendFrameLine(ctrl, line);
     }
 
+    hasFramed.current = true;
+    setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
   }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
 
@@ -724,6 +715,8 @@ export function ConnectionPanel({
       await new Promise(r => setTimeout(r, 200));
       sendCmd('G10 L20 P1 X0 Y0');
       ctrl.requestStatusReport();
+      hasZeroed.current = true;
+      setWorkflowVersion(v => v + 1);
       setMessages(prev => [...prev, '✓ Work origin set at current position — matches “Where Head Is” G-code mode']);
     } catch {
       setMessages(prev => [...prev, 'Zero failed — try again']);
@@ -868,9 +861,6 @@ export function ConnectionPanel({
     color: disabled ? '#333355' : `rgb(${color})`,
   });
 
-  const posX = machinePosition?.x ?? machineState?.position.x;
-  const posY = machinePosition?.y ?? machineState?.position.y;
-  const canStart = !!gcode && !isRunning;
   const readinessScore = preflight?.score ?? null;
   const issues = (preflight?.issues ?? []).filter(i => i.severity !== 'info');
 
@@ -894,8 +884,8 @@ export function ConnectionPanel({
 
   const jogCellStyle: React.CSSProperties = {
     ...jogBtnStyle,
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     padding: 0,
     fontSize: 14,
     display: 'flex',
@@ -911,48 +901,50 @@ export function ConnectionPanel({
       style: jogCellStyle,
     }, label);
 
-  const statusBar = React.createElement('div', {
+  const posX = machinePosition?.x ?? machineState?.position.x;
+  const posY = machinePosition?.y ?? machineState?.position.y;
+  const canStartJob = !!gcode && !isRunning && !!preflight?.canStart && !gcodeStale;
+  void workflowVersion;
+
+  const statusSection = React.createElement('div', {
     style: {
-      padding: '10px 14px', borderBottom: '1px solid #1a1a2e',
+      padding: '10px 16px', borderBottom: '1px solid #1a1a2e',
       background: isConnected ? 'rgba(45,212,160,0.04)' : '#0a0a14',
       flexShrink: 0,
+      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
     },
   },
-    React.createElement('div', {
-      style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
-    },
-      React.createElement('span', {
-        style: { fontSize: 12, fontWeight: 600, color: isConnected ? '#2dd4a0' : '#8888aa' },
-      }, isConnected ? `⚡ Connected${isSimulator ? ' (Simulator)' : ''}` : '⚡ Not Connected'),
-      React.createElement('button', {
-        type: 'button',
-        onClick: onClose,
-        style: { background: 'none', border: 'none', color: '#555570', fontSize: 14, cursor: 'pointer', padding: 0 },
-      }, '×'),
-    ),
-    isConnected && React.createElement('div', {
-      style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: mono },
-    },
-      React.createElement('span', {
-        style: { color: machineState?.status === 'alarm' ? '#ff4466' : '#555570' },
-      }, `Status: ${machineState?.status || 'Unknown'}`),
-      React.createElement('span', { style: { color: '#555570' } },
-        `X:${posX != null && Number.isFinite(posX) ? posX.toFixed(1) : '?'}  Y:${posY != null && Number.isFinite(posY) ? posY.toFixed(1) : '?'}`,
+    React.createElement('div', null,
+      React.createElement('div', {
+        style: { fontSize: 13, fontWeight: 600, color: isConnected ? '#2dd4a0' : '#8888aa' },
+      }, isConnected ? `⚡ Connected${isSimulator ? ' (Sim)' : ''}` : '⚡ Not Connected'),
+      isConnected && React.createElement('div', {
+        style: { fontSize: 10, fontFamily: mono, color: '#555570', marginTop: 2 },
+      },
+        `${machineState?.status || 'Unknown'}  ·  X:${posX != null && Number.isFinite(posX) ? posX.toFixed(1) : '?'}  Y:${posY != null && Number.isFinite(posY) ? posY.toFixed(1) : '?'}`,
       ),
     ),
+    React.createElement('button', {
+      type: 'button',
+      onClick: onClose,
+      style: { background: 'none', border: 'none', color: '#555570', fontSize: 16, cursor: 'pointer', padding: '0 4px' },
+    }, '×'),
   );
 
-  const connectOptions = React.createElement('div', {
-    style: { padding: '20px 14px', display: 'flex', flexDirection: 'column' as const, gap: 8, alignItems: 'center', flex: 1, minHeight: 0 },
+  const connectSection = React.createElement('div', {
+    style: {
+      padding: '30px 20px', display: 'flex', flexDirection: 'column' as const, gap: 10, alignItems: 'center', flex: 1,
+      justifyContent: 'center',
+    },
   },
-    React.createElement('div', { style: { fontSize: 28, marginBottom: 4 } }, '⚡'),
-    React.createElement('div', { style: { fontSize: 13, color: '#8888aa', marginBottom: 12 } }, 'Connect your laser'),
+    React.createElement('div', { style: { fontSize: 36, marginBottom: 8 } }, '⚡'),
+    React.createElement('div', { style: { fontSize: 14, color: '#8888aa', marginBottom: 16 } }, 'Connect your laser to get started'),
     WebSerialPort.isSupported() && React.createElement('button', {
       type: 'button',
       onClick: () => { void connectRealLaser(); },
       style: {
-        width: '100%', padding: '12px', fontSize: 12, fontWeight: 600,
-        borderRadius: 8, cursor: 'pointer', fontFamily: font,
+        width: '100%', maxWidth: 280, padding: '14px', fontSize: 13, fontWeight: 600,
+        borderRadius: 10, cursor: 'pointer', fontFamily: font,
         background: 'rgba(0,212,255,0.08)', border: '1px solid #00d4ff', color: '#00d4ff',
       },
     }, '🔌 Connect via USB'),
@@ -960,24 +952,129 @@ export function ConnectionPanel({
       type: 'button',
       onClick: () => { void connectSimulator(); },
       style: {
-        width: '100%', padding: '10px', fontSize: 11,
-        borderRadius: 8, cursor: 'pointer', fontFamily: font,
+        width: '100%', maxWidth: 280, padding: '12px', fontSize: 12,
+        borderRadius: 10, cursor: 'pointer', fontFamily: font,
         background: '#0a0a14', border: '1px solid #252540', color: '#555570',
       },
     }, '🖥 Use Simulator'),
   );
 
-  const movementControls = isConnected && React.createElement('div', {
-    style: { padding: '10px 14px', borderBottom: '1px solid #1a1a2e', flexShrink: 0, display: 'flex', gap: 12 },
+  const step1Done = hasZeroed.current;
+  const step3Done = hasFramed.current;
+  const startJobDesc = canStartJob
+    ? 'Ready to cut!'
+    : gcodeStale
+      ? 'Recompile G-code (design changed)'
+      : !preflight?.canStart
+        ? 'Fix issues below first'
+        : 'Prepare job';
+
+  const workflowSection = isConnected && React.createElement('div', {
+    style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
+  },
+    React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 1 } }, 'Workflow'),
+    ...([
+      {
+        num: 1,
+        label: 'Jog to workpiece',
+        description: 'Move the laser head to where you want to start',
+        done: step1Done,
+        action: undefined as (() => void) | undefined,
+        actionLabel: '',
+        primary: false,
+        disabled: false,
+      },
+      {
+        num: 2,
+        label: 'Zero position',
+        description: 'Set this as the starting point',
+        done: step1Done,
+        action: () => { void handleZero(); },
+        actionLabel: '◎ Zero Here',
+        primary: false,
+        disabled: false,
+      },
+      {
+        num: 3,
+        label: 'Frame the job',
+        description: 'Preview where the laser will cut',
+        done: step3Done,
+        action: () => { void handleFrameSafe(); },
+        actionLabel: '⬚ Frame',
+        primary: false,
+        disabled: !canFrame,
+      },
+      {
+        num: 4,
+        label: 'Start job',
+        description: startJobDesc,
+        done: false,
+        action: canStartJob ? () => { void handleStartJob(); } : undefined,
+        actionLabel: `▶ START${isSimulator ? ' (Sim)' : ''}`,
+        primary: true,
+        disabled: !canStartJob,
+      },
+    ] as const).map(step =>
+      React.createElement('div', {
+        key: step.num,
+        style: {
+          display: 'flex', alignItems: 'center', gap: 10,
+          padding: '8px 0',
+          borderBottom: step.num < 4 ? '1px solid #12121e' : 'none',
+          opacity: step.num === 4 && !canStartJob ? 0.5 : 1,
+        },
+      },
+        React.createElement('div', {
+          style: {
+            width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 11, fontWeight: 600, fontFamily: mono,
+            background: step.done ? 'rgba(45,212,160,0.15)' : '#0a0a14',
+            border: step.done ? '1px solid #2dd4a0' : '1px solid #252540',
+            color: step.done ? '#2dd4a0' : '#555570',
+          },
+        }, step.done ? '✓' : String(step.num)),
+        React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+          React.createElement('div', { style: { fontSize: 12, color: step.done ? '#2dd4a0' : '#e0e0ec', fontWeight: 500 } }, step.label),
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 1 } }, step.description),
+        ),
+        step.action && React.createElement('button', {
+          type: 'button',
+          onClick: step.action,
+          disabled: step.disabled,
+          style: {
+            padding: step.primary ? '8px 20px' : '6px 12px',
+            fontSize: step.primary ? 12 : 10,
+            fontWeight: 600, borderRadius: 6, cursor: step.disabled ? 'default' : 'pointer',
+            fontFamily: font, flexShrink: 0, whiteSpace: 'nowrap' as const,
+            background: step.primary
+              ? (canStartJob ? 'rgba(45,212,160,0.12)' : '#1a1a2e')
+              : '#0a0a14',
+            border: step.primary
+              ? (canStartJob ? '1px solid #2dd4a0' : '1px solid #252540')
+              : '1px solid #252540',
+            color: step.primary
+              ? (canStartJob ? '#2dd4a0' : '#333355')
+              : '#c0c0d0',
+            opacity: step.disabled && step.num === 3 ? (canFrame ? 1 : 0.45) : 1,
+          },
+        }, step.actionLabel),
+      ),
+    ),
+  );
+
+  const controlsSection = isConnected && React.createElement('div', {
+    style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 16, flexShrink: 0 },
   },
     React.createElement('div', {
       style: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 },
     },
+      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'Jog'),
       React.createElement('div', {
-        style: { display: 'grid', gridTemplateColumns: '36px 36px 36px', gap: 3 },
+        style: { display: 'grid', gridTemplateColumns: '38px 38px 38px', gap: 3 },
       },
         React.createElement('div', { key: 'j0' }),
-        jogCell('↑', 'Y', -jogStep, 'Jog Y+'),
+        jogCell('↑', 'Y', jogStep, 'Jog Y+'),
         React.createElement('div', { key: 'j1' }),
         jogCell('←', 'X', -jogStep, 'Jog X-'),
         React.createElement('button', {
@@ -988,114 +1085,61 @@ export function ConnectionPanel({
         }, '⌂'),
         jogCell('→', 'X', jogStep, 'Jog X+'),
         React.createElement('div', { key: 'j2' }),
-        jogCell('↓', 'Y', jogStep, 'Jog Y-'),
+        jogCell('↓', 'Y', -jogStep, 'Jog Y-'),
         React.createElement('div', { key: 'j3' }),
       ),
       React.createElement('div', {
         style: { display: 'flex', gap: 2, marginTop: 4 },
       },
-        ...[0.1, 1, 10, 50].map(step =>
+        ...[0.1, 1, 10, 50].map(j =>
           React.createElement('button', {
             type: 'button',
-            key: step,
-            onClick: () => setJogStep(step),
+            key: j,
+            onClick: () => setJogStep(j),
             style: {
-              padding: '2px 6px', fontSize: 9, borderRadius: 3, cursor: 'pointer',
+              padding: '2px 7px', fontSize: 9, borderRadius: 3, cursor: 'pointer',
               fontFamily: mono,
-              background: jogStep === step ? 'rgba(0,212,255,0.1)' : 'transparent',
-              border: jogStep === step ? '1px solid #00d4ff' : '1px solid #1a1a2e',
-              color: jogStep === step ? '#00d4ff' : '#555570',
+              background: jogStep === j ? 'rgba(0,212,255,0.1)' : 'transparent',
+              border: jogStep === j ? '1px solid #00d4ff' : '1px solid #1a1a2e',
+              color: jogStep === j ? '#00d4ff' : '#555570',
             },
-          }, `${step}`),
+          }, `${j}`),
         ),
       ),
-      React.createElement('div', { style: { fontSize: 8, color: '#333355', marginTop: 1 } }, 'mm'),
     ),
     React.createElement('div', {
-      style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 4, minWidth: 0 },
+      style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },
     },
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleZero(); },
-        title: 'Set current position as work origin (0,0)',
-        style: {
-          width: '100%', padding: '8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-          cursor: 'pointer', fontFamily: font,
-          background: 'rgba(45,212,160,0.08)', border: '1px solid rgba(45,212,160,0.3)',
-          color: '#2dd4a0',
-        },
-      }, '◎ Zero XY'),
-      machineState?.status === 'alarm' && React.createElement('button', {
-        type: 'button',
-        onClick: handleUnlock,
-        title: 'Clear alarm state ($X)',
-        style: {
-          width: '100%', padding: '8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-          cursor: 'pointer', fontFamily: font,
-          background: 'rgba(255,212,68,0.08)', border: '1px solid rgba(255,212,68,0.3)',
-          color: '#ffd444',
-        },
-      }, '🔓 Unlock'),
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleTestFire(); },
-        disabled: machineState?.status === 'alarm' || isRunning,
-        title: isTestFiring ? 'Click to turn laser off' : 'Low-power laser pulse',
-        style: {
-          width: '100%', padding: '8px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-          cursor: machineState?.status === 'alarm' || isRunning ? 'default' : 'pointer',
-          fontFamily: font,
-          background: isTestFiring ? 'rgba(255,68,102,0.15)' : 'rgba(255,68,102,0.05)',
-          border: isTestFiring ? '1px solid #ff4466' : '1px solid rgba(255,68,102,0.2)',
-          color: isTestFiring ? '#ff4466' : '#ff6680',
-          opacity: machineState?.status === 'alarm' || isRunning ? 0.4 : 1,
-          animation: isTestFiring ? 'laserforgePulse 1s infinite' : 'none',
-        },
-      }, isTestFiring ? '🔴 OFF' : '🔥 Fire'),
-      React.createElement('div', {
-        style: { padding: '4px 8px', background: '#08080f', borderRadius: 4, textAlign: 'center' as const },
-      },
-        React.createElement('span', { style: { fontSize: 10, fontFamily: mono, color: '#555570' } },
-          `X:${machinePosition?.x != null && Number.isFinite(machinePosition.x) ? machinePosition.x.toFixed(1) : '0.0'}  Y:${machinePosition?.y != null && Number.isFinite(machinePosition.y) ? machinePosition.y.toFixed(1) : '0.0'}`,
+      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 1 } }, 'Start Position'),
+      React.createElement('div', { style: { display: 'flex', gap: 3, marginBottom: 6 } },
+        ...([
+          { mode: 'absolute' as const, label: '📍 Bed' },
+          { mode: 'current' as const, label: '🎯 Head' },
+          { mode: 'savedOrigin' as const, label: '⚑ Origin' },
+        ]).map(m =>
+          React.createElement('button', {
+            type: 'button',
+            key: m.mode,
+            onClick: () => onSelectMode(m.mode),
+            disabled: m.mode === 'current' && !machinePosition,
+            style: {
+              flex: 1, padding: '4px', fontSize: 9, borderRadius: 4, cursor: 'pointer', fontFamily: font,
+              background: startMode === m.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
+              border: startMode === m.mode ? '1px solid #00d4ff' : '1px solid #252540',
+              color: startMode === m.mode ? '#00d4ff' : '#555570',
+              opacity: m.mode === 'current' && !machinePosition ? 0.4 : 1,
+            },
+          }, m.label),
         ),
       ),
-    ),
-  );
-
-  const jobControls = isConnected && React.createElement('div', {
-    style: { padding: '10px 14px', flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, overflow: 'hidden', minHeight: 0 },
-  },
-    React.createElement('div', { style: { marginBottom: 0 } },
-      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 3, fontWeight: 600 } }, 'Start Position'),
-      React.createElement('div', { style: { display: 'flex', gap: 4, width: '100%' } },
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => onSelectMode('absolute'),
-          title: 'Design cuts exactly where placed on canvas',
-          style: modeBtn(startMode === 'absolute', false),
-        }, '📍 Bed'),
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { if (machinePosition) onSelectMode('current'); },
-          disabled: !machinePosition,
-          title: 'Job starts at current laser position',
-          style: modeBtn(startMode === 'current', !machinePosition),
-        }, '🎯 Head'),
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => onSelectMode('savedOrigin'),
-          title: 'Job starts at your saved reference point',
-          style: modeBtn(startMode === 'savedOrigin', false),
-        }, '⚑ Origin'),
-      ),
-      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 3, lineHeight: 1.3 } }, startPositionStatus),
+      React.createElement('div', { style: { fontSize: 9, color: '#555570', lineHeight: 1.25, marginBottom: 4 } }, startPositionStatus),
       (startMode === 'savedOrigin' || isConnected) && React.createElement('button', {
         type: 'button',
         onClick: onSaveOrigin,
         disabled: !isConnected,
         title: isConnected ? 'Store current head X/Y as the saved reference' : 'Connect to laser to save origin from head position',
         style: {
-          marginTop: 6,
+          marginBottom: 4,
           padding: 0,
           background: 'none',
           border: 'none',
@@ -1108,141 +1152,122 @@ export function ConnectionPanel({
           opacity: isConnected ? 1 : 0.45,
         },
       }, '📌 Save current head position as origin'),
-    ),
-
-    gcode && React.createElement('div', {
-      style: {
-        padding: '6px 10px', background: '#08080f', borderRadius: 6, border: '1px solid #1a1a2e',
-        display: 'flex', justifyContent: 'space-between', fontSize: 10,
-      },
-    },
-      React.createElement('span', { style: { color: '#555570' } }, 'Est. time'),
-      React.createElement('span', { style: { color: '#00d4ff', fontFamily: mono, fontWeight: 600 } }, estimateJobTime(gcode).formatted),
-    ),
-
-    !isRunning && !displayPaused && React.createElement(React.Fragment, null,
-      React.createElement('div', {
-        style: { display: 'flex', gap: 6, marginTop: 2 },
-      },
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { void handleFrameSafe(); },
-          disabled: !canFrame,
-          title: 'Trace outline with laser OFF',
-          style: {
-            flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-            borderRadius: 8, cursor: canFrame ? 'pointer' : 'default',
-            fontFamily: font,
-            background: '#0a0a14', border: '1px solid #252540', color: '#c0c0d0',
-            opacity: canFrame ? 1 : 0.4,
-          },
-        }, '⬚ Frame'),
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { void handleStartJob(); },
-          disabled: !canStart,
-          title: 'Start laser job',
-          style: {
-            flex: 2, padding: '12px', fontSize: 14, fontWeight: 700,
-            borderRadius: 8, cursor: canStart ? 'pointer' : 'default',
-            fontFamily: font,
-            background: canStart ? 'rgba(45,212,160,0.12)' : '#1a1a2e',
-            border: canStart ? '1px solid #2dd4a0' : '1px solid #252540',
-            color: canStart ? '#2dd4a0' : '#333355',
-          },
-        }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
-      ),
+      machineState?.status === 'alarm' && React.createElement('button', {
+        type: 'button',
+        onClick: handleUnlock,
+        title: 'Clear alarm state ($X)',
+        style: {
+          width: '100%', padding: '6px', fontSize: 10, fontWeight: 600, borderRadius: 6,
+          cursor: 'pointer', fontFamily: font,
+          background: 'rgba(255,212,68,0.08)', border: '1px solid rgba(255,212,68,0.3)',
+          color: '#ffd444',
+        },
+      }, '🔓 Unlock'),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handleTestFire(); },
+        disabled: machineState?.status === 'alarm' || isRunning,
+        title: isTestFiring ? 'Click to turn laser off' : 'Low-power laser pulse',
+        style: {
+          width: '100%', padding: '7px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+          cursor: machineState?.status === 'alarm' || isRunning ? 'default' : 'pointer', fontFamily: font,
+          background: isTestFiring ? 'rgba(255,68,102,0.15)' : 'rgba(255,68,102,0.05)',
+          border: isTestFiring ? '1px solid #ff4466' : '1px solid rgba(255,68,102,0.2)',
+          color: isTestFiring ? '#ff4466' : '#ff6680',
+          opacity: machineState?.status === 'alarm' || isRunning ? 0.4 : 1,
+          animation: isTestFiring ? 'laserforgePulse 1s infinite' : 'none',
+        },
+      }, isTestFiring ? '🔴 Laser OFF' : '🔥 Test Fire'),
       React.createElement('button', {
         type: 'button',
         onClick: () => { void handleFrameDot(); },
         disabled: !canFrame,
         title: 'Trace outline with low-power laser dot',
         style: {
-          width: '100%', padding: '6px', fontSize: 10,
-          borderRadius: 6, cursor: canFrame ? 'pointer' : 'default',
-          fontFamily: font,
+          width: '100%', padding: '5px', fontSize: 9, borderRadius: 4,
+          cursor: canFrame ? 'pointer' : 'default', fontFamily: font,
           background: 'transparent', border: '1px solid #1a1a2e', color: '#555570',
           opacity: canFrame ? 1 : 0.4,
         },
       }, '◉ Frame with Laser Dot'),
-    ),
-
-    (isRunning || progressFlashGreen) && React.createElement(React.Fragment, null,
-      React.createElement('div', {
-        style: { marginTop: 4 },
+      gcode && React.createElement('div', {
+        style: {
+          padding: '6px 8px', background: '#08080f', borderRadius: 6, border: '1px solid #1a1a2e',
+          display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 4,
+        },
       },
-        React.createElement('div', {
-          style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#8888aa', marginBottom: 4 },
+        React.createElement('span', { style: { color: '#555570' } }, 'Est. time'),
+        React.createElement('span', { style: { color: '#00d4ff', fontFamily: mono, fontWeight: 600 } }, estimateJobTime(gcode).formatted),
+      ),
+    ),
+  );
+
+  const gcodeWarning = isConnected && gcodeStale && !isRunning && React.createElement('div', {
+    style: {
+      margin: '0 16px', padding: '10px 14px',
+      background: 'rgba(255,212,68,0.06)', border: '1px solid rgba(255,212,68,0.2)',
+      borderRadius: 8, display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+      flexShrink: 0,
+    },
+  },
+    React.createElement('div', null,
+      React.createElement('div', { style: { fontSize: 11, color: '#ffd444', fontWeight: 600 } }, '⚠ Design changed'),
+      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 2 } }, 'G-code is outdated — recompile before cutting'),
+    ),
+    React.createElement('button', {
+      type: 'button',
+      onClick: () => { onRecompile?.(); },
+      style: {
+        padding: '6px 14px', fontSize: 11, fontWeight: 600, borderRadius: 6,
+        cursor: 'pointer', fontFamily: font,
+        background: 'rgba(255,212,68,0.1)', border: '1px solid #ffd444', color: '#ffd444',
+      },
+    }, '↻ Update'),
+  );
+
+  const issuesSection = isConnected && !isRunning && !displayPaused && (issues.length > 0 || readinessScore != null) && React.createElement('div', {
+    style: { padding: '10px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0, flex: 1, minHeight: 0, overflowY: 'auto' as const },
+  },
+    React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1 } }, 'Issues'),
+    ...issues.map((issue: PreflightIssue, i: number) =>
+      React.createElement('div', {
+        key: issue.id ?? i,
+        style: {
+          display: 'flex', alignItems: 'flex-start', gap: 8,
+          padding: '6px 0',
+          borderBottom: i < issues.length - 1 ? '1px solid #12121e' : 'none',
         },
-          React.createElement('span', null,
-            isRunning
-              ? (displayPaused ? '⏸ Paused' : '▶ Running...')
-              : '✓ Complete',
-          ),
-          React.createElement('span', { style: { fontFamily: mono } },
-            `${isRunning ? (jobProgress?.percentComplete?.toFixed(0) ?? 0) : '100'}%`,
-          ),
-        ),
-        React.createElement('div', {
+      },
+        React.createElement('span', {
           style: {
-            width: '100%', height: 8, background: '#1a1a2e', borderRadius: 4, overflow: 'hidden',
-            boxShadow: progressFlashGreen ? '0 0 14px rgba(45,212,160,0.85)' : 'none',
-            transition: 'box-shadow 0.2s',
+            fontSize: 12, flexShrink: 0, marginTop: 1,
+            color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
           },
-        },
-          React.createElement('div', {
-            style: {
-              width: `${isRunning ? (jobProgress?.percentComplete ?? 0) : (progressFlashGreen ? 100 : 0)}%`,
-              height: '100%',
-              background: progressFlashGreen ? '#4ade80' : displayPaused ? '#ffd444' : '#2dd4a0',
-              borderRadius: 4,
-              transition: 'width 0.3s, background 0.15s',
-            },
-          }),
-        ),
-        isRunning && React.createElement('div', {
-          style: { fontSize: 9, color: '#555570', marginTop: 4, fontFamily: mono },
-        }, `${jobProgress?.linesAcknowledged ?? 0} / ${jobProgress?.totalLines ?? 0} lines`),
-        isRunning && React.createElement('div', {
-          style: { display: 'flex', justifyContent: 'space-between', fontSize: 9, color: '#555570', marginTop: 4, fontFamily: mono },
-        },
-          React.createElement('span', null, `Elapsed: ${formatJobTime(elapsedSeconds)}`),
-          estimatedRemaining != null && estimatedRemaining > 0 && React.createElement('span', null,
-            `~${formatJobTime(estimatedRemaining)} remaining`,
-          ),
+        }, issue.severity === 'blocker' ? '✗' : '⚠'),
+        React.createElement('div', null,
+          React.createElement('div', { style: { fontSize: 11, color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444' } }, issue.title),
+          issue.fix && React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 2 } }, issue.fix),
         ),
       ),
     ),
-    isRunning && React.createElement('div', {
-      style: { display: 'flex', gap: 6, marginTop: 8 },
+    readinessScore != null && React.createElement('div', {
+      style: { display: 'flex', justifyContent: 'flex-end', marginTop: 6 },
     },
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handlePauseResume(); },
+      React.createElement('span', {
         style: {
-          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-          borderRadius: 8, cursor: 'pointer', fontFamily: font,
-          background: displayPaused ? 'rgba(45,212,160,0.1)' : 'rgba(255,212,68,0.08)',
-          border: displayPaused ? '1px solid #2dd4a0' : '1px solid rgba(255,212,68,0.3)',
-          color: displayPaused ? '#2dd4a0' : '#ffd444',
+          fontSize: 10, fontWeight: 600, fontFamily: mono,
+          padding: '2px 8px', borderRadius: 4,
+          background: readinessScore >= 80 ? 'rgba(45,212,160,0.1)' : readinessScore >= 50 ? 'rgba(255,212,68,0.1)' : 'rgba(255,68,102,0.1)',
+          color: readinessScore >= 80 ? '#2dd4a0' : readinessScore >= 50 ? '#ffd444' : '#ff4466',
         },
-      }, displayPaused ? '▶ Resume' : '⏸ Pause'),
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleStop(); },
-        style: {
-          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-          borderRadius: 8, cursor: 'pointer', fontFamily: font,
-          background: 'rgba(255,68,102,0.08)',
-          border: '1px solid rgba(255,68,102,0.3)',
-          color: '#ff4466',
-        },
-      }, '⏹ Stop'),
+      }, `Readiness: ${readinessScore}%`),
     ),
+  );
 
+  const outcomeExtrasSection = isConnected && !isRunning && !displayPaused && React.createElement(React.Fragment, null,
     jobCompleted && React.createElement('div', {
       style: {
-        padding: '12px', marginTop: 4,
+        padding: '12px', margin: '0 16px 8px',
         background: 'rgba(45,212,160,0.08)', border: '1px solid rgba(45,212,160,0.3)',
         borderRadius: 8, textAlign: 'center' as const,
       },
@@ -1253,39 +1278,9 @@ export function ConnectionPanel({
         `Finished in ${formatJobTime(completedTime)}`,
       ),
     ),
-
-    !isRunning && !displayPaused && readinessScore != null && React.createElement('div', {
-      style: { marginTop: 8, padding: '8px 10px', background: '#08080f', borderRadius: 6, border: '1px solid #1a1a2e' },
-    },
-      React.createElement('div', {
-        style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-      },
-        React.createElement('span', { style: { fontSize: 10, color: '#555570' } }, 'Readiness'),
-        React.createElement('span', {
-          style: {
-            fontSize: 11, fontWeight: 600, fontFamily: mono,
-            color: readinessScore >= 80 ? '#2dd4a0' : readinessScore >= 50 ? '#ffd444' : '#ff4466',
-          },
-        }, `${readinessScore}%`),
-      ),
-      issues.length > 0 && React.createElement('div', {
-        style: { marginTop: 6 },
-      },
-        ...issues.slice(0, 3).map((issue, i) =>
-          React.createElement('div', {
-            key: issue.id ?? i,
-            style: { fontSize: 9, color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444', marginTop: 2 },
-          }, `${issue.severity === 'blocker' ? '✗' : '⚠'} ${issue.title}`),
-        ),
-        issues.length > 3 && React.createElement('div', {
-          style: { fontSize: 9, color: '#333355', marginTop: 2 },
-        }, `+${issues.length - 3} more`),
-      ),
-    ),
-
     showOutcome && currentReplay && React.createElement('div', {
       style: {
-        marginTop: 8,
+        margin: '0 16px 8px',
         padding: '10px', background: 'rgba(45,212,160,0.06)',
         borderRadius: 8, border: '1px solid rgba(45,212,160,0.2)',
       },
@@ -1344,6 +1339,72 @@ export function ConnectionPanel({
     ),
   );
 
+  const jobProgressSection = isConnected && (isRunning || displayPaused) && React.createElement('div', {
+    style: { padding: '16px', flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 12, minHeight: 0 },
+  },
+    React.createElement('div', { style: { textAlign: 'center' as const } },
+      React.createElement('div', {
+        style: { fontSize: 16, fontWeight: 700, color: displayPaused ? '#ffd444' : '#2dd4a0' },
+      }, displayPaused ? '⏸ Paused' : '▶ Cutting...'),
+    ),
+    React.createElement('div', null,
+      React.createElement('div', {
+        style: { display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8888aa', marginBottom: 4 },
+      },
+        React.createElement('span', { style: { fontFamily: mono } },
+          `${jobProgress?.percentComplete?.toFixed(0) ?? 0}%`,
+        ),
+        React.createElement('span', { style: { fontFamily: mono } },
+          `${jobProgress?.linesAcknowledged ?? 0} / ${jobProgress?.totalLines ?? 0}`,
+        ),
+      ),
+      React.createElement('div', {
+        style: { width: '100%', height: 10, background: '#1a1a2e', borderRadius: 5, overflow: 'hidden' },
+      },
+        React.createElement('div', {
+          style: {
+            width: `${(isRunning || displayPaused) ? (jobProgress?.percentComplete ?? 0) : 0}%`,
+            height: '100%',
+            background: displayPaused ? '#ffd444' : '#2dd4a0',
+            borderRadius: 5,
+            transition: 'width 0.3s',
+          },
+        }),
+      ),
+    ),
+    React.createElement('div', {
+      style: { display: 'flex', justifyContent: 'space-between', fontSize: 10, fontFamily: mono, color: '#555570' },
+    },
+      React.createElement('span', null, `Elapsed: ${formatJobTime(elapsedSeconds)}`),
+      estimatedRemaining != null && estimatedRemaining > 0 &&
+        React.createElement('span', null, `~${formatJobTime(estimatedRemaining)} left`),
+    ),
+    React.createElement('div', { style: { display: 'flex', gap: 8, marginTop: 8 } },
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handlePauseResume(); },
+        style: {
+          flex: 1, padding: '16px', fontSize: 14, fontWeight: 700,
+          borderRadius: 10, cursor: 'pointer', fontFamily: font,
+          background: displayPaused ? 'rgba(45,212,160,0.1)' : 'rgba(255,212,68,0.08)',
+          border: displayPaused ? '2px solid #2dd4a0' : '2px solid rgba(255,212,68,0.4)',
+          color: displayPaused ? '#2dd4a0' : '#ffd444',
+        },
+      }, displayPaused ? '▶ Resume' : '⏸ Pause'),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void handleStop(); },
+        style: {
+          flex: 1, padding: '16px', fontSize: 14, fontWeight: 700,
+          borderRadius: 10, cursor: 'pointer', fontFamily: font,
+          background: 'rgba(255,68,102,0.08)',
+          border: '2px solid rgba(255,68,102,0.4)',
+          color: '#ff4466',
+        },
+      }, '⏹ Stop'),
+    ),
+  );
+
   const moreSection = isConnected && React.createElement('div', {
     style: { borderTop: '1px solid #1a1a2e', flexShrink: 0 },
   },
@@ -1351,7 +1412,7 @@ export function ConnectionPanel({
       type: 'button',
       onClick: () => setShowMore(v => !v),
       style: {
-        width: '100%', padding: '8px 14px', fontSize: 10,
+        width: '100%', padding: '8px 16px', fontSize: 10,
         background: 'transparent', border: 'none', color: '#555570',
         cursor: 'pointer', fontFamily: font,
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1361,7 +1422,7 @@ export function ConnectionPanel({
       React.createElement('span', null, showMore ? '▲' : '▼'),
     ),
     showMore && React.createElement('div', {
-      style: { padding: '6px 14px 10px', display: 'flex', flexDirection: 'column' as const, gap: 5, maxHeight: 160, overflow: 'hidden' },
+      style: { padding: '8px 16px 12px', display: 'flex', flexDirection: 'column' as const, gap: 6, maxHeight: 200, overflowY: 'auto' as const },
     },
       React.createElement(DeviceProfileSelector, {
         scene,
@@ -1374,8 +1435,10 @@ export function ConnectionPanel({
         type: 'button',
         onClick: () => setShowSimulator(v => !v),
         style: {
-          width: '100%', padding: '8px', fontSize: 10, borderRadius: 6, cursor: 'pointer', fontFamily: font,
-          background: 'rgba(255,212,68,0.06)', border: '1px solid rgba(255,212,68,0.25)', color: '#ffd444',
+          width: '100%', padding: '8px', fontSize: 11, borderRadius: 6, cursor: 'pointer', fontFamily: font,
+          background: showSimulator ? 'rgba(0,212,255,0.06)' : '#0a0a14',
+          border: showSimulator ? '1px solid rgba(0,212,255,0.2)' : '1px solid #252540',
+          color: showSimulator ? '#00d4ff' : '#555570',
         },
       }, showSimulator ? 'Hide Simulator' : 'Show Simulator'),
       React.createElement(JobLogViewer, {
@@ -1449,7 +1512,7 @@ export function ConnectionPanel({
     React.createElement('style', {}, '@keyframes laserforgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }'),
     React.createElement('div', {
       style: {
-        width: 340,
+        width: 450,
         flexShrink: 0,
         height: '100%',
         minHeight: 0,
@@ -1461,13 +1524,17 @@ export function ConnectionPanel({
         fontFamily: font,
       },
     },
-      statusBar,
-      !isConnected && connectOptions,
+      statusSection,
+      !isConnected && connectSection,
       isConnected && React.createElement('div', {
         style: { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' as const, overflow: 'hidden' },
       },
-        movementControls,
-        jobControls,
+        !isRunning && !displayPaused && workflowSection,
+        !isRunning && !displayPaused && controlsSection,
+        (isRunning || displayPaused) && jobProgressSection,
+        gcodeWarning,
+        issuesSection,
+        outcomeExtrasSection,
       ),
       moreSection,
       simulatorView,

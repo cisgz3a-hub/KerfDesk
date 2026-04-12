@@ -213,8 +213,11 @@ export function App() {
   }, [grbl.isJobRunning, grbl.machineState, activeJobPlanMin]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
-  const connectionSidebarWidth = connectionSidebarOpen ? 340 : 0;
+  const connectionSidebarWidth = connectionSidebarOpen ? 450 : 0;
   const layersPanelWidth = connectionSidebarOpen ? 0 : 240;
+  const toolbarWidth = 36;
+  const canvasViewportWidth =
+    canvasSize.width - toolbarWidth - connectionSidebarWidth - layersPanelWidth;
 
   const toolbarLaserConnected = useMemo(() => {
     const s = grbl.machineState;
@@ -452,6 +455,34 @@ export function App() {
   }, []);
 
   const { currentGcode, setCurrentGcode, compileGcode } = useGcodeExport(startMode, savedOrigin);
+
+  const lastCompiledSceneRef = useRef('');
+  const [gcodeStale, setGcodeStale] = useState(false);
+
+  const sceneCompileFingerprint = useCallback(
+    (s: Scene) =>
+      JSON.stringify({
+        objects: s.objects.map(o => ({ id: o.id, transform: o.transform, geometry: o.geometry, layerId: o.layerId })),
+        startMode,
+        savedOrigin,
+      }),
+    [startMode, savedOrigin],
+  );
+
+  useEffect(() => {
+    if (!connectionSidebarOpen) return;
+    const currentKey = sceneCompileFingerprint(scene);
+    if (lastCompiledSceneRef.current && currentKey !== lastCompiledSceneRef.current) {
+      setGcodeStale(true);
+    }
+  }, [scene.objects, connectionSidebarOpen, sceneCompileFingerprint, scene]);
+
+  const handleConnectionRecompile = useCallback(() => {
+    const gc = compileGcode(scene);
+    setCurrentGcode(gc);
+    lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
+    setGcodeStale(false);
+  }, [scene, compileGcode, setCurrentGcode, sceneCompileFingerprint]);
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
     selectedIds,
@@ -775,12 +806,14 @@ export function App() {
         await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
       }
       setCurrentGcode(gc);
+      lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
+      setGcodeStale(false);
     } catch (err) {
       console.error('G-code build failed:', err);
       setCurrentGcode(null);
     }
     dialogs.setShowConnection(true);
-  }, [scene, compileGcode, showAlert]);
+  }, [scene, compileGcode, showAlert, sceneCompileFingerprint]);
 
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
@@ -1281,7 +1314,7 @@ export function App() {
         React.createElement(CanvasViewport, {
           scene,
           activeTool: activeTool,
-          width: canvasSize.width - layersPanelWidth - 36 - connectionSidebarWidth,
+          width: canvasViewportWidth,
           height: canvasSize.height,
           selectedIds: selectedIds,
           onSelectionChange: setSelectedIds,
@@ -1325,6 +1358,8 @@ export function App() {
         machinePosition: machinePositionForStartWizard,
         onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
         onSaveOrigin: handleSaveOrigin,
+        gcodeStale,
+        onRecompile: handleConnectionRecompile,
       }),
       !connectionSidebarOpen && React.createElement('div', {
         style: {
