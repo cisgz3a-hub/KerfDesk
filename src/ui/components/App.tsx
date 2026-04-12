@@ -526,6 +526,56 @@ export function App() {
     [scene, handleSceneCommit, connectionSidebarOpen],
   );
 
+  const handleConnectionUpdateLayerFillInterval = useCallback(
+    (layerId: string, intervalMm: number) => {
+      const interval = Math.max(0.02, Math.min(1, Number.isFinite(intervalMm) ? intervalMm : 0.1));
+      handleSceneCommit({
+        ...scene,
+        layers: scene.layers.map(l => {
+          if (l.id !== layerId) return l;
+          const f = l.settings.fill;
+          return {
+            ...l,
+            settings: {
+              ...l.settings,
+              fill: {
+                ...f,
+                enabled: true,
+                interval,
+              },
+            },
+          };
+        }),
+      });
+      if (connectionSidebarOpen) setGcodeStale(true);
+    },
+    [scene, handleSceneCommit, connectionSidebarOpen],
+  );
+
+  const handleConnectionUpdateLayerFillBidirectional = useCallback(
+    (layerId: string, bidirectional: boolean) => {
+      handleSceneCommit({
+        ...scene,
+        layers: scene.layers.map(l => {
+          if (l.id !== layerId) return l;
+          const f = l.settings.fill;
+          return {
+            ...l,
+            settings: {
+              ...l.settings,
+              fill: {
+                ...f,
+                biDirectional: bidirectional,
+              },
+            },
+          };
+        }),
+      });
+      if (connectionSidebarOpen) setGcodeStale(true);
+    },
+    [scene, handleSceneCommit, connectionSidebarOpen],
+  );
+
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
     selectedIds,
@@ -1405,6 +1455,8 @@ export function App() {
         onRecompile: handleConnectionRecompile,
         onUpdateLayerMode: handleConnectionUpdateLayerMode,
         onUpdateLayerFillMode: handleConnectionUpdateLayerFillMode,
+        onUpdateLayerFillInterval: handleConnectionUpdateLayerFillInterval,
+        onUpdateLayerFillBidirectional: handleConnectionUpdateLayerFillBidirectional,
       }),
       !connectionSidebarOpen && React.createElement('div', {
         style: {

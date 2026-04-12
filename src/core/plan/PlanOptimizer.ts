@@ -421,6 +421,7 @@ function planFillOperation(
   const interval = Math.max(0.01, settings.fillInterval > 0 ? settings.fillInterval : 0.1);
 
   const scanlines: ScanlineSegment[] = [];
+  let fillStripIndex = 0;
   for (const angle of fillAngles) {
     const fillSettings: FillSettings = {
       interval,
@@ -428,7 +429,9 @@ function planFillOperation(
       biDirectional: settings.fillBiDirectional,
       overscanning: settings.overscanning,
     };
-    scanlines.push(...generateFillScanlines(boundaryPaths, fillSettings));
+    const nextSegs = generateFillScanlines(boundaryPaths, fillSettings, fillStripIndex);
+    fillStripIndex += nextSegs.length;
+    scanlines.push(...nextSegs);
   }
 
   if (scanlines.length === 0 && boundaryPaths.length > 0) {

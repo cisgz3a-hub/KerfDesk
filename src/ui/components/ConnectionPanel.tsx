@@ -83,6 +83,8 @@ interface ConnectionPanelProps {
   onRecompile?: () => void;
   onUpdateLayerMode?: (layerId: string, mode: LayerMode) => void;
   onUpdateLayerFillMode?: (layerId: string, fillMode: FillMode) => void;
+  onUpdateLayerFillInterval?: (layerId: string, intervalMm: number) => void;
+  onUpdateLayerFillBidirectional?: (layerId: string, bidirectional: boolean) => void;
 }
 
 export function ConnectionPanel({
@@ -114,6 +116,8 @@ export function ConnectionPanel({
   onRecompile,
   onUpdateLayerMode,
   onUpdateLayerFillMode,
+  onUpdateLayerFillInterval,
+  onUpdateLayerFillBidirectional,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -1284,6 +1288,49 @@ export function ConnectionPanel({
               },
             }, f.label),
           ),
+        ),
+        m === 'engrave' && onUpdateLayerFillInterval && React.createElement('div', {
+          style: { marginTop: 6, marginBottom: 4 },
+        },
+          React.createElement('div', {
+            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
+          },
+            React.createElement('span', { style: { fontSize: 9, color: '#555570' } }, 'Line spacing'),
+            React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } },
+              `${(Number(layer.settings.fill.interval) > 0 ? layer.settings.fill.interval : 0.1).toFixed(2)}mm`,
+            ),
+          ),
+          React.createElement('input', {
+            type: 'range',
+            min: 0.02,
+            max: 1,
+            step: 0.02,
+            value: Math.min(1, Math.max(0.02, Number(layer.settings.fill.interval) > 0 ? layer.settings.fill.interval : 0.1)),
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              onUpdateLayerFillInterval(layer.id, parseFloat(e.target.value));
+            },
+            style: { width: '100%', accentColor: '#00d4ff', height: 4 },
+          }),
+          React.createElement('div', {
+            style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355', marginTop: 1 },
+          },
+            React.createElement('span', null, 'Dense (0.02)'),
+            React.createElement('span', null, 'Light (1.0)'),
+          ),
+        ),
+        m === 'engrave' && onUpdateLayerFillBidirectional && React.createElement('div', {
+          style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 },
+        },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: layer.settings.fill.biDirectional !== false,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              onUpdateLayerFillBidirectional(layer.id, e.target.checked);
+            },
+            style: { accentColor: '#00d4ff', width: 12, height: 12, flexShrink: 0 },
+          }),
+          React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } }, 'Bidirectional scanning'),
+          React.createElement('span', { style: { fontSize: 8, color: '#555570' } }, '(faster)'),
         ),
         React.createElement('div', {
           style: { display: 'flex', gap: 8, fontSize: 9, fontFamily: mono, color: '#555570' },

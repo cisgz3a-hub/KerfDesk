@@ -50,7 +50,9 @@ export interface FillSettings {
  */
 export function generateFillScanlines(
   paths: FlatPath[],
-  settings: FillSettings
+  settings: FillSettings,
+  /** Continues serpentine parity across cross-hatch passes (second angle). */
+  initialStripIndex: number = 0,
 ): ScanlineSegment[] {
   // Filter to closed paths only — open paths can't define a fill region
   const closed = paths.filter(p => p.closed);
@@ -100,14 +102,13 @@ export function generateFillScanlines(
 
   // Offset start by half-interval to avoid landing exactly on vertices
   const startY = minY + safeInterval / 2;
-  let lineIndex = 0;
+  let stripIndex = initialStripIndex;
 
   for (let y = startY; y < maxY; y += safeInterval) {
     // Step 4a: Find all intersections at this Y
     const intersections = findIntersections(rotatedEdges, y);
 
     if (intersections.length < 2) {
-      lineIndex++;
       continue;
     }
 
@@ -127,16 +128,15 @@ export function generateFillScanlines(
       const from = rotatePoint(x1, y, angleRad);
       const to = rotatePoint(x2, y, angleRad);
 
-      // Step 7: Apply bidirectional alternation
-      if (settings.biDirectional && lineIndex % 2 === 1) {
-        // Reverse direction for odd lines
+      // Step 7: Serpentine — alternate each burn segment (not empty Y rows)
+      // TODO: Extra laser-off overscan past segment ends for cleaner bidirectional turnarounds
+      if (settings.biDirectional && stripIndex % 2 === 1) {
         segments.push({ from: to, to: from });
       } else {
         segments.push({ from, to });
       }
+      stripIndex++;
     }
-
-    lineIndex++;
   }
 
   return segments;

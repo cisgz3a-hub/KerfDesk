@@ -146,7 +146,7 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
     fillInterval: engraveFillInterval,
     fillAngle: s.fill.angle % 360,
     fillMode: s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line',
-    fillBiDirectional: s.fill.biDirectional,
+    fillBiDirectional: s.fill.biDirectional !== false,
     overscanning: Math.max(0, s.fill.overscanning),
 
     overcut: Math.max(0, s.cut.overcut),
