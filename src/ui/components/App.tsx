@@ -215,6 +215,7 @@ export function App() {
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
   const connectionSidebarWidth = connectionSidebarOpen ? 340 : 0;
+  const layersPanelWidth = connectionSidebarOpen ? 0 : 240;
 
   const toolbarLaserConnected = useMemo(() => {
     const s = grbl.machineState;
@@ -1283,7 +1284,7 @@ export function App() {
         React.createElement(CanvasViewport, {
           scene,
           activeTool: activeTool,
-          width: canvasSize.width - 240 - 36 - connectionSidebarWidth,
+          width: canvasSize.width - layersPanelWidth - 36 - connectionSidebarWidth,
           height: canvasSize.height,
           selectedIds: selectedIds,
           onSelectionChange: setSelectedIds,
@@ -1329,9 +1330,10 @@ export function App() {
         onOpenStartWizard: () => setShowStartWizard(true),
         onSaveOrigin: handleSaveOrigin,
       }),
-      React.createElement('div', {
+      !connectionSidebarOpen && React.createElement('div', {
         style: {
           width: 240,
+          flexShrink: 0,
           display: 'flex',
           flexDirection: 'column' as const,
           borderLeft: '1px solid #1a1a30',
