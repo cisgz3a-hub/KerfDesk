@@ -753,7 +753,6 @@ export function CanvasViewport({
     isPolygonPt: boolean;
     ptIdx: number;
   } | null>(null);
-  const startDragRef = useRef<{ startX: number; startY: number } | null>(null);
 
   const HANDLE_SIZE = 8;
 
@@ -895,17 +894,6 @@ export function CanvasViewport({
       return;
     }
 
-    // Start position dot drag
-    if (scene.startPosition) {
-      const sp = scene.startPosition;
-      const hitRadius = 10 / (viewport.zoom || 1);
-      if (Math.abs(worldPt.x - sp.x) < hitRadius && Math.abs(worldPt.y - sp.y) < hitRadius) {
-        startDragRef.current = { startX: worldPt.x, startY: worldPt.y };
-        e.preventDefault();
-        return;
-      }
-    }
-
     // Check for resize handle hit (union bounds of selection)
     if (selectedIds.size >= 1) {
       const sx = e.clientX - rect.left;
@@ -1043,19 +1031,6 @@ export function CanvasViewport({
       y: e.clientY - rect.top,
     });
     mouseWorldRef.current = world;
-
-    // Start position dragging
-    if (startDragRef.current) {
-      const newScene = {
-        ...scene,
-        startPosition: {
-          x: Math.round(world.x),
-          y: Math.round(world.y),
-        },
-      };
-      onSceneChange?.(newScene);
-      return;
-    }
 
     // Drawing preview: update current position for rubber band
     if (drawRef.current && (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line')) {
@@ -1298,13 +1273,6 @@ export function CanvasViewport({
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     setIsPanning(false);
     setPanStart(null);
-
-    // Start position drag completion
-    if (startDragRef.current) {
-      onSceneCommit?.(scene);
-      startDragRef.current = null;
-      return;
-    }
 
     // Drawing tool: create shape on mouseUp
     if (drawRef.current && (activeTool === 'rect' || activeTool === 'ellipse' || activeTool === 'line')) {

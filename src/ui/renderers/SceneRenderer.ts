@@ -324,22 +324,6 @@ export function renderSceneObjects(
     ctx.shadowOffsetX = 0;
     ctx.shadowOffsetY = 0;
 
-    // Start position (same role as normal pass)
-    if (scene.startPosition) {
-      const sp = scene.startPosition;
-      const dotRadius = transform.screenPx(6);
-      const ringRadius = transform.screenPx(10);
-      ctx.strokeStyle = 'rgba(45, 212, 160, 0.3)';
-      ctx.lineWidth = transform.screenPx(1.5);
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, ringRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.fillStyle = 'rgba(45, 212, 160, 0.9)';
-      ctx.beginPath();
-      ctx.arc(sp.x, sp.y, dotRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     ctx.restore();
     return;
   }
@@ -409,58 +393,6 @@ export function renderSceneObjects(
         ctx.restore();
       }
     }
-  }
-
-  // Draw start position indicator
-  if (scene.startPosition) {
-    const sp = scene.startPosition;
-    const dotRadius = transform.screenPx(6);
-    const ringRadius = transform.screenPx(10);
-
-    // Outer ring
-    ctx.strokeStyle = 'rgba(45, 212, 160, 0.3)';
-    ctx.lineWidth = transform.screenPx(1.5);
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, ringRadius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Inner filled dot
-    ctx.fillStyle = 'rgba(45, 212, 160, 0.9)';
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, dotRadius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // White center
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-    ctx.beginPath();
-    ctx.arc(sp.x, sp.y, transform.screenPx(2), 0, Math.PI * 2);
-    ctx.fill();
-
-    // Crosshair lines
-    ctx.strokeStyle = 'rgba(45, 212, 160, 0.25)';
-    ctx.lineWidth = transform.screenPx(0.5);
-    ctx.setLineDash([transform.screenPx(3), transform.screenPx(3)]);
-    const crossLen = transform.screenPx(20);
-    ctx.beginPath();
-    ctx.moveTo(sp.x - crossLen, sp.y);
-    ctx.lineTo(sp.x + crossLen, sp.y);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(sp.x, sp.y - crossLen);
-    ctx.lineTo(sp.x, sp.y + crossLen);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Label
-    ctx.fillStyle = 'rgba(45, 212, 160, 0.6)';
-    ctx.font = `${transform.screenPx(9)}px "DM Sans", system-ui, sans-serif`;
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText('⌂ Home position', sp.x + transform.screenPx(10), sp.y - transform.screenPx(4));
-    ctx.globalAlpha = 0.3;
-    ctx.font = `${transform.screenPx(7)}px "DM Sans", system-ui, sans-serif`;
-    ctx.fillText('laser begins & returns here', sp.x + transform.screenPx(10), sp.y + transform.screenPx(6));
-    ctx.globalAlpha = 1;
   }
 
   if (!previewMode && boundsCache && boundsCache.size > 0) {
