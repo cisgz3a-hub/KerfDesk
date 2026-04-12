@@ -24,7 +24,7 @@ import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 interface FileToolbarProps {
   scene: Scene;
   /** Compile scene to G-code (shared with App — resets singleton strategy state). */
-  compileGcode: (scene: Scene) => string | null;
+  compileGcode: (scene: Scene) => Promise<string | null>;
   onSceneChange: (scene: Scene) => void;
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
@@ -242,20 +242,7 @@ export function FileToolbar({
 
   const handleGenerateGcode = useCallback(async () => {
     try {
-      // Preflight: warn about text objects that won't be in output
-      const textObjs = scene.objects.filter(o =>
-        o.visible && (o.geometry as any).type === 'text' &&
-        scene.layers.find(l => l.id === o.layerId)?.visible
-      );
-      if (textObjs.length > 0) {
-        const names = textObjs.map(o => o.name || (o.geometry as any).text || 'Text').join(', ');
-        const ok = await showConfirm(
-          'Text Objects',
-          `${textObjs.length} text object(s) will be skipped: ${names}\n\nConvert to paths first (right-click → "Text to Path").\n\nContinue?`
-        );
-        if (!ok) return;
-      }
-      const gc = compileGcode(scene);
+      const gc = await compileGcode(scene);
       if (!gc) {
         await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
         return;
@@ -272,7 +259,7 @@ export function FileToolbar({
       console.error('G-code generation failed:', e);
       await showAlert('G-code', 'G-code generation failed: ' + (e as Error).message);
     }
-  }, [scene, compileGcode, showAlert, showConfirm]);
+  }, [scene, compileGcode, showAlert]);
 
   // ─── RENDER ──────────────────────────────────────────────────
 

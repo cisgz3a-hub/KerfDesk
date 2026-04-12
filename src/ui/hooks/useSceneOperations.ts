@@ -278,6 +278,7 @@ export function useSceneOperations({
         geom.fontFamily || 'Arial',
         geom.fontSize || 20,
         geom.bold ?? false,
+        geom.italic ?? false,
       );
 
       if (!result) continue;

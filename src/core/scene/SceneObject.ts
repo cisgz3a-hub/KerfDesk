@@ -73,7 +73,8 @@ export interface TextGeometry {
   fontFamily: string;
   bold?: boolean;
   italic?: boolean;
-  // Text is converted to paths before toolpath generation
+  /** Ephemeral: filled before compileJob for engrave/cut; not required for scene persistence */
+  outlineSubPaths?: SubPath[];
 }
 
 export interface ImageGeometry {

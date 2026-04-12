@@ -73,7 +73,8 @@ export async function textToPath(
   text: string,
   fontFamily: string = 'Arial',
   fontSize: number = 20,
-  bold: boolean = false
+  bold: boolean = false,
+  italic: boolean = false,
 ): Promise<TextPathResult | null> {
   if (!text.trim()) return null;
 
@@ -84,7 +85,7 @@ export async function textToPath(
   const measureCtx = measureCanvas.getContext('2d');
   if (!measureCtx) return null;
 
-  const fontStr = `${bold ? 'bold ' : ''}${scaledSize}px ${fontFamily}`;
+  const fontStr = `${bold ? 'bold ' : ''}${italic ? 'italic ' : ''}${scaledSize}px ${fontFamily}`;
   measureCtx.font = fontStr;
   const metrics = measureCtx.measureText(text);
 

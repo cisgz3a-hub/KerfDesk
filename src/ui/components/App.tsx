@@ -31,6 +31,7 @@ import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useGcodeExport } from '../hooks/useGcodeExport';
 import { compileJob } from '../../core/job/JobCompiler';
+import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -170,27 +171,39 @@ export function App() {
   }
 
   useEffect(() => {
+    let cancelled = false;
+
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
-      try {
-        const job = compileJob(scene);
-        if (job.operations.length === 0) {
-          setActiveJobMoves(null);
-          setActiveJobPlanMin(null);
-        } else {
-          const plan = optimizePlan(job);
-          const moves = plan.operations.flatMap(op => op.moves);
-          setActiveJobMoves(moves);
-          setActiveJobPlanMin(computePlanMoveMinFromMoves(moves));
+      void (async () => {
+        try {
+          const sceneForJob = await expandTextOutlinesForCompile(scene);
+          if (cancelled) return;
+          const job = compileJob(sceneForJob);
+          if (job.operations.length === 0) {
+            setActiveJobMoves(null);
+            setActiveJobPlanMin(null);
+          } else {
+            const plan = optimizePlan(job);
+            const moves = plan.operations.flatMap(op => op.moves);
+            setActiveJobMoves(moves);
+            setActiveJobPlanMin(computePlanMoveMinFromMoves(moves));
+          }
+        } catch {
+          if (!cancelled) {
+            setActiveJobMoves(null);
+            setActiveJobPlanMin(null);
+          }
         }
-      } catch {
-        setActiveJobMoves(null);
-        setActiveJobPlanMin(null);
-      }
+      })();
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
       setActiveJobMoves(null);
       setActiveJobPlanMin(null);
     }
     wasJobRunningRef.current = grbl.isJobRunning;
+
+    return () => {
+      cancelled = true;
+    };
   }, [grbl.isJobRunning, scene]);
 
   const machinePositionForStartWizard = useMemo(() => {
@@ -479,10 +492,12 @@ export function App() {
   }, [scene.objects, connectionSidebarOpen, sceneCompileFingerprint, scene]);
 
   const handleConnectionRecompile = useCallback(() => {
-    const gc = compileGcode(scene);
-    setCurrentGcode(gc);
-    lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
-    setGcodeStale(false);
+    void (async () => {
+      const gc = await compileGcode(scene);
+      setCurrentGcode(gc);
+      lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
+      setGcodeStale(false);
+    })();
   }, [scene, compileGcode, setCurrentGcode, sceneCompileFingerprint]);
 
   const handleConnectionUpdateLayerMode = useCallback(
@@ -894,7 +909,7 @@ export function App() {
 
   const handleConnect = useCallback(async () => {
     try {
-      const gc = compileGcode(scene);
+      const gc = await compileGcode(scene);
       if (!gc) {
         await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
       }
@@ -1210,12 +1225,14 @@ export function App() {
         onToolNode: () => setActiveTool('node'),
         onToolPan: () => {},
         onToggleToolpath: () => {
-          try {
-            const gc = compileGcode(scene);
-            if (gc) setGcodePreview(gc);
-          } catch (err) {
-            console.error('G-code generation failed:', err);
-          }
+          void (async () => {
+            try {
+              const gc = await compileGcode(scene);
+              if (gc) setGcodePreview(gc);
+            } catch (err) {
+              console.error('G-code generation failed:', err);
+            }
+          })();
         },
         onToggleShortcuts: () => dialogs.setShowShortcuts(s => !s),
         onNudge: handleNudge,
@@ -1341,7 +1358,7 @@ export function App() {
       onExit: handleExit,
       onToolpathPreview: async () => {
         try {
-          const gc = compileGcode(scene);
+          const gc = await compileGcode(scene);
           if (gc) setGcodePreview(gc);
         } catch (err) {
           await showAlert('Preview Failed', 'Toolpath preview failed: ' + (err as Error).message);

@@ -161,22 +161,6 @@ export function runPreflight(
     });
   }
 
-  // Text objects that will be silently dropped
-  const textObjs = visibleObjects.filter(o =>
-    o.geometry.type === 'text' &&
-    visibleLayers.some(l => l.id === o.layerId)
-  );
-  if (textObjs.length > 0) {
-    issues.push({
-      id: 'design-text-unconverted',
-      severity: 'warning',
-      title: `${textObjs.length} text object(s) will be skipped`,
-      detail: textObjs.map(o => o.name || (o.geometry as { text?: string }).text || 'Text').join(', '),
-      fix: 'Right-click → "Text to Path" to convert before cutting',
-      category: 'design',
-    });
-  }
-
   // Objects outside material bounds (world-space AABB, respects rotation/scale)
   if (scene.material && scene.material.enabled !== false) {
     const mat = scene.material;

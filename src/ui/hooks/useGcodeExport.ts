@@ -5,6 +5,7 @@ import { optimizePlan } from '../../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../../core/output/Output';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import '../../core/output/GrblStrategy';
+import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
 
 export function useGcodeExport(
   startMode: GcodeStartMode = 'current',
@@ -12,9 +13,10 @@ export function useGcodeExport(
 ) {
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
 
-  const compileGcode = useCallback((targetScene: Scene): string | null => {
+  const compileGcode = useCallback(async (targetScene: Scene): Promise<string | null> => {
     try {
-      const job = compileJob(targetScene);
+      const sceneForJob = await expandTextOutlinesForCompile(targetScene);
+      const job = compileJob(sceneForJob);
       if (job.operations.length === 0) return null;
       const plan = optimizePlan(job);
       const strategy = getOutputStrategy('grbl');

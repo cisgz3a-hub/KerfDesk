@@ -381,10 +381,14 @@ export function geometryToPoints(geom: Geometry): PointGroup[] {
         closed: sub.closed,
       }));
     }
-    case 'text':
-      // Text must be converted to paths before reaching here
-      // (handled in a future text-to-path module)
-      return [];
+    case 'text': {
+      const subPaths = geom.outlineSubPaths;
+      if (!subPaths?.length) return [];
+      return subPaths.map(sub => ({
+        points: subPathToPoints(sub.segments),
+        closed: sub.closed,
+      }));
+    }
     case 'image':
       // Images are handled by the raster pipeline, not here
       return [];
