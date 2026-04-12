@@ -369,34 +369,35 @@ export function useSceneOperations({
     const cos = Math.cos(rad);
     const sin = Math.sin(rad);
 
+    // Pivot = center of union world AABB (same corners/transform as SceneRenderer + computeObjectBounds).
+    // SceneRenderer applies ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty) → wx = a*lx + c*ly + tx, wy = b*lx + d*ly + ty.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const obj of selected) {
+      const b = computeObjectBounds(obj);
+      if (!b || !Number.isFinite(b.minX) || b.minX > b.maxX || b.minY > b.maxY) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
+    if (!Number.isFinite(minX) || minX > maxX) return;
+
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
     const newScene = {
       ...scene,
       objects: scene.objects.map(o => {
         if (!selectedIds.has(o.id)) return o;
 
-        // Compute object's bounding box center in world coordinates
-        const bounds = computeObjectBounds(o);
-        if (!bounds) return o;
-        const cx = (bounds.minX + bounds.maxX) / 2;
-        const cy = (bounds.minY + bounds.maxY) / 2;
-
         const t = o.transform;
 
-        // Rotation around (cx, cy) is equivalent to:
-        // 1. Translate so (cx, cy) is at origin
-        // 2. Rotate
-        // 3. Translate back
-        //
-        // For an affine transform M, the new transform is:
-        //   T(cx,cy) * R * T(-cx,-cy) * M
-        //
-        // The new linear part: rotation applied to current linear part
-        const newA = cos * t.a - sin * t.c;
-        const newB = cos * t.b - sin * t.d;
-        const newC = sin * t.a + cos * t.c;
-        const newD = sin * t.b + cos * t.d;
+        // Linear part L = [[a,c],[b,d]]; new L = R * L with R = [[cos,-sin],[sin,cos]] (Canvas2D / Matrix3x2 layout).
+        const newA = cos * t.a - sin * t.b;
+        const newB = sin * t.a + cos * t.b;
+        const newC = cos * t.c - sin * t.d;
+        const newD = sin * t.c + cos * t.d;
 
-        // The new translation: rotated point + center offset back
         const newTx = cos * (t.tx - cx) - sin * (t.ty - cy) + cx;
         const newTy = sin * (t.tx - cx) + cos * (t.ty - cy) + cy;
 
