@@ -1483,6 +1483,7 @@ export function App() {
       onApplyKerf: handleKerfApply,
       onSaveToPreset: handleKerfSaveToPreset,
       onClose: () => setShowKerfWizard(false),
+      showAlert,
     }),
 
     showNesting && React.createElement(NestingDialog, {
