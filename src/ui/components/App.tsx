@@ -156,6 +156,16 @@ export function App() {
     return { x: s.position.x, y: s.position.y };
   }, [grbl.machineState]);
 
+  const liveJobCanvasPosition = useMemo(() => {
+    if (!grbl.isJobRunning) return null;
+    const s = grbl.machineState;
+    if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
+    return { x: s.position.x, y: s.position.y };
+  }, [grbl.isJobRunning, grbl.machineState]);
+
+  const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
+  const connectionSidebarWidth = connectionSidebarOpen ? 280 : 0;
+
   const toolbarLaserConnected = useMemo(() => {
     const s = grbl.machineState;
     return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
@@ -1217,22 +1227,56 @@ export function App() {
         activeTool,
         onToolChange: setActiveTool,
       }),
-      React.createElement(CanvasViewport, {
+      React.createElement('div', {
+        style: { flex: 1, position: 'relative' as const, overflow: 'hidden', minWidth: 0 },
+      },
+        React.createElement(CanvasViewport, {
+          scene,
+          activeTool: activeTool,
+          width: canvasSize.width - 240 - 36 - connectionSidebarWidth,
+          height: canvasSize.height,
+          selectedIds: selectedIds,
+          onSelectionChange: setSelectedIds,
+          onSceneChange: handleSceneChange,
+          onSceneCommit: handleSceneCommit,
+          actionsRef: viewportActionsRef,
+          onZoomChange: setZoomLevel,
+          previewMode,
+          onSelectionScreenPos: setQuickActionPos,
+          onRequestTextPlacement: handleRequestTextPlacement,
+          onActiveTool: setActiveTool,
+          onEditText: handleEditText,
+          livePosition: liveJobCanvasPosition,
+          isJobRunning: grbl.isJobRunning,
+          jobProgress: grbl.jobProgress,
+        }),
+      ),
+      connectionSidebarOpen && React.createElement(ConnectionPanel, {
+        controller: grbl.controller!,
+        portRef: grbl.portRef,
+        machineState: grbl.machineState,
+        jobProgress: grbl.jobProgress,
         scene,
-        activeTool: activeTool,
-        width: canvasSize.width - 240 - 36,
-        height: canvasSize.height,
-        selectedIds: selectedIds,
-        onSelectionChange: setSelectedIds,
-        onSceneChange: handleSceneChange,
+        productionMode,
+        gcode: currentGcode,
+        onClose: () => dialogs.setShowConnection(false),
+        onDisconnect: () => dialogs.setShowConnection(false),
+        bedWidth: scene.canvas.width,
+        bedHeight: scene.canvas.height,
+        boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
+        boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
+        boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
+        boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
+        showAlert,
+        showConfirm,
+        showPrompt,
         onSceneCommit: handleSceneCommit,
-        actionsRef: viewportActionsRef,
-        onZoomChange: setZoomLevel,
-        previewMode,
-        onSelectionScreenPos: setQuickActionPos,
-        onRequestTextPlacement: handleRequestTextPlacement,
-        onActiveTool: setActiveTool,
-        onEditText: handleEditText,
+        startMode,
+        savedOrigin,
+        machinePosition: machinePositionForStartWizard,
+        onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
+        onOpenStartWizard: () => setShowStartWizard(true),
+        onSaveOrigin: handleSaveOrigin,
       }),
       React.createElement('div', {
         style: {
@@ -1461,34 +1505,6 @@ export function App() {
 
     dialogs.showShortcuts && React.createElement(ShortcutsPanel, {
       onClose: () => dialogs.setShowShortcuts(false),
-    }),
-
-    dialogs.showConnection && grbl.grblReady && React.createElement(ConnectionPanel, {
-      controller: grbl.controller!,
-      portRef: grbl.portRef,
-      machineState: grbl.machineState,
-      jobProgress: grbl.jobProgress,
-      scene,
-      productionMode,
-      gcode: currentGcode,
-      onClose: () => dialogs.setShowConnection(false),
-      onDisconnect: () => dialogs.setShowConnection(false),
-      bedWidth: scene.canvas.width,
-      bedHeight: scene.canvas.height,
-      boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
-      boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
-      boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
-      boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
-      showAlert,
-      showConfirm,
-      showPrompt,
-      onSceneCommit: handleSceneCommit,
-      startMode,
-      savedOrigin,
-      machinePosition: machinePositionForStartWizard,
-      onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
-      onOpenStartWizard: () => setShowStartWizard(true),
-      onSaveOrigin: handleSaveOrigin,
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

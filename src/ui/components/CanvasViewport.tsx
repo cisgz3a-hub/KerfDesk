@@ -43,6 +43,7 @@ import {
 import { type ToolType } from './ToolBar';
 import { CanvasRenderer } from './canvas/CanvasRenderer';
 import { geometryToPoints } from '../../core/job/JobCompiler';
+import { type JobProgress } from '../../controllers/ControllerInterface';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -246,6 +247,10 @@ interface CanvasViewportProps {
   onRequestTextPlacement?: (world: { x: number; y: number }) => void;
   /** Double-clicked a text object — open edit dialog. */
   onEditText?: (obj: SceneObject) => void;
+  /** Machine work position (mm) during an active streamed job — drawn as live head overlay. */
+  livePosition?: { x: number; y: number } | null;
+  isJobRunning?: boolean;
+  jobProgress?: JobProgress | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -267,6 +272,9 @@ export function CanvasViewport({
   onSelectionScreenPos,
   onRequestTextPlacement,
   onEditText,
+  livePosition = null,
+  isJobRunning = false,
+  jobProgress = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -668,9 +676,61 @@ export function CanvasViewport({
       ctx.restore();
     }
 
+    const monoUi = "'JetBrains Mono', monospace";
+
+    if (isJobRunning && livePosition && Number.isFinite(livePosition.x) && Number.isFinite(livePosition.y)) {
+      ctx.save();
+      const s = transform.worldToScreen({ x: livePosition.x, y: livePosition.y });
+      const glowR = Math.max(10, transform.screenPx(12));
+      const glow = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+      glow.addColorStop(0, 'rgba(255, 80, 50, 0.6)');
+      glow.addColorStop(1, 'rgba(255, 80, 50, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#ff4466';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(s.x - 5, s.y);
+      ctx.lineTo(s.x + 5, s.y);
+      ctx.moveTo(s.x, s.y - 5);
+      ctx.lineTo(s.x, s.y + 5);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ff4466';
+      ctx.font = `9px ${monoUi}`;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
+      ctx.fillText(
+        `${livePosition.x.toFixed(1)}, ${livePosition.y.toFixed(1)}`,
+        s.x + 8,
+        s.y - 6,
+      );
+      ctx.restore();
+    }
+
+    if (isJobRunning && jobProgress) {
+      ctx.save();
+      const pct = jobProgress.percentComplete != null ? jobProgress.percentComplete.toFixed(0) : '0';
+      const w = width;
+      ctx.fillStyle = 'rgba(8, 8, 15, 0.8)';
+      ctx.fillRect(w - 100, 10, 90, 28);
+      ctx.strokeStyle = '#2dd4a0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(w - 100, 10, 90, 28);
+      ctx.fillStyle = '#2dd4a0';
+      ctx.font = `bold 14px ${monoUi}`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${pct}%`, w - 55, 24);
+      ctx.restore();
+    }
+
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

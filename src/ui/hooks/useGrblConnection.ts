@@ -7,6 +7,7 @@ import { type WebSerialPort } from '../../communication/WebSerialPort';
 export function useGrblConnection() {
   const [machineState, setMachineState] = useState<MachineState | null>(null);
   const [jobProgress, setJobProgress] = useState<JobProgress | null>(null);
+  const [isJobRunning, setIsJobRunning] = useState(false);
   const [grblReady, setGrblReady] = useState(false);
 
   const grblControllerRef = useRef<GrblController | null>(null);
@@ -14,8 +15,14 @@ export function useGrblConnection() {
 
   useEffect(() => {
     const controller = new GrblController();
-    controller.onStateChange((state) => setMachineState({ ...state }));
-    controller.onProgress((prog) => setJobProgress({ ...prog }));
+    controller.onStateChange((state) => {
+      setMachineState({ ...state });
+      setIsJobRunning(controller.isJobRunning);
+    });
+    controller.onProgress((prog) => {
+      setJobProgress({ ...prog });
+      setIsJobRunning(controller.isJobRunning);
+    });
     grblControllerRef.current = controller;
     setGrblReady(true);
 
@@ -50,6 +57,7 @@ export function useGrblConnection() {
     portRef: serialPortRef,
     machineState,
     jobProgress,
+    isJobRunning,
     grblReady,
     connect,
     disconnect,

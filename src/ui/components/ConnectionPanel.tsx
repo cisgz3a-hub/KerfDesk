@@ -866,6 +866,9 @@ export function ConnectionPanel({
       React.createElement('div', { key: 'e3' }),
     ),
     React.createElement('div', {
+      style: { fontSize: 9, color: '#555570', textAlign: 'center' as const, marginBottom: 3 },
+    }, 'Jog distance'),
+    React.createElement('div', {
       style: { display: 'flex', justifyContent: 'center', gap: 3, marginBottom: 10, flexWrap: 'wrap' as const },
     },
       ...[0.1, 1, 10, 50].map(step =>
@@ -1279,31 +1282,23 @@ export function ConnectionPanel({
   );
 
   // ─── Render ─────────────────────────────────────────────
+  // Sidebar layout: parent row provides width; this fills height beside the canvas.
 
-  return React.createElement('div', {
-    style: {
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
-      backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
-      justifyContent: 'center', zIndex: 2000, fontFamily: font,
-    },
-    onClick: (e: React.MouseEvent) => { if (e.target === e.currentTarget) onClose(); },
-  },
+  return React.createElement(React.Fragment, null,
     React.createElement('style', {}, '@keyframes laserforgePulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.65; } }'),
     React.createElement('div', {
       style: {
         width: 280,
-        height: '90vh',
-        maxHeight: 720,
+        flexShrink: 0,
+        height: '100%',
+        minHeight: 0,
         background: '#0d0d18',
-        border: '1px solid #252540',
-        borderRadius: 12,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
+        borderLeft: '1px solid #1a1a2e',
         display: 'flex',
         flexDirection: 'column' as const,
         overflow: 'hidden',
         fontFamily: font,
       },
-      onClick: (e: React.MouseEvent) => e.stopPropagation(),
     },
       statusBar,
       !isConnected && connectOptions,

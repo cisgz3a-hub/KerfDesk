@@ -309,6 +309,9 @@ export class GrblController implements LaserController {
       this._state.status = newStatus;
     }
 
+    let mPos: MachinePosition | null = null;
+    let wPos: MachinePosition | null = null;
+
     for (let i = 1; i < parts.length; i++) {
       const colonIdx = parts[i].indexOf(':');
       if (colonIdx < 0) continue;
@@ -316,11 +319,17 @@ export class GrblController implements LaserController {
       const value = parts[i].slice(colonIdx + 1);
 
       switch (key) {
-        case 'MPos':
+        case 'MPos': {
+          const coords = value.split(',').map(Number);
+          if (coords.length >= 2) {
+            mPos = { x: coords[0], y: coords[1], z: coords[2] || 0 };
+          }
+          break;
+        }
         case 'WPos': {
           const coords = value.split(',').map(Number);
           if (coords.length >= 2) {
-            this._state.position = { x: coords[0], y: coords[1], z: coords[2] || 0 };
+            wPos = { x: coords[0], y: coords[1], z: coords[2] || 0 };
           }
           break;
         }
@@ -335,6 +344,12 @@ export class GrblController implements LaserController {
           break;
         }
       }
+    }
+
+    if (wPos) {
+      this._state.position = wPos;
+    } else if (mPos) {
+      this._state.position = mPos;
     }
 
     for (const cb of this._stateListeners) {
