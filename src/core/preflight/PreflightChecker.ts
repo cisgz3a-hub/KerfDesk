@@ -265,6 +265,25 @@ export function runPreflight(
     }
   }
 
+  const outputLayers = visibleLayers.filter(l => l.output !== false);
+  if (outputLayers.length > 0) {
+    const modeLabel = (m: string) =>
+      m === 'cut' ? 'Cut' : m === 'engrave' ? 'Engrave' : m === 'score' ? 'Score' : m === 'image' ? 'Image' : m;
+    const lines = outputLayers.map(layer => {
+      const label = modeLabel(layer.settings.mode);
+      const p = layer.settings.passes;
+      const passWord = p === 1 ? '1 pass' : `${p} passes`;
+      return `${label}: "${layer.name}" — ${layer.settings.power.max}% power, ${layer.settings.speed} mm/min, ${passWord}`;
+    });
+    issues.push({
+      id: 'layer-output-summaries',
+      severity: 'info',
+      title: 'Layer laser settings (output layers)',
+      detail: lines.join('\n'),
+      category: 'settings',
+    });
+  }
+
   // ─── OUTPUT CHECKS ──────────────────────────────────
   if (gcode) {
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;

@@ -19,7 +19,7 @@
 
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type Geometry } from '../../core/scene/SceneObject';
-import { type Layer } from '../../core/scene/Layer';
+import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -496,6 +496,14 @@ function renderOrigin(ctx: CanvasRenderingContext2D, transform: Transform): void
 
 // ─── SCENE OBJECT ────────────────────────────────────────────────
 
+function previewStrokeForMode(mode: LayerMode): string {
+  if (mode === 'cut') return '#ff4466';
+  if (mode === 'engrave') return '#00d4ff';
+  if (mode === 'score') return '#2dd4a0';
+  if (mode === 'image') return '#8888aa';
+  return '#8888aa';
+}
+
 function renderObject(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
@@ -508,12 +516,13 @@ function renderObject(
   const t = obj.transform;
   ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
 
-  ctx.strokeStyle = layer.color;
+  const modeColor = previewStrokeForMode(layer.settings.mode);
+  ctx.strokeStyle = modeColor;
   ctx.lineWidth = transform.screenPx(1.2);
 
   const isFill = layer.settings.mode === 'engrave' || layer.settings.mode === 'image';
   if (isFill) {
-    ctx.fillStyle = layer.color + '15';
+    ctx.fillStyle = `${modeColor}22`;
   }
 
   drawGeometry(ctx, obj.geometry, transform, isFill, obj);

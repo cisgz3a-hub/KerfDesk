@@ -862,7 +862,9 @@ export function ConnectionPanel({
   });
 
   const readinessScore = preflight?.score ?? null;
-  const issues = (preflight?.issues ?? []).filter(i => i.severity !== 'info');
+  const issues = (preflight?.issues ?? []).filter(
+    i => i.severity !== 'info' || i.id === 'layer-output-summaries',
+  );
 
   const estimatedRemaining = useMemo(() => {
     if (!jobProgress || jobStartTime == null || jobProgress.linesAcknowledged < 2 || !jobProgress.totalLines) {
@@ -1241,11 +1243,23 @@ export function ConnectionPanel({
         React.createElement('span', {
           style: {
             fontSize: 12, flexShrink: 0, marginTop: 1,
-            color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444',
+            color: issue.severity === 'blocker'
+              ? '#ff4466'
+              : issue.severity === 'info'
+                ? '#8888aa'
+                : '#ffd444',
           },
-        }, issue.severity === 'blocker' ? '✗' : '⚠'),
+        }, issue.severity === 'blocker' ? '✗' : issue.severity === 'info' ? 'ℹ' : '⚠'),
         React.createElement('div', null,
-          React.createElement('div', { style: { fontSize: 11, color: issue.severity === 'blocker' ? '#ff4466' : '#ffd444' } }, issue.title),
+          React.createElement('div', {
+            style: {
+              fontSize: 11,
+              color: issue.severity === 'blocker' ? '#ff4466' : issue.severity === 'info' ? '#c0c0d8' : '#ffd444',
+            },
+          }, issue.title),
+          issue.detail && React.createElement('div', {
+            style: { fontSize: 9, color: '#555570', marginTop: 2, whiteSpace: 'pre-line' as const, fontFamily: mono },
+          }, issue.detail),
           issue.fix && React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 2 } }, issue.fix),
         ),
       ),

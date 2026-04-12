@@ -14,13 +14,13 @@ export interface MaterialPreset {
   category: string;
   thickness: number;
   settings: {
-    diode_5w: { cut: LaserOp; engrave: LaserOp };
-    diode_10w: { cut: LaserOp; engrave: LaserOp };
-    diode_20w: { cut: LaserOp; engrave: LaserOp };
-    diode_40w: { cut: LaserOp; engrave: LaserOp };
-    co2_40w: { cut: LaserOp; engrave: LaserOp };
-    co2_60w: { cut: LaserOp; engrave: LaserOp };
-    co2_80w: { cut: LaserOp; engrave: LaserOp };
+    diode_5w: MaterialPresetOps;
+    diode_10w: MaterialPresetOps;
+    diode_20w: MaterialPresetOps;
+    diode_40w: MaterialPresetOps;
+    co2_40w: MaterialPresetOps;
+    co2_60w: MaterialPresetOps;
+    co2_80w: MaterialPresetOps;
   };
 }
 
@@ -38,6 +38,25 @@ interface LaserOp {
   power: number;
   speed: number;
   passes: number;
+}
+
+/** Per-machine preset row: cut + engrave always; score derived from cut if omitted. */
+export type MaterialPresetOps = { cut: LaserOp; engrave: LaserOp; score?: LaserOp };
+
+function deriveScoreFromCut(cut: LaserOp): LaserOp {
+  return {
+    power: Math.max(1, Math.min(100, Math.round(cut.power * 0.2))),
+    speed: Math.min(6000, Math.max(2000, Math.round(cut.speed * 4))),
+    passes: 1,
+  };
+}
+
+function normalizePresetOps(ops: { cut: LaserOp; engrave: LaserOp; score?: LaserOp }): MaterialPresetOps {
+  return {
+    cut: ops.cut,
+    engrave: ops.engrave,
+    score: ops.score ?? deriveScoreFromCut(ops.cut),
+  };
 }
 
 export const MATERIAL_CATEGORIES = [
@@ -452,19 +471,19 @@ export function createUserMaterialFromLayer(
 
   const emptyOp: LaserOp = { power: 0, speed: 0, passes: 0 };
   const settings: MaterialPreset['settings'] = {
-    diode_5w: { cut: emptyOp, engrave: emptyOp },
-    diode_10w: { cut: emptyOp, engrave: emptyOp },
-    diode_20w: { cut: emptyOp, engrave: emptyOp },
-    diode_40w: { cut: emptyOp, engrave: emptyOp },
-    co2_40w: { cut: emptyOp, engrave: emptyOp },
-    co2_60w: { cut: emptyOp, engrave: emptyOp },
-    co2_80w: { cut: emptyOp, engrave: emptyOp },
+    diode_5w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    diode_10w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    diode_20w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    diode_40w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    co2_40w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    co2_60w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
+    co2_80w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
   };
 
-  settings[machineKey] = {
+  settings[machineKey] = normalizePresetOps({
     cut: cutSettings,
     engrave: engraveSettings,
-  };
+  });
 
   const now = new Date().toISOString();
   return {
@@ -584,7 +603,7 @@ export function getPresetSettings(
   presetName: string,
   machineType: string,
   machineWatts: string = '10',
-): { cut: LaserOp; engrave: LaserOp } | null {
+): { cut: LaserOp; engrave: LaserOp; score: LaserOp } | null {
   let preset: MaterialPreset | UserMaterial | undefined = MATERIAL_PRESETS.find(p => p.name === presetName);
 
   if (!preset) {
@@ -594,7 +613,9 @@ export function getPresetSettings(
   if (!preset) return null;
 
   const key = getMachineSettingsKey(machineType, machineWatts) as keyof MaterialPreset['settings'];
-  return preset.settings[key] ?? null;
+  const row = preset.settings[key];
+  if (!row) return null;
+  return normalizePresetOps(row);
 }
 
 /**

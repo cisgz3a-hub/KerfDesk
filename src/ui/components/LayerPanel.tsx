@@ -96,19 +96,58 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
     })));
   };
 
-  const updateMode = (mode: LayerMode) => {
+  const updateMode = (newMode: LayerMode) => {
     if (!activeLayer) return;
-    onSceneCommit(updateLayer(scene, activeLayer.id, layer => ({
-      ...layer,
-      settings: {
-        ...layer.settings,
-        mode,
-        fill: {
-          ...layer.settings.fill,
-          enabled: mode === 'engrave' || mode === 'image',
+    const oldMode = activeLayer.settings.mode;
+    if (oldMode === newMode) return;
+
+    onSceneCommit(updateLayer(scene, activeLayer.id, layer => {
+      const s = layer.settings;
+      let powerMax = s.power.max;
+      let speed = s.speed;
+      const fill = { ...s.fill, enabled: newMode === 'engrave' || newMode === 'image' };
+
+      if (newMode === 'engrave' && oldMode === 'cut') {
+        if (powerMax >= 60) powerMax = Math.round(powerMax * 0.4);
+        if (speed <= 1000) {
+          speed = Math.min(3000, Math.max(1200, Math.round(speed * 3)));
+        }
+      } else if (newMode === 'cut' && oldMode === 'engrave') {
+        if (powerMax <= 50) powerMax = Math.min(100, Math.round(powerMax * 2.5));
+        if (speed >= 2000) speed = Math.max(200, Math.round(speed / 3));
+        else if (speed >= 800) speed = Math.max(150, Math.min(500, Math.round(speed * 0.35)));
+      } else if (newMode === 'score') {
+        if (powerMax >= 60) powerMax = Math.round(powerMax * 0.2);
+        speed = Math.max(speed, 2000);
+      } else if (newMode === 'cut' && oldMode === 'score') {
+        if (powerMax <= 30) powerMax = Math.min(100, Math.round(powerMax * 2.5));
+        if (speed >= 2000) speed = Math.max(200, Math.round(speed / 3));
+      } else if (newMode === 'engrave' && oldMode === 'score') {
+        if (powerMax <= 25) powerMax = Math.min(60, Math.round(powerMax * 2));
+        if (speed >= 2500) speed = Math.max(800, Math.round(speed * 0.65));
+      } else if (newMode === 'image' && oldMode === 'cut') {
+        if (powerMax >= 60) powerMax = Math.round(powerMax * 0.45);
+        if (speed <= 1000) speed = Math.min(2500, Math.round(speed * 3));
+      } else if (newMode === 'cut' && oldMode === 'image') {
+        if (powerMax <= 45) powerMax = Math.min(100, Math.round(powerMax * 1.8));
+        if (speed >= 2000) speed = Math.max(200, Math.round(speed / 3));
+      }
+
+      powerMax = Math.max(0, Math.min(100, powerMax));
+      speed = Math.max(1, speed);
+
+      return {
+        ...layer,
+        settings: {
+          ...s,
+          mode: newMode,
+          power: { ...s.power, max: powerMax },
+          speed,
+          fill,
+          airAssist: newMode === 'cut',
         },
-      },
-    })));
+      };
+    }));
   };
 
   const handleAddLayer = useCallback(() => {
@@ -444,7 +483,14 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
             if (!settings) return;
 
             const mode = activeLayer.settings.mode;
-            const s = mode === 'cut' ? settings.cut : settings.engrave;
+            const s =
+              mode === 'cut'
+                ? settings.cut
+                : mode === 'engrave'
+                  ? settings.engrave
+                  : mode === 'score'
+                    ? settings.score
+                    : settings.engrave;
 
             const newLayers = scene.layers.map(l =>
               l.id === activeLayer.id
@@ -455,6 +501,10 @@ export function LayerPanel({ scene, selectedIds, onSceneCommit, productionMode, 
                       power: { ...l.settings.power, max: s.power },
                       speed: s.speed,
                       passes: 'passes' in s ? s.passes : l.settings.passes,
+                      fill: {
+                        ...l.settings.fill,
+                        enabled: mode === 'engrave' || mode === 'image',
+                      },
                     },
                   }
                 : l

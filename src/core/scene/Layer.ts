@@ -120,7 +120,7 @@ export function defaultLaserSettings(mode: LayerMode = 'cut'): LaserSettings {
   return {
     mode,
     power: { min: 0, max: mode === 'cut' ? 80 : mode === 'engrave' ? 50 : mode === 'image' ? 70 : 15 },
-    speed: mode === 'cut' ? 150 : mode === 'engrave' ? 3000 : 800,
+    speed: mode === 'cut' ? 150 : mode === 'engrave' ? 3000 : mode === 'image' ? 800 : 2200,
     passes: 1,
     zStepPerPass: 0,
     fill: {
