@@ -40,8 +40,6 @@ interface FileToolbarProps {
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
   onCamera?: () => void;
-  /** Estimated 3D relief preview for engrave layers */
-  onDepthPreview?: () => void;
   /** Open start position / work origin wizard */
   onStartPosition?: () => void;
   /** Active G-code start / work origin mode (toolbar label). */
@@ -83,7 +81,6 @@ export function FileToolbar({
   onExit,
   onMaterialTest,
   onCamera,
-  onDepthPreview,
   onStartPosition,
   startMode = 'absolute',
   onImportImageFile,
@@ -448,7 +445,6 @@ export function FileToolbar({
         `🪵 ${materialName}`,
       )
       : null,
-    toolbarBtn('👁 Preview', 'See how your engrave will look on the selected material', () => onDepthPreview?.()),
   );
 
   return React.createElement(

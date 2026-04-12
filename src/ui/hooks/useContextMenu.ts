@@ -51,7 +51,6 @@ export interface ContextMenuActions {
   flipSelected?: (axis: 'horizontal' | 'vertical') => void;
   toggleLock?: () => void;
   toggleVisibility?: () => void;
-  openDepthPreview?: () => void;
 }
 
 export function useContextMenu(
@@ -76,17 +75,6 @@ export function useContextMenu(
       items.push({ label: 'Duplicate', action: actions.handleDuplicate, disabled: !hasSelection });
       items.push({ label: 'Delete', action: actions.handleDelete, disabled: !hasSelection });
       items.push({ label: '', action: () => {}, separator: true });
-
-      const hasEngraveSelected = hasSelection && selectedObjs.some(o => {
-        const layer = scene.layers.find(l => l.id === o.layerId);
-        return layer?.settings.mode === 'engrave';
-      });
-      if (hasEngraveSelected && actions.openDepthPreview) {
-        items.push({
-          label: '🗻 Depth Preview',
-          action: () => actions.openDepthPreview!(),
-        });
-      }
 
       items.push({
         label: 'Select All',
