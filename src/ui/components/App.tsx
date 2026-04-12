@@ -163,14 +163,17 @@ export function App() {
     return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
   }, [grbl.machineState]);
 
+  const startModeRef = useRef(startMode);
+  startModeRef.current = startMode;
+
   useEffect(() => {
-    if (grbl.machineState?.status === 'disconnected' && startMode === 'current') {
+    if (grbl.machineState?.status === 'disconnected' && startModeRef.current === 'current') {
       setStartMode('absolute');
       try {
         localStorage.setItem('laserforge_start_mode', 'absolute');
       } catch { /* ignore */ }
     }
-  }, [grbl.machineState?.status, startMode]);
+  }, [grbl.machineState?.status]);
 
   const handleSaveOrigin = useCallback(() => {
     const pos = grbl.machineState?.position;
@@ -1234,7 +1237,6 @@ export function App() {
         laserConnected: toolbarLaserConnected,
         startMode,
         savedOrigin,
-        machinePosition: machinePositionForStartWizard,
         onSelectionScreenPos: setQuickActionPos,
         onRequestTextPlacement: handleRequestTextPlacement,
         onActiveTool: setActiveTool,
@@ -1503,6 +1505,7 @@ export function App() {
       savedOrigin,
       machinePosition: machinePositionForStartWizard,
       onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
+      onOpenStartWizard: () => setShowStartWizard(true),
       onSaveOrigin: handleSaveOrigin,
     }),
 

@@ -246,7 +246,6 @@ interface CanvasViewportProps {
   laserConnected?: boolean;
   startMode?: StartMode;
   savedOrigin?: { x: number; y: number } | null;
-  machinePosition?: { x: number; y: number } | null;
   /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
   onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
   /** Text tool: user clicked canvas — open text dialog with this world position. */
@@ -274,7 +273,6 @@ export function CanvasViewport({
   laserConnected = false,
   startMode = 'absolute',
   savedOrigin = null,
-  machinePosition = null,
   onSelectionScreenPos,
   onRequestTextPlacement,
   onEditText,
@@ -327,13 +325,9 @@ export function CanvasViewport({
     if (!laserConnected) return null;
     const dbMinX = Number.isFinite(sceneBoundsForOrigin.minX) ? sceneBoundsForOrigin.minX : 0;
     const dbMinY = Number.isFinite(sceneBoundsForOrigin.minY) ? sceneBoundsForOrigin.minY : 0;
-    if (startMode === 'current') {
-      if (!machinePosition) return null;
-      return { x: machinePosition.x, y: machinePosition.y };
-    }
     const offset = computeGcodeOffset(startMode, { minX: dbMinX, minY: dbMinY }, savedOrigin);
     return { x: dbMinX + offset.x, y: dbMinY + offset.y };
-  }, [laserConnected, startMode, sceneBoundsForOrigin.minX, sceneBoundsForOrigin.minY, savedOrigin, machinePosition]);
+  }, [laserConnected, startMode, sceneBoundsForOrigin.minX, sceneBoundsForOrigin.minY, savedOrigin]);
 
   useEffect(() => {
     if (!onSelectionScreenPos) return;

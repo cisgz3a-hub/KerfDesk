@@ -46,6 +46,7 @@ interface ConnectionPanelProps {
   savedOrigin: { x: number; y: number } | null;
   machinePosition: { x: number; y: number } | null;
   onSelectMode: (mode: StartMode) => void;
+  onOpenStartWizard: () => void;
   onSaveOrigin: () => void;
 }
 
@@ -73,6 +74,7 @@ export function ConnectionPanel({
   savedOrigin,
   machinePosition,
   onSelectMode,
+  onOpenStartWizard: _onOpenStartWizard,
   onSaveOrigin,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
@@ -883,6 +885,54 @@ export function ConnectionPanel({
         ),
       ),
 
+      // Start position — visible before connect (Head dimmed without machine position)
+      React.createElement('div', { style: { padding: '12px 18px', borderBottom: '1px solid #1a1a2e' } },
+        React.createElement('div', { style: { marginBottom: 6 } },
+          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, fontWeight: 600 } }, 'Start Position'),
+          React.createElement('div', { style: { display: 'flex', gap: 4, width: '100%' } },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => onSelectMode('absolute'),
+              title: 'Design cuts exactly where placed on canvas',
+              style: modeBtn(startMode === 'absolute', false),
+            }, '📍 Bed'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => { if (machinePosition) onSelectMode('current'); },
+              disabled: !machinePosition,
+              title: 'Job starts at current laser position',
+              style: modeBtn(startMode === 'current', !machinePosition),
+            }, '🎯 Head'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => onSelectMode('savedOrigin'),
+              title: 'Job starts at your saved reference point',
+              style: modeBtn(startMode === 'savedOrigin', false),
+            }, '⚑ Origin'),
+          ),
+          React.createElement('div', { style: { fontSize: 10, color: '#555570', marginTop: 4, lineHeight: 1.35 } }, startPositionStatus),
+          (startMode === 'savedOrigin' || isConnected) && React.createElement('button', {
+            type: 'button',
+            onClick: onSaveOrigin,
+            disabled: !isConnected,
+            title: isConnected ? 'Store current head X/Y as the saved reference' : 'Connect to laser to save origin from head position',
+            style: {
+              marginTop: 6,
+              padding: 0,
+              background: 'none',
+              border: 'none',
+              color: '#00d4ff',
+              fontSize: 9,
+              cursor: isConnected ? 'pointer' : 'default',
+              fontFamily: font,
+              textDecoration: 'underline',
+              textAlign: 'left' as const,
+              opacity: isConnected ? 1 : 0.45,
+            },
+          }, '📌 Save current head position as origin'),
+        ),
+      ),
+
       // Disconnect
       isConnected && React.createElement('div', { style: { padding: '8px 18px', display: 'flex', justifyContent: 'flex-end' } },
         React.createElement('button', { onClick: () => void handleDisconnect(), style: btnStyle('255, 68, 102') }, 'Disconnect'),
@@ -1143,48 +1193,6 @@ export function ConnectionPanel({
 
       // Time estimate + job buttons
       isConnected && React.createElement('div', { style: { padding: '8px 18px' } },
-        React.createElement('div', { style: { marginBottom: 6 } },
-          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, fontWeight: 600 } }, 'Start Position'),
-          React.createElement('div', { style: { display: 'flex', gap: 4, width: '100%' } },
-            React.createElement('button', {
-              type: 'button',
-              onClick: () => onSelectMode('absolute'),
-              title: 'Design cuts exactly where placed on canvas',
-              style: modeBtn(startMode === 'absolute', false),
-            }, '📍 Bed'),
-            React.createElement('button', {
-              type: 'button',
-              onClick: () => { if (machinePosition) onSelectMode('current'); },
-              disabled: !machinePosition,
-              title: 'Job starts at current laser position',
-              style: modeBtn(startMode === 'current', !machinePosition),
-            }, '🎯 Head'),
-            React.createElement('button', {
-              type: 'button',
-              onClick: () => onSelectMode('savedOrigin'),
-              title: 'Job starts at your saved reference point',
-              style: modeBtn(startMode === 'savedOrigin', false),
-            }, '⚑ Origin'),
-          ),
-          React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 4, lineHeight: 1.35 } }, startPositionStatus),
-          startMode === 'savedOrigin' && React.createElement('button', {
-            type: 'button',
-            onClick: onSaveOrigin,
-            title: 'Store current head X/Y as the saved reference',
-            style: {
-              marginTop: 6,
-              padding: 0,
-              background: 'none',
-              border: 'none',
-              color: '#00d4ff',
-              fontSize: 9,
-              cursor: 'pointer',
-              fontFamily: font,
-              textDecoration: 'underline',
-              textAlign: 'left' as const,
-            },
-          }, '📌 Save current head position as origin'),
-        ),
         gcode && React.createElement('div', {
           style: { padding: '6px 12px', marginBottom: 6, background: '#0a0a14', borderRadius: 6, border: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', fontSize: 11 },
         },
