@@ -51,7 +51,8 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { createLayer, type Layer } from '../../core/scene/Layer';
+import { createLayer, type Layer, type LayerMode, type FillMode } from '../../core/scene/Layer';
+import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { offsetObject } from '../../geometry/OffsetPath';
@@ -483,6 +484,48 @@ export function App() {
     lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
     setGcodeStale(false);
   }, [scene, compileGcode, setCurrentGcode, sceneCompileFingerprint]);
+
+  const handleConnectionUpdateLayerMode = useCallback(
+    (layerId: string, mode: LayerMode) => {
+      const layer = scene.layers.find(l => l.id === layerId);
+      if (!layer) return;
+      const next = applyLayerModeChange(layer, mode);
+      handleSceneCommit({
+        ...scene,
+        layers: scene.layers.map(l => (l.id === layerId ? next : l)),
+      });
+      if (connectionSidebarOpen) setGcodeStale(true);
+    },
+    [scene, handleSceneCommit, connectionSidebarOpen],
+  );
+
+  const handleConnectionUpdateLayerFillMode = useCallback(
+    (layerId: string, fillMode: FillMode) => {
+      handleSceneCommit({
+        ...scene,
+        layers: scene.layers.map(l => {
+          if (l.id !== layerId) return l;
+          const f = l.settings.fill;
+          const interval = Number(f.interval) > 0 ? f.interval : 0.1;
+          return {
+            ...l,
+            settings: {
+              ...l.settings,
+              fill: {
+                ...f,
+                enabled: true,
+                mode: fillMode,
+                interval,
+              },
+            },
+          };
+        }),
+      });
+      if (connectionSidebarOpen) setGcodeStale(true);
+    },
+    [scene, handleSceneCommit, connectionSidebarOpen],
+  );
+
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
     selectedIds,
@@ -1360,6 +1403,8 @@ export function App() {
         onSaveOrigin: handleSaveOrigin,
         gcodeStale,
         onRecompile: handleConnectionRecompile,
+        onUpdateLayerMode: handleConnectionUpdateLayerMode,
+        onUpdateLayerFillMode: handleConnectionUpdateLayerFillMode,
       }),
       !connectionSidebarOpen && React.createElement('div', {
         style: {

@@ -5,6 +5,7 @@ import { WebSerialPort } from '../../communication/WebSerialPort';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
+import { type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
@@ -80,6 +81,8 @@ interface ConnectionPanelProps {
   onSaveOrigin: () => void;
   gcodeStale?: boolean;
   onRecompile?: () => void;
+  onUpdateLayerMode?: (layerId: string, mode: LayerMode) => void;
+  onUpdateLayerFillMode?: (layerId: string, fillMode: FillMode) => void;
 }
 
 export function ConnectionPanel({
@@ -109,6 +112,8 @@ export function ConnectionPanel({
   onSaveOrigin,
   gcodeStale = false,
   onRecompile,
+  onUpdateLayerMode,
+  onUpdateLayerFillMode,
 }: ConnectionPanelProps) {
   const [preflight, setPreflight] = useState<PreflightResult | null>(null);
   const [messages, setMessages] = useState<string[]>([]);
@@ -1204,6 +1209,108 @@ export function ConnectionPanel({
     ),
   );
 
+  const layerOverviewRows: React.ReactNode[] = [];
+  for (const layer of scene.layers) {
+    if (!layer.visible || layer.output === false) continue;
+    const objectCount = scene.objects.filter(o => o.layerId === layer.id && o.visible).length;
+    if (objectCount === 0) continue;
+    const m = layer.settings.mode;
+    const modeColor =
+      m === 'cut' ? '#ff4466' : m === 'engrave' ? '#00d4ff' : m === 'score' ? '#2dd4a0' : '#f0b429';
+
+    layerOverviewRows.push(
+      React.createElement('div', {
+        key: layer.id,
+        style: {
+          padding: '8px 10px', marginBottom: 4,
+          background: '#08080f', borderRadius: 6,
+          border: `1px solid ${modeColor}22`,
+        },
+      },
+        React.createElement('div', {
+          style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
+        },
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6 } },
+            React.createElement('div', {
+              style: { width: 8, height: 8, borderRadius: '50%', background: modeColor, flexShrink: 0 },
+            }),
+            React.createElement('span', { style: { fontSize: 11, color: '#e0e0ec', fontWeight: 600 } },
+              layer.name || `Layer ${layer.id.slice(0, 4)}`,
+            ),
+          ),
+          React.createElement('span', { style: { fontSize: 9, color: '#555570' } },
+            `${objectCount} object${objectCount !== 1 ? 's' : ''}`,
+          ),
+        ),
+        React.createElement('div', { style: { display: 'flex', gap: 3, marginBottom: 6 } },
+          ...([
+            { mode: 'cut' as const, label: 'Cut', color: '#ff4466' },
+            { mode: 'engrave' as const, label: 'Engrave', color: '#00d4ff' },
+            { mode: 'score' as const, label: 'Score', color: '#2dd4a0' },
+            { mode: 'image' as const, label: 'Image', color: '#f0b429' },
+          ]).map(mm =>
+            React.createElement('button', {
+              type: 'button',
+              key: mm.mode,
+              onClick: () => { onUpdateLayerMode?.(layer.id, mm.mode); },
+              style: {
+                flex: 1, padding: '3px', fontSize: 9, borderRadius: 3,
+                cursor: onUpdateLayerMode ? 'pointer' : 'default', fontFamily: font,
+                background: m === mm.mode ? `${mm.color}18` : 'transparent',
+                border: m === mm.mode ? `1px solid ${mm.color}` : '1px solid #1a1a2e',
+                color: m === mm.mode ? mm.color : '#555570',
+              },
+            }, mm.label),
+          ),
+        ),
+        m === 'engrave' && onUpdateLayerFillMode && React.createElement('div', {
+          style: { display: 'flex', gap: 3, marginBottom: 6 },
+        },
+          ...([
+            { mode: 'line' as const, label: 'Line fill' },
+            { mode: 'offset' as const, label: 'Offset' },
+            { mode: 'cross-hatch' as const, label: 'Cross-hatch' },
+          ]).map(f =>
+            React.createElement('button', {
+              type: 'button',
+              key: f.mode,
+              onClick: () => { onUpdateLayerFillMode(layer.id, f.mode); },
+              style: {
+                flex: 1, padding: '3px', fontSize: 9, borderRadius: 3,
+                cursor: 'pointer', fontFamily: font,
+                background: layer.settings.fill.mode === f.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
+                border: layer.settings.fill.mode === f.mode ? '1px solid #00d4ff' : '1px solid #1a1a2e',
+                color: layer.settings.fill.mode === f.mode ? '#00d4ff' : '#555570',
+              },
+            }, f.label),
+          ),
+        ),
+        React.createElement('div', {
+          style: { display: 'flex', gap: 8, fontSize: 9, fontFamily: mono, color: '#555570' },
+        },
+          React.createElement('span', null, `${layer.settings.power.max}%`),
+          React.createElement('span', null, `${layer.settings.speed}mm/min`),
+          React.createElement('span', null, `${layer.settings.passes}x`),
+        ),
+      ),
+    );
+  }
+
+  const layerOverviewSection =
+    isConnected &&
+    !isRunning &&
+    !displayPaused &&
+    onUpdateLayerMode &&
+    layerOverviewRows.length > 0 &&
+    React.createElement('div', {
+      style: { padding: '10px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
+    },
+      React.createElement('div', {
+        style: { fontSize: 10, color: '#555570', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 1 },
+      }, 'Layers'),
+      ...layerOverviewRows,
+    );
+
   const gcodeWarning = isConnected && gcodeStale && !isRunning && React.createElement('div', {
     style: {
       margin: '0 16px', padding: '10px 14px',
@@ -1593,6 +1700,7 @@ export function ConnectionPanel({
       },
         !isRunning && !displayPaused && workflowSection,
         !isRunning && !displayPaused && controlsSection,
+        layerOverviewSection,
         (isRunning || displayPaused) && jobProgressSection,
         gcodeWarning,
         issuesSection,
