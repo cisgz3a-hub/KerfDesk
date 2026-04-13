@@ -49,7 +49,7 @@ import { GcodePreview } from './GcodePreview';
 import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
-import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
+import { deserializeScene, serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type Layer, type LayerMode, type FillMode } from '../../core/scene/Layer';
@@ -503,6 +503,8 @@ export function App() {
   /** New project: reset history entirely and start fresh. */
   const handleNewProject = useCallback((newScene: Scene) => {
     sceneIsDirtyRef.current = false;
+    setSelectedIds(new Set());
+    setQuickActionPos(null);
     historyRef.current.reset(newScene);
     setScene(newScene);
   }, []);
@@ -735,7 +737,7 @@ export function App() {
       if (!sceneIsDirtyRef.current) return;
 
       try {
-        const json = serializeScene(scene);
+        const json = serializeForAutosave(scene);
 
         if (json === lastSavedSceneRef.current) {
           sceneIsDirtyRef.current = false;
@@ -921,18 +923,24 @@ export function App() {
     contextMenuActions,
   );
 
+  const syncAutosaveAfterFileSave = useCallback(() => {
+    sceneIsDirtyRef.current = false;
+    try {
+      const json = serializeForAutosave(scene);
+      localStorage.setItem('laserforge_autosave', json);
+      localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+      lastSavedSceneRef.current = json;
+    } catch { /* ignore */ }
+  }, [scene]);
+
   const handleKeyboardSave = useCallback(async () => {
     try {
-      saveSceneToFile(scene);
-      try {
-        const serialized = serializeScene(scene);
-        localStorage.setItem('laserforge_autosave', serialized);
-        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
-      } catch { /* ignore */ }
+      await saveSceneToFile(scene);
+      syncAutosaveAfterFileSave();
     } catch (e) {
       await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
     }
-  }, [scene, showAlert]);
+  }, [scene, showAlert, syncAutosaveAfterFileSave]);
 
   const handleKeyboardOpen = useCallback(() => {
     const input = document.createElement('input');
@@ -1511,6 +1519,7 @@ export function App() {
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
+      onAfterSuccessfulFileSave: syncAutosaveAfterFileSave,
       showAlert,
       showConfirm,
       onConnect: handleConnect,

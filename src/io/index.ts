@@ -6,7 +6,7 @@
  * Last updated: File Save/Load feature
  */
 
-export { serializeScene, deserializeScene } from './SceneSerializer';
+export { serializeScene, serializeForAutosave, deserializeScene } from './SceneSerializer';
 export { saveSceneToFile, loadSceneFromFile } from './FileIO';
 export {
   type ImportOptions,

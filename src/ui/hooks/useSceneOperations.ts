@@ -306,7 +306,7 @@ export function useSceneOperations({
         geometry: {
           type: 'path',
           subPaths: result.subPaths,
-          _sourceText: { ...geom },
+          sourceText: { ...geom },
         },
         visible: true,
         locked: false,

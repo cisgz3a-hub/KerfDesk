@@ -193,7 +193,7 @@ const layerScene = addLayer(scene1, {
     power: 65,
     speed: 200,
     passes: 3,
-  },
+  } as unknown as typeof engraveLayer.settings,
 });
 
 const layerJson = serializeScene(layerScene);
@@ -204,7 +204,8 @@ assert(layerRestored.layers.length === 2, 'Layer: 2 layers');
 const restoredEngrave = layerRestored.layers[1];
 assert(restoredEngrave.name === 'Engrave', 'Layer: name preserved');
 assert(restoredEngrave.settings.mode === 'engrave', 'Layer: mode preserved');
-assert(restoredEngrave.settings.power === 65, 'Layer: power preserved');
+assert(restoredEngrave.settings.power.max === 65, 'Layer: legacy numeric power → power.max');
+assert(restoredEngrave.settings.power.min === 0, 'Layer: legacy numeric power → power.min');
 assert(restoredEngrave.settings.speed === 200, 'Layer: speed preserved');
 assert(restoredEngrave.settings.passes === 3, 'Layer: passes preserved');
 

@@ -1456,12 +1456,12 @@ export function ConnectionPanel({
             style: { width: '100%', accentColor: modeColor, height: 4 },
           }),
         ),
-        // ── Text spacing controls (text objects + converted paths with _sourceText) ──
+        // ── Text spacing controls (text objects + converted paths with sourceText) ──
         (() => {
           const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
           const convertedPaths = scene.objects.filter(o =>
             o.layerId === layer.id && o.visible &&
-            o.geometry.type === 'path' && (o.geometry as PathGeometry)._sourceText,
+            o.geometry.type === 'path' && (o.geometry as PathGeometry).sourceText,
           );
           if (textObjs.length === 0 && convertedPaths.length === 0) return null;
 
@@ -1469,7 +1469,7 @@ export function ConnectionPanel({
           const sourceGeom: TextGeometry | undefined =
             textObjs.length > 0
               ? (textObjs[0].geometry as TextGeometry)
-              : (convertedPaths[0].geometry as PathGeometry)._sourceText;
+              : (convertedPaths[0].geometry as PathGeometry).sourceText;
           if (!sourceGeom) return null;
 
           const wordSp = sourceGeom.wordSpacing ?? 100;
@@ -1492,17 +1492,17 @@ export function ConnectionPanel({
             });
           };
 
-          // Update spacing on converted path _sourceText (stored for reconversion)
+          // Update spacing on converted path sourceText (stored for reconversion)
           const updateConvertedSpacing = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
             onSceneCommit({
               ...scene,
               objects: scene.objects.map(o => {
                 if (o.layerId !== layer.id || o.geometry.type !== 'path') return o;
                 const pg = o.geometry as PathGeometry;
-                if (!pg._sourceText) return o;
+                if (!pg.sourceText) return o;
                 return {
                   ...o,
-                  geometry: { ...pg, _sourceText: { ...pg._sourceText, [prop]: value } },
+                  geometry: { ...pg, sourceText: { ...pg.sourceText, [prop]: value } },
                   _bounds: null,
                   _worldTransform: null,
                 };
@@ -1515,19 +1515,19 @@ export function ConnectionPanel({
             if (convertedPaths.length > 0) updateConvertedSpacing(prop, value);
           };
 
-          // Re-convert paths from stored _sourceText with updated spacing
+          // Re-convert paths from stored sourceText with updated spacing
           const handleReconvert = async () => {
             const newObjects = [...scene.objects];
             for (let i = 0; i < newObjects.length; i++) {
               const o = newObjects[i];
               if (o.layerId !== layer.id || o.geometry.type !== 'path') continue;
               const pg = o.geometry as PathGeometry;
-              if (!pg._sourceText) continue;
-              const result = await textGeometryToPath(pg._sourceText);
+              if (!pg.sourceText) continue;
+              const result = await textGeometryToPath(pg.sourceText);
               if (!result) continue;
               newObjects[i] = {
                 ...o,
-                geometry: { type: 'path', subPaths: result.subPaths, _sourceText: pg._sourceText },
+                geometry: { type: 'path', subPaths: result.subPaths, sourceText: pg.sourceText },
                 _bounds: null,
                 _worldTransform: null,
               };

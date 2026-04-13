@@ -18,8 +18,9 @@
  */
 
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject } from '../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type ImageGeometry } from '../core/scene/SceneObject';
 import { type Layer } from '../core/scene/Layer';
+import { defaultLaserSettings, type LaserSettings, type LayerMode } from '../core/scene/Layer';
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
@@ -80,6 +81,39 @@ export function serializeScene(scene: Scene): string {
   };
 
   return JSON.stringify(file, null, 2);
+}
+
+/**
+ * Serialize for localStorage auto-save only: strips heavy image pixel buffers so
+ * quota is not exhausted. Full `serializeScene` is still used for file export.
+ */
+export function serializeForAutosave(scene: Scene): string {
+  const cleaned: SerializedScene = {
+    id: scene.id,
+    version: scene.version,
+    canvas: scene.canvas,
+    layers: scene.layers,
+    objects: scene.objects.map((o) =>
+      encodeImageBuffers(stripObjectCache(stripImageBuffersForAutosave(o))),
+    ),
+    material: scene.material,
+    startPosition: scene.startPosition,
+    machine: scene.machine,
+    activeLayerId: scene.activeLayerId,
+    metadata: {
+      ...scene.metadata,
+      modified: new Date().toISOString(),
+    },
+  };
+
+  const file: SceneFile = {
+    format: 'laserforge',
+    version: '1.0',
+    appVersion: APP_VERSION,
+    scene: cleaned,
+  };
+
+  return JSON.stringify(file);
 }
 
 // ─── DESERIALIZE ─────────────────────────────────────────────────
@@ -267,7 +301,58 @@ function migrateScene(file: any): Scene {
 
 // ─── DEFAULT RESTORATION ─────────────────────────────────────────
 
+function normalizePowerForLayer(rawPower: unknown, defaults: LaserSettings['power']): LaserSettings['power'] {
+  if (typeof rawPower === 'number' && Number.isFinite(rawPower)) {
+    return { min: 0, max: rawPower };
+  }
+  if (rawPower && typeof rawPower === 'object') {
+    const p = rawPower as { min?: unknown; max?: unknown };
+    return {
+      min: typeof p.min === 'number' && Number.isFinite(p.min) ? p.min : defaults.min,
+      max: typeof p.max === 'number' && Number.isFinite(p.max) ? p.max : defaults.max,
+    };
+  }
+  return { ...defaults };
+}
+
+function mergeLayerSettings(raw: unknown, fallbackMode: LayerMode): LaserSettings {
+  if (!raw || typeof raw !== 'object') {
+    return defaultLaserSettings(fallbackMode);
+  }
+  const s = raw as Record<string, unknown>;
+  const mode = (s.mode as LayerMode) || fallbackMode;
+  const base = defaultLaserSettings(mode);
+
+  const fill = { ...base.fill, ...(s.fill && typeof s.fill === 'object' ? (s.fill as object) : {}) };
+  const cut = { ...base.cut, ...(s.cut && typeof s.cut === 'object' ? (s.cut as object) : {}) };
+  const image = { ...base.image, ...(s.image && typeof s.image === 'object' ? (s.image as object) : {}) };
+
+  const out: LaserSettings = {
+    ...base,
+    mode,
+    power: normalizePowerForLayer(s.power, base.power),
+    speed: typeof s.speed === 'number' && Number.isFinite(s.speed) ? s.speed : base.speed,
+    passes: typeof s.passes === 'number' && Number.isFinite(s.passes) ? s.passes : base.passes,
+    zStepPerPass:
+      typeof s.zStepPerPass === 'number' && Number.isFinite(s.zStepPerPass)
+        ? s.zStepPerPass
+        : base.zStepPerPass,
+    fill,
+    cut,
+    image,
+    airAssist: typeof s.airAssist === 'boolean' ? s.airAssist : base.airAssist,
+    cutOrder: (s.cutOrder as LaserSettings['cutOrder']) ?? base.cutOrder,
+  };
+
+  if (s.tabs && typeof s.tabs === 'object') {
+    out.tabs = { enabled: false, count: 0, width: 0, height: 0, ...(s.tabs as object) };
+  }
+
+  return out;
+}
+
 function restoreLayerDefaults(l: any): Layer {
+  const fallbackMode = (l.settings?.mode as LayerMode) || 'cut';
   return {
     id: l.id,
     name: l.name || 'Layer',
@@ -276,8 +361,18 @@ function restoreLayerDefaults(l: any): Layer {
     locked: l.locked === true,
     output: l.output !== false,
     order: l.order ?? 0,
-    settings: l.settings,
+    settings: mergeLayerSettings(l.settings, fallbackMode),
   };
+}
+
+function migratePathGeometry(geom: unknown): Geometry {
+  if (!geom || typeof geom !== 'object') return geom as Geometry;
+  const g = geom as Record<string, unknown>;
+  if (g.type === 'path' && g._sourceText != null && g.sourceText == null) {
+    const { _sourceText, ...rest } = g;
+    return { ...rest, sourceText: _sourceText } as Geometry;
+  }
+  return geom as Geometry;
 }
 
 function restoreObjectDefaults(o: any): SceneObject {
@@ -288,7 +383,7 @@ function restoreObjectDefaults(o: any): SceneObject {
     layerId: o.layerId || '',
     parentId: o.parentId ?? null,
     transform: o.transform,
-    geometry: o.geometry,
+    geometry: migratePathGeometry(o.geometry),
     visible: o.visible !== false,
     locked: o.locked === true,
     powerScale: o.powerScale ?? 1.0,
@@ -303,6 +398,23 @@ function restoreObjectDefaults(o: any): SceneObject {
 function stripObjectCache(obj: SceneObject): any {
   const { _bounds, _worldTransform, ...clean } = obj;
   return clean;
+}
+
+function stripImageBuffersForAutosave(obj: SceneObject): SceneObject {
+  if (obj.geometry?.type !== 'image') return obj;
+  const g = obj.geometry as unknown as Record<string, unknown>;
+  const {
+    grayscaleData: _gd,
+    adjustedData: _ad,
+    _grayscaleDataB64: _g64,
+    _adjustedDataB64: _a64,
+    _grayscaleDataLength: _gl,
+    _adjustedDataLength: _al,
+    _grayscaleB64: _gleg,
+    _adjustedB64: _aleg,
+    ...rest
+  } = g;
+  return { ...obj, geometry: rest as unknown as ImageGeometry };
 }
 
 // ─── BASE64 HELPERS FOR TYPED ARRAYS ────────────────────────────

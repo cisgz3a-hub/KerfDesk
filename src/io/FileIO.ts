@@ -16,15 +16,40 @@
 
 import { type Scene } from '../core/scene/Scene';
 import { serializeScene, deserializeScene } from './SceneSerializer';
+import { getImage } from './ImageStore';
 
 // ─── SAVE ────────────────────────────────────────────────────────
+
+const INDEXEDDB_SRC_PREFIX = 'indexeddb://';
+
+async function embedIndexedDbImagesInScene(scene: Scene): Promise<Scene> {
+  const objects = await Promise.all(
+    scene.objects.map(async (obj) => {
+      if (obj.geometry?.type !== 'image') return obj;
+      const src = obj.geometry.src;
+      if (typeof src !== 'string' || !src.startsWith(INDEXEDDB_SRC_PREFIX)) {
+        return obj;
+      }
+      const id = src.slice(INDEXEDDB_SRC_PREFIX.length);
+      const dataUri = await getImage(id);
+      if (!dataUri) return obj;
+      return {
+        ...obj,
+        geometry: { ...obj.geometry, src: dataUri },
+      };
+    }),
+  );
+  return { ...scene, objects };
+}
 
 /**
  * Save a Scene to disk by triggering a browser download.
  * Creates a .json file with the scene name as filename.
+ * Resolves `indexeddb://…` image refs to inline data URIs so the file is portable.
  */
-export function saveSceneToFile(scene: Scene): void {
-  const json = serializeScene(scene);
+export async function saveSceneToFile(scene: Scene): Promise<void> {
+  const resolved = await embedIndexedDbImagesInScene(scene);
+  const json = serializeScene(resolved);
   const blob = new Blob([json], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
 

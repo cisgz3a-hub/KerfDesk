@@ -7,7 +7,7 @@
  * Dependencies:
  *   - /src/core/scene/Scene.ts (createScene)
  *   - /src/import/svg/SvgToScene.ts (importSvgIntoScene)
- *   - /src/io/SceneSerializer.ts (serializeScene)
+ *   - /src/io/SceneSerializer.ts (deserializeScene)
  *   - /src/io/FileIO.ts (saveSceneToFile)
  * Last updated: UI Wiring — File Toolbar
  */
@@ -18,7 +18,7 @@ import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { saveSceneToFile } from '../../io/FileIO';
-import { deserializeScene, serializeScene } from '../../io/SceneSerializer';
+import { deserializeScene } from '../../io/SceneSerializer';
 // ─── PROPS ───────────────────────────────────────────────────────
 
 interface FileToolbarProps {
@@ -64,6 +64,8 @@ interface FileToolbarProps {
   showToolpathPreview?: boolean;
   productionMode?: boolean;
   onToggleProductionMode?: () => void;
+  /** After a successful disk save — sync auto-save snapshot / dirty flags in App. */
+  onAfterSuccessfulFileSave?: () => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -96,6 +98,7 @@ export function FileToolbar({
   onToggleProductionMode,
   onTogglePreview,
   showToolpathPreview = false,
+  onAfterSuccessfulFileSave,
 }: FileToolbarProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
@@ -214,16 +217,12 @@ export function FileToolbar({
 
   const handleSave = useCallback(async () => {
     try {
-      saveSceneToFile(scene);
-      try {
-        const serialized = serializeScene(scene);
-        localStorage.setItem('laserforge_autosave', serialized);
-        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
-      } catch { /* ignore */ }
+      await saveSceneToFile(scene);
+      onAfterSuccessfulFileSave?.();
     } catch (e) {
       await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
     }
-  }, [scene, showAlert]);
+  }, [scene, showAlert, onAfterSuccessfulFileSave]);
 
   const handleOpenClick = useCallback(() => {
     openInputRef.current?.click();
