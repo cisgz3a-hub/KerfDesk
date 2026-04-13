@@ -17,10 +17,15 @@ export class GrblOutputStrategy extends BaseGCodeStrategy {
   readonly formatName = 'GRBL 1.1 (G-code)';
 
   /**
+   * Upper bound for S in M4/M3 (GRBL $30). 0–100% laser power maps linearly to 0–maxSpindle.
+   * Set from the active device profile before generating G-code.
+   */
+  maxSpindle = 1000;
+
+  /**
    * GRBL uses M4 for dynamic laser mode.
    * M4 = laser power scales with speed during acceleration.
    * This prevents burning during acceleration/deceleration.
-   * S value: 0-1000 (maps to 0-100% power).
    */
   encodeLaserOn(power: number): string {
     return `M4 ${this.encodePowerValue(power)}`;
@@ -30,12 +35,9 @@ export class GrblOutputStrategy extends BaseGCodeStrategy {
     return 'M5 S0';
   }
 
-  /**
-   * GRBL S-value range: 0-1000 (configurable via $30)
-   * We use the default 1000 max.
-   */
   encodePowerValue(power: number): string {
-    const sValue = Math.round(Math.max(0, Math.min(100, power)) * 10);
+    const pct = Math.max(0, Math.min(100, power));
+    const sValue = Math.round((pct * this.maxSpindle) / 100);
     return `S${sValue}`;
   }
 }

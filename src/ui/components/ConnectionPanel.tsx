@@ -20,12 +20,15 @@ import {
   type JobLog,
 } from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
+import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
 import { type StartMode } from './StartPositionWizard';
 import { SimulatorView } from './SimulatorView';
 
 const FRAME_IDLE_POLL_MS = 200;
 const FRAME_IDLE_TIMEOUT_MS = 15_000;
+/** Backup stop if pointer-up is missed (deadman test fire). */
+const TEST_FIRE_MAX_MS = 5000;
 
 /** Poll until GRBL reports idle (e.g. after framing moves). */
 async function waitForGrblIdle(ctrl: GrblController): Promise<boolean> {
@@ -161,6 +164,7 @@ export function ConnectionPanel({
   const [isTestFiring, setIsTestFiring] = useState(false);
   const isTestFiringRef = useRef(false);
   const testFireTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const testFirePointerCaptureRef = useRef<{ pointerId: number; el: HTMLButtonElement } | null>(null);
   const [jobStartTime, setJobStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [jobCompleted, setJobCompleted] = useState(false);
@@ -211,6 +215,32 @@ export function ConnectionPanel({
   useEffect(() => {
     isTestFiringRef.current = isTestFiring;
   }, [isTestFiring]);
+
+  const stopTestFire = useCallback(() => {
+    const cap = testFirePointerCaptureRef.current;
+    if (cap?.el) {
+      try {
+        if (cap.el.hasPointerCapture(cap.pointerId)) {
+          cap.el.releasePointerCapture(cap.pointerId);
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    testFirePointerCaptureRef.current = null;
+
+    if (testFireTimeoutRef.current) {
+      clearTimeout(testFireTimeoutRef.current);
+      testFireTimeoutRef.current = null;
+    }
+    notifySimulatorTx('M5 S0');
+    try {
+      controllerRef.current?.sendCommand('M5 S0');
+    } catch (err: unknown) {
+      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+    }
+    setIsTestFiring(false);
+  }, [notifySimulatorTx]);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -456,19 +486,7 @@ export function ConnectionPanel({
         }
       }
 
-      if (testFireTimeoutRef.current) {
-        clearTimeout(testFireTimeoutRef.current);
-        testFireTimeoutRef.current = null;
-      }
-      if (isTestFiring) {
-        notifySimulatorTx('M5 S0');
-        try {
-          ctrl?.sendCommand('M5 S0');
-        } catch {
-          /* ignore */
-        }
-      }
-      setIsTestFiring(false);
+      stopTestFire();
 
       notifySimulatorTx('M5 S0');
       try {
@@ -490,7 +508,7 @@ export function ConnectionPanel({
     setShowSimulator(false);
     setMessages([]);
     onDisconnect?.();
-  }, [isTestFiring, notifySimulatorTx, onDisconnect]);
+  }, [stopTestFire, notifySimulatorTx, onDisconnect]);
 
   // ─── Machine control ────────────────────────────────────
 
@@ -556,19 +574,7 @@ export function ConnectionPanel({
       if (!proceed) return;
     }
 
-    if (isTestFiring) {
-      if (testFireTimeoutRef.current) {
-        clearTimeout(testFireTimeoutRef.current);
-        testFireTimeoutRef.current = null;
-      }
-      notifySimulatorTx('M5 S0');
-      try {
-        controllerRef.current?.sendCommand('M5 S0');
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-      }
-      setIsTestFiring(false);
-    }
+    stopTestFire();
 
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
     setMessages(prev => [...prev, `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%)`]);
@@ -819,82 +825,76 @@ export function ConnectionPanel({
     }
   }, [notifySimulatorTx]);
 
-  const handleTestFire = useCallback(async () => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
+  /** Deadman: laser is on only while primary pointer is held on the button. */
+  const beginTestFire = useCallback(
+    (e: React.PointerEvent<HTMLButtonElement>) => {
+      if (e.button !== 0) return;
+      const ctrl = controllerRef.current;
+      if (!ctrl || isTestFiringRef.current) return;
+      if (machineState?.status === 'alarm') return;
 
-    if (isTestFiring) {
+      const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
+      if (!acknowledged) {
+        const ok = confirm(
+          '⚠ Test Fire enables the laser at low power (2% of your machine\'s max spindle / S range).\n\n' +
+          'Hold the button to fire — release to stop (5 second safety limit).\n\n' +
+          'Make sure:\n' +
+          '• Eye protection is on\n' +
+          '• Nothing flammable directly under the laser\n\n' +
+          'After OK, press and hold the button again to test fire.',
+        );
+        if (!ok) return;
+        localStorage.setItem('laserforge_testfire_acknowledged', 'true');
+        return;
+      }
+
+      const maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
+      const sVal = Math.max(0, Math.round((2 / 100) * maxSpindle));
+      const cmd = `M3 S${sVal}`;
+
       if (testFireTimeoutRef.current) {
         clearTimeout(testFireTimeoutRef.current);
         testFireTimeoutRef.current = null;
       }
-      notifySimulatorTx('M5 S0');
+
       try {
-        ctrl.sendCommand('M5 S0');
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+
+      try {
+        notifySimulatorTx(cmd);
+        ctrl.sendCommand(cmd);
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+        return;
       }
-      setIsTestFiring(false);
-      return;
-    }
 
-    if (machineState?.status === 'alarm') return;
+      testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
+      setIsTestFiring(true);
+      testFireTimeoutRef.current = setTimeout(() => {
+        testFireTimeoutRef.current = null;
+        stopTestFire();
+      }, TEST_FIRE_MAX_MS);
+    },
+    [machineState?.status, notifySimulatorTx, stopTestFire],
+  );
 
-    const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
-    if (!acknowledged) {
-      const ok = confirm(
-        '⚠ Test Fire enables the laser at low power.\n\n' +
-        'Make sure:\n' +
-        '• Eye protection is on\n' +
-        '• Nothing flammable directly under the laser\n\n' +
-        'Click the button again to turn off.\n\n' +
-        'Continue?',
-      );
-      if (!ok) return;
-      localStorage.setItem('laserforge_testfire_acknowledged', 'true');
-    }
-
-    // M3 = constant spindle mode — fires laser even when stationary (GRBL $32 laser mode)
-    // S20 = low power. If $30=1000, ~2%; if $30=255, ~8%.
-    if (testFireTimeoutRef.current) {
-      clearTimeout(testFireTimeoutRef.current);
-      testFireTimeoutRef.current = null;
-    }
-    try {
-      notifySimulatorTx('M3 S20');
-      ctrl.sendCommand('M3 S20');
-    } catch (err: unknown) {
-      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-    }
-    setIsTestFiring(true);
-    testFireTimeoutRef.current = setTimeout(() => {
-      testFireTimeoutRef.current = null;
-      notifySimulatorTx('M5 S0');
-      try {
-        controllerRef.current?.sendCommand('M5 S0');
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-      }
-      setIsTestFiring(false);
-    }, 10000);
-  }, [notifySimulatorTx, isTestFiring, machineState?.status]);
+  const endTestFire = useCallback(() => {
+    stopTestFire();
+  }, [stopTestFire]);
 
   useEffect(() => {
     return () => {
-      if (testFireTimeoutRef.current) {
-        clearTimeout(testFireTimeoutRef.current);
-        testFireTimeoutRef.current = null;
-      }
-      if (isTestFiringRef.current) {
-        notifySimulatorTx('M5 S0');
-        try {
-          controllerRef.current?.sendCommand('M5 S0');
-        } catch (err: unknown) {
-          console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-        }
-      }
+      stopTestFire();
     };
-  }, [notifySimulatorTx]);
+  }, [stopTestFire]);
 
   const btnStyle = (color: string, disabled?: boolean): React.CSSProperties => ({
     padding: '6px 14px',
@@ -1211,9 +1211,19 @@ export function ConnectionPanel({
       }, '🔓 Unlock'),
       React.createElement('button', {
         type: 'button',
-        onClick: () => { void handleTestFire(); },
+        onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
+          e.preventDefault();
+          beginTestFire(e);
+        },
+        onPointerUp: () => { endTestFire(); },
+        onPointerLeave: () => {
+          if (isTestFiringRef.current) endTestFire();
+        },
+        onPointerCancel: () => { endTestFire(); },
         disabled: machineState?.status === 'alarm' || isRunning,
-        title: isTestFiring ? 'Click to turn laser off' : 'Low-power laser pulse',
+        title: isTestFiring
+          ? 'Release to stop laser (deadman)'
+          : 'Hold to fire at 2% of machine max S — release to stop',
         style: {
           width: '100%', padding: '7px', fontSize: 11, fontWeight: 600, borderRadius: 6,
           cursor: machineState?.status === 'alarm' || isRunning ? 'default' : 'pointer', fontFamily: font,
@@ -1222,8 +1232,10 @@ export function ConnectionPanel({
           color: isTestFiring ? '#ff4466' : '#ff6680',
           opacity: machineState?.status === 'alarm' || isRunning ? 0.4 : 1,
           animation: isTestFiring ? 'laserforgePulse 1s infinite' : 'none',
-        },
-      }, isTestFiring ? '🔴 Laser OFF' : '🔥 Test Fire'),
+          touchAction: 'none',
+          userSelect: 'none',
+        } as React.CSSProperties,
+      }, isTestFiring ? '🔴 FIRING — Release to stop' : '🔥 Test Fire (hold)'),
       React.createElement('button', {
         type: 'button',
         onClick: () => { void handleFrameDot(); },
@@ -2021,11 +2033,7 @@ export function ConnectionPanel({
           type: 'button',
           onClick: () => {
             jobStoppedByUserRef.current = true;
-            if (testFireTimeoutRef.current) {
-              clearTimeout(testFireTimeoutRef.current);
-              testFireTimeoutRef.current = null;
-            }
-            setIsTestFiring(false);
+            stopTestFire();
             controllerRef.current?.stop();
             try {
               notifySimulatorTx('M5 S0');

@@ -21,6 +21,7 @@ import { type Point, type AABB, emptyAABB, mergeAABB, generateId } from '../type
 import { type Scene, getOutputLayers, getObjectsByLayer } from '../scene/Scene';
 import { type SceneObject, type Geometry, type ImageGeometry } from '../scene/SceneObject';
 import { type Layer, sortLayersByProcessingOrder } from '../scene/Layer';
+import { ditherImage, type DitherMode } from '../../import/Dithering';
 import {
   type Job, type Operation, type OperationType, type OperationGeometry,
   type ResolvedLaserSettings, type FlatPath, type ProcessedBitmap,
@@ -78,7 +79,7 @@ export function compileJob(scene: Scene): Job {
 function compileOperation(layer: Layer, objects: SceneObject[]): Operation | null {
   const type = mapModeToType(layer.settings.mode);
   const settings = resolveSettings(layer);
-  const geometry = compileGeometry(type, objects);
+  const geometry = compileGeometry(type, layer, objects);
 
   if (!geometry) return null;
 
@@ -165,37 +166,82 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
 
 // ─── COMPILE GEOMETRY ────────────────────────────────────────────
 
+/** Apply layer image settings in photo grayscale space (before laser inversion / dither). */
+function applyLayerImageAdjustments(
+  src: Uint8Array,
+  brightness: number,
+  contrast: number,
+  gamma: number,
+  invert: boolean,
+): Uint8Array {
+  const out = new Uint8Array(src.length);
+  const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+  const g = Math.max(0.1, Math.min(5, gamma));
+
+  for (let i = 0; i < src.length; i++) {
+    let v = src[i];
+    v = Math.max(0, Math.min(255, v + brightness));
+    v = Math.max(0, Math.min(255, Math.round(contrastFactor * (v - 128) + 128)));
+    let nv = v / 255;
+    nv = Math.pow(Math.max(0, Math.min(1, nv)), 1 / g);
+    v = Math.round(nv * 255);
+    if (invert) v = 255 - v;
+    out[i] = v;
+  }
+  return out;
+}
+
 function compileGeometry(
   type: OperationType,
+  layer: Layer,
   objects: SceneObject[]
 ): OperationGeometry | null {
   if (type === 'raster') {
-    // Process image objects into raster operations
+    const img = layer.settings.image;
+    const dpiRaw = img.resolution;
+    const dpi =
+      typeof dpiRaw === 'number' && Number.isFinite(dpiRaw) && dpiRaw > 0 ? dpiRaw : 254;
+
+    const brightness = typeof img.brightness === 'number' && Number.isFinite(img.brightness)
+      ? img.brightness
+      : 0;
+    const contrast = typeof img.contrast === 'number' && Number.isFinite(img.contrast)
+      ? img.contrast
+      : 0;
+    const gamma = typeof img.gamma === 'number' && Number.isFinite(img.gamma) ? img.gamma : 1;
+    const inverted = img.invert === true;
+    const ditherMode: DitherMode = img.dithering ?? 'none';
+
     for (const obj of objects) {
       if (!obj.visible) continue;
       if (obj.geometry.type !== 'image') continue;
 
       const geom = obj.geometry;
-      const dpi = 254; // Default raster resolution
       const scaleX = Math.abs(obj.transform.a) || 1;
       const scaleY = Math.abs(obj.transform.d) || 1;
       const physicalWidth = ((geom.originalWidth / 96) * 25.4) * scaleX;
       const physicalHeight = ((geom.originalHeight / 96) * 25.4) * scaleY;
 
-      // Create a simple 8-bit grayscale bitmap from the image
-      // For now, create a placeholder bitmap — actual image processing
-      // (brightness, contrast, dithering) will be added later
       let bitmapWidth: number;
       let bitmapHeight: number;
       let data: Uint8Array;
+      let mode: '1bit' | '8bit';
 
       const pixelData = (geom as ImageGeometry).adjustedData || geom.grayscaleData;
       if (pixelData && geom.grayscaleWidth && geom.grayscaleHeight) {
         bitmapWidth = geom.grayscaleWidth;
         bitmapHeight = geom.grayscaleHeight;
-        data = new Uint8Array(bitmapWidth * bitmapHeight);
-        for (let i = 0; i < pixelData.length; i++) {
-          data[i] = 255 - pixelData[i];
+        const gray = applyLayerImageAdjustments(pixelData, brightness, contrast, gamma, inverted);
+
+        if (ditherMode !== 'none') {
+          data = ditherImage(gray, bitmapWidth, bitmapHeight, ditherMode);
+          mode = '1bit';
+        } else {
+          data = new Uint8Array(bitmapWidth * bitmapHeight);
+          for (let i = 0; i < gray.length; i++) {
+            data[i] = 255 - gray[i];
+          }
+          mode = '8bit';
         }
       } else {
         console.warn(
@@ -208,7 +254,7 @@ function compileGeometry(
         width: bitmapWidth,
         height: bitmapHeight,
         dpi,
-        mode: '8bit',
+        mode,
         data,
         physicalWidth,
         physicalHeight,
@@ -217,11 +263,11 @@ function compileGeometry(
           y: obj.transform.ty,
         },
         pipeline: {
-          brightness: 0,
-          contrast: 0,
-          gamma: 1.0,
-          ditheringMode: 'none',
-          inverted: false,
+          brightness,
+          contrast,
+          gamma,
+          ditheringMode: ditherMode,
+          inverted,
         },
       };
 
