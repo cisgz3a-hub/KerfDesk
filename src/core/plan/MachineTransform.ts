@@ -56,10 +56,10 @@ export function applyMachineTransform(
   const flipY = options.flipY;
   const designMaxY = maxY;
 
-  // 3. Transform every rapid/linear move
+  // 3. Transform every rapid/linear move (offset Y must match G-code / computeGcodeOffset)
   const transformedOps: PlannedOperation[] = plan.operations.map(op => ({
     ...op,
-    moves: op.moves.map(move => transformMove(move, offset.x, designMaxY, flipY)),
+    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, designMaxY, flipY)),
   }));
 
   // 4. Recompute bounds
@@ -92,14 +92,14 @@ export function applyMachineTransform(
   };
 }
 
-function transformMove(move: Move, offsetX: number, designMaxY: number, flipY: boolean): Move {
+function transformMove(move: Move, offsetX: number, offsetY: number, designMaxY: number, flipY: boolean): Move {
   switch (move.type) {
     case 'rapid':
       return {
         ...move,
         to: {
           x: move.to.x + offsetX,
-          y: flipY ? designMaxY - move.to.y : move.to.y,
+          y: flipY ? designMaxY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
     case 'linear':
@@ -107,7 +107,7 @@ function transformMove(move: Move, offsetX: number, designMaxY: number, flipY: b
         ...move,
         to: {
           x: move.to.x + offsetX,
-          y: flipY ? designMaxY - move.to.y : move.to.y,
+          y: flipY ? designMaxY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
     default:

@@ -258,8 +258,8 @@ export function App() {
     if (activeJobTransform) {
       const canvasX = wp.x - activeJobTransform.offsetX;
       const canvasY = activeJobTransform.flipY
-        ? activeJobTransform.designMaxY - wp.y
-        : wp.y;
+        ? activeJobTransform.designMaxY - wp.y + activeJobTransform.offsetY
+        : wp.y - activeJobTransform.offsetY;
       return { x: canvasX, y: canvasY };
     }
     return { x: wp.x, y: wp.y };
@@ -1765,7 +1765,7 @@ export function App() {
         onDisconnect: () => dialogs.setShowConnection(false),
         bedWidth: scene.canvas.width,
         bedHeight: scene.canvas.height,
-        machinePlanBounds: null,
+        machinePlanBounds: activeJobTransform?.plan.bounds ?? null,
         boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
         boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
         boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,

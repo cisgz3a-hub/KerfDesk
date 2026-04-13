@@ -75,6 +75,12 @@ export class GrblController implements LaserController {
 
     return new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
+        this._stopStatusPolling();
+        if (this._port) {
+          try { this._port.close(); } catch { /* ignore */ }
+          this._port = null;
+        }
+        this._updateStatus('disconnected');
         reject(new Error('Connection timeout — no GRBL welcome message'));
       }, 5000);
 
@@ -101,6 +107,8 @@ export class GrblController implements LaserController {
         for (const cb of this._errorListeners) {
           cb(-1, `Serial error: ${err.message}`);
         }
+        // Abort active job on serial error — don't wait for close
+        this._abortJob();
       });
 
       port.onClose(() => {

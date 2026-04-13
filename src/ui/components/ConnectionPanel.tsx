@@ -280,7 +280,7 @@ export function ConnectionPanel({
   useEffect(() => {
     const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight, machinePlanBounds);
     setPreflight(result);
-  }, [gcode, machineState, scene, bedWidth, bedHeight]);
+  }, [gcode, machineState, scene, bedWidth, bedHeight, machinePlanBounds]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
@@ -781,13 +781,8 @@ export function ConnectionPanel({
       } catch {
         /* ignore */
       }
-      await new Promise(r => setTimeout(r, 200));
-      notifySimulatorTx('$X');
-      try {
-        ctrl.sendCommand('$X');
-      } catch {
-        /* ignore */
-      }
+      // Do NOT auto-send $X — leave machine in alarm/lock state
+      // so operator can inspect before unlocking manually
       setIsPaused(false);
     } catch (err: unknown) {
       console.warn('[Stop]', err instanceof Error ? err.message : err);
