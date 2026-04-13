@@ -48,15 +48,22 @@ export function applyMachineTransform(
   const minY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
-  // 2. Compute X/Y offset from start mode
+  const flipY = options.flipY;
+  /** Canvas max Y (bottom of design in Y-down space) — used for the flip: y' = designMaxY - y. */
+  const designMaxY = maxY;
+
+  // 2. Offset is applied after the Y flip when flipY is true, so Y must use flipped-space bounds:
+  // flipped Y runs from (designMaxY - maxY) at the canvas bottom to (designMaxY - minY) at the top.
+  const offsetDesignMin = {
+    minX,
+    minY: flipY ? designMaxY - maxY : minY,
+  };
+
   const offset = computeGcodeOffset(
     options.startMode,
-    { minX, minY },
+    offsetDesignMin,
     options.savedOrigin,
   );
-
-  const flipY = options.flipY;
-  const designMaxY = maxY;
 
   // 3. Transform every rapid/linear move (offset Y must match G-code / computeGcodeOffset)
   const transformedOps: PlannedOperation[] = plan.operations.map(op => ({

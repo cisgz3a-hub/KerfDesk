@@ -335,20 +335,22 @@ export function runPreflight(
     if (minX < -1) {
       issues.push({
         id: 'output-negative-x',
-        severity: 'blocker',
+        severity: 'warning',
         title: `Output has negative X (${minX.toFixed(1)}mm)`,
-        detail: 'Laser will hit the left limit switch',
-        fix: 'Move objects right or re-zero the machine',
+        detail:
+          'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
+        fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
         category: 'output',
       });
     }
     if (minY < -1) {
       issues.push({
         id: 'output-negative-y',
-        severity: 'blocker',
+        severity: 'warning',
         title: `Output has negative Y (${minY.toFixed(1)}mm)`,
-        detail: 'Laser will hit a limit switch',
-        fix: 'Move objects down or re-zero the machine',
+        detail:
+          'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
+        fix: 'Verify your work zero and machine limits, or adjust the design / start position',
         category: 'output',
       });
     }
@@ -383,20 +385,22 @@ export function runPreflight(
     if (minX < -1) {
       issues.push({
         id: 'output-negative-x',
-        severity: 'blocker',
+        severity: 'warning',
         title: `G-code has negative X (${minX.toFixed(1)}mm)`,
-        detail: 'Laser will hit the left limit switch',
-        fix: 'Move objects right or re-zero the machine',
+        detail:
+          'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
+        fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
         category: 'output',
       });
     }
     if (minY < -1) {
       issues.push({
         id: 'output-negative-y',
-        severity: 'blocker',
+        severity: 'warning',
         title: `G-code has negative Y (${minY.toFixed(1)}mm)`,
-        detail: 'Laser will hit a limit switch',
-        fix: 'Move objects down or re-zero the machine',
+        detail:
+          'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
+        fix: 'Verify your work zero and machine limits, or adjust the design / start position',
         category: 'output',
       });
     }
