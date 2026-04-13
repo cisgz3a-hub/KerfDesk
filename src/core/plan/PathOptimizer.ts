@@ -1,9 +1,15 @@
 /**
  * 2-opt path optimization — reorders cut paths to minimize total travel distance.
- * Uses nearest-neighbor for initial ordering, then 2-opt swaps to improve.
+ * Nearest-neighbor for initial ordering, then capped 2-opt refinement.
+ *
+ * Scaling (path count): ≤50 → 50 iterations; 51–100 → 15; 101–300 → 3; >300 → NN only.
+ * A 2s wall-clock cap inside 2-opt is a safety net on pathological inputs.
  *
  * This reduces idle laser travel by 30-60% on typical jobs with many small shapes.
  */
+
+/** Hard stop for 2-opt inner loop (ms) — tiered iteration limits should make this rare. */
+const TWO_OPT_WALL_MS = 2000;
 
 import { type FlatPath } from '../job/Job';
 
@@ -80,10 +86,13 @@ function nearestNeighbor(paths: FlatPath[], startPos: Point = { x: 0, y: 0 }): F
  */
 function twoOpt(
   paths: FlatPath[],
-  maxIterations: number = 50,
+  maxIterations: number,
   startPos: Point = { x: 0, y: 0 },
 ): FlatPath[] {
   if (paths.length <= 2) return paths;
+
+  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+  const wallStart = now();
 
   let best = [...paths];
   let bestTravel = totalTravel(best, startPos);
@@ -91,6 +100,8 @@ function twoOpt(
   let iterations = 0;
 
   while (improved && iterations < maxIterations) {
+    if (now() - wallStart > TWO_OPT_WALL_MS) break;
+
     improved = false;
     iterations++;
 
@@ -133,11 +144,16 @@ export function optimizePathOrder(
   if (paths.length <= 1) return paths;
 
   const greedy = nearestNeighbor(paths, startPos);
+  const n = paths.length;
 
-  const maxIter = paths.length > 100 ? 20 : paths.length > 50 ? 30 : 50;
-  const optimized = twoOpt(greedy, maxIter, startPos);
+  // 2-opt cost grows ~O(n²) per iteration; cap iterations by size, skip entirely when huge.
+  let maxIter: number;
+  if (n <= 50) maxIter = 50;
+  else if (n <= 100) maxIter = 15;
+  else if (n <= 300) maxIter = 3;
+  else return greedy;
 
-  return optimized;
+  return twoOpt(greedy, maxIter, startPos);
 }
 
 /**
