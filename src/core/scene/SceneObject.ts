@@ -64,6 +64,8 @@ export interface PolygonGeometry {
 export interface PathGeometry {
   type: 'path';
   subPaths: SubPath[];
+  /** Original text data preserved when converting text → path. Enables re-adjusting spacing after conversion. */
+  _sourceText?: TextGeometry;
 }
 
 export interface TextGeometry {

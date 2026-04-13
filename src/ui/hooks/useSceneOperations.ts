@@ -109,6 +109,7 @@ interface SceneOperationsActions {
   handleSceneCommit: (scene: Scene) => void;
   setSelectedIds: (ids: Set<string>) => void;
   showAlert: (title: string, message: string) => void | Promise<void>;
+  showConfirm: (title: string, message: string) => Promise<boolean>;
 }
 
 export function useSceneOperations({
@@ -117,6 +118,7 @@ export function useSceneOperations({
   handleSceneCommit,
   setSelectedIds,
   showAlert,
+  showConfirm,
 }: SceneOperationsActions) {
   const alignLeft = useCallback(() => {
     handleSceneCommit(alignSelection(scene, selectedIds, 'left'));
@@ -268,6 +270,21 @@ export function useSceneOperations({
       return;
     }
 
+    // Warn if text is on an engrave layer — conversion is not needed for engrave
+    const engraveTextObjs = textObjs.filter(o => {
+      const layer = scene.layers.find(l => l.id === o.layerId);
+      return layer && layer.settings.mode === 'engrave';
+    });
+    if (engraveTextObjs.length > 0) {
+      const proceed = await showConfirm(
+        'Text to Path',
+        'Text on engrave layers is handled automatically — you don\'t need to convert it.\n\n' +
+        'Converting removes text editing (spacing, font changes).\n\n' +
+        'Convert anyway?',
+      );
+      if (!proceed) return;
+    }
+
     const newObjects: SceneObject[] = [];
     const removeIds = new Set<string>();
 
@@ -289,6 +306,7 @@ export function useSceneOperations({
         geometry: {
           type: 'path',
           subPaths: result.subPaths,
+          _sourceText: { ...geom },
         },
         visible: true,
         locked: false,
@@ -310,7 +328,7 @@ export function useSceneOperations({
 
     handleSceneCommit(newScene);
     setSelectedIds(new Set(newObjects.map(o => o.id)));
-  }, [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert]);
+  }, [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert, showConfirm]);
 
   const distributeObjects = useCallback(
     (direction: 'horizontal' | 'vertical') => {

@@ -6,6 +6,8 @@ import { type MachineState, type JobProgress } from '../../controllers/Controlle
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
 import { type LayerMode, type FillMode } from '../../core/scene/Layer';
+import { type PathGeometry, type TextGeometry } from '../../core/scene/SceneObject';
+import { textGeometryToPath } from '../../geometry/TextToPath';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
@@ -1429,16 +1431,28 @@ export function ConnectionPanel({
             style: { width: '100%', accentColor: modeColor, height: 4 },
           }),
         ),
-        // ── Text spacing controls (when layer has text objects) ──
+        // ── Text spacing controls (text objects + converted paths with _sourceText) ──
         (() => {
           const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
-          if (textObjs.length === 0) return null;
+          const convertedPaths = scene.objects.filter(o =>
+            o.layerId === layer.id && o.visible &&
+            o.geometry.type === 'path' && (o.geometry as PathGeometry)._sourceText,
+          );
+          if (textObjs.length === 0 && convertedPaths.length === 0) return null;
 
-          const firstText = textObjs[0].geometry as import('../../core/scene/SceneObject').TextGeometry;
-          const wordSp = firstText.wordSpacing ?? 100;
-          const letterSp = firstText.letterSpacing ?? 0;
+          // Get spacing values from text objects first, then from converted paths
+          const sourceGeom: TextGeometry | undefined =
+            textObjs.length > 0
+              ? (textObjs[0].geometry as TextGeometry)
+              : (convertedPaths[0].geometry as PathGeometry)._sourceText;
+          if (!sourceGeom) return null;
 
-          const updateTextProp = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
+          const wordSp = sourceGeom.wordSpacing ?? 100;
+          const letterSp = sourceGeom.letterSpacing ?? 0;
+          const isConverted = textObjs.length === 0; // only converted paths, no live text
+
+          // Update spacing on live text objects (instant canvas feedback)
+          const updateLiveText = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
             onSceneCommit({
               ...scene,
               objects: scene.objects.map(o => {
@@ -1453,12 +1467,60 @@ export function ConnectionPanel({
             });
           };
 
+          // Update spacing on converted path _sourceText (stored for reconversion)
+          const updateConvertedSpacing = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
+            onSceneCommit({
+              ...scene,
+              objects: scene.objects.map(o => {
+                if (o.layerId !== layer.id || o.geometry.type !== 'path') return o;
+                const pg = o.geometry as PathGeometry;
+                if (!pg._sourceText) return o;
+                return {
+                  ...o,
+                  geometry: { ...pg, _sourceText: { ...pg._sourceText, [prop]: value } },
+                  _bounds: null,
+                  _worldTransform: null,
+                };
+              }),
+            });
+          };
+
+          const updateSpacing = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
+            if (textObjs.length > 0) updateLiveText(prop, value);
+            if (convertedPaths.length > 0) updateConvertedSpacing(prop, value);
+          };
+
+          // Re-convert paths from stored _sourceText with updated spacing
+          const handleReconvert = async () => {
+            const newObjects = [...scene.objects];
+            for (let i = 0; i < newObjects.length; i++) {
+              const o = newObjects[i];
+              if (o.layerId !== layer.id || o.geometry.type !== 'path') continue;
+              const pg = o.geometry as PathGeometry;
+              if (!pg._sourceText) continue;
+              const result = await textGeometryToPath(pg._sourceText);
+              if (!result) continue;
+              newObjects[i] = {
+                ...o,
+                geometry: { type: 'path', subPaths: result.subPaths, _sourceText: pg._sourceText },
+                _bounds: null,
+                _worldTransform: null,
+              };
+            }
+            onSceneCommit({ ...scene, objects: newObjects });
+          };
+
+          const label = textObjs.length > 0
+            ? `TEXT SPACING (${textObjs.length} text)`
+            : `TEXT SPACING (${convertedPaths.length} converted)`;
+
           return React.createElement('div', {
             style: { marginTop: 8, padding: '8px 0 2px', borderTop: '1px solid #1a1a2e' },
           },
             React.createElement('div', {
               style: { fontSize: 9, color: '#00d4ff', marginBottom: 6, fontWeight: 600 },
-            }, `TEXT SPACING (${textObjs.length} text)`),
+            }, label),
+            // Word spacing
             React.createElement('div', {
               style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
             },
@@ -1472,10 +1534,11 @@ export function ConnectionPanel({
               step: 10,
               value: wordSp,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateTextProp('wordSpacing', parseInt(e.target.value, 10));
+                updateSpacing('wordSpacing', parseInt(e.target.value, 10));
               },
               style: { width: '100%', accentColor: '#00d4ff', height: 4, marginBottom: 6 },
             }),
+            // Letter spacing
             React.createElement('div', {
               style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
             },
@@ -1489,10 +1552,21 @@ export function ConnectionPanel({
               step: 2,
               value: letterSp,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateTextProp('letterSpacing', parseInt(e.target.value, 10));
+                updateSpacing('letterSpacing', parseInt(e.target.value, 10));
               },
               style: { width: '100%', accentColor: '#00d4ff', height: 4 },
             }),
+            // Re-convert button for converted paths
+            isConverted && React.createElement('button', {
+              type: 'button',
+              onClick: () => { void handleReconvert(); },
+              style: {
+                marginTop: 8, width: '100%', padding: '6px 0',
+                background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)',
+                borderRadius: 4, color: '#00d4ff', fontSize: 10, fontWeight: 600,
+                cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
+              },
+            }, '↺ Apply spacing & re-convert'),
           );
         })(),
       ),

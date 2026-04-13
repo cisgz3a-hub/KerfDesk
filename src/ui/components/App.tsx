@@ -497,6 +497,7 @@ export function App() {
     handleSceneCommit,
     setSelectedIds: (ids) => setSelectedIds(ids),
     showAlert,
+    showConfirm,
   });
 
   /** New project: reset history entirely and start fresh. */
