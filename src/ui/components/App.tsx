@@ -33,6 +33,7 @@ import { useGcodeExport } from '../hooks/useGcodeExport';
 import { compileJob } from '../../core/job/JobCompiler';
 import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
+import { applyMachineTransform, type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
@@ -150,6 +151,10 @@ export function App() {
       return null;
     }
   });
+  const startModeRef = useRef(startMode);
+  startModeRef.current = startMode;
+  const savedOriginRef = useRef(savedOrigin);
+  savedOriginRef.current = savedOrigin;
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [showToolpathPreview, setShowToolpathPreview] = useState(false);
   const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
@@ -161,6 +166,7 @@ export function App() {
     maxX: number;
     maxY: number;
   } | null>(null);
+  const [activeJobTransform, setActiveJobTransform] = useState<MachineTransformResult | null>(null);
   const grbl = useGrblConnection();
   const wasJobRunningRef = useRef(false);
 
@@ -198,22 +204,31 @@ export function App() {
           if (job.operations.length === 0) {
             setActiveJobMoves(null);
             setActiveJobPlanBounds(null);
+            setActiveJobTransform(null);
           } else {
             const plan = optimizePlan(job);
             const moves = plan.operations.flatMap(op => op.moves);
             setActiveJobMoves(moves);
             setActiveJobPlanBounds(computePlanMoveBoundsFromMoves(moves));
+            const txResult = applyMachineTransform(plan, {
+              startMode: startModeRef.current,
+              savedOrigin: savedOriginRef.current ?? null,
+              flipY: true,
+            });
+            setActiveJobTransform(txResult);
           }
         } catch {
           if (!cancelled) {
             setActiveJobMoves(null);
             setActiveJobPlanBounds(null);
+            setActiveJobTransform(null);
           }
         }
       })();
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
       setActiveJobMoves(null);
       setActiveJobPlanBounds(null);
+      setActiveJobTransform(null);
     }
     wasJobRunningRef.current = grbl.isJobRunning;
 
@@ -233,15 +248,15 @@ export function App() {
     const s = grbl.machineState;
     if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
     const wp = s.position;
-    if (activeJobPlanBounds) {
-      const b = activeJobPlanBounds;
-      return {
-        x: wp.x + b.minX,
-        y: b.maxY - wp.y,
-      };
+    if (activeJobTransform) {
+      const canvasX = wp.x - activeJobTransform.offsetX;
+      const canvasY = activeJobTransform.flipY
+        ? activeJobTransform.designMaxY - wp.y
+        : wp.y;
+      return { x: canvasX, y: canvasY };
     }
     return { x: wp.x, y: wp.y };
-  }, [grbl.isJobRunning, grbl.machineState, activeJobPlanBounds]);
+  }, [grbl.isJobRunning, grbl.machineState, activeJobTransform]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
   const connectionSidebarWidth = connectionSidebarOpen
@@ -256,9 +271,6 @@ export function App() {
     const s = grbl.machineState;
     return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
   }, [grbl.machineState]);
-
-  const startModeRef = useRef(startMode);
-  startModeRef.current = startMode;
 
   useEffect(() => {
     if (grbl.machineState?.status === 'disconnected' && startModeRef.current === 'current') {
