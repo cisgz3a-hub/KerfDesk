@@ -536,7 +536,8 @@ function renderObject(
 /**
  * Draw parallel scanline preview inside an engrave object.
  * Uses canvas clipping to constrain lines to the object shape.
- * Skips text objects (scanlines follow character outlines at compile time).
+ * For text objects, clips to the text bounding box as an approximation.
+ * Dense patterns are downsampled (every Nth line) so the preview is always visible.
  */
 function drawFillPreview(
   ctx: CanvasRenderingContext2D,
@@ -546,33 +547,51 @@ function drawFillPreview(
   modeColor: string,
 ): void {
   const geom = obj.geometry;
-  // Skip text and image — text scanlines follow character outlines, not a bounding box
-  if (geom.type === 'text' || geom.type === 'image' || geom.type === 'line') return;
+  if (geom.type === 'image' || geom.type === 'line') return;
 
   const interval = layer.settings.fill.interval || 0.1;
   const angleDeg = layer.settings.fill.angle || 0;
 
   // Compute local-space bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  const corners = getLocalCorners(geom);
-  if (corners.length === 0) return;
-  for (const p of corners) {
-    minX = Math.min(minX, p.x);
-    minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x);
-    maxY = Math.max(maxY, p.y);
+
+  if (geom.type === 'text') {
+    // Text: compute bounds from text measurement
+    const c = document.createElement('canvas');
+    const tctx = c.getContext('2d');
+    if (!tctx) return;
+    const { width, height } = measureTextGeometrySize(tctx, geom as TextGeometry);
+    if (width <= 0 || height <= 0) return;
+    minX = 0; minY = 0; maxX = width; maxY = height;
+  } else {
+    const corners = getLocalCorners(geom);
+    if (corners.length === 0) return;
+    for (const p of corners) {
+      minX = Math.min(minX, p.x);
+      minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x);
+      maxY = Math.max(maxY, p.y);
+    }
   }
 
   const width = maxX - minX;
   const height = maxY - minY;
   if (width <= 0 || height <= 0) return;
 
-  // Cap scanlines for performance — skip if too dense to see at current zoom
-  const pixelInterval = interval / transform.screenPx(1);
-  if (pixelInterval < 2) return; // Too dense to distinguish — skip
+  // Downsample dense patterns so preview is always visible
+  // Instead of hiding, show every Nth line to maintain min 3px visual gap
+  let displayInterval = interval;
+  const pxPerMm = 1 / transform.screenPx(1);
+  while (displayInterval * pxPerMm < 3 && displayInterval < 100) {
+    displayInterval *= 2;
+  }
+
+  // Cap total lines for performance
   const maxLines = 500;
   const diagonal = Math.sqrt(width * width + height * height);
-  if (diagonal / interval > maxLines) return;
+  if (diagonal / displayInterval > maxLines) {
+    displayInterval = diagonal / maxLines;
+  }
 
   ctx.save();
 
@@ -603,40 +622,40 @@ function drawFillPreview(
         else if (seg.type === 'close') ctx.closePath();
       }
     }
+  } else if (geom.type === 'text') {
+    // Text: clip to text bounding box
+    ctx.rect(minX, minY, width, height);
   }
   ctx.clip();
 
-  // Draw scanlines
-  ctx.strokeStyle = `${modeColor}30`;
+  // Draw scanlines — lighter opacity when downsampled to hint that actual pattern is denser
+  const isDownsampled = displayInterval > interval * 1.5;
+  ctx.strokeStyle = isDownsampled ? `${modeColor}20` : `${modeColor}30`;
   ctx.lineWidth = transform.screenPx(0.6);
 
   const angleRad = (angleDeg * Math.PI) / 180;
   const cx = (minX + maxX) / 2;
   const cy = (minY + maxY) / 2;
-  const span = diagonal + interval;
+  const span = diagonal + displayInterval;
 
   if (Math.abs(angleDeg % 180) < 0.01) {
-    // Horizontal — fast path, no rotation
-    for (let y = minY + interval / 2; y < maxY; y += interval) {
+    for (let y = minY + displayInterval / 2; y < maxY; y += displayInterval) {
       ctx.beginPath();
       ctx.moveTo(minX, y);
       ctx.lineTo(maxX, y);
       ctx.stroke();
     }
   } else if (Math.abs((angleDeg - 90) % 180) < 0.01) {
-    // Vertical — fast path
-    for (let x = minX + interval / 2; x < maxX; x += interval) {
+    for (let x = minX + displayInterval / 2; x < maxX; x += displayInterval) {
       ctx.beginPath();
       ctx.moveTo(x, minY);
       ctx.lineTo(x, maxY);
       ctx.stroke();
     }
   } else {
-    // Angled scanlines — rotate lines around center
     const cos = Math.cos(angleRad);
     const sin = Math.sin(angleRad);
-    for (let d = -span / 2; d < span / 2; d += interval) {
-      // Line perpendicular offset by d from center, rotated by angle
+    for (let d = -span / 2; d < span / 2; d += displayInterval) {
       const px = cx + d * sin;
       const py = cy - d * cos;
       const dx = span * cos;
