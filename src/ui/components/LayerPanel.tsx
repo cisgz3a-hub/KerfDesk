@@ -113,7 +113,15 @@ export function LayerPanel({
   const updateMode = (newMode: LayerMode) => {
     if (!activeLayer) return;
     if (activeLayer.settings.mode === newMode) return;
-    onSceneCommit(updateLayer(scene, activeLayer.id, layer => applyLayerModeChange(layer, newMode)));
+    const modeNames: Record<LayerMode, string> = { cut: 'Cut', engrave: 'Engrave', score: 'Score', image: 'Image' };
+    onSceneCommit(updateLayer(scene, activeLayer.id, layer => {
+      const updated = applyLayerModeChange(layer, newMode);
+      // Auto-rename if the name matches the old mode (e.g. "Cut" → "Engrave")
+      if (layer.name.toLowerCase() === layer.settings.mode) {
+        return { ...updated, name: modeNames[newMode] };
+      }
+      return updated;
+    }));
   };
 
   const handleAddLayer = useCallback(() => {

@@ -1266,12 +1266,16 @@ export function App() {
     };
     const matType = preset ? (catMap[preset.category] || 'custom') : 'custom';
 
+    const matWidth = scene.canvas.width * 0.6;
+    const matHeight = scene.canvas.height * 0.5;
+
     const updatedMaterial = scene.material
       ? { ...scene.material, name: presetName, type: matType, thickness: preset?.thickness ?? scene.material.thickness }
       : {
           type: matType, name: presetName,
-          width: scene.canvas.width * 0.6, height: scene.canvas.height * 0.5,
-          x: scene.canvas.width * 0.1, y: scene.canvas.height * 0.1,
+          width: matWidth, height: matHeight,
+          x: (scene.canvas.width - matWidth) / 2,
+          y: (scene.canvas.height - matHeight) / 2,
           thickness: preset?.thickness ?? 3, color: '#c4956a', enabled: true,
         };
 
