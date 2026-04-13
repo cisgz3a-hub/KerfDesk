@@ -43,6 +43,10 @@ export class GrblController implements LaserController {
   private _linesAcknowledged = 0;
   private _jobStartTime = 0;
   private _stopOnError = true;
+  /** Feed-hold sent; ignore stale Run in status reports until Hold is confirmed. */
+  private _pausePending = false;
+  /** Cycle-start sent; ignore stale Hold until Run is confirmed. */
+  private _resumeRequested = false;
 
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -142,6 +146,8 @@ export class GrblController implements LaserController {
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._linesAcknowledged = 0;
     this._jobStartTime = Date.now();
+    this._pausePending = false;
+    this._resumeRequested = false;
 
     // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
     if (this._jobLines.length === 0) {
@@ -158,14 +164,20 @@ export class GrblController implements LaserController {
   pause(): void {
     if (!this._isJobRunning) return;
     this._sendRealtime(REALTIME_HOLD);
-    this._updateStatus('hold');
+    this._pausePending = true;
+    this._resumeRequested = false;
+    this._state.status = 'hold';
+    // UI updates when the status report confirms Hold (avoids optimistic mismatch).
   }
 
   resume(): void {
     if (this._state.status !== 'hold') return;
     this._sendRealtime(REALTIME_RESUME);
-    this._updateStatus('run');
+    this._resumeRequested = true;
+    this._pausePending = false;
+    this._state.status = 'run';
     this._drainQueue();
+    // UI updates when the status report confirms Run.
   }
 
   stop(): void {
@@ -314,7 +326,27 @@ export class GrblController implements LaserController {
     };
     const newStatus = statusMap[stateStr];
     if (newStatus && this._state.status !== 'disconnected' && this._state.status !== 'connecting') {
-      this._state.status = newStatus;
+      if (this._pausePending) {
+        if (newStatus === 'hold' || newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
+          this._state.status = newStatus;
+          if (newStatus === 'hold') this._pausePending = false;
+          if (newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
+            this._pausePending = false;
+          }
+        }
+        // Stale Run while feed-hold is taking effect — keep internal Hold.
+      } else if (this._resumeRequested) {
+        if (newStatus === 'run' || newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
+          this._state.status = newStatus;
+          if (newStatus === 'run') this._resumeRequested = false;
+          if (newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
+            this._resumeRequested = false;
+          }
+        }
+        // Stale Hold until cycle-start takes effect — keep internal Run for streaming.
+      } else {
+        this._state.status = newStatus;
+      }
     }
 
     let mPos: MachinePosition | null = null;
@@ -404,6 +436,8 @@ export class GrblController implements LaserController {
     this._queueIndex = 0;
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
+    this._pausePending = false;
+    this._resumeRequested = false;
   }
 
   // ─── INTERNALS ──────────────────────────────────────────────

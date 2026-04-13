@@ -76,7 +76,9 @@ export async function compileGcode(
   const strategy = getOutputStrategy('grbl');
   if (!strategy) return null;
 
-  const output = strategy.generate(machineTransform.plan, job);
+  const output = strategy.generate(machineTransform.plan, job, {
+    returnPosition: machineTransform.returnPosition,
+  });
   if (!output.text) return null;
 
   return {

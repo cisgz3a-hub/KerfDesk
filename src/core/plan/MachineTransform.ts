@@ -22,6 +22,8 @@ export interface MachineTransformResult {
   offsetY: number;
   designMaxY: number;
   flipY: boolean;
+  /** Work-coordinate return point for program end (WCS origin after zeroing). */
+  returnPosition: { x: number; y: number };
 }
 
 /**
@@ -89,6 +91,7 @@ export function applyMachineTransform(
     offsetY: offset.y,
     designMaxY,
     flipY,
+    returnPosition: { x: 0, y: 0 },
   };
 }
 

@@ -10,6 +10,8 @@ export type GcodeStartMode = 'absolute' | 'current' | 'savedOrigin';
 export interface GcodeGenerateOptions {
   startMode?: GcodeStartMode;
   savedOrigin?: { x: number; y: number } | null;
+  /** Machine-space XY to rapid to before M2; omit or null to skip the return move. */
+  returnPosition?: { x: number; y: number } | null;
 }
 
 export function designMinFromJob(job: Job): { minX: number; minY: number } {

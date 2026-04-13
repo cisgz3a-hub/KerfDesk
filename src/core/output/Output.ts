@@ -65,7 +65,7 @@ export interface OutputStrategy {
   encodeDwell(ms: number): string;
   encodeAirAssist(on: boolean): string;
   encodeZMove(z: number): string;
-  encodeFooter(job: Job): string;
+  encodeFooter(job: Job, options?: GcodeGenerateOptions): string;
 }
 
 // ─── STRATEGY REGISTRY ───────────────────────────────────────────
@@ -181,12 +181,18 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return `G0 Z${z.toFixed(3)}`;
   }
 
-  encodeFooter(_job: Job): string {
-    return [
-      this.encodeLaserOff(),
-      'G0 X0.000 Y0.000 ; return to origin',
-      'M2 ; program end',
-    ].join('\n');
+  encodeFooter(_job: Job, options?: GcodeGenerateOptions): string {
+    const parts: string[] = [this.encodeLaserOff()];
+    const rp = options?.returnPosition;
+    if (
+      rp != null &&
+      Number.isFinite(rp.x) &&
+      Number.isFinite(rp.y)
+    ) {
+      parts.push(`${this.encodeRapid(rp)} ; return to job origin`);
+    }
+    parts.push('M2 ; program end');
+    return parts.join('\n');
   }
 
   private encodeMove(move: Move): string {

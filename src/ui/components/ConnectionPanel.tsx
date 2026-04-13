@@ -24,6 +24,24 @@ import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
 import { type StartMode } from './StartPositionWizard';
 import { SimulatorView } from './SimulatorView';
 
+const FRAME_IDLE_POLL_MS = 200;
+const FRAME_IDLE_TIMEOUT_MS = 15_000;
+
+/** Poll until GRBL reports idle (e.g. after framing moves). */
+async function waitForGrblIdle(ctrl: GrblController): Promise<boolean> {
+  const deadline = Date.now() + FRAME_IDLE_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    try {
+      ctrl.requestStatusReport();
+    } catch {
+      /* disconnected */
+    }
+    if (ctrl.state.status === 'idle') return true;
+    await new Promise<void>(r => setTimeout(r, FRAME_IDLE_POLL_MS));
+  }
+  return false;
+}
+
 function formatJobTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
   const m = Math.floor(s / 60);
@@ -678,6 +696,12 @@ export function ConnectionPanel({
       await sendFrameLine(ctrl, line);
     }
 
+    const idleOk = await waitForGrblIdle(ctrl);
+    if (!idleOk) {
+      setMessages(prev => [...prev, '⚠ Frame (Safe): machine did not reach idle within 15s — check machine state']);
+      return;
+    }
+
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
@@ -719,6 +743,12 @@ export function ConnectionPanel({
 
     for (const line of lines) {
       await sendFrameLine(ctrl, line);
+    }
+
+    const idleOk = await waitForGrblIdle(ctrl);
+    if (!idleOk) {
+      setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle within 15s — check machine state']);
+      return;
     }
 
     hasFramed.current = true;
