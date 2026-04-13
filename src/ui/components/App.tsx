@@ -41,7 +41,6 @@ import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useGrblConnection } from '../hooks/useGrblConnection';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
-import { PropertiesPanel } from './PropertiesPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
@@ -1586,25 +1585,11 @@ export function App() {
           productionMode,
           materialLibraryRev,
           onMaterialLibraryBump: () => setMaterialLibraryRev(r => r + 1),
+          onSceneChange: handleSceneChange,
+          onSelectionChange: setSelectedIds,
+          showAlert,
+          handleTextToPath: () => void sceneOps.textToPath(),
         }),
-        React.createElement('div', {
-          style: {
-            flex: 1,
-            overflowY: 'auto' as const,
-            minHeight: 0,
-          },
-        },
-          React.createElement(PropertiesPanel, {
-            scene,
-            selectedIds,
-            onSceneCommit: handleSceneCommit,
-            onSceneChange: handleSceneChange,
-            onSelectionChange: setSelectedIds,
-            showAlert,
-            handleTextToPath: () => void sceneOps.textToPath(),
-            productionMode,
-          }),
-        ),
       ),
     ),
 

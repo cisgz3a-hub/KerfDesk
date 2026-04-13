@@ -21,7 +21,7 @@ const TEXT_FONT_OPTIONS = [
   'Bookman', 'Avant Garde',
 ] as const;
 
-interface PropertiesPanelProps {
+export interface ObjectPropertiesTabProps {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
@@ -33,7 +33,8 @@ interface PropertiesPanelProps {
   productionMode?: boolean;
 }
 
-export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: PropertiesPanelProps) {
+/** Object properties UI (embedded in LayerPanel Object tab). */
+export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: ObjectPropertiesTabProps) {
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
 
@@ -181,7 +182,6 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
 
   const containerStyle: React.CSSProperties = {
     padding: '10px 12px',
-    borderTop: `1px solid ${theme.border.subtle}`,
     fontFamily: theme.font.ui,
     color: theme.text.secondary,
   };
@@ -255,8 +255,23 @@ export function PropertiesPanel({ scene, selectedIds, onSceneCommit, onSceneChan
   };
 
   if (selectedObjects.length === 0) {
-    return React.createElement('div', { style: containerStyle },
-      React.createElement('div', { style: emptyStateStyle }, 'No selection')
+    return React.createElement('div', {
+      style: {
+        ...containerStyle,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: 120,
+      },
+    },
+      React.createElement('div', {
+        style: {
+          color: theme.text.tertiary,
+          fontSize: theme.font.size.sm,
+          textAlign: 'center' as const,
+          fontFamily: theme.font.ui,
+        },
+      }, 'Select an object to see its properties'),
     );
   }
 
