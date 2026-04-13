@@ -1,63 +1,50 @@
 import { useState, useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { compileJob } from '../../core/job/JobCompiler';
-import { optimizePlan } from '../../core/plan/PlanOptimizer';
-import { applyMachineTransform } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
-import { getOutputStrategy } from '../../core/output/Output';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
-import '../../core/output/GrblStrategy';
-import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
+import {
+  compileGcode as pipelineCompileGcode,
+  compileToolpath as pipelineCompileToolpath,
+  type CompileGcodeResult,
+} from '../../app/PipelineService';
 
 export function useGcodeExport(
   startMode: GcodeStartMode = 'current',
   savedOrigin: { x: number; y: number } | null = null,
 ) {
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
+  const [lastCompileResult, setLastCompileResult] = useState<CompileGcodeResult | null>(null);
 
   const compileGcode = useCallback(async (targetScene: Scene): Promise<string | null> => {
     try {
-      const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(targetScene);
-      if (failedTextObjects.length > 0) {
-        console.warn(`[LaserForge] Text outline conversion failed for: ${failedTextObjects.join(', ')}. These text objects will be excluded from the job. Try a larger font size or bolder font.`);
-      }
-      const job = compileJob(sceneForJob);
-      if (job.operations.length === 0) return null;
-      const plan = optimizePlan(job);
-      const { plan: machinePlan } = applyMachineTransform(plan, {
-        startMode,
-        savedOrigin,
-        flipY: true,
-      });
-      const strategy = getOutputStrategy('grbl');
-      if (!strategy) return null;
-      const output = strategy.generate(machinePlan, job, { startMode, savedOrigin });
-      return output.text ?? null;
+      const result = await pipelineCompileGcode(targetScene, startMode, savedOrigin);
+      setLastCompileResult(result);
+      if (!result) return null;
+      return result.gcode;
     } catch (err) {
       console.error('G-code compilation failed:', err);
+      setLastCompileResult(null);
       return null;
     }
   }, [startMode, savedOrigin]);
 
   const compileToolpathMoves = useCallback(async (targetScene: Scene): Promise<Move[] | null> => {
     try {
-      const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(targetScene);
-      if (failedTextObjects.length > 0) {
-        console.warn(`[LaserForge] Text outline conversion failed for: ${failedTextObjects.join(', ')}`);
-      }
-      const job = compileJob(sceneForJob);
-      if (job.operations.length === 0) return null;
-      const plan = optimizePlan(job);
-      const moves: Move[] = [];
-      for (const op of plan.operations) {
-        moves.push(...op.moves);
-      }
-      return moves;
+      const result = await pipelineCompileToolpath(targetScene);
+      if (!result) return null;
+      return result.moves;
     } catch (err) {
       console.error('Toolpath compilation failed:', err);
       return null;
     }
   }, []);
 
-  return { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves };
+  return {
+    currentGcode,
+    setCurrentGcode,
+    compileGcode,
+    compileToolpathMoves,
+    /** Full result from the last compileGcode call — includes transform, bounds, warnings. */
+    lastCompileResult,
+  };
 }
