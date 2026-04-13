@@ -1340,74 +1340,6 @@ export function ConnectionPanel({
           React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } }, 'Bidirectional scanning'),
           React.createElement('span', { style: { fontSize: 8, color: '#555570' } }, '(faster)'),
         ),
-        // ── Text spacing controls (when layer has text objects) ──
-        (() => {
-          const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
-          if (textObjs.length === 0) return null;
-          const firstText = textObjs[0].geometry as import('../../core/scene/SceneObject').TextGeometry;
-          const wordSp = firstText.wordSpacing ?? 100;
-          const letterSp = firstText.letterSpacing ?? 0;
-
-          const updateTextProp = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
-            onSceneCommit({
-              ...scene,
-              layers: scene.layers,
-              objects: scene.objects.map(o => {
-                if (o.layerId !== layer.id || o.geometry.type !== 'text') return o;
-                return {
-                  ...o,
-                  geometry: { ...o.geometry, [prop]: value },
-                  _bounds: null,
-                  _worldTransform: null,
-                };
-              }),
-            });
-          };
-
-          return React.createElement('div', {
-            style: { marginTop: 6, padding: '6px 0', borderTop: '1px solid #1a1a2e' },
-          },
-            React.createElement('div', {
-              style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: '0.05em' },
-            }, `Text spacing (${textObjs.length} text obj${textObjs.length > 1 ? 's' : ''})`),
-            // Word spacing
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-            },
-              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Word spacing'),
-              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${wordSp}%`),
-            ),
-            React.createElement('input', {
-              type: 'range',
-              min: 50,
-              max: 400,
-              step: 10,
-              value: wordSp,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateTextProp('wordSpacing', parseInt(e.target.value, 10));
-              },
-              style: { width: '100%', accentColor: '#00d4ff', height: 4 },
-            }),
-            // Letter spacing
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2, marginTop: 4 },
-            },
-              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Letter spacing'),
-              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${letterSp}%`),
-            ),
-            React.createElement('input', {
-              type: 'range',
-              min: -20,
-              max: 100,
-              step: 2,
-              value: letterSp,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateTextProp('letterSpacing', parseInt(e.target.value, 10));
-              },
-              style: { width: '100%', accentColor: '#00d4ff', height: 4 },
-            }),
-          );
-        })(),
         onUpdateLayerSetting && React.createElement('div', {
           style: { display: 'flex', gap: 6, marginTop: 6 },
         },
@@ -1497,6 +1429,71 @@ export function ConnectionPanel({
             style: { width: '100%', accentColor: modeColor, height: 4 },
           }),
         ),
+        // ── Text spacing controls (when layer has text objects) ──
+        (() => {
+          const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
+          if (textObjs.length === 0) return null;
+          const firstText = textObjs[0].geometry as import('../../core/scene/SceneObject').TextGeometry;
+          const wordSp = firstText.wordSpacing ?? 100;
+          const letterSp = firstText.letterSpacing ?? 0;
+
+          const updateTextProp = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
+            onSceneCommit({
+              ...scene,
+              objects: scene.objects.map(o => {
+                if (o.layerId !== layer.id || o.geometry.type !== 'text') return o;
+                return {
+                  ...o,
+                  geometry: { ...o.geometry, [prop]: value },
+                  _bounds: null,
+                  _worldTransform: null,
+                };
+              }),
+            });
+          };
+
+          return React.createElement('div', {
+            style: { marginTop: 8, padding: '8px 0 2px', borderTop: '1px solid #1a1a2e' },
+          },
+            React.createElement('div', {
+              style: { fontSize: 9, color: '#00d4ff', marginBottom: 6, fontWeight: 600 },
+            }, `TEXT SPACING (${textObjs.length} text)`),
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+            },
+              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Word spacing'),
+              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${wordSp}%`),
+            ),
+            React.createElement('input', {
+              type: 'range',
+              min: 50,
+              max: 400,
+              step: 10,
+              value: wordSp,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                updateTextProp('wordSpacing', parseInt(e.target.value, 10));
+              },
+              style: { width: '100%', accentColor: '#00d4ff', height: 4, marginBottom: 6 },
+            }),
+            React.createElement('div', {
+              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+            },
+              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Letter spacing'),
+              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${letterSp}%`),
+            ),
+            React.createElement('input', {
+              type: 'range',
+              min: -20,
+              max: 100,
+              step: 2,
+              value: letterSp,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                updateTextProp('letterSpacing', parseInt(e.target.value, 10));
+              },
+              style: { width: '100%', accentColor: '#00d4ff', height: 4 },
+            }),
+          );
+        })(),
       ),
     );
   }
