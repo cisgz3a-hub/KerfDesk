@@ -1,0 +1,122 @@
+/**
+ * Guardrails: autosave strips image pixel buffers, remains loadable, and stays much smaller than full save.
+ * Run: npx tsx tests/autosave-serialization.test.ts
+ */
+
+import { serializeScene, serializeForAutosave, deserializeScene } from '../src/io/SceneSerializer';
+import { createScene } from '../src/core/scene/Scene';
+import { addObject } from '../src/ui/history/SceneCommands';
+import { type SceneObject, type ImageGeometry } from '../src/core/scene/SceneObject';
+import { IDENTITY_MATRIX, generateId } from '../src/core/types';
+import { createRect } from '../src/core/scene/SceneObject';
+
+let passed = 0;
+let failed = 0;
+
+function assert(condition: boolean, message: string): void {
+  if (condition) {
+    passed++;
+    console.log(`  ✓ ${message}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${message}`);
+  }
+}
+
+function makeImageObject(layerId: string, pixels: number): SceneObject {
+  const w = 80;
+  const h = Math.max(1, Math.floor(pixels / w));
+  const geom: ImageGeometry = {
+    type: 'image',
+    src: 'data:image/png;base64,xx',
+    originalWidth: w,
+    originalHeight: h,
+    cropX: 0,
+    cropY: 0,
+    cropWidth: w,
+    cropHeight: h,
+    grayscaleData: new Uint8Array(w * h).fill(128),
+    grayscaleWidth: w,
+    grayscaleHeight: h,
+    adjustedData: new Uint8Array(w * h).fill(64),
+  };
+  return {
+    id: generateId(),
+    type: 'image',
+    name: 'Img',
+    layerId,
+    parentId: null,
+    transform: { ...IDENTITY_MATRIX, tx: 5, ty: 5 },
+    geometry: geom,
+    visible: true,
+    locked: false,
+    powerScale: 1,
+    _bounds: null,
+    _worldTransform: null,
+  };
+}
+
+console.log('\n=== Autosave serialization guardrails ===');
+
+const base = createScene(400, 300, 'Autosave Test');
+const lid = base.layers[0].id;
+const withImage = addObject(addObject(base, makeImageObject(lid, 80 * 60)), makeImageObject(lid, 80 * 60));
+
+const fullJson = serializeScene(withImage);
+const autoJson = serializeForAutosave(withImage);
+
+assert(JSON.parse(autoJson).format === 'laserforge', 'autosave: valid envelope format');
+assert(JSON.parse(autoJson).scene?.objects?.length === 2, 'autosave: two objects preserved');
+
+assert(!autoJson.includes('grayscaleData'), 'autosave: no raw grayscaleData key in JSON');
+assert(!autoJson.includes('adjustedData'), 'autosave: no raw adjustedData key in JSON');
+assert(!autoJson.includes('_grayscaleDataB64'), 'autosave: strips image buffers (no grayscale b64)');
+assert(!autoJson.includes('_adjustedDataB64'), 'autosave: strips image buffers (no adjusted b64)');
+
+assert(
+  fullJson.includes('_grayscaleDataB64') || fullJson.includes('grayscaleData'),
+  'full save: still carries image payload (b64 or array)',
+);
+
+const ratio = autoJson.length / fullJson.length;
+assert(ratio < 0.5, `autosave size < 50% of full save (got ${(ratio * 100).toFixed(1)}%)`);
+assert(autoJson.length < fullJson.length, 'autosave byte length strictly less than full save');
+
+let loaded: ReturnType<typeof deserializeScene> | null = null;
+try {
+  loaded = deserializeScene(autoJson);
+  assert(true, 'deserialize autosave: does not throw');
+} catch {
+  assert(false, 'deserialize autosave: does not throw');
+}
+
+if (loaded) {
+  assert(loaded.objects.length === 2, 'roundtrip: object count');
+  assert(loaded.objects.every(o => o.type === 'image'), 'roundtrip: both remain images');
+  assert(
+    loaded.objects.every(o => {
+      const g = o.geometry as ImageGeometry;
+      return g.type === 'image' && g.src.includes('data:image');
+    }),
+    'roundtrip: image src preserved',
+  );
+}
+
+const rectOnly = addObject(base, createRect(lid, 12, 12, 30, 20));
+const autoRect = serializeForAutosave(rectOnly);
+const fullRect = serializeScene(rectOnly);
+assert(JSON.parse(autoRect).scene.objects.length === 1, 'rect scene autosave: one object');
+assert(deserializeScene(autoRect).objects[0].type === 'rect', 'rect autosave roundtrip');
+
+assert(
+  autoRect.length <= fullRect.length * 1.05,
+  'rect-only autosave not larger than full (no image bloat)',
+);
+
+const huge = addObject(base, makeImageObject(lid, 200 * 200));
+const autoH = serializeForAutosave(huge);
+const fullH = serializeScene(huge);
+assert(autoH.length / fullH.length < 0.2, 'large image: autosave far smaller than full save');
+
+console.log(`\nAutosave serialization: ${passed} passed, ${failed} failed`);
+if (failed > 0) process.exit(1);

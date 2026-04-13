@@ -4,8 +4,11 @@
  */
 
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject, type SubPath, type TextGeometry } from '../core/scene/SceneObject';
+import { type SceneObject, type SubPath } from '../core/scene/SceneObject';
 import { textGeometryToPath } from './TextToPath';
+import { textOutlineFingerprint } from './textOutlineFingerprint';
+
+export { textOutlineFingerprint } from './textOutlineFingerprint';
 
 export interface TextExpansionResult {
   scene: Scene;
@@ -16,20 +19,6 @@ export interface TextExpansionResult {
 const TEXT_OUTLINE_CACHE_MAX = 64;
 /** Potrace results keyed by text geometry fingerprint (LRU). */
 const textOutlineCache = new Map<string, SubPath[]>();
-
-function textOutlineFingerprint(g: TextGeometry): string {
-  return JSON.stringify({
-    t: g.text,
-    fs: g.fontSize,
-    ff: g.fontFamily,
-    b: !!g.bold,
-    i: !!g.italic,
-    ta: g.textAlign ?? 'left',
-    ls: g.letterSpacing ?? 0,
-    lh: g.lineSpacing ?? 120,
-    ws: g.wordSpacing ?? 100,
-  });
-}
 
 function cloneSubPaths(paths: SubPath[]): SubPath[] {
   return structuredClone(paths) as SubPath[];
