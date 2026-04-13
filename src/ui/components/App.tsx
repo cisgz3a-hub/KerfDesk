@@ -1533,6 +1533,7 @@ export function App() {
         onDisconnect: () => dialogs.setShowConnection(false),
         bedWidth: scene.canvas.width,
         bedHeight: scene.canvas.height,
+        machinePlanBounds: null,
         boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
         boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
         boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,

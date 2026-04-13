@@ -62,6 +62,8 @@ interface ConnectionPanelProps {
   gcode: string | null;
   bedWidth: number;
   bedHeight: number;
+  /** Machine-space plan bounds for preflight validation (from applyMachineTransform). */
+  machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
   boundsMinX?: number;
   boundsMinY?: number;
   boundsMaxX?: number;
@@ -99,6 +101,7 @@ export function ConnectionPanel({
   gcode,
   bedWidth,
   bedHeight,
+  machinePlanBounds = null,
   boundsMinX,
   boundsMinY,
   boundsMaxX,
@@ -273,7 +276,7 @@ export function ConnectionPanel({
   }, [messages]);
 
   useEffect(() => {
-    const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight);
+    const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight, machinePlanBounds);
     setPreflight(result);
   }, [gcode, machineState, scene, bedWidth, bedHeight]);
 
