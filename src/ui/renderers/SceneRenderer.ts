@@ -23,7 +23,7 @@ import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
-import { fillTextGeometry } from '../../geometry/textCanvasDraw';
+import { fillTextGeometry, measureTextGeometrySize } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
@@ -525,7 +525,159 @@ function renderObject(
 
   drawGeometry(ctx, obj.geometry, transform, isFill, obj);
 
+  // Scanline preview for engrave mode — shows fill line spacing live
+  if (layer.settings.mode === 'engrave' && layer.settings.fill.enabled) {
+    drawFillPreview(ctx, obj, layer, transform, modeColor);
+  }
+
   ctx.restore();
+}
+
+/**
+ * Draw parallel scanline preview inside an engrave object.
+ * Uses canvas clipping to constrain lines to the object shape.
+ * Skips text objects (scanlines follow character outlines at compile time).
+ */
+function drawFillPreview(
+  ctx: CanvasRenderingContext2D,
+  obj: SceneObject,
+  layer: Layer,
+  transform: Transform,
+  modeColor: string,
+): void {
+  const geom = obj.geometry;
+  // Skip text and image — text scanlines follow character outlines, not a bounding box
+  if (geom.type === 'text' || geom.type === 'image' || geom.type === 'line') return;
+
+  const interval = layer.settings.fill.interval || 0.1;
+  const angleDeg = layer.settings.fill.angle || 0;
+
+  // Compute local-space bounding box
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  const corners = getLocalCorners(geom);
+  if (corners.length === 0) return;
+  for (const p of corners) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
+  }
+
+  const width = maxX - minX;
+  const height = maxY - minY;
+  if (width <= 0 || height <= 0) return;
+
+  // Cap scanlines for performance — skip if too dense to see at current zoom
+  const pixelInterval = interval / transform.screenPx(1);
+  if (pixelInterval < 2) return; // Too dense to distinguish — skip
+  const maxLines = 500;
+  const diagonal = Math.sqrt(width * width + height * height);
+  if (diagonal / interval > maxLines) return;
+
+  ctx.save();
+
+  // Build clip path from object shape
+  ctx.beginPath();
+  if (geom.type === 'rect') {
+    if (geom.cornerRadius > 0) {
+      roundRect(ctx, geom.x, geom.y, geom.width, geom.height, Math.min(geom.cornerRadius, geom.width / 2, geom.height / 2));
+    } else {
+      ctx.rect(geom.x, geom.y, geom.width, geom.height);
+    }
+  } else if (geom.type === 'ellipse') {
+    ctx.ellipse(geom.cx, geom.cy, geom.rx, geom.ry, 0, 0, Math.PI * 2);
+  } else if (geom.type === 'polygon') {
+    const pts = geom.points;
+    if (pts.length > 0) {
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+      if (geom.closed) ctx.closePath();
+    }
+  } else if (geom.type === 'path') {
+    for (const sub of geom.subPaths) {
+      for (const seg of sub.segments) {
+        if (seg.type === 'move') ctx.moveTo(seg.to.x, seg.to.y);
+        else if (seg.type === 'line') ctx.lineTo(seg.to.x, seg.to.y);
+        else if (seg.type === 'cubic') ctx.bezierCurveTo(seg.cp1.x, seg.cp1.y, seg.cp2.x, seg.cp2.y, seg.to.x, seg.to.y);
+        else if (seg.type === 'quadratic') ctx.quadraticCurveTo(seg.cp.x, seg.cp.y, seg.to.x, seg.to.y);
+        else if (seg.type === 'close') ctx.closePath();
+      }
+    }
+  }
+  ctx.clip();
+
+  // Draw scanlines
+  ctx.strokeStyle = `${modeColor}30`;
+  ctx.lineWidth = transform.screenPx(0.6);
+
+  const angleRad = (angleDeg * Math.PI) / 180;
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const span = diagonal + interval;
+
+  if (Math.abs(angleDeg % 180) < 0.01) {
+    // Horizontal — fast path, no rotation
+    for (let y = minY + interval / 2; y < maxY; y += interval) {
+      ctx.beginPath();
+      ctx.moveTo(minX, y);
+      ctx.lineTo(maxX, y);
+      ctx.stroke();
+    }
+  } else if (Math.abs((angleDeg - 90) % 180) < 0.01) {
+    // Vertical — fast path
+    for (let x = minX + interval / 2; x < maxX; x += interval) {
+      ctx.beginPath();
+      ctx.moveTo(x, minY);
+      ctx.lineTo(x, maxY);
+      ctx.stroke();
+    }
+  } else {
+    // Angled scanlines — rotate lines around center
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    for (let d = -span / 2; d < span / 2; d += interval) {
+      // Line perpendicular offset by d from center, rotated by angle
+      const px = cx + d * sin;
+      const py = cy - d * cos;
+      const dx = span * cos;
+      const dy = span * sin;
+      ctx.beginPath();
+      ctx.moveTo(px - dx, py - dy);
+      ctx.lineTo(px + dx, py + dy);
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+/** Get local-space corner points for scanline bounding box computation. */
+function getLocalCorners(geom: Geometry): Array<{ x: number; y: number }> {
+  switch (geom.type) {
+    case 'rect':
+      return [
+        { x: geom.x, y: geom.y },
+        { x: geom.x + geom.width, y: geom.y + geom.height },
+      ];
+    case 'ellipse':
+      return [
+        { x: geom.cx - geom.rx, y: geom.cy - geom.ry },
+        { x: geom.cx + geom.rx, y: geom.cy + geom.ry },
+      ];
+    case 'polygon': return geom.points;
+    case 'path': {
+      const pts: Array<{ x: number; y: number }> = [];
+      for (const sub of geom.subPaths) {
+        for (const seg of sub.segments) {
+          if (seg.type === 'move' || seg.type === 'line') pts.push(seg.to);
+          else if (seg.type === 'cubic') { pts.push(seg.cp1); pts.push(seg.cp2); pts.push(seg.to); }
+          else if (seg.type === 'quadratic') { pts.push(seg.cp); pts.push(seg.to); }
+        }
+      }
+      return pts;
+    }
+    default: return [];
+  }
 }
 
 function drawObjectPath(ctx: CanvasRenderingContext2D, obj: SceneObject): void {
