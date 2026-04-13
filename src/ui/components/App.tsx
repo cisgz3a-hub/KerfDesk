@@ -1035,6 +1035,14 @@ export function App() {
     dialogs.setShowConnection(true);
   }, [scene, compileGcode, showAlert, sceneCompileFingerprint]);
 
+  const handleToolbarDisconnect = useCallback(async () => {
+    try {
+      try { grbl.controller?.sendCommand('M5 S0'); } catch { /* ignore */ }
+      await grbl.disconnect();
+    } catch { /* best effort */ }
+    dialogs.setShowConnection(false);
+  }, [grbl, dialogs]);
+
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
 
@@ -1505,6 +1513,7 @@ export function App() {
       showAlert,
       showConfirm,
       onConnect: handleConnect,
+      onDisconnect: handleToolbarDisconnect,
       onSetup: () => dialogs.setShowSetup(true),
       onMaterialTest: () => {
         if (gatedFeature('material_test')) setShowMaterialTest(true);

@@ -32,6 +32,8 @@ interface FileToolbarProps {
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   onConnect?: () => void;
+  /** Disconnect laser (toolbar); shown when connected. */
+  onDisconnect?: () => void | Promise<void>;
   /** Close app (Electron quit or browser navigate away) */
   onExit?: () => void;
   onSetup?: () => void;
@@ -75,6 +77,7 @@ export function FileToolbar({
   showAlert,
   showConfirm,
   onConnect,
+  onDisconnect,
   onExit,
   onMaterialTest,
   onCamera,
@@ -388,6 +391,14 @@ export function FileToolbar({
         isConnected ? 'Laser connected' : 'Connect to laser',
         () => onConnect(),
         { active: isConnected, color: isConnected ? '#2dd4a0' : '#c0c0d0' },
+      )
+      : null,
+    onConnect && isConnected && onDisconnect
+      ? toolbarBtn(
+        'Disconnect',
+        'Turn off laser and disconnect serial',
+        () => { void onDisconnect(); },
+        { color: '#ff6b6b' },
       )
       : null,
     onExit
