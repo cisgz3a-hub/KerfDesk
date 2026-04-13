@@ -578,7 +578,12 @@ export function App() {
     (layerId: string, mode: LayerMode) => {
       const layer = scene.layers.find(l => l.id === layerId);
       if (!layer) return;
-      const next = applyLayerModeChange(layer, mode);
+      let next = applyLayerModeChange(layer, mode);
+      // Auto-rename if the name matches the old mode (e.g. "Cut" → "Engrave")
+      const modeNames: Record<LayerMode, string> = { cut: 'Cut', engrave: 'Engrave', score: 'Score', image: 'Image' };
+      if (layer.name.toLowerCase() === layer.settings.mode) {
+        next = { ...next, name: modeNames[mode] };
+      }
       handleSceneCommit({
         ...scene,
         activeLayerId: layerId,
