@@ -22,6 +22,7 @@ import {
 import { type Plan, type Move } from '../src/core/plan/Plan';
 import { optimizePlan } from '../src/core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../src/core/output/Output';
+import { applyMachineTransform } from '../src/core/plan/MachineTransform';
 import '../src/core/output/GrblStrategy';  // Register GRBL strategy
 import { generateId } from '../src/core/types';
 import { simulatePlan } from '../src/core/plan/Simulation';
@@ -555,7 +556,12 @@ const grblStrategy = getOutputStrategy('grbl');
 assert(grblStrategy !== undefined, 'GRBL strategy is registered');
 
 if (grblStrategy) {
-  const output = grblStrategy.generate(plan, job);
+  const { plan: machinePlan } = applyMachineTransform(plan, {
+    startMode: 'current',
+    savedOrigin: null,
+    flipY: true,
+  });
+  const output = grblStrategy.generate(machinePlan, job);
   
   assert(output.format === 'grbl', 'Output format is GRBL');
   assert(output.text !== null, 'Output has text content');

@@ -9,6 +9,11 @@
 export * from './Plan';
 export { optimizePlan } from './PlanOptimizer';
 export {
+  applyMachineTransform,
+  type MachineTransformOptions,
+  type MachineTransformResult,
+} from './MachineTransform';
+export {
   applyInsideFirstOrder,
   buildContainmentTree,
   flattenContainmentTree,

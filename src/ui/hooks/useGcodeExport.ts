@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { compileJob } from '../../core/job/JobCompiler';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
+import { applyMachineTransform } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { getOutputStrategy } from '../../core/output/Output';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
@@ -23,9 +24,14 @@ export function useGcodeExport(
       const job = compileJob(sceneForJob);
       if (job.operations.length === 0) return null;
       const plan = optimizePlan(job);
+      const { plan: machinePlan } = applyMachineTransform(plan, {
+        startMode,
+        savedOrigin,
+        flipY: true,
+      });
       const strategy = getOutputStrategy('grbl');
       if (!strategy) return null;
-      const output = strategy.generate(plan, job, { startMode, savedOrigin });
+      const output = strategy.generate(machinePlan, job, { startMode, savedOrigin });
       return output.text ?? null;
     } catch (err) {
       console.error('G-code compilation failed:', err);

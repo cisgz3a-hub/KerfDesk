@@ -45,7 +45,7 @@ export interface Output {
 
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
-import { type GcodeGenerateOptions, computeGcodeOffset } from './GcodeOrigin';
+import { type GcodeGenerateOptions } from './GcodeOrigin';
 
 export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 
@@ -99,20 +99,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract encodePowerValue(power: number): string;
 
   private currentSpeed = 0;
-  private gcodeOffsetX = 0;
-  /** Canvas max Y among all moves — used to flip Y (canvas Y-down → machine Y-up). */
-  private designMaxY = 0;
 
-  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
-    const b = this.designBoundsFromPlan(plan);
-    const startMode = options?.startMode ?? 'current';
-    const offset = computeGcodeOffset(
-      startMode,
-      { minX: b.minX, minY: b.minY },
-      options?.savedOrigin ?? null,
-    );
-    this.gcodeOffsetX = offset.x;
-    this.designMaxY = b.maxY;
+  generate(plan: Plan, job: Job, _options?: GcodeGenerateOptions): Output {
     this.currentSpeed = 0;
 
     try {
@@ -151,8 +139,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         fileSizeBytes: new TextEncoder().encode(text).length,
       };
     } finally {
-      this.gcodeOffsetX = 0;
-      this.designMaxY = 0;
+      this.currentSpeed = 0;
     }
   }
 
@@ -169,15 +156,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   }
 
   encodeRapid(to: { x: number; y: number }): string {
-    const x = to.x + this.gcodeOffsetX;
-    const y = this.designMaxY - to.y;
-    return `G0 X${x.toFixed(3)} Y${y.toFixed(3)}`;
+    return `G0 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`;
   }
 
   encodeLinear(to: { x: number; y: number }, power: number, speed: number): string {
-    const x = to.x + this.gcodeOffsetX;
-    const y = this.designMaxY - to.y;
-    const parts = [`G1 X${x.toFixed(3)} Y${y.toFixed(3)}`];
+    const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
     if (speed !== this.currentSpeed) {
       parts.push(`F${speed.toFixed(0)}`);
       this.currentSpeed = speed;
@@ -198,37 +181,12 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return `G0 Z${z.toFixed(3)}`;
   }
 
-  encodeFooter(job: Job): string {
-    const spX = job.metadata.startPositionX ?? 0;
-    const spY = job.metadata.startPositionY ?? 0;
-    const returnX = (spX + this.gcodeOffsetX).toFixed(3);
-    const returnY = (this.designMaxY - spY).toFixed(3);
+  encodeFooter(_job: Job): string {
     return [
       this.encodeLaserOff(),
-      `G0 X${returnX} Y${returnY} ; return to start position`,
+      'G0 X0.000 Y0.000 ; return to origin',
       'M2 ; program end',
     ].join('\n');
-  }
-
-  /** Bounds of all rapid/linear destinations — X shifted to 0 at minX; Y flipped about maxY. */
-  private designBoundsFromPlan(plan: Plan): { minX: number; minY: number; maxX: number; maxY: number } {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const op of plan.operations) {
-      for (const move of op.moves) {
-        if (move.type === 'rapid' || move.type === 'linear') {
-          minX = Math.min(minX, move.to.x);
-          minY = Math.min(minY, move.to.y);
-          maxX = Math.max(maxX, move.to.x);
-          maxY = Math.max(maxY, move.to.y);
-        }
-      }
-    }
-    if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-    if (!Number.isFinite(maxY)) return { minX, minY, maxX: minX, maxY: minY };
-    return { minX, minY, maxX, maxY };
   }
 
   private encodeMove(move: Move): string {
