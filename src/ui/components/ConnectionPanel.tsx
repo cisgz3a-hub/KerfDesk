@@ -1433,6 +1433,7 @@ export function ConnectionPanel({
         (() => {
           const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
           if (textObjs.length === 0) return null;
+
           const firstText = textObjs[0].geometry as import('../../core/scene/SceneObject').TextGeometry;
           const wordSp = firstText.wordSpacing ?? 100;
           const letterSp = firstText.letterSpacing ?? 0;
