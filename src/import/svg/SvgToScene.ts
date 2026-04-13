@@ -101,7 +101,9 @@ export function importSvgIntoScene(
   layerId: string,
   options?: Partial<ImportOptions>
 ): Scene {
-  const parsed = parseSvg(svgString);
+  const parsed = parseSvg(svgString, {
+    unitMode: options?.svgUnitMode,
+  });
 
   let currentLayers = [...scene.layers];
   let objects: SceneObject[] = [];

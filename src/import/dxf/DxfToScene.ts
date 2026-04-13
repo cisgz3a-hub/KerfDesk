@@ -177,15 +177,24 @@ function convertEllipse(e: DxfEntity, layerId: string): SceneObject {
   const majorRadius = Math.sqrt(mx * mx + my * my);
   const minorRadius = majorRadius * ratio;
 
-  // For simplicity, treat as axis-aligned ellipse
-  // (rotation from major axis direction is ignored for now)
-  return makeObject(layerId, 'ellipse', 'Ellipse', {
+  const obj = makeObject(layerId, 'ellipse', 'Ellipse', {
     type: 'ellipse',
-    cx,
-    cy,
+    cx: 0,
+    cy: 0,
     rx: majorRadius,
     ry: minorRadius,
   });
+
+  if (majorRadius < 1e-9) {
+    obj.transform = { a: 1, b: 0, c: 0, d: 1, tx: cx, ty: cy };
+    return obj;
+  }
+
+  const theta = Math.atan2(my, mx);
+  const cos = Math.cos(theta);
+  const sin = Math.sin(theta);
+  obj.transform = { a: cos, b: sin, c: -sin, d: cos, tx: cx, ty: cy };
+  return obj;
 }
 
 function convertLwPolyline(e: DxfEntity, layerId: string): SceneObject {

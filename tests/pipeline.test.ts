@@ -520,12 +520,16 @@ const gradientMoves = gradientPlan.operations[0].moves;
 const gradientLinears = gradientMoves.filter(m => m.type === 'linear');
 const gradientLaserOns = gradientMoves.filter(m => m.type === 'laserOn');
 
-// Pixel 0 is zero → skipped. Pixels 1-4 are non-zero → 1 segment (consecutive)
-assert(gradientLinears.length === 1, `8-bit: 1 burn segment (4 consecutive non-zero pixels)`);
+// Pixel 0 is zero → skipped. Pixels 64,128,192,255 fall in different 16-level buckets → 4 segments
+assert(gradientLinears.length === 4, `8-bit: 4 burn segments (gradient pixels in distinct power buckets)`);
+assert(gradientLaserOns.length === 4, '8-bit: 4 laserOn events for gradient');
 
-// Power should be mapped from max pixel (255) → powerMax (100%)
-const gradientPower = gradientLaserOns[0];
-assert(gradientPower.type === 'laserOn' && gradientPower.power === 100, '8-bit: power = 100% (from max pixel 255)');
+const p0 = gradientLaserOns[0].type === 'laserOn' ? gradientLaserOns[0].power : -1;
+const p1 = gradientLaserOns[1].type === 'laserOn' ? gradientLaserOns[1].power : -1;
+const p2 = gradientLaserOns[2].type === 'laserOn' ? gradientLaserOns[2].power : -1;
+const p3 = gradientLaserOns[3].type === 'laserOn' ? gradientLaserOns[3].power : -1;
+assert(p0 < p1 && p1 < p2 && p2 < p3, '8-bit: laser power increases along the gradient');
+assert(p3 === 100, '8-bit: brightest pixel maps to powerMax (100%)');
 
 console.log(`  ℹ 8-bit segments: ${gradientLinears.length}`);
 

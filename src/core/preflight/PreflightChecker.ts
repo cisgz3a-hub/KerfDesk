@@ -235,6 +235,32 @@ export function runPreflight(
     }
   }
 
+  // Engrave + fill: very small shapes vs line spacing (may get outline fallback or sparse lines)
+  for (const obj of visibleObjects) {
+    if (!outputLayerIds.has(obj.layerId)) continue;
+    const layer = scene.layers.find(l => l.id === obj.layerId);
+    if (!layer || layer.settings.mode !== 'engrave') continue;
+    const rawIv = Number(layer.settings.fill.interval);
+    const interval = Math.max(0.01, Number.isFinite(rawIv) && rawIv > 0 ? rawIv : 0.1);
+    const bounds = computeObjectBounds(obj);
+    if (!hasUsableObjectBounds(bounds)) continue;
+    const w = bounds.maxX - bounds.minX;
+    const h = bounds.maxY - bounds.minY;
+    const minDim = Math.min(w, h);
+    if (minDim < 2 * interval) {
+      issues.push({
+        id: `design-engrave-small-fill-${obj.id}`,
+        severity: 'warning',
+        title: `Object "${obj.name || obj.id}" may be too small for engrave fill`,
+        detail:
+          `Smallest span ≈ ${minDim.toFixed(2)}mm with line spacing ${interval.toFixed(2)}mm — ` +
+          'fill may produce few or no scanlines (outline fallback).',
+        fix: 'Use a tighter line spacing, enlarge the shape, or switch to score/outline-style engraving.',
+        category: 'design',
+      });
+    }
+  }
+
   // ─── SETTINGS CHECKS ─────────────────────────────────
   for (const layer of visibleLayers) {
     if (layer.output === false) continue;

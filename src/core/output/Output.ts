@@ -100,7 +100,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   private currentSpeed = 0;
 
-  generate(plan: Plan, job: Job, _options?: GcodeGenerateOptions): Output {
+  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
     this.currentSpeed = 0;
 
     try {
@@ -124,7 +124,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       }
 
       lines.push('');
-      lines.push(this.encodeFooter(job));
+      lines.push(this.encodeFooter(job, options));
 
       const text = lines.filter(l => l !== undefined).join('\n');
 

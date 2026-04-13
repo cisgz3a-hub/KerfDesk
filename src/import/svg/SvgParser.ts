@@ -35,6 +35,13 @@ export interface SvgElement {
  * Groups are flattened — each element carries its accumulated transform.
  * Returns an empty array if parsing fails.
  */
+export type SvgUnitMode = 'laser' | 'spec';
+
+/** laser: viewBox user units = mm (default). spec: viewBox-only SVGs scale user units as CSS px → mm. */
+export interface ParseSvgOptions {
+  unitMode?: SvgUnitMode;
+}
+
 export interface SvgParseResult {
   elements: SvgElement[];
   viewBox: { x: number; y: number; width: number; height: number } | null;
@@ -54,8 +61,10 @@ const EMPTY_RESULT: SvgParseResult = {
  * Handles units: all coordinates are converted to mm.
  * Handles viewBox: computes scale transform from viewBox to physical size.
  */
-export function parseSvg(svgString: string): SvgParseResult {
+export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParseResult {
   if (!svgString || svgString.trim() === '') return EMPTY_RESULT;
+
+  const unitMode: SvgUnitMode = options?.unitMode ?? 'laser';
 
   let doc: any;
   try {
@@ -79,7 +88,7 @@ export function parseSvg(svgString: string): SvgParseResult {
 
   // Compute physical dimensions in mm and root transform
   const { widthMm, heightMm, rootTransform } = computeRootTransform(
-    viewBox, widthParsed, heightParsed, svgUnits
+    viewBox, widthParsed, heightParsed, svgUnits, unitMode,
   );
 
   // Traverse and collect elements with root transform applied
@@ -104,16 +113,23 @@ function computeRootTransform(
   viewBox: { x: number; y: number; width: number; height: number } | null,
   widthParsed: ParsedLength | null,
   heightParsed: ParsedLength | null,
-  svgUnits: 'mm' | 'px'
+  svgUnits: 'mm' | 'px',
+  unitMode: SvgUnitMode,
 ): { widthMm: number; heightMm: number; rootTransform: Matrix3x2 } {
   let widthMm: number;
   let heightMm: number;
+
+  const strictViewBoxOnly = Boolean(viewBox && !widthParsed && !heightParsed);
 
   if (widthParsed && heightParsed) {
     widthMm = widthParsed.mm;
     heightMm = heightParsed.mm;
   } else if (viewBox) {
-    if (svgUnits === 'mm') {
+    if (unitMode === 'spec' && strictViewBoxOnly) {
+      const px = SVG_UNIT_TO_MM['px'];
+      widthMm = viewBox.width * px;
+      heightMm = viewBox.height * px;
+    } else if (svgUnits === 'mm') {
       widthMm = viewBox.width;
       heightMm = viewBox.height;
     } else {
@@ -137,7 +153,13 @@ function computeRootTransform(
   }
 
   if (viewBox) {
-    // ViewBox only: assume 1 unit = 1mm (common in laser SVGs)
+    if (unitMode === 'spec' && strictViewBoxOnly) {
+      const s = SVG_UNIT_TO_MM['px'];
+      const tx = -viewBox.x * s;
+      const ty = -viewBox.y * s;
+      return { widthMm, heightMm, rootTransform: { a: s, b: 0, c: 0, d: s, tx, ty } };
+    }
+    // Laser / default: viewBox user units = mm
     const tx = -viewBox.x;
     const ty = -viewBox.y;
     if (tx === 0 && ty === 0) {

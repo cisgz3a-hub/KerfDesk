@@ -20,6 +20,7 @@
 import { type Matrix3x2, type AABB, IDENTITY_MATRIX } from '../core/types';
 import { type SceneObject } from '../core/scene/SceneObject';
 import { multiplyMatrix } from '../import/svg/TransformParser';
+import { type SvgUnitMode } from '../import/svg/SvgParser';
 
 // ─── OPTIONS ─────────────────────────────────────────────────────
 
@@ -36,6 +37,8 @@ export interface ImportOptions {
    *  false = shrink if too big, leave alone if small (safe import)
    *  true  = always scale to match target (fit-to-canvas) */
   allowScaleUp?: boolean;
+  /** SVG root scaling: laser (default) vs W3C-style viewBox-as-px for viewBox-only files */
+  svgUnitMode?: SvgUnitMode;
 }
 
 const DEFAULT_OPTIONS: Required<ImportOptions> = {

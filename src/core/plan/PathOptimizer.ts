@@ -33,9 +33,9 @@ function dist(a: Point, b: Point): number {
 }
 
 /** Calculate total travel distance between consecutive paths */
-function totalTravel(paths: FlatPath[]): number {
+function totalTravel(paths: FlatPath[], startPos: Point = { x: 0, y: 0 }): number {
   let total = 0;
-  let current: Point = { x: 0, y: 0 }; // Start from origin
+  let current: Point = { ...startPos };
   for (const path of paths) {
     total += dist(current, pathStart(path));
     current = pathEnd(path);
@@ -45,14 +45,14 @@ function totalTravel(paths: FlatPath[]): number {
 
 /**
  * Nearest-neighbor greedy ordering.
- * Start from origin, always pick the closest unvisited path start.
+ * Start from startPos, always pick the closest unvisited path start.
  */
-function nearestNeighbor(paths: FlatPath[]): FlatPath[] {
+function nearestNeighbor(paths: FlatPath[], startPos: Point = { x: 0, y: 0 }): FlatPath[] {
   if (paths.length <= 1) return [...paths];
 
   const remaining = new Set(paths.map((_, i) => i));
   const ordered: FlatPath[] = [];
-  let current: Point = { x: 0, y: 0 };
+  let current: Point = { ...startPos };
 
   while (remaining.size > 0) {
     let bestIdx = -1;
@@ -78,11 +78,15 @@ function nearestNeighbor(paths: FlatPath[]): FlatPath[] {
  * 2-opt improvement — iteratively reverse segments to reduce total travel.
  * Runs until no improvement found or max iterations reached.
  */
-function twoOpt(paths: FlatPath[], maxIterations: number = 50): FlatPath[] {
+function twoOpt(
+  paths: FlatPath[],
+  maxIterations: number = 50,
+  startPos: Point = { x: 0, y: 0 },
+): FlatPath[] {
   if (paths.length <= 2) return paths;
 
   let best = [...paths];
-  let bestTravel = totalTravel(best);
+  let bestTravel = totalTravel(best, startPos);
   let improved = true;
   let iterations = 0;
 
@@ -99,7 +103,7 @@ function twoOpt(paths: FlatPath[], maxIterations: number = 50): FlatPath[] {
           ...best.slice(j + 1),
         ];
 
-        const candidateTravel = totalTravel(candidate);
+        const candidateTravel = totalTravel(candidate, startPos);
         if (candidateTravel < bestTravel - 0.01) { // Small epsilon to avoid floating point noise
           best = candidate;
           bestTravel = candidateTravel;
@@ -119,18 +123,19 @@ function twoOpt(paths: FlatPath[], maxIterations: number = 50): FlatPath[] {
  * Uses nearest-neighbor + 2-opt refinement.
  *
  * @param paths Array of flat paths to reorder
+ * @param startPos Current head position (defaults to origin)
  * @returns Reordered paths with minimized travel distance
  */
-export function optimizePathOrder(paths: FlatPath[]): FlatPath[] {
+export function optimizePathOrder(
+  paths: FlatPath[],
+  startPos: Point = { x: 0, y: 0 },
+): FlatPath[] {
   if (paths.length <= 1) return paths;
 
-  // Step 1: Nearest-neighbor greedy ordering
-  const greedy = nearestNeighbor(paths);
+  const greedy = nearestNeighbor(paths, startPos);
 
-  // Step 2: 2-opt refinement
-  // Limit iterations based on path count to keep it fast
   const maxIter = paths.length > 100 ? 20 : paths.length > 50 ? 30 : 50;
-  const optimized = twoOpt(greedy, maxIter);
+  const optimized = twoOpt(greedy, maxIter, startPos);
 
   return optimized;
 }
@@ -138,14 +143,18 @@ export function optimizePathOrder(paths: FlatPath[]): FlatPath[] {
 /**
  * Get optimization stats for display.
  */
-export function getOptimizationStats(original: FlatPath[], optimized: FlatPath[]): {
+export function getOptimizationStats(
+  original: FlatPath[],
+  optimized: FlatPath[],
+  startPos: Point = { x: 0, y: 0 },
+): {
   originalTravel: number;
   optimizedTravel: number;
   savedTravel: number;
   savedPercent: number;
 } {
-  const originalTravel = totalTravel(original);
-  const optimizedTravel = totalTravel(optimized);
+  const originalTravel = totalTravel(original, startPos);
+  const optimizedTravel = totalTravel(optimized, startPos);
   const savedTravel = originalTravel - optimizedTravel;
   const savedPercent = originalTravel > 0 ? (savedTravel / originalTravel) * 100 : 0;
 

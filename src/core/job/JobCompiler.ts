@@ -198,10 +198,10 @@ function compileGeometry(
           data[i] = 255 - pixelData[i];
         }
       } else {
-        bitmapWidth = Math.round(physicalWidth * (dpi / 25.4));
-        bitmapHeight = Math.round(physicalHeight * (dpi / 25.4));
-        data = new Uint8Array(bitmapWidth * bitmapHeight);
-        data.fill(128);
+        console.warn(
+          `[LaserForge] Skipping image "${obj.name || obj.id}": no raster bitmap data (import or adjust image to produce grayscale pixels).`,
+        );
+        return null;
       }
 
       const bitmap: ProcessedBitmap = {

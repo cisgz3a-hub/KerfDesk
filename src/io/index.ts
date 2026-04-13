@@ -13,3 +13,4 @@ export {
   computeImportTransform,
   applyTransformToObjects,
 } from './SvgImportPlacement';
+export { type SvgUnitMode } from '../import/svg/SvgParser';

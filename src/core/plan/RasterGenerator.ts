@@ -8,9 +8,9 @@
  *                     become burn segments at constant power.
  *
  *             8-bit:  Pixels carry grayscale intensity (0–255).
- *                     Consecutive non-zero pixels become burn segments.
- *                     Power is mapped from pixel value using
- *                     powerMin..powerMax range.
+ *                     Consecutive pixels in the same power bucket (16 levels)
+ *                     form one segment; bucket changes split segments so
+ *                     grayscale detail is preserved (not collapsed to max power).
  *
  *             For both modes, empty rows are skipped, segments are
  *             run-length encoded, and bidirectional scanning alternates
@@ -22,7 +22,6 @@
  * Last updated: Phase 5, Step 18d — Raster scanline generation
  */
 
-import { type Point } from '../types';
 import { type ProcessedBitmap } from '../job/Job';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
@@ -152,13 +151,24 @@ function extractSegments1Bit(
 
 // ─── 8-BIT SEGMENT EXTRACTION ────────────────────────────────────
 
+/** 16 discrete power buckets over 1–255 (bucket changes split segments). */
+const EIGHT_BIT_POWER_BUCKETS = 16;
+
+function pixelToPowerBucket(val: number): number {
+  if (val <= 0) return -1;
+  return Math.min(
+    EIGHT_BIT_POWER_BUCKETS - 1,
+    Math.floor((val * EIGHT_BIT_POWER_BUCKETS) / 256),
+  );
+}
+
 /**
  * Extract burn segments from an 8-bit grayscale row.
  * Non-zero pixels become burn segments with power mapped from
  * pixel intensity: 0 = skip, 1–255 = powerMin..powerMax.
  *
- * Consecutive non-zero pixels are grouped. The segment's power
- * is the MAXIMUM pixel value in the group (preserves detail).
+ * Consecutive non-zero pixels share one segment only while they fall in the
+ * same power bucket; a bucket change starts a new segment (grayscale fidelity).
  */
 function extractSegments8Bit(
   data: Uint8Array,
@@ -171,27 +181,38 @@ function extractSegments8Bit(
 ): RasterSegment[] {
   const segments: RasterSegment[] = [];
   let segStart: number | null = null;
-  let maxVal = 0;
+  let bucket = -1;
+  let repVal = 0;
+
+  const flush = (endCol: number) => {
+    if (segStart === null) return;
+    const power = mapPixelToPower(repVal, settings.powerMin, settings.powerMax);
+    segments.push(createSegment(
+      segStart, endCol, y, originX, pixelSizeMm,
+      power, settings.overscanning
+    ));
+    segStart = null;
+    bucket = -1;
+    repVal = 0;
+  };
 
   for (let col = 0; col <= width; col++) {
     const val = col < width ? data[rowStart + col] : 0;
+    const b = pixelToPowerBucket(val);
 
     if (val > 0 && segStart === null) {
-      // Start new segment
       segStart = col;
-      maxVal = val;
-    } else if (val > 0 && segStart !== null) {
-      // Continue segment, track max intensity
-      maxVal = Math.max(maxVal, val);
+      bucket = b;
+      repVal = val;
+    } else if (val > 0 && segStart !== null && b === bucket) {
+      repVal = Math.max(repVal, val);
+    } else if (val > 0 && segStart !== null && b !== bucket) {
+      flush(col);
+      segStart = col;
+      bucket = b;
+      repVal = val;
     } else if (val === 0 && segStart !== null) {
-      // End of segment — map max pixel value to power
-      const power = mapPixelToPower(maxVal, settings.powerMin, settings.powerMax);
-      segments.push(createSegment(
-        segStart, col, y, originX, pixelSizeMm,
-        power, settings.overscanning
-      ));
-      segStart = null;
-      maxVal = 0;
+      flush(col);
     }
   }
 

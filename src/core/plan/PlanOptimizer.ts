@@ -435,6 +435,10 @@ function planFillOperation(
   }
 
   if (scanlines.length === 0 && boundaryPaths.length > 0) {
+    console.warn(
+      `[LaserForge] Engrave fill produced no scanlines (interval ${interval.toFixed(3)}mm); ` +
+        `falling back to outline trace (${boundaryPaths.length} path(s)). Check shape size vs line spacing.`,
+    );
     let pos = startPos;
     const movesOut: Move[] = [];
     const ordered = orderPathsForCutting(boundaryPaths, pos, false);
@@ -557,7 +561,7 @@ function orderPathsForCutting(
   insideFirst: boolean
 ): OrderedPath[] {
   if (!insideFirst || paths.length <= 1) {
-    return orderWithBestDirection(optimizePathOrder(paths), startPos);
+    return orderWithBestDirection(optimizePathOrder(paths, startPos), startPos);
   }
 
   // Separate closed and open paths
@@ -569,7 +573,7 @@ function orderPathsForCutting(
 
   // If no closed paths, just nearest-neighbor the open ones
   if (closed.length === 0) {
-    return orderWithBestDirection(optimizePathOrder(open), startPos);
+    return orderWithBestDirection(optimizePathOrder(open, startPos), startPos);
   }
 
   // Build containment tree and get depth-grouped paths
@@ -584,7 +588,7 @@ function orderPathsForCutting(
     if (!group || group.length === 0) continue;
 
     // Within this depth level, optimize order then pick traversal direction
-    const ordered = orderWithBestDirection(optimizePathOrder(group), pos);
+    const ordered = orderWithBestDirection(optimizePathOrder(group, pos), pos);
     result.push(...ordered);
 
     // Update position to end of last path in this group
@@ -596,7 +600,7 @@ function orderPathsForCutting(
 
   // Open paths go last, optimized order
   if (open.length > 0) {
-    result.push(...orderWithBestDirection(optimizePathOrder(open), pos));
+    result.push(...orderWithBestDirection(optimizePathOrder(open, pos), pos));
   }
 
   return result;

@@ -23,7 +23,7 @@ import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
-import { fillTextGeometry, measureTextGeometrySize } from '../../geometry/textCanvasDraw';
+import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
@@ -536,7 +536,7 @@ function renderObject(
 /**
  * Draw parallel scanline preview inside an engrave object.
  * Uses canvas clipping to constrain lines to the object shape.
- * For text objects, clips to the text bounding box as an approximation.
+ * Text is skipped — rectangle-clipped scanlines misrepresent glyph-based fill.
  * Dense patterns are downsampled (every Nth line) so the preview is always visible.
  */
 function drawFillPreview(
@@ -547,7 +547,7 @@ function drawFillPreview(
   modeColor: string,
 ): void {
   const geom = obj.geometry;
-  if (geom.type === 'image' || geom.type === 'line') return;
+  if (geom.type === 'image' || geom.type === 'line' || geom.type === 'text') return;
 
   const interval = layer.settings.fill.interval || 0.1;
   const angleDeg = layer.settings.fill.angle || 0;
@@ -555,23 +555,13 @@ function drawFillPreview(
   // Compute local-space bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-  if (geom.type === 'text') {
-    // Text: compute bounds from text measurement
-    const c = document.createElement('canvas');
-    const tctx = c.getContext('2d');
-    if (!tctx) return;
-    const { width, height } = measureTextGeometrySize(tctx, geom as TextGeometry);
-    if (width <= 0 || height <= 0) return;
-    minX = 0; minY = 0; maxX = width; maxY = height;
-  } else {
-    const corners = getLocalCorners(geom);
-    if (corners.length === 0) return;
-    for (const p of corners) {
-      minX = Math.min(minX, p.x);
-      minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x);
-      maxY = Math.max(maxY, p.y);
-    }
+  const corners = getLocalCorners(geom);
+  if (corners.length === 0) return;
+  for (const p of corners) {
+    minX = Math.min(minX, p.x);
+    minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x);
+    maxY = Math.max(maxY, p.y);
   }
 
   const width = maxX - minX;
@@ -622,9 +612,6 @@ function drawFillPreview(
         else if (seg.type === 'close') ctx.closePath();
       }
     }
-  } else if (geom.type === 'text') {
-    // Text: clip to text bounding box
-    ctx.rect(minX, minY, width, height);
   }
   ctx.clip();
 

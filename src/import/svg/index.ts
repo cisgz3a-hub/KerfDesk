@@ -19,4 +19,6 @@ export {
   type SvgElement,
   type SvgParseResult,
   type ParsedLength,
+  type ParseSvgOptions,
+  type SvgUnitMode,
 } from './SvgParser';
