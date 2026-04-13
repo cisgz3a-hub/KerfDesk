@@ -230,8 +230,37 @@ assertThrows(
 
 assertThrows(
   () => deserializeScene('{"format":"laserforge","version":"2.0"}'),
-  'Unsupported file version', 'Wrong version'
+  'not supported by this version', 'Wrong major version'
 );
+
+// ─── TEST: ENVELOPE VERSION 1.x (best-effort) ────────────────────
+
+console.log('\n=== Test: Envelope version 1.x forward compatibility ===');
+
+const minimalBase = {
+  format: 'laserforge',
+  version: '1.0',
+  scene: {
+    id: 'fwd-scene',
+    canvas: { width: 100, height: 100 },
+    layers: [{ id: 'L1', settings: { mode: 'cut', power: 80, speed: 300, passes: 1, interval: 0.1, angle: 0, dpi: 254, powerMin: 0, airAssist: false, zOffset: 0 } }],
+    objects: [{
+      id: 'o1',
+      layerId: 'L1',
+      geometry: { type: 'rect', x: 0, y: 0, width: 10, height: 10, cornerRadius: 0 },
+      transform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 },
+    }],
+  },
+};
+
+const fwd11 = { ...minimalBase, version: '1.1' };
+const loaded11 = deserializeScene(JSON.stringify(fwd11));
+assert(loaded11.id === 'fwd-scene', 'Envelope 1.1: scene loads');
+
+const noEnvVer = JSON.parse(JSON.stringify(minimalBase)) as typeof minimalBase;
+delete noEnvVer.version;
+const loadedNo = deserializeScene(JSON.stringify(noEnvVer));
+assert(loadedNo.id === 'fwd-scene', 'Missing envelope version: treated as major 1');
 
 assertThrows(
   () => deserializeScene('{"format":"laserforge","version":"1.0"}'),

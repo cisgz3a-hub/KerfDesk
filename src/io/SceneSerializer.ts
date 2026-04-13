@@ -121,7 +121,7 @@ export function serializeForAutosave(scene: Scene): string {
 /**
  * Parse a JSON string back into a Scene.
  *
- * - Validates the file envelope (format, version)
+ * - Validates the file envelope (format, version: major 1 loads, major 2+ rejected, 1.x not 1.0 warns and loads best-effort)
  * - Validates required scene fields
  * - Restores transient state defaults (empty selection, null caches)
  * - Preserves all IDs exactly as saved
@@ -146,115 +146,25 @@ export function deserializeScene(json: string): Scene {
     throw new Error(`Unknown file format: '${parsed.format}' (expected 'laserforge')`);
   }
 
-  // Version check with migration path
-  if (parsed.version !== '1.0') {
-    return migrateScene(parsed);
+  const major = fileFormatMajor(parsed.version);
+  if (!Number.isFinite(major) || major < 1) {
+    throw new Error('Invalid file: format version is missing or not recognized (expected major version 1)');
+  }
+  if (major > 1) {
+    const raw = parsed.version == null || parsed.version === '' ? '(unknown)' : String(parsed.version);
+    throw new Error(
+      `This project file uses format version ${raw}, which is not supported by this version of LaserForge. Please update the app to open it.`,
+    );
   }
 
-  const s = parsed.scene;
-  if (!s || typeof s !== 'object') {
-    throw new Error('Invalid file: missing scene data');
+  const vDisplay = parsed.version == null || parsed.version === '' ? '1.0' : String(parsed.version);
+  if (vDisplay !== '1.0') {
+    console.warn(
+      `[LaserForge] Loading file format ${vDisplay} as 1.0-compatible (best-effort). Re-save the project to normalize the file header.`,
+    );
   }
 
-  // Validate required fields
-  validateRequired(s, 'id', 'string');
-  validateRequired(s, 'canvas', 'object');
-  validateRequired(s.canvas, 'width', 'number');
-  validateRequired(s.canvas, 'height', 'number');
-  validateArray(s, 'layers');
-  validateArray(s, 'objects');
-
-  if (s.layers.length === 0) {
-    throw new Error('Invalid file: scene must have at least one layer');
-  }
-
-  // Validate each layer has an id
-  for (const layer of s.layers) {
-    validateRequired(layer, 'id', 'string');
-    validateRequired(layer, 'settings', 'object');
-  }
-
-  // Validate each object has an id and geometry
-  for (const obj of s.objects) {
-    validateRequired(obj, 'id', 'string');
-    validateRequired(obj, 'geometry', 'object');
-    validateRequired(obj, 'transform', 'object');
-    validateTransform(obj.transform, `object '${obj.id || '?'}'`);
-  }
-
-  // Validate canvas dimensions are finite
-  if (!Number.isFinite(s.canvas.width) || !Number.isFinite(s.canvas.height)) {
-    throw new Error('Invalid file: canvas dimensions must be finite numbers');
-  }
-
-  // Reconstruct Scene with transient defaults
-  const scene: Scene = {
-    id: s.id,
-    version: s.version || '1.0',
-    canvas: {
-      width: s.canvas.width,
-      height: s.canvas.height,
-      origin: s.canvas.origin || 'top-left',
-      units: s.canvas.units || 'mm',
-    },
-    layers: s.layers.map((l: any) => restoreLayerDefaults(l)),
-    objects: s.objects.map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
-    material: s.material ?? null,
-    startPosition: s.startPosition ?? { x: 0, y: 0 },
-    machine: s.machine,
-    selection: [],              // Transient: always empty on load
-    activeLayerId: s.activeLayerId || s.layers[0].id,
-    metadata: {
-      name: s.metadata?.name || 'Untitled',
-      created: s.metadata?.created || new Date().toISOString(),
-      modified: s.metadata?.modified || new Date().toISOString(),
-      author: s.metadata?.author || '',
-      notes: s.metadata?.notes || '',
-      deviceProfileId: s.metadata?.deviceProfileId ?? null,
-      materialPresetId: s.metadata?.materialPresetId ?? null,
-    },
-  };
-
-  // ─── REFERENTIAL INTEGRITY ────────────────────────────────────
-  // Validate and repair broken references to prevent runtime crashes
-
-  const layerIds = new Set(scene.layers.map(l => l.id));
-
-  // Fix activeLayerId if it points to a non-existent layer
-  if (!layerIds.has(scene.activeLayerId)) {
-    scene.activeLayerId = scene.layers[0].id;
-  }
-
-  // Fix objects whose layerId points to a non-existent layer
-  let orphanCount = 0;
-  for (const obj of scene.objects) {
-    if (!layerIds.has(obj.layerId)) {
-      obj.layerId = scene.layers[0].id;
-      orphanCount++;
-    }
-  }
-
-  // Fix objects whose parentId points to a non-existent object
-  const objectIds = new Set(scene.objects.map(o => o.id));
-  for (const obj of scene.objects) {
-    if (obj.parentId && !objectIds.has(obj.parentId)) {
-      obj.parentId = null;
-    }
-  }
-
-  // Remove duplicate object IDs (keep the first occurrence)
-  const seenIds = new Set<string>();
-  scene.objects = scene.objects.filter(o => {
-    if (seenIds.has(o.id)) return false;
-    seenIds.add(o.id);
-    return true;
-  });
-
-  if (orphanCount > 0) {
-    console.warn(`[LaserForge] Repaired ${orphanCount} object(s) with invalid layer references`);
-  }
-
-  return scene;
+  return buildSceneFromParsedEnvelope(parsed);
 }
 
 // ─── VALIDATION HELPERS ──────────────────────────────────────────
@@ -288,15 +198,111 @@ function validateTransform(t: any, context: string): void {
   }
 }
 
-// ─── MIGRATION ───────────────────────────────────────────────────
+// ─── MIGRATION / ENVELOPE PARSE ──────────────────────────────────
 
-/**
- * Migrate files from older format versions.
- * Currently no older versions exist, so this always throws.
- * When version '1.1' is introduced, add a migration path here.
- */
-function migrateScene(file: any): Scene {
-  throw new Error(`Unsupported file version: '${file.version}' (expected '1.0'). No migration available.`);
+/** Major version number from envelope `version` (e.g. "1.2" → 1). Missing/empty → 1. */
+function fileFormatMajor(version: unknown): number {
+  if (version == null || version === '') return 1;
+  const s = String(version).trim();
+  const m = /^(\d+)/.exec(s);
+  if (!m) return NaN;
+  return parseInt(m[1], 10);
+}
+
+/** Shared load path after envelope checks (format laserforge, major version 1). */
+function buildSceneFromParsedEnvelope(parsed: any): Scene {
+  const s = parsed.scene;
+  if (!s || typeof s !== 'object') {
+    throw new Error('Invalid file: missing scene data');
+  }
+
+  validateRequired(s, 'id', 'string');
+  validateRequired(s, 'canvas', 'object');
+  validateRequired(s.canvas, 'width', 'number');
+  validateRequired(s.canvas, 'height', 'number');
+  validateArray(s, 'layers');
+  validateArray(s, 'objects');
+
+  if (s.layers.length === 0) {
+    throw new Error('Invalid file: scene must have at least one layer');
+  }
+
+  for (const layer of s.layers) {
+    validateRequired(layer, 'id', 'string');
+    validateRequired(layer, 'settings', 'object');
+  }
+
+  for (const obj of s.objects) {
+    validateRequired(obj, 'id', 'string');
+    validateRequired(obj, 'geometry', 'object');
+    validateRequired(obj, 'transform', 'object');
+    validateTransform(obj.transform, `object '${obj.id || '?'}'`);
+  }
+
+  if (!Number.isFinite(s.canvas.width) || !Number.isFinite(s.canvas.height)) {
+    throw new Error('Invalid file: canvas dimensions must be finite numbers');
+  }
+
+  const scene: Scene = {
+    id: s.id,
+    version: s.version || '1.0',
+    canvas: {
+      width: s.canvas.width,
+      height: s.canvas.height,
+      origin: s.canvas.origin || 'top-left',
+      units: s.canvas.units || 'mm',
+    },
+    layers: s.layers.map((l: any) => restoreLayerDefaults(l)),
+    objects: s.objects.map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
+    material: s.material ?? null,
+    startPosition: s.startPosition ?? { x: 0, y: 0 },
+    machine: s.machine,
+    selection: [],
+    activeLayerId: s.activeLayerId || s.layers[0].id,
+    metadata: {
+      name: s.metadata?.name || 'Untitled',
+      created: s.metadata?.created || new Date().toISOString(),
+      modified: s.metadata?.modified || new Date().toISOString(),
+      author: s.metadata?.author || '',
+      notes: s.metadata?.notes || '',
+      deviceProfileId: s.metadata?.deviceProfileId ?? null,
+      materialPresetId: s.metadata?.materialPresetId ?? null,
+    },
+  };
+
+  const layerIds = new Set(scene.layers.map(l => l.id));
+
+  if (!layerIds.has(scene.activeLayerId)) {
+    scene.activeLayerId = scene.layers[0].id;
+  }
+
+  let orphanCount = 0;
+  for (const obj of scene.objects) {
+    if (!layerIds.has(obj.layerId)) {
+      obj.layerId = scene.layers[0].id;
+      orphanCount++;
+    }
+  }
+
+  const objectIds = new Set(scene.objects.map(o => o.id));
+  for (const obj of scene.objects) {
+    if (obj.parentId && !objectIds.has(obj.parentId)) {
+      obj.parentId = null;
+    }
+  }
+
+  const seenIds = new Set<string>();
+  scene.objects = scene.objects.filter(o => {
+    if (seenIds.has(o.id)) return false;
+    seenIds.add(o.id);
+    return true;
+  });
+
+  if (orphanCount > 0) {
+    console.warn(`[LaserForge] Repaired ${orphanCount} object(s) with invalid layer references`);
+  }
+
+  return scene;
 }
 
 // ─── DEFAULT RESTORATION ─────────────────────────────────────────
@@ -365,7 +371,8 @@ function restoreLayerDefaults(l: any): Layer {
   };
 }
 
-function migratePathGeometry(geom: unknown): Geometry {
+/** Per-geometry migrations applied on every load (e.g. legacy JSON keys). */
+function migrateGeometry(geom: unknown): Geometry {
   if (!geom || typeof geom !== 'object') return geom as Geometry;
   const g = geom as Record<string, unknown>;
   if (g.type === 'path' && g._sourceText != null && g.sourceText == null) {
@@ -383,7 +390,7 @@ function restoreObjectDefaults(o: any): SceneObject {
     layerId: o.layerId || '',
     parentId: o.parentId ?? null,
     transform: o.transform,
-    geometry: migratePathGeometry(o.geometry),
+    geometry: migrateGeometry(o.geometry),
     visible: o.visible !== false,
     locked: o.locked === true,
     powerScale: o.powerScale ?? 1.0,

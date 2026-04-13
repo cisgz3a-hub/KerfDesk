@@ -3,7 +3,7 @@
  * Returns a readiness score (0-100%) with categorized issues.
  */
 
-import { type Scene } from '../scene/Scene';
+import { type Scene, getOutputLayers } from '../scene/Scene';
 import { type SceneObject } from '../scene/SceneObject';
 import { type MachineState } from '../../controllers/ControllerInterface';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -150,15 +150,19 @@ export function runPreflight(
   }
 
   // ─── DESIGN CHECKS ──────────────────────────────────
-  const visibleObjects = scene.objects.filter(o => o.visible);
-  const visibleLayers = scene.layers.filter(l => l.visible);
+  // Match JobCompiler: only objects on visible layers with output enabled (see getOutputLayers).
+  const outputLayers = getOutputLayers(scene);
+  const outputLayerIds = new Set(outputLayers.map(l => l.id));
+  const outputObjects = scene.objects.filter(o => o.visible && outputLayerIds.has(o.layerId));
 
-  if (visibleObjects.length === 0) {
+  if (outputObjects.length === 0) {
     issues.push({
       id: 'design-empty',
       severity: 'blocker',
-      title: 'No objects on canvas',
-      detail: 'Add or import objects before starting a job',
+      title: 'No objects on output layers',
+      detail:
+        'Nothing will be sent to the laser — objects are hidden, on hidden layers, or on layers excluded from output.',
+      fix: 'Show objects, enable layer output, or move artwork onto a layer that is included in the job',
       category: 'design',
     });
   }
@@ -166,7 +170,7 @@ export function runPreflight(
   // Objects outside material bounds (world-space AABB, respects rotation/scale)
   if (scene.material && scene.material.enabled !== false) {
     const mat = scene.material;
-    for (const obj of visibleObjects) {
+    for (const obj of outputObjects) {
       const { outside, partial } = isObjectOutsideMaterial(obj, mat);
 
       if (outside) {
@@ -191,7 +195,7 @@ export function runPreflight(
     }
   }
 
-  for (const obj of visibleObjects) {
+  for (const obj of outputObjects) {
     if (isObjectOutsideBed(obj, scene.canvas)) {
       issues.push({
         id: `design-outside-bed-${obj.id}`,
@@ -204,13 +208,9 @@ export function runPreflight(
     }
   }
 
-  // Text objects on output layers: warn about small fonts that may not convert to outlines
-  const outputLayerIds = new Set(
-    scene.layers.filter(l => l.visible && l.output !== false).map(l => l.id),
-  );
-  for (const obj of visibleObjects) {
+  // Text on output layers: warn about small fonts / empty text (outputObjects already scoped)
+  for (const obj of outputObjects) {
     if (obj.geometry.type !== 'text') continue;
-    if (!outputLayerIds.has(obj.layerId)) continue;
     const g = obj.geometry;
     const fontSize = g.fontSize || 10;
     if (fontSize < 4) {
@@ -236,8 +236,7 @@ export function runPreflight(
   }
 
   // Engrave + fill: very small shapes vs line spacing (may get outline fallback or sparse lines)
-  for (const obj of visibleObjects) {
-    if (!outputLayerIds.has(obj.layerId)) continue;
+  for (const obj of outputObjects) {
     const layer = scene.layers.find(l => l.id === obj.layerId);
     if (!layer || layer.settings.mode !== 'engrave') continue;
     const rawIv = Number(layer.settings.fill.interval);
@@ -262,9 +261,7 @@ export function runPreflight(
   }
 
   // ─── SETTINGS CHECKS ─────────────────────────────────
-  for (const layer of visibleLayers) {
-    if (layer.output === false) continue;
-
+  for (const layer of outputLayers) {
     if (layer.settings.power.max === 0) {
       issues.push({
         id: `settings-zero-power-${layer.id}`,
@@ -308,7 +305,6 @@ export function runPreflight(
     }
   }
 
-  const outputLayers = visibleLayers.filter(l => l.output !== false);
   if (outputLayers.length > 0) {
     const modeLabel = (m: string) =>
       m === 'cut' ? 'Cut' : m === 'engrave' ? 'Engrave' : m === 'score' ? 'Score' : m === 'image' ? 'Image' : m;
