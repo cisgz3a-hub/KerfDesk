@@ -16,7 +16,10 @@ export function useGcodeExport(
 
   const compileGcode = useCallback(async (targetScene: Scene): Promise<string | null> => {
     try {
-      const sceneForJob = await expandTextOutlinesForCompile(targetScene);
+      const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(targetScene);
+      if (failedTextObjects.length > 0) {
+        console.warn(`[LaserForge] Text outline conversion failed for: ${failedTextObjects.join(', ')}. These text objects will be excluded from the job. Try a larger font size or bolder font.`);
+      }
       const job = compileJob(sceneForJob);
       if (job.operations.length === 0) return null;
       const plan = optimizePlan(job);
@@ -32,7 +35,10 @@ export function useGcodeExport(
 
   const compileToolpathMoves = useCallback(async (targetScene: Scene): Promise<Move[] | null> => {
     try {
-      const sceneForJob = await expandTextOutlinesForCompile(targetScene);
+      const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(targetScene);
+      if (failedTextObjects.length > 0) {
+        console.warn(`[LaserForge] Text outline conversion failed for: ${failedTextObjects.join(', ')}`);
+      }
       const job = compileJob(sceneForJob);
       if (job.operations.length === 0) return null;
       const plan = optimizePlan(job);

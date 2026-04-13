@@ -202,6 +202,37 @@ export function runPreflight(
     }
   }
 
+  // Text objects on output layers: warn about small fonts that may not convert to outlines
+  const outputLayerIds = new Set(
+    scene.layers.filter(l => l.visible && l.output !== false).map(l => l.id),
+  );
+  for (const obj of visibleObjects) {
+    if (obj.geometry.type !== 'text') continue;
+    if (!outputLayerIds.has(obj.layerId)) continue;
+    const g = obj.geometry;
+    const fontSize = g.fontSize || 10;
+    if (fontSize < 4) {
+      issues.push({
+        id: `design-text-small-${obj.id}`,
+        severity: 'warning',
+        title: `Text "${obj.name}" has a very small font (${fontSize.toFixed(1)}mm)`,
+        detail: 'Small or thin text may not convert to outlines correctly and could be missing from the job output',
+        fix: 'Increase the font size to at least 4mm, or use a bolder font',
+        category: 'design',
+      });
+    }
+    if (!g.text?.trim()) {
+      issues.push({
+        id: `design-text-empty-${obj.id}`,
+        severity: 'warning',
+        title: `Text object "${obj.name}" is empty`,
+        detail: 'This text object has no content and will produce no output',
+        fix: 'Add text content or remove the object',
+        category: 'design',
+      });
+    }
+  }
+
   // ─── SETTINGS CHECKS ─────────────────────────────────
   for (const layer of visibleLayers) {
     if (layer.output === false) continue;

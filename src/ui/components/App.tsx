@@ -192,7 +192,7 @@ export function App() {
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
       void (async () => {
         try {
-          const sceneForJob = await expandTextOutlinesForCompile(scene);
+          const { scene: sceneForJob } = await expandTextOutlinesForCompile(scene);
           if (cancelled) return;
           const job = compileJob(sceneForJob);
           if (job.operations.length === 0) {

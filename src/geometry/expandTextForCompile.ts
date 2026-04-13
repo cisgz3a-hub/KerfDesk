@@ -7,9 +7,16 @@ import { type Scene } from '../core/scene/Scene';
 import { type SceneObject } from '../core/scene/SceneObject';
 import { textGeometryToPath } from './TextToPath';
 
-export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene> {
+export interface TextExpansionResult {
+  scene: Scene;
+  /** Names/IDs of text objects whose outlines could not be generated (potrace returned nothing). */
+  failedTextObjects: string[];
+}
+
+export async function expandTextOutlinesForCompile(scene: Scene): Promise<TextExpansionResult> {
   const objects: SceneObject[] = [];
   let changed = false;
+  const failedTextObjects: string[] = [];
 
   for (const obj of scene.objects) {
     if (obj.geometry.type !== 'text') {
@@ -19,6 +26,7 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene>
     const g = obj.geometry;
     const result = await textGeometryToPath(g);
     if (!result?.subPaths.length) {
+      failedTextObjects.push(obj.name || obj.id);
       objects.push({
         ...obj,
         geometry: { ...g, outlineSubPaths: undefined },
@@ -36,5 +44,6 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<Scene>
     });
   }
 
-  return changed ? { ...scene, objects } : scene;
+  const outScene = changed ? { ...scene, objects } : scene;
+  return { scene: outScene, failedTextObjects };
 }
