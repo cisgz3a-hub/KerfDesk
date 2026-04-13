@@ -19,7 +19,7 @@
  * Last updated: UI Wiring — App Shell
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
@@ -511,23 +511,16 @@ export function App() {
 
   const { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves } = useGcodeExport(startMode, savedOrigin);
 
-  const lastCompiledSceneRef = useRef('');
+  /** Monotonic tick bumped when `scene`, `startMode`, or `savedOrigin` changes — O(1) compile invalidation vs JSON fingerprint. */
+  const sceneRevisionRef = useRef(0);
+  const [sceneCompileTick, setSceneCompileTick] = useState(0);
+  const lastCompiledRevisionRef = useRef<number | null>(null);
   const [gcodeStale, setGcodeStale] = useState(false);
 
-  const sceneCompileFingerprint = useCallback(
-    (s: Scene) =>
-      JSON.stringify({
-        objects: s.objects.map(o => ({ id: o.id, transform: o.transform, geometry: o.geometry, layerId: o.layerId })),
-        startMode,
-        savedOrigin,
-      }),
-    [startMode, savedOrigin],
-  );
-
-  const toolpathCompileKey = useMemo(
-    () => sceneCompileFingerprint(scene),
-    [scene, sceneCompileFingerprint],
-  );
+  useLayoutEffect(() => {
+    sceneRevisionRef.current += 1;
+    setSceneCompileTick(sceneRevisionRef.current);
+  }, [scene, startMode, savedOrigin]);
 
   const handleTogglePreview = useCallback(() => {
     setShowToolpathPreview(p => !p);
@@ -551,24 +544,26 @@ export function App() {
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, toolpathCompileKey, compileToolpathMoves, showAlert]);
+  }, [showToolpathPreview, sceneCompileTick, compileToolpathMoves, showAlert]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;
-    const currentKey = sceneCompileFingerprint(scene);
-    if (lastCompiledSceneRef.current && currentKey !== lastCompiledSceneRef.current) {
+    if (
+      lastCompiledRevisionRef.current !== null &&
+      lastCompiledRevisionRef.current !== sceneCompileTick
+    ) {
       setGcodeStale(true);
     }
-  }, [scene.objects, connectionSidebarOpen, sceneCompileFingerprint, scene]);
+  }, [sceneCompileTick, connectionSidebarOpen]);
 
   const handleConnectionRecompile = useCallback(() => {
     void (async () => {
       const gc = await compileGcode(scene);
       setCurrentGcode(gc);
-      lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
+      lastCompiledRevisionRef.current = sceneCompileTick;
       setGcodeStale(false);
     })();
-  }, [scene, compileGcode, setCurrentGcode, sceneCompileFingerprint]);
+  }, [scene, compileGcode, setCurrentGcode, sceneCompileTick]);
 
   const bumpCanvasRepaint = useCallback(() => {
     try {
@@ -1035,14 +1030,14 @@ export function App() {
         await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
       }
       setCurrentGcode(gc);
-      lastCompiledSceneRef.current = sceneCompileFingerprint(scene);
+      lastCompiledRevisionRef.current = sceneCompileTick;
       setGcodeStale(false);
     } catch (err) {
       console.error('G-code build failed:', err);
       setCurrentGcode(null);
     }
     dialogs.setShowConnection(true);
-  }, [scene, compileGcode, showAlert, sceneCompileFingerprint]);
+  }, [scene, compileGcode, showAlert, sceneCompileTick]);
 
   const handleToolbarDisconnect = useCallback(async () => {
     try {

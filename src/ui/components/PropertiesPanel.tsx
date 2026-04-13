@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { theme } from '../styles/theme';
 import {
@@ -35,6 +35,13 @@ export interface ObjectPropertiesTabProps {
 
 /** Object properties UI (embedded in LayerPanel Object tab). */
 export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: ObjectPropertiesTabProps) {
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
+
+  /** Skip one blur commit after pointer-up (same slider already committed). */
+  const skipBlurBrightnessCommit = useRef(false);
+  const skipBlurContrastCommit = useRef(false);
+
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
 
@@ -48,49 +55,76 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     onSceneCommit(newScene);
   }, [scene, onSceneCommit]);
 
-  const updateImageSettings = useCallback((objId: string, field: string, value: number | boolean) => {
-    const newScene = {
-      ...scene,
-      objects: scene.objects.map(o => {
-        if (o.id !== objId || o.geometry.type !== 'image') return o;
-        const geom = o.geometry as ImageGeometry;
+  /** Live preview only: updates brightness/contrast/invert on geometry. Canvas uses ctx.filter; no buffer work, no history. */
+  const previewImageSettings = useCallback(
+    (objId: string, field: 'brightness' | 'contrast' | 'invert', value: number | boolean) => {
+      if (!onSceneChange) return;
+      const s = sceneRef.current;
+      const newScene = {
+        ...s,
+        objects: s.objects.map(o => {
+          if (o.id !== objId || o.geometry.type !== 'image') return o;
+          const geom = o.geometry as ImageGeometry;
+          return {
+            ...o,
+            geometry: { ...geom, [field]: value } as ImageGeometry,
+            _bounds: null,
+            _worldTransform: null,
+          };
+        }),
+      };
+      onSceneChange(newScene);
+    },
+    [onSceneChange],
+  );
 
-        // Get current grayscale data
-        if (!geom.grayscaleData || !geom.grayscaleWidth || !geom.grayscaleHeight) return o;
+  /** Recompute adjusted grayscale from source + current settings; one history entry (dither cleared). */
+  const commitImageSettings = useCallback(
+    (objId: string, overrides?: Partial<Pick<ImageGeometry, 'brightness' | 'contrast' | 'invert'>>) => {
+      const s = sceneRef.current;
+      const newScene = {
+        ...s,
+        objects: s.objects.map(o => {
+          if (o.id !== objId || o.geometry.type !== 'image') return o;
+          const geom = o.geometry as ImageGeometry;
 
-        // Store adjustment values on the geometry (we'll add these fields)
-        const newGeom = { ...geom, [field]: value } as ImageGeometry;
+          if (!geom.grayscaleData || !geom.grayscaleWidth || !geom.grayscaleHeight) return o;
 
-        // Recompute adjusted grayscale
-        const src = geom.grayscaleData;
-        const adjusted = new Uint8Array(src.length);
-        const brightness = newGeom.brightness ?? 0;
-        const contrast = newGeom.contrast ?? 0;
-        const invert = newGeom.invert ?? false;
+          const newGeom = {
+            ...geom,
+            brightness: overrides?.brightness ?? geom.brightness ?? 0,
+            contrast: overrides?.contrast ?? geom.contrast ?? 0,
+            invert: overrides?.invert ?? geom.invert ?? false,
+          } as ImageGeometry;
 
-        const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
+          const src = geom.grayscaleData;
+          const adjusted = new Uint8Array(src.length);
+          const brightness = newGeom.brightness ?? 0;
+          const contrast = newGeom.contrast ?? 0;
+          const invert = newGeom.invert ?? false;
 
-        for (let i = 0; i < src.length; i++) {
-          let v = src[i];
-          // Brightness
-          v = Math.max(0, Math.min(255, v + brightness));
-          // Contrast
-          v = Math.max(0, Math.min(255, Math.round(contrastFactor * (v - 128) + 128)));
-          // Invert
-          if (invert) v = 255 - v;
-          adjusted[i] = v;
-        }
+          const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
 
-        return {
-          ...o,
-          geometry: { ...newGeom, adjustedData: adjusted, ditherMode: undefined },
-          _bounds: null,
-          _worldTransform: null,
-        };
-      }),
-    };
-    onSceneCommit(newScene);
-  }, [scene, onSceneCommit]);
+          for (let i = 0; i < src.length; i++) {
+            let v = src[i];
+            v = Math.max(0, Math.min(255, v + brightness));
+            v = Math.max(0, Math.min(255, Math.round(contrastFactor * (v - 128) + 128)));
+            if (invert) v = 255 - v;
+            adjusted[i] = v;
+          }
+
+          return {
+            ...o,
+            geometry: { ...newGeom, adjustedData: adjusted, ditherMode: undefined },
+            _bounds: null,
+            _worldTransform: null,
+          };
+        }),
+      };
+      onSceneCommit(newScene);
+    },
+    [onSceneCommit],
+  );
 
   const [traceThreshold, setTraceThreshold] = React.useState(DEFAULT_TRACE_OPTIONS.threshold);
   const [traceTurdsize, setTraceTurdsize] = React.useState(DEFAULT_TRACE_OPTIONS.turdsize);
@@ -818,7 +852,21 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         value: (obj.geometry as ImageGeometry).brightness ?? 0,
         style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
         onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          updateImageSettings(obj.id, 'brightness', parseInt(e.target.value, 10)),
+          previewImageSettings(obj.id, 'brightness', parseInt(e.target.value, 10)),
+        onFocus: () => {
+          skipBlurBrightnessCommit.current = false;
+        },
+        onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+          skipBlurBrightnessCommit.current = true;
+          commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
+        },
+        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+          if (skipBlurBrightnessCommit.current) {
+            skipBlurBrightnessCommit.current = false;
+            return;
+          }
+          commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
+        },
       }),
 
       React.createElement('div', { style: labelStyle }, 'Contrast'),
@@ -829,7 +877,21 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         value: (obj.geometry as ImageGeometry).contrast ?? 0,
         style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
         onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          updateImageSettings(obj.id, 'contrast', parseInt(e.target.value, 10)),
+          previewImageSettings(obj.id, 'contrast', parseInt(e.target.value, 10)),
+        onFocus: () => {
+          skipBlurContrastCommit.current = false;
+        },
+        onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+          skipBlurContrastCommit.current = true;
+          commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
+        },
+        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+          if (skipBlurContrastCommit.current) {
+            skipBlurContrastCommit.current = false;
+            return;
+          }
+          commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
+        },
       }),
 
       React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
@@ -837,7 +899,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           type: 'checkbox',
           checked: (obj.geometry as ImageGeometry).invert ?? false,
           onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-            updateImageSettings(obj.id, 'invert', e.target.checked),
+            commitImageSettings(obj.id, { invert: e.target.checked }),
         }),
         React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Invert'),
       ),

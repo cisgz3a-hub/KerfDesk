@@ -4,13 +4,51 @@
  */
 
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject } from '../core/scene/SceneObject';
+import { type SceneObject, type SubPath, type TextGeometry } from '../core/scene/SceneObject';
 import { textGeometryToPath } from './TextToPath';
 
 export interface TextExpansionResult {
   scene: Scene;
   /** Names/IDs of text objects whose outlines could not be generated (potrace returned nothing). */
   failedTextObjects: string[];
+}
+
+const TEXT_OUTLINE_CACHE_MAX = 64;
+/** Potrace results keyed by text geometry fingerprint (LRU). */
+const textOutlineCache = new Map<string, SubPath[]>();
+
+function textOutlineFingerprint(g: TextGeometry): string {
+  return JSON.stringify({
+    t: g.text,
+    fs: g.fontSize,
+    ff: g.fontFamily,
+    b: !!g.bold,
+    i: !!g.italic,
+    ta: g.textAlign ?? 'left',
+    ls: g.letterSpacing ?? 0,
+    lh: g.lineSpacing ?? 120,
+    ws: g.wordSpacing ?? 100,
+  });
+}
+
+function cloneSubPaths(paths: SubPath[]): SubPath[] {
+  return structuredClone(paths) as SubPath[];
+}
+
+function outlineCacheGet(key: string): SubPath[] | undefined {
+  const v = textOutlineCache.get(key);
+  if (!v) return undefined;
+  textOutlineCache.delete(key);
+  textOutlineCache.set(key, v);
+  return cloneSubPaths(v);
+}
+
+function outlineCacheSet(key: string, paths: SubPath[]): void {
+  textOutlineCache.delete(key);
+  textOutlineCache.set(key, cloneSubPaths(paths));
+  while (textOutlineCache.size > TEXT_OUTLINE_CACHE_MAX) {
+    textOutlineCache.delete(textOutlineCache.keys().next().value);
+  }
 }
 
 export async function expandTextOutlinesForCompile(scene: Scene): Promise<TextExpansionResult> {
@@ -24,6 +62,19 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<TextEx
       continue;
     }
     const g = obj.geometry;
+    const fp = textOutlineFingerprint(g);
+    const cached = outlineCacheGet(fp);
+    if (cached) {
+      changed = true;
+      objects.push({
+        ...obj,
+        geometry: { ...g, outlineSubPaths: cached },
+        _bounds: null,
+        _worldTransform: null,
+      });
+      continue;
+    }
+
     const result = await textGeometryToPath(g);
     if (!result?.subPaths.length) {
       failedTextObjects.push(obj.name || obj.id);
@@ -35,6 +86,7 @@ export async function expandTextOutlinesForCompile(scene: Scene): Promise<TextEx
       });
       continue;
     }
+    outlineCacheSet(fp, result.subPaths);
     changed = true;
     objects.push({
       ...obj,

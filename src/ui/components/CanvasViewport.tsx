@@ -520,8 +520,13 @@ export function CanvasViewport({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    canvas.width = width;
-    canvas.height = height;
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    } else {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 
     const transform = Transform.from(viewport);
 

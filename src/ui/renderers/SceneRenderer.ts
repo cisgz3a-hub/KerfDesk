@@ -33,12 +33,67 @@ function dispatchCanvasRepaint(): void {
   window.dispatchEvent(new Event(CANVAS_REPAINT_EVENT));
 }
 
-// Renderer-private caches — not stored on scene objects
-const imageCacheMap = new WeakMap<object, Map<string, HTMLImageElement>>();
-const ditherCacheMap = new WeakMap<object, { key: string; canvas: HTMLCanvasElement }>();
-/** Per render object: maps `indexeddb://id` → resolved data URI */
-const idbResolvedUriByObject = new WeakMap<object, Map<string, string>>();
-const idbPendingLoadByObject = new WeakMap<object, Set<string>>();
+// Global content-keyed caches (LRU) — moving/transforming an object does not evict entries.
+const RENDER_CACHE_CAP = 100;
+
+const imageElementBySrc = new Map<string, HTMLImageElement>();
+const idbResolvedUriBySrc = new Map<string, string>();
+const idbPendingSrc = new Set<string>();
+const ditherCanvasByKey = new Map<string, HTMLCanvasElement>();
+
+function shrinkMap<K, V>(m: Map<K, V>): void {
+  while (m.size > RENDER_CACHE_CAP) {
+    m.delete(m.keys().next().value);
+  }
+}
+
+function touchMap<K, V>(m: Map<K, V>, key: K): void {
+  const v = m.get(key);
+  if (v === undefined) return;
+  m.delete(key);
+  m.set(key, v);
+}
+
+function getOrCreateImage(loadSrc: string): HTMLImageElement {
+  let img = imageElementBySrc.get(loadSrc);
+  if (img) {
+    touchMap(imageElementBySrc, loadSrc);
+    return img;
+  }
+  img = new Image();
+  img.src = loadSrc;
+  imageElementBySrc.set(loadSrc, img);
+  img.onload = () => {
+    dispatchCanvasRepaint();
+  };
+  shrinkMap(imageElementBySrc);
+  return img;
+}
+
+function setIdbResolved(srcKey: string, uri: string): void {
+  idbResolvedUriBySrc.delete(srcKey);
+  idbResolvedUriBySrc.set(srcKey, uri);
+  shrinkMap(idbResolvedUriBySrc);
+}
+
+function getIdbResolved(srcKey: string): string | undefined {
+  const u = idbResolvedUriBySrc.get(srcKey);
+  if (u !== undefined) touchMap(idbResolvedUriBySrc, srcKey);
+  return u;
+}
+
+function ditherCacheGet(key: string): HTMLCanvasElement | undefined {
+  const c = ditherCanvasByKey.get(key);
+  if (!c) return undefined;
+  touchMap(ditherCanvasByKey, key);
+  return c;
+}
+
+function ditherCacheSet(key: string, canvas: HTMLCanvasElement): void {
+  ditherCanvasByKey.delete(key);
+  ditherCanvasByKey.set(key, canvas);
+  shrinkMap(ditherCanvasByKey);
+}
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
@@ -807,37 +862,21 @@ function drawGeometry(
 
     case 'image': {
       if (!forObject) break;
-      const renderObject = forObject;
-      // Load and cache images for rendering
-      let imgCache = imageCacheMap.get(renderObject);
-      if (!imgCache) {
-        imgCache = new Map<string, HTMLImageElement>();
-        imageCacheMap.set(renderObject, imgCache);
-      }
 
       let loadSrc = geom.src;
       if (geom.src.startsWith('indexeddb://')) {
-        let rmap = idbResolvedUriByObject.get(renderObject);
-        if (!rmap) {
-          rmap = new Map<string, string>();
-          idbResolvedUriByObject.set(renderObject, rmap);
-        }
-        const resolved = rmap.get(geom.src);
+        const resolved = getIdbResolved(geom.src);
         if (resolved) {
           loadSrc = resolved;
         } else {
-          let pending = idbPendingLoadByObject.get(renderObject);
-          if (!pending) {
-            pending = new Set<string>();
-            idbPendingLoadByObject.set(renderObject, pending);
-          }
-          if (!pending.has(geom.src)) {
-            pending.add(geom.src);
+          if (!idbPendingSrc.has(geom.src)) {
+            idbPendingSrc.add(geom.src);
             const rawId = geom.src.slice('indexeddb://'.length);
+            const srcKey = geom.src;
             void getImage(rawId).then(uri => {
-              pending!.delete(geom.src);
+              idbPendingSrc.delete(srcKey);
               if (uri) {
-                rmap!.set(geom.src, uri);
+                setIdbResolved(srcKey, uri);
                 dispatchCanvasRepaint();
               }
             });
@@ -858,15 +897,7 @@ function drawGeometry(
         }
       }
 
-      let img = imgCache.get(loadSrc);
-      if (!img) {
-        img = new Image();
-        img.src = loadSrc;
-        imgCache.set(loadSrc, img);
-        img.onload = () => {
-          dispatchCanvasRepaint();
-        };
-      }
+      const img = getOrCreateImage(loadSrc);
 
       if (img.complete && img.naturalWidth > 0) {
         const dpi = 96;
@@ -895,10 +926,10 @@ function drawGeometry(
         const ditherMode = (geom as any).ditherMode;
         const adjustedData = (geom as any).adjustedData;
         if (ditherMode && ditherMode !== 'none' && adjustedData && geom.grayscaleWidth && geom.grayscaleHeight) {
-          const cacheKey = `dither_${geom.grayscaleWidth}_${geom.grayscaleHeight}_${ditherMode}_${adjustedData.length}`;
-          let cached = ditherCacheMap.get(renderObject);
+          const ditherKey = `${loadSrc}\x1e${geom.grayscaleWidth}\x1e${geom.grayscaleHeight}\x1e${ditherMode}\x1e${adjustedData.length}`;
+          let ditherCanvas = ditherCacheGet(ditherKey);
 
-          if (!cached || cached.key !== cacheKey) {
+          if (!ditherCanvas) {
             const dw = geom.grayscaleWidth;
             const dh = geom.grayscaleHeight;
             const offscreen = document.createElement('canvas');
@@ -915,13 +946,13 @@ function drawGeometry(
                 imgData.data[i * 4 + 3] = 255;
               }
               offCtx.putImageData(imgData, 0, 0);
-              cached = { key: cacheKey, canvas: offscreen };
-              ditherCacheMap.set(renderObject, cached);
+              ditherCacheSet(ditherKey, offscreen);
+              ditherCanvas = offscreen;
             }
           }
 
-          if (cached) {
-            ctx.drawImage(cached.canvas, 0, 0, physicalWidth, physicalHeight);
+          if (ditherCanvas) {
+            ctx.drawImage(ditherCanvas, 0, 0, physicalWidth, physicalHeight);
           }
         }
 
