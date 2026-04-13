@@ -45,7 +45,7 @@ export interface Output {
 
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
-import { type GcodeGenerateOptions } from './GcodeOrigin';
+import { type GcodeGenerateOptions, computeGcodeOffset } from './GcodeOrigin';
 
 export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 
@@ -103,9 +103,15 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   /** Canvas max Y among all moves — used to flip Y (canvas Y-down → machine Y-up). */
   private designMaxY = 0;
 
-  generate(plan: Plan, job: Job, _options?: GcodeGenerateOptions): Output {
+  generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
     const b = this.designBoundsFromPlan(plan);
-    this.gcodeOffsetX = -b.minX;
+    const startMode = options?.startMode ?? 'current';
+    const offset = computeGcodeOffset(
+      startMode,
+      { minX: b.minX, minY: b.minY },
+      options?.savedOrigin ?? null,
+    );
+    this.gcodeOffsetX = offset.x;
     this.designMaxY = b.maxY;
     this.currentSpeed = 0;
 
