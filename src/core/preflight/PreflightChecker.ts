@@ -82,6 +82,8 @@ export function runPreflight(
   machineState: MachineState | null,
   bedWidth: number,
   bedHeight: number,
+  /** Machine-space plan bounds (from applyMachineTransform). Preferred over gcode parsing. */
+  machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null,
 ): PreflightResult {
   const issues: PreflightIssue[] = [];
 
@@ -300,7 +302,50 @@ export function runPreflight(
   }
 
   // ─── OUTPUT CHECKS ──────────────────────────────────
-  if (gcode) {
+  if (machinePlanBounds) {
+    // Preferred path: use pre-computed machine-space bounds from applyMachineTransform
+    const { minX, maxX, minY, maxY } = machinePlanBounds;
+
+    if (minX < -1) {
+      issues.push({
+        id: 'output-negative-x',
+        severity: 'blocker',
+        title: `Output has negative X (${minX.toFixed(1)}mm)`,
+        detail: 'Laser will hit the left limit switch',
+        fix: 'Move objects right or re-zero the machine',
+        category: 'output',
+      });
+    }
+    if (minY < -1) {
+      issues.push({
+        id: 'output-negative-y',
+        severity: 'blocker',
+        title: `Output has negative Y (${minY.toFixed(1)}mm)`,
+        detail: 'Laser will hit a limit switch',
+        fix: 'Move objects down or re-zero the machine',
+        category: 'output',
+      });
+    }
+    if (maxX > bedWidth + 1) {
+      issues.push({
+        id: 'output-exceed-x',
+        severity: 'blocker',
+        title: `Output exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
+        detail: 'Objects extend beyond the machine workspace',
+        category: 'output',
+      });
+    }
+    if (maxY > bedHeight + 1) {
+      issues.push({
+        id: 'output-exceed-y',
+        severity: 'blocker',
+        title: `Output exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
+        detail: 'Objects extend beyond the machine workspace',
+        category: 'output',
+      });
+    }
+  } else if (gcode) {
+    // Fallback: parse raw G-code text (legacy path, kept for backward compat)
     let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
     for (const line of gcode.split('\n')) {
       const xm = line.match(/X([-\d.]+)/);
