@@ -2,17 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
-import {
-  MATERIAL_CATEGORIES,
-  MATERIAL_PRESETS,
-  canCutMaterial,
-  getPresetSettings,
-  getAllMaterials,
-  getUserMaterials,
-  exportUserMaterials,
-  importMaterialsFromJsonLoose,
-} from '../../core/materials/MaterialPresets';
-import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { theme } from '../styles/theme';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
@@ -23,10 +12,6 @@ interface LayerPanelProps {
   selectedIds: ReadonlySet<string>;
   onSceneCommit: (scene: Scene) => void;
   productionMode: boolean;
-  /** Bumps when custom material library changes so preset list refreshes. */
-  materialLibraryRev?: number;
-  /** Call after user materials are imported so preset dropdown refreshes. */
-  onMaterialLibraryBump?: () => void;
   /** Object tab: live scene preview without history. */
   onSceneChange?: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
@@ -62,8 +47,6 @@ export function LayerPanel({
   selectedIds,
   onSceneCommit,
   productionMode,
-  materialLibraryRev = 0,
-  onMaterialLibraryBump,
   onSceneChange,
   onSelectionChange,
   showAlert,
@@ -147,37 +130,6 @@ export function LayerPanel({
     };
     onSceneCommit(newScene);
   }, [scene, onSceneCommit]);
-
-  const handleExportPresets = useCallback(() => {
-    const json = exportUserMaterials();
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'laserforge-material-presets.json';
-    a.click();
-    URL.revokeObjectURL(url);
-  }, []);
-
-  const handleImportPresets = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,application/json';
-    input.onchange = () => {
-      void (async () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        try {
-          const text = await file.text();
-          importMaterialsFromJsonLoose(text);
-          onMaterialLibraryBump?.();
-        } catch {
-          alert('Invalid preset file');
-        }
-      })();
-    };
-    input.click();
-  }, [onMaterialLibraryBump]);
 
   const handleRemoveLayer = useCallback(() => {
     if (scene.layers.length <= 1) return;
@@ -548,206 +500,18 @@ export function LayerPanel({
           }),
         ),
       ),
-      React.createElement('div', { style: { marginTop: 6 } },
-        React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Material Preset'),
-        React.createElement('div', { style: { display: 'flex', gap: 6, alignItems: 'center' } },
-          React.createElement('select', {
-            key: `material-preset-select-${materialLibraryRev}`,
-            value: '',
-            style: { ...selectStyle, flex: 1, minWidth: 0 },
-            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-            const presetName = e.target.value;
-            if (!presetName || !activeLayer) return;
-
-            const machineType = scene.machine?.type || 'diode';
-            const settings = getPresetSettings(presetName, machineType, scene.machine?.watts || '10');
-            if (!settings) return;
-
-            const mode = activeLayer.settings.mode;
-            const s =
-              mode === 'cut'
-                ? settings.cut
-                : mode === 'engrave'
-                  ? settings.engrave
-                  : mode === 'score'
-                    ? settings.score
-                    : settings.engrave;
-
-            const newLayers = scene.layers.map(l =>
-              l.id === activeLayer.id
-                ? {
-                    ...l,
-                    settings: {
-                      ...l.settings,
-                      power: { ...l.settings.power, max: s.power },
-                      speed: s.speed,
-                      passes: 'passes' in s ? s.passes : l.settings.passes,
-                      fill: {
-                        ...l.settings.fill,
-                        enabled: mode === 'engrave' || mode === 'image',
-                      },
-                    },
-                  }
-                : l
-            );
-
-            const preset = getAllMaterials().find(p => p.name === presetName);
-            const categoryToSceneMaterialType = (category: string): NonNullable<typeof scene.material>['type'] => {
-              if (category === 'Acrylic') return 'acrylic';
-              if (category === 'Leather') return 'leather';
-              if (category === 'Paper & Card') return 'paper';
-              if (category === 'Fabric') return 'fabric';
-              if (category === 'Wood' || category === 'Plywood' || category === 'MDF') return 'wood';
-              return 'custom';
-            };
-            const matType = preset ? categoryToSceneMaterialType(preset.category) : 'custom';
-
-            const updatedMaterial = scene.material
-              ? {
-                  ...scene.material,
-                  name: presetName,
-                  type: matType,
-                  thickness: preset?.thickness ?? scene.material.thickness,
-                }
-              : {
-                  type: matType,
-                  name: presetName,
-                  width: scene.canvas.width * 0.6,
-                  height: scene.canvas.height * 0.5,
-                  x: scene.canvas.width * 0.1,
-                  y: scene.canvas.height * 0.1,
-                  thickness: preset?.thickness ?? 3,
-                  color: '#c4956a',
-                  enabled: true,
-                };
-
-            onSceneCommit({ ...scene, layers: newLayers, material: updatedMaterial });
-          },
+      scene.material?.name && React.createElement('div', {
+        style: {
+          padding: '5px 10px', margin: '4px 0',
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid #1a1a30',
+          borderRadius: 6, fontSize: 10, color: '#8888a8',
+          display: 'flex', alignItems: 'center', gap: 6,
         },
-            React.createElement('option', { value: '' }, '— Select material —'),
-            ...MATERIAL_CATEGORIES.map(cat => {
-              const presets = MATERIAL_PRESETS.filter(p => p.category === cat);
-              if (presets.length === 0) return null;
-              return React.createElement('optgroup', { key: `builtin-${cat}`, label: cat },
-                ...presets.map(p =>
-                  React.createElement('option', { key: p.name, value: p.name }, p.name),
-                ),
-              );
-            }).filter(Boolean),
-            (() => {
-              const userMats = getUserMaterials();
-              if (userMats.length === 0) return null;
-              return React.createElement('optgroup', { key: `user-${materialLibraryRev}`, label: 'My Materials' },
-                ...userMats.map(m =>
-                  React.createElement('option', { key: m.id, value: m.name }, `★ ${m.name} (${m.thickness}mm)`),
-                ),
-              );
-            })(),
-          ),
-          React.createElement('button', {
-            type: 'button',
-            onClick: handleExportPresets,
-            title: 'Export material presets as JSON',
-            style: {
-              flexShrink: 0,
-              width: 28,
-              padding: '4px 0',
-              background: '#0a0a14',
-              border: '1px solid #252540',
-              borderRadius: 4,
-              color: '#8888aa',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: theme.font.ui,
-            },
-          }, '↓'),
-          React.createElement('button', {
-            type: 'button',
-            onClick: handleImportPresets,
-            title: 'Import material presets from JSON',
-            style: {
-              flexShrink: 0,
-              width: 28,
-              padding: '4px 0',
-              background: '#0a0a14',
-              border: '1px solid #252540',
-              borderRadius: 4,
-              color: '#8888aa',
-              fontSize: 12,
-              cursor: 'pointer',
-              fontFamily: theme.font.ui,
-            },
-          }, '↑'),
-        ),
-        (() => {
-          const selectedPresetName = scene.material?.name || '';
-          return selectedPresetName &&
-            !canCutMaterial(selectedPresetName, scene.machine?.type || 'diode', scene.machine?.watts || '10') &&
-            activeLayer.settings.mode === 'cut'
-            ? React.createElement('div', {
-              style: {
-                fontSize: 9,
-                color: '#ff4466',
-                marginTop: 3,
-                padding: '3px 6px',
-                background: 'rgba(255,68,102,0.06)',
-                borderRadius: 4,
-              },
-            }, '⚠ This material cannot be cut with your laser type. Use CO2 laser or switch to engrave mode.')
-            : null;
-        })(),
-        React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 3 } },
-          `Settings for ${scene.machine?.type || 'diode'} laser. Run a material test to fine-tune.`,
-        ),
+      },
+        React.createElement('span', { style: { opacity: 0.5 } }, '🪵'),
+        'Material: ' + (scene.material?.name || ''),
       ),
-      (() => {
-        const machineType = scene.machine?.type || 'diode';
-        const materialName = scene.material?.name || '';
-        if (!materialName) return null;
-
-        const suggestion = getSuggestion(materialName, machineType, activeLayer.settings.mode);
-        if (!suggestion || suggestion.sampleCount === 0) return null;
-
-        return React.createElement('div', {
-          style: {
-            margin: '6px 0', padding: '6px 10px',
-            background: suggestion.confidence > 0 ? 'rgba(45,212,160,0.06)' : 'rgba(255,212,68,0.06)',
-            border: `1px solid ${suggestion.confidence > 0 ? 'rgba(45,212,160,0.15)' : 'rgba(255,212,68,0.15)'}`,
-            borderRadius: 6, fontSize: 10,
-          },
-        },
-          React.createElement('div', {
-            style: { fontWeight: 600, marginBottom: 3, color: suggestion.confidence > 0 ? '#2dd4a0' : '#ffd444' },
-          }, suggestion.confidence > 0
-            ? `✓ Learned: ${suggestion.confidence}% confidence (${suggestion.sampleCount} jobs)`
-            : `⚡ Suggested adjustment (${suggestion.sampleCount} jobs tried)`),
-          React.createElement('div', { style: { color: '#8888aa', marginBottom: 4 } },
-            `Power ${suggestion.power}% · Speed ${suggestion.speed} · ${suggestion.passes} pass${suggestion.passes > 1 ? 'es' : ''}`),
-          React.createElement('button', {
-            onClick: () => {
-              const newLayers = scene.layers.map(l =>
-                l.id === activeLayer.id
-                  ? {
-                      ...l,
-                      settings: {
-                        ...l.settings,
-                        power: { ...l.settings.power, max: suggestion.power },
-                        speed: suggestion.speed,
-                        passes: suggestion.passes,
-                      },
-                    }
-                  : l
-              );
-              onSceneCommit({ ...scene, layers: newLayers });
-            },
-            style: {
-              padding: '3px 10px', fontSize: 10, cursor: 'pointer',
-              background: 'rgba(255,255,255,0.03)', border: '1px solid #252540',
-              borderRadius: 4, color: '#e0e0ec', fontFamily: "'DM Sans', system-ui, sans-serif",
-            },
-          }, 'Apply suggestion'),
-        );
-      })(),
       React.createElement('div', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Power %'),
         React.createElement('div', { style: { position: 'relative' as const } },
