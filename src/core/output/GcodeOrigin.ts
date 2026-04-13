@@ -12,6 +12,10 @@ export interface GcodeGenerateOptions {
   savedOrigin?: { x: number; y: number } | null;
   /** Machine-space XY to rapid to before M2; omit or null to skip the return move. */
   returnPosition?: { x: number; y: number } | null;
+  /** From device profile: lines appended after the standard header (G21/G90/laser off). */
+  customStartGcode?: string;
+  /** From device profile: lines inserted before laser-off / return / M2 in the footer. */
+  customEndGcode?: string;
 }
 
 export function designMinFromJob(job: Job): { minX: number; minY: number } {

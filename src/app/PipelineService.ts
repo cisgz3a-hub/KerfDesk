@@ -67,22 +67,27 @@ export async function compileGcode(
   const canvasMoves = plan.operations.flatMap(op => op.moves);
   const canvasPlanBounds = { ...plan.bounds };
 
+  const profile = getActiveProfile();
+  const flipY = profile?.invertY ?? true;
+
   // Machine-space data for output
   const machineTransform = applyMachineTransform(plan, {
     startMode,
     savedOrigin,
-    flipY: true,
+    flipY,
   });
 
   const strategy = getOutputStrategy('grbl');
   if (!strategy) return null;
 
   if (strategy instanceof GrblOutputStrategy) {
-    strategy.maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
+    strategy.maxSpindle = profile?.maxSpindle ?? 1000;
   }
 
   const output = strategy.generate(machineTransform.plan, job, {
     returnPosition: machineTransform.returnPosition,
+    customStartGcode: profile?.startGcode,
+    customEndGcode: profile?.endGcode,
   });
   if (!output.text) return null;
 

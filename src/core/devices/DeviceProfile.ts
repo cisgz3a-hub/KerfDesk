@@ -116,10 +116,10 @@ export function createBlankProfile(name: string): DeviceProfile {
     maxSpindle: 1000,
     homingEnabled: false,
     softLimitsEnabled: false,
-    invertY: false,
+    invertY: true,
     baudRate: 115200,
-    startGcode: 'G21\nG90\nM4 S0',
-    endGcode: 'M5\nG0 X0 Y0',
+    startGcode: '',
+    endGcode: '',
   };
 }
 

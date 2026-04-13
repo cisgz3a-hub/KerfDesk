@@ -464,7 +464,7 @@ export function ConnectionPanel({
     const ws = new WebSerialPort();
     portRef.current = ws;
     try {
-      await ws.requestAndOpen(115200);
+      await ws.requestAndOpen(getActiveProfile()?.baudRate ?? 115200);
       setMessages(prev => [...prev, 'Port opened, waiting for GRBL welcome...']);
       await ctrl.connect(ws);
       setIsSimulator(false);
@@ -765,9 +765,14 @@ export function ConnectionPanel({
   const handleZero = useCallback(async () => {
     const ctrl = controllerRef.current;
     if (!ctrl) return;
+    if (machineState?.status === 'alarm') {
+      await showAlert(
+        'Machine in alarm',
+        'Unlock the machine (Clear alarm / $X) before setting work zero.',
+      );
+      return;
+    }
     try {
-      sendCmd('$X');
-      await new Promise(r => setTimeout(r, 200));
       sendCmd('G10 L20 P1 X0 Y0');
       ctrl.requestStatusReport();
       hasZeroed.current = true;
@@ -776,7 +781,7 @@ export function ConnectionPanel({
     } catch {
       setMessages(prev => [...prev, 'Zero failed — try again']);
     }
-  }, []);
+  }, [machineState?.status, showAlert]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');

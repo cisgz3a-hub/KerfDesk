@@ -34,6 +34,7 @@ import { compileJob } from '../../core/job/JobCompiler';
 import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
 import { optimizePlan } from '../../core/plan/PlanOptimizer';
 import { applyMachineTransform, type MachineTransformResult } from '../../core/plan/MachineTransform';
+import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
@@ -217,10 +218,11 @@ export function App() {
             const moves = plan.operations.flatMap(op => op.moves);
             setActiveJobMoves(moves);
             setActiveJobPlanBounds(computePlanMoveBoundsFromMoves(moves));
+            const flipY = getActiveProfile()?.invertY ?? true;
             const txResult = applyMachineTransform(plan, {
               startMode: startModeRef.current,
               savedOrigin: savedOriginRef.current ?? null,
-              flipY: true,
+              flipY,
             });
             setActiveJobTransform(txResult);
           }
