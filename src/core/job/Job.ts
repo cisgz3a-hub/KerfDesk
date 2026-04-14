@@ -56,8 +56,8 @@ export interface ProcessedBitmap {
   mode: '1bit' | '8bit';
   data: Uint8Array;
 
-  physicalWidth: number;         // mm (derived: width / dpi * 25.4)
-  physicalHeight: number;        // mm
+  physicalWidth: number;         // mm on bed (must match bitmap pixel pitch: physicalWidth/width)
+  physicalHeight: number;        // mm on bed (physicalHeight/height)
   position: Point;               // world coordinates of top-left corner
 
   pipeline: {

@@ -19,7 +19,7 @@
  * Last updated: UI Wiring — App Shell
  */
 
-import React, { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
@@ -29,12 +29,8 @@ import { useModal } from '../hooks/useModal';
 import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
-import { useGcodeExport } from '../hooks/useGcodeExport';
-import { compileJob } from '../../core/job/JobCompiler';
-import { expandTextOutlinesForCompile } from '../../geometry/expandTextForCompile';
-import { optimizePlan } from '../../core/plan/PlanOptimizer';
-import { applyMachineTransform, type MachineTransformResult } from '../../core/plan/MachineTransform';
-import { getActiveProfile } from '../../core/devices/DeviceProfile';
+import { useCompileManager } from '../hooks/useCompileManager';
+import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
@@ -161,8 +157,6 @@ export function App() {
   });
   const startModeRef = useRef(startMode);
   startModeRef.current = startMode;
-  const savedOriginRef = useRef(savedOrigin);
-  savedOriginRef.current = savedOrigin;
   const [gcodePreview, setGcodePreview] = useState<string | null>(null);
   const [showToolpathPreview, setShowToolpathPreview] = useState(false);
   const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
@@ -177,76 +171,6 @@ export function App() {
   const [activeJobTransform, setActiveJobTransform] = useState<MachineTransformResult | null>(null);
   const grbl = useGrblConnection();
   const wasJobRunningRef = useRef(false);
-
-  function computePlanMoveBoundsFromMoves(moves: readonly Move[]): {
-    minX: number;
-    minY: number;
-    maxX: number;
-    maxY: number;
-  } {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const m of moves) {
-      if (m.type === 'rapid' || m.type === 'linear') {
-        minX = Math.min(minX, m.to.x);
-        minY = Math.min(minY, m.to.y);
-        maxX = Math.max(maxX, m.to.x);
-        maxY = Math.max(maxY, m.to.y);
-      }
-    }
-    if (!Number.isFinite(minX)) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-    return { minX, minY, maxX, maxY };
-  }
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (grbl.isJobRunning && !wasJobRunningRef.current) {
-      void (async () => {
-        try {
-          const { scene: sceneForJob } = await expandTextOutlinesForCompile(scene);
-          if (cancelled) return;
-          const job = compileJob(sceneForJob);
-          if (job.operations.length === 0) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          } else {
-            const plan = optimizePlan(job, {
-              maxRapidSpeed: getActiveProfile()?.maxFeedRate ?? 6000,
-            });
-            const moves = plan.operations.flatMap(op => op.moves);
-            setActiveJobMoves(moves);
-            setActiveJobPlanBounds(computePlanMoveBoundsFromMoves(moves));
-            const flipY = getActiveProfile()?.invertY ?? true;
-            const txResult = applyMachineTransform(plan, {
-              startMode: startModeRef.current,
-              savedOrigin: savedOriginRef.current ?? null,
-              flipY,
-            });
-            setActiveJobTransform(txResult);
-          }
-        } catch {
-          if (!cancelled) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          }
-        }
-      })();
-    } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
-      setActiveJobMoves(null);
-      setActiveJobPlanBounds(null);
-      setActiveJobTransform(null);
-    }
-    wasJobRunningRef.current = grbl.isJobRunning;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [grbl.isJobRunning, scene]);
 
   const machinePositionForStartWizard = useMemo(() => {
     const s = grbl.machineState;
@@ -270,6 +194,61 @@ export function App() {
   }, [grbl.isJobRunning, grbl.machineState, activeJobTransform]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
+
+  const {
+    currentGcode,
+    setCurrentGcode,
+    compileGcode,
+    compileToolpath,
+    compileToResult,
+    gcodeStale,
+    setGcodeStale,
+    sceneCompileTick,
+  } = useCompileManager({
+    scene,
+    startMode,
+    savedOrigin,
+    controllerMaxSpindle: grbl.controller?.maxSpindle ?? null,
+    connectionSidebarOpen,
+  });
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (grbl.isJobRunning && !wasJobRunningRef.current) {
+      void (async () => {
+        try {
+          const result = await compileToResult(scene);
+          if (cancelled) return;
+          if (!result) {
+            setActiveJobMoves(null);
+            setActiveJobPlanBounds(null);
+            setActiveJobTransform(null);
+          } else {
+            setActiveJobMoves(result.canvasMoves);
+            setActiveJobPlanBounds(result.canvasPlanBounds);
+            setActiveJobTransform(result.machineTransform);
+          }
+        } catch {
+          if (!cancelled) {
+            setActiveJobMoves(null);
+            setActiveJobPlanBounds(null);
+            setActiveJobTransform(null);
+          }
+        }
+      })();
+    } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
+      setActiveJobMoves(null);
+      setActiveJobPlanBounds(null);
+      setActiveJobTransform(null);
+    }
+    wasJobRunningRef.current = grbl.isJobRunning;
+
+    return () => {
+      cancelled = true;
+    };
+  }, [grbl.isJobRunning, scene, compileToResult]);
+
   const connectionSidebarWidth = connectionSidebarOpen
     ? Math.min(500, Math.floor(canvasSize.width * 0.45))
     : 0;
@@ -563,23 +542,6 @@ export function App() {
     setScene(newScene);
   }, []);
 
-  const { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves } = useGcodeExport(
-    startMode,
-    savedOrigin,
-    grbl.controller?.maxSpindle ?? null,
-  );
-
-  /** Monotonic tick bumped when `scene`, `startMode`, or `savedOrigin` changes — O(1) compile invalidation vs JSON fingerprint. */
-  const sceneRevisionRef = useRef(0);
-  const [sceneCompileTick, setSceneCompileTick] = useState(0);
-  const lastCompiledRevisionRef = useRef<number | null>(null);
-  const [gcodeStale, setGcodeStale] = useState(false);
-
-  useLayoutEffect(() => {
-    sceneRevisionRef.current += 1;
-    setSceneCompileTick(sceneRevisionRef.current);
-  }, [scene, startMode, savedOrigin, grbl.controller?.maxSpindle]);
-
   const handleTogglePreview = useCallback(() => {
     setShowToolpathPreview(p => !p);
   }, []);
@@ -591,7 +553,7 @@ export function App() {
       return;
     }
     let cancelled = false;
-    void compileToolpathMoves(scene).then(m => {
+    void compileToolpath(scene).then(m => {
       if (cancelled) return;
       if (m === null) {
         void showAlert('No Objects', 'No objects to preview. Add objects to an output layer first.');
@@ -602,26 +564,14 @@ export function App() {
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, sceneCompileTick, compileToolpathMoves, showAlert]);
-
-  useEffect(() => {
-    if (!connectionSidebarOpen) return;
-    if (
-      lastCompiledRevisionRef.current !== null &&
-      lastCompiledRevisionRef.current !== sceneCompileTick
-    ) {
-      setGcodeStale(true);
-    }
-  }, [sceneCompileTick, connectionSidebarOpen]);
+  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert]);
 
   const handleConnectionRecompile = useCallback(() => {
     void (async () => {
       const gc = await compileGcode(scene);
       setCurrentGcode(gc);
-      lastCompiledRevisionRef.current = sceneCompileTick;
-      setGcodeStale(false);
     })();
-  }, [scene, compileGcode, setCurrentGcode, sceneCompileTick]);
+  }, [scene, compileGcode, setCurrentGcode]);
 
   const bumpCanvasRepaint = useCallback(() => {
     try {
@@ -1088,14 +1038,12 @@ export function App() {
         await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
       }
       setCurrentGcode(gc);
-      lastCompiledRevisionRef.current = sceneCompileTick;
-      setGcodeStale(false);
     } catch (err) {
       console.error('G-code build failed:', err);
       setCurrentGcode(null);
     }
     dialogs.setShowConnection(true);
-  }, [scene, compileGcode, showAlert, sceneCompileTick]);
+  }, [scene, compileGcode, showAlert, dialogs]);
 
   const handleToolbarDisconnect = useCallback(async () => {
     try {

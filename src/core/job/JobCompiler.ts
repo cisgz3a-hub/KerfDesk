@@ -167,6 +167,35 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
 // ─── COMPILE GEOMETRY ────────────────────────────────────────────
 
 /** Apply layer image settings in photo grayscale space (before laser inversion / dither). */
+/** Reverse raster rows and/or columns so negative scale (mirror) matches canvas preview. */
+function mirrorRasterData(
+  data: Uint8Array,
+  width: number,
+  height: number,
+  flipX: boolean,
+  flipY: boolean,
+): Uint8Array {
+  let buf = data;
+  if (flipY) {
+    const next = new Uint8Array(width * height);
+    for (let r = 0; r < height; r++) {
+      next.set(buf.subarray(r * width, (r + 1) * width), (height - 1 - r) * width);
+    }
+    buf = next;
+  }
+  if (flipX) {
+    const next = new Uint8Array(buf.length);
+    for (let r = 0; r < height; r++) {
+      const row = r * width;
+      for (let c = 0; c < width; c++) {
+        next[row + c] = buf[row + (width - 1 - c)];
+      }
+    }
+    buf = next;
+  }
+  return buf;
+}
+
 function applyLayerImageAdjustments(
   src: Uint8Array,
   brightness: number,
@@ -217,10 +246,18 @@ function compileGeometry(
       if (obj.geometry.type !== 'image') continue;
 
       const geom = obj.geometry;
-      const scaleX = Math.abs(obj.transform.a) || 1;
-      const scaleY = Math.abs(obj.transform.d) || 1;
-      const physicalWidth = ((geom.originalWidth / 96) * 25.4) * scaleX;
-      const physicalHeight = ((geom.originalHeight / 96) * 25.4) * scaleY;
+      const sx = obj.transform.a;
+      const sy = obj.transform.d;
+      const scaleAbsX = Math.abs(sx) || 1;
+      const scaleAbsY = Math.abs(sy) || 1;
+      const wMm = ((geom.cropWidth || geom.originalWidth) / 96) * 25.4;
+      const hMm = ((geom.cropHeight || geom.originalHeight) / 96) * 25.4;
+      const physicalWidth = wMm * scaleAbsX;
+      const physicalHeight = hMm * scaleAbsY;
+      const flipRasterX = sx < 0;
+      const flipRasterY = sy < 0;
+      const rasterPosX = Math.min(obj.transform.tx, obj.transform.tx + sx * wMm);
+      const rasterPosY = Math.min(obj.transform.ty, obj.transform.ty + sy * hMm);
 
       let bitmapWidth: number;
       let bitmapHeight: number;
@@ -243,6 +280,9 @@ function compileGeometry(
           }
           mode = '8bit';
         }
+        if (flipRasterX || flipRasterY) {
+          data = mirrorRasterData(data, bitmapWidth, bitmapHeight, flipRasterX, flipRasterY);
+        }
       } else {
         console.warn(
           `[LaserForge] Skipping image "${obj.name || obj.id}": no raster bitmap data (import or adjust image to produce grayscale pixels).`,
@@ -259,8 +299,8 @@ function compileGeometry(
         physicalWidth,
         physicalHeight,
         position: {
-          x: obj.transform.tx,
-          y: obj.transform.ty,
+          x: rasterPosX,
+          y: rasterPosY,
         },
         pipeline: {
           brightness,

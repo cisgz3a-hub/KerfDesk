@@ -70,21 +70,25 @@ export function generateRasterScanlines(
   bitmap: ProcessedBitmap,
   settings: RasterSettings
 ): RasterScanline[] {
-  const { width, height, data, mode, dpi, position } = bitmap;
+  const { width, height, data, mode, position, physicalWidth, physicalHeight } = bitmap;
   if (width === 0 || height === 0 || data.length === 0) return [];
 
-  const pixelSizeMm = 25.4 / dpi;  // Physical size of one pixel in mm
+  /** Pixel pitch from actual physical size (matches resampled bitmap; avoids dpi-only mismatch). */
+  const pixelSizeX = physicalWidth / width;
+  const pixelSizeY = physicalHeight / height;
+  if (!(pixelSizeX > 0) || !(pixelSizeY > 0)) return [];
+
   const scanlines: RasterScanline[] = [];
   let lineIndex = 0;
 
   for (let row = 0; row < height; row++) {
-    const y = position.y + row * pixelSizeMm;
+    const y = position.y + row * pixelSizeY;
     const rowStart = row * width;
 
     // Extract burn segments from this row
     const segments = mode === '1bit'
-      ? extractSegments1Bit(data, rowStart, width, y, position.x, pixelSizeMm, settings)
-      : extractSegments8Bit(data, rowStart, width, y, position.x, pixelSizeMm, settings);
+      ? extractSegments1Bit(data, rowStart, width, y, position.x, pixelSizeX, settings)
+      : extractSegments8Bit(data, rowStart, width, y, position.x, pixelSizeX, settings);
 
     // Skip empty rows
     if (segments.length === 0) continue;

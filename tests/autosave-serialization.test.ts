@@ -9,6 +9,13 @@ import { addObject } from '../src/ui/history/SceneCommands';
 import { type SceneObject, type ImageGeometry } from '../src/core/scene/SceneObject';
 import { IDENTITY_MATRIX, generateId } from '../src/core/types';
 import { createRect } from '../src/core/scene/SceneObject';
+import { createLayer } from '../src/core/scene/Layer';
+import { compileJob } from '../src/core/job/JobCompiler';
+import { optimizePlan } from '../src/core/plan/PlanOptimizer';
+import { applyMachineTransform } from '../src/core/plan/MachineTransform';
+import { getOutputStrategy } from '../src/core/output/Output';
+import { runPreflight } from '../src/core/preflight/PreflightChecker';
+import '../src/core/output/GrblStrategy';
 
 let passed = 0;
 let failed = 0;
@@ -117,6 +124,80 @@ const huge = addObject(base, makeImageObject(lid, 200 * 200));
 const autoH = serializeForAutosave(huge);
 const fullH = serializeScene(huge);
 assert(autoH.length / fullH.length < 0.2, 'large image: autosave far smaller than full save');
+
+// Compile-equivalence guardrail (vectors survive autosave unchanged)
+const vectorScene = createScene(300, 200, 'Vector Eq');
+const vectorLayerId = vectorScene.layers[0].id;
+const vectorWithRect = addObject(vectorScene, createRect(vectorLayerId, 15, 25, 55, 35));
+const fullVector = deserializeScene(serializeScene(vectorWithRect));
+const autosavedVector = deserializeScene(serializeForAutosave(vectorWithRect));
+
+const fullVectorJob = compileJob(fullVector);
+const autoVectorJob = compileJob(autosavedVector);
+assert(fullVectorJob.operations.length === autoVectorJob.operations.length, 'compile eq: operation count stable after autosave');
+
+const fullVectorPlan = optimizePlan(fullVectorJob);
+const autoVectorPlan = optimizePlan(autoVectorJob);
+assert(fullVectorPlan.operations.length === autoVectorPlan.operations.length, 'compile eq: plan operation count stable');
+
+const fullMachine = applyMachineTransform(fullVectorPlan, {
+  startMode: 'current',
+  savedOrigin: null,
+  flipY: true,
+});
+const autoMachine = applyMachineTransform(autoVectorPlan, {
+  startMode: 'current',
+  savedOrigin: null,
+  flipY: true,
+});
+
+const grbl = getOutputStrategy('grbl');
+assert(!!grbl, 'compile eq: GRBL strategy registered');
+if (grbl) {
+  const normalize = (g: string) =>
+    g
+      .split('\n')
+      .filter(line => !line.startsWith('; Date: '))
+      .join('\n');
+
+  const fullGcode = grbl.generate(fullMachine.plan, fullVectorJob, { returnPosition: null }).text ?? '';
+  const autoGcode = grbl.generate(autoMachine.plan, autoVectorJob, { returnPosition: null }).text ?? '';
+
+  assert(fullGcode.length > 0, 'compile eq: full scene produces gcode');
+  assert(autoGcode.length > 0, 'compile eq: autosave scene produces gcode');
+  assert(normalize(fullGcode) === normalize(autoGcode), 'compile eq: autosave vector output matches full output');
+}
+
+// Crash-recovery image guardrail: missing pixel buffers should block start (not silently engrave nothing)
+const rasterScene = createScene(300, 200, 'Raster Missing Data');
+const rasterLayer = createLayer(1, 'image', 'Image');
+rasterScene.layers.push(rasterLayer);
+const missingDataImage = makeImageObject(rasterLayer.id, 64 * 64);
+const g = missingDataImage.geometry as ImageGeometry;
+delete g.adjustedData;
+delete g.grayscaleData;
+delete g.grayscaleWidth;
+delete g.grayscaleHeight;
+rasterScene.objects.push(missingDataImage);
+
+const recoveredRaster = deserializeScene(serializeForAutosave(rasterScene));
+const recoveredJob = compileJob(recoveredRaster);
+assert(recoveredJob.operations.length === 0, 'recovered raster with missing data compiles to no operations');
+
+const machineIdle = {
+  status: 'idle',
+  position: { x: 0, y: 0, z: 0 },
+  feedRate: 0,
+  spindleSpeed: 0,
+  alarmCode: null,
+  errorCode: null,
+} as const;
+const preflight = runPreflight(recoveredRaster, null, machineIdle, 300, 200, null);
+assert(preflight.canStart === false, 'preflight blocks recovered image with missing raster data');
+assert(
+  preflight.issues.some(i => i.id.startsWith('design-image-missing-raster-data-') && i.severity === 'blocker'),
+  'preflight reports explicit missing image raster-data blocker',
+);
 
 console.log(`\nAutosave serialization: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

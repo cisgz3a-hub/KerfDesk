@@ -491,6 +491,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     ),
 
     (() => {
+      if (!isProUnlocked()) return null;
       const g = obj.geometry;
       const closedPath = g.type === 'path' && (g as PathGeometry).subPaths.some(sp => sp.closed);
       const eligible =

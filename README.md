@@ -75,14 +75,16 @@ tests/
   viewport.test.ts          — 70 assertions
   svg-import.test.ts        — 141 assertions
   svg-import-placement.test.ts — 58 assertions
+  placement.test.ts         — machine placement / G-code golden extents
   history.test.ts           — 101 assertions
   scene-io.test.ts          — 75 assertions
   ui-integration.test.ts    — 38 assertions
+  autosave-serialization.test.ts — autosave stripping + compile-equivalence + recovery guardrails
 ```
 
 ## Tests
 
-676 assertions across 9 test suites, all passing.
+777 assertions across 15 test suites, all passing.
 
 ```bash
 npm test

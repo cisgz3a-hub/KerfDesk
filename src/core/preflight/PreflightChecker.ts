@@ -264,6 +264,25 @@ export function runPreflight(
   // Rotated or skewed images would burn at the wrong position/size.
   for (const obj of outputObjects) {
     if (obj.geometry.type !== 'image') continue;
+    const layer = scene.layers.find(l => l.id === obj.layerId);
+    if (layer?.settings.mode === 'image') {
+      const g = obj.geometry;
+      const hasRasterPixels =
+        ((g.adjustedData?.length ?? 0) > 0 || (g.grayscaleData?.length ?? 0) > 0) &&
+        (g.grayscaleWidth ?? 0) > 0 &&
+        (g.grayscaleHeight ?? 0) > 0;
+      if (!hasRasterPixels) {
+        issues.push({
+          id: `design-image-missing-raster-data-${obj.id}`,
+          severity: 'blocker',
+          title: `Image "${obj.name || obj.id}" has no raster data loaded`,
+          detail:
+            'This image cannot produce engraving output right now (common after autosave crash recovery before image processing finishes).',
+          fix: 'Reopen or reprocess the image, then confirm preview/compile before starting the job',
+          category: 'design',
+        });
+      }
+    }
     const t = obj.transform;
     // b and c are the rotation/skew components of the 2D affine matrix.
     // If non-zero, the image is rotated or skewed — not supported by raster compile.
