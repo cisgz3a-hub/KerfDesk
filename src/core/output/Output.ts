@@ -99,9 +99,12 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract encodePowerValue(power: number): string;
 
   private currentSpeed = 0;
+  /** GRBL $30 / PWM ceiling; set each generate() from options.maxSpindle (default 1000). */
+  protected _maxSpindle = 1000;
 
   generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
     this.currentSpeed = 0;
+    this._maxSpindle = options?.maxSpindle ?? 1000;
 
     try {
       const lines: string[] = [];

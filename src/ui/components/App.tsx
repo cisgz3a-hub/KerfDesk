@@ -290,6 +290,32 @@ export function App() {
     }
   }, [grbl.machineState?.status]);
 
+  // Safety: best-effort laser off if the tab or window is closed while connected.
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const ctrl = grbl.controllerRef.current;
+      if (!ctrl) return;
+      const status = ctrl.state.status;
+      if (status === 'disconnected' || status === 'connecting') return;
+
+      const jobWasRunning = ctrl.isJobRunning;
+      try {
+        ctrl.stop();
+        ctrl.sendCommand('M5 S0');
+      } catch {
+        /* port may already be gone */
+      }
+
+      if (jobWasRunning) {
+        e.preventDefault();
+        e.returnValue = 'A laser job was running. The laser has been stopped. Are you sure you want to close?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, []);
+
   const handleSaveOrigin = useCallback(() => {
     const pos = grbl.machineState?.position;
     if (!pos) return;
@@ -436,7 +462,31 @@ export function App() {
     });
   }, [scene, handleSceneCommit]);
 
-  const handleExit = useCallback(() => {
+  const handleExit = useCallback(async () => {
+    const ctrl = grbl.controllerRef.current;
+    const status = grbl.machineState?.status;
+    const isConnected = !!status && status !== 'disconnected' && status !== 'connecting';
+
+    if (isConnected && ctrl) {
+      if (ctrl.isJobRunning) {
+        const ok = confirm(
+          'A laser job is running!\n\nThe laser will be stopped. Are you sure you want to exit?',
+        );
+        if (!ok) return;
+      }
+      try {
+        ctrl.stop();
+      } catch {
+        /* ignore */
+      }
+      try {
+        ctrl.sendCommand('M5 S0');
+      } catch {
+        /* ignore */
+      }
+      await ctrl.disconnect();
+    }
+
     if (sceneIsDirtyRef.current) {
       const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
       if (!confirmed) return;
@@ -448,7 +498,7 @@ export function App() {
     }
 
     window.location.href = '/landing.html';
-  }, []);
+  }, [grbl.machineState?.status]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
     if (selectedIds.size === 0) {

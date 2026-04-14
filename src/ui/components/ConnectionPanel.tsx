@@ -735,10 +735,13 @@ export function ConnectionPanel({
       `Framing (laser dot): X${workFrame.minX.toFixed(0)}-${workFrame.maxX.toFixed(0)} Y${workFrame.minY.toFixed(0)}-${workFrame.maxY.toFixed(0)}`,
     ]);
 
+    const maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
+    const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
+
     const lines: string[] = [
       'G90', 'G21',
       // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
-      'M4 S5',
+      `M4 S${frameDotS}`,
       `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
       `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
       `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.maxY.toFixed(3)} F3000`,

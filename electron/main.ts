@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { listSerialPorts, openSerial, closeSerial, writeSerialLine } from './serial';
+import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -96,8 +96,15 @@ app.on('activate', () => {
   if (mainWindow === null) createWindow();
 });
 
-app.on('before-quit', () => {
-  void closeSerial();
+let safeShutdownDone = false;
+
+app.on('before-quit', (e) => {
+  if (safeShutdownDone) return;
+  e.preventDefault();
+  safeShutdownDone = true;
+  safeCloseSerial()
+    .catch(err => console.error('[before-quit] safe close failed:', err))
+    .finally(() => app.quit());
 });
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────

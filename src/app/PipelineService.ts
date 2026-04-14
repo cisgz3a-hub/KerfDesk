@@ -16,7 +16,6 @@ import { type GcodeStartMode } from '../core/output/GcodeOrigin';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
-import { GrblOutputStrategy } from '../core/output/GrblStrategy';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
 
@@ -80,14 +79,11 @@ export async function compileGcode(
   const strategy = getOutputStrategy('grbl');
   if (!strategy) return null;
 
-  if (strategy instanceof GrblOutputStrategy) {
-    strategy.maxSpindle = profile?.maxSpindle ?? 1000;
-  }
-
   const output = strategy.generate(machineTransform.plan, job, {
     returnPosition: machineTransform.returnPosition,
     customStartGcode: profile?.startGcode,
     customEndGcode: profile?.endGcode,
+    maxSpindle: profile?.maxSpindle ?? 1000,
   });
   if (!output.text) return null;
 

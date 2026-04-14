@@ -127,8 +127,24 @@ export class GrblController implements LaserController {
   async disconnect(): Promise<void> {
     this._stopStatusPolling();
     this._abortJob();
-    if (this._port) {
-      this._port.close();
+    if (this._port?.isOpen) {
+      // Safety: turn laser off and reset GRBL before closing port.
+      // Without this, closing the port while GRBL is in M3 (constant
+      // spindle) mode leaves the laser on indefinitely.
+      try {
+        this._sendRealtime(REALTIME_RESET); // \x18 — soft reset, stops motion + spindle
+        this._port.write('M5 S0\n');
+      } catch {
+        // Best effort — port may already be closing or in error state
+      }
+      await new Promise(r => setTimeout(r, 80));
+      try {
+        this._port.close();
+      } catch {
+        // Port may have closed from the reset
+      }
+      this._port = null;
+    } else if (this._port) {
       this._port = null;
     }
     this._updateStatus('disconnected');
