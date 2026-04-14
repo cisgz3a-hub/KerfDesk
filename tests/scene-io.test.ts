@@ -62,23 +62,17 @@ assert(restored1.layers.length === 1, 'Roundtrip: 1 layer');
 assert(restored1.layers[0].id === lid1, 'Roundtrip: layer ID preserved');
 assert(restored1.objects.length === 0, 'Roundtrip: 0 objects');
 
-// ─── TEST: SELECTION STRIPPED ────────────────────────────────────
+// ─── TEST: NO SELECTION FIELD IN FILE ────────────────────────────
 
-console.log('\n=== Test: Selection Stripped ===');
+console.log('\n=== Test: No Selection Field ===');
 
-const sceneWithSel = {
-  ...scene1,
-  selection: ['fake-id-1', 'fake-id-2'],
-};
-
-const jsonSel = serializeScene(sceneWithSel);
+const jsonSel = serializeScene(scene1);
 const restoredSel = deserializeScene(jsonSel);
-
-assert(restoredSel.selection.length === 0, 'Selection stripped: empty after roundtrip');
+assert(restoredSel.id === scene1.id, 'Roundtrip still valid without selection field');
 
 // Verify selection is not in the JSON string at all
 const parsedJson = JSON.parse(jsonSel);
-assert(parsedJson.scene.selection === undefined, 'Selection stripped: not present in JSON');
+assert(parsedJson.scene.selection === undefined, 'Selection not present in JSON');
 
 // ─── TEST: CACHE FIELDS STRIPPED ─────────────────────────────────
 
@@ -320,7 +314,6 @@ assert(minScene.layers[0].name === 'Layer', 'Tolerant: layer name defaulted');
 assert(minScene.layers[0].visible === true, 'Tolerant: layer visible defaulted true');
 assert(minScene.objects[0].visible === true, 'Tolerant: object visible defaulted true');
 assert(minScene.objects[0].name === '', 'Tolerant: object name defaulted empty');
-assert(minScene.selection.length === 0, 'Tolerant: selection empty');
 assert(minScene.metadata.name === 'Untitled', 'Tolerant: metadata name defaulted');
 assert(minScene.activeLayerId === 'layer-1', 'Tolerant: activeLayerId defaulted to first layer');
 
@@ -362,7 +355,6 @@ complex = {
     deviceProfileId: 'k40-co2',
     materialPresetId: '3mm-plywood',
   },
-  selection: ['should-be-stripped'],
 };
 
 // Serialize and deserialize
@@ -371,7 +363,6 @@ const complexRestored = deserializeScene(complexJson);
 
 assert(complexRestored.layers.length === 3, 'Complex: 3 layers');
 assert(complexRestored.objects.length === 5, 'Complex: 5 objects');
-assert(complexRestored.selection.length === 0, 'Complex: selection stripped');
 assert(complexRestored.metadata.author === 'Test Author', 'Complex: author preserved');
 assert(complexRestored.metadata.notes.includes('<>&'), 'Complex: special chars preserved');
 assert(complexRestored.metadata.deviceProfileId === 'k40-co2', 'Complex: device profile preserved');

@@ -96,10 +96,7 @@ export class HistoryManager {
    * - Moves cursor to the new entry
    */
   push(scene: Scene): void {
-    // Strip transient UI state — selection is managed by the UI layer,
-    // not the document. Undo should restore geometry, not which objects
-    // were highlighted when the edit happened.
-    const snapshot = stripTransientState(scene);
+    const snapshot = scene;
 
     // Skip if identical to current snapshot (prevents duplicate entries
     // from no-op commits like mouseUp without movement)
@@ -149,7 +146,7 @@ export class HistoryManager {
    * Clear all history and start fresh with an initial scene.
    */
   reset(initialScene: Scene): void {
-    this._stack = [stripTransientState(initialScene)];
+    this._stack = [initialScene];
     this._cursor = 0;
     this._notify();
   }
@@ -182,14 +179,3 @@ export class HistoryManager {
   }
 }
 
-// ─── HELPERS ─────────────────────────────────────────────────────
-
-/**
- * Strip UI-only transient state from a Scene before storing in history.
- * Selection is managed by the UI layer — undo should restore geometry,
- * not which objects were highlighted when the edit happened.
- */
-function stripTransientState(scene: Scene): Scene {
-  if (scene.selection.length === 0) return scene; // No allocation needed
-  return { ...scene, selection: [] };
-}

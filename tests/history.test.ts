@@ -421,9 +421,9 @@ console.log('\n=== Test: Duplicate Scene Prevention ===');
   assert(hist.canUndo(), 'Dedup: can undo after real change');
 }
 
-// ─── TEST: SELECTION NOT IN HISTORY ──────────────────────────────
+// ─── TEST: UI SELECTION EXTERNAL TO HISTORY ──────────────────────
 
-console.log('\n=== Test: Selection Not In History ===');
+console.log('\n=== Test: UI Selection External to History ===');
 
 {
   const hist = new HistoryManager();
@@ -432,24 +432,21 @@ console.log('\n=== Test: Selection Not In History ===');
   const obj = createRect(lid, 10, 10, 40, 40, 'Selectable');
   const withObj = addObject(scene, obj);
 
-  // Push scene with non-empty selection
-  const withSelection = { ...withObj, selection: [obj.id] };
-  hist.push(withSelection);
+  // Push scene snapshot
+  hist.push(withObj);
 
-  // Stored snapshot should have empty selection
+  // Stored snapshot keeps geometry only
   const stored = hist.getCurrent()!;
-  assert(stored.selection.length === 0, 'Selection stripped: stored snapshot has empty selection');
-  assert(stored.objects.length === 1, 'Selection stripped: objects preserved');
+  assert(stored.objects.length === 1, 'Stored snapshot: objects preserved');
 
   // Add another object and push
   const obj2 = createRect(lid, 50, 50, 20, 20, 'Second');
-  const withTwo = { ...addObject(withObj, obj2), selection: [obj2.id] };
+  const withTwo = addObject(withObj, obj2);
   hist.push(withTwo);
 
-  // Undo — should restore geometry but NOT selection
+  // Undo — should restore geometry. UI selection is managed externally.
   const undone = hist.undo()!;
   assert(undone.objects.length === 1, 'Undo: geometry restored (1 object)');
-  assert(undone.selection.length === 0, 'Undo: selection is empty (not restored from old snapshot)');
 
   // External selectedIds (simulating React state) is unaffected
   const externalSelectedIds = new Set([obj.id]);

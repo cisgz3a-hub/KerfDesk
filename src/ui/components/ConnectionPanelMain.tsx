@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { type GrblController } from '../../controllers/grbl/GrblController';
+import { type LaserController } from '../../controllers/ControllerInterface';
 import { MockSerialPort } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
+import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
@@ -29,7 +30,7 @@ const FRAME_IDLE_TIMEOUT_MS = 15_000;
 const TEST_FIRE_MAX_MS = 5000;
 
 /** Poll until GRBL reports idle (e.g. after framing moves). */
-async function waitForGrblIdle(ctrl: GrblController): Promise<boolean> {
+async function waitForGrblIdle(ctrl: LaserController): Promise<boolean> {
   const deadline = Date.now() + FRAME_IDLE_TIMEOUT_MS;
   while (Date.now() < deadline) {
     try {
@@ -75,7 +76,7 @@ function playCompletionBeep(): void {
 }
 
 export interface ConnectionPanelMainProps {
-  controller: GrblController;
+  controller: LaserController;
   portRef: React.MutableRefObject<WebSerialPort | MockSerialPort | null>;
   machineState: MachineState | null;
   jobProgress: JobProgress | null;
@@ -377,7 +378,7 @@ export function ConnectionPanelMain({
     const ctrl = controllerRef.current;
     if (!ctrl) return;
 
-    const mock = new MockSerialPort(undefined, { width: bedWidth, height: bedHeight });
+    const mock = createSerialPort('simulator', { bedWidth, bedHeight }) as MockSerialPort;
     portRef.current = mock;
     mock.open();
     try {
@@ -528,7 +529,7 @@ export function ConnectionPanelMain({
   }, [workFrame, bedWidth, bedHeight, showConfirm]);
 
   const sendFrameLine = useCallback(
-    async (ctrl: GrblController, line: string) => {
+    async (ctrl: LaserController, line: string) => {
       notifySimulatorTx(line);
       try {
         ctrl.sendCommand(line);

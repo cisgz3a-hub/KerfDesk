@@ -1,7 +1,8 @@
 import { type MutableRefObject } from 'react';
-import { type GrblController } from '../controllers/grbl/GrblController';
+import { type LaserController } from '../controllers/ControllerInterface';
 import { type MockSerialPort } from '../communication/SerialPort';
 import { WebSerialPort } from '../communication/WebSerialPort';
+import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
 import { hasPro } from '../entitlements';
@@ -43,7 +44,7 @@ export class MachineService {
   private detachRecording: (() => void) | null = null;
 
   constructor(
-    private readonly controllerRef: MutableRefObject<GrblController>,
+    private readonly controllerRef: MutableRefObject<LaserController>,
     private readonly portRef: MutableRefObject<WebSerialPort | MockSerialPort | null>,
   ) {}
 
@@ -78,7 +79,7 @@ export class MachineService {
   /**
    * Subscribe to controller traffic for replay + job log. Call once per mount; cleanup on unmount.
    */
-  attachJobRecording(controller: GrblController, sink: JobRecordingSink): () => void {
+  attachJobRecording(controller: LaserController, sink: JobRecordingSink): () => void {
     this.detachRecording?.();
     const recordingSink = sink;
 
@@ -243,7 +244,7 @@ export class MachineService {
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
     }
-    const ws = new WebSerialPort();
+    const ws = createSerialPort('web') as WebSerialPort;
     this.portRef.current = ws;
     await ws.requestAndOpen(baudRate);
     await this.controllerRef.current.connect(ws);

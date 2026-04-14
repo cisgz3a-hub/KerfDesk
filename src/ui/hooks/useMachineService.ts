@@ -1,12 +1,12 @@
 import { useMemo, useState, useCallback } from 'react';
 import { type MutableRefObject } from 'react';
-import { type GrblController } from '../../controllers/grbl/GrblController';
+import { type LaserController } from '../../controllers/ControllerInterface';
 import { type MockSerialPort } from '../../communication/SerialPort';
 import { type WebSerialPort } from '../../communication/WebSerialPort';
 import { MachineService } from '../../app/MachineService';
 
 interface UseMachineServiceArgs {
-  controllerRef: MutableRefObject<GrblController>;
+  controllerRef: MutableRefObject<LaserController>;
   portRef: MutableRefObject<WebSerialPort | MockSerialPort | null>;
 }
 

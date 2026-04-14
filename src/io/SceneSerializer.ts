@@ -51,7 +51,7 @@ interface SerializedScene {
 /**
  * Convert a Scene to a JSON string suitable for saving to disk.
  *
- * - Strips transient UI state (selection)
+ * - Strips transient UI/cache state
  * - Strips cached values (_bounds, _worldTransform)
  * - Wraps in a file envelope with format identifier and version
  * - Pretty-prints with 2-space indent for human readability
@@ -123,7 +123,7 @@ export function serializeForAutosave(scene: Scene): string {
  *
  * - Validates the file envelope (format, version: major 1 loads, major 2+ rejected, 1.x not 1.0 warns and loads best-effort)
  * - Validates required scene fields
- * - Restores transient state defaults (empty selection, null caches)
+ * - Restores runtime defaults (null caches)
  * - Preserves all IDs exactly as saved
  *
  * @throws Error if JSON is invalid or required fields are missing
@@ -257,7 +257,6 @@ function buildSceneFromParsedEnvelope(parsed: any): Scene {
     material: s.material ?? null,
     startPosition: s.startPosition ?? { x: 0, y: 0 },
     machine: s.machine,
-    selection: [],
     activeLayerId: s.activeLayerId || s.layers[0].id,
     metadata: {
       name: s.metadata?.name || 'Untitled',

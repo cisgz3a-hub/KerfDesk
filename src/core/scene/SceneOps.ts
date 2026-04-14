@@ -63,21 +63,6 @@ export function moveObjects(
   };
 }
 
-// ─── SELECTION ───────────────────────────────────────────────────
-
-/**
- * Update the scene's selection array.
- */
-export function setSelection(
-  scene: Scene,
-  selectedIds: ReadonlySet<string>
-): Scene {
-  return {
-    ...scene,
-    selection: [...selectedIds],
-  };
-}
-
 // ─── DELETE ──────────────────────────────────────────────────────
 
 /**
@@ -92,7 +77,6 @@ export function deleteObjects(
   return {
     ...scene,
     objects: scene.objects.filter(obj => !objectIds.has(obj.id)),
-    selection: scene.selection.filter(id => !objectIds.has(id)),
     metadata: {
       ...scene.metadata,
       modified: new Date().toISOString(),
@@ -115,7 +99,6 @@ export function duplicateObjects(
   if (objectIds.size === 0) return scene;
 
   const clones: SceneObject[] = [];
-  const newSelection: string[] = [];
 
   for (const obj of scene.objects) {
     if (!objectIds.has(obj.id)) continue;
@@ -133,13 +116,11 @@ export function duplicateObjects(
       _bounds: null,
       _worldTransform: null,
     });
-    newSelection.push(cloneId);
   }
 
   return {
     ...scene,
     objects: [...scene.objects, ...clones],
-    selection: newSelection,
     metadata: {
       ...scene.metadata,
       modified: new Date().toISOString(),

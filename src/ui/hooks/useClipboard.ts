@@ -55,7 +55,11 @@ export function useClipboard(
     if (selectedIds.size === 0) return;
     const newScene = duplicateObjects(scene, selectedIds, 10, 10);
     handleSceneCommit(newScene);
-    setSelectedIds(new Set(newScene.selection));
+    const existingIds = new Set(scene.objects.map(o => o.id));
+    const duplicatedIds = new Set(
+      newScene.objects.filter(o => !existingIds.has(o.id)).map(o => o.id),
+    );
+    setSelectedIds(duplicatedIds);
   }, [scene, selectedIds, handleSceneCommit, setSelectedIds]);
 
   return { clipboard, handleCopy, handlePaste, handleDuplicate };

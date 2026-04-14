@@ -35,7 +35,7 @@ import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
-import { useGrblConnection } from '../hooks/useGrblConnection';
+import { useControllerConnection } from '../hooks/useControllerConnection';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
@@ -169,7 +169,7 @@ export function App() {
     maxY: number;
   } | null>(null);
   const [activeJobTransform, setActiveJobTransform] = useState<MachineTransformResult | null>(null);
-  const grbl = useGrblConnection();
+  const grbl = useControllerConnection('grbl');
   const wasJobRunningRef = useRef(false);
 
   const machinePositionForStartWizard = useMemo(() => {
@@ -193,7 +193,7 @@ export function App() {
     return { x: wp.x, y: wp.y };
   }, [grbl.isJobRunning, grbl.machineState, activeJobTransform]);
 
-  const connectionSidebarOpen = dialogs.showConnection && grbl.grblReady;
+  const connectionSidebarOpen = dialogs.showConnection && grbl.controllerReady;
 
   const {
     currentGcode,
@@ -210,6 +210,7 @@ export function App() {
     savedOrigin,
     controllerMaxSpindle: grbl.controller?.maxSpindle ?? null,
     connectionSidebarOpen,
+    outputFormat: 'grbl',
   });
 
   useEffect(() => {
@@ -1338,7 +1339,6 @@ export function App() {
     const newScene = {
       ...scene,
       objects: [...scene.objects, ...objects],
-      selection: objects.map(o => o.id),
     };
     handleSceneCommit(newScene);
     setSelectedIds(new Set(objects.map(o => o.id)));
@@ -1348,7 +1348,6 @@ export function App() {
     const newScene = {
       ...scene,
       objects: [...scene.objects, ...objects],
-      selection: objects.map(o => o.id),
     };
     handleSceneCommit(newScene);
     setSelectedIds(new Set(objects.map(o => o.id)));
@@ -2229,7 +2228,6 @@ export function App() {
                 const newScene = {
                   ...scene,
                   objects: [...scene.objects, textObj],
-                  selection: [textObj.id],
                 };
                 handleSceneCommit(newScene);
                 setSelectedIds(new Set([textObj.id]));

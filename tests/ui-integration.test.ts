@@ -130,7 +130,6 @@ console.log('\n=== Test: Save Roundtrip Flow ===');
   assert(loaded.objects[0].name === 'MyRect', 'Load: first object name');
   assert(loaded.objects[1].name === 'MySquare', 'Load: second object name');
   assert(loaded.metadata.name === 'SaveTest', 'Load: project name');
-  assert(loaded.selection.length === 0, 'Load: selection empty');
 
   // IDs must match
   assert(loaded.id === scene.id, 'Load: scene ID preserved');

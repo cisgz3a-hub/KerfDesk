@@ -8,6 +8,7 @@ import {
 import { type Scene } from '../../core/scene/Scene';
 import { type Move } from '../../core/plan/Plan';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { type OutputFormat } from '../../core/output/Output';
 import {
   compileGcode as pipelineCompileGcode,
   compileToolpath as pipelineCompileToolpath,
@@ -22,6 +23,7 @@ export interface UseCompileManagerOptions {
   savedOrigin: { x: number; y: number } | null;
   controllerMaxSpindle: number | null;
   connectionSidebarOpen: boolean;
+  outputFormat?: OutputFormat;
 }
 
 export interface UseCompileManagerResult {
@@ -45,7 +47,14 @@ export interface UseCompileManagerResult {
  * Owns compile orchestration + G-code staleness vs scene/start origin (O(1) tick invalidation).
  */
 export function useCompileManager(options: UseCompileManagerOptions): UseCompileManagerResult {
-  const { scene, startMode, savedOrigin, controllerMaxSpindle, connectionSidebarOpen } = options;
+  const {
+    scene,
+    startMode,
+    savedOrigin,
+    controllerMaxSpindle,
+    connectionSidebarOpen,
+    outputFormat = 'grbl',
+  } = options;
 
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<CompileGcodeResult | null>(null);
@@ -76,8 +85,8 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
 
   const compileToResult = useCallback(
     (targetScene: Scene) =>
-      pipelineCompileGcode(targetScene, startMode, savedOrigin, controllerMaxSpindle),
-    [startMode, savedOrigin, controllerMaxSpindle],
+      pipelineCompileGcode(targetScene, startMode, savedOrigin, controllerMaxSpindle, outputFormat),
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat],
   );
 
   const compileGcode = useCallback(
@@ -89,6 +98,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           startMode,
           savedOrigin,
           controllerMaxSpindle,
+          outputFormat,
         );
         setLastResult(result);
         // Match previous App behavior: any finished compile attempt (including empty job)
@@ -107,7 +117,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         setIsCompiling(false);
       }
     },
-    [startMode, savedOrigin, controllerMaxSpindle],
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat],
   );
 
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {

@@ -13,6 +13,7 @@ import { type AABB } from '../core/types';
 import { type Move } from '../core/plan/Plan';
 import { type MachineTransformResult, applyMachineTransform } from '../core/plan/MachineTransform';
 import { type GcodeStartMode } from '../core/output/GcodeOrigin';
+import { type OutputFormat } from '../core/output/Output';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
@@ -50,6 +51,7 @@ export async function compileGcode(
   savedOrigin: { x: number; y: number } | null = null,
   /** Auto-detected GRBL $30. Fallback when device profile has no maxSpindle. */
   controllerMaxSpindle: number | null = null,
+  outputFormat: OutputFormat = 'grbl',
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
 
@@ -86,7 +88,7 @@ export async function compileGcode(
     flipY,
   });
 
-  const strategy = getOutputStrategy('grbl');
+  const strategy = getOutputStrategy(outputFormat);
   if (!strategy) return null;
 
   const output = strategy.generate(machineTransform.plan, job, {

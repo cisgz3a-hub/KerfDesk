@@ -14,12 +14,29 @@ app.commandLine.appendSwitch('enable-features', 'ElectronSerialChooser,WebSerial
 app.on('web-contents-created', (_, contents) => {
   contents.session.on('select-serial-port', (event, portList, _webContents, callback) => {
     event.preventDefault();
-    // Show all available ports — user picks in the browser dialog
-    if (portList && portList.length > 0) {
-      callback(portList[0].portId);
-    } else {
+    // Never auto-select the first port. Let the user choose explicitly.
+    if (!portList || portList.length === 0) {
       callback('');
+      return;
     }
+    void (async () => {
+      const buttons = portList.map(p => p.displayName || p.portName);
+      buttons.push('Cancel');
+      const chosen = await dialog.showMessageBox({
+        type: 'question',
+        buttons,
+        cancelId: buttons.length - 1,
+        defaultId: 0,
+        title: 'Select Serial Port',
+        message: 'Choose the laser controller serial port to connect.',
+        noLink: true,
+      });
+      if (chosen.response >= 0 && chosen.response < portList.length) {
+        callback(portList[chosen.response].portId);
+      } else {
+        callback('');
+      }
+    })();
   });
 
   contents.session.setPermissionCheckHandler((_webContents, permission) => {

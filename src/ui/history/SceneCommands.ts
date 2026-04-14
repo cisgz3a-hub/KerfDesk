@@ -26,7 +26,6 @@ import { type Matrix3x2 } from '../../core/types';
 // Re-export existing SceneOps commands
 export {
   moveObjects,
-  setSelection,
   deleteObjects,
   duplicateObjects,
   moveToLayer,
@@ -153,10 +152,6 @@ export function removeLayer(
     ...scene,
     layers: scene.layers.filter(l => l.id !== layerId),
     objects: scene.objects.filter(o => o.layerId !== layerId),
-    selection: scene.selection.filter(id => {
-      const obj = scene.objects.find(o => o.id === id);
-      return obj ? obj.layerId !== layerId : false;
-    }),
     activeLayerId: scene.activeLayerId === layerId
       ? scene.layers.find(l => l.id !== layerId)!.id
       : scene.activeLayerId,

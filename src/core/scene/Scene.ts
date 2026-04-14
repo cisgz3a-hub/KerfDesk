@@ -58,8 +58,6 @@ export interface Scene {
     type: string; // 'diode' | 'co2' | 'fiber'
   };
 
-  // State (not saved to file, transient)
-  selection: string[];       // Selected object IDs
   activeLayerId: string;     // Currently active layer
 
   // Project metadata
@@ -96,7 +94,6 @@ export function createScene(
     objects: [],
     material: null,
     startPosition: { x: 0, y: 0 },
-    selection: [],
     activeLayerId: defaultLayer.id,
     metadata: {
       name,
@@ -122,11 +119,6 @@ export function getLayerById(scene: Scene, id: string): Layer | undefined {
 
 export function getObjectsByLayer(scene: Scene, layerId: string): SceneObject[] {
   return scene.objects.filter(o => o.layerId === layerId);
-}
-
-export function getSelectedObjects(scene: Scene): SceneObject[] {
-  const selSet = new Set(scene.selection);
-  return scene.objects.filter(o => selSet.has(o.id));
 }
 
 export function getActiveLayer(scene: Scene): Layer | undefined {
