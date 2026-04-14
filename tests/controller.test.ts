@@ -194,12 +194,13 @@ async function testBufferManagement() {
   );
   const output = makeOutput(longLines.join('\n'));
 
+  const receivedBeforeJob = port.received.length;
   ctrl.sendJob(outputToLines(output));
   await flush();
 
   // With 127-byte buffer and ~32 bytes per line,
   // controller should send ~3-4 lines before waiting
-  const sentBeforeAck = port.received.length;
+  const sentBeforeAck = port.received.length - receivedBeforeJob;
   assert(sentBeforeAck >= 3, `Sent ${sentBeforeAck} lines before any ack (buffer filling)`);
   assert(sentBeforeAck <= 5, `Sent ${sentBeforeAck} lines — didn't overflow 127-byte buffer`);
 
@@ -222,7 +223,8 @@ async function testBufferManagement() {
   }
   await flush();
 
-  assert(port.received.length === 10, `All 10 lines eventually sent (got ${port.received.length})`);
+  const jobLines = port.received.filter(l => l.startsWith('G1'));
+  assert(jobLines.length === 10, `All 10 job lines eventually sent (got ${jobLines.length}, total TX ${port.received.length})`);
 
   await ctrl.disconnect();
 }

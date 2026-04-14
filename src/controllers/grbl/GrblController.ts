@@ -48,6 +48,11 @@ export class GrblController implements LaserController {
   /** Cycle-start sent; ignore stale Hold until Run is confirmed. */
   private _resumeRequested = false;
 
+  /** Parsed GRBL $30 (max spindle/PWM). Null until a $$ response includes $30=. */
+  private _maxSpindle: number | null = null;
+  /** True after we have parsed $30 from settings (or given up re-querying). */
+  private _settingsQueried = false;
+
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
   private _stateListeners: Set<StateChangeCallback> = new Set();
@@ -68,11 +73,15 @@ export class GrblController implements LaserController {
 
   get state(): MachineState { return { ...this._state }; }
   get isJobRunning(): boolean { return this._isJobRunning; }
+  get maxSpindle(): number | null { return this._maxSpindle; }
 
   // ─── LIFECYCLE ──────────────────────────────────────────────
 
   async connect(port: SerialPortLike): Promise<void> {
     if (this._port) throw new Error('Already connected. Disconnect first.');
+
+    this._maxSpindle = null;
+    this._settingsQueried = false;
 
     this._port = port;
     this._updateStatus('connecting');
@@ -99,6 +108,13 @@ export class GrblController implements LaserController {
           this._updateStatus('idle');
           this._startStatusPolling();
           resolve();
+          if (!this._settingsQueried) {
+            try {
+              this._writeLine('$$');
+            } catch {
+              /* ignore */
+            }
+          }
           return;
         }
 
@@ -147,6 +163,8 @@ export class GrblController implements LaserController {
     } else if (this._port) {
       this._port = null;
     }
+    this._maxSpindle = null;
+    this._settingsQueried = false;
     this._updateStatus('disconnected');
   }
 
@@ -269,6 +287,19 @@ export class GrblController implements LaserController {
       this._handleAlarm(line);
     } else if (line.startsWith('Grbl')) {
       this._updateStatus('idle');
+    } else if (line.startsWith('$') && line.includes('=')) {
+      const m = line.match(/^\$(\d+)=([\d.]+)/);
+      if (m) {
+        const num = parseInt(m[1], 10);
+        const val = parseFloat(m[2]);
+        if (num === 30 && Number.isFinite(val) && val > 0) {
+          this._maxSpindle = val;
+          this._settingsQueried = true;
+          for (const cb of this._stateListeners) {
+            cb({ ...this._state });
+          }
+        }
+      }
     }
   }
 

@@ -17,7 +17,7 @@
  * Last updated: Phase 1, Step 1 — Foundation
  */
 
-import { type Point, type AABB, emptyAABB, mergeAABB, generateId } from '../types';
+import { type Point, type AABB, emptyAABB, mergeAABB, generateId, MAX_LASER_SPEED, MIN_LASER_SPEED } from '../types';
 import { type Scene, getOutputLayers, getObjectsByLayer } from '../scene/Scene';
 import { type SceneObject, type Geometry, type ImageGeometry } from '../scene/SceneObject';
 import { type Layer, sortLayersByProcessingOrder } from '../scene/Layer';
@@ -140,7 +140,7 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
   return {
     powerMin: Math.max(0, Math.min(100, s.power.min)),
     powerMax: Math.max(0, Math.min(100, s.power.max)),
-    speed: Math.max(1, s.speed),
+    speed: Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, s.speed)),
     passes: Math.max(1, Math.min(99, s.passes)),
     zStepPerPass: s.zStepPerPass,
 

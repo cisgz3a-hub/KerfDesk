@@ -50,6 +50,8 @@ export interface LaserController {
   readonly protocolName: string;
   readonly state: MachineState;
   readonly isJobRunning: boolean;
+  /** GRBL $30 (max spindle/PWM). Null until parsed from a $$ response after connect. */
+  readonly maxSpindle: number | null;
 
   connect(port: SerialPortLike): Promise<void>;
   disconnect(): Promise<void>;

@@ -11,13 +11,15 @@ import {
 export function useGcodeExport(
   startMode: GcodeStartMode = 'current',
   savedOrigin: { x: number; y: number } | null = null,
+  /** GRBL $30 from controller when device profile omits maxSpindle. */
+  controllerMaxSpindle: number | null = null,
 ) {
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [lastCompileResult, setLastCompileResult] = useState<CompileGcodeResult | null>(null);
 
   const compileGcode = useCallback(async (targetScene: Scene): Promise<string | null> => {
     try {
-      const result = await pipelineCompileGcode(targetScene, startMode, savedOrigin);
+      const result = await pipelineCompileGcode(targetScene, startMode, savedOrigin, controllerMaxSpindle);
       setLastCompileResult(result);
       if (!result) return null;
       return result.gcode;
@@ -26,7 +28,7 @@ export function useGcodeExport(
       setLastCompileResult(null);
       return null;
     }
-  }, [startMode, savedOrigin]);
+  }, [startMode, savedOrigin, controllerMaxSpindle]);
 
   const compileToolpathMoves = useCallback(async (targetScene: Scene): Promise<Move[] | null> => {
     try {

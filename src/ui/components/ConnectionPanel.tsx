@@ -21,6 +21,7 @@ import {
 } from '../../core/job/JobLog';
 import { recordMaterialOutcome } from '../../core/materials/MaterialFeedback';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
+import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
 import { type StartMode } from './StartPositionWizard';
 import { SimulatorView } from './SimulatorView';
@@ -1420,7 +1421,7 @@ export function ConnectionPanel({
               type: 'number',
               value: layer.settings.speed,
               min: 10,
-              max: 10000,
+              max: MAX_LASER_SPEED,
               step: 100,
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                 onUpdateLayerSetting(layer.id, 'speed', parseInt(e.target.value, 10) || 1000);

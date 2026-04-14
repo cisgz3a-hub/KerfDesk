@@ -54,6 +54,13 @@ import { optimizePathOrder } from './PathOptimizer';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
+export interface OptimizePlanConfig {
+  /** Max rapid travel speed in mm/min (default 6000). */
+  maxRapidSpeed?: number;
+  /** Max acceleration in mm/s² (default 500). */
+  maxAcceleration?: number;
+}
+
 /**
  * Convert a compiled Job into an optimized, executable Plan.
  *
@@ -61,7 +68,7 @@ import { optimizePathOrder } from './PathOptimizer';
  * returns, the Job is no longer needed for execution — the Plan
  * is fully self-contained.
  */
-export function optimizePlan(job: Job): Plan {
+export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
   const plan = createEmptyPlan(job.id);
   let currentPos: Point = { x: 0, y: 0 };
 
@@ -78,8 +85,11 @@ export function optimizePlan(job: Job): Plan {
   // Compute bounds from all moves
   plan.bounds = computePlanBounds(plan);
 
-  // Calculate statistics with trapezoidal velocity model
-  plan.stats = calculatePlanStats(plan);
+  plan.stats = calculatePlanStats(
+    plan,
+    config?.maxAcceleration ?? 500,
+    config?.maxRapidSpeed ?? 6000,
+  );
 
   return plan;
 }

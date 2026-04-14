@@ -48,6 +48,8 @@ export async function compileGcode(
   scene: Scene,
   startMode: GcodeStartMode = 'current',
   savedOrigin: { x: number; y: number } | null = null,
+  /** Auto-detected GRBL $30. Fallback when device profile has no maxSpindle. */
+  controllerMaxSpindle: number | null = null,
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
 
@@ -60,14 +62,22 @@ export async function compileGcode(
   const job = compileJob(sceneForJob);
   if (job.operations.length === 0) return null;
 
-  const plan = optimizePlan(job);
+  const profile = getActiveProfile();
+
+  const plan = optimizePlan(job, {
+    maxRapidSpeed: profile?.maxFeedRate ?? 6000,
+  });
 
   // Canvas-space data for preview
   const canvasMoves = plan.operations.flatMap(op => op.moves);
   const canvasPlanBounds = { ...plan.bounds };
 
-  const profile = getActiveProfile();
   const flipY = profile?.invertY ?? true;
+
+  const maxSpindle =
+    profile?.maxSpindle
+    ?? (controllerMaxSpindle != null && controllerMaxSpindle > 0 ? controllerMaxSpindle : null)
+    ?? 1000;
 
   // Machine-space data for output
   const machineTransform = applyMachineTransform(plan, {
@@ -83,7 +93,7 @@ export async function compileGcode(
     returnPosition: machineTransform.returnPosition,
     customStartGcode: profile?.startGcode,
     customEndGcode: profile?.endGcode,
-    maxSpindle: profile?.maxSpindle ?? 1000,
+    maxSpindle,
   });
   if (!output.text) return null;
 
@@ -117,7 +127,10 @@ export async function compileToolpath(
   const job = compileJob(sceneForJob);
   if (job.operations.length === 0) return null;
 
-  const plan = optimizePlan(job);
+  const profile = getActiveProfile();
+  const plan = optimizePlan(job, {
+    maxRapidSpeed: profile?.maxFeedRate ?? 6000,
+  });
   const moves = plan.operations.flatMap(op => op.moves);
 
   return {

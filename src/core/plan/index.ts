@@ -7,7 +7,7 @@
  */
 
 export * from './Plan';
-export { optimizePlan } from './PlanOptimizer';
+export { optimizePlan, type OptimizePlanConfig } from './PlanOptimizer';
 export {
   applyMachineTransform,
   type MachineTransformOptions,

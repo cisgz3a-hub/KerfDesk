@@ -52,7 +52,7 @@ import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
-import { generateId, IDENTITY_MATRIX } from '../../core/types';
+import { generateId, IDENTITY_MATRIX, MAX_LASER_SPEED, MIN_LASER_SPEED } from '../../core/types';
 import { createLayer, type Layer, type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -214,7 +214,9 @@ export function App() {
             setActiveJobPlanBounds(null);
             setActiveJobTransform(null);
           } else {
-            const plan = optimizePlan(job);
+            const plan = optimizePlan(job, {
+              maxRapidSpeed: getActiveProfile()?.maxFeedRate ?? 6000,
+            });
             const moves = plan.operations.flatMap(op => op.moves);
             setActiveJobMoves(moves);
             setActiveJobPlanBounds(computePlanMoveBoundsFromMoves(moves));
@@ -561,7 +563,11 @@ export function App() {
     setScene(newScene);
   }, []);
 
-  const { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves } = useGcodeExport(startMode, savedOrigin);
+  const { currentGcode, setCurrentGcode, compileGcode, compileToolpathMoves } = useGcodeExport(
+    startMode,
+    savedOrigin,
+    grbl.controller?.maxSpindle ?? null,
+  );
 
   /** Monotonic tick bumped when `scene`, `startMode`, or `savedOrigin` changes — O(1) compile invalidation vs JSON fingerprint. */
   const sceneRevisionRef = useRef(0);
@@ -572,7 +578,7 @@ export function App() {
   useLayoutEffect(() => {
     sceneRevisionRef.current += 1;
     setSceneCompileTick(sceneRevisionRef.current);
-  }, [scene, startMode, savedOrigin]);
+  }, [scene, startMode, savedOrigin, grbl.controller?.maxSpindle]);
 
   const handleTogglePreview = useCallback(() => {
     setShowToolpathPreview(p => !p);
@@ -657,7 +663,7 @@ export function App() {
             return { ...l, settings: { ...l.settings, power: { ...l.settings.power, max: v } } };
           }
           if (key === 'speed') {
-            const v = Math.max(10, Math.min(10000, Math.round(Number.isFinite(value) ? value : 1000)));
+            const v = Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, Math.round(Number.isFinite(value) ? value : 1000)));
             return { ...l, settings: { ...l.settings, speed: v } };
           }
           const v = Math.max(1, Math.min(99, Math.round(Number.isFinite(value) ? value : 1)));

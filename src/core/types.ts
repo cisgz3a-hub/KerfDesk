@@ -97,6 +97,14 @@ export function aabbIntersects(a: AABB, b: AABB): boolean {
 export type Units = 'mm' | 'inch';
 export type Origin = 'top-left' | 'bottom-left' | 'center';
 
+// ─── MACHINE LIMITS ─────────────────────────────────────────────
+
+/** Maximum allowed laser feed rate (mm/min). GRBL caps via $110/$111; we clamp in UI and compiler for consistent estimates. */
+export const MAX_LASER_SPEED = 10000;
+
+/** Minimum allowed laser feed rate (mm/min). */
+export const MIN_LASER_SPEED = 1;
+
 // ─── RESULT TYPE ─────────────────────────────────────────────────
 
 export type Result<T, E = string> =

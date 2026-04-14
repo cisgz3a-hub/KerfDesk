@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
+import { MAX_LASER_SPEED } from '../../core/types';
 import { theme } from '../styles/theme';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
@@ -552,7 +553,7 @@ export function LayerPanel({
         React.createElement(NumberInput, {
           value: activeLayer.settings.speed,
           min: 1,
-          max: 250000,
+          max: MAX_LASER_SPEED,
           defaultValue: activeLayer.settings.speed,
           style: numberInputStyle,
           onCommit: updateSpeed,
