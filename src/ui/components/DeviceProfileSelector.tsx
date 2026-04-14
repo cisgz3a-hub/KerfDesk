@@ -51,6 +51,7 @@ export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showCon
             const updated = profileFromScene(active.name, scene);
             updated.id = active.id;
             updated.createdAt = active.createdAt;
+            updated.returnToOrigin = active.returnToOrigin ?? true;
             saveDeviceProfile(updated);
             setProfiles(getDeviceProfiles());
             onMessage(`✓ Profile "${active.name}" updated`);

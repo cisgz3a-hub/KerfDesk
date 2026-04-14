@@ -90,7 +90,9 @@ export async function compileGcode(
   if (!strategy) return null;
 
   const output = strategy.generate(machineTransform.plan, job, {
-    returnPosition: machineTransform.returnPosition,
+    returnPosition: (profile?.returnToOrigin ?? true)
+      ? machineTransform.returnPosition
+      : null,
     customStartGcode: profile?.startGcode,
     customEndGcode: profile?.endGcode,
     maxSpindle,

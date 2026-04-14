@@ -260,6 +260,27 @@ export function runPreflight(
     }
   }
 
+  // Images with rotation/skew: raster compile only supports scale + translate.
+  // Rotated or skewed images would burn at the wrong position/size.
+  for (const obj of outputObjects) {
+    if (obj.geometry.type !== 'image') continue;
+    const t = obj.transform;
+    // b and c are the rotation/skew components of the 2D affine matrix.
+    // If non-zero, the image is rotated or skewed — not supported by raster compile.
+    const EPS = 0.001;
+    if (Math.abs(t.b) > EPS || Math.abs(t.c) > EPS) {
+      issues.push({
+        id: `design-image-rotated-${obj.id}`,
+        severity: 'blocker',
+        title: `Image "${obj.name || obj.id}" is rotated or skewed`,
+        detail:
+          'Rotated/skewed images cannot be compiled correctly — the burn position and size would not match the editor preview.',
+        fix: 'Reset the image rotation to 0° or flatten it to a non-rotated copy before running the job',
+        category: 'design',
+      });
+    }
+  }
+
   // ─── SETTINGS CHECKS ─────────────────────────────────
   for (const layer of outputLayers) {
     if (layer.settings.power.max === 0) {

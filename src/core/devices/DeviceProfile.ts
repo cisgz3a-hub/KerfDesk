@@ -27,6 +27,8 @@ export interface DeviceProfile {
   homingEnabled: boolean;
   softLimitsEnabled: boolean;
   invertY: boolean;
+  /** Whether to rapid to work origin (0,0) after each job. Default true. */
+  returnToOrigin: boolean;
 
   // Connection
   baudRate: number;
@@ -45,7 +47,12 @@ export function getDeviceProfiles(): DeviceProfile[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw) as DeviceProfile[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map(p => ({
+      ...p,
+      returnToOrigin: p.returnToOrigin ?? true,
+    }));
   } catch {
     return [];
   }
@@ -117,6 +124,7 @@ export function createBlankProfile(name: string): DeviceProfile {
     homingEnabled: false,
     softLimitsEnabled: false,
     invertY: true,
+    returnToOrigin: true,
     baudRate: 115200,
     startGcode: '',
     endGcode: '',
