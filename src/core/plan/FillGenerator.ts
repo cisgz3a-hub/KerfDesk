@@ -17,8 +17,8 @@
  *             9. Apply bidirectional alternation
  *
  * Dependencies:
- *   - /src/core/types.ts
- *   - /src/core/job/Job.ts (FlatPath)
+ *             - /src/core/types.ts
+ *             - /src/core/job/Job.ts (FlatPath)
  * Last updated: Phase 5, Step 18c — Fill scanline generation
  */
 
@@ -30,6 +30,26 @@ import { type FlatPath } from '../job/Job';
 export interface ScanlineSegment {
   from: Point;
   to: Point;
+}
+
+/** A single burn segment within a scanline row (actual boundary, no overscanning). */
+export interface FillSegment {
+  actualFrom: Point;
+  actualTo: Point;
+}
+
+/**
+ * One scanline row containing all burn segments and overscan motion boundaries.
+ * The planner uses this to emit continuous G1 motion with inline S-value toggling:
+ *   rapid(overscanFrom) → G1 S0(approach) → G1 S{power}(burn) → G1 S0(gap) → ... → G1 S0(exit to overscanTo)
+ */
+export interface FillScanlineRow {
+  /** Ordered burn segments on this row (in traversal direction). */
+  segments: FillSegment[];
+  /** Start of machine motion including overscan (laser OFF). */
+  overscanFrom: Point;
+  /** End of machine motion including overscan (laser OFF). */
+  overscanTo: Point;
 }
 
 export interface FillSettings {
@@ -140,6 +160,115 @@ export function generateFillScanlines(
   }
 
   return segments;
+}
+
+/**
+ * Generate scanline rows for fill/engrave operations.
+ *
+ * Unlike generateFillScanlines (which bakes overscanning into the burn area),
+ * this function returns rows with SEPARATE actual boundaries and overscan
+ * motion boundaries. The planner uses this to emit:
+ *   - Overscan approach: G1 S0 (motion with laser OFF)
+ *   - Burn segments: G1 S{power} (laser ON within actual boundary)
+ *   - Gaps between segments: G1 S0 (laser OFF)
+ *   - Overscan exit: G1 S0 (motion with laser OFF)
+ *
+ * This matches how LightBurn handles overscanning on GRBL and is correct
+ * per the GRBL laser mode spec: inline S-value changes don't cause motion
+ * stops, so the machine maintains constant velocity across the entire row.
+ */
+export function generateFillRows(
+  paths: FlatPath[],
+  settings: FillSettings,
+  initialRowIndex: number = 0,
+): FillScanlineRow[] {
+  const closed = paths.filter(p => p.closed);
+  if (closed.length === 0) return [];
+
+  const angleRad = (settings.angle * Math.PI) / 180;
+  const edges = extractEdges(closed);
+
+  const rotatedEdges = edges.map(e => ({
+    x1: e.x1 * Math.cos(-angleRad) - e.y1 * Math.sin(-angleRad),
+    y1: e.x1 * Math.sin(-angleRad) + e.y1 * Math.cos(-angleRad),
+    x2: e.x2 * Math.cos(-angleRad) - e.y2 * Math.sin(-angleRad),
+    y2: e.x2 * Math.sin(-angleRad) + e.y2 * Math.cos(-angleRad),
+  }));
+
+  let minY = Infinity, maxY = -Infinity;
+  for (const e of rotatedEdges) {
+    minY = Math.min(minY, e.y1, e.y2);
+    maxY = Math.max(maxY, e.y1, e.y2);
+  }
+
+  const MIN_FILL_INTERVAL = 0.01;
+  const MAX_SCANLINES = 50000;
+  const rawInterval = Number(settings.interval);
+  let safeInterval = Math.max(
+    MIN_FILL_INTERVAL,
+    Number.isFinite(rawInterval) && rawInterval > 0 ? rawInterval : 0.1,
+  );
+  const spanY = maxY - minY;
+  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
+  if (estimatedLines > MAX_SCANLINES) {
+    safeInterval = spanY / MAX_SCANLINES;
+  }
+
+  const rows: FillScanlineRow[] = [];
+  const startY = minY + safeInterval / 2;
+  let rowIndex = initialRowIndex;
+  const os = Math.max(0, settings.overscanning);
+
+  for (let y = startY; y < maxY; y += safeInterval) {
+    const intersections = findIntersections(rotatedEdges, y);
+    if (intersections.length < 2) continue;
+    intersections.sort((a, b) => a - b);
+
+    // Build segments from even-odd pairs (actual boundaries, no overscanning)
+    const segs: FillSegment[] = [];
+    for (let i = 0; i < intersections.length - 1; i += 2) {
+      const x1 = intersections[i];
+      const x2 = intersections[i + 1];
+      segs.push({
+        actualFrom: rotatePoint(x1, y, angleRad),
+        actualTo: rotatePoint(x2, y, angleRad),
+      });
+    }
+    if (segs.length === 0) continue;
+
+    // Overscan extends beyond the first and last segment of the row
+    const firstX = intersections[0];
+    const lastX = intersections[intersections.length - 1 - ((intersections.length % 2 === 1) ? 1 : 0)];
+    const osFrom = rotatePoint(firstX - os, y, angleRad);
+    const osTo = rotatePoint(lastX + os, y, angleRad);
+
+    // Bidirectional: alternate entire rows (not individual segments)
+    const reversed = settings.biDirectional && rowIndex % 2 === 1;
+    if (reversed) {
+      // Reverse segment order and swap from/to within each segment
+      const revSegs: FillSegment[] = [];
+      for (let i = segs.length - 1; i >= 0; i--) {
+        revSegs.push({
+          actualFrom: segs[i].actualTo,
+          actualTo: segs[i].actualFrom,
+        });
+      }
+      rows.push({
+        segments: revSegs,
+        overscanFrom: osTo,   // start from the right side
+        overscanTo: osFrom,   // end at the left side
+      });
+    } else {
+      rows.push({
+        segments: segs,
+        overscanFrom: osFrom,
+        overscanTo: osTo,
+      });
+    }
+    rowIndex++;
+  }
+
+  return rows;
 }
 
 /**

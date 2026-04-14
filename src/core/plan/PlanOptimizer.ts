@@ -41,9 +41,9 @@ import {
   type ContainmentNode,
 } from './ContainmentOrder';
 import {
-  generateFillScanlines,
+  generateFillRows,
   type FillSettings,
-  type ScanlineSegment,
+  type FillScanlineRow,
 } from './FillGenerator';
 import {
   generateRasterScanlines,
@@ -397,16 +397,22 @@ function planPath(
 /**
  * Convert a fill operation's boundary paths into scanline moves.
  *
- * Produces:
- *   For each scanline segment:
- *     1. rapid   → move to segment start
- *     2. laserOn → turn laser on
- *     3. linear  → scan to segment end
- *     4. laserOff → turn laser off
+ * Uses continuous motion across each scanline row with inline S-value
+ * toggling instead of per-segment M4/M5 cycling. This matches the
+ * GRBL laser mode spec and LightBurn's approach:
  *
- * Scanlines are generated at the configured interval and angle.
- * Bidirectional scanning alternates direction per line.
- * Overscanning extends beyond boundaries for acceleration room.
+ *   - M4 S0 set ONCE at the start (dynamic laser mode, initially off)
+ *   - Per row: rapid to overscan start → G1 S0 approach → G1 S{power}
+ *     burn → G1 S0 gap → G1 S{power} burn → ... → G1 S0 exit
+ *   - M5 S0 ONCE at the end
+ *
+ * Per GRBL docs, M4 does NOT stop for inline S changes — the machine
+ * maintains constant velocity. This eliminates the acceleration/power
+ * loss that occurred with per-segment M4/M5 cycling.
+ *
+ * Overscanning extends the MOTION (laser off) beyond the actual shape
+ * boundary, giving the machine room to accelerate before the laser
+ * turns on and decelerate after it turns off.
  */
 function planFillOperation(
   boundaryPaths: FlatPath[],
@@ -420,8 +426,8 @@ function planFillOperation(
 
   const interval = Math.max(0.01, settings.fillInterval > 0 ? settings.fillInterval : 0.1);
 
-  const scanlines: ScanlineSegment[] = [];
-  let fillStripIndex = 0;
+  const allRows: FillScanlineRow[] = [];
+  let rowIndex = 0;
   for (const angle of fillAngles) {
     const fillSettings: FillSettings = {
       interval,
@@ -429,12 +435,13 @@ function planFillOperation(
       biDirectional: settings.fillBiDirectional,
       overscanning: settings.overscanning,
     };
-    const nextSegs = generateFillScanlines(boundaryPaths, fillSettings, fillStripIndex);
-    fillStripIndex += nextSegs.length;
-    scanlines.push(...nextSegs);
+    const rows = generateFillRows(boundaryPaths, fillSettings, rowIndex);
+    rowIndex += rows.length;
+    allRows.push(...rows);
   }
 
-  if (scanlines.length === 0 && boundaryPaths.length > 0) {
+  // Fallback: if no scanline rows but paths exist, trace outlines instead
+  if (allRows.length === 0 && boundaryPaths.length > 0) {
     console.warn(
       `[LaserForge] Engrave fill produced no scanlines (interval ${interval.toFixed(3)}mm); ` +
         `falling back to outline trace (${boundaryPaths.length} path(s)). Check shape size vs line spacing.`,
@@ -449,36 +456,82 @@ function planFillOperation(
     return movesOut;
   }
 
-  if (scanlines.length === 0) return [];
+  if (allRows.length === 0) return [];
 
   const moves: Move[] = [];
   const power = settings.powerMax;
   const speed = settings.speed;
 
-  for (const segment of scanlines) {
-    // 1. Rapid to start of scanline
+  // Set M4 dynamic mode ONCE at the start with S0 (laser off).
+  // Per GRBL spec, M4 inline S changes don't cause motion stops.
+  moves.push({ type: 'laserOn', power: 0 });
+
+  for (const row of allRows) {
+    // 1. Rapid to the overscan start position (G0 — laser auto-off in M4 mode)
     moves.push({
       type: 'rapid',
-      to: { x: segment.from.x, y: segment.from.y },
+      to: row.overscanFrom,
     });
 
-    // 2. Laser ON
-    moves.push({
-      type: 'laserOn',
-      power,
-    });
+    // 2. Overscan approach: G1 at speed with S0 (motion, laser off, machine accelerates)
+    //    Skip if zero-length (overscanning = 0)
+    if (row.segments.length > 0) {
+      const approachTo = row.segments[0].actualFrom;
+      const dx = approachTo.x - row.overscanFrom.x;
+      const dy = approachTo.y - row.overscanFrom.y;
+      if (dx * dx + dy * dy > 0.0001) {
+        moves.push({
+          type: 'linear',
+          to: approachTo,
+          power: 0,
+          speed,
+        });
+      }
+    }
 
-    // 3. Linear scan across
-    moves.push({
-      type: 'linear',
-      to: { x: segment.to.x, y: segment.to.y },
-      power,
-      speed,
-    });
+    // 3. Burn segments with S0 gaps between them
+    for (let i = 0; i < row.segments.length; i++) {
+      const seg = row.segments[i];
 
-    // 4. Laser OFF
-    moves.push({ type: 'laserOff' });
+      // Burn across this segment (laser ON at full power)
+      moves.push({
+        type: 'linear',
+        to: seg.actualTo,
+        power,
+        speed,
+      });
+
+      // Gap to next segment: G1 with S0 (laser off, maintain speed)
+      if (i < row.segments.length - 1) {
+        const nextSeg = row.segments[i + 1];
+        moves.push({
+          type: 'linear',
+          to: nextSeg.actualFrom,
+          power: 0,
+          speed,
+        });
+      }
+    }
+
+    // 4. Overscan exit: G1 at speed with S0 (motion, laser off, machine decelerates)
+    //    Skip if zero-length (overscanning = 0)
+    if (row.segments.length > 0) {
+      const lastSeg = row.segments[row.segments.length - 1];
+      const dx = row.overscanTo.x - lastSeg.actualTo.x;
+      const dy = row.overscanTo.y - lastSeg.actualTo.y;
+      if (dx * dx + dy * dy > 0.0001) {
+        moves.push({
+          type: 'linear',
+          to: row.overscanTo,
+          power: 0,
+          speed,
+        });
+      }
+    }
   }
+
+  // Turn laser off at end of fill operation
+  moves.push({ type: 'laserOff' });
 
   return moves;
 }

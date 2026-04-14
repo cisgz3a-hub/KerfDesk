@@ -316,40 +316,52 @@ const fillLaserOffs = fillMoves.filter(m => m.type === 'laserOff');
 
 assert(fillRapids.length > 0, `Fill: has rapid moves (${fillRapids.length})`);
 assert(fillLinears.length > 0, `Fill: has linear moves (${fillLinears.length})`);
-assert(fillLaserOns.length === fillLinears.length, 'Fill: laserOn count matches linear count (one per scanline)');
-assert(fillLaserOffs.length === fillLinears.length, 'Fill: laserOff count matches linear count (one per scanline)');
 
-// Each scanline should be ~10mm wide (rectangle width)
-// Allow some tolerance for float math
-const firstLinear = fillLinears[0];
-if (firstLinear.type === 'linear') {
+// New fill pattern: 1 laserOn (M4 S0) at start, 1 laserOff (M5 S0) at end
+// Burn segments are linear moves with power > 0
+// Overscan approach/exit and gaps are linear moves with power = 0
+assert(fillLaserOns.length === 1, `Fill: exactly 1 laserOn (M4 S0 at start), got ${fillLaserOns.length}`);
+assert(fillLaserOffs.length === 1, `Fill: exactly 1 laserOff (M5 S0 at end), got ${fillLaserOffs.length}`);
+
+const fillBurnLinears = fillLinears.filter(m => m.type === 'linear' && m.power > 0);
+
+// Each scanline row should have exactly 1 burn linear (rectangle = 1 segment per row)
+// With 1mm interval on a 20mm rect, expect ~20 burn lines
+const expectedLines = Math.floor(20 / 1.0);
+assert(fillBurnLinears.length >= expectedLines - 2, `Fill: at least ${expectedLines - 2} burn linears (got ${fillBurnLinears.length})`);
+assert(fillBurnLinears.length <= expectedLines + 2, `Fill: at most ${expectedLines + 2} burn linears (got ${fillBurnLinears.length})`);
+
+// Each burn linear should be ~10mm wide (rectangle width)
+const firstBurn = fillBurnLinears[0];
+if (firstBurn.type === 'linear') {
   const firstRapid = fillRapids[0];
   if (firstRapid.type === 'rapid') {
-    const scanWidth = Math.abs(firstLinear.to.x - firstRapid.to.x);
+    const scanWidth = Math.abs(firstBurn.to.x - firstRapid.to.x);
     assert(Math.abs(scanWidth - 10) < 0.5, `Fill: scanline width ≈ 10mm (got ${scanWidth.toFixed(2)})`);
   }
 }
 
-// Verify scanline count is reasonable (height / interval, approximately)
-const expectedLines = Math.floor(20 / 1.0);  // 20mm height / 1mm interval
-assert(fillLinears.length >= expectedLines - 2, `Fill: at least ${expectedLines - 2} scanlines (got ${fillLinears.length})`);
-assert(fillLinears.length <= expectedLines + 2, `Fill: at most ${expectedLines + 2} scanlines (got ${fillLinears.length})`);
-
-// Verify bidirectional: first two linears should go opposite directions
-if (fillLinears.length >= 2 && fillLinears[0].type === 'linear' && fillLinears[1].type === 'linear') {
-  const dir0 = fillLinears[0].to.x - (fillRapids[0].type === 'rapid' ? fillRapids[0].to.x : 0);
-  const dir1 = fillLinears[1].to.x - (fillRapids[1].type === 'rapid' ? fillRapids[1].to.x : 0);
-  const isAlternating = (dir0 > 0 && dir1 < 0) || (dir0 < 0 && dir1 > 0);
-  assert(isAlternating, 'Fill: bidirectional — scanlines alternate direction');
+// Verify bidirectional: first two burn linears should go opposite directions
+if (fillBurnLinears.length >= 2 && fillBurnLinears[0].type === 'linear' && fillBurnLinears[1].type === 'linear') {
+  const rapid0 = fillRapids[0];
+  const rapid1 = fillRapids[1];
+  if (rapid0.type === 'rapid' && rapid1.type === 'rapid') {
+    const dir0 = fillBurnLinears[0].to.x - rapid0.to.x;
+    const dir1 = fillBurnLinears[1].to.x - rapid1.to.x;
+    const isAlternating = (dir0 > 0 && dir1 < 0) || (dir0 < 0 && dir1 > 0);
+    assert(isAlternating, 'Fill: bidirectional — burn linears alternate direction');
+  }
 }
 
-// Verify laserOn power matches layer settings
+// LaserOn at start should be M4 S0 (dynamic mode, initially off).
+// Actual burn power is carried on the linear moves.
 const fillFirstOn = fillLaserOns[0];
 if (fillFirstOn.type === 'laserOn') {
-  assert(fillFirstOn.power === fillLayer.settings.power.max, `Fill: laserOn power = ${fillLayer.settings.power.max}%`);
+  assert(fillFirstOn.power === 0, `Fill: laserOn sets M4 S0 (got power=${fillFirstOn.power})`);
 }
+assert(firstBurn.type === 'linear' && firstBurn.power === fillLayer.settings.power.max, `Fill: burn linear power = ${fillLayer.settings.power.max}%`);
 
-console.log(`  ℹ Scanlines: ${fillLinears.length}`);
+console.log(`  ℹ Burn scanlines: ${fillBurnLinears.length}`);
 console.log(`  ℹ Total fill moves: ${fillMoves.length}`);
 
 // ─── TEST: MAIN SCENE ENGRAVE OPERATION ──────────────────────────
@@ -362,10 +374,10 @@ const engraveMoves = engravePlanned.moves;
 const engraveLinears = engraveMoves.filter(m => m.type === 'linear').length;
 const engraveRapids = engraveMoves.filter(m => m.type === 'rapid').length;
 
-// With scanlines: many linears (one per scanline) and many rapids
-// Previous behavior was 4 linears (rectangle outline) — now should be much more
+// With scanlines: many linears and rapids. New pattern has 1 rapid per row
+// and multiple linears (approach S0 + burn S{power} + exit S0).
 assert(engraveLinears > 10, `Engrave: uses scanlines, not outline (${engraveLinears} linear moves)`);
-assert(engraveRapids === engraveLinears, `Engrave: rapid count matches linear count (${engraveRapids})`);
+assert(engraveRapids > 5, `Engrave: has rapid moves per row (${engraveRapids})`);
 
 // ─── TEST: RASTER (1-BIT) SCANLINE GENERATION ────────────────────
 

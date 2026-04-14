@@ -33,7 +33,10 @@ function hardThresholdInk(ctx: CanvasRenderingContext2D, w: number, h: number): 
   for (let i = 0; i < d.length; i += 4) {
     const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
     const darkness = 255 - lum;
-    const ink = darkness > 170 ? 0 : 255;
+    // Threshold 220: only count clearly-dark pixels as ink.
+    // Lower values (like 170) include anti-aliased gray fringe pixels,
+    // which makes traced outlines fatter than the true glyph edge.
+    const ink = darkness > 220 ? 0 : 255;
     d[i] = ink;
     d[i + 1] = ink;
     d[i + 2] = ink;
@@ -90,7 +93,7 @@ export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResul
   const text = g.text || '';
   if (!text.trim()) return null;
 
-  const scale = 4;
+  const scale = 8;
   const baseSize = g.fontSize || 10;
   const gScaled: TextGeometry = {
     ...g,
