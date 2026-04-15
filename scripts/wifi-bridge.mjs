@@ -73,7 +73,16 @@ wss.on('connection', (ws) => {
   });
 
   ws.on('message', (data) => {
-    const payload = Buffer.isBuffer(data) ? data : Buffer.from(String(data), 'utf8');
+    const text = Buffer.isBuffer(data) ? data.toString('utf8') : String(data);
+    let payload;
+    if (text.startsWith('__BYTE__:')) {
+      const byte = Number.parseInt(text.slice(9), 10);
+      payload = Number.isFinite(byte) && byte >= 0 && byte <= 255
+        ? Buffer.from([byte])
+        : Buffer.from(text, 'utf8');
+    } else {
+      payload = Buffer.from(text, 'utf8');
+    }
     process.stdout.write(`[browser->laser] ${payload.toString('utf8')}`);
     tcp.write(payload);
   });

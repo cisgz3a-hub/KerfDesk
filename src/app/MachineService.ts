@@ -252,7 +252,7 @@ export class MachineService {
     this.state.isSimulator = false;
   }
 
-  async connectWifiLaser(host: string, bridgePort: number = 8081): Promise<void> {
+  async connectWifiLaser(host: string, bridgePort: number = 8765): Promise<void> {
     const ws = createSerialPort('websocket') as WebSocketSerialPort;
     const url = `ws://${host}:${bridgePort}`;
     this.portRef.current = ws;

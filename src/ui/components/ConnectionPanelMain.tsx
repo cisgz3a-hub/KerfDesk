@@ -181,7 +181,7 @@ export function ConnectionPanelMain({
   const [completedTime, setCompletedTime] = useState(0);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [wifiBridgeHost, setWifiBridgeHost] = useState('localhost');
-  const [wifiBridgePort, setWifiBridgePort] = useState('8081');
+  const [wifiBridgePort, setWifiBridgePort] = useState('8765');
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;

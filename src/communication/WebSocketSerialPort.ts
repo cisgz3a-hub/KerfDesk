@@ -46,7 +46,8 @@ export class WebSocketSerialPort implements SerialPortLike {
 
   writeByte(byte: number): void {
     if (!this.socket || !this.open) throw new Error('Port is not open');
-    this.socket.send(String.fromCharCode(byte));
+    // Bridges (e.g. wainlux-bridge.mjs) decode realtime GRBL bytes from this prefix.
+    this.socket.send(`__BYTE__:${byte}`);
   }
 
   onData(callback: (line: string) => void): void {
