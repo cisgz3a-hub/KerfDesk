@@ -87,24 +87,39 @@ export class GrblController implements LaserController {
     this._updateStatus('connecting');
 
     return new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        this._stopStatusPolling();
-        if (this._port) {
-          try { this._port.close(); } catch { /* ignore */ }
-          this._port = null;
-        }
-        this._updateStatus('disconnected');
-        reject(new Error('Connection timeout — no GRBL welcome message'));
-      }, 5000);
-
       let welcomeReceived = false;
+      let timeout: ReturnType<typeof setTimeout>;
+      let probeI: ReturnType<typeof setTimeout> | undefined;
+      let probeSettings: ReturnType<typeof setTimeout> | undefined;
+      let probeWifi1: ReturnType<typeof setTimeout> | undefined;
+      let probeWifi2: ReturnType<typeof setTimeout> | undefined;
+      let probeWifi3: ReturnType<typeof setTimeout> | undefined;
+
+      const clearProbeTimers = (): void => {
+        if (probeI !== undefined) clearTimeout(probeI);
+        if (probeSettings !== undefined) clearTimeout(probeSettings);
+        if (probeWifi1 !== undefined) clearTimeout(probeWifi1);
+        if (probeWifi2 !== undefined) clearTimeout(probeWifi2);
+        if (probeWifi3 !== undefined) clearTimeout(probeWifi3);
+        probeI = undefined;
+        probeSettings = undefined;
+        probeWifi1 = undefined;
+        probeWifi2 = undefined;
+        probeWifi3 = undefined;
+      };
 
       port.onData((line) => {
         this._emitRawLine(line, 'rx');
 
-        if (!welcomeReceived && line.startsWith('Grbl')) {
+        const isWelcome =
+          line.toLowerCase().includes('grbl') ||
+          line.startsWith('[VER:') ||
+          line === 'ok';
+
+        if (!welcomeReceived && isWelcome) {
           welcomeReceived = true;
           clearTimeout(timeout);
+          clearProbeTimers();
           this._updateStatus('idle');
           this._startStatusPolling();
           resolve();
@@ -123,6 +138,34 @@ export class GrblController implements LaserController {
         }
       });
 
+      probeWifi1 = setTimeout(() => {
+        if (!welcomeReceived) {
+          try {
+            port.write('\n');
+          } catch {
+            /* ignore */
+          }
+        }
+      }, 1000);
+      probeWifi2 = setTimeout(() => {
+        if (!welcomeReceived) {
+          try {
+            port.write('?\n');
+          } catch {
+            /* ignore */
+          }
+        }
+      }, 2000);
+      probeWifi3 = setTimeout(() => {
+        if (!welcomeReceived) {
+          try {
+            port.write('\n');
+          } catch {
+            /* ignore */
+          }
+        }
+      }, 3000);
+
       port.onError((err) => {
         for (const cb of this._errorListeners) {
           cb(-1, `Serial error: ${err.message}`);
@@ -137,6 +180,34 @@ export class GrblController implements LaserController {
         this._port = null;
         this._updateStatus('disconnected');
       });
+
+      port.write('\n');
+      if (!welcomeReceived) {
+        probeI = setTimeout(() => {
+          try {
+            port.write('$I\n');
+          } catch {
+            /* ignore */
+          }
+        }, 500);
+        probeSettings = setTimeout(() => {
+          try {
+            port.write('$$\n');
+          } catch {
+            /* ignore */
+          }
+        }, 1000);
+        timeout = setTimeout(() => {
+          clearProbeTimers();
+          this._stopStatusPolling();
+          if (this._port) {
+            try { this._port.close(); } catch { /* ignore */ }
+            this._port = null;
+          }
+          this._updateStatus('disconnected');
+          reject(new Error('Connection timeout — no GRBL welcome message'));
+        }, 10_000);
+      }
     });
   }
 

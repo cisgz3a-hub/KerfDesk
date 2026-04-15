@@ -90,6 +90,16 @@ wss.on('connection', (browserWs) => {
   laserWs.on('open', () => {
     laserConnected = true;
     console.log(`🔗 Connected to laser WebSocket (ws://${laserIp}:81)`);
+
+    // Send synthetic GRBL welcome to browser immediately.
+    // The real welcome data arrives too early (before GrblController's onData is ready).
+    // This guaranteed-late message makes GrblController detect the firmware.
+    setTimeout(() => {
+      if (browserWs.readyState === WebSocket.OPEN) {
+        browserWs.send("Grbl 1.1h ['$' for help]");
+        console.log('  → Sent synthetic GRBL welcome to browser');
+      }
+    }, 500);
   });
 
   laserWs.on('message', (data, isBinary) => {
