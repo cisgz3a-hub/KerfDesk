@@ -6,7 +6,36 @@
  * Output: Uint8Array of 1-bit values (0=no burn, 255=burn)
  */
 
-export type DitherMode = 'none' | 'threshold' | 'floyd-steinberg' | 'jarvis' | 'stucki' | 'ordered' | 'atkinson';
+export type DitherMode =
+  | 'none'
+  | 'threshold'
+  | 'floyd-steinberg'
+  | 'jarvis'
+  | 'stucki'
+  | 'ordered'
+  | 'atkinson'
+  | 'burkes'
+  | 'sierra3'
+  | 'sierra2'
+  | 'sierra-lite'
+  | 'random';
+
+export function getDitherModes(): { id: DitherMode; name: string }[] {
+  return [
+    { id: 'none', name: 'None' },
+    { id: 'threshold', name: 'Threshold' },
+    { id: 'floyd-steinberg', name: 'Floyd-Steinberg' },
+    { id: 'jarvis', name: 'Jarvis' },
+    { id: 'stucki', name: 'Stucki' },
+    { id: 'ordered', name: 'Ordered' },
+    { id: 'atkinson', name: 'Atkinson' },
+    { id: 'burkes', name: 'Burkes' },
+    { id: 'sierra3', name: 'Sierra 3' },
+    { id: 'sierra2', name: 'Sierra 2' },
+    { id: 'sierra-lite', name: 'Sierra Lite' },
+    { id: 'random', name: 'Random' },
+  ];
+}
 
 export function ditherImage(
   data: Uint8Array,
@@ -22,6 +51,11 @@ export function ditherImage(
     case 'jarvis': return ditherErrorDiffusion(data, width, height, threshold, JARVIS);
     case 'stucki': return ditherErrorDiffusion(data, width, height, threshold, STUCKI);
     case 'atkinson': return ditherErrorDiffusion(data, width, height, threshold, ATKINSON);
+    case 'burkes': return ditherErrorDiffusion(data, width, height, threshold, BURKES);
+    case 'sierra3': return ditherErrorDiffusion(data, width, height, threshold, SIERRA3);
+    case 'sierra2': return ditherErrorDiffusion(data, width, height, threshold, SIERRA2);
+    case 'sierra-lite': return ditherErrorDiffusion(data, width, height, threshold, SIERRA_LITE);
+    case 'random': return ditherRandom(data, width, height);
     case 'ordered': return ditherOrdered(data, width, height);
     default: return data.slice();
   }
@@ -83,6 +117,39 @@ const ATKINSON: DiffusionKernel = {
   divisor: 8,
 };
 
+const BURKES: DiffusionKernel = {
+  offsets: [
+    [1, 0, 8], [2, 0, 4],
+    [-2, 1, 2], [-1, 1, 4], [0, 1, 8], [1, 1, 4], [2, 1, 2],
+  ],
+  divisor: 32,
+};
+
+const SIERRA3: DiffusionKernel = {
+  offsets: [
+    [1, 0, 5], [2, 0, 3],
+    [-2, 1, 2], [-1, 1, 4], [0, 1, 5], [1, 1, 4], [2, 1, 2],
+    [-1, 2, 2], [0, 2, 3], [1, 2, 2],
+  ],
+  divisor: 32,
+};
+
+const SIERRA2: DiffusionKernel = {
+  offsets: [
+    [1, 0, 4], [2, 0, 3],
+    [-2, 1, 1], [-1, 1, 2], [0, 1, 3], [1, 1, 2], [2, 1, 1],
+  ],
+  divisor: 16,
+};
+
+const SIERRA_LITE: DiffusionKernel = {
+  offsets: [
+    [1, 0, 2],
+    [-1, 1, 1], [0, 1, 1],
+  ],
+  divisor: 4,
+};
+
 function ditherErrorDiffusion(
   data: Uint8Array,
   width: number,
@@ -139,6 +206,21 @@ function ditherOrdered(
       const thresh = ((bayerVal + 0.5) / 16) * 255;
       out[i] = data[i] < thresh ? 255 : 0; // dark = burn
     }
+  }
+
+  return out;
+}
+
+function ditherRandom(
+  data: Uint8Array, width: number, height: number
+): Uint8Array {
+  const out = new Uint8Array(width * height);
+  let seed = 42;
+
+  for (let i = 0; i < data.length; i++) {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+    const randomThreshold = seed / 0x7fffffff * 255;
+    out[i] = data[i] < randomThreshold ? 255 : 0; // dark = burn
   }
 
   return out;
