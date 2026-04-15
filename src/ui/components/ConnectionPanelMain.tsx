@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
-import { MockSerialPort } from '../../communication/SerialPort';
+import { MockSerialPort, type SerialPortLike } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
 import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
@@ -77,7 +77,7 @@ function playCompletionBeep(): void {
 
 export interface ConnectionPanelMainProps {
   controller: LaserController;
-  portRef: React.MutableRefObject<WebSerialPort | MockSerialPort | null>;
+  portRef: React.MutableRefObject<SerialPortLike | null>;
   machineState: MachineState | null;
   jobProgress: JobProgress | null;
   scene: Scene;
@@ -180,6 +180,8 @@ export function ConnectionPanelMain({
   const [jobCompleted, setJobCompleted] = useState(false);
   const [completedTime, setCompletedTime] = useState(0);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
+  const [wifiBridgeHost, setWifiBridgeHost] = useState('localhost');
+  const [wifiBridgePort, setWifiBridgePort] = useState('8081');
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -223,6 +225,17 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessages([]);
     setShowSimulator(false);
+  }, []);
+
+  useEffect(() => {
+    try {
+      const host = localStorage.getItem('laserforge_wifi_bridge_host');
+      const port = localStorage.getItem('laserforge_wifi_bridge_port');
+      if (host) setWifiBridgeHost(host);
+      if (port) setWifiBridgePort(port);
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {
@@ -400,6 +413,29 @@ export function ConnectionPanelMain({
       await machineService.connectRealLaser(getActiveProfile()?.baudRate ?? 115200);
       setSimulator(false);
       appendMessage('✓ Real laser connected via USB');
+    } catch (e: any) {
+      appendMessage(`Connection failed: ${e.message}`);
+    }
+  };
+
+  const connectWifiLaser = async () => {
+    const host = wifiBridgeHost.trim() || 'localhost';
+    const parsedPort = Number.parseInt(wifiBridgePort.trim(), 10);
+    if (!Number.isFinite(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
+      appendMessage('ERROR: WiFi bridge port must be 1-65535');
+      return;
+    }
+    try {
+      appendMessage(`Connecting to WiFi bridge ws://${host}:${parsedPort} ...`);
+      await machineService.connectWifiLaser(host, parsedPort);
+      try {
+        localStorage.setItem('laserforge_wifi_bridge_host', host);
+        localStorage.setItem('laserforge_wifi_bridge_port', String(parsedPort));
+      } catch {
+        /* ignore */
+      }
+      setSimulator(false);
+      appendMessage('✓ Connected to laser via WiFi');
     } catch (e: any) {
       appendMessage(`Connection failed: ${e.message}`);
     }
@@ -851,6 +887,72 @@ export function ConnectionPanelMain({
         background: 'rgba(0,212,255,0.08)', border: '1px solid #00d4ff', color: '#00d4ff',
       },
     }, '🔌 Connect via USB'),
+    React.createElement('div', {
+      style: {
+        width: '100%',
+        maxWidth: 280,
+        display: 'flex',
+        flexDirection: 'column' as const,
+        gap: 6,
+        marginTop: 2,
+        marginBottom: 2,
+      },
+    },
+      React.createElement('div', {
+        style: { display: 'flex', gap: 6 },
+      },
+        React.createElement('input', {
+          type: 'text',
+          value: wifiBridgeHost,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWifiBridgeHost(e.target.value),
+          placeholder: 'Bridge host',
+          style: {
+            flex: 1,
+            padding: '8px 10px',
+            fontSize: 11,
+            borderRadius: 8,
+            fontFamily: mono,
+            background: '#0a0a14',
+            border: '1px solid #252540',
+            color: '#c0c0d0',
+            outline: 'none',
+          },
+        }),
+        React.createElement('input', {
+          type: 'text',
+          value: wifiBridgePort,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setWifiBridgePort(e.target.value),
+          placeholder: 'Port',
+          style: {
+            width: 68,
+            padding: '8px 10px',
+            fontSize: 11,
+            borderRadius: 8,
+            fontFamily: mono,
+            background: '#0a0a14',
+            border: '1px solid #252540',
+            color: '#c0c0d0',
+            outline: 'none',
+          },
+        }),
+      ),
+      React.createElement('button', {
+        type: 'button',
+        onClick: () => { void connectWifiLaser(); },
+        style: {
+          width: '100%',
+          padding: '12px',
+          fontSize: 12,
+          fontWeight: 600,
+          borderRadius: 10,
+          cursor: 'pointer',
+          fontFamily: font,
+          background: 'rgba(45,212,160,0.08)',
+          border: '1px solid rgba(45,212,160,0.7)',
+          color: '#2dd4a0',
+        },
+      }, '📡 Connect via WiFi'),
+    ),
     React.createElement('button', {
       type: 'button',
       onClick: () => { void connectSimulator(); },

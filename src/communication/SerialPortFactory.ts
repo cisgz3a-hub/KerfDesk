@@ -1,7 +1,8 @@
 import { MockSerialPort, type SerialPortLike } from './SerialPort';
 import { WebSerialPort } from './WebSerialPort';
+import { WebSocketSerialPort } from './WebSocketSerialPort';
 
-export type SerialPortKind = 'web' | 'simulator';
+export type SerialPortKind = 'web' | 'simulator' | 'websocket';
 
 export interface SerialPortFactoryOptions {
   bedWidth?: number;
@@ -17,6 +18,9 @@ export function createSerialPort(
       width: options.bedWidth ?? 400,
       height: options.bedHeight ?? 300,
     });
+  }
+  if (kind === 'websocket') {
+    return new WebSocketSerialPort();
   }
   return new WebSerialPort();
 }
