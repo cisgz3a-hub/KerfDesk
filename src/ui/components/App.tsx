@@ -206,6 +206,16 @@ export function App() {
     return null;
   }, [grbl.controller, grbl.machineState]);
 
+  const machineAccelFromGrbl = useMemo(() => {
+    const c = grbl.controller;
+    if (!c || !(c instanceof GrblController)) return null;
+    const { maxAccelX, maxAccelY } = c.getMachineInfo();
+    if (maxAccelX > 0 && maxAccelY > 0) return Math.min(maxAccelX, maxAccelY);
+    if (maxAccelX > 0) return maxAccelX;
+    if (maxAccelY > 0) return maxAccelY;
+    return null;
+  }, [grbl.controller, grbl.machineState]);
+
   const {
     currentGcode,
     setCurrentGcode,
@@ -221,6 +231,7 @@ export function App() {
     savedOrigin,
     controllerMaxSpindle: grbl.controller?.maxSpindle ?? null,
     machineBedFromController: machineBedFromGrbl,
+    controllerAccelMmPerS2: machineAccelFromGrbl,
     connectionSidebarOpen,
     outputFormat: 'grbl',
   });

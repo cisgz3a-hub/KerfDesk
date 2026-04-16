@@ -40,6 +40,10 @@ export interface GrblMachineInfo {
   laserMode: boolean;
   maxFeedX: number;
   maxFeedY: number;
+  /** $120 max X acceleration (mm/s²). */
+  maxAccelX: number;
+  /** $121 max Y acceleration (mm/s²). */
+  maxAccelY: number;
 }
 
 export class GrblController implements LaserController {
@@ -74,6 +78,8 @@ export class GrblController implements LaserController {
   private _bedHeight = 0;
   private _maxFeedX = 0;
   private _maxFeedY = 0;
+  private _maxAccelX = 0;
+  private _maxAccelY = 0;
   /** Waiting for trailing `ok` after a `$$` settings dump. */
   private _awaitingSettingsOk = false;
 
@@ -109,6 +115,8 @@ export class GrblController implements LaserController {
       laserMode: this._laserMode,
       maxFeedX: this._maxFeedX,
       maxFeedY: this._maxFeedY,
+      maxAccelX: this._maxAccelX,
+      maxAccelY: this._maxAccelY,
     };
   }
 
@@ -668,6 +676,8 @@ export class GrblController implements LaserController {
     this._bedHeight = 0;
     this._maxFeedX = 0;
     this._maxFeedY = 0;
+    this._maxAccelX = 0;
+    this._maxAccelY = 0;
   }
 
   /** Run after welcome + connect promise resolve; does not run during welcome detection. */
@@ -724,6 +734,16 @@ export class GrblController implements LaserController {
       case 111: {
         const v = parseFloat(rawVal);
         if (Number.isFinite(v)) this._maxFeedY = v;
+        break;
+      }
+      case 120: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v) && v > 0) this._maxAccelX = v;
+        break;
+      }
+      case 121: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v) && v > 0) this._maxAccelY = v;
         break;
       }
       default:

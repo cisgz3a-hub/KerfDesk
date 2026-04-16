@@ -105,6 +105,11 @@ export interface LaserSettings {
   // Hardware
   airAssist: boolean;
   cutOrder: CutOrder;
+
+  /** Image/raster: scale power during accel/decel (default true via resolve). */
+  accelAwarePower?: boolean;
+  /** Minimum laser power ratio during decel phases (0–1). */
+  minPowerRatioAccel?: number;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

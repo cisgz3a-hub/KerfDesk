@@ -24,6 +24,8 @@ export interface UseCompileManagerOptions {
   controllerMaxSpindle: number | null;
   /** Auto-detected bed from GRBL $$ ($130/$131) when available. */
   machineBedFromController: { width: number; height: number } | null;
+  /** Min of GRBL $120/$121 when available. */
+  controllerAccelMmPerS2: number | null;
   connectionSidebarOpen: boolean;
   outputFormat?: OutputFormat;
 }
@@ -55,6 +57,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     savedOrigin,
     controllerMaxSpindle,
     machineBedFromController,
+    controllerAccelMmPerS2,
     connectionSidebarOpen,
     outputFormat = 'grbl',
   } = options;
@@ -74,7 +77,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   useLayoutEffect(() => {
     sceneRevisionRef.current += 1;
     setSceneCompileTick(sceneRevisionRef.current);
-  }, [scene, startMode, savedOrigin, controllerMaxSpindle, machineBedFromController]);
+  }, [scene, startMode, savedOrigin, controllerMaxSpindle, machineBedFromController, controllerAccelMmPerS2]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;
@@ -95,8 +98,9 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         controllerMaxSpindle,
         outputFormat,
         machineBedFromController,
+        controllerAccelMmPerS2,
       ),
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController],
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController, controllerAccelMmPerS2],
   );
 
   const compileGcode = useCallback(
@@ -110,6 +114,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           controllerMaxSpindle,
           outputFormat,
           machineBedFromController,
+          controllerAccelMmPerS2,
         );
         setLastResult(result);
         // Match previous App behavior: any finished compile attempt (including empty job)
@@ -128,19 +133,19 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         setIsCompiling(false);
       }
     },
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController],
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController, controllerAccelMmPerS2],
   );
 
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {
     try {
-      const result = await pipelineCompileToolpath(targetScene);
+      const result = await pipelineCompileToolpath(targetScene, controllerAccelMmPerS2);
       if (!result) return null;
       return result.moves;
     } catch (err) {
       console.error('Toolpath compilation failed:', err);
       return null;
     }
-  }, []);
+  }, [controllerAccelMmPerS2]);
 
   return {
     currentGcode,

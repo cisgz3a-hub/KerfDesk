@@ -110,4 +110,4 @@ const idStable = withPath.objects.find(o => o.name === 'TextPath')!.id;
 assert(deserializeScene(fresh).objects.find(o => o.id === idStable) != null, 'round-trip preserves object id');
 
 console.log(`\nSource text migration: ${passed} passed, ${failed} failed`);
-if (failed > 0) process.exit(1);
+process.exit(failed > 0 ? 1 : 0);

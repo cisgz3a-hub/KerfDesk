@@ -104,6 +104,13 @@ export interface ResolvedLaserSettings {
   insideFirst: boolean;
 
   airAssist: boolean;
+
+  /** Raster: scale laser power with trapezoidal velocity (reduces dark scan ends). */
+  accelAwarePower: boolean;
+  /** Max acceleration mm/s² for velocity profile (from profile or GRBL $120/$121). */
+  maxAccelMmPerS2: number;
+  /** Minimum power ratio during decel (0–1). */
+  minPowerRatioAccel: number;
 }
 
 // ─── OPERATION ───────────────────────────────────────────────────

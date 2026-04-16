@@ -112,3 +112,4 @@ assert(getPresets().length === defaultCount, 'deletePreset does not remove defau
 console.log('\n=== Summary ===');
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) throw new Error(`materials.test.ts: ${failed} assertion(s) failed`);
+process.exit(0);

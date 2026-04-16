@@ -120,3 +120,4 @@ console.log('\n=== compileJob optimizeOrder false preserves layer batching ===')
 console.log('\n=== Summary ===');
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) throw new Error(`operation-ordering.test.ts: ${failed} failed`);
+process.exit(0);

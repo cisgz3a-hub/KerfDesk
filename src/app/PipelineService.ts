@@ -72,6 +72,8 @@ export async function compileGcode(
   outputFormat: OutputFormat = 'grbl',
   /** GRBL $$ bed ($131) when connected; overrides profile height for Y mapping only. */
   machineBedFromController: { width: number; height: number } | null = null,
+  /** GRBL $120/$121 (min); raster acceleration-aware power. */
+  controllerAccelMmPerS2: number | null = null,
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
 
@@ -81,7 +83,9 @@ export async function compileGcode(
     );
   }
 
-  const job = compileJob(sceneForJob);
+  const job = compileJob(sceneForJob, {
+    machineAccelMmPerS2: controllerAccelMmPerS2,
+  });
   if (job.operations.length === 0) return null;
 
   const profile = getActiveProfile();
@@ -141,6 +145,7 @@ export async function compileGcode(
  */
 export async function compileToolpath(
   scene: Scene,
+  controllerAccelMmPerS2: number | null = null,
 ): Promise<CompileToolpathResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
 
@@ -150,7 +155,9 @@ export async function compileToolpath(
     );
   }
 
-  const job = compileJob(sceneForJob);
+  const job = compileJob(sceneForJob, {
+    machineAccelMmPerS2: controllerAccelMmPerS2,
+  });
   if (job.operations.length === 0) return null;
 
   const profile = getActiveProfile();

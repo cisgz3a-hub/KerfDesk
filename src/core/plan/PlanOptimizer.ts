@@ -51,6 +51,12 @@ import {
   type RasterScanline,
 } from './RasterGenerator';
 import { optimizePathOrder } from './PathOptimizer';
+import {
+  computeVelocityZones,
+  velocityAt,
+  scalePowerByVelocity,
+  type MoveKinematics,
+} from './VelocityProfile';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -578,35 +584,115 @@ function planRasterOperation(
 
   const moves: Move[] = [];
   const speed = settings.speed;
+  const useAccel = settings.accelAwarePower !== false;
+  const maxAccel = Math.max(1, settings.maxAccelMmPerS2);
+  const minRatio = Math.max(0, Math.min(1, settings.minPowerRatioAccel));
 
   for (const scanline of scanlines) {
     for (const segment of scanline.segments) {
-      // 1. Rapid to start of segment
       moves.push({
         type: 'rapid',
         to: { x: segment.startX, y: segment.y },
       });
 
-      // 2. Laser ON at segment's power
       moves.push({
         type: 'laserOn',
         power: segment.power,
       });
 
-      // 3. Linear scan to end
-      moves.push({
-        type: 'linear',
-        to: { x: segment.endX, y: segment.y },
-        power: segment.power,
+      appendRasterBurnMoves(
+        moves,
+        segment.startX,
+        segment.endX,
+        segment.y,
+        segment.power,
         speed,
-      });
+        useAccel,
+        maxAccel,
+        minRatio,
+      );
 
-      // 4. Laser OFF
       moves.push({ type: 'laserOff' });
     }
   }
 
   return moves;
+}
+
+/** Split a horizontal raster burn into 2–3 G1 moves with velocity-scaled power. */
+function appendRasterBurnMoves(
+  moves: Move[],
+  startX: number,
+  endX: number,
+  y: number,
+  powerPct: number,
+  speed: number,
+  useAccel: boolean,
+  maxAccelMmPerS2: number,
+  minPowerRatio: number,
+): void {
+  const lineLen = Math.abs(endX - startX);
+  const dir = endX >= startX ? 1 : -1;
+  const xAt = (distFromStart: number) => startX + dir * distFromStart;
+
+  const pushLinear = (nextX: number, pow: number): void => {
+    moves.push({
+      type: 'linear',
+      to: { x: nextX, y },
+      power: pow,
+      speed,
+    });
+  };
+
+  if (!useAccel || lineLen <= 0.5) {
+    pushLinear(endX, powerPct);
+    return;
+  }
+
+  const k: MoveKinematics = {
+    distanceMm: lineLen,
+    feedrateMmPerMin: speed,
+    entryVelocityMmPerMin: 0,
+    exitVelocityMmPerMin: 0,
+    maxAccelMmPerS2: maxAccelMmPerS2,
+  };
+  const zones = computeVelocityZones(k);
+
+  let curX = startX;
+  const go = (nextX: number, pow: number): void => {
+    if (Math.abs(nextX - curX) < 1e-4) return;
+    pushLinear(nextX, pow);
+    curX = nextX;
+  };
+
+  const triangular =
+    zones.isTriangular || zones.decelStartMm <= zones.accelEndMm + 1e-6;
+
+  if (triangular) {
+    const apexDist = zones.accelEndMm;
+    const apexX = xAt(apexDist);
+    const vMidA = velocityAt(apexDist / 2, k, zones);
+    const s1 = scalePowerByVelocity(powerPct, vMidA, speed, minPowerRatio);
+    go(apexX, s1);
+    const midD = (apexDist + lineLen) / 2;
+    const vMidD = velocityAt(midD, k, zones);
+    const s2 = scalePowerByVelocity(powerPct, vMidD, speed, minPowerRatio);
+    go(endX, s2);
+    return;
+  }
+
+  const xAccelEnd = xAt(zones.accelEndMm);
+  const xDecelStart = xAt(zones.decelStartMm);
+
+  const vA = velocityAt(zones.accelEndMm / 2, k, zones);
+  const sA = scalePowerByVelocity(powerPct, vA, speed, minPowerRatio);
+  go(xAccelEnd, sA);
+
+  go(xDecelStart, powerPct);
+
+  const vD = velocityAt((zones.decelStartMm + lineLen) / 2, k, zones);
+  const sD = scalePowerByVelocity(powerPct, vD, speed, minPowerRatio);
+  go(endX, sD);
 }
 
 // ─── PATH ORDERING (INSIDE-FIRST + NEAREST-NEIGHBOR) ─────────────

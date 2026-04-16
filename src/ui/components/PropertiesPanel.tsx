@@ -960,6 +960,36 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           React.createElement('option', { value: 'threshold' }, 'Threshold (1-bit)'),
         ),
 
+        React.createElement('label', {
+          style: {
+            ...labelStyle,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 10,
+            cursor: 'pointer',
+          },
+          title:
+            'Scales laser power with actual velocity during accel/decel on each scan line. Reduces dark streaks at line ends. Turn off only if results look worse on your machine.',
+        },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: imageLayer.settings.accelAwarePower !== false,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const s = sceneRef.current;
+              onSceneCommit({
+                ...s,
+                layers: s.layers.map(l =>
+                  l.id === imageLayer.id
+                    ? { ...l, settings: { ...l.settings, accelAwarePower: e.target.checked } }
+                    : l,
+                ),
+              });
+            },
+          }),
+          'Acceleration-aware power (recommended)',
+        ),
+
         imageMode === 'dither' && React.createElement(React.Fragment, null,
           React.createElement('div', { style: { ...labelStyle, marginTop: 4 } }, 'Dithering algorithm'),
           React.createElement('select', {

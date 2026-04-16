@@ -16,7 +16,7 @@
     "license-check": "node scripts/license-check.mjs",
     "license-check:report": "node scripts/license-check-report.mjs",
     "license-check:summary": "node scripts/license-check-summary.mjs",
-    "test": "npx tsx tests/pipeline.test.ts && npx tsx tests/controller.test.ts && npx tsx tests/simulation.test.ts && npx tsx tests/viewport.test.ts && npx tsx tests/svg-import.test.ts && npx tsx tests/svg-import-placement.test.ts && npx tsx tests/placement.test.ts && npx tsx tests/history.test.ts && npx tsx tests/scene-io.test.ts && npx tsx tests/ui-integration.test.ts && npx tsx tests/autosave-serialization.test.ts && npx tsx tests/text-outline-cache.test.ts && npx tsx tests/source-text-migration.test.ts && npx tsx tests/preflight-bounds.test.ts && npx tsx tests/controller-stop-safety.test.ts && npx tsx tests/materials.test.ts && npx tsx tests/image-processing.test.ts && npx tsx tests/operation-ordering.test.ts && npx tsx tests/test-grid-generator.test.ts",
+    "test": "node scripts/run-tests.mjs",
     "prepare": "husky"
   },
   "keywords": [],

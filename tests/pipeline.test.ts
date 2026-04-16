@@ -440,6 +440,9 @@ const rasterSettings: ResolvedLaserSettings = {
   fillInterval: 0.1, fillAngle: 0, fillMode: 'line', fillBiDirectional: true, overscanning: 0,
   overcut: 0, leadIn: 0, tabCount: 0, tabWidth: 0, insideFirst: false,
   airAssist: false,
+  accelAwarePower: false,
+  maxAccelMmPerS2: 1000,
+  minPowerRatioAccel: 0.1,
 };
 
 const rasterJob = createEmptyJob('Raster Test', 'test');
@@ -623,6 +626,4 @@ console.log(`\n${'='.repeat(40)}`);
 console.log(`Results: ${passed} passed, ${failed} failed`);
 console.log(`${'='.repeat(40)}\n`);
 
-if (failed > 0) {
-  process.exit(1);
-}
+process.exit(failed > 0 ? 1 : 0);

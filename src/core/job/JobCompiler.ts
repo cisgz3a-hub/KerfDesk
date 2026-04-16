@@ -39,9 +39,12 @@ import {
   createEmptyJob, flatPathFromPoints,
 } from './Job';
 import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
+import { getActiveProfile } from '../devices/DeviceProfile';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
+  /** From GRBL $120/$121 (min of X,Y) when connected; overrides profile for raster kinematics. */
+  machineAccelMmPerS2?: number | null;
 }
 
 function vectorOpToOrderableShape(
@@ -79,6 +82,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   const job = createEmptyJob(scene.metadata.name, scene.id);
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
   const optimizeOrder = options?.optimizeOrder ?? scene.compileOptions?.optimizeOrder !== false;
+  const compileOpts = options;
 
   let totalObjects = 0;
 
@@ -90,7 +94,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of objects) {
           if (!obj.visible || obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj]);
+          const imgOp = compileOperation(layer, [obj], compileOpts);
           if (imgOp) {
             job.operations.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -100,7 +104,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
         continue;
       }
 
-      const operation = compileOperation(layer, objects);
+      const operation = compileOperation(layer, objects, compileOpts);
       if (operation) {
         job.operations.push(operation);
         job.bounds = mergeAABB(job.bounds, operation.bounds);
@@ -123,7 +127,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of orderedObjs) {
           if (obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj]);
+          const imgOp = compileOperation(layer, [obj], compileOpts);
           if (imgOp) {
             rasterOps.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -137,7 +141,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       const sceneIndexById = new Map(scene.objects.map((o, i) => [o.id, i]));
 
       for (const obj of orderedObjs) {
-        const op = compileOperation(layer, [obj]);
+        const op = compileOperation(layer, [obj], compileOpts);
         if (!op) continue;
         if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') continue;
         const shape = vectorOpToOrderableShape(op, phase, sceneIndexById.get(obj.id) ?? 0);
@@ -184,9 +188,13 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
 
 // ─── COMPILE SINGLE OPERATION ────────────────────────────────────
 
-function compileOperation(layer: Layer, objects: SceneObject[]): Operation | null {
+function compileOperation(
+  layer: Layer,
+  objects: SceneObject[],
+  jobOpts?: CompileJobOptions,
+): Operation | null {
   const type = mapModeToType(layer.settings.mode);
-  const settings = resolveSettings(layer);
+  const settings = resolveSettings(layer, jobOpts);
   const geometry = compileGeometry(type, layer, objects);
 
   if (!geometry) return null;
@@ -236,8 +244,19 @@ function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType 
  * Convert Layer's LaserSettings into fully resolved ResolvedLaserSettings.
  * No nulls, no defaults, no conditional logic downstream.
  */
-function resolveSettings(layer: Layer): ResolvedLaserSettings {
+function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLaserSettings {
   const s = layer.settings;
+  const profile = getActiveProfile();
+  const detectedAccel = jobOpts?.machineAccelMmPerS2;
+  const accelFromProfile = profile?.maxAccelMmPerS2 ?? 1000;
+  const maxAccelMmPerS2 =
+    detectedAccel != null && Number.isFinite(detectedAccel) && detectedAccel > 0
+      ? detectedAccel
+      : accelFromProfile;
+  const accelAwarePower =
+    s.accelAwarePower ?? profile?.accelAwarePower ?? true;
+  const minPowerRatioAccel =
+    s.minPowerRatioAccel ?? profile?.minPowerRatioAccel ?? 0.1;
   /** Engrave always needs scanline spacing; do not rely only on fill.enabled. */
   const fillActiveForEngrave = s.fill.enabled || s.mode === 'engrave';
   const rawIv = Number(s.fill.interval);
@@ -269,6 +288,10 @@ function resolveSettings(layer: Layer): ResolvedLaserSettings {
     insideFirst: s.cut.insideFirst,
 
     airAssist: s.airAssist,
+
+    accelAwarePower,
+    maxAccelMmPerS2,
+    minPowerRatioAccel,
   };
 }
 

@@ -131,3 +131,4 @@ console.log('\n=== threshold 1-bit raster ===');
 console.log('\n=== Summary ===');
 console.log(`Passed: ${passed}, Failed: ${failed}`);
 if (failed > 0) throw new Error(`image-processing.test.ts: ${failed} assertion(s) failed`);
+process.exit(0);

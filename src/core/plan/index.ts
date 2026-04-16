@@ -52,3 +52,10 @@ export {
   type SimulationConfig,
   type SimulationResult,
 } from './Simulation';
+export {
+  computeVelocityZones,
+  velocityAt,
+  scalePowerByVelocity,
+  type MoveKinematics,
+  type VelocityZones,
+} from './VelocityProfile';

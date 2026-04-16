@@ -46,15 +46,35 @@ export interface DeviceProfile {
   // Custom G-code
   startGcode: string;
   endGcode: string;
+
+  /** Max acceleration mm/s² (GRBL-style). Used for raster power vs velocity. */
+  maxAccelMmPerS2?: number;
+  /** Default acceleration-aware raster power when layer does not override. */
+  accelAwarePower?: boolean;
+  /** Default minimum power ratio during raster decel. */
+  minPowerRatioAccel?: number;
 }
 
 const STORAGE_KEY = 'laserforge_device_profiles';
 const ACTIVE_PROFILE_KEY = 'laserforge_active_profile';
 
+/** Browser `localStorage`; absent in Node (tsx tests) and some embed contexts. */
+function getBrowserLocalStorage(): Storage | null {
+  if (typeof globalThis === 'undefined') return null;
+  try {
+    const ls = (globalThis as unknown as { localStorage?: Storage }).localStorage;
+    return ls ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Get all saved profiles */
 export function getDeviceProfiles(): DeviceProfile[] {
+  const ls = getBrowserLocalStorage();
+  if (!ls) return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = ls.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as DeviceProfile[];
     if (!Array.isArray(parsed)) return [];
@@ -72,6 +92,8 @@ export function getDeviceProfiles(): DeviceProfile[] {
 
 /** Save a profile (create or update) */
 export function saveDeviceProfile(profile: DeviceProfile): void {
+  const ls = getBrowserLocalStorage();
+  if (!ls) return;
   const profiles = getDeviceProfiles();
   const existingIdx = profiles.findIndex(p => p.id === profile.id);
   profile.updatedAt = new Date().toISOString();
@@ -83,31 +105,37 @@ export function saveDeviceProfile(profile: DeviceProfile): void {
     profiles.push(profile);
   }
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  ls.setItem(STORAGE_KEY, JSON.stringify(profiles));
 }
 
 /** Delete a profile by ID */
 export function deleteDeviceProfile(id: string): void {
+  const ls = getBrowserLocalStorage();
+  if (!ls) return;
   const profiles = getDeviceProfiles().filter(p => p.id !== id);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  ls.setItem(STORAGE_KEY, JSON.stringify(profiles));
 
   // Clear active if it was deleted
   if (getActiveProfileId() === id) {
-    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    ls.removeItem(ACTIVE_PROFILE_KEY);
   }
 }
 
 /** Get the active profile ID */
 export function getActiveProfileId(): string | null {
-  return localStorage.getItem(ACTIVE_PROFILE_KEY);
+  const ls = getBrowserLocalStorage();
+  if (!ls) return null;
+  return ls.getItem(ACTIVE_PROFILE_KEY);
 }
 
 /** Set the active profile */
 export function setActiveProfileId(id: string | null): void {
+  const ls = getBrowserLocalStorage();
+  if (!ls) return;
   if (id) {
-    localStorage.setItem(ACTIVE_PROFILE_KEY, id);
+    ls.setItem(ACTIVE_PROFILE_KEY, id);
   } else {
-    localStorage.removeItem(ACTIVE_PROFILE_KEY);
+    ls.removeItem(ACTIVE_PROFILE_KEY);
   }
 }
 
@@ -141,6 +169,9 @@ export function createBlankProfile(name: string): DeviceProfile {
     baudRate: 115200,
     startGcode: '',
     endGcode: '',
+    maxAccelMmPerS2: 1000,
+    accelAwarePower: true,
+    minPowerRatioAccel: 0.1,
   };
 }
 
