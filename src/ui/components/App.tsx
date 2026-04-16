@@ -289,7 +289,7 @@ export function App() {
     const profile = getDeviceProfiles().find(p => p.id === id);
     if (!profile) return;
     handleSceneCommit(applyProfileToScene(profile, scene));
-  }, [refreshProfiles, handleSceneCommit, scene]);
+  }, [refreshProfiles, scene]);
   const createProfileFromCurrentScene = useCallback((name: string) => {
     const profile = profileFromScene(name, scene);
     saveDeviceProfile(profile);
