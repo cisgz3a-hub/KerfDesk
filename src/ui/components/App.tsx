@@ -167,7 +167,7 @@ export function App() {
       const raw = localStorage.getItem('laserforge_start_mode');
       if (raw === 'absolute' || raw === 'current' || raw === 'savedOrigin') return raw;
     } catch { /* ignore */ }
-    return 'current';
+    return 'absolute';
   });
   const [savedOrigin, setSavedOrigin] = useState<{ x: number; y: number } | null>(() => {
     try {
