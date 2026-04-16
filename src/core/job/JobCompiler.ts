@@ -7,7 +7,11 @@
  *             After this step, the scene graph is no longer needed.
  * 
  * Pipeline:   Scene → [compileJob()] → Job
- * 
+ *
+ * Canvas → machine Y mapping for G-code is **not** done here; see
+ * `applyMachineTransform` in `/src/core/plan/MachineTransform.ts` (uses device
+ * `originCorner` and physical bed height from profile or GRBL $$).
+ *
  * Dependencies:
  *   - /src/core/types.ts
  *   - /src/core/scene/Scene.ts

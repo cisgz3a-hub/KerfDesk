@@ -17,8 +17,26 @@ import { type OutputFormat } from '../core/output/Output';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
-import { getActiveProfile } from '../core/devices/DeviceProfile';
+import { getActiveProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
+
+const DEFAULT_MACHINE_BED_MM = 300;
+
+function resolveBedHeightMm(
+  profile: ReturnType<typeof getActiveProfile>,
+  machineBedFromController: { width: number; height: number } | null | undefined,
+): number {
+  const hCtrl = machineBedFromController?.height;
+  if (typeof hCtrl === 'number' && Number.isFinite(hCtrl) && hCtrl > 0) return hCtrl;
+  const hProf = profile?.bedHeight;
+  if (typeof hProf === 'number' && Number.isFinite(hProf) && hProf > 0) return hProf;
+  return DEFAULT_MACHINE_BED_MM;
+}
+
+function resolveOriginCorner(profile: ReturnType<typeof getActiveProfile>): MachineOriginCorner {
+  return profile?.originCorner
+    ?? (profile?.invertY === false ? 'rear-left' : 'front-left');
+}
 
 // ─── RESULT TYPES ──────────────────────────────────────────────
 
@@ -52,6 +70,8 @@ export async function compileGcode(
   /** Auto-detected GRBL $30. Fallback when device profile has no maxSpindle. */
   controllerMaxSpindle: number | null = null,
   outputFormat: OutputFormat = 'grbl',
+  /** GRBL $$ bed ($131) when connected; overrides profile height for Y mapping only. */
+  machineBedFromController: { width: number; height: number } | null = null,
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
 
@@ -74,7 +94,8 @@ export async function compileGcode(
   const canvasMoves = plan.operations.flatMap(op => op.moves);
   const canvasPlanBounds = { ...plan.bounds };
 
-  const flipY = profile?.invertY ?? true;
+  const originCorner = resolveOriginCorner(profile);
+  const bedHeightMm = resolveBedHeightMm(profile, machineBedFromController);
 
   const maxSpindle =
     profile?.maxSpindle
@@ -85,7 +106,8 @@ export async function compileGcode(
   const machineTransform = applyMachineTransform(plan, {
     startMode,
     savedOrigin,
-    flipY,
+    originCorner,
+    bedHeightMm,
   });
 
   const strategy = getOutputStrategy(outputFormat);

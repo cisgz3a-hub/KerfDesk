@@ -97,13 +97,32 @@ function ditherCacheSet(key: string, canvas: HTMLCanvasElement): void {
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
+function renderMachineWorkAreaOverlay(
+  ctx: CanvasRenderingContext2D,
+  machine: { width: number; height: number },
+  transform: Transform,
+): void {
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 196, 72, 0.75)';
+  ctx.setLineDash([transform.screenPx(5), transform.screenPx(4)]);
+  ctx.lineWidth = transform.screenPx(1.2);
+  ctx.strokeRect(0, 0, machine.width, machine.height);
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255, 196, 72, 0.92)';
+  ctx.font = `${Math.max(9, transform.screenPx(10))}px "JetBrains Mono", monospace`;
+  ctx.textBaseline = 'top';
+  ctx.fillText(`${machine.width}×${machine.height} mm (machine)`, 3, 3);
+  ctx.restore();
+}
+
 /** Bed, grid, origin, crosshair — leaves ctx with transform applied (outer save still active). */
 export function renderSceneBackground(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
   transform: Transform,
   canvasWidth: number,
-  canvasHeight: number
+  canvasHeight: number,
+  machineWorkAreaMm: { width: number; height: number } | null = null,
 ): void {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
   ctx.fillStyle = '#0a0a14';
@@ -114,6 +133,14 @@ export function renderSceneBackground(
 
   renderBed(ctx, scene.canvas.width, scene.canvas.height, transform);
   renderGrid(ctx, scene.canvas.width, scene.canvas.height, transform);
+
+  if (
+    machineWorkAreaMm &&
+    machineWorkAreaMm.width > 0 &&
+    machineWorkAreaMm.height > 0
+  ) {
+    renderMachineWorkAreaOverlay(ctx, machineWorkAreaMm, transform);
+  }
 
   // ─── MATERIAL RECTANGLE ─────────────────────────────────────────
   if (scene.material) {
@@ -471,9 +498,10 @@ export function renderScene(
   canvasWidth: number,
   canvasHeight: number,
   selectedIds?: ReadonlySet<string>,
-  previewMode: boolean = false
+  previewMode: boolean = false,
+  machineWorkAreaMm: { width: number; height: number } | null = null,
 ): void {
-  renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight);
+  renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight, machineWorkAreaMm);
   renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode);
 }
 

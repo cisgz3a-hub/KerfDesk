@@ -223,7 +223,11 @@ async function testBufferManagement() {
   }
   await flush();
 
-  const jobLines = port.received.filter(l => l.startsWith('G1'));
+  // Exclude post-connect WCO line `G10 L2...` — it also begins with `G1` if tested naïvely.
+  const jobLines = port.received.filter(l => {
+    const s = l.endsWith('\n') ? l.slice(0, -1) : l;
+    return /^G1 X\d/.test(s);
+  });
   assert(jobLines.length === 10, `All 10 job lines eventually sent (got ${jobLines.length}, total TX ${port.received.length})`);
 
   await ctrl.disconnect();

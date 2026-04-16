@@ -143,12 +143,14 @@ assert(fullVectorPlan.operations.length === autoVectorPlan.operations.length, 'c
 const fullMachine = applyMachineTransform(fullVectorPlan, {
   startMode: 'current',
   savedOrigin: null,
-  flipY: true,
+  originCorner: 'front-left',
+  bedHeightMm: vectorScene.canvas.height,
 });
 const autoMachine = applyMachineTransform(autoVectorPlan, {
   startMode: 'current',
   savedOrigin: null,
-  flipY: true,
+  originCorner: 'front-left',
+  bedHeightMm: vectorScene.canvas.height,
 });
 
 const grbl = getOutputStrategy('grbl');

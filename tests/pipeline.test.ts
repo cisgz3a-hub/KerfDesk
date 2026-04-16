@@ -575,7 +575,8 @@ if (grblStrategy) {
   const { plan: machinePlan } = applyMachineTransform(plan, {
     startMode: 'current',
     savedOrigin: null,
-    flipY: true,
+    originCorner: 'front-left',
+    bedHeightMm: scene.canvas.height,
   });
   const output = grblStrategy.generate(machinePlan, job);
   

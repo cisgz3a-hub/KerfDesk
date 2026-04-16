@@ -36,6 +36,7 @@ import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
+import { GrblController } from '../../controllers/grbl/GrblController';
 import { CanvasViewport } from './CanvasViewport';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
@@ -186,7 +187,7 @@ export function App() {
     if (activeJobTransform) {
       const canvasX = wp.x - activeJobTransform.offsetX;
       const canvasY = activeJobTransform.flipY
-        ? activeJobTransform.designMaxY - wp.y + activeJobTransform.offsetY
+        ? activeJobTransform.flipReferenceY - wp.y + activeJobTransform.offsetY
         : wp.y - activeJobTransform.offsetY;
       return { x: canvasX, y: canvasY };
     }
@@ -194,6 +195,16 @@ export function App() {
   }, [grbl.isJobRunning, grbl.machineState, activeJobTransform]);
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.controllerReady;
+
+  const machineBedFromGrbl = useMemo(() => {
+    const c = grbl.controller;
+    if (!c || !(c instanceof GrblController)) return null;
+    const info = c.getMachineInfo();
+    if (info.bedWidth > 0 && info.bedHeight > 0) {
+      return { width: info.bedWidth, height: info.bedHeight };
+    }
+    return null;
+  }, [grbl.controller, grbl.machineState]);
 
   const {
     currentGcode,
@@ -209,6 +220,7 @@ export function App() {
     startMode,
     savedOrigin,
     controllerMaxSpindle: grbl.controller?.maxSpindle ?? null,
+    machineBedFromController: machineBedFromGrbl,
     connectionSidebarOpen,
     outputFormat: 'grbl',
   });
@@ -1758,6 +1770,7 @@ export function App() {
           activeJobMoves,
           showToolpathPreview,
           toolpathMoves: showToolpathPreview ? toolpathPreviewMoves : null,
+          machineWorkAreaMm: machineBedFromGrbl,
         }),
         ),
       ),

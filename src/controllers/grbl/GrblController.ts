@@ -24,9 +24,22 @@ const REALTIME_HOLD = 0x21;
 const REALTIME_RESUME = 0x7E;
 const REALTIME_RESET = 0x18;
 
+const GRBL_SETTING_LINE = /^\$(\d+)=(.+)$/;
+
 interface PendingLine {
   text: string;
   byteCount: number;
+}
+
+/** Parsed machine limits from GRBL $$ (defaults until first successful dump). */
+export interface GrblMachineInfo {
+  bedWidth: number;
+  bedHeight: number;
+  homingDir: number;
+  maxSpindle: number;
+  laserMode: boolean;
+  maxFeedX: number;
+  maxFeedY: number;
 }
 
 export class GrblController implements LaserController {
@@ -50,8 +63,19 @@ export class GrblController implements LaserController {
 
   /** Parsed GRBL $30 (max spindle/PWM). Null until a $$ response includes $30=. */
   private _maxSpindle: number | null = null;
-  /** True after we have parsed $30 from settings (or given up re-querying). */
+  /** True after post-connect $$ completes (ok received) and WCO / $10 steps are issued. */
   private _settingsQueried = false;
+
+  /** All $N=value lines from the latest $$ dump (number → raw value string). */
+  private readonly _grblSettings = new Map<number, string>();
+  private _homingDir = 0;
+  private _laserMode = false;
+  private _bedWidth = 0;
+  private _bedHeight = 0;
+  private _maxFeedX = 0;
+  private _maxFeedY = 0;
+  /** Waiting for trailing `ok` after a `$$` settings dump. */
+  private _awaitingSettingsOk = false;
 
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -75,6 +99,19 @@ export class GrblController implements LaserController {
   get isJobRunning(): boolean { return this._isJobRunning; }
   get maxSpindle(): number | null { return this._maxSpindle; }
 
+  /** Bed size, feeds, homing mask, and laser mode from the last $$ dump. */
+  getMachineInfo(): GrblMachineInfo {
+    return {
+      bedWidth: this._bedWidth,
+      bedHeight: this._bedHeight,
+      homingDir: this._homingDir,
+      maxSpindle: this._maxSpindle ?? 0,
+      laserMode: this._laserMode,
+      maxFeedX: this._maxFeedX,
+      maxFeedY: this._maxFeedY,
+    };
+  }
+
   // ─── LIFECYCLE ──────────────────────────────────────────────
 
   async connect(port: SerialPortLike): Promise<void> {
@@ -82,6 +119,7 @@ export class GrblController implements LaserController {
 
     this._maxSpindle = null;
     this._settingsQueried = false;
+    this._resetMachineSettingsCache();
 
     this._port = port;
     this._updateStatus('connecting');
@@ -123,13 +161,13 @@ export class GrblController implements LaserController {
           this._updateStatus('idle');
           this._startStatusPolling();
           resolve();
-          if (!this._settingsQueried) {
+          queueMicrotask(() => {
             try {
-              this._writeLine('$$');
+              this._queryMachineSettings();
             } catch {
               /* ignore */
             }
-          }
+          });
           return;
         }
 
@@ -236,6 +274,9 @@ export class GrblController implements LaserController {
     }
     this._maxSpindle = null;
     this._settingsQueried = false;
+    this._awaitingSettingsOk = false;
+    this._grblSettings.clear();
+    this._resetMachineSettingsCache();
     this._updateStatus('disconnected');
   }
 
@@ -348,6 +389,19 @@ export class GrblController implements LaserController {
   // ─── LINE HANDLER ───────────────────────────────────────────
 
   private _handleLine(line: string): void {
+    if (this._awaitingSettingsOk) {
+      if (line === 'ok') {
+        this._finalizeMachineSettingsQuery();
+        return;
+      }
+      if (line.startsWith('error:')) {
+        this._awaitingSettingsOk = false;
+        // Fall through so the error is surfaced like any other GRBL error.
+      } else if (this._parseDollarSetting(line)) {
+        return;
+      }
+    }
+
     if (line === 'ok') {
       this._handleOk();
     } else if (line.startsWith('error:')) {
@@ -358,19 +412,8 @@ export class GrblController implements LaserController {
       this._handleAlarm(line);
     } else if (line.startsWith('Grbl')) {
       this._updateStatus('idle');
-    } else if (line.startsWith('$') && line.includes('=')) {
-      const m = line.match(/^\$(\d+)=([\d.]+)/);
-      if (m) {
-        const num = parseInt(m[1], 10);
-        const val = parseFloat(m[2]);
-        if (num === 30 && Number.isFinite(val) && val > 0) {
-          this._maxSpindle = val;
-          this._settingsQueried = true;
-          for (const cb of this._stateListeners) {
-            cb({ ...this._state });
-          }
-        }
-      }
+    } else if (this._parseDollarSetting(line)) {
+      /* setting line outside active $$ dump — map already updated */
     }
   }
 
@@ -613,6 +656,102 @@ export class GrblController implements LaserController {
     if (this._pollTimer) {
       clearInterval(this._pollTimer);
       this._pollTimer = null;
+    }
+  }
+
+  // ─── POST-CONNECT MACHINE SETTINGS ($$) ─────────────────────
+
+  private _resetMachineSettingsCache(): void {
+    this._homingDir = 0;
+    this._laserMode = false;
+    this._bedWidth = 0;
+    this._bedHeight = 0;
+    this._maxFeedX = 0;
+    this._maxFeedY = 0;
+  }
+
+  /** Run after welcome + connect promise resolve; does not run during welcome detection. */
+  private _queryMachineSettings(): void {
+    if (!this._port?.isOpen) return;
+    this._grblSettings.clear();
+    this._resetMachineSettingsCache();
+    this._maxSpindle = null;
+    this._settingsQueried = false;
+    this._awaitingSettingsOk = true;
+    this._writeLine('$$');
+  }
+
+  /** Returns true if `line` was a `$N=value` setting (stored in `_grblSettings`). */
+  private _parseDollarSetting(line: string): boolean {
+    const m = line.match(GRBL_SETTING_LINE);
+    if (!m) return false;
+    const num = parseInt(m[1], 10);
+    const rawVal = m[2].trim();
+    this._grblSettings.set(num, rawVal);
+
+    switch (num) {
+      case 23:
+        this._homingDir = parseInt(rawVal, 10) || 0;
+        break;
+      case 30: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v) && v > 0) {
+          this._maxSpindle = v;
+          for (const cb of this._stateListeners) {
+            cb({ ...this._state });
+          }
+        }
+        break;
+      }
+      case 32:
+        this._laserMode = parseInt(rawVal, 10) !== 0;
+        break;
+      case 130: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v)) this._bedWidth = v;
+        break;
+      }
+      case 131: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v)) this._bedHeight = v;
+        break;
+      }
+      case 110: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v)) this._maxFeedX = v;
+        break;
+      }
+      case 111: {
+        const v = parseFloat(rawVal);
+        if (Number.isFinite(v)) this._maxFeedY = v;
+        break;
+      }
+      default:
+        break;
+    }
+    return true;
+  }
+
+  private _finalizeMachineSettingsQuery(): void {
+    if (!this._awaitingSettingsOk) return;
+    this._awaitingSettingsOk = false;
+    if (!this._port?.isOpen) return;
+
+    this._settingsQueried = true;
+    this._writeLine('G10 L2 P1 X0 Y0 Z0');
+    this._writeLine('$10=0');
+    console.log(
+      '[GRBL] Machine: ' +
+        this._bedWidth +
+        'x' +
+        this._bedHeight +
+        'mm, $23=' +
+        this._homingDir +
+        ', laser=' +
+        this._laserMode
+    );
+    for (const cb of this._stateListeners) {
+      cb({ ...this._state });
     }
   }
 }

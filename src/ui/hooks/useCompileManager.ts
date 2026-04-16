@@ -22,6 +22,8 @@ export interface UseCompileManagerOptions {
   startMode: GcodeStartMode;
   savedOrigin: { x: number; y: number } | null;
   controllerMaxSpindle: number | null;
+  /** Auto-detected bed from GRBL $$ ($130/$131) when available. */
+  machineBedFromController: { width: number; height: number } | null;
   connectionSidebarOpen: boolean;
   outputFormat?: OutputFormat;
 }
@@ -52,6 +54,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     startMode,
     savedOrigin,
     controllerMaxSpindle,
+    machineBedFromController,
     connectionSidebarOpen,
     outputFormat = 'grbl',
   } = options;
@@ -71,7 +74,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   useLayoutEffect(() => {
     sceneRevisionRef.current += 1;
     setSceneCompileTick(sceneRevisionRef.current);
-  }, [scene, startMode, savedOrigin, controllerMaxSpindle]);
+  }, [scene, startMode, savedOrigin, controllerMaxSpindle, machineBedFromController]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;
@@ -85,8 +88,15 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
 
   const compileToResult = useCallback(
     (targetScene: Scene) =>
-      pipelineCompileGcode(targetScene, startMode, savedOrigin, controllerMaxSpindle, outputFormat),
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat],
+      pipelineCompileGcode(
+        targetScene,
+        startMode,
+        savedOrigin,
+        controllerMaxSpindle,
+        outputFormat,
+        machineBedFromController,
+      ),
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController],
   );
 
   const compileGcode = useCallback(
@@ -99,6 +109,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           savedOrigin,
           controllerMaxSpindle,
           outputFormat,
+          machineBedFromController,
         );
         setLastResult(result);
         // Match previous App behavior: any finished compile attempt (including empty job)
@@ -117,7 +128,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         setIsCompiling(false);
       }
     },
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat],
+    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController],
   );
 
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {

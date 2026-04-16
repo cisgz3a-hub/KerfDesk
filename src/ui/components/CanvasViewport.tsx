@@ -354,6 +354,8 @@ interface CanvasViewportProps {
   /** When true, draw compiled plan moves as a blue overlay (design space). */
   showToolpathPreview?: boolean;
   toolpathMoves?: readonly Move[] | null;
+  /** GRBL-reported work area ($130×$131) — dashed overlay when connected and parsed. */
+  machineWorkAreaMm?: { width: number; height: number } | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -381,6 +383,7 @@ export function CanvasViewport({
   activeJobMoves = null,
   showToolpathPreview = false,
   toolpathMoves = null,
+  machineWorkAreaMm = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -534,11 +537,11 @@ export function CanvasViewport({
     if (simulation && simulation.frames.length > 1) {
       ctx.save();
       ctx.globalAlpha = 0.15;
-      renderScene(ctx, scene, transform, width, height, selectedIds, previewMode);
+      renderScene(ctx, scene, transform, width, height, selectedIds, previewMode, machineWorkAreaMm);
       ctx.restore();
       drawRulers(ctx, transform, width, height);
     } else {
-      renderSceneBackground(ctx, scene, transform, width, height);
+      renderSceneBackground(ctx, scene, transform, width, height, machineWorkAreaMm);
       ctx.restore();
       drawRulers(ctx, transform, width, height);
       ctx.save();
@@ -861,7 +864,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

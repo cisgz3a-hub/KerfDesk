@@ -80,13 +80,14 @@ function runCase(
   plan: ReturnType<typeof optimizePlan>,
   startMode: GcodeStartMode,
   savedOrigin: { x: number; y: number } | null,
-  flipY: boolean,
+  bedHeightMm: number,
 ): void {
   const grbl = getOutputStrategy('grbl')!;
   const { plan: machinePlan } = applyMachineTransform(plan, {
     startMode,
     savedOrigin,
-    flipY,
+    originCorner: 'front-left',
+    bedHeightMm,
   });
   const pe = moveExtents(machinePlan);
   const text = grbl.generate(machinePlan, job, {
@@ -130,8 +131,56 @@ const savedForSavedOrigin: { x: number; y: number } = { x: 120, y: 75 };
 
 for (const startMode of startModes) {
   const saved = startMode === 'savedOrigin' ? savedForSavedOrigin : null;
-  runCase('flipY', job, plan, startMode, saved, true);
+  runCase('front-left+bed500', job, plan, startMode, saved, 500);
 }
+
+console.log('\n=== Placement: 300mm bed Y-flip (10,10) 40×40 rect → Y 290 & 250 ===');
+
+const scene300 = createScene(300, 300, 'YFlip300');
+const r300 = createRect(scene300.layers[0].id, 10, 10, 40, 40, 'R');
+scene300.objects.push(r300);
+const job300 = compileJob(scene300);
+const plan300 = optimizePlan(job300);
+const grbl = getOutputStrategy('grbl')!;
+const { plan: mp300 } = applyMachineTransform(plan300, {
+  startMode: 'absolute',
+  savedOrigin: null,
+  originCorner: 'front-left',
+  bedHeightMm: 300,
+});
+const g300 = grbl.generate(mp300, job300, {
+  startMode: 'absolute',
+  returnPosition: null,
+}).text!;
+const ys = new Set<number>();
+for (const line of g300.split('\n')) {
+  const t = line.trim();
+  if (!/^G[01]\b/i.test(t)) continue;
+  const my = /\bY([-\d.]+)/i.exec(t);
+  if (my) ys.add(parseFloat(my[1]));
+}
+assert(ys.has(290) && ys.has(250), `absolute 300mm bed: expect Y 290 and 250 in G0/G1, got ${[...ys].sort((a, b) => a - b).join(',')}`);
+
+console.log('\n=== Placement: rear-left — no Y mirror (bed height ignored for flip) ===');
+
+const { plan: mpRear } = applyMachineTransform(plan300, {
+  startMode: 'absolute',
+  savedOrigin: null,
+  originCorner: 'rear-left',
+  bedHeightMm: 300,
+});
+const gRear = grbl.generate(mpRear, job300, {
+  startMode: 'absolute',
+  returnPosition: null,
+}).text!;
+const ysRear: number[] = [];
+for (const line of gRear.split('\n')) {
+  const t = line.trim();
+  if (!/^G[01]\b/i.test(t)) continue;
+  const my = /\bY([-\d.]+)/i.exec(t);
+  if (my) ysRear.push(parseFloat(my[1]));
+}
+assert(ysRear.includes(10) && ysRear.includes(50), `rear-left: canvas Y 10 and 50 preserved, got ${[...new Set(ysRear)].sort((a, b) => a - b).join(',')}`);
 
 console.log(`\n${'='.repeat(40)}`);
 console.log(`Results: ${passed} passed, ${failed} failed`);

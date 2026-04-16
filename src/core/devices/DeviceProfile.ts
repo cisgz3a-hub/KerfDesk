@@ -5,6 +5,9 @@
 
 import { type Scene } from '../scene/Scene';
 
+/** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
+export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
+
 export interface DeviceProfile {
   id: string;
   name: string;
@@ -20,12 +23,18 @@ export interface DeviceProfile {
   // Workspace
   bedWidth: number;
   bedHeight: number;
+  /** Where (0,0) sits after homing — default front-left (e.g. Wainlux $23=3). */
+  originCorner: MachineOriginCorner;
 
   // GRBL settings
   maxFeedRate: number;     // mm/min
   maxSpindle: number;      // S-value (usually 255 or 1000)
   homingEnabled: boolean;
   softLimitsEnabled: boolean;
+  /**
+   * Legacy: when `originCorner` is absent in storage, `invertY === false` maps to `rear-left`
+   * (no Y flip). Prefer `originCorner` for new profiles.
+   */
   invertY: boolean;
   /** Whether to rapid to work origin (0,0) after each job. Default true. */
   returnToOrigin: boolean;
@@ -52,6 +61,9 @@ export function getDeviceProfiles(): DeviceProfile[] {
     return parsed.map(p => ({
       ...p,
       returnToOrigin: p.returnToOrigin ?? true,
+      originCorner:
+        (p as DeviceProfile).originCorner
+        ?? (p.invertY === false ? 'rear-left' : 'front-left'),
     }));
   } catch {
     return [];
@@ -119,6 +131,7 @@ export function createBlankProfile(name: string): DeviceProfile {
     model: '',
     bedWidth: 400,
     bedHeight: 400,
+    originCorner: 'front-left',
     maxFeedRate: 6000,
     maxSpindle: 1000,
     homingEnabled: false,

@@ -1,6 +1,7 @@
 /**
- * Transforms a Plan from canvas coordinates (Y-down) to machine coordinates (Y-up).
- * This is the bridge between the design world and the physical machine.
+ * Transforms a Plan from canvas coordinates (Y-down) to machine coordinates for GRBL.
+ * Front-origin machines (e.g. $23=3): machineY = bedHeightMm - canvasY (+ offset).
+ * Rear-origin: machineY = canvasY (+ offset) — canvas Y-down matches machine Y from back.
  *
  * Pipeline position: Plan → [applyMachineTransform] → TransformedPlan → strategy.generate → Output
  */
@@ -8,11 +9,21 @@
 import { type Plan, type PlannedOperation, type Move } from './Plan';
 import { emptyAABB, expandAABB } from '../types';
 import { type GcodeStartMode, computeGcodeOffset } from '../output/GcodeOrigin';
+import { type MachineOriginCorner } from '../devices/DeviceProfile';
+
+const DEFAULT_BED_HEIGHT_MM = 300;
+
+export type { MachineOriginCorner };
 
 export interface MachineTransformOptions {
   startMode: GcodeStartMode;
   savedOrigin: { x: number; y: number } | null;
-  flipY: boolean;
+  originCorner: MachineOriginCorner;
+  /**
+   * Physical bed height (mm) for front-origin Y mapping: machineY = bedHeightMm - canvasY.
+   * Use scene / profile / controller-reported height (see PipelineService resolution order).
+   */
+  bedHeightMm: number;
 }
 
 export interface MachineTransformResult {
@@ -20,10 +31,19 @@ export interface MachineTransformResult {
   /** The offset and flip values applied — useful for reverse-mapping (e.g. live preview dot). */
   offsetX: number;
   offsetY: number;
-  designMaxY: number;
+  /**
+   * Reference Y used when flipY is true: machineY = flipReferenceY - canvasY + offsetY.
+   * Equals physical bed height for front-left / front-right.
+   */
+  flipReferenceY: number;
+  /** True when Y is mirrored into machine space (front-left / front-right). */
   flipY: boolean;
   /** Work-coordinate return point for program end (WCS origin after zeroing). */
   returnPosition: { x: number; y: number };
+}
+
+function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean {
+  return originCorner === 'front-left' || originCorner === 'front-right';
 }
 
 /**
@@ -35,7 +55,6 @@ export function applyMachineTransform(
   plan: Plan,
   options: MachineTransformOptions,
 ): MachineTransformResult {
-  // 1. Compute design bounds from all move destinations
   let bounds = emptyAABB();
   for (const op of plan.operations) {
     for (const move of op.moves) {
@@ -48,15 +67,16 @@ export function applyMachineTransform(
   const minY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
-  const flipY = options.flipY;
-  /** Canvas max Y (bottom of design in Y-down space) — used for the flip: y' = designMaxY - y. */
-  const designMaxY = maxY;
+  const flipY = useFrontOriginYFlip(options.originCorner);
+  const bedH =
+    Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
+      ? options.bedHeightMm
+      : DEFAULT_BED_HEIGHT_MM;
+  const flipReferenceY = flipY ? bedH : maxY;
 
-  // 2. Offset is applied after the Y flip when flipY is true, so Y must use flipped-space bounds:
-  // flipped Y runs from (designMaxY - maxY) at the canvas bottom to (designMaxY - minY) at the top.
   const offsetDesignMin = {
     minX,
-    minY: flipY ? designMaxY - maxY : minY,
+    minY: flipY ? bedH - maxY : minY,
   };
 
   const offset = computeGcodeOffset(
@@ -65,13 +85,11 @@ export function applyMachineTransform(
     options.savedOrigin,
   );
 
-  // 3. Transform every rapid/linear move (offset Y must match G-code / computeGcodeOffset)
   const transformedOps: PlannedOperation[] = plan.operations.map(op => ({
     ...op,
-    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, designMaxY, flipY)),
+    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, flipReferenceY, flipY)),
   }));
 
-  // 4. Recompute bounds
   let newBounds = emptyAABB();
   for (const op of transformedOps) {
     for (const move of op.moves) {
@@ -96,20 +114,26 @@ export function applyMachineTransform(
     plan: transformedPlan,
     offsetX: offset.x,
     offsetY: offset.y,
-    designMaxY,
+    flipReferenceY,
     flipY,
     returnPosition: { x: 0, y: 0 },
   };
 }
 
-function transformMove(move: Move, offsetX: number, offsetY: number, designMaxY: number, flipY: boolean): Move {
+function transformMove(
+  move: Move,
+  offsetX: number,
+  offsetY: number,
+  flipReferenceY: number,
+  flipY: boolean,
+): Move {
   switch (move.type) {
     case 'rapid':
       return {
         ...move,
         to: {
           x: move.to.x + offsetX,
-          y: flipY ? designMaxY - move.to.y + offsetY : move.to.y + offsetY,
+          y: flipY ? flipReferenceY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
     case 'linear':
@@ -117,7 +141,7 @@ function transformMove(move: Move, offsetX: number, offsetY: number, designMaxY:
         ...move,
         to: {
           x: move.to.x + offsetX,
-          y: flipY ? designMaxY - move.to.y + offsetY : move.to.y + offsetY,
+          y: flipY ? flipReferenceY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
     default:

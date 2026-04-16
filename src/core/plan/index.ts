@@ -10,6 +10,7 @@ export * from './Plan';
 export { optimizePlan, type OptimizePlanConfig } from './PlanOptimizer';
 export {
   applyMachineTransform,
+  type MachineOriginCorner,
   type MachineTransformOptions,
   type MachineTransformResult,
 } from './MachineTransform';

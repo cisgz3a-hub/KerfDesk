@@ -77,7 +77,63 @@ console.log(`   Laser HTTP:         http://${laserIp}:80/command`);
 console.log(`   Waiting for browser connection...\n`);
 
 wss.on('connection', (browserWs) => {
+  const RX_BUFFER_SIZE = 128;
+  const sentLineLengths = []; // FIFO: byte count of each line in GRBL's buffer
+  let bufferUsed = 0;
+  const commandQueue = []; // lines waiting for room
+
   console.log('🔗 Browser connected');
+
+  function resetStreamState() {
+    sentLineLengths.length = 0;
+    bufferUsed = 0;
+    commandQueue.length = 0;
+  }
+
+  function drainQueue() {
+    while (
+      commandQueue.length > 0 &&
+      bufferUsed + commandQueue[0].byteCount < RX_BUFFER_SIZE
+    ) {
+      const { line: trimmed, byteCount } = commandQueue.shift();
+      void sendCommand(trimmed).catch((err) => {
+        console.error(`  ✗ Failed to send: ${err.message}`);
+      });
+      sentLineLengths.push(byteCount);
+      bufferUsed += byteCount;
+      console.log(
+        '[STREAM] sent: ' +
+          trimmed.substring(0, 30) +
+          ' | buffer: ' +
+          bufferUsed +
+          '/128, queued: ' +
+          commandQueue.length
+      );
+    }
+  }
+
+  function sendGcodeWithFlowControl(line) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0) return;
+    const byteCount = trimmed.length + 1; // +1 for newline GRBL counts
+    if (bufferUsed + byteCount < RX_BUFFER_SIZE) {
+      void sendCommand(trimmed).catch((err) => {
+        console.error(`  ✗ Failed to send: ${err.message}`);
+      });
+      sentLineLengths.push(byteCount);
+      bufferUsed += byteCount;
+    } else {
+      commandQueue.push({ line: trimmed, byteCount });
+    }
+    console.log(
+      '[STREAM] sent: ' +
+        trimmed.substring(0, 30) +
+        ' | buffer: ' +
+        bufferUsed +
+        '/128, queued: ' +
+        commandQueue.length
+    );
+  }
 
   // Connect to laser's WebSocket for receiving GRBL data
   const laserWs = new WebSocket(`ws://${laserIp}:81/`, {
@@ -132,6 +188,13 @@ wss.on('connection', (browserWs) => {
       const trimmed = line.replace(/\r$/, '').trim();
       if (trimmed.length === 0) continue;
 
+      if (trimmed === 'ok' || trimmed.startsWith('error')) {
+        if (sentLineLengths.length > 0) {
+          bufferUsed -= sentLineLengths.shift();
+        }
+        drainQueue();
+      }
+
       if (browserWs.readyState === WebSocket.OPEN) {
         browserWs.send(trimmed);
       }
@@ -164,34 +227,31 @@ wss.on('connection', (browserWs) => {
 
   laserWs.on('close', () => {
     console.log('🔌 Laser WebSocket closed');
+    resetStreamState();
     laserConnected = false;
     if (browserWs.readyState === WebSocket.OPEN) {
       browserWs.close();
     }
   });
 
-  // Browser → Laser: send G-code via HTTP GET
+  // Browser → Laser: send G-code via HTTP GET (GRBL character-counting for G-code only)
   browserWs.on('message', async (data) => {
     const msg = data.toString().trim();
     if (!laserConnected) return;
 
     try {
       if (msg.startsWith('__BYTE__:')) {
-        // Realtime commands (?, !, ~, 0x18)
+        // Realtime commands — bypass GRBL RX buffer accounting
         const byte = parseInt(msg.substring(9), 10);
         if (byte === 0x3F) {
-          // Status query '?'
           await sendCommand('?');
         } else if (byte === 0x18) {
-          // Soft reset
           await sendCommand('\x18');
           console.log('  → [soft reset]');
         } else if (byte === 0x21) {
-          // Feed hold '!'
           await sendCommand('!');
           console.log('  → [feed hold]');
         } else if (byte === 0x7E) {
-          // Resume '~'
           await sendCommand('~');
           console.log('  → [resume]');
         } else {
@@ -199,11 +259,7 @@ wss.on('connection', (browserWs) => {
           console.log(`  → [byte 0x${byte.toString(16)}]`);
         }
       } else {
-        // Regular G-code command
-        await sendCommand(msg);
-        if (!msg.startsWith('?')) {
-          console.log(`  → ${msg}`);
-        }
+        sendGcodeWithFlowControl(msg);
       }
     } catch (err) {
       console.error(`  ✗ Failed to send: ${err.message}`);
@@ -212,6 +268,7 @@ wss.on('connection', (browserWs) => {
 
   browserWs.on('close', () => {
     console.log('🔌 Browser disconnected');
+    resetStreamState();
     if (laserConnected) {
       laserWs.close();
     }
