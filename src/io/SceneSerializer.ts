@@ -330,7 +330,14 @@ function mergeLayerSettings(raw: unknown, fallbackMode: LayerMode): LaserSetting
 
   const fill = { ...base.fill, ...(s.fill && typeof s.fill === 'object' ? (s.fill as object) : {}) };
   const cut = { ...base.cut, ...(s.cut && typeof s.cut === 'object' ? (s.cut as object) : {}) };
-  const image = { ...base.image, ...(s.image && typeof s.image === 'object' ? (s.image as object) : {}) };
+  const imageRaw = s.image && typeof s.image === 'object' ? (s.image as Record<string, unknown>) : {};
+  const image = { ...base.image, ...imageRaw } as LaserSettings['image'];
+  if (imageRaw.imageMode == null || typeof imageRaw.imageMode !== 'string') {
+    image.imageMode = image.passThrough === true ? 'grayscale' : 'dither';
+  }
+  if (typeof image.imageThreshold !== 'number' || !Number.isFinite(image.imageThreshold)) {
+    image.imageThreshold = 128;
+  }
 
   const out: LaserSettings = {
     ...base,

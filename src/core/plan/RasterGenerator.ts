@@ -7,10 +7,9 @@
  *             1-bit:  Pixels are ON or OFF. Consecutive ON pixels
  *                     become burn segments at constant power.
  *
- *             8-bit:  Pixels carry grayscale intensity (0–255).
- *                     Consecutive pixels in the same power bucket (16 levels)
- *                     form one segment; bucket changes split segments so
- *                     grayscale detail is preserved (not collapsed to max power).
+ *             Grayscale: 8-bit luminance (0 = dark, 255 = light). Each pixel maps to
+ *                     laser power; consecutive pixels with the same rounded S are merged
+ *                     into one G1 span (LaserGRBL-style variable power).
  *
  *             For both modes, empty rows are skipped, segments are
  *             run-length encoded, and bidirectional scanning alternates
@@ -88,7 +87,7 @@ export function generateRasterScanlines(
     // Extract burn segments from this row
     const segments = mode === '1bit'
       ? extractSegments1Bit(data, rowStart, width, y, position.x, pixelSizeX, settings)
-      : extractSegments8Bit(data, rowStart, width, y, position.x, pixelSizeX, settings);
+      : extractSegmentsGrayscale(data, rowStart, width, y, position.x, pixelSizeX, settings);
 
     // Skip empty rows
     if (segments.length === 0) continue;
@@ -153,28 +152,19 @@ function extractSegments1Bit(
   return segments;
 }
 
-// ─── 8-BIT SEGMENT EXTRACTION ────────────────────────────────────
+// ─── GRAYSCALE (VARIABLE S) SEGMENT EXTRACTION ───────────────────
 
-/** 16 discrete power buckets over 1–255 (bucket changes split segments). */
-const EIGHT_BIT_POWER_BUCKETS = 16;
-
-function pixelToPowerBucket(val: number): number {
-  if (val <= 0) return -1;
-  return Math.min(
-    EIGHT_BIT_POWER_BUCKETS - 1,
-    Math.floor((val * EIGHT_BIT_POWER_BUCKETS) / 256),
-  );
+/** Map luminance 0–255 (dark→light) to laser power %; white → powerMin, black → powerMax. */
+export function luminanceToLaserPower(pixelValue: number, powerMin: number, powerMax: number): number {
+  const v = Math.max(0, Math.min(255, pixelValue));
+  return Math.round(powerMin + (powerMax - powerMin) * (1 - v / 255));
 }
 
 /**
- * Extract burn segments from an 8-bit grayscale row.
- * Non-zero pixels become burn segments with power mapped from
- * pixel intensity: 0 = skip, 1–255 = powerMin..powerMax.
- *
- * Consecutive non-zero pixels share one segment only while they fall in the
- * same power bucket; a bucket change starts a new segment (grayscale fidelity).
+ * Variable-power row: each pixel gets S = luminanceToLaserPower; adjacent equal S merge.
+ * Pixels with S <= 0 are treated as laser off (skip).
  */
-function extractSegments8Bit(
+function extractSegmentsGrayscale(
   data: Uint8Array,
   rowStart: number,
   width: number,
@@ -185,40 +175,40 @@ function extractSegments8Bit(
 ): RasterSegment[] {
   const segments: RasterSegment[] = [];
   let segStart: number | null = null;
-  let bucket = -1;
-  let repVal = 0;
+  let currentPower = -1;
 
   const flush = (endCol: number) => {
-    if (segStart === null) return;
-    const power = mapPixelToPower(repVal, settings.powerMin, settings.powerMax);
+    if (segStart === null || currentPower <= 0) {
+      segStart = null;
+      currentPower = -1;
+      return;
+    }
     segments.push(createSegment(
       segStart, endCol, y, originX, pixelSizeMm,
-      power, settings.overscanning
+      currentPower, settings.overscanning,
     ));
     segStart = null;
-    bucket = -1;
-    repVal = 0;
+    currentPower = -1;
   };
 
-  for (let col = 0; col <= width; col++) {
-    const val = col < width ? data[rowStart + col] : 0;
-    const b = pixelToPowerBucket(val);
+  for (let col = 0; col < width; col++) {
+    const lum = data[rowStart + col];
+    const S = luminanceToLaserPower(lum, settings.powerMin, settings.powerMax);
 
-    if (val > 0 && segStart === null) {
+    if (S <= 0) {
+      flush(col);
+      continue;
+    }
+    if (segStart === null) {
       segStart = col;
-      bucket = b;
-      repVal = val;
-    } else if (val > 0 && segStart !== null && b === bucket) {
-      repVal = Math.max(repVal, val);
-    } else if (val > 0 && segStart !== null && b !== bucket) {
+      currentPower = S;
+    } else if (S !== currentPower) {
       flush(col);
       segStart = col;
-      bucket = b;
-      repVal = val;
-    } else if (val === 0 && segStart !== null) {
-      flush(col);
+      currentPower = S;
     }
   }
+  flush(width);
 
   return segments;
 }
@@ -242,16 +232,3 @@ function createSegment(
   return { startX, endX, y, power };
 }
 
-/**
- * Map a pixel value (1–255) to a laser power (powerMin–powerMax).
- * Value 0 is never passed here (filtered upstream).
- */
-function mapPixelToPower(
-  value: number,
-  powerMin: number,
-  powerMax: number
-): number {
-  // Linear interpolation: value 1 → powerMin, value 255 → powerMax
-  const t = (value - 1) / 254;
-  return powerMin + t * (powerMax - powerMin);
-}

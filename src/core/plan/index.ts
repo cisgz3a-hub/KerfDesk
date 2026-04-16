@@ -28,6 +28,7 @@ export {
 } from './FillGenerator';
 export {
   generateRasterScanlines,
+  luminanceToLaserPower,
   type RasterSegment,
   type RasterScanline,
   type RasterSettings,

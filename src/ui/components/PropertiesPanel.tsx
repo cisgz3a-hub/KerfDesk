@@ -10,7 +10,14 @@ import {
 } from '../../core/scene/SceneObject';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { computeObjectBounds } from '../../geometry/bounds';
-import { ditherImage, type DitherMode } from '../../import/Dithering';
+import { ditherImage, getDitherModes, type DitherMode } from '../../import/Dithering';
+import type { ImageRasterMode } from '../../core/scene/Layer';
+import {
+  adjustBrightness,
+  adjustContrast,
+  adjustGamma,
+  invertImage,
+} from '../../core/image/ImageProcessing';
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
@@ -41,6 +48,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   /** Skip one blur commit after pointer-up (same slider already committed). */
   const skipBlurBrightnessCommit = useRef(false);
   const skipBlurContrastCommit = useRef(false);
+  const skipBlurImageThresholdCommit = useRef(false);
 
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
@@ -60,8 +68,20 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     (objId: string, field: 'brightness' | 'contrast' | 'invert', value: number | boolean) => {
       if (!onSceneChange) return;
       const s = sceneRef.current;
+      const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
+      if (!target) return;
       const newScene = {
         ...s,
+        layers: s.layers.map(l => {
+          if (l.id !== target.layerId) return l;
+          return {
+            ...l,
+            settings: {
+              ...l.settings,
+              image: { ...l.settings.image, [field]: value },
+            },
+          };
+        }),
         objects: s.objects.map(o => {
           if (o.id !== objId || o.geometry.type !== 'image') return o;
           const geom = o.geometry as ImageGeometry;
@@ -78,44 +98,48 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     [onSceneChange],
   );
 
-  /** Recompute adjusted grayscale from source + current settings; one history entry (dither cleared). */
+  /** Persist image adjustments on the image layer (compile uses layer + original `grayscaleData` only). */
   const commitImageSettings = useCallback(
     (objId: string, overrides?: Partial<Pick<ImageGeometry, 'brightness' | 'contrast' | 'invert'>>) => {
       const s = sceneRef.current;
+      const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
+      if (!target || target.geometry.type !== 'image') return;
+      const geom = target.geometry as ImageGeometry;
+      if (!geom.grayscaleData) return;
+
+      const brightness = overrides?.brightness ?? geom.brightness ?? 0;
+      const contrast = overrides?.contrast ?? geom.contrast ?? 0;
+      const invert = overrides?.invert ?? geom.invert ?? false;
+
       const newScene = {
         ...s,
+        layers: s.layers.map(l => {
+          if (l.id !== target.layerId) return l;
+          return {
+            ...l,
+            settings: {
+              ...l.settings,
+              image: {
+                ...l.settings.image,
+                brightness,
+                contrast,
+                invert,
+              },
+            },
+          };
+        }),
         objects: s.objects.map(o => {
           if (o.id !== objId || o.geometry.type !== 'image') return o;
-          const geom = o.geometry as ImageGeometry;
-
-          if (!geom.grayscaleData || !geom.grayscaleWidth || !geom.grayscaleHeight) return o;
-
-          const newGeom = {
-            ...geom,
-            brightness: overrides?.brightness ?? geom.brightness ?? 0,
-            contrast: overrides?.contrast ?? geom.contrast ?? 0,
-            invert: overrides?.invert ?? geom.invert ?? false,
-          } as ImageGeometry;
-
-          const src = geom.grayscaleData;
-          const adjusted = new Uint8Array(src.length);
-          const brightness = newGeom.brightness ?? 0;
-          const contrast = newGeom.contrast ?? 0;
-          const invert = newGeom.invert ?? false;
-
-          const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
-          for (let i = 0; i < src.length; i++) {
-            let v = src[i];
-            v = Math.max(0, Math.min(255, v + brightness));
-            v = Math.max(0, Math.min(255, Math.round(contrastFactor * (v - 128) + 128)));
-            if (invert) v = 255 - v;
-            adjusted[i] = v;
-          }
-
           return {
             ...o,
-            geometry: { ...newGeom, adjustedData: adjusted, ditherMode: undefined },
+            geometry: {
+              ...(o.geometry as ImageGeometry),
+              brightness,
+              contrast,
+              invert,
+              adjustedData: undefined,
+              ditherMode: undefined,
+            } as ImageGeometry,
             _bounds: null,
             _worldTransform: null,
           };
@@ -131,11 +155,13 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   const [traceAlphamax, setTraceAlphamax] = React.useState(DEFAULT_TRACE_OPTIONS.alphamax);
   const [traceInvert, setTraceInvert] = React.useState(DEFAULT_TRACE_OPTIONS.invert);
 
-  const [ditherMode, setDitherMode] = useState<DitherMode>('none');
+  const [ditherMode, setDitherMode] = useState<DitherMode>('floyd-steinberg');
 
   useEffect(() => {
     const o = scene.objects.find(x => selectedIds.has(x.id) && x.geometry.type === 'image');
-    if (o) setDitherMode((o.geometry as ImageGeometry).ditherMode ?? 'none');
+    if (!o) return;
+    const L = scene.layers.find(l => l.id === o.layerId);
+    if (L) setDitherMode(L.settings.image.dithering ?? 'floyd-steinberg');
   }, [scene, selectedIds]);
 
   const handleTrace = useCallback(async () => {
@@ -842,156 +868,283 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       );
     })(),
 
-    obj.geometry.type === 'image' && React.createElement('div', { style: dividerStyle },
-      React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),
+    obj.geometry.type === 'image' && (() => {
+      const imageLayer = scene.layers.find(l => l.id === obj.layerId);
+      if (!imageLayer) return null;
+      const ims = imageLayer.settings.image;
+      const geom = obj.geometry as ImageGeometry;
+      const brightVal = ims.brightness ?? geom.brightness ?? 0;
+      const contrastVal = ims.contrast ?? geom.contrast ?? 0;
+      const invertVal = ims.invert ?? geom.invert ?? false;
+      const imageMode: ImageRasterMode = ims.imageMode ?? 'dither';
+      const thresholdVal = ims.imageThreshold ?? 128;
 
-      React.createElement('div', { style: labelStyle }, 'Brightness'),
-      React.createElement('input', {
-        type: 'range',
-        min: -100,
-        max: 100,
-        value: (obj.geometry as ImageGeometry).brightness ?? 0,
-        style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          previewImageSettings(obj.id, 'brightness', parseInt(e.target.value, 10)),
-        onFocus: () => {
-          skipBlurBrightnessCommit.current = false;
+      const commitRasterLayer = (patch: Partial<typeof ims>) => {
+        const s = sceneRef.current;
+        const newScene = {
+          ...s,
+          layers: s.layers.map(l =>
+            l.id === imageLayer.id
+              ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, ...patch } } }
+              : l,
+          ),
+          objects: s.objects.map(o =>
+            o.id === obj.id && o.geometry.type === 'image'
+              ? {
+                ...o,
+                geometry: {
+                  ...(o.geometry as ImageGeometry),
+                  adjustedData: undefined,
+                  ditherMode: undefined,
+                } as ImageGeometry,
+                _bounds: null,
+                _worldTransform: null,
+              }
+              : o,
+          ),
+        };
+        onSceneCommit(newScene);
+      };
+
+      const buildPreprocessedForDitherPreview = (): Uint8Array | null => {
+        const srcData = geom.grayscaleData;
+        if (!srcData || !geom.grayscaleWidth || !geom.grayscaleHeight) return null;
+        let buf = new Uint8Array(srcData);
+        const b = ims.brightness ?? 0;
+        const c = ims.contrast ?? 0;
+        const g = ims.gamma ?? 1;
+        const inv = ims.invert === true;
+        if (b !== 0) buf = adjustBrightness(buf, b);
+        if (c !== 0) buf = adjustContrast(buf, c);
+        if (g !== 1) buf = adjustGamma(buf, g);
+        if (inv) buf = invertImage(buf);
+        return buf;
+      };
+
+      return React.createElement('div', { style: dividerStyle, key: `img-${obj.id}` },
+        React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),
+
+        React.createElement('div', { style: labelStyle }, 'Image mode'),
+        React.createElement('select', {
+          value: imageMode,
+          style: { ...selectStyle, marginBottom: 8 },
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+            const next = e.target.value as ImageRasterMode;
+            const s = sceneRef.current;
+            onSceneCommit({
+              ...s,
+              layers: s.layers.map(l =>
+                l.id === imageLayer.id
+                  ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, imageMode: next } } }
+                  : l,
+              ),
+              objects: s.objects.map(o =>
+                o.id === obj.id && o.geometry.type === 'image'
+                  ? {
+                    ...o,
+                    geometry: {
+                      ...(o.geometry as ImageGeometry),
+                      adjustedData: undefined,
+                      ditherMode: undefined,
+                    } as ImageGeometry,
+                    _bounds: null,
+                    _worldTransform: null,
+                  }
+                  : o,
+              ),
+            });
+          },
         },
-        onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
-          skipBlurBrightnessCommit.current = true;
-          commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
-        },
-        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          if (skipBlurBrightnessCommit.current) {
-            skipBlurBrightnessCommit.current = false;
-            return;
-          }
-          commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
-        },
-      }),
-
-      React.createElement('div', { style: labelStyle }, 'Contrast'),
-      React.createElement('input', {
-        type: 'range',
-        min: -100,
-        max: 100,
-        value: (obj.geometry as ImageGeometry).contrast ?? 0,
-        style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
-        onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-          previewImageSettings(obj.id, 'contrast', parseInt(e.target.value, 10)),
-        onFocus: () => {
-          skipBlurContrastCommit.current = false;
-        },
-        onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
-          skipBlurContrastCommit.current = true;
-          commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
-        },
-        onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
-          if (skipBlurContrastCommit.current) {
-            skipBlurContrastCommit.current = false;
-            return;
-          }
-          commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
-        },
-      }),
-
-      React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
-        React.createElement('input', {
-          type: 'checkbox',
-          checked: (obj.geometry as ImageGeometry).invert ?? false,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
-            commitImageSettings(obj.id, { invert: e.target.checked }),
-        }),
-        React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Invert'),
-      ),
-
-      React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Dither Mode'),
-      React.createElement('select', {
-        value: (obj.geometry as ImageGeometry).ditherMode ?? ditherMode,
-        style: selectStyle,
-        onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-          const mode = e.target.value as DitherMode;
-          setDitherMode(mode);
-
-          const imgObj = selectedObjects[0];
-          if (!imgObj || imgObj.geometry.type !== 'image') return;
-          const geom = imgObj.geometry as ImageGeometry;
-          const srcData = geom.grayscaleData;
-          if (!srcData || !geom.grayscaleWidth || !geom.grayscaleHeight) return;
-
-          const brightness = geom.brightness ?? 0;
-          const contrast = geom.contrast ?? 0;
-          const invert = geom.invert ?? false;
-          const contrastFactor = (259 * (contrast + 255)) / (255 * (259 - contrast));
-
-          const preprocessed = new Uint8Array(srcData.length);
-          for (let i = 0; i < srcData.length; i++) {
-            let v = srcData[i];
-            v = Math.max(0, Math.min(255, v + brightness));
-            v = Math.max(0, Math.min(255, Math.round(contrastFactor * (v - 128) + 128)));
-            if (invert) v = 255 - v;
-            preprocessed[i] = v;
-          }
-
-          const dithered = ditherImage(preprocessed, geom.grayscaleWidth, geom.grayscaleHeight, mode);
-
-          const newScene = {
-            ...scene,
-            objects: scene.objects.map(o =>
-              o.id === imgObj.id
-                ? { ...o, geometry: { ...o.geometry, adjustedData: dithered, ditherMode: mode } as ImageGeometry, _bounds: null, _worldTransform: null }
-                : o
-            ),
-          };
-          onSceneCommit(newScene);
-        },
-      },
-        React.createElement('option', { value: 'none' }, 'None (grayscale)'),
-        React.createElement('option', { value: 'threshold' }, 'Threshold'),
-        React.createElement('option', { value: 'floyd-steinberg' }, 'Floyd-Steinberg'),
-        React.createElement('option', { value: 'jarvis' }, 'Jarvis'),
-        React.createElement('option', { value: 'stucki' }, 'Stucki'),
-        React.createElement('option', { value: 'atkinson' }, 'Atkinson'),
-        React.createElement('option', { value: 'ordered' }, 'Ordered (Bayer)'),
-      ),
-
-      React.createElement('div', { style: dividerStyle },
-        React.createElement('div', { style: sectionHeaderStyle }, 'Image Tracing'),
-
-        React.createElement('div', { style: labelStyle }, `Threshold: ${traceThreshold}`),
-        React.createElement('input', {
-          type: 'range', min: 1, max: 255, value: traceThreshold,
-          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceThreshold(parseInt(e.target.value, 10)),
-        }),
-
-        React.createElement('div', { style: labelStyle }, `Speckle filter: ${traceTurdsize}`),
-        React.createElement('input', {
-          type: 'range', min: 0, max: 50, value: traceTurdsize,
-          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceTurdsize(parseInt(e.target.value, 10)),
-        }),
-
-        React.createElement('div', { style: labelStyle }, `Smoothness: ${traceAlphamax.toFixed(1)}`),
-        React.createElement('input', {
-          type: 'range', min: 0, max: 1.33, step: 0.1, value: traceAlphamax,
-          style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceAlphamax(parseFloat(e.target.value)),
-        }),
-
-        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 } },
-          React.createElement('input', {
-            type: 'checkbox', checked: traceInvert,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceInvert(e.target.checked),
-          }),
-          React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Trace light areas'),
+          React.createElement('option', { value: 'dither' }, 'Dither'),
+          React.createElement('option', { value: 'grayscale' }, 'Grayscale (variable power)'),
+          React.createElement('option', { value: 'threshold' }, 'Threshold (1-bit)'),
         ),
 
-        React.createElement('button', {
-          onClick: handleTrace,
-          style: traceButtonStyle,
-        }, 'Trace to Vector (Cut layer)'),
-      ),
-    ),
+        imageMode === 'dither' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: { ...labelStyle, marginTop: 4 } }, 'Dithering algorithm'),
+          React.createElement('select', {
+            value: ims.dithering ?? ditherMode,
+            style: { ...selectStyle, marginBottom: 8 },
+            onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+              const mode = e.target.value as DitherMode;
+              setDitherMode(mode);
+              const imgObj = selectedObjects[0];
+              if (!imgObj || imgObj.geometry.type !== 'image') return;
+              const g = imgObj.geometry as ImageGeometry;
+              const pre = buildPreprocessedForDitherPreview();
+              if (!pre || !g.grayscaleWidth || !g.grayscaleHeight) return;
+              const thr = sceneRef.current.layers.find(l => l.id === imgObj.layerId)?.settings.image.imageThreshold ?? 128;
+              const dithered = ditherImage(pre, g.grayscaleWidth, g.grayscaleHeight, mode, thr);
+              const s = sceneRef.current;
+              onSceneCommit({
+                ...s,
+                layers: s.layers.map(l =>
+                  l.id === imageLayer.id
+                    ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, dithering: mode, imageMode: 'dither' } } }
+                    : l,
+                ),
+                objects: s.objects.map(o =>
+                  o.id === imgObj.id
+                    ? { ...o, geometry: { ...o.geometry, adjustedData: dithered, ditherMode: mode } as ImageGeometry, _bounds: null, _worldTransform: null }
+                    : o,
+                ),
+              });
+            },
+          },
+            ...getDitherModes().map(dm =>
+              React.createElement('option', { key: dm.id, value: dm.id }, dm.name),
+            ),
+          ),
+        ),
+
+        imageMode === 'threshold' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: labelStyle }, `Threshold (${thresholdVal})`),
+          React.createElement('input', {
+            type: 'range',
+            min: 0,
+            max: 255,
+            value: thresholdVal,
+            style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 8 },
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const v = parseInt(e.target.value, 10);
+              if (!onSceneChange) return;
+              const s = sceneRef.current;
+              onSceneChange({
+                ...s,
+                layers: s.layers.map(l =>
+                  l.id === imageLayer.id
+                    ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, imageThreshold: v } } }
+                    : l,
+                ),
+                objects: s.objects.map(o =>
+                  o.id === obj.id && o.geometry.type === 'image'
+                    ? {
+                      ...o,
+                      geometry: {
+                        ...(o.geometry as ImageGeometry),
+                        adjustedData: undefined,
+                        ditherMode: undefined,
+                      } as ImageGeometry,
+                      _bounds: null,
+                      _worldTransform: null,
+                    }
+                    : o,
+                ),
+              });
+            },
+            onFocus: () => { skipBlurImageThresholdCommit.current = false; },
+            onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+              skipBlurImageThresholdCommit.current = true;
+              commitRasterLayer({ imageThreshold: parseInt(e.currentTarget.value, 10) });
+            },
+            onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+              if (skipBlurImageThresholdCommit.current) {
+                skipBlurImageThresholdCommit.current = false;
+                return;
+              }
+              commitRasterLayer({ imageThreshold: parseInt(e.currentTarget.value, 10) });
+            },
+          }),
+        ),
+
+        React.createElement('div', { style: labelStyle }, `Brightness (${brightVal})`),
+        React.createElement('input', {
+          type: 'range',
+          min: -100,
+          max: 100,
+          value: brightVal,
+          style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+            previewImageSettings(obj.id, 'brightness', parseInt(e.target.value, 10)),
+          onFocus: () => {
+            skipBlurBrightnessCommit.current = false;
+          },
+          onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+            skipBlurBrightnessCommit.current = true;
+            commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
+          },
+          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+            if (skipBlurBrightnessCommit.current) {
+              skipBlurBrightnessCommit.current = false;
+              return;
+            }
+            commitImageSettings(obj.id, { brightness: parseInt(e.currentTarget.value, 10) });
+          },
+        }),
+
+        React.createElement('div', { style: labelStyle }, `Contrast (${contrastVal})`),
+        React.createElement('input', {
+          type: 'range',
+          min: -100,
+          max: 100,
+          value: contrastVal,
+          style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+            previewImageSettings(obj.id, 'contrast', parseInt(e.target.value, 10)),
+          onFocus: () => {
+            skipBlurContrastCommit.current = false;
+          },
+          onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+            skipBlurContrastCommit.current = true;
+            commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
+          },
+          onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+            if (skipBlurContrastCommit.current) {
+              skipBlurContrastCommit.current = false;
+              return;
+            }
+            commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
+          },
+        }),
+
+        React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: invertVal,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+              commitImageSettings(obj.id, { invert: e.target.checked }),
+          }),
+          React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Invert'),
+        ),
+
+        React.createElement('div', { style: dividerStyle },
+          React.createElement('div', { style: sectionHeaderStyle }, 'Image Tracing'),
+
+          React.createElement('div', { style: labelStyle }, `Threshold: ${traceThreshold}`),
+          React.createElement('input', {
+            type: 'range', min: 1, max: 255, value: traceThreshold,
+            style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceThreshold(parseInt(e.target.value, 10)),
+          }),
+
+          React.createElement('div', { style: labelStyle }, `Speckle filter: ${traceTurdsize}`),
+          React.createElement('input', {
+            type: 'range', min: 0, max: 50, value: traceTurdsize,
+            style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceTurdsize(parseInt(e.target.value, 10)),
+          }),
+
+          React.createElement('div', { style: labelStyle }, `Smoothness: ${traceAlphamax.toFixed(1)}`),
+          React.createElement('input', {
+            type: 'range', min: 0, max: 1.33, step: 0.1, value: traceAlphamax,
+            style: { width: '100%', accentColor: theme.accent.green, marginBottom: 4 },
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceAlphamax(parseFloat(e.target.value)),
+          }),
+
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 } },
+            React.createElement('input', {
+              type: 'checkbox', checked: traceInvert,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceInvert(e.target.checked),
+            }),
+            React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Trace light areas'),
+          ),
+
+          React.createElement('button', {
+            onClick: handleTrace,
+            style: traceButtonStyle,
+          }, 'Trace to Vector (Cut layer)'),
+        ),
+      );
+    })(),
   );
 }

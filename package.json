@@ -13,7 +13,7 @@
     "wainlux-bridge": "node scripts/wainlux-bridge.mjs",
     "electron:build": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --win",
     "electron:build:mac": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --mac",
-    "test": "npx tsx tests/pipeline.test.ts && npx tsx tests/controller.test.ts && npx tsx tests/simulation.test.ts && npx tsx tests/viewport.test.ts && npx tsx tests/svg-import.test.ts && npx tsx tests/svg-import-placement.test.ts && npx tsx tests/placement.test.ts && npx tsx tests/history.test.ts && npx tsx tests/scene-io.test.ts && npx tsx tests/ui-integration.test.ts && npx tsx tests/autosave-serialization.test.ts && npx tsx tests/text-outline-cache.test.ts && npx tsx tests/source-text-migration.test.ts && npx tsx tests/preflight-bounds.test.ts && npx tsx tests/controller-stop-safety.test.ts"
+    "test": "npx tsx tests/pipeline.test.ts && npx tsx tests/controller.test.ts && npx tsx tests/simulation.test.ts && npx tsx tests/viewport.test.ts && npx tsx tests/svg-import.test.ts && npx tsx tests/svg-import-placement.test.ts && npx tsx tests/placement.test.ts && npx tsx tests/history.test.ts && npx tsx tests/scene-io.test.ts && npx tsx tests/ui-integration.test.ts && npx tsx tests/autosave-serialization.test.ts && npx tsx tests/text-outline-cache.test.ts && npx tsx tests/source-text-migration.test.ts && npx tsx tests/preflight-bounds.test.ts && npx tsx tests/controller-stop-safety.test.ts && npx tsx tests/materials.test.ts && npx tsx tests/image-processing.test.ts"
   },
   "keywords": [],
   "author": "",

@@ -18,7 +18,7 @@
  */
 
 import { type Scene } from '../../core/scene/Scene';
-import { type SceneObject, type Geometry, type TextGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type ImageGeometry, type TextGeometry } from '../../core/scene/SceneObject';
 import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
 import { type AABB, type Matrix3x2, aabbIntersects } from '../../core/types';
@@ -652,7 +652,7 @@ function renderObject(
       ctx.fillStyle = `${modeColor}22`;
     }
 
-    drawGeometry(ctx, obj.geometry, transform, isFill, obj);
+    drawGeometry(ctx, obj.geometry, transform, isFill, obj, layer);
 
     if (layer.settings.mode === 'engrave' && layer.settings.fill.enabled) {
       drawFillPreview(ctx, obj, layer, transform, modeColor);
@@ -866,7 +866,8 @@ function drawGeometry(
   geom: Geometry,
   transform: Transform,
   fill: boolean,
-  forObject?: SceneObject
+  forObject?: SceneObject,
+  layer?: Layer
 ): void {
   switch (geom.type) {
     case 'rect': {
@@ -995,10 +996,10 @@ function drawGeometry(
         const physicalHeight = (geom.originalHeight / dpi) * 25.4;
 
         ctx.save();
-        // Apply image processing filters
-        const brightness = (geom as any).brightness || 0;
-        const contrast = (geom as any).contrast || 0;
-        const invert = (geom as any).invert || false;
+        const ims = layer?.settings.mode === 'image' ? layer.settings.image : undefined;
+        const brightness = ims?.brightness ?? (geom as ImageGeometry).brightness ?? 0;
+        const contrast = ims?.contrast ?? (geom as ImageGeometry).contrast ?? 0;
+        const invert = ims?.invert ?? (geom as ImageGeometry).invert ?? false;
 
         const brightnessVal = 1 + brightness / 100;
         const contrastVal = 1 + contrast / 100;
@@ -1012,9 +1013,9 @@ function drawGeometry(
         ctx.filter = 'none';
         ctx.restore();
 
-        // Dithered preview with caching
-        const ditherMode = (geom as any).ditherMode;
-        const adjustedData = (geom as any).adjustedData;
+        // Dithered preview with caching (layer-driven raster mode)
+        const ditherMode = ims?.imageMode === 'dither' ? ims.dithering : undefined;
+        const adjustedData = (geom as ImageGeometry).adjustedData;
         if (ditherMode && ditherMode !== 'none' && adjustedData && geom.grayscaleWidth && geom.grayscaleHeight) {
           const ditherKey = `${loadSrc}\x1e${geom.grayscaleWidth}\x1e${geom.grayscaleHeight}\x1e${ditherMode}\x1e${adjustedData.length}`;
           let ditherCanvas = ditherCacheGet(ditherKey);

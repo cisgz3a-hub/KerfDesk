@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
@@ -7,6 +7,13 @@ import { theme } from '../styles/theme';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
 import { ObjectPropertiesTab } from './PropertiesPanel';
+import {
+  applyMaterialPresetToLayer,
+  getPresetById,
+  getPresets,
+  savePreset as persistMaterialPreset,
+} from '../../core/materials/MaterialLibrary';
+import type { MaterialPreset } from '../../core/materials/MaterialPreset';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -56,10 +63,58 @@ export function LayerPanel({
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
   const [showTabsCustomize, setShowTabsCustomize] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'layer' | 'object'>('layer');
+  const [materialPresetRevision, setMaterialPresetRevision] = useState(0);
+  const [selectedMaterialPresetId, setSelectedMaterialPresetId] = useState('');
+  const [materialPresetWarning, setMaterialPresetWarning] = useState<string | null>(null);
+  const [saveMaterialPresetOpen, setSaveMaterialPresetOpen] = useState(false);
+  const [saveMaterialPresetName, setSaveMaterialPresetName] = useState('');
+  const [saveMaterialPresetMaterial, setSaveMaterialPresetMaterial] = useState('');
+  const [saveMaterialPresetThickness, setSaveMaterialPresetThickness] = useState('');
+
+  const materialPresets = useMemo(() => {
+    void materialPresetRevision;
+    return getPresets();
+  }, [materialPresetRevision]);
+
+  const materialPresetsByMaterial = useMemo(() => {
+    const map = new Map<string, MaterialPreset[]>();
+    for (const p of materialPresets) {
+      const key = p.material || 'Other';
+      const list = map.get(key) ?? [];
+      list.push(p);
+      map.set(key, list);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  }, [materialPresets]);
 
   useEffect(() => {
     setShowTabsCustomize(false);
   }, [scene.activeLayerId]);
+
+  useEffect(() => {
+    if (!selectedMaterialPresetId) {
+      setMaterialPresetWarning(null);
+      return;
+    }
+    if (!activeLayer) return;
+    const preset = getPresetById(selectedMaterialPresetId);
+    if (!preset) {
+      setMaterialPresetWarning(null);
+      return;
+    }
+    const next = applyMaterialPresetToLayer(activeLayer, preset);
+    if (!next) {
+      const m = activeLayer.settings.mode;
+      const label = m === 'cut' ? 'Cut' : m === 'engrave' ? 'Engrave' : m === 'score' ? 'Score' : 'Image';
+      setMaterialPresetWarning(`No ${label} settings for this material`);
+      return;
+    }
+    setMaterialPresetWarning(null);
+    onSceneCommit(updateLayer(scene, activeLayer.id, () => next));
+  }, [selectedMaterialPresetId, activeLayer?.settings.mode, activeLayer?.id]);
 
   const simpleTabsOn = activeLayer?.settings.tabs?.enabled === true;
   const detailTabCount =
@@ -473,6 +528,210 @@ export function LayerPanel({
           textAlign: 'center' as const,
         },
       }, 'This layer is visible but excluded from output'),
+      React.createElement('div', { style: fieldStyle },
+        React.createElement('span', { style: settingsLabelStyle }, 'Material Preset'),
+        React.createElement('select', {
+          value: selectedMaterialPresetId,
+          onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+            setSelectedMaterialPresetId(e.target.value);
+          },
+          style: {
+            width: '100%',
+            padding: '6px 8px',
+            borderRadius: theme.radius.sm,
+            border: `1px solid ${theme.border.subtle}`,
+            background: theme.bg.base,
+            color: theme.text.primary,
+            fontSize: theme.font.size.sm,
+            fontFamily: theme.font.ui,
+          },
+        },
+          React.createElement('option', { value: '' }, '— None —'),
+          ...materialPresetsByMaterial.flatMap(([materialLabel, list]) => [
+            React.createElement('optgroup', { key: materialLabel, label: materialLabel },
+              ...list.map(preset =>
+                React.createElement('option', { key: preset.id, value: preset.id }, preset.name),
+              ),
+            ),
+          ]),
+        ),
+        materialPresetWarning && React.createElement('div', {
+          style: {
+            marginTop: 4,
+            fontSize: 10,
+            color: '#ffb020',
+            lineHeight: 1.35,
+          },
+        }, materialPresetWarning),
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => {
+            if (!activeLayer) return;
+            setSaveMaterialPresetName(activeLayer.name || '');
+            setSaveMaterialPresetMaterial(scene.material?.name || '');
+            setSaveMaterialPresetThickness('');
+            setSaveMaterialPresetOpen(true);
+          },
+          style: {
+            marginTop: 6,
+            alignSelf: 'flex-start',
+            padding: '5px 10px',
+            borderRadius: theme.radius.sm,
+            border: `1px solid ${theme.border.subtle}`,
+            background: '#14142a',
+            color: theme.text.secondary,
+            fontSize: 10,
+            fontWeight: 600,
+            fontFamily: theme.font.ui,
+            cursor: 'pointer',
+          },
+        }, 'Save current as preset'),
+      ),
+      saveMaterialPresetOpen && activeLayer && React.createElement('div', {
+        style: {
+          position: 'fixed' as const,
+          inset: 0,
+          background: 'rgba(0,0,0,0.45)',
+          zIndex: 2000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 16,
+        },
+        onClick: () => setSaveMaterialPresetOpen(false),
+      },
+        React.createElement('div', {
+          style: {
+            width: 'min(360px, 100%)',
+            padding: 14,
+            borderRadius: 10,
+            background: '#121225',
+            border: `1px solid ${theme.border.subtle}`,
+            display: 'flex',
+            flexDirection: 'column' as const,
+            gap: 10,
+            boxShadow: '0 12px 40px rgba(0,0,0,0.45)',
+          },
+          onClick: (e: React.MouseEvent<HTMLDivElement>) => e.stopPropagation(),
+        },
+          React.createElement('div', { style: { fontSize: 13, fontWeight: 700, color: theme.text.primary, fontFamily: theme.font.ui } }, 'Save material preset'),
+          React.createElement('label', { style: fieldStyle },
+            React.createElement('span', { style: settingsLabelStyle }, 'Name'),
+            React.createElement('input', {
+              value: saveMaterialPresetName,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSaveMaterialPresetName(e.target.value),
+              style: {
+                padding: '6px 8px',
+                borderRadius: theme.radius.sm,
+                border: `1px solid ${theme.border.subtle}`,
+                background: theme.bg.base,
+                color: theme.text.primary,
+                fontFamily: theme.font.ui,
+                fontSize: 12,
+              },
+            }),
+          ),
+          React.createElement('label', { style: fieldStyle },
+            React.createElement('span', { style: settingsLabelStyle }, 'Material'),
+            React.createElement('input', {
+              value: saveMaterialPresetMaterial,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSaveMaterialPresetMaterial(e.target.value),
+              style: {
+                padding: '6px 8px',
+                borderRadius: theme.radius.sm,
+                border: `1px solid ${theme.border.subtle}`,
+                background: theme.bg.base,
+                color: theme.text.primary,
+                fontFamily: theme.font.ui,
+                fontSize: 12,
+              },
+            }),
+          ),
+          React.createElement('label', { style: fieldStyle },
+            React.createElement('span', { style: settingsLabelStyle }, 'Thickness'),
+            React.createElement('input', {
+              value: saveMaterialPresetThickness,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setSaveMaterialPresetThickness(e.target.value),
+              placeholder: 'e.g. 3mm',
+              style: {
+                padding: '6px 8px',
+                borderRadius: theme.radius.sm,
+                border: `1px solid ${theme.border.subtle}`,
+                background: theme.bg.base,
+                color: theme.text.primary,
+                fontFamily: theme.font.ui,
+                fontSize: 12,
+              },
+            }),
+          ),
+          React.createElement('div', { style: { display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 } },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => setSaveMaterialPresetOpen(false),
+              style: {
+                padding: '6px 12px',
+                borderRadius: theme.radius.sm,
+                border: `1px solid ${theme.border.subtle}`,
+                background: 'transparent',
+                color: theme.text.secondary,
+                fontSize: 11,
+                fontFamily: theme.font.ui,
+                cursor: 'pointer',
+              },
+            }, 'Cancel'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: async () => {
+                if (!activeLayer) return;
+                const name = saveMaterialPresetName.trim();
+                const material = saveMaterialPresetMaterial.trim();
+                const thickness = saveMaterialPresetThickness.trim();
+                if (!name || !material || !thickness) {
+                  await showAlert('Missing fields', 'Please enter name, material, and thickness.');
+                  return;
+                }
+                const mode = activeLayer.settings.mode;
+                if (mode !== 'cut' && mode !== 'engrave' && mode !== 'score') {
+                  await showAlert('Unsupported mode', 'Switch to Cut, Engrave, or Score to save power, speed, and passes.');
+                  return;
+                }
+                const op = {
+                  power: activeLayer.settings.power.max,
+                  speed: activeLayer.settings.speed,
+                  passes: activeLayer.settings.passes ?? 1,
+                };
+                const operations: MaterialPreset['operations'] =
+                  mode === 'cut' ? { cut: op }
+                    : mode === 'engrave' ? { engrave: op }
+                      : { score: op };
+                const id = `preset-user-${Date.now()}`;
+                persistMaterialPreset({
+                  id,
+                  name,
+                  material,
+                  thickness,
+                  laserWattage: '10W',
+                  operations,
+                });
+                setMaterialPresetRevision(r => r + 1);
+                setSaveMaterialPresetOpen(false);
+                setSelectedMaterialPresetId(id);
+              },
+              style: {
+                padding: '6px 12px',
+                borderRadius: theme.radius.sm,
+                border: 'none',
+                background: activeLayer.color,
+                color: '#0a0a12',
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: theme.font.ui,
+                cursor: 'pointer',
+              },
+            }, 'Save'),
+          ),
+        ),
+      ),
       React.createElement('div', { style: fieldStyle },
         React.createElement('span', { style: settingsLabelStyle }, 'Mode'),
         React.createElement('div', {

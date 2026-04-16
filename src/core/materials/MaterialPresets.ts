@@ -603,7 +603,7 @@ export function getPresetSettings(
   presetName: string,
   machineType: string,
   machineWatts: string = '10',
-): { cut: LaserOp; engrave: LaserOp; score: LaserOp } | null {
+): MaterialPresetOps | null {
   let preset: MaterialPreset | UserMaterial | undefined = MATERIAL_PRESETS.find(p => p.name === presetName);
 
   if (!preset) {

@@ -16,7 +16,7 @@
  */
 
 import { type AABB, type Point, emptyAABB, generateId } from '../types';
-import { type FillMode } from '../scene/Layer';
+import { type FillMode, type ImageRasterMode } from '../scene/Layer';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -47,13 +47,14 @@ export interface FlatPath {
 // ─── PROCESSED BITMAP ────────────────────────────────────────────
 /**
  * Raster image data after processing pipeline:
- * Raw Image → brightness/contrast → grayscale → dithering → ProcessedBitmap
+ * Raw Image → brightness/contrast/gamma/invert (on a copy) → dither | grayscale | threshold → ProcessedBitmap
  */
 export interface ProcessedBitmap {
   width: number;                 // pixels
   height: number;                // pixels
   dpi: number;
-  mode: '1bit' | '8bit';
+  /** 1-bit mask, or 8-bit luminance (0=dark, 255=light) for variable-S raster. */
+  mode: '1bit' | 'grayscale';
   data: Uint8Array;
 
   physicalWidth: number;         // mm on bed (must match bitmap pixel pitch: physicalWidth/width)
@@ -66,6 +67,8 @@ export interface ProcessedBitmap {
     gamma: number;
     ditheringMode: string;
     inverted: boolean;
+    imageMode?: ImageRasterMode;
+    imageThreshold?: number;
   };
 }
 

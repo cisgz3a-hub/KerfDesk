@@ -499,19 +499,22 @@ assert(!hasRow8, 'Raster: empty row 8 skipped');
 console.log(`  ℹ Burn segments: ${rasterLinears.length}`);
 console.log(`  ℹ Total raster moves: ${rasterMoves.length}`);
 
-// ─── TEST: RASTER (8-BIT) VARIABLE POWER ─────────────────────────
+// ─── TEST: RASTER (GRAYSCALE) VARIABLE POWER ─────────────────────
 
-console.log('\n=== Test: Raster 8-bit Variable Power ===');
+console.log('\n=== Test: Raster grayscale variable power ===');
 
-// Create a 5×1 bitmap with gradient: [0, 64, 128, 192, 255]
+// Create a 5×1 bitmap with gradient: [0, 64, 128, 192, 255] — each luminance maps to distinct S
 const gradientData = new Uint8Array([0, 64, 128, 192, 255]);
 const gradientBitmap: ProcessedBitmap = {
-  width: 5, height: 1, dpi: 254, mode: '8bit',
+  width: 5, height: 1, dpi: 254, mode: 'grayscale',
   data: gradientData,
   physicalWidth: 5 * pixelSize,
   physicalHeight: 1 * pixelSize,
   position: { x: 50, y: 50 },
-  pipeline: { brightness: 0, contrast: 0, gamma: 1, ditheringMode: 'none', inverted: false },
+  pipeline: {
+    brightness: 0, contrast: 0, gamma: 1, ditheringMode: 'none', inverted: false,
+    imageMode: 'grayscale',
+  },
 };
 
 const gradientJob = createEmptyJob('Gradient Test', 'test');
@@ -532,18 +535,15 @@ const gradientMoves = gradientPlan.operations[0].moves;
 const gradientLinears = gradientMoves.filter(m => m.type === 'linear');
 const gradientLaserOns = gradientMoves.filter(m => m.type === 'laserOn');
 
-// Pixel 0 is zero → skipped. Pixels 64,128,192,255 fall in different 16-level buckets → 4 segments
-assert(gradientLinears.length === 4, `8-bit: 4 burn segments (gradient pixels in distinct power buckets)`);
-assert(gradientLaserOns.length === 4, '8-bit: 4 laserOn events for gradient');
+assert(gradientLinears.length === 5, `grayscale: 5 burn segments (one per distinct S)`);
+assert(gradientLaserOns.length === 5, 'grayscale: 5 laserOn events for gradient');
 
-const p0 = gradientLaserOns[0].type === 'laserOn' ? gradientLaserOns[0].power : -1;
-const p1 = gradientLaserOns[1].type === 'laserOn' ? gradientLaserOns[1].power : -1;
-const p2 = gradientLaserOns[2].type === 'laserOn' ? gradientLaserOns[2].power : -1;
-const p3 = gradientLaserOns[3].type === 'laserOn' ? gradientLaserOns[3].power : -1;
-assert(p0 < p1 && p1 < p2 && p2 < p3, '8-bit: laser power increases along the gradient');
-assert(p3 === 100, '8-bit: brightest pixel maps to powerMax (100%)');
+const gp = gradientLaserOns.map(m => (m.type === 'laserOn' ? m.power : -1));
+assert(gp[0] > gp[1] && gp[1] > gp[2] && gp[2] > gp[3] && gp[3] > gp[4],
+  'grayscale: laser power decreases left→right (dark→light)');
+assert(gp[0] === 100 && gp[4] === 10, 'grayscale: endpoints map to powerMax / powerMin');
 
-console.log(`  ℹ 8-bit segments: ${gradientLinears.length}`);
+console.log(`  ℹ Grayscale segments: ${gradientLinears.length}`);
 
 // ─── TEST: PLAN STATISTICS ───────────────────────────────────────
 

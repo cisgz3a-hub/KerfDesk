@@ -28,6 +28,9 @@ export const LAYER_COLORS = [
 
 export type LayerMode = 'cut' | 'engrave' | 'score' | 'image';
 
+/** How raster image pixels become laser power / 1-bit output. */
+export type ImageRasterMode = 'dither' | 'grayscale' | 'threshold';
+
 export type FillMode = 'line' | 'offset' | 'cross-hatch';
 
 export type DitherMode =
@@ -86,13 +89,17 @@ export interface LaserSettings {
 
   // Image settings
   image: {
+    imageMode: ImageRasterMode;
+    /** Used when `imageMode === 'threshold'`, and as default threshold for dither `threshold` algorithm. */
+    imageThreshold: number;
     dithering: DitherMode;
     resolution: number;     // DPI
     brightness: number;     // -100 to 100
     contrast: number;       // -100 to 100
     gamma: number;          // 0.1 to 5.0
     invert: boolean;
-    passThrough: boolean;   // grayscale → variable power
+    /** @deprecated Use `imageMode === 'grayscale'` instead. */
+    passThrough: boolean;
   };
 
   // Hardware
@@ -139,6 +146,8 @@ export function defaultLaserSettings(mode: LayerMode = 'cut'): LaserSettings {
       insideFirst: true,
     },
     image: {
+      imageMode: 'dither',
+      imageThreshold: 128,
       dithering: 'floyd-steinberg',
       resolution: 254,  // ~0.1mm dot pitch
       brightness: 0,
