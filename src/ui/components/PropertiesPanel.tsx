@@ -21,6 +21,8 @@ import {
 import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
+import { getActiveProfile } from '../../core/devices/DeviceProfile';
+import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
 
 const TEXT_FONT_OPTIONS = [
   'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana',
@@ -921,6 +923,15 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         return buf;
       };
 
+      const profileForRaster = getActiveProfile();
+      const smartOverscanUiEnabled =
+        imageLayer.settings.smartOverscanEnabled ?? profileForRaster?.smartOverscanEnabled ?? true;
+      const smartOverscanPreview = computeSmartOverscan({
+        scanSpeedMmPerMin: imageLayer.settings.speed,
+        maxAccelMmPerS2: profileForRaster?.maxAccelMmPerS2 ?? 1000,
+        accelAwarePowerEnabled: imageLayer.settings.accelAwarePower !== false,
+      });
+
       return React.createElement('div', { style: dividerStyle, key: `img-${obj.id}` },
         React.createElement('div', { style: sectionHeaderStyle }, 'Image Processing'),
 
@@ -1019,6 +1030,88 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           }),
           'Scanning offset correction',
         ),
+
+        React.createElement('label', {
+          style: {
+            ...labelStyle,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 6,
+            cursor: 'pointer',
+          },
+          title:
+            'Compute overscan from scan speed and machine acceleration (device profile). Uses Phase 2.6 accel-aware margin when enabled. Turn off to set a fixed overscan (mm) below.',
+        },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: smartOverscanUiEnabled,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const s = sceneRef.current;
+              onSceneCommit({
+                ...s,
+                layers: s.layers.map(l =>
+                  l.id === imageLayer.id
+                    ? { ...l, settings: { ...l.settings, smartOverscanEnabled: e.target.checked } }
+                    : l,
+                ),
+              });
+            },
+          }),
+          'Smart overscan sizing (recommended)',
+        ),
+
+        smartOverscanUiEnabled &&
+          React.createElement(
+            'div',
+            {
+              style: {
+                fontSize: 10,
+                color: theme.accent.green,
+                marginTop: 2,
+                paddingLeft: 20,
+                fontFamily: theme.font.mono,
+              },
+            },
+            `→ ${smartOverscanPreview.overscanMm.toFixed(2)} mm`,
+            smartOverscanPreview.clampedByMinimum ? ' (minimum)' : '',
+            ' at ',
+            String(Math.round(imageLayer.settings.speed)),
+            ' mm/min, ',
+            String(profileForRaster?.maxAccelMmPerS2 ?? 1000),
+            ' mm/s²',
+          ),
+
+        !smartOverscanUiEnabled &&
+          React.createElement(React.Fragment, null,
+            React.createElement('div', { style: { ...labelStyle, marginTop: 6 } }, 'Overscan (mm, fixed)'),
+            React.createElement('input', {
+              type: 'number',
+              min: 0,
+              step: 0.1,
+              value: imageLayer.settings.fill.overscanning,
+              style: { ...selectStyle, marginBottom: 8 },
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const n = parseFloat(e.target.value);
+                if (!Number.isFinite(n) || n < 0) return;
+                const s = sceneRef.current;
+                onSceneCommit({
+                  ...s,
+                  layers: s.layers.map(l =>
+                    l.id === imageLayer.id
+                      ? {
+                        ...l,
+                        settings: {
+                          ...l.settings,
+                          fill: { ...l.settings.fill, overscanning: n },
+                        },
+                      }
+                      : l,
+                  ),
+                });
+              },
+            }),
+          ),
 
         imageMode === 'dither' && React.createElement(React.Fragment, null,
           React.createElement('div', { style: { ...labelStyle, marginTop: 4 } }, 'Dithering algorithm'),

@@ -32,6 +32,7 @@ const files = [
   'test-grid-generator.test.ts',
   'velocity-profile.test.ts',
   'scanning-offset.test.ts',
+  'smart-overscan.test.ts',
 ];
 
 for (const f of files) {

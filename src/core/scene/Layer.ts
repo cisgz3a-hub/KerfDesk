@@ -116,6 +116,9 @@ export interface LaserSettings {
   useScanOffsets?: boolean;
   /** Per-layer scanning offset table; overrides device profile when non-empty. */
   scanningOffsets?: ScanningOffsetTable;
+
+  /** When true (default), overscan is computed from speed and machine acceleration. */
+  smartOverscanEnabled?: boolean;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

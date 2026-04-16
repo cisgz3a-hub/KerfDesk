@@ -28,6 +28,8 @@ function mergeProfilePreservedFields(target: DeviceProfile, previous: DeviceProf
   target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
   target.accelAwarePower = previous.accelAwarePower;
   target.minPowerRatioAccel = previous.minPowerRatioAccel;
+  target.smartOverscanEnabled = previous.smartOverscanEnabled;
+  target.overscanMm = previous.overscanMm;
   target.preferredPort = previous.preferredPort;
   target.startGcode = previous.startGcode;
   target.endGcode = previous.endGcode;

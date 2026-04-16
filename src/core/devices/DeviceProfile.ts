@@ -57,6 +57,11 @@ export interface DeviceProfile {
 
   /** Scanning offset calibration table for compensating laser firing latency. */
   scanningOffsets?: ScanningOffsetTable;
+
+  /** When true, overscan is computed from scan speed and machine accel (see SmartOverscan). */
+  smartOverscanEnabled?: boolean;
+  /** Default manual overscan (mm) when smart overscan is off; also fallback if layer value missing. */
+  overscanMm?: number;
 }
 
 const STORAGE_KEY = 'laserforge_device_profiles';
@@ -176,6 +181,8 @@ export function createBlankProfile(name: string): DeviceProfile {
     maxAccelMmPerS2: 1000,
     accelAwarePower: true,
     minPowerRatioAccel: 0.1,
+    smartOverscanEnabled: true,
+    overscanMm: 2.5,
   };
 }
 

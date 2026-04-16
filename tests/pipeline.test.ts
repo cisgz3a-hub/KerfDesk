@@ -298,6 +298,7 @@ fillLayer.settings.fill.interval = 1.0;    // 1mm spacing for easy counting
 fillLayer.settings.fill.angle = 0;          // horizontal scanlines
 fillLayer.settings.fill.biDirectional = true;
 fillLayer.settings.fill.overscanning = 0;   // no overscan for precise testing
+fillLayer.settings.smartOverscanEnabled = false; // honor fixed fill.overscanning (not kinematic smart overscan)
 fillScene.layers = [fillLayer];
 
 // 10mm × 20mm rectangle at (50, 50)

@@ -67,3 +67,9 @@ export {
   type ScanningOffsetPoint,
   type ScanningOffsetTable,
 } from './ScanningOffset';
+export {
+  computeSmartOverscan,
+  explainOverscan,
+  type SmartOverscanInput,
+  type SmartOverscanResult,
+} from './SmartOverscan';

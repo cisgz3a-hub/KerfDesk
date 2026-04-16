@@ -41,6 +41,7 @@ import {
 import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
 import { getActiveProfile } from '../devices/DeviceProfile';
 import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { computeSmartOverscan } from '../plan/SmartOverscan';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -279,10 +280,30 @@ function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLas
     s.mode === 'engrave' && fillActiveForEngrave
       ? Math.max(0.01, Number.isFinite(rawIv) && rawIv > 0 ? rawIv : 0.1)
       : 0;
+
+  const resolvedSpeed = Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, s.speed));
+  const smartOverscanEnabled = s.smartOverscanEnabled ?? profile?.smartOverscanEnabled ?? true;
+  let overscanning: number;
+  if (smartOverscanEnabled) {
+    overscanning = computeSmartOverscan({
+      scanSpeedMmPerMin: resolvedSpeed,
+      maxAccelMmPerS2,
+      accelAwarePowerEnabled: accelAwarePower,
+    }).overscanMm;
+  } else {
+    const manual = s.fill.overscanning;
+    overscanning = Math.max(
+      0,
+      Number.isFinite(manual) && manual >= 0
+        ? manual
+        : profile?.overscanMm ?? 2.5,
+    );
+  }
+
   return {
     powerMin: Math.max(0, Math.min(100, s.power.min)),
     powerMax: Math.max(0, Math.min(100, s.power.max)),
-    speed: Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, s.speed)),
+    speed: resolvedSpeed,
     passes: Math.max(1, Math.min(99, s.passes)),
     zStepPerPass: s.zStepPerPass,
 
@@ -290,7 +311,7 @@ function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLas
     fillAngle: s.fill.angle % 360,
     fillMode: s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line',
     fillBiDirectional: s.fill.biDirectional !== false,
-    overscanning: Math.max(0, s.fill.overscanning),
+    overscanning,
 
     overcut: Math.max(0, s.cut.overcut),
     leadIn: Math.max(0, s.cut.leadIn),
