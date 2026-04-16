@@ -14,10 +14,11 @@ import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
 import { confirmPreflightForJobStart } from '../../core/preflight/confirmPreflightForJobStart';
-import { getActiveProfile } from '../../core/devices/DeviceProfile';
+import { getActiveProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { transformPointToMachine } from '../../core/plan/MachineTransform';
 import { SimulatorView } from './SimulatorView';
 import { ConnectionControls } from './ConnectionControls';
 import { MoveControls } from './MoveControls';
@@ -103,6 +104,7 @@ export interface ConnectionPanelMainProps {
   onSceneCommit: (scene: Scene) => void;
   startMode: StartMode;
   savedOrigin: { x: number; y: number } | null;
+  originCorner: MachineOriginCorner;
   machinePosition: { x: number; y: number } | null;
   onSelectMode: (mode: StartMode) => void;
   onSaveOrigin: () => void;
@@ -149,6 +151,7 @@ export function ConnectionPanelMain({
   onSceneCommit,
   startMode,
   savedOrigin,
+  originCorner,
   machinePosition,
   onSelectMode,
   onSaveOrigin,
@@ -605,19 +608,34 @@ export function ConnectionPanelMain({
 
     if (!(await confirmFrameBounds())) return;
 
+    const transformOpts = {
+      startMode,
+      savedOrigin,
+      originCorner,
+      bedHeightMm: bedHeight,
+    };
+
+    const corners = [
+      { x: sceneBounds.minX, y: sceneBounds.minY },
+      { x: sceneBounds.maxX, y: sceneBounds.minY },
+      { x: sceneBounds.maxX, y: sceneBounds.maxY },
+      { x: sceneBounds.minX, y: sceneBounds.maxY },
+      { x: sceneBounds.minX, y: sceneBounds.minY },
+    ].map(p => transformPointToMachine(p, sceneBounds, transformOpts));
+
+    const ys = corners.map(c => c.y);
+    const yLo = Math.min(...ys);
+    const yHi = Math.max(...ys);
+
     setMessages(prev => [...prev,
-      `Framing (safe): X${workFrame.minX.toFixed(0)}-${workFrame.maxX.toFixed(0)} Y${workFrame.minY.toFixed(0)}-${workFrame.maxY.toFixed(0)}`,
+      `Framing (safe): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
     const lines: string[] = [
       'G90',
       'G21',
       'M5 S0',
-      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
-      `G0 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
-      `G0 X${workFrame.maxX.toFixed(3)} Y${workFrame.maxY.toFixed(3)}`,
-      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.maxY.toFixed(3)}`,
-      `G0 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)}`,
+      ...corners.map(c => `G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`),
       'M5 S0',
     ];
 
@@ -634,7 +652,7 @@ export function ConnectionPanelMain({
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
+  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
 
   const handleFrameDot = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -654,8 +672,27 @@ export function ConnectionPanelMain({
       localStorage.setItem('laserforge_frame_dot_acknowledged', 'true');
     }
 
+    const transformOpts = {
+      startMode,
+      savedOrigin,
+      originCorner,
+      bedHeightMm: bedHeight,
+    };
+
+    const corners = [
+      { x: sceneBounds.minX, y: sceneBounds.minY },
+      { x: sceneBounds.maxX, y: sceneBounds.minY },
+      { x: sceneBounds.maxX, y: sceneBounds.maxY },
+      { x: sceneBounds.minX, y: sceneBounds.maxY },
+      { x: sceneBounds.minX, y: sceneBounds.minY },
+    ].map(p => transformPointToMachine(p, sceneBounds, transformOpts));
+
+    const ys = corners.map(c => c.y);
+    const yLo = Math.min(...ys);
+    const yHi = Math.max(...ys);
+
     setMessages(prev => [...prev,
-      `Framing (laser dot): X${workFrame.minX.toFixed(0)}-${workFrame.maxX.toFixed(0)} Y${workFrame.minY.toFixed(0)}-${workFrame.maxY.toFixed(0)}`,
+      `Framing (laser dot): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
     const maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
@@ -665,11 +702,7 @@ export function ConnectionPanelMain({
       'G90', 'G21',
       // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
       `M4 S${frameDotS}`,
-      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
-      `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
-      `G1 X${workFrame.maxX.toFixed(3)} Y${workFrame.maxY.toFixed(3)} F3000`,
-      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.maxY.toFixed(3)} F3000`,
-      `G1 X${workFrame.minX.toFixed(3)} Y${workFrame.minY.toFixed(3)} F3000`,
+      ...corners.map(c => `G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`),
       'M5 S0',
     ];
 
@@ -686,7 +719,7 @@ export function ConnectionPanelMain({
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [canFrame, confirmFrameBounds, workFrame, sendFrameLine]);
+  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
 
   const handleZero = useCallback(async () => {
     const ctrl = controllerRef.current;

@@ -42,7 +42,7 @@ export interface MachineTransformResult {
   returnPosition: { x: number; y: number };
 }
 
-function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean {
+export function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean {
   return originCorner === 'front-left' || originCorner === 'front-right';
 }
 
@@ -147,4 +147,41 @@ function transformMove(
     default:
       return move;
   }
+}
+
+/**
+ * Transform a single canvas-space point to machine space using the same
+ * rules as applyMachineTransform(). Used by Frame / jog previews / etc.
+ * that need coordinates matching the compiled G-code job.
+ *
+ * `sceneBounds` must be the pre-transform bounding rectangle of the same
+ * design whose coords are being transformed — the flip reference uses maxY.
+ */
+export function transformPointToMachine(
+  point: { x: number; y: number },
+  sceneBounds: { minX: number; minY: number; maxX: number; maxY: number },
+  options: MachineTransformOptions,
+): { x: number; y: number } {
+  const flipY = useFrontOriginYFlip(options.originCorner);
+  const bedH =
+    Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
+      ? options.bedHeightMm
+      : DEFAULT_BED_HEIGHT_MM;
+  const flipReferenceY = flipY ? bedH : sceneBounds.maxY;
+
+  const offsetDesignMin = {
+    minX: sceneBounds.minX,
+    minY: flipY ? bedH - sceneBounds.maxY : sceneBounds.minY,
+  };
+
+  const offset = computeGcodeOffset(
+    options.startMode,
+    offsetDesignMin,
+    options.savedOrigin,
+  );
+
+  return {
+    x: point.x + offset.x,
+    y: flipY ? flipReferenceY - point.y + offset.y : point.y + offset.y,
+  };
 }

@@ -1941,6 +1941,7 @@ export function App() {
         onSceneCommit: handleSceneCommit,
         startMode,
         savedOrigin,
+        originCorner: activeProfile?.originCorner ?? 'front-left',
         machinePosition: machinePositionForStartWizard,
         onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
         onSaveOrigin: handleSaveOrigin,
