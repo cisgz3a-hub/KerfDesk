@@ -25,6 +25,7 @@ import { getOutputStrategy } from '../src/core/output/Output';
 import { applyMachineTransform } from '../src/core/plan/MachineTransform';
 import '../src/core/output/GrblStrategy';  // Register GRBL strategy
 import { generateId } from '../src/core/types';
+import { EMPTY_OFFSET_TABLE } from '../src/core/plan/ScanningOffset';
 import { simulatePlan } from '../src/core/plan/Simulation';
 import { computeFitBounds, computeSceneBounds, computeSimulationBounds } from '../src/geometry/bounds';
 
@@ -440,9 +441,10 @@ const rasterSettings: ResolvedLaserSettings = {
   fillInterval: 0.1, fillAngle: 0, fillMode: 'line', fillBiDirectional: true, overscanning: 0,
   overcut: 0, leadIn: 0, tabCount: 0, tabWidth: 0, insideFirst: false,
   airAssist: false,
-  accelAwarePower: false,
-  maxAccelMmPerS2: 1000,
-  minPowerRatioAccel: 0.1,
+    accelAwarePower: false,
+    maxAccelMmPerS2: 1000,
+    minPowerRatioAccel: 0.1,
+    scanningOffsets: EMPTY_OFFSET_TABLE,
 };
 
 const rasterJob = createEmptyJob('Raster Test', 'test');

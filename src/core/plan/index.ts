@@ -59,3 +59,11 @@ export {
   type MoveKinematics,
   type VelocityZones,
 } from './VelocityProfile';
+export {
+  interpolateOffset,
+  applyScanOffset,
+  suggestedDefaultTable,
+  EMPTY_OFFSET_TABLE,
+  type ScanningOffsetPoint,
+  type ScanningOffsetTable,
+} from './ScanningOffset';

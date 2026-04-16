@@ -990,6 +990,36 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           'Acceleration-aware power (recommended)',
         ),
 
+        React.createElement('label', {
+          style: {
+            ...labelStyle,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 6,
+            cursor: 'pointer',
+          },
+          title:
+            'Shifts raster scan lines to compensate for laser on/off latency vs motion. Calibrate speed/offset pairs in Connection → device profile.',
+        },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: imageLayer.settings.useScanOffsets === true,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              const s = sceneRef.current;
+              onSceneCommit({
+                ...s,
+                layers: s.layers.map(l =>
+                  l.id === imageLayer.id
+                    ? { ...l, settings: { ...l.settings, useScanOffsets: e.target.checked } }
+                    : l,
+                ),
+              });
+            },
+          }),
+          'Scanning offset correction',
+        ),
+
         imageMode === 'dither' && React.createElement(React.Fragment, null,
           React.createElement('div', { style: { ...labelStyle, marginTop: 4 } }, 'Dithering algorithm'),
           React.createElement('select', {

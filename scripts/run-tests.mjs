@@ -31,6 +31,7 @@ const files = [
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'velocity-profile.test.ts',
+  'scanning-offset.test.ts',
 ];
 
 for (const f of files) {

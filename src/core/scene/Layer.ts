@@ -10,6 +10,7 @@
  */
 
 import { generateId } from '../types';
+import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 
 // ─── LAYER COLORS ────────────────────────────────────────────────
 
@@ -110,6 +111,11 @@ export interface LaserSettings {
   accelAwarePower?: boolean;
   /** Minimum laser power ratio during decel phases (0–1). */
   minPowerRatioAccel?: number;
+
+  /** When true, apply scanning offset table (layer or device profile). */
+  useScanOffsets?: boolean;
+  /** Per-layer scanning offset table; overrides device profile when non-empty. */
+  scanningOffsets?: ScanningOffsetTable;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

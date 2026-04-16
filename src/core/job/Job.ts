@@ -17,6 +17,7 @@
 
 import { type AABB, type Point, emptyAABB, generateId } from '../types';
 import { type FillMode, type ImageRasterMode } from '../scene/Layer';
+import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -111,6 +112,9 @@ export interface ResolvedLaserSettings {
   maxAccelMmPerS2: number;
   /** Minimum power ratio during decel (0–1). */
   minPowerRatioAccel: number;
+
+  /** Raster: scanning offset table (empty = no lateral shift). */
+  scanningOffsets: ScanningOffsetTable;
 }
 
 // ─── OPERATION ───────────────────────────────────────────────────

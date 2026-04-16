@@ -4,6 +4,7 @@
  */
 
 import { type Scene } from '../scene/Scene';
+import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
@@ -53,6 +54,9 @@ export interface DeviceProfile {
   accelAwarePower?: boolean;
   /** Default minimum power ratio during raster decel. */
   minPowerRatioAccel?: number;
+
+  /** Scanning offset calibration table for compensating laser firing latency. */
+  scanningOffsets?: ScanningOffsetTable;
 }
 
 const STORAGE_KEY = 'laserforge_device_profiles';

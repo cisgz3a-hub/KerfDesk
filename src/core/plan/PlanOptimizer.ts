@@ -57,6 +57,7 @@ import {
   scalePowerByVelocity,
   type MoveKinematics,
 } from './VelocityProfile';
+import { interpolateOffset, applyScanOffset } from './ScanningOffset';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -588,11 +589,22 @@ function planRasterOperation(
   const maxAccel = Math.max(1, settings.maxAccelMmPerS2);
   const minRatio = Math.max(0, Math.min(1, settings.minPowerRatioAccel));
 
+  const scanTable = settings.scanningOffsets;
+
   for (const scanline of scanlines) {
     for (const segment of scanline.segments) {
+      let burnStartX = segment.startX;
+      let burnEndX = segment.endX;
+      if (scanTable.length > 0) {
+        const off = interpolateOffset(scanTable, speed);
+        const adj = applyScanOffset(segment.startX, segment.endX, off);
+        burnStartX = adj.startX;
+        burnEndX = adj.endX;
+      }
+
       moves.push({
         type: 'rapid',
-        to: { x: segment.startX, y: segment.y },
+        to: { x: burnStartX, y: segment.y },
       });
 
       moves.push({
@@ -602,8 +614,8 @@ function planRasterOperation(
 
       appendRasterBurnMoves(
         moves,
-        segment.startX,
-        segment.endX,
+        burnStartX,
+        burnEndX,
         segment.y,
         segment.power,
         speed,

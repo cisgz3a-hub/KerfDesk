@@ -40,6 +40,7 @@ import {
 } from './Job';
 import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
 import { getActiveProfile } from '../devices/DeviceProfile';
+import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -257,6 +258,20 @@ function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLas
     s.accelAwarePower ?? profile?.accelAwarePower ?? true;
   const minPowerRatioAccel =
     s.minPowerRatioAccel ?? profile?.minPowerRatioAccel ?? 0.1;
+
+  let scanningOffsets: ScanningOffsetTable = EMPTY_OFFSET_TABLE;
+  if (s.useScanOffsets === false) {
+    scanningOffsets = EMPTY_OFFSET_TABLE;
+  } else if (s.scanningOffsets && s.scanningOffsets.length > 0) {
+    scanningOffsets = s.scanningOffsets;
+  } else if (
+    s.useScanOffsets === true
+    && profile?.scanningOffsets
+    && profile.scanningOffsets.length > 0
+  ) {
+    scanningOffsets = profile.scanningOffsets;
+  }
+
   /** Engrave always needs scanline spacing; do not rely only on fill.enabled. */
   const fillActiveForEngrave = s.fill.enabled || s.mode === 'engrave';
   const rawIv = Number(s.fill.interval);
@@ -292,6 +307,8 @@ function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLas
     accelAwarePower,
     maxAccelMmPerS2,
     minPowerRatioAccel,
+
+    scanningOffsets,
   };
 }
 
