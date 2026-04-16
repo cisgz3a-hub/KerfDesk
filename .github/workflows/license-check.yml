@@ -1,0 +1,49 @@
+name: License Compliance Check
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  schedule:
+    - cron: '0 8 * * 1'
+
+jobs:
+  license-check:
+    runs-on: ubuntu-latest
+    name: Verify no GPL/AGPL/commercial-restricting licenses
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run license check
+        run: npm run license-check
+
+      - name: Generate license report (on failure or push)
+        if: always()
+        run: npm run license-check:report
+
+      - name: Upload license report as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: license-report
+          path: licenses-report.csv
+          retention-days: 90
+
+      - name: Post summary
+        if: success()
+        run: |
+          echo "All dependencies use commercially-compatible licenses."
+          echo "Summary:"
+          npm run license-check:summary
