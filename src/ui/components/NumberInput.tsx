@@ -40,10 +40,16 @@ export function NumberInput({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isFocused) {
-      setLocalValue(String(value));
-    }
-  }, [value, isFocused]);
+    if (isFocused) return;
+    // Normalize to fixed precision before stringifying — prevents float drift
+    // (e.g. 123.45678901234499 vs .501) from producing different strings
+    // every render, which would cause setState thrash → "Maximum update depth exceeded".
+    const normalized = Number.isFinite(value)
+      ? (integer ? Math.round(value) : Math.round(value * 1_000_000) / 1_000_000)
+      : value;
+    const nextStr = String(normalized);
+    setLocalValue(prev => (prev === nextStr ? prev : nextStr));
+  }, [value, isFocused, integer]);
 
   const clamp = (v: number): number => {
     let clamped = v;
