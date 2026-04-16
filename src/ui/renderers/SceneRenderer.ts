@@ -194,11 +194,29 @@ function renderMachineOriginOverlay(
       break;
   }
 
-  const frontOrigin = options.originCorner === 'front-left' || options.originCorner === 'front-right';
-  const boxMinX = originCanvasX;
-  const boxMaxX = originCanvasX + options.bedWidthMm;
-  const boxMinY = frontOrigin ? originCanvasY - options.bedHeightMm : originCanvasY;
-  const boxMaxY = frontOrigin ? originCanvasY : originCanvasY + options.bedHeightMm;
+  let boxMinX: number;
+  let boxMaxX: number;
+  let boxMinY: number;
+  let boxMaxY: number;
+
+  if (options.startMode === 'absolute') {
+    // Canvas (0,0) is machine (0,0) in absolute mode; match visible bed exactly.
+    boxMinX = 0;
+    boxMaxX = options.bedWidthMm;
+    boxMinY = 0;
+    boxMaxY = options.bedHeightMm;
+  } else {
+    const frontOrigin = options.originCorner === 'front-left' || options.originCorner === 'front-right';
+    boxMinX = originCanvasX;
+    boxMaxX = originCanvasX + options.bedWidthMm;
+    if (frontOrigin) {
+      boxMinY = originCanvasY - options.bedHeightMm;
+      boxMaxY = originCanvasY;
+    } else {
+      boxMinY = originCanvasY;
+      boxMaxY = originCanvasY + options.bedHeightMm;
+    }
+  }
 
   const p1 = transform.worldToScreen({ x: boxMinX, y: boxMinY });
   const p2 = transform.worldToScreen({ x: boxMaxX, y: boxMaxY });
