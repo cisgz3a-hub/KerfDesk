@@ -60,6 +60,8 @@ export interface LaserController {
   pause(): void;
   resume(): void;
   stop(): void;
+  /** Soft reset — use only for true emergency (position may be lost). */
+  emergencyStop(): void;
 
   sendCommand(command: string): void;
   requestStatusReport(): void;

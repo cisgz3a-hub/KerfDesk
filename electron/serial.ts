@@ -56,9 +56,9 @@ export async function closeSerial(): Promise<void> {
 }
 
 /**
- * Safety shutdown: laser off + soft reset, wait for bytes to transmit,
+ * Safety shutdown: feed hold + laser off, wait for bytes to transmit,
  * then close the port. Used from Electron before-quit so the laser does
- * not stay on when the app exits.
+ * not stay on when the app exits. Avoids soft reset (0x18) so position is not lost.
  */
 export async function safeCloseSerial(): Promise<void> {
   const p = port;
@@ -67,7 +67,8 @@ export async function safeCloseSerial(): Promise<void> {
     return;
   }
   try {
-    p.write(Buffer.from([0x18]));
+    p.write(Buffer.from([0x21])); // feed hold — clean pause, preserves position
+    await new Promise<void>(r => setTimeout(r, 50));
     p.write('M5 S0\n');
     await new Promise<void>((resolve) => {
       p.drain((err) => {

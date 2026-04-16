@@ -1978,7 +1978,7 @@ export function ConnectionPanelMain({
           onClick: () => {
             jobStoppedByUserRef.current = true;
             stopTestFire();
-            controllerRef.current?.stop();
+            controllerRef.current?.emergencyStop();
             try {
               notifySimulatorTx('M5 S0');
               controllerRef.current?.sendCommand('M5 S0');

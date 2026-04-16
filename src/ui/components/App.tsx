@@ -412,7 +412,7 @@ export function App() {
     }
   }, [grbl.machineState?.status]);
 
-  // Safety: best-effort laser off if the tab or window is closed while connected.
+  // Safety: clean stop on page unload — feed hold + laser off, not soft reset (avoids ALARM:3 / forced rehome).
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       const ctrl = grbl.controllerRef.current;
@@ -600,6 +600,7 @@ export function App() {
         if (!ok) return;
       }
       try {
+        // Clean stop (feed hold + queued laser off) — not soft reset, to avoid ALARM:3 / forced rehome.
         ctrl.stop();
       } catch {
         /* ignore */

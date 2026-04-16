@@ -20,8 +20,8 @@ import { type SerialPortLike } from '../../communication/SerialPort';
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
 const REALTIME_STATUS = 0x3F;
-const REALTIME_HOLD = 0x21;
-const REALTIME_RESUME = 0x7E;
+const REALTIME_FEED_HOLD = 0x21; // '!'
+const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
 
 const GRBL_SETTING_LINE = /^\$(\d+)=(.+)$/;
@@ -261,12 +261,14 @@ export class GrblController implements LaserController {
     this._stopStatusPolling();
     this._abortJob();
     if (this._port?.isOpen) {
-      // Safety: turn laser off and reset GRBL before closing port.
-      // Without this, closing the port while GRBL is in M3 (constant
-      // spindle) mode leaves the laser on indefinitely.
+      // Safety: pause motion and turn laser off before closing port.
+      // Uses feed hold (not soft reset) to preserve machine position.
+      // Without this, closing port while in M3 mode leaves the laser on.
       try {
-        this._sendRealtime(REALTIME_RESET); // \x18 — soft reset, stops motion + spindle
+        this._sendRealtime(REALTIME_FEED_HOLD);
+        await new Promise(r => setTimeout(r, 50));
         this._port.write('M5 S0\n');
+        this._emitRawLine('M5 S0', 'tx');
       } catch {
         // Best effort — port may already be closing or in error state
       }
@@ -274,7 +276,7 @@ export class GrblController implements LaserController {
       try {
         this._port.close();
       } catch {
-        // Port may have closed from the reset
+        // Port may have closed from the other side
       }
       this._port = null;
     } else if (this._port) {
@@ -315,28 +317,68 @@ export class GrblController implements LaserController {
     this._drainQueue();
   }
 
+  /**
+   * Feed-hold pause. Machine decelerates cleanly, preserves position, laser turns off.
+   * Recoverable via resume(). Send this for user-initiated pause during a job.
+   */
   pause(): void {
-    if (!this._isJobRunning) return;
-    this._sendRealtime(REALTIME_HOLD);
-    this._pausePending = true;
-    this._resumeRequested = false;
-    this._state.status = 'hold';
-    // UI updates when the status report confirms Hold (avoids optimistic mismatch).
+    if (!this._port?.isOpen) return;
+    console.info('[GrblController] pause() — feed hold (recoverable)');
+    if (this._isJobRunning) {
+      this._pausePending = true;
+      this._resumeRequested = false;
+      this._state.status = 'hold';
+    }
+    this._sendRealtime(REALTIME_FEED_HOLD);
   }
 
+  /**
+   * Resume a feed-hold pause. Only meaningful after pause().
+   */
   resume(): void {
-    if (this._state.status !== 'hold') return;
-    this._sendRealtime(REALTIME_RESUME);
+    if (!this._port?.isOpen) return;
+    if (this._state.status !== 'hold' && !this._pausePending) return;
+    console.info('[GrblController] resume() — cycle start');
+    this._sendRealtime(REALTIME_CYCLE_START);
+    if (!this._isJobRunning) return;
     this._resumeRequested = true;
     this._pausePending = false;
     this._state.status = 'run';
     this._drainQueue();
-    // UI updates when the status report confirms Run.
   }
 
+  /**
+   * Abort current job cleanly. Pauses first, then clears job queue.
+   * Does not soft-reset. Position preserved. User can continue with new commands.
+   */
   stop(): void {
+    if (!this._port?.isOpen) return;
+    console.info('[GrblController] stop() — clean pause + laser off, job aborted, position preserved');
+    this._sendRealtime(REALTIME_FEED_HOLD);
+    // Abort streaming immediately so sendCommand / disconnect are not blocked while GRBL decelerates.
+    this._abortJob();
+    this._emitProgress();
+    setTimeout(() => {
+      try {
+        this._port?.write('M5 S0\n');
+        this._emitRawLine('M5 S0', 'tx');
+      } catch {
+        /* port gone */
+      }
+    }, 100);
+  }
+
+  /**
+   * EMERGENCY stop only. Sends soft reset. Position may be lost (e.g. ALARM:3).
+   * Machine must be unlocked + rehomed before the next job.
+   * Use only for physical danger — fire, crash, runaway.
+   */
+  emergencyStop(): void {
+    if (!this._port?.isOpen) return;
+    console.warn('[GrblController] EMERGENCY STOP — soft reset, position may be lost, rehome may be required');
     this._sendRealtime(REALTIME_RESET);
     this._abortJob();
+    this._emitProgress();
   }
 
   // ─── MANUAL CONTROL ─────────────────────────────────────────
