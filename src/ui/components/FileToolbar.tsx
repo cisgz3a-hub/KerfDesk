@@ -362,6 +362,33 @@ export function FileToolbar({
     toolbarBtn('Image', 'Import image (PNG, JPG)', handleImportImageClick),
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
+    React.createElement('label', {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        marginLeft: 4,
+        fontSize: 10,
+        color: '#8888aa',
+        cursor: 'pointer',
+        userSelect: 'none' as const,
+        flexShrink: 0,
+      },
+      title:
+        'Automatically order operations: engrave first, then inner cuts, then outer cuts. Reduces travel time and prevents misalignment.',
+    },
+      React.createElement('input', {
+        type: 'checkbox',
+        checked: scene.compileOptions?.optimizeOrder !== false,
+        onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+          onSceneCommit({
+            ...scene,
+            compileOptions: { ...scene.compileOptions, optimizeOrder: e.target.checked },
+          });
+        },
+      }),
+      React.createElement('span', null, 'Optimize order'),
+    ),
     onTogglePreview
       ? React.createElement('button', {
         type: 'button',

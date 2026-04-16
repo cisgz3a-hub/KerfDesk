@@ -38,45 +38,142 @@ import {
   type ResolvedLaserSettings, type FlatPath, type ProcessedBitmap,
   createEmptyJob, flatPathFromPoints,
 } from './Job';
+import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
+
+export interface CompileJobOptions {
+  optimizeOrder?: boolean;
+}
+
+function vectorOpToOrderableShape(
+  op: Operation,
+  layerPhase: number,
+  sceneIndex: number,
+): OrderableShape | null {
+  if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') return null;
+  const paths = op.geometry.paths;
+  if (paths.length === 0) return null;
+  const c = paths[0].coords;
+  if (c.length < 2) return null;
+  const mode: OrderableShape['mode'] =
+    op.type === 'engrave' ? 'engrave' : op.type === 'score' ? 'score' : 'cut';
+  return {
+    id: op.id,
+    mode,
+    boundingBox: { ...op.bounds },
+    startPoint: { x: c[0], y: c[1] },
+    endPoint: { x: c[0], y: c[1] },
+    layerIndex: layerPhase,
+    sceneIndex,
+    settingsKey: JSON.stringify(op.settings),
+    operation: op,
+  };
+}
+
+function objectsOnLayerInSceneOrder(scene: Scene, layerId: string): SceneObject[] {
+  return scene.objects.filter(o => o.layerId === layerId && o.visible);
+}
 
 // ─── MAIN COMPILER ───────────────────────────────────────────────
 
-export function compileJob(scene: Scene): Job {
+export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   const job = createEmptyJob(scene.metadata.name, scene.id);
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
+  const optimizeOrder = options?.optimizeOrder ?? scene.compileOptions?.optimizeOrder !== false;
 
   let totalObjects = 0;
 
-  for (const layer of outputLayers) {
-    const objects = getObjectsByLayer(scene, layer.id);
-    if (objects.length === 0) continue;
+  if (!optimizeOrder) {
+    for (const layer of outputLayers) {
+      const objects = getObjectsByLayer(scene, layer.id);
+      if (objects.length === 0) continue;
 
-    // Raster layers: one operation per image (not per layer)
-    if (layer.settings.mode === 'image') {
-      for (const obj of objects) {
-        if (!obj.visible || obj.geometry.type !== 'image') continue;
-        const imgOp = compileOperation(layer, [obj]);
-        if (imgOp) {
-          job.operations.push(imgOp);
-          job.bounds = mergeAABB(job.bounds, imgOp.bounds);
-          totalObjects++;
+      if (layer.settings.mode === 'image') {
+        for (const obj of objects) {
+          if (!obj.visible || obj.geometry.type !== 'image') continue;
+          const imgOp = compileOperation(layer, [obj]);
+          if (imgOp) {
+            job.operations.push(imgOp);
+            job.bounds = mergeAABB(job.bounds, imgOp.bounds);
+            totalObjects++;
+          }
         }
+        continue;
       }
-      continue;
+
+      const operation = compileOperation(layer, objects);
+      if (operation) {
+        job.operations.push(operation);
+        job.bounds = mergeAABB(job.bounds, operation.bounds);
+        totalObjects += objects.length;
+      }
+    }
+  } else {
+    const firstImageLayerPhase = outputLayers.findIndex(l => l.settings.mode === 'image');
+    const splitPhase = firstImageLayerPhase < 0 ? outputLayers.length : firstImageLayerPhase;
+
+    const rasterOps: Operation[] = [];
+    const preVectorShapes: OrderableShape[] = [];
+    const postVectorShapes: OrderableShape[] = [];
+
+    for (let phase = 0; phase < outputLayers.length; phase++) {
+      const layer = outputLayers[phase];
+      const orderedObjs = objectsOnLayerInSceneOrder(scene, layer.id);
+      if (orderedObjs.length === 0) continue;
+
+      if (layer.settings.mode === 'image') {
+        for (const obj of orderedObjs) {
+          if (obj.geometry.type !== 'image') continue;
+          const imgOp = compileOperation(layer, [obj]);
+          if (imgOp) {
+            rasterOps.push(imgOp);
+            job.bounds = mergeAABB(job.bounds, imgOp.bounds);
+            totalObjects++;
+          }
+        }
+        continue;
+      }
+
+      const targetPool = phase < splitPhase ? preVectorShapes : postVectorShapes;
+      const sceneIndexById = new Map(scene.objects.map((o, i) => [o.id, i]));
+
+      for (const obj of orderedObjs) {
+        const op = compileOperation(layer, [obj]);
+        if (!op) continue;
+        if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') continue;
+        const shape = vectorOpToOrderableShape(op, phase, sceneIndexById.get(obj.id) ?? 0);
+        if (!shape) continue;
+        targetPool.push(shape);
+        totalObjects++;
+      }
     }
 
-    const operation = compileOperation(layer, objects);
-    if (operation) {
-      job.operations.push(operation);
-      job.bounds = mergeAABB(job.bounds, operation.bounds);
-      totalObjects += objects.length;
+    const pushOrdered = (pool: OrderableShape[], label: string) => {
+      if (pool.length === 0) return;
+      const distinctKeys = new Set(pool.map(s => s.settingsKey));
+      if (distinctKeys.size > 6) {
+        console.warn(
+          `[Optimize] Many distinct laser setting groups (${distinctKeys.size}) in ${label} — order stays within settings groups (no cross-settings NN).`,
+        );
+      }
+      const { ordered } = orderOperationsWithMetrics(pool, '[Optimize]');
+      for (const s of ordered) {
+        const op = s.operation;
+        if (!op) continue;
+        job.operations.push(op);
+        job.bounds = mergeAABB(job.bounds, op.bounds);
+      }
+    };
+
+    pushOrdered(preVectorShapes, 'pre-raster');
+    for (const ro of rasterOps) {
+      job.operations.push(ro);
     }
+    pushOrdered(postVectorShapes, 'post-raster');
   }
 
   job.metadata.objectCount = totalObjects;
   job.metadata.layerCount = job.operations.length;
 
-  // Pass start position from scene to job for G-code footer
   const spX = scene.startPosition?.x ?? 0;
   const spY = scene.startPosition?.y ?? 0;
   job.metadata.startPositionX = spX;

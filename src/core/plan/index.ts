@@ -34,6 +34,16 @@ export {
   type RasterSettings,
 } from './RasterGenerator';
 export {
+  orderOperations,
+  orderOperationsWithMetrics,
+  bboxFullyContains,
+  estimateTravelMm,
+  sortShapesOriginalOrder,
+  type OrderableShape,
+  type OperationMode,
+  type ContainmentClass,
+} from './OperationOrderer';
+export {
   simulatePlan,
   interpolateFrames,
   extractLaserPath,

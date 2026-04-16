@@ -77,33 +77,37 @@ assert(scene.objects.length === 4, 'Scene has 4 objects');
 console.log('\n=== Test: Job Compilation ===');
 
 const job: Job = compileJob(scene);
-assert(job.operations.length === 3, 'Job has 3 operations (one per active layer)');
+assert(job.operations.length === 4, 'Job has 4 operations (per-object compile with optimizeOrder)');
 assert(job.metadata.objectCount === 4, 'Job reports 4 objects');
 
-// Check processing order: engrave → score → cut
 const opTypes = job.operations.map(op => op.type);
-assert(opTypes[0] === 'engrave', 'First operation is engrave');
-assert(opTypes[1] === 'score', 'Second operation is score');
-assert(opTypes[2] === 'cut', 'Third operation is cut');
+const iEngrave = opTypes.indexOf('engrave');
+const iScore = opTypes.indexOf('score');
+const iCuts = opTypes.map((t, i) => (t === 'cut' ? i : -1)).filter(i => i >= 0);
+assert(iEngrave >= 0 && iScore >= 0 && iCuts.length === 2, 'One engrave, one score, two cuts');
+assert(Math.max(iEngrave, iScore) < Math.min(iCuts[0], iCuts[1]), 'Engrave and score run before cut operations');
 
-// Check that settings are resolved
-const cutOp = job.operations.find(op => op.type === 'cut')!;
+const cutOps = job.operations.filter(op => op.type === 'cut');
+const cutPathCount = cutOps.reduce(
+  (n, op) => n + (op.geometry.type === 'vector' ? op.geometry.paths.length : 0),
+  0,
+);
+assert(cutPathCount === 2, 'Cut layer still yields 2 paths total');
+const cutOp = cutOps[0];
 assert(cutOp.settings.powerMax === 80, 'Cut power max is 80%');
 assert(cutOp.settings.speed === 150, 'Cut speed is 150 mm/min');
 assert(cutOp.settings.insideFirst === true, 'Inside-first is enabled');
 
-// Check geometry is flattened
 assert(cutOp.geometry.type === 'vector', 'Cut geometry is vector type');
 if (cutOp.geometry.type === 'vector') {
-  assert(cutOp.geometry.paths.length === 2, 'Cut layer has 2 paths (rect + ellipse)');
-  
-  const rectPath = cutOp.geometry.paths[0];
-  assert(rectPath.closed === true, 'Rectangle path is closed');
-  assert(rectPath.coords.length === 8, 'Rectangle has 4 points (8 coords)');
-  
-  // Verify coordinates are in world space (transform applied)
-  assert(rectPath.coords[0] === 50, 'First point X = 50 (transform applied)');
-  assert(rectPath.coords[1] === 30, 'First point Y = 30 (transform applied)');
+  const rectPath = cutOps.find(o => o.geometry.paths.some(p => p.coords.length === 8))?.geometry;
+  assert(rectPath && rectPath.type === 'vector', 'Rectangle cut path present');
+  if (rectPath.type === 'vector') {
+    const rp = rectPath.paths.find(p => p.coords.length === 8)!;
+    assert(rp.closed === true, 'Rectangle path is closed');
+    assert(rp.coords[0] === 50, 'First point X = 50 (transform applied)');
+    assert(rp.coords[1] === 30, 'First point Y = 30 (transform applied)');
+  }
 }
 
 // Check engrave layer
@@ -118,7 +122,7 @@ console.log('\n=== Test: Plan Optimizer ===');
 const plan: Plan = optimizePlan(job);
 
 // Plan should have one PlannedOperation per operation (1 pass each)
-assert(plan.operations.length === 3, 'Plan has 3 planned operations');
+assert(plan.operations.length === 4, 'Plan has 4 planned operations');
 
 // Verify operation names preserved
 const planNames = plan.operations.map(op => op.layerName);
@@ -133,9 +137,9 @@ assert(plan.operations.every(op => op.passIndex === 0), 'All operations are sing
 
 console.log('\n=== Test: Move Sequence Structure ===');
 
-// Find the cut operation in the plan
-const cutPlanned = plan.operations.find(op => op.layerName === 'Cut')!;
-const cutMoves = cutPlanned.moves;
+// Per-shape cut compile can yield multiple planned ops with the same layer name — aggregate moves.
+const cutPlannedOps = plan.operations.filter(op => op.layerName === 'Cut');
+const cutMoves = cutPlannedOps.flatMap(op => op.moves);
 
 // Cut operation has 2 paths (rect + circle), so expect:
 // setAir(on) + [rapid, laserOn, ...linear, laserOff] × 2 + setAir(off)
@@ -206,6 +210,7 @@ console.log('\n=== Test: Inside-First Ordering ===');
 // Create a scene with a large outer square and a small inner square.
 // The inner square MUST be cut before the outer square.
 const ifScene = createScene(400, 400, 'Inside-First Test');
+ifScene.compileOptions = { optimizeOrder: false };
 const ifLayer = ifScene.layers[0]; // Default cut layer
 
 const outerSquare = createRect(ifLayer.id, 10, 10, 200, 200, 'Outer');
@@ -253,6 +258,7 @@ if (rapids.length === 2 && rapids[0].type === 'rapid' && rapids[1].type === 'rap
 
 // Also test: three levels of nesting
 const ifScene2 = createScene(400, 400, 'Triple Nesting');
+ifScene2.compileOptions = { optimizeOrder: false };
 const ifLayer2 = ifScene2.layers[0];
 const big = createRect(ifLayer2.id, 0, 0, 300, 300, 'Big');
 const mid = createRect(ifLayer2.id, 50, 50, 200, 200, 'Mid');
@@ -553,7 +559,7 @@ assert(plan.stats.moveCount > 0, `Plan has ${plan.stats.moveCount} total moves`)
 assert(plan.stats.cutDistanceMm > 0, `Cut distance: ${plan.stats.cutDistanceMm.toFixed(1)}mm`);
 assert(plan.stats.rapidDistanceMm > 0, `Rapid distance: ${plan.stats.rapidDistanceMm.toFixed(1)}mm`);
 assert(plan.stats.estimatedTimeSeconds > 0, `Estimated time: ${plan.stats.estimatedTimeSeconds.toFixed(1)}s`);
-assert(plan.stats.operationCount === 3, 'Stats report 3 operations');
+assert(plan.stats.operationCount === 4, 'Stats report 4 operations');
 
 // Bounds should encompass all objects
 assert(plan.bounds.minX <= 50, `Bounds minX <= 50 (got ${plan.bounds.minX.toFixed(1)})`);

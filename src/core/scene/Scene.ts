@@ -58,6 +58,12 @@ export interface Scene {
     type: string; // 'diode' | 'co2' | 'fiber'
   };
 
+  /** Compile-time options (persisted with project). */
+  compileOptions?: {
+    /** When true (default), order vector ops: engrave/score → rasters → inner cuts → outer cuts with travel NN. */
+    optimizeOrder?: boolean;
+  };
+
   activeLayerId: string;     // Currently active layer
 
   // Project metadata
@@ -95,6 +101,7 @@ export function createScene(
     material: null,
     startPosition: { x: 0, y: 0 },
     activeLayerId: defaultLayer.id,
+    compileOptions: { optimizeOrder: true },
     metadata: {
       name,
       created: new Date().toISOString(),

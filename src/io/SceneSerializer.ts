@@ -42,6 +42,7 @@ interface SerializedScene {
   material: Scene['material'];
   startPosition: Scene['startPosition'];
   machine?: Scene['machine'];
+  compileOptions?: Scene['compileOptions'];
   activeLayerId: string;
   metadata: Scene['metadata'];
 }
@@ -66,6 +67,7 @@ export function serializeScene(scene: Scene): string {
     material: scene.material,
     startPosition: scene.startPosition,
     machine: scene.machine,
+    compileOptions: scene.compileOptions,
     activeLayerId: scene.activeLayerId,
     metadata: {
       ...scene.metadata,
@@ -99,6 +101,7 @@ export function serializeForAutosave(scene: Scene): string {
     material: scene.material,
     startPosition: scene.startPosition,
     machine: scene.machine,
+    compileOptions: scene.compileOptions,
     activeLayerId: scene.activeLayerId,
     metadata: {
       ...scene.metadata,
@@ -257,6 +260,15 @@ function buildSceneFromParsedEnvelope(parsed: any): Scene {
     material: s.material ?? null,
     startPosition: s.startPosition ?? { x: 0, y: 0 },
     machine: s.machine,
+    compileOptions:
+      s.compileOptions && typeof s.compileOptions === 'object'
+        ? {
+            optimizeOrder:
+              typeof (s.compileOptions as { optimizeOrder?: unknown }).optimizeOrder === 'boolean'
+                ? (s.compileOptions as { optimizeOrder: boolean }).optimizeOrder
+                : true,
+          }
+        : { optimizeOrder: true },
     activeLayerId: s.activeLayerId || s.layers[0].id,
     metadata: {
       name: s.metadata?.name || 'Untitled',
