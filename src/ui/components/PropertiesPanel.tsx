@@ -67,7 +67,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
   /** Live preview only: updates brightness/contrast/invert on geometry. Canvas uses ctx.filter; no buffer work, no history. */
   const previewImageSettings = useCallback(
-    (objId: string, field: 'brightness' | 'contrast' | 'invert', value: number | boolean) => {
+    (objId: string, field: 'brightness' | 'contrast' | 'gamma' | 'invert', value: number | boolean) => {
       if (!onSceneChange) return;
       const s = sceneRef.current;
       const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
@@ -102,7 +102,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
   /** Persist image adjustments on the image layer (compile uses layer + original `grayscaleData` only). */
   const commitImageSettings = useCallback(
-    (objId: string, overrides?: Partial<Pick<ImageGeometry, 'brightness' | 'contrast' | 'invert'>>) => {
+    (objId: string, overrides?: Partial<Pick<ImageGeometry, 'brightness' | 'contrast' | 'gamma' | 'invert'>>) => {
       const s = sceneRef.current;
       const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
       if (!target || target.geometry.type !== 'image') return;
@@ -111,6 +111,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
       const brightness = overrides?.brightness ?? geom.brightness ?? 0;
       const contrast = overrides?.contrast ?? geom.contrast ?? 0;
+      const gamma = overrides?.gamma ?? geom.gamma ?? 1;
       const invert = overrides?.invert ?? geom.invert ?? false;
 
       const newScene = {
@@ -125,6 +126,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
                 ...l.settings.image,
                 brightness,
                 contrast,
+                gamma,
                 invert,
               },
             },
@@ -138,6 +140,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               ...(o.geometry as ImageGeometry),
               brightness,
               contrast,
+              gamma,
               invert,
               adjustedData: undefined,
               ditherMode: undefined,
@@ -877,6 +880,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       const geom = obj.geometry as ImageGeometry;
       const brightVal = ims.brightness ?? geom.brightness ?? 0;
       const contrastVal = ims.contrast ?? geom.contrast ?? 0;
+      const gammaVal = ims.gamma ?? geom.gamma ?? 1;
       const invertVal = ims.invert ?? geom.invert ?? false;
       const imageMode: ImageRasterMode = ims.imageMode ?? 'dither';
       const thresholdVal = ims.imageThreshold ?? 128;
@@ -1248,6 +1252,20 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
             }
             commitImageSettings(obj.id, { contrast: parseInt(e.currentTarget.value, 10) });
           },
+        }),
+
+        React.createElement('div', { style: labelStyle }, `Gamma (${gammaVal.toFixed(2)})`),
+        React.createElement('input', {
+          type: 'range',
+          min: 0.3,
+          max: 3.0,
+          step: 0.05,
+          value: gammaVal,
+          style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 6 },
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) =>
+            previewImageSettings(obj.id, 'gamma', parseFloat(e.target.value)),
+          onBlur: (e: React.FocusEvent<HTMLInputElement>) =>
+            commitImageSettings(obj.id, { gamma: parseFloat(e.currentTarget.value) }),
         }),
 
         React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 } },

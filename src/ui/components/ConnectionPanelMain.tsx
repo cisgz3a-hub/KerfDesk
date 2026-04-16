@@ -17,13 +17,15 @@ import { confirmPreflightForJobStart } from '../../core/preflight/confirmPreflig
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
 import { MAX_LASER_SPEED } from '../../core/types';
-import { computeGcodeOffset } from '../../core/output/GcodeOrigin';
-import { type StartMode } from './StartPositionWizard';
+import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { SimulatorView } from './SimulatorView';
 import { ConnectionControls } from './ConnectionControls';
 import { MoveControls } from './MoveControls';
 import { JobControls } from './JobControls';
 import { ConsolePanel } from './ConsolePanel';
+import { type SettingsTab } from './SettingsModal';
+
+type StartMode = GcodeStartMode;
 
 const FRAME_IDLE_POLL_MS = 200;
 const FRAME_IDLE_TIMEOUT_MS = 15_000;
@@ -111,6 +113,7 @@ export interface ConnectionPanelMainProps {
   onUpdateLayerFillInterval?: (layerId: string, intervalMm: number) => void;
   onUpdateLayerFillBidirectional?: (layerId: string, bidirectional: boolean) => void;
   onUpdateLayerSetting?: (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => void;
+  onOpenSettings?: (tab?: SettingsTab) => void;
   /** Panel width in px (host computes min(500, 45% window)). */
   sidebarWidth?: number;
   machineService: MachineService;
@@ -156,6 +159,7 @@ export function ConnectionPanelMain({
   onUpdateLayerFillInterval,
   onUpdateLayerFillBidirectional,
   onUpdateLayerSetting,
+  onOpenSettings,
   sidebarWidth = 500,
   machineService,
   outcomeReplaySection,
@@ -1829,8 +1833,7 @@ export function ConnectionPanelMain({
         scene,
         onSceneCommit,
         onMessage: (msg: string) => setMessages(prev => [...prev, msg]),
-        showConfirm,
-        showPrompt,
+        onOpenSettings,
       }),
       isSimulator && React.createElement('button', {
         type: 'button',

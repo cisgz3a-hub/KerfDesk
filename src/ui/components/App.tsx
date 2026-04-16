@@ -65,12 +65,30 @@ import { BoxGenerator } from './BoxGenerator';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
-import { type StartMode } from './StartPositionWizard';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
+import { SettingsModal, type SettingsTab } from './SettingsModal';
+import {
+  deleteDeviceProfile,
+  getActiveProfile,
+  getActiveProfileId,
+  getDeviceProfiles,
+  profileFromScene,
+  saveDeviceProfile,
+  setActiveProfileId,
+  type DeviceProfile,
+} from '../../core/devices/DeviceProfile';
+import { MachineSettingsTab } from './settings/MachineSettingsTab';
+import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
+import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
+import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
+import { entitlementService, tierDisplayName } from '../../entitlements';
+import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
+
+type StartMode = GcodeStartMode;
 import {
   MATERIAL_CATEGORIES,
   MATERIAL_PRESETS,
@@ -141,6 +159,9 @@ export function App() {
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showKerfWizard, setShowKerfWizard] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('machine');
+  const [profileRevision, setProfileRevision] = useState(0);
   const [startMode, setStartMode] = useState<StartMode>(() => {
     try {
       const raw = localStorage.getItem('laserforge_start_mode');
@@ -215,6 +236,100 @@ export function App() {
     if (maxAccelY > 0) return maxAccelY;
     return null;
   }, [grbl.controller, grbl.machineState]);
+
+  const grblMachineInfo = useMemo(() => {
+    const c = grbl.controller;
+    if (!c || !(c instanceof GrblController)) return null;
+    const info = c.getMachineInfo();
+    return info;
+  }, [grbl.controller, grbl.machineState]);
+
+  const activeProfile = useMemo(() => {
+    void profileRevision;
+    return getActiveProfile();
+  }, [profileRevision]);
+  const activeProfileId = useMemo(() => {
+    void profileRevision;
+    return getActiveProfileId();
+  }, [profileRevision]);
+  const allProfiles = useMemo(() => {
+    void profileRevision;
+    return getDeviceProfiles();
+  }, [profileRevision]);
+
+  const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
+  const updateActiveProfile = useCallback((updates: Partial<DeviceProfile>) => {
+    const current = getActiveProfile();
+    if (!current) return;
+    const updated: DeviceProfile = { ...current, ...updates };
+    saveDeviceProfile(updated);
+    refreshProfiles();
+  }, [refreshProfiles]);
+  const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
+    target.scanningOffsets = previous.scanningOffsets;
+    target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
+    target.accelAwarePower = previous.accelAwarePower;
+    target.minPowerRatioAccel = previous.minPowerRatioAccel;
+    target.smartOverscanEnabled = previous.smartOverscanEnabled;
+    target.overscanMm = previous.overscanMm;
+    target.preferredPort = previous.preferredPort;
+    target.startGcode = previous.startGcode;
+    target.endGcode = previous.endGcode;
+    target.gcodeHeaderTemplate = previous.gcodeHeaderTemplate;
+    target.gcodeFooterTemplate = previous.gcodeFooterTemplate;
+    target.maxRateX = previous.maxRateX;
+    target.maxRateY = previous.maxRateY;
+    target.maxAccelX = previous.maxAccelX;
+    target.maxAccelY = previous.maxAccelY;
+  }, []);
+  const setActiveProfileAndApply = useCallback((id: string | null) => {
+    setActiveProfileId(id);
+    refreshProfiles();
+    if (!id) return;
+    const profile = getDeviceProfiles().find(p => p.id === id);
+    if (!profile) return;
+    handleSceneCommit(applyProfileToScene(profile, scene));
+  }, [refreshProfiles, handleSceneCommit, scene]);
+  const createProfileFromCurrentScene = useCallback((name: string) => {
+    const profile = profileFromScene(name, scene);
+    saveDeviceProfile(profile);
+    setActiveProfileId(profile.id);
+    refreshProfiles();
+  }, [scene, refreshProfiles]);
+  const updateCurrentProfileFromScene = useCallback(() => {
+    const current = getActiveProfile();
+    if (!current) return;
+    const updated = profileFromScene(current.name, scene);
+    updated.id = current.id;
+    updated.createdAt = current.createdAt;
+    updated.returnToOrigin = current.returnToOrigin ?? true;
+    mergeProfilePreservedFields(updated, current);
+    saveDeviceProfile(updated);
+    refreshProfiles();
+  }, [scene, mergeProfilePreservedFields, refreshProfiles]);
+  const deleteProfileAndClearActive = useCallback((id: string) => {
+    deleteDeviceProfile(id);
+    if (getActiveProfileId() === id) setActiveProfileId(null);
+    refreshProfiles();
+  }, [refreshProfiles]);
+  const handleAutoDetectMachine = useCallback(() => {
+    if (!grblMachineInfo) return;
+    const current = getActiveProfile();
+    if (!current) return;
+    updateActiveProfile({
+      bedWidth: grblMachineInfo.bedWidth > 0 ? grblMachineInfo.bedWidth : current.bedWidth,
+      bedHeight: grblMachineInfo.bedHeight > 0 ? grblMachineInfo.bedHeight : current.bedHeight,
+      maxRateX: grblMachineInfo.maxFeedX > 0 ? grblMachineInfo.maxFeedX : current.maxRateX,
+      maxRateY: grblMachineInfo.maxFeedY > 0 ? grblMachineInfo.maxFeedY : current.maxRateY,
+      maxAccelX: grblMachineInfo.maxAccelX > 0 ? grblMachineInfo.maxAccelX : current.maxAccelX,
+      maxAccelY: grblMachineInfo.maxAccelY > 0 ? grblMachineInfo.maxAccelY : current.maxAccelY,
+      maxAccelMmPerS2:
+        grblMachineInfo.maxAccelX > 0 && grblMachineInfo.maxAccelY > 0
+          ? Math.min(grblMachineInfo.maxAccelX, grblMachineInfo.maxAccelY)
+          : (grblMachineInfo.maxAccelX > 0 ? grblMachineInfo.maxAccelX
+            : (grblMachineInfo.maxAccelY > 0 ? grblMachineInfo.maxAccelY : current.maxAccelMmPerS2)),
+    });
+  }, [grblMachineInfo, updateActiveProfile]);
 
   const {
     currentGcode,
@@ -1587,6 +1702,10 @@ export function App() {
       machineMaxSpindle: grbl.controller?.maxSpindle ?? 1000,
       machineBedWidth: machineBedFromGrbl?.width ?? scene.canvas.width,
       machineBedHeight: machineBedFromGrbl?.height ?? scene.canvas.height,
+      onOpenSettings: (tab?: SettingsTab) => {
+        setSettingsInitialTab(tab ?? 'machine');
+        setSettingsOpen(true);
+      },
     }),
 
     showRecover && !dialogs.showSetup && React.createElement('div', {
@@ -1799,6 +1918,10 @@ export function App() {
         gcode: currentGcode,
         onClose: () => dialogs.setShowConnection(false),
         onDisconnect: () => dialogs.setShowConnection(false),
+      onOpenSettings: (tab?: SettingsTab) => {
+        setSettingsInitialTab(tab ?? 'machine');
+        setSettingsOpen(true);
+      },
         bedWidth: scene.canvas.width,
         bedHeight: scene.canvas.height,
         machinePlanBounds: activeJobTransform?.plan.bounds ?? null,
@@ -2025,6 +2148,44 @@ export function App() {
 
     dialogs.showShortcuts && React.createElement(ShortcutsPanel, {
       onClose: () => dialogs.setShowShortcuts(false),
+    }),
+
+    React.createElement(SettingsModal, {
+      open: settingsOpen,
+      onClose: () => setSettingsOpen(false),
+      initialTab: settingsInitialTab,
+      machineTab: React.createElement(MachineSettingsTab, {
+        activeProfile,
+        onUpdateProfile: updateActiveProfile,
+        canAutoDetect: !!grblMachineInfo,
+        onAutoDetect: handleAutoDetectMachine,
+        autoDetecting: false,
+      }),
+      gcodeTab: React.createElement(GcodeSettingsTab, {
+        activeProfile,
+        onUpdateProfile: updateActiveProfile,
+      }),
+      calibrationTab: React.createElement(CalibrationSettingsTab, {
+        activeProfile,
+        onUpdateProfile: updateActiveProfile,
+      }),
+      profilesTab: React.createElement(ProfilesSettingsTab, {
+        profiles: allProfiles,
+        activeProfileId,
+        onSetActiveProfile: setActiveProfileAndApply,
+        onCreateProfileFromCurrentScene: createProfileFromCurrentScene,
+        onUpdateCurrentFromScene: updateCurrentProfileFromScene,
+        onDeleteProfile: deleteProfileAndClearActive,
+      }),
+      aboutTab: React.createElement('div', null,
+        React.createElement('h3', { style: { marginTop: 0 } }, 'LaserForge'),
+        React.createElement('p', { style: { fontSize: 12, color: '#c0c0d0', lineHeight: 1.6 } },
+          `Version: v0.1.0`, React.createElement('br'),
+          `License: ${tierDisplayName(entitlementService.getState().tier)}`,
+        ),
+        React.createElement('p', { style: { fontSize: 11, color: '#888', marginTop: 20 } },
+          'Third-party licenses: see LICENSES-THIRD-PARTY.md'),
+      ),
     }),
 
     quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {

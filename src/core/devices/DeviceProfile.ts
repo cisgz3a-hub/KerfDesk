@@ -36,6 +36,12 @@ export interface DeviceProfile {
   // GRBL settings
   maxFeedRate: number;     // mm/min
   maxSpindle: number;      // S-value (usually 255 or 1000)
+  /** Optional per-axis max rate from GRBL ($110/$111). */
+  maxRateX?: number;
+  maxRateY?: number;
+  /** Optional per-axis acceleration from GRBL ($120/$121). */
+  maxAccelX?: number;
+  maxAccelY?: number;
   homingEnabled: boolean;
   softLimitsEnabled: boolean;
   /**

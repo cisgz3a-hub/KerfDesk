@@ -100,6 +100,7 @@ export interface ImageGeometry {
   grayscaleHeight?: number;
   brightness?: number;
   contrast?: number;
+  gamma?: number;
   invert?: boolean;
   adjustedData?: Uint8Array;
   /** Set when applying dithering from the properties panel */

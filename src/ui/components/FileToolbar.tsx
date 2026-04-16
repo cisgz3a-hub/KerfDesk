@@ -71,6 +71,7 @@ interface FileToolbarProps {
   machineMaxSpindle?: number;
   machineBedWidth?: number;
   machineBedHeight?: number;
+  onOpenSettings?: (tab?: 'machine' | 'gcode' | 'calibration' | 'profiles' | 'about') => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -107,6 +108,7 @@ export function FileToolbar({
   machineMaxSpindle = 1000,
   machineBedWidth = 300,
   machineBedHeight = 300,
+  onOpenSettings,
 }: FileToolbarProps) {
   const [testGridOpen, setTestGridOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -425,6 +427,9 @@ export function FileToolbar({
       }, showToolpathPreview ? '👁 Preview ON' : '👁 Preview')
       : null,
     spacer(),
+    onOpenSettings
+      ? toolbarBtn('⚙ Settings', 'Machine and application settings', () => onOpenSettings('machine'))
+      : null,
     onConnect
       ? toolbarBtn(
         isConnected ? '⚡ Connected' : '⚡ Connect',
