@@ -431,6 +431,7 @@ export function CanvasViewport({
   const selectionKey = [...selectedIds].sort().join(',');
 
   useEffect(() => {
+    const POSITION_EPSILON = 0.5; // half a pixel — tighter than any real UI change
     const notify = (pos: { x: number; y: number } | null) => {
       const cb = onSelectionScreenPosRef.current;
       if (!cb) return;
@@ -442,7 +443,14 @@ export function CanvasViewport({
         }
         return;
       }
-      if (prev !== null && prev !== undefined && prev.x === pos.x && prev.y === pos.y) return;
+      if (
+        prev !== null &&
+        prev !== undefined &&
+        Math.abs(prev.x - pos.x) < POSITION_EPSILON &&
+        Math.abs(prev.y - pos.y) < POSITION_EPSILON
+      ) {
+        return;
+      }
       lastSelectionScreenPosRef.current = pos;
       cb(pos);
     };
@@ -486,8 +494,10 @@ export function CanvasViewport({
       notify({ x: rect.left + screen.x, y: rect.top + screen.y });
     };
 
-    report();
-    let raf = 0;
+    // Run report on next frame — not synchronously. This gives React a chance
+    // to settle state between effect invocations and prevents feedback loops
+    // where notify triggers a re-render that triggers this effect again.
+    let raf = requestAnimationFrame(report);
     const onResize = () => {
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(report);
