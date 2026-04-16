@@ -1573,6 +1573,9 @@ export function App() {
       onExit: handleExit,
       onTogglePreview: handleTogglePreview,
       showToolpathPreview,
+      machineMaxSpindle: grbl.controller?.maxSpindle ?? 1000,
+      machineBedWidth: machineBedFromGrbl?.width ?? scene.canvas.width,
+      machineBedHeight: machineBedFromGrbl?.height ?? scene.canvas.height,
     }),
 
     showRecover && !dialogs.showSetup && React.createElement('div', {

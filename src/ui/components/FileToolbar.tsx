@@ -12,13 +12,14 @@
  * Last updated: UI Wiring — File Toolbar
  */
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene } from '../../io/SceneSerializer';
+import { TestGridDialog } from './TestGridDialog';
 // ─── PROPS ───────────────────────────────────────────────────────
 
 interface FileToolbarProps {
@@ -66,6 +67,10 @@ interface FileToolbarProps {
   onToggleProductionMode?: () => void;
   /** After a successful disk save — sync auto-save snapshot / dirty flags in App. */
   onAfterSuccessfulFileSave?: () => void;
+  /** From controller $30 / machine profile — test grid S clamp. */
+  machineMaxSpindle?: number;
+  machineBedWidth?: number;
+  machineBedHeight?: number;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -99,7 +104,11 @@ export function FileToolbar({
   onTogglePreview,
   showToolpathPreview = false,
   onAfterSuccessfulFileSave,
+  machineMaxSpindle = 1000,
+  machineBedWidth = 300,
+  machineBedHeight = 300,
 }: FileToolbarProps) {
+  const [testGridOpen, setTestGridOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const openInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
@@ -362,6 +371,11 @@ export function FileToolbar({
     toolbarBtn('Image', 'Import image (PNG, JPG)', handleImportImageClick),
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
+    toolbarBtn(
+      'Test grid',
+      'Generate power/speed calibration test grid (download G-code)',
+      () => setTestGridOpen(true),
+    ),
     React.createElement('label', {
       style: {
         display: 'flex',
@@ -522,6 +536,22 @@ export function FileToolbar({
       accept: '.dxf',
       style: { display: 'none' },
       onChange: handleDxfSelected,
+    }),
+    React.createElement(TestGridDialog, {
+      open: testGridOpen,
+      onClose: () => setTestGridOpen(false),
+      onGenerate: (gcode: string, _bounds: { width: number; height: number }) => {
+        const blob = new Blob([gcode], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `test-grid-${new Date().toISOString().slice(0, 10)}.gcode`;
+        a.click();
+        URL.revokeObjectURL(url);
+      },
+      defaultMaxSpindle: machineMaxSpindle,
+      defaultBedWidth: machineBedWidth,
+      defaultBedHeight: machineBedHeight,
     }),
   );
 }
