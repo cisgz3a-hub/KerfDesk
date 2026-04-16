@@ -74,10 +74,24 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   const lastCompiledRevisionRef = useRef<number | null>(null);
   const [gcodeStale, setGcodeStale] = useState(false);
 
+  const savedOriginX = savedOrigin?.x ?? null;
+  const savedOriginY = savedOrigin?.y ?? null;
+  const machineBedWidth = machineBedFromController?.width ?? null;
+  const machineBedHeight = machineBedFromController?.height ?? null;
+
   useLayoutEffect(() => {
     sceneRevisionRef.current += 1;
     setSceneCompileTick(sceneRevisionRef.current);
-  }, [scene, startMode, savedOrigin, controllerMaxSpindle, machineBedFromController, controllerAccelMmPerS2]);
+  }, [
+    scene,
+    startMode,
+    savedOriginX,
+    savedOriginY,
+    controllerMaxSpindle,
+    machineBedWidth,
+    machineBedHeight,
+    controllerAccelMmPerS2,
+  ]);
 
   useEffect(() => {
     if (!connectionSidebarOpen) return;
@@ -100,7 +114,16 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         machineBedFromController,
         controllerAccelMmPerS2,
       ),
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController, controllerAccelMmPerS2],
+    [
+      startMode,
+      savedOriginX,
+      savedOriginY,
+      controllerMaxSpindle,
+      outputFormat,
+      machineBedWidth,
+      machineBedHeight,
+      controllerAccelMmPerS2,
+    ],
   );
 
   const compileGcode = useCallback(
@@ -133,7 +156,16 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         setIsCompiling(false);
       }
     },
-    [startMode, savedOrigin, controllerMaxSpindle, outputFormat, machineBedFromController, controllerAccelMmPerS2],
+    [
+      startMode,
+      savedOriginX,
+      savedOriginY,
+      controllerMaxSpindle,
+      outputFormat,
+      machineBedWidth,
+      machineBedHeight,
+      controllerAccelMmPerS2,
+    ],
   );
 
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {

@@ -217,15 +217,16 @@ export function App() {
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.controllerReady;
 
+  // Read bed scalars each render; memoize the {width,height} object by value only so
+  // GRBL status polls (new machineState references) do not churn object identity.
+  const _bedWidth =
+    grbl.controller instanceof GrblController ? grbl.controller.getMachineInfo().bedWidth : 0;
+  const _bedHeight =
+    grbl.controller instanceof GrblController ? grbl.controller.getMachineInfo().bedHeight : 0;
   const machineBedFromGrbl = useMemo(() => {
-    const c = grbl.controller;
-    if (!c || !(c instanceof GrblController)) return null;
-    const info = c.getMachineInfo();
-    if (info.bedWidth > 0 && info.bedHeight > 0) {
-      return { width: info.bedWidth, height: info.bedHeight };
-    }
+    if (_bedWidth > 0 && _bedHeight > 0) return { width: _bedWidth, height: _bedHeight };
     return null;
-  }, [grbl.controller, grbl.machineState]);
+  }, [_bedWidth, _bedHeight]);
 
   const machineAccelFromGrbl = useMemo(() => {
     const c = grbl.controller;
