@@ -32,38 +32,62 @@ for (let i = 1; i < args.length; i++) {
   }
 }
 
-// ─── HTTP COMMAND SENDER ────────────────────────────────────────
+// ─── HTTP COMMAND QUEUE ─────────────────────────────────────────
+// Commands must be sent one at a time to preserve order.
+
+const commandQueue = [];
+let sending = false;
 
 function sendCommand(cmd) {
-  const encoded = encodeURIComponent(cmd);
-  const url = `/command?commandText=${encoded}&PAGEID=0`;
-
   return new Promise((resolve, reject) => {
-    const req = http.get({
-      hostname: laserIp,
-      port: 80,
-      path: url,
-      headers: {
-        'Host': `${laserIp}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': '*/*',
-        'Connection': 'keep-alive',
-        'User-Agent': 'LaserForge/1.0',
-      },
-      timeout: 5000,
-    }, (res) => {
-      res.resume(); // drain response
-      resolve();
-    });
-    req.on('error', (err) => {
-      console.error(`  ✗ HTTP error: ${err.message}`);
-      reject(err);
-    });
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('HTTP timeout'));
-    });
+    commandQueue.push({ cmd, resolve, reject });
+    processQueue();
   });
+}
+
+async function processQueue() {
+  if (sending || commandQueue.length === 0) return;
+  sending = true;
+
+  while (commandQueue.length > 0) {
+    const { cmd, resolve, reject } = commandQueue.shift();
+    const encoded = encodeURIComponent(cmd);
+    const url = `/command?commandText=${encoded}&PAGEID=0`;
+
+    try {
+      await new Promise((res, rej) => {
+        const req = http.get({
+          hostname: laserIp,
+          port: 80,
+          path: url,
+          headers: {
+            'Host': `${laserIp}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Accept': '*/*',
+            'Connection': 'keep-alive',
+            'User-Agent': 'LaserForge/1.0',
+          },
+          timeout: 5000,
+        }, (httpRes) => {
+          httpRes.resume();
+          res();
+        });
+        req.on('error', (err) => {
+          console.error(`  ✗ HTTP error: ${err.message}`);
+          rej(err);
+        });
+        req.on('timeout', () => {
+          req.destroy();
+          rej(new Error('HTTP timeout'));
+        });
+      });
+      resolve();
+    } catch (err) {
+      reject(err);
+    }
+  }
+
+  sending = false;
 }
 
 // ─── BRIDGE ─────────────────────────────────────────────────────
