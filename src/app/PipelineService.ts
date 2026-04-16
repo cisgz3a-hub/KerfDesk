@@ -19,6 +19,11 @@ import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
 import { getActiveProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
+import {
+  BUILT_IN_FOOTER_TEMPLATES,
+  DEFAULT_FOOTER_TEMPLATE_NAME,
+  emptyTemplateContext,
+} from '../core/plan/GcodeTemplates';
 
 const DEFAULT_MACHINE_BED_MM = 300;
 
@@ -123,6 +128,23 @@ export async function compileGcode(
       : null,
     customStartGcode: profile?.startGcode,
     customEndGcode: profile?.endGcode,
+    gcodeHeaderTemplate: profile?.gcodeHeaderTemplate,
+    gcodeFooterTemplate:
+      (profile?.returnToOrigin ?? true)
+        ? profile?.gcodeFooterTemplate
+        : (profile?.gcodeFooterTemplate === BUILT_IN_FOOTER_TEMPLATES[DEFAULT_FOOTER_TEMPLATE_NAME]
+            ? BUILT_IN_FOOTER_TEMPLATES['Stay in place']
+            : profile?.gcodeFooterTemplate),
+    gcodeTemplateContext: {
+      ...emptyTemplateContext(),
+      jobName: scene.metadata?.name || job.name || 'untitled',
+      bedWidthMm: profile?.bedWidth ?? scene.canvas.width ?? 300,
+      bedHeightMm: profile?.bedHeight ?? scene.canvas.height ?? 300,
+      maxSpeedMmPerMin: Math.max(0, ...job.operations.map(op => op.settings.speed)),
+      materialName: scene.material?.name ?? '',
+      materialThicknessMm: scene.material?.thickness ?? 0,
+      estimatedTime: 'TBD',
+    },
     maxSpindle,
   });
   if (!output.text) return null;

@@ -33,6 +33,7 @@ const files = [
   'velocity-profile.test.ts',
   'scanning-offset.test.ts',
   'smart-overscan.test.ts',
+  'gcode-templates.test.ts',
 ];
 
 for (const f of files) {

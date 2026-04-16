@@ -73,3 +73,12 @@ export {
   type SmartOverscanInput,
   type SmartOverscanResult,
 } from './SmartOverscan';
+export {
+  renderTemplate,
+  emptyTemplateContext,
+  BUILT_IN_HEADER_TEMPLATES,
+  BUILT_IN_FOOTER_TEMPLATES,
+  DEFAULT_HEADER_TEMPLATE_NAME,
+  DEFAULT_FOOTER_TEMPLATE_NAME,
+  type GcodeTemplateContext,
+} from './GcodeTemplates';

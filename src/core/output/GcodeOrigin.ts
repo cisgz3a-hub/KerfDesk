@@ -4,6 +4,7 @@
  */
 
 import { type Job } from '../job/Job';
+import { type GcodeTemplateContext } from '../plan/GcodeTemplates';
 
 export type GcodeStartMode = 'absolute' | 'current' | 'savedOrigin';
 
@@ -18,6 +19,12 @@ export interface GcodeGenerateOptions {
   customStartGcode?: string;
   /** From device profile: lines inserted before laser-off / return / M2 in the footer. */
   customEndGcode?: string;
+  /** Full template text for header; if provided this supersedes the built-in header text. */
+  gcodeHeaderTemplate?: string;
+  /** Full template text for footer; if provided this supersedes the built-in footer text. */
+  gcodeFooterTemplate?: string;
+  /** Template context values for header/footer substitution. */
+  gcodeTemplateContext?: GcodeTemplateContext;
 }
 
 export function designMinFromJob(job: Job): { minX: number; minY: number } {

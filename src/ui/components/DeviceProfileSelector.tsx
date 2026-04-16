@@ -13,6 +13,13 @@ import {
 import { type Scene } from '../../core/scene/Scene';
 import { ScanningOffsetDialog } from './ScanningOffsetDialog';
 import { type ScanningOffsetTable } from '../../core/plan/ScanningOffset';
+import { GcodeTemplateEditor } from './GcodeTemplateEditor';
+import {
+  BUILT_IN_FOOTER_TEMPLATES,
+  BUILT_IN_HEADER_TEMPLATES,
+  DEFAULT_FOOTER_TEMPLATE_NAME,
+  DEFAULT_HEADER_TEMPLATE_NAME,
+} from '../../core/plan/GcodeTemplates';
 
 interface DeviceProfileSelectorProps {
   scene: Scene;
@@ -33,12 +40,15 @@ function mergeProfilePreservedFields(target: DeviceProfile, previous: DeviceProf
   target.preferredPort = previous.preferredPort;
   target.startGcode = previous.startGcode;
   target.endGcode = previous.endGcode;
+  target.gcodeHeaderTemplate = previous.gcodeHeaderTemplate;
+  target.gcodeFooterTemplate = previous.gcodeFooterTemplate;
 }
 
 export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showConfirm, showPrompt }: DeviceProfileSelectorProps) {
   const [profiles, setProfiles] = useState<DeviceProfile[]>(getDeviceProfiles);
   const [activeId, setActiveId] = useState<string | null>(getActiveProfileId);
   const [scanOffsetOpen, setScanOffsetOpen] = useState(false);
+  const [gcodeTemplateOpen, setGcodeTemplateOpen] = useState(false);
   const font = "'DM Sans', system-ui, sans-serif";
 
   return React.createElement(
@@ -174,6 +184,26 @@ export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showCon
           },
           'Calibrate scanning offsets…',
         ),
+      activeId &&
+        React.createElement(
+          'button',
+          {
+            type: 'button',
+            onClick: () => setGcodeTemplateOpen(true),
+            style: {
+              alignSelf: 'flex-start',
+              padding: '4px 10px',
+              fontSize: 10,
+              background: '#12121f',
+              border: '1px solid #252540',
+              borderRadius: 4,
+              color: '#a8a8c0',
+              fontFamily: font,
+              cursor: 'pointer',
+            },
+          },
+          'Edit G-code header/footer…',
+        ),
     ),
     React.createElement(ScanningOffsetDialog, {
       open: scanOffsetOpen,
@@ -189,6 +219,28 @@ export function DeviceProfileSelector({ scene, onSceneCommit, onMessage, showCon
         saveDeviceProfile(updated);
         setProfiles(getDeviceProfiles());
         onMessage('✓ Scanning offsets saved to profile');
+      },
+    }),
+    React.createElement(GcodeTemplateEditor, {
+      open: gcodeTemplateOpen,
+      onClose: () => setGcodeTemplateOpen(false),
+      initialHeader:
+        getActiveProfile()?.gcodeHeaderTemplate
+        ?? BUILT_IN_HEADER_TEMPLATES[DEFAULT_HEADER_TEMPLATE_NAME],
+      initialFooter:
+        getActiveProfile()?.gcodeFooterTemplate
+        ?? BUILT_IN_FOOTER_TEMPLATES[DEFAULT_FOOTER_TEMPLATE_NAME],
+      onSave: (header: string, footer: string) => {
+        const active = getActiveProfile();
+        if (!active) return;
+        const updated: DeviceProfile = {
+          ...active,
+          gcodeHeaderTemplate: header,
+          gcodeFooterTemplate: footer,
+        };
+        saveDeviceProfile(updated);
+        setProfiles(getDeviceProfiles());
+        onMessage('✓ G-code header/footer templates saved to profile');
       },
     }),
   );

@@ -5,6 +5,12 @@
 
 import { type Scene } from '../scene/Scene';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import {
+  BUILT_IN_FOOTER_TEMPLATES,
+  BUILT_IN_HEADER_TEMPLATES,
+  DEFAULT_FOOTER_TEMPLATE_NAME,
+  DEFAULT_HEADER_TEMPLATE_NAME,
+} from '../plan/GcodeTemplates';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
@@ -47,6 +53,10 @@ export interface DeviceProfile {
   // Custom G-code
   startGcode: string;
   endGcode: string;
+  /** Custom G-code header template. Uses {VAR} placeholders. See GcodeTemplates. */
+  gcodeHeaderTemplate?: string;
+  /** Custom G-code footer template. Uses {VAR} placeholders. See GcodeTemplates. */
+  gcodeFooterTemplate?: string;
 
   /** Max acceleration mm/s² (GRBL-style). Used for raster power vs velocity. */
   maxAccelMmPerS2?: number;
@@ -178,6 +188,8 @@ export function createBlankProfile(name: string): DeviceProfile {
     baudRate: 115200,
     startGcode: '',
     endGcode: '',
+    gcodeHeaderTemplate: BUILT_IN_HEADER_TEMPLATES[DEFAULT_HEADER_TEMPLATE_NAME],
+    gcodeFooterTemplate: BUILT_IN_FOOTER_TEMPLATES[DEFAULT_FOOTER_TEMPLATE_NAME],
     maxAccelMmPerS2: 1000,
     accelAwarePower: true,
     minPowerRatioAccel: 0.1,
