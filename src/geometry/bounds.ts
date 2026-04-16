@@ -98,9 +98,11 @@ export function computeObjectBounds(obj: SceneObject): AABB {
   const t = obj.transform;
 
   for (const p of localPoints) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
     // Apply affine transform
     const wx = t.a * p.x + t.c * p.y + t.tx;
     const wy = t.b * p.x + t.d * p.y + t.ty;
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) continue;
     bounds = expandAABB(bounds, wx, wy);
   }
 

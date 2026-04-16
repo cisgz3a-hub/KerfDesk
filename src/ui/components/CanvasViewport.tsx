@@ -546,7 +546,19 @@ export function CanvasViewport({
       drawRulers(ctx, transform, width, height);
       ctx.save();
       transform.applyToContext(ctx);
-      renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
+      {
+        const m = ctx.getTransform();
+        const ok =
+          Number.isFinite(m.a) && Number.isFinite(m.b) &&
+          Number.isFinite(m.c) && Number.isFinite(m.d) &&
+          Number.isFinite(m.e) && Number.isFinite(m.f);
+        if (!ok) {
+          console.error('[Canvas] Viewport transform invalid before scene objects');
+          ctx.restore();
+        } else {
+          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
+        }
+      }
     }
 
     if (!previewMode) {
@@ -1247,33 +1259,48 @@ export function CanvasViewport({
       const dx = world.x - r.startX;
       const dy = world.y - r.startY;
       const handle = r.handle;
-      const origW = r.origBounds.maxX - r.origBounds.minX;
-      const origH = r.origBounds.maxY - r.origBounds.minY;
+      const MIN_ORIG_MM = 0.1;
+      const MIN_SCALE = 0.05;
+      const MAX_SCALE = 500;
+      let origW = r.origBounds.maxX - r.origBounds.minX;
+      let origH = r.origBounds.maxY - r.origBounds.minY;
+      if (!Number.isFinite(origW) || origW <= 0) origW = MIN_ORIG_MM;
+      if (!Number.isFinite(origH) || origH <= 0) origH = MIN_ORIG_MM;
 
-      if (origW === 0 || origH === 0) return;
-
-      let sx = 1, sy = 1;
+      let sx = 1;
+      let sy = 1;
 
       if (handle === 'se') {
-        sx = sy = Math.max(0.05, 1 + Math.max(dx / origW, dy / origH));
+        sx = sy = Math.max(MIN_SCALE, 1 + Math.max(dx / origW, dy / origH));
       } else if (handle === 'nw') {
-        sx = sy = Math.max(0.05, 1 + Math.max(-dx / origW, -dy / origH));
+        sx = sy = Math.max(MIN_SCALE, 1 + Math.max(-dx / origW, -dy / origH));
       } else if (handle === 'ne') {
-        sx = sy = Math.max(0.05, 1 + Math.max(dx / origW, -dy / origH));
+        sx = sy = Math.max(MIN_SCALE, 1 + Math.max(dx / origW, -dy / origH));
       } else if (handle === 'sw') {
-        sx = sy = Math.max(0.05, 1 + Math.max(-dx / origW, dy / origH));
+        sx = sy = Math.max(MIN_SCALE, 1 + Math.max(-dx / origW, dy / origH));
       } else if (handle === 'e') {
-        sx = Math.max(0.05, 1 + dx / origW);
+        sx = Math.max(MIN_SCALE, 1 + dx / origW);
       } else if (handle === 'w') {
-        sx = Math.max(0.05, 1 - dx / origW);
+        sx = Math.max(MIN_SCALE, 1 - dx / origW);
       } else if (handle === 's') {
-        sy = Math.max(0.05, 1 + dy / origH);
+        sy = Math.max(MIN_SCALE, 1 + dy / origH);
       } else if (handle === 'n') {
-        sy = Math.max(0.05, 1 - dy / origH);
+        sy = Math.max(MIN_SCALE, 1 - dy / origH);
       }
+
+      sx = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number.isFinite(sx) ? sx : MIN_SCALE));
+      sy = Math.min(MAX_SCALE, Math.max(MIN_SCALE, Number.isFinite(sy) ? sy : MIN_SCALE));
 
       const ax = r.anchorX;
       const ay = r.anchorY;
+
+      const clampAxis = (v: number, minAbs: number): number => {
+        if (!Number.isFinite(v)) return minAbs;
+        if (v === 0) return minAbs;
+        const s = Math.sign(v);
+        return s * Math.max(minAbs, Math.abs(v));
+      };
+      const MIN_AXIS = 1e-4;
 
       const newScene = {
         ...scene,
@@ -1282,14 +1309,23 @@ export function CanvasViewport({
           const ot = r.origTransforms.get(o.id);
           if (!ot) return o;
 
-          const newA = ot.a * sx;
-          const newD = ot.d * sy;
-          const newTx = ax + (ot.tx - ax) * sx;
-          const newTy = ay + (ot.ty - ay) * sy;
+          let newA = ot.a * sx;
+          let newD = ot.d * sy;
+          let newTx = ax + (ot.tx - ax) * sx;
+          let newTy = ay + (ot.ty - ay) * sy;
+          const nb = Number.isFinite(ot.b) ? ot.b : 0;
+          const nc = Number.isFinite(ot.c) ? ot.c : 0;
+
+          if (Math.abs(nb) < 1e-8 && Math.abs(nc) < 1e-8) {
+            newA = clampAxis(newA, MIN_AXIS);
+            newD = clampAxis(newD, MIN_AXIS);
+          }
+          if (!Number.isFinite(newTx)) newTx = Number.isFinite(ot.tx) ? ot.tx : 0;
+          if (!Number.isFinite(newTy)) newTy = Number.isFinite(ot.ty) ? ot.ty : 0;
 
           return {
             ...o,
-            transform: { ...o.transform, a: newA, b: ot.b, c: ot.c, d: newD, tx: newTx, ty: newTy },
+            transform: { ...o.transform, a: newA, b: nb, c: nc, d: newD, tx: newTx, ty: newTy },
             _bounds: null, _worldTransform: null,
           };
         }),

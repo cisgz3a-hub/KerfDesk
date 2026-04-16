@@ -21,7 +21,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type Geometry, type TextGeometry } from '../../core/scene/SceneObject';
 import { type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type Transform } from '../viewport';
-import { type AABB, aabbIntersects } from '../../core/types';
+import { type AABB, type Matrix3x2, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
@@ -31,6 +31,27 @@ const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
 
 function dispatchCanvasRepaint(): void {
   window.dispatchEvent(new Event(CANVAS_REPAINT_EVENT));
+}
+
+function isCurrentTransformFinite(ctx: CanvasRenderingContext2D): boolean {
+  const m = ctx.getTransform();
+  return (
+    Number.isFinite(m.a) && Number.isFinite(m.b) &&
+    Number.isFinite(m.c) && Number.isFinite(m.d) &&
+    Number.isFinite(m.e) && Number.isFinite(m.f)
+  );
+}
+
+function isRenderableAabb(b: AABB): boolean {
+  return (
+    Number.isFinite(b.minX) && Number.isFinite(b.maxX) &&
+    Number.isFinite(b.minY) && Number.isFinite(b.maxY) &&
+    b.maxX > b.minX && b.maxY > b.minY
+  );
+}
+
+function isSafeObjectMatrix(t: Matrix3x2): boolean {
+  return [t.a, t.b, t.c, t.d, t.tx, t.ty].every(Number.isFinite);
 }
 
 // Global content-keyed caches (LRU) — moving/transforming an object does not evict entries.
@@ -130,6 +151,11 @@ export function renderSceneBackground(
 
   ctx.save();
   transform.applyToContext(ctx);
+  if (!isCurrentTransformFinite(ctx)) {
+    console.error('[Canvas] World transform contains NaN/Infinity after applyToContext (background)');
+    ctx.restore();
+    return;
+  }
 
   renderBed(ctx, scene.canvas.width, scene.canvas.height, transform);
   renderGrid(ctx, scene.canvas.width, scene.canvas.height, transform);
@@ -315,9 +341,16 @@ export function renderSceneObjects(
       const mode = layer.settings.mode;
       const power = layer.settings.power.max / 100;
 
-      ctx.save();
       const t = obj.transform;
+      if (!isSafeObjectMatrix(t)) continue;
+
+      ctx.save();
       ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
+      if (!isCurrentTransformFinite(ctx)) {
+        console.error('[Canvas] Preview: bad object transform', obj.id);
+        ctx.restore();
+        continue;
+      }
 
       const geom = obj.geometry as any;
 
@@ -420,13 +453,18 @@ export function renderSceneObjects(
     if (!layer || !layer.visible) continue;
 
     const objBounds = computeObjectBounds(obj);
+    if (!isRenderableAabb(objBounds)) continue;
     if (!aabbIntersects(objBounds, visibleBounds)) continue;
 
     if (boundsCache && selectedIds!.has(obj.id)) {
       boundsCache.set(obj.id, objBounds);
     }
 
-    renderObject(ctx, obj, layer, transform);
+    try {
+      renderObject(ctx, obj, layer, transform);
+    } catch (err) {
+      console.error('[Canvas] Failed to render object:', obj.id, err);
+    }
   }
 
   // Boundary warnings: highlight objects outside material
@@ -439,7 +477,7 @@ export function renderSceneObjects(
       if (!layer || !layer.visible) continue;
 
       const bounds = computeObjectBounds(obj);
-      if (!bounds) continue;
+      if (!bounds || !isRenderableAabb(bounds)) continue;
       if (!aabbIntersects(bounds, visibleBounds)) continue;
 
       const outsideLeft = bounds.minX < mat.x;
@@ -591,29 +629,39 @@ function renderObject(
   layer: Layer,
   transform: Transform
 ): void {
-  ctx.save();
-
-  // Apply object transform
   const t = obj.transform;
-  ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
-
-  const modeColor = previewStrokeForMode(layer.settings.mode);
-  ctx.strokeStyle = modeColor;
-  ctx.lineWidth = transform.screenPx(1.2);
-
-  const isFill = layer.settings.mode === 'engrave' || layer.settings.mode === 'image';
-  if (isFill) {
-    ctx.fillStyle = `${modeColor}22`;
+  if (!isSafeObjectMatrix(t)) {
+    console.error('[Canvas] Skipping object with non-finite transform matrix:', obj.id);
+    return;
   }
 
-  drawGeometry(ctx, obj.geometry, transform, isFill, obj);
+  ctx.save();
+  try {
+    ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
+    if (!isCurrentTransformFinite(ctx)) {
+      console.error('[Canvas] Object transform produced NaN/Infinity:', obj.id);
+      return;
+    }
 
-  // Scanline preview for engrave mode — shows fill line spacing live
-  if (layer.settings.mode === 'engrave' && layer.settings.fill.enabled) {
-    drawFillPreview(ctx, obj, layer, transform, modeColor);
+    const modeColor = previewStrokeForMode(layer.settings.mode);
+    ctx.strokeStyle = modeColor;
+    ctx.lineWidth = transform.screenPx(1.2);
+
+    const isFill = layer.settings.mode === 'engrave' || layer.settings.mode === 'image';
+    if (isFill) {
+      ctx.fillStyle = `${modeColor}22`;
+    }
+
+    drawGeometry(ctx, obj.geometry, transform, isFill, obj);
+
+    if (layer.settings.mode === 'engrave' && layer.settings.fill.enabled) {
+      drawFillPreview(ctx, obj, layer, transform, modeColor);
+    }
+  } catch (err) {
+    console.error('[Canvas] renderObject error:', obj.id, err);
+  } finally {
+    ctx.restore();
   }
-
-  ctx.restore();
 }
 
 /**
@@ -821,16 +869,20 @@ function drawGeometry(
   forObject?: SceneObject
 ): void {
   switch (geom.type) {
-    case 'rect':
+    case 'rect': {
+      const rw = geom.width;
+      const rh = geom.height;
+      if (!Number.isFinite(rw) || !Number.isFinite(rh) || rw <= 0 || rh <= 0) break;
       ctx.beginPath();
       if (geom.cornerRadius > 0) {
-        roundRect(ctx, geom.x, geom.y, geom.width, geom.height, geom.cornerRadius);
+        roundRect(ctx, geom.x, geom.y, rw, rh, geom.cornerRadius);
       } else {
-        ctx.rect(geom.x, geom.y, geom.width, geom.height);
+        ctx.rect(geom.x, geom.y, rw, rh);
       }
       if (fill) ctx.fill();
       ctx.stroke();
       break;
+    }
 
     case 'ellipse':
       ctx.beginPath();
@@ -862,15 +914,25 @@ function drawGeometry(
       for (const sub of geom.subPaths) {
         ctx.beginPath();
         for (const seg of sub.segments) {
+          const fin = (p: { x: number; y: number } | undefined) =>
+            p && Number.isFinite(p.x) && Number.isFinite(p.y);
           switch (seg.type) {
             case 'move':
-              ctx.moveTo(seg.to.x, seg.to.y); break;
+              if (fin(seg.to)) ctx.moveTo(seg.to.x, seg.to.y);
+              break;
             case 'line':
-              ctx.lineTo(seg.to.x, seg.to.y); break;
+              if (fin(seg.to)) ctx.lineTo(seg.to.x, seg.to.y);
+              break;
             case 'cubic':
-              ctx.bezierCurveTo(seg.cp1.x, seg.cp1.y, seg.cp2.x, seg.cp2.y, seg.to.x, seg.to.y); break;
+              if (fin(seg.cp1) && fin(seg.cp2) && fin(seg.to)) {
+                ctx.bezierCurveTo(seg.cp1.x, seg.cp1.y, seg.cp2.x, seg.cp2.y, seg.to.x, seg.to.y);
+              }
+              break;
             case 'quadratic':
-              ctx.quadraticCurveTo(seg.cp.x, seg.cp.y, seg.to.x, seg.to.y); break;
+              if (fin(seg.cp) && fin(seg.to)) {
+                ctx.quadraticCurveTo(seg.cp.x, seg.cp.y, seg.to.x, seg.to.y);
+              }
+              break;
             case 'close':
               ctx.closePath(); break;
           }
@@ -1012,6 +1074,7 @@ function roundRect(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number, r: number
 ): void {
+  if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0 || !Number.isFinite(r)) return;
   r = Math.min(r, w / 2, h / 2);
   ctx.moveTo(x + r, y);
   ctx.lineTo(x + w - r, y);
