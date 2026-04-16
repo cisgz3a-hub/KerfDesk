@@ -110,7 +110,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     try {
       const lines: string[] = [];
       const header = this.encodeHeader(job, options);
-      lines.push(...header.split(/\r?\n/));
+      const headerLines = header.split(/\r?\n/);
+      for (let i = 0; i < headerLines.length; i++) {
+        lines.push(headerLines[i]);
+      }
 
       for (const op of plan.operations) {
         const srcOp = job.operations.find(o => o.id === op.operationId);
@@ -132,7 +135,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
       const totalLines = lines.length + footerLineCount;
       const footer = this.encodeFooter(job, options, totalLines);
-      lines.push(...footer.split(/\r?\n/));
+      const footerLines = footer.split(/\r?\n/);
+      for (let i = 0; i < footerLines.length; i++) {
+        lines.push(footerLines[i]);
+      }
 
       const text = lines.filter(l => l !== undefined).join('\n');
 
@@ -219,7 +225,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       };
       const renderedFooter = renderTemplate(options.gcodeFooterTemplate, templateContext);
       if (renderedFooter.trim().length > 0) {
-        parts.push(...renderedFooter.split(/\r?\n/).map(l => l.trimEnd()));
+        const footerParts = renderedFooter.split(/\r?\n/).map(l => l.trimEnd());
+        for (let i = 0; i < footerParts.length; i++) {
+          parts.push(footerParts[i]);
+        }
       }
       const hasProgramEnd = parts.some(l => /\bM2\b/i.test(l) || /\bM30\b/i.test(l));
       if (!hasProgramEnd) {

@@ -83,7 +83,9 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
     const planned = planOperation(operation, currentPos);
     if (planned.length === 0) continue;
 
-    plan.operations.push(...planned);
+    for (let i = 0; i < planned.length; i++) {
+      plan.operations.push(planned[i]);
+    }
 
     // Track laser head position across operations
     currentPos = getFinalPosition(planned);
@@ -137,7 +139,9 @@ function planOperation(
         settings,
         pos
       );
-      moves.push(...rasterMoves);
+      for (let i = 0; i < rasterMoves.length; i++) {
+        moves.push(rasterMoves[i]);
+      }
     } else if (operation.type === 'engrave' && operation.geometry.type === 'fill') {
       // FILL: engrave only — never infer from fillInterval on cut/score jobs
       const fillMoves = planFillOperation(
@@ -145,7 +149,9 @@ function planOperation(
         settings,
         pos
       );
-      moves.push(...fillMoves);
+      for (let i = 0; i < fillMoves.length; i++) {
+        moves.push(fillMoves[i]);
+      }
     } else {
       // VECTOR (cut/score): Outline paths with inside-first ordering
       const paths = operation.geometry.paths;
@@ -153,7 +159,9 @@ function planOperation(
         const ordered = orderPathsForCutting(paths, pos, settings.insideFirst);
         for (const { path, reversed } of ordered) {
           const pathMoves = planPath(path, reversed, settings);
-          moves.push(...pathMoves);
+          for (let i = 0; i < pathMoves.length; i++) {
+            moves.push(pathMoves[i]);
+          }
           pos = getPathEndpoint(path, reversed);
         }
       }
@@ -454,7 +462,9 @@ function planFillOperation(
     };
     const rows = generateFillRows(boundaryPaths, fillSettings, rowIndex);
     rowIndex += rows.length;
-    allRows.push(...rows);
+    for (let i = 0; i < rows.length; i++) {
+      allRows.push(rows[i]);
+    }
   }
 
   // Fallback: if no scanline rows but paths exist, trace outlines instead
@@ -467,7 +477,10 @@ function planFillOperation(
     const movesOut: Move[] = [];
     const ordered = orderPathsForCutting(boundaryPaths, pos, false);
     for (const { path, reversed } of ordered) {
-      movesOut.push(...planPath(path, reversed, settings));
+      const pathMoves = planPath(path, reversed, settings);
+      for (let i = 0; i < pathMoves.length; i++) {
+        movesOut.push(pathMoves[i]);
+      }
       pos = getPathEndpoint(path, reversed);
     }
     return movesOut;
@@ -750,7 +763,9 @@ function orderPathsForCutting(
 
     // Within this depth level, optimize order then pick traversal direction
     const ordered = orderWithBestDirection(optimizePathOrder(group, pos), pos);
-    result.push(...ordered);
+    for (let i = 0; i < ordered.length; i++) {
+      result.push(ordered[i]);
+    }
 
     // Update position to end of last path in this group
     if (ordered.length > 0) {
@@ -761,7 +776,10 @@ function orderPathsForCutting(
 
   // Open paths go last, optimized order
   if (open.length > 0) {
-    result.push(...orderWithBestDirection(optimizePathOrder(open, pos), pos));
+    const orderedOpen = orderWithBestDirection(optimizePathOrder(open, pos), pos);
+    for (let i = 0; i < orderedOpen.length; i++) {
+      result.push(orderedOpen[i]);
+    }
   }
 
   return result;

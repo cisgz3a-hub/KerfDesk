@@ -12,6 +12,7 @@ const tsxCli = join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
 const files = [
   'pipeline.test.ts',
+  'plan-optimizer-large-raster.test.ts',
   'controller.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
@@ -25,6 +26,7 @@ const files = [
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
+  'preflight.test.ts',
   'controller-stop-safety.test.ts',
   'materials.test.ts',
   'image-processing.test.ts',

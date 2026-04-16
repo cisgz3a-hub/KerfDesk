@@ -481,7 +481,9 @@ function compileGeometry(
   for (const obj of objects) {
     if (!obj.visible) continue;
     const flatPaths = flattenObject(obj);
-    paths.push(...flatPaths);
+    for (let i = 0; i < flatPaths.length; i++) {
+      paths.push(flatPaths[i]);
+    }
   }
 
   if (paths.length === 0) return null;
