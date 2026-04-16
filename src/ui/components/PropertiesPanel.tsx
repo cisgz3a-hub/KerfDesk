@@ -159,6 +159,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   const [traceTurdsize, setTraceTurdsize] = React.useState(DEFAULT_TRACE_OPTIONS.turdsize);
   const [traceAlphamax, setTraceAlphamax] = React.useState(DEFAULT_TRACE_OPTIONS.alphamax);
   const [traceInvert, setTraceInvert] = React.useState(DEFAULT_TRACE_OPTIONS.invert);
+  const [isTracing, setIsTracing] = useState(false);
 
   const [ditherMode, setDitherMode] = useState<DitherMode>('floyd-steinberg');
 
@@ -176,73 +177,108 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     const geom = obj.geometry as ImageGeometry;
     if (!geom.grayscaleData || !geom.grayscaleWidth || !geom.grayscaleHeight) return;
 
-    const cutLayerId = scene.layers.find(l => l.settings.mode === 'cut')?.id || scene.layers[0].id;
+    const pixelCount = (geom.grayscaleWidth ?? 0) * (geom.grayscaleHeight ?? 0);
+    const MAX_SAFE_PIXELS = 1_000_000; // ~1 megapixel — traces fast enough not to freeze
 
-    const dpi = 96;
-    const physW = (geom.originalWidth / dpi) * 25.4;
-    const physH = (geom.originalHeight / dpi) * 25.4;
-    const scaleX = physW / geom.grayscaleWidth;
-    const scaleY = physH / geom.grayscaleHeight;
-
-    const traced = traceToSceneObject(
-      geom.grayscaleData,
-      geom.grayscaleWidth,
-      geom.grayscaleHeight,
-      {
-        threshold: traceThreshold,
-        turdsize: traceTurdsize,
-        alphamax: traceAlphamax,
-        opttolerance: DEFAULT_TRACE_OPTIONS.opttolerance,
-        invert: traceInvert,
-      },
-      cutLayerId,
-      obj.name || 'Image'
-    );
-
-    if (!traced) {
-      await showAlert('Trace', 'No contours found. Try adjusting the threshold.');
-      return;
+    if (pixelCount > MAX_SAFE_PIXELS) {
+      const mp = (pixelCount / 1_000_000).toFixed(1);
+      const proceed = window.confirm(
+        `This image is ${mp} megapixels. Tracing will freeze the app for several seconds — no way to cancel. ` +
+          'For best results, resize the image to under 1 megapixel first.\n\nTrace anyway?',
+      );
+      if (!proceed) return;
     }
 
-    const pathGeom = traced.geometry as PathGeometry;
-    const scaledSubPaths = pathGeom.subPaths.map(sp => ({
-      ...sp,
-      segments: sp.segments.map(seg => {
-        if (seg.type === 'close') return seg;
-        if (seg.type === 'move' || seg.type === 'line') {
-          return { ...seg, to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY } };
-        }
-        if (seg.type === 'quadratic') {
-          return {
-            ...seg,
-            cp: { x: seg.cp.x * scaleX, y: seg.cp.y * scaleY },
-            to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
-          };
-        }
-        if (seg.type === 'cubic') {
-          return {
-            ...seg,
-            cp1: { x: seg.cp1.x * scaleX, y: seg.cp1.y * scaleY },
-            cp2: { x: seg.cp2.x * scaleX, y: seg.cp2.y * scaleY },
-            to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
-          };
-        }
-        return seg;
-      }),
-    }));
+    setIsTracing(true);
+    await new Promise<void>(resolve => {
+      requestAnimationFrame(() => resolve());
+    });
 
-    const finalObj = {
-      ...traced,
-      transform: { ...obj.transform },
-      geometry: { ...pathGeom, subPaths: scaledSubPaths },
-    };
+    try {
+      const cutLayerId = scene.layers.find(l => l.settings.mode === 'cut')?.id || scene.layers[0].id;
 
-    const newScene = {
-      ...scene,
-      objects: [...scene.objects, finalObj],
-    };
-    onSceneCommit(newScene);
-    onSelectionChange?.(new Set([finalObj.id]));
+      const dpi = 96;
+      const physW = (geom.originalWidth / dpi) * 25.4;
+      const physH = (geom.originalHeight / dpi) * 25.4;
+      const scaleX = physW / geom.grayscaleWidth;
+      const scaleY = physH / geom.grayscaleHeight;
+
+      const traced = traceToSceneObject(
+        geom.grayscaleData,
+        geom.grayscaleWidth,
+        geom.grayscaleHeight,
+        {
+          threshold: traceThreshold,
+          turdsize: traceTurdsize,
+          alphamax: traceAlphamax,
+          opttolerance: DEFAULT_TRACE_OPTIONS.opttolerance,
+          invert: traceInvert,
+        },
+        cutLayerId,
+        obj.name || 'Image',
+      );
+
+      if (!traced) {
+        await showAlert('Trace', 'No contours found. Try adjusting the threshold.');
+        return;
+      }
+
+      const pathGeom = traced.geometry as PathGeometry;
+      const scaledSubPaths = pathGeom.subPaths.map(sp => ({
+        ...sp,
+        segments: sp.segments.map(seg => {
+          if (seg.type === 'close') return seg;
+          if (seg.type === 'move' || seg.type === 'line') {
+            return { ...seg, to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY } };
+          }
+          if (seg.type === 'quadratic') {
+            return {
+              ...seg,
+              cp: { x: seg.cp.x * scaleX, y: seg.cp.y * scaleY },
+              to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
+            };
+          }
+          if (seg.type === 'cubic') {
+            return {
+              ...seg,
+              cp1: { x: seg.cp1.x * scaleX, y: seg.cp1.y * scaleY },
+              cp2: { x: seg.cp2.x * scaleX, y: seg.cp2.y * scaleY },
+              to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
+            };
+          }
+          return seg;
+        }),
+      }));
+
+      const finalObj = {
+        ...traced,
+        transform: { ...obj.transform },
+        geometry: { ...pathGeom, subPaths: scaledSubPaths },
+      };
+
+      const newScene = {
+        ...scene,
+        objects: [...scene.objects, finalObj],
+      };
+      try {
+        onSceneCommit(newScene);
+        onSelectionChange?.(new Set([finalObj.id]));
+      } catch (err) {
+        console.error('[Trace] scene commit failed:', err);
+        await showAlert(
+          'Trace produced invalid output',
+          'The traced paths could not be added to the scene. Try a different threshold or smaller image.',
+        );
+      }
+    } catch (err) {
+      console.error('[Trace] failed:', err);
+      await showAlert(
+        'Trace failed',
+        err instanceof Error ? err.message : 'Unknown error during tracing.',
+      );
+    } finally {
+      setIsTracing(false);
+    }
   }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, onSceneCommit, onSelectionChange, showAlert]);
 
   const containerStyle: React.CSSProperties = {
@@ -1311,9 +1347,15 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           ),
 
           React.createElement('button', {
-            onClick: handleTrace,
-            style: traceButtonStyle,
-          }, 'Trace to Vector (Cut layer)'),
+            type: 'button',
+            onClick: () => { void handleTrace(); },
+            disabled: isTracing,
+            style: {
+              ...traceButtonStyle,
+              opacity: isTracing ? 0.6 : 1,
+              cursor: isTracing ? 'wait' : 'pointer',
+            },
+          }, isTracing ? '⏳ Tracing… (app may freeze)' : 'Trace to Vector (Cut layer)'),
         ),
       );
     })(),
