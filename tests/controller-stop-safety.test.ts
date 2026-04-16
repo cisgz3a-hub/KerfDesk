@@ -1,5 +1,6 @@
 /**
- * Guardrails: GrblController.stop() must not send $X (unlock); use realtime reset only.
+ * Guardrails: GrblController.stop() must not send $X (unlock) or soft reset (0x18);
+ * clean stop uses feed hold (0x21). emergencyStop() uses 0x18.
  * Run: npx tsx tests/controller-stop-safety.test.ts
  */
 
@@ -23,6 +24,7 @@ function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 15));
 }
 
+
 function hasUnlock(lines: string[]): boolean {
   return lines.some(l => l.includes('$X'));
 }
@@ -37,9 +39,14 @@ async function main(): Promise<void> {
     await ctrl.connect(port);
     await flush();
     port.received.length = 0;
+    port.realtimeBytes.length = 0;
     ctrl.stop();
     await flush();
     assert(!hasUnlock(port.received), 'stop() while idle: no $X in port.received');
+    assert(
+      port.realtimeBytes.includes(0x21) && !port.realtimeBytes.includes(0x18),
+      'stop() while idle: feed hold (0x21), not soft reset (0x18)',
+    );
     await ctrl.disconnect();
   }
 
@@ -53,9 +60,14 @@ async function main(): Promise<void> {
     ctrl.sendJob(lines);
     await flush();
     port.received.length = 0;
+    port.realtimeBytes.length = 0;
     ctrl.stop();
     await flush();
     assert(!hasUnlock(port.received), 'stop() during job: no $X in port.received');
+    assert(
+      port.realtimeBytes.includes(0x21) && !port.realtimeBytes.includes(0x18),
+      'stop() during job: feed hold (0x21), not soft reset (0x18)',
+    );
     await ctrl.disconnect();
   }
 
@@ -68,6 +80,23 @@ async function main(): Promise<void> {
     ctrl.sendCommand('$X');
     await flush();
     assert(hasUnlock(port.received), 'sanity: explicit sendCommand("$X") appears in port.received');
+    await ctrl.disconnect();
+  }
+
+  {
+    const ctrl = new GrblController();
+    const port = new MockSerialPort();
+    port.open();
+    await ctrl.connect(port);
+    await flush();
+    port.realtimeBytes.length = 0;
+    ctrl.emergencyStop();
+    await flush();
+    assert(
+      port.realtimeBytes.includes(0x18),
+      'emergencyStop() sends soft reset (0x18)',
+    );
+    assert(!hasUnlock(port.received), 'emergencyStop(): no $X in port.received');
     await ctrl.disconnect();
   }
 

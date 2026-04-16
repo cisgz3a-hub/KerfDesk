@@ -42,6 +42,8 @@ export class MockSerialPort implements SerialPortLike {
 
   readonly received: string[] = [];
   readonly sent: string[] = [];
+  /** Bytes sent via writeByte (realtime GRBL commands). */
+  readonly realtimeBytes: number[] = [];
 
   constructor(responseGenerator?: (line: string) => string[], bed?: { width: number; height: number }) {
     this._responseGenerator = responseGenerator ?? null;
@@ -76,6 +78,7 @@ export class MockSerialPort implements SerialPortLike {
 
   writeByte(byte: number): void {
     if (!this._isOpen) throw new Error('Port is not open');
+    this.realtimeBytes.push(byte);
     if (byte === 0x3F) {
       if (this._responseGenerator) {
         this.injectResponse('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');

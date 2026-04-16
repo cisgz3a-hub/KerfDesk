@@ -112,6 +112,23 @@ function getSetupStorageKey(): string {
 // ─── COMPONENT ───────────────────────────────────────────────────
 
 export function App() {
+  if (typeof window !== 'undefined' && !(window as any).__LF_DEBUG_CONSOLE_PATCHED__) {
+    (window as any).__LF_DEBUG_CONSOLE_PATCHED__ = true;
+    const origError = console.error;
+    console.error = function (...args: unknown[]) {
+      const first = args[0];
+      if (
+        typeof first === 'string' &&
+        first.includes('Cannot update a component') &&
+        first.includes('while rendering a different component')
+      ) {
+        origError.apply(console, args);
+        throw new Error('[DEBUG] React render-phase setState detected');
+      }
+      origError.apply(console, args);
+    };
+  }
+
   const {
     modal,
     showAlert,
