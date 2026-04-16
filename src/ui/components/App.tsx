@@ -256,6 +256,7 @@ export function App() {
     void profileRevision;
     return getDeviceProfiles();
   }, [profileRevision]);
+  const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
 
   const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
   const updateActiveProfile = useCallback((updates: Partial<DeviceProfile>) => {
@@ -288,7 +289,7 @@ export function App() {
     if (!id) return;
     const profile = getDeviceProfiles().find(p => p.id === id);
     if (!profile) return;
-    handleSceneCommit(applyProfileToScene(profile, scene));
+    handleSceneCommitRef.current?.(applyProfileToScene(profile, scene));
   }, [refreshProfiles, scene]);
   const createProfileFromCurrentScene = useCallback((name: string) => {
     const profile = profileFromScene(name, scene);
@@ -570,6 +571,9 @@ export function App() {
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
+  useEffect(() => {
+    handleSceneCommitRef.current = handleSceneCommit;
+  }, [handleSceneCommit]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
