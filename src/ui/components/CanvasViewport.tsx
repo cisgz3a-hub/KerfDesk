@@ -409,6 +409,10 @@ export function CanvasViewport({
   const onZoomChangeRef = useRef(onZoomChange);
   onZoomChangeRef.current = onZoomChange;
 
+  const onSelectionScreenPosRef = useRef(onSelectionScreenPos);
+  onSelectionScreenPosRef.current = onSelectionScreenPos;
+  const lastSelectionScreenPosRef = useRef<{ x: number; y: number } | null | undefined>(undefined);
+
   useEffect(() => {
     onZoomChangeRef.current?.(Math.round(viewport.zoom * 100));
   }, [viewport.zoom]);
@@ -416,16 +420,30 @@ export function CanvasViewport({
   const selectionKey = [...selectedIds].sort().join(',');
 
   useEffect(() => {
-    if (!onSelectionScreenPos) return;
+    const notify = (pos: { x: number; y: number } | null) => {
+      const cb = onSelectionScreenPosRef.current;
+      if (!cb) return;
+      const prev = lastSelectionScreenPosRef.current;
+      if (pos === null) {
+        if (prev !== null && prev !== undefined) {
+          lastSelectionScreenPosRef.current = null;
+          cb(null);
+        }
+        return;
+      }
+      if (prev !== null && prev !== undefined && prev.x === pos.x && prev.y === pos.y) return;
+      lastSelectionScreenPosRef.current = pos;
+      cb(pos);
+    };
 
     const report = () => {
       const canvas = canvasRef.current;
       if (selectedIds.size === 0) {
-        onSelectionScreenPos(null);
+        notify(null);
         return;
       }
       if (!canvas) {
-        onSelectionScreenPos(null);
+        notify(null);
         return;
       }
 
@@ -446,7 +464,7 @@ export function CanvasViewport({
       }
 
       if (minX === Infinity) {
-        onSelectionScreenPos(null);
+        notify(null);
         return;
       }
 
@@ -454,7 +472,7 @@ export function CanvasViewport({
       const cx = (minX + maxX) / 2;
       const screen = transform.worldToScreen({ x: cx, y: minY });
       const rect = canvas.getBoundingClientRect();
-      onSelectionScreenPos({ x: rect.left + screen.x, y: rect.top + screen.y });
+      notify({ x: rect.left + screen.x, y: rect.top + screen.y });
     };
 
     report();
@@ -468,7 +486,7 @@ export function CanvasViewport({
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(raf);
     };
-  }, [scene, viewport, selectionKey, width, height, onSelectionScreenPos, selectedIds]);
+  }, [scene, viewport, selectionKey, width, height, selectedIds]);
 
   useEffect(() => {
     if (!actionsRef) return;
