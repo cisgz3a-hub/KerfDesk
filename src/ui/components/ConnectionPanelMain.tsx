@@ -898,6 +898,14 @@ export function ConnectionPanelMain({
   const posX = machinePosition?.x ?? machineState?.position.x;
   const posY = machinePosition?.y ?? machineState?.position.y;
   const canStartJob = !!gcode && !isRunning && !!preflight?.canStart && !gcodeStale;
+  /** Human-readable reason the Start button is disabled, or null if ready. */
+  const startDisabledReason: string | null = (() => {
+    if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
+    if (!gcode) return 'Click G-code in the toolbar to compile this design';
+    if (gcodeStale) return 'Design changed - click ↻ Update above';
+    if (!preflight?.canStart) return 'Fix the issues listed below first';
+    return null; // ready to start
+  })();
   void workflowVersion;
 
   const statusSection = React.createElement('div', {
@@ -1029,11 +1037,15 @@ export function ConnectionPanelMain({
   const step3Done = hasFramed.current;
   const startJobDesc = canStartJob
     ? 'Ready to cut!'
-    : gcodeStale
-      ? 'Recompile G-code (design changed)'
-      : !preflight?.canStart
-        ? 'Fix issues below first'
-        : 'Prepare job';
+    : isRunning
+      ? 'Running'
+      : !gcode
+        ? 'Compile G-code first'
+        : gcodeStale
+          ? 'Recompile G-code (design changed)'
+          : !preflight?.canStart
+            ? 'Fix issues below first'
+            : 'Prepare job';
 
   const workflowSection = isConnected && React.createElement('div', {
     style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
@@ -1787,33 +1799,49 @@ export function ConnectionPanelMain({
     },
   },
     !isRunning && !displayPaused && React.createElement('div', {
-      style: { display: 'flex', gap: 6 },
+      style: { display: 'flex', flexDirection: 'column' as const, gap: 6 },
     },
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleFrameSafe(); },
-        disabled: !canFrame,
+      React.createElement('div', {
+        style: { display: 'flex', gap: 6 },
+      },
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => { void handleFrameSafe(); },
+          disabled: !canFrame,
+          style: {
+            flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
+            borderRadius: 8, cursor: canFrame ? 'pointer' : 'default',
+            fontFamily: font,
+            background: '#0a0a14', border: '1px solid #252540', color: '#c0c0d0',
+            opacity: canFrame ? 1 : 0.4,
+          },
+        }, '⬚ Frame'),
+        React.createElement('button', {
+          type: 'button',
+          onClick: () => { void handleStartJob(); },
+          disabled: !canStartJob,
+          style: {
+            flex: 2, padding: '12px', fontSize: 14, fontWeight: 700,
+            borderRadius: 8, cursor: canStartJob ? 'pointer' : 'default',
+            fontFamily: font,
+            background: canStartJob ? 'rgba(45,212,160,0.12)' : '#1a1a2e',
+            border: canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
+            color: canStartJob ? '#2dd4a0' : '#333355',
+          },
+        }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
+      ),
+      startDisabledReason && React.createElement('div', {
         style: {
-          flex: 1, padding: '12px', fontSize: 12, fontWeight: 600,
-          borderRadius: 8, cursor: canFrame ? 'pointer' : 'default',
+          fontSize: 10,
+          color: '#ffd444',
+          textAlign: 'center' as const,
+          padding: '4px 8px',
+          background: 'rgba(255,212,68,0.06)',
+          border: '1px solid rgba(255,212,68,0.2)',
+          borderRadius: 6,
           fontFamily: font,
-          background: '#0a0a14', border: '1px solid #252540', color: '#c0c0d0',
-          opacity: canFrame ? 1 : 0.4,
         },
-      }, '⬚ Frame'),
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleStartJob(); },
-        disabled: !canStartJob,
-        style: {
-          flex: 2, padding: '12px', fontSize: 14, fontWeight: 700,
-          borderRadius: 8, cursor: canStartJob ? 'pointer' : 'default',
-          fontFamily: font,
-          background: canStartJob ? 'rgba(45,212,160,0.12)' : '#1a1a2e',
-          border: canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
-          color: canStartJob ? '#2dd4a0' : '#333355',
-        },
-      }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
+      }, startDisabledReason),
     ),
     (isRunning || displayPaused) && React.createElement('div', {
       style: { display: 'flex', gap: 6 },
