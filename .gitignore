@@ -4,5 +4,5 @@ dist/
 dist-electron/
 build/
 release/
-package-lock.json
 *.log
+licenses-report.csv

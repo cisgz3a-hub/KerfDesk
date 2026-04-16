@@ -1,0 +1,26 @@
+/** Semicolon-separated allowlist for license-checker-rseidelsohn (kept in JS for Windows npm scripts). */
+export const ONLY_ALLOW =
+  [
+    'MIT',
+    'MIT-0',
+    'ISC',
+    'Apache-2.0',
+    'BSD-2-Clause',
+    'BSD-3-Clause',
+    '0BSD',
+    'CC0-1.0',
+    'CC-BY-3.0',
+    'CC-BY-4.0',
+    'Unlicense',
+    'WTFPL',
+    'BlueOak-1.0.0',
+    'Python-2.0',
+    '(MIT OR CC0-1.0)',
+    '(MIT OR Apache-2.0)',
+    '(MIT AND CC-BY-3.0)',
+    '(Apache-2.0 OR MIT)',
+    '(MIT OR BSD-3-Clause)',
+    '(BSD-3-Clause OR MIT)',
+    '(Apache-2.0 AND MIT)',
+    '(MPL-2.0 OR Apache-2.0)',
+  ].join(';');

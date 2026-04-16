@@ -13,7 +13,11 @@
     "wainlux-bridge": "node scripts/wainlux-bridge.mjs",
     "electron:build": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --win",
     "electron:build:mac": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --mac",
-    "test": "npx tsx tests/pipeline.test.ts && npx tsx tests/controller.test.ts && npx tsx tests/simulation.test.ts && npx tsx tests/viewport.test.ts && npx tsx tests/svg-import.test.ts && npx tsx tests/svg-import-placement.test.ts && npx tsx tests/placement.test.ts && npx tsx tests/history.test.ts && npx tsx tests/scene-io.test.ts && npx tsx tests/ui-integration.test.ts && npx tsx tests/autosave-serialization.test.ts && npx tsx tests/text-outline-cache.test.ts && npx tsx tests/source-text-migration.test.ts && npx tsx tests/preflight-bounds.test.ts && npx tsx tests/controller-stop-safety.test.ts && npx tsx tests/materials.test.ts && npx tsx tests/image-processing.test.ts && npx tsx tests/operation-ordering.test.ts"
+    "license-check": "node scripts/license-check.mjs",
+    "license-check:report": "node scripts/license-check-report.mjs",
+    "license-check:summary": "node scripts/license-check-summary.mjs",
+    "test": "npx tsx tests/pipeline.test.ts && npx tsx tests/controller.test.ts && npx tsx tests/simulation.test.ts && npx tsx tests/viewport.test.ts && npx tsx tests/svg-import.test.ts && npx tsx tests/svg-import-placement.test.ts && npx tsx tests/placement.test.ts && npx tsx tests/history.test.ts && npx tsx tests/scene-io.test.ts && npx tsx tests/ui-integration.test.ts && npx tsx tests/autosave-serialization.test.ts && npx tsx tests/text-outline-cache.test.ts && npx tsx tests/source-text-migration.test.ts && npx tsx tests/preflight-bounds.test.ts && npx tsx tests/controller-stop-safety.test.ts && npx tsx tests/materials.test.ts && npx tsx tests/image-processing.test.ts && npx tsx tests/operation-ordering.test.ts",
+    "prepare": "husky"
   },
   "keywords": [],
   "author": "",
@@ -65,6 +69,8 @@
     "@vitejs/plugin-react": "^6.0.1",
     "electron": "^34.0.0",
     "electron-builder": "^25.0.0",
+    "husky": "^9.1.7",
+    "license-checker-rseidelsohn": "^4.4.2",
     "png-to-ico": "^3.0.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.2",
@@ -75,9 +81,9 @@
     "@xmldom/xmldom": "^0.9.9",
     "dompurify": "^3.3.3",
     "floyd-steinberg": "^1.0.6",
+    "imagetracerjs": "^1.2.6",
     "polygon-clipping": "^0.15.7",
     "polygon-offset": "^0.3.2",
-    "potrace-js": "^0.0.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "serialport": "^13.0.0"

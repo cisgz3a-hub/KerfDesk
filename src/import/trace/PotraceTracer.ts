@@ -1,8 +1,8 @@
 /**
- * Image tracing using potrace-js library.
- * Thresholded bitmap on canvas → potrace → SubPaths (POINT / CURVE from getPaths).
+ * Image tracing via imagetracerjs (potrace-compatible POINT/CURVE output).
+ * Thresholded bitmap on canvas → trace → SubPaths (POINT / CURVE from getPaths).
  */
-import { getPaths, traceCanvas } from 'potrace-js';
+import { getPaths, traceCanvas } from './ImageTracerAdapter';
 import {
   type SceneObject,
   type PathGeometry,

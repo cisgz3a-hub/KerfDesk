@@ -1,12 +1,12 @@
 /**
- * Convert text to vector path outlines using canvas + potrace-js tracing.
+ * Convert text to vector path outlines using canvas + bitmap tracing.
  * Renders text to a high-res bitmap, then traces it (same stack as image import).
  *
  * Limitation: Canvas doesn't expose glyph outlines directly.
- * We render text to a high-res canvas and trace the result with potrace-js.
+ * We render text to a high-res canvas and trace the result (imagetracerjs).
  */
 
-import { getPaths, traceCanvas } from 'potrace-js';
+import { getPaths, traceCanvas } from '../import/trace/ImageTracerAdapter';
 import type { SubPath, PathSegment, TextGeometry } from '../core/scene/SceneObject';
 import { fillTextGeometry, measureTextGeometrySize } from './textCanvasDraw';
 

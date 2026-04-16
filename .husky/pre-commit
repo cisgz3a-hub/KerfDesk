@@ -1,0 +1,15 @@
+# Run license check before every commit
+# This prevents accidentally committing a package.json with GPL dependencies
+echo "Checking licenses..."
+npm run license-check || {
+  echo ""
+  echo "LICENSE CHECK FAILED"
+  echo ""
+  echo "One or more dependencies have licenses that would prevent"
+  echo "commercial distribution of LaserForge. Commit blocked."
+  echo ""
+  echo "Run 'npm run license-check:summary' to see details."
+  echo ""
+  exit 1
+}
+echo "License check passed"
