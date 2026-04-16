@@ -45,6 +45,7 @@ import { CanvasRenderer } from './canvas/CanvasRenderer';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { type JobProgress } from '../../controllers/ControllerInterface';
 import { type Move } from '../../core/plan/Plan';
+import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -356,6 +357,11 @@ interface CanvasViewportProps {
   toolpathMoves?: readonly Move[] | null;
   /** GRBL-reported work area ($130×$131) — dashed overlay when connected and parsed. */
   machineWorkAreaMm?: { width: number; height: number } | null;
+  startMode?: 'absolute' | 'current' | 'savedOrigin';
+  savedOrigin?: { x: number; y: number } | null;
+  bedWidthMm?: number;
+  bedHeightMm?: number;
+  originCorner?: MachineOriginCorner;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -384,6 +390,11 @@ export function CanvasViewport({
   showToolpathPreview = false,
   toolpathMoves = null,
   machineWorkAreaMm = null,
+  startMode = 'absolute',
+  savedOrigin = null,
+  bedWidthMm = 0,
+  bedHeightMm = 0,
+  originCorner = 'front-left',
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -555,11 +566,29 @@ export function CanvasViewport({
     if (simulation && simulation.frames.length > 1) {
       ctx.save();
       ctx.globalAlpha = 0.15;
-      renderScene(ctx, scene, transform, width, height, selectedIds, previewMode, machineWorkAreaMm);
+      renderScene(
+        ctx,
+        scene,
+        transform,
+        width,
+        height,
+        selectedIds,
+        previewMode,
+        machineWorkAreaMm,
+        { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
+      );
       ctx.restore();
       drawRulers(ctx, transform, width, height);
     } else {
-      renderSceneBackground(ctx, scene, transform, width, height, machineWorkAreaMm);
+      renderSceneBackground(
+        ctx,
+        scene,
+        transform,
+        width,
+        height,
+        machineWorkAreaMm,
+        { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
+      );
       ctx.restore();
       drawRulers(ctx, transform, width, height);
       ctx.save();
@@ -894,7 +923,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

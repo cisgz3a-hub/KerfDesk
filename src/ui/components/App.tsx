@@ -1887,6 +1887,31 @@ export function App() {
           style: { flex: 1, position: 'relative' as const, overflow: 'hidden' },
           onClick: () => materialDropdownOpen && setMaterialDropdownOpen(false),
         },
+          React.createElement('div', {
+            style: {
+              position: 'absolute',
+              top: 6,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: 10,
+              fontFamily: theme.font.mono,
+              color: '#8888aa',
+              background: 'rgba(10, 10, 20, 0.75)',
+              padding: '3px 10px',
+              borderRadius: 4,
+              border: '1px solid #1a1a2e',
+              pointerEvents: 'none',
+              zIndex: 5,
+            },
+          },
+          startMode === 'absolute'
+            ? 'Canvas = Bed position'
+            : startMode === 'current'
+              ? 'Design starts at laser head'
+              : savedOrigin
+                ? `Design starts at saved origin X:${savedOrigin.x.toFixed(0)} Y:${savedOrigin.y.toFixed(0)}`
+                : 'No saved origin - set one below',
+          ),
           React.createElement(CanvasViewport, {
           scene,
           activeTool: activeTool,
@@ -1910,6 +1935,11 @@ export function App() {
           showToolpathPreview,
           toolpathMoves: showToolpathPreview ? toolpathPreviewMoves : null,
           machineWorkAreaMm: machineBedFromGrbl,
+          startMode,
+          savedOrigin,
+          bedWidthMm: scene.canvas.width,
+          bedHeightMm: scene.canvas.height,
+          originCorner: activeProfile?.originCorner ?? 'front-left',
         }),
         ),
       ),

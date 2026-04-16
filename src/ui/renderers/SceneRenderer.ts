@@ -25,6 +25,7 @@ import { type AABB, type Matrix3x2, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
+import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
 const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
@@ -116,6 +117,18 @@ function ditherCacheSet(key: string, canvas: HTMLCanvasElement): void {
   shrinkMap(ditherCanvasByKey);
 }
 
+export interface SceneMachineOverlayOptions {
+  /** Current G-code start mode — controls where machine (0,0) is drawn. */
+  startMode?: 'absolute' | 'current' | 'savedOrigin';
+  /** Saved origin in canvas coordinates for saved-origin mode. */
+  savedOrigin?: { x: number; y: number } | null;
+  /** Physical bed size in mm for reachable area rectangle. */
+  bedWidthMm?: number;
+  bedHeightMm?: number;
+  /** Machine origin corner for reachable area direction. */
+  originCorner?: MachineOriginCorner;
+}
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
 function renderMachineWorkAreaOverlay(
@@ -136,6 +149,91 @@ function renderMachineWorkAreaOverlay(
   ctx.restore();
 }
 
+function computeSceneBounds(scene: Scene): { minX: number; minY: number; maxX: number; maxY: number } {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const obj of scene.objects) {
+    if (!obj.visible) continue;
+    const b = computeObjectBounds(obj);
+    if (!b || !Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
+    minX = Math.min(minX, b.minX);
+    minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX);
+    maxY = Math.max(maxY, b.maxY);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  }
+  return { minX, minY, maxX, maxY };
+}
+
+function renderMachineOriginOverlay(
+  ctx: CanvasRenderingContext2D,
+  transform: Transform,
+  sceneBounds: { minX: number; minY: number; maxX: number; maxY: number },
+  options: SceneMachineOverlayOptions,
+): void {
+  if (!options.startMode || !options.bedWidthMm || !options.bedHeightMm) return;
+
+  let originCanvasX = 0;
+  let originCanvasY = 0;
+  switch (options.startMode) {
+    case 'absolute':
+      originCanvasX = 0;
+      originCanvasY = 0;
+      break;
+    case 'current':
+      originCanvasX = Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0;
+      originCanvasY = Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0;
+      break;
+    case 'savedOrigin':
+      originCanvasX = options.savedOrigin?.x ?? 0;
+      originCanvasY = options.savedOrigin?.y ?? 0;
+      break;
+  }
+
+  const frontOrigin = options.originCorner === 'front-left' || options.originCorner === 'front-right';
+  const boxMinX = originCanvasX;
+  const boxMaxX = originCanvasX + options.bedWidthMm;
+  const boxMinY = frontOrigin ? originCanvasY - options.bedHeightMm : originCanvasY;
+  const boxMaxY = frontOrigin ? originCanvasY : originCanvasY + options.bedHeightMm;
+
+  const p1 = transform.worldToScreen({ x: boxMinX, y: boxMinY });
+  const p2 = transform.worldToScreen({ x: boxMaxX, y: boxMaxY });
+  const origin = transform.worldToScreen({ x: originCanvasX, y: originCanvasY });
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  ctx.strokeStyle = 'rgba(45, 212, 160, 0.35)';
+  ctx.setLineDash([6, 4]);
+  ctx.lineWidth = 1;
+  ctx.strokeRect(
+    Math.min(p1.x, p2.x),
+    Math.min(p1.y, p2.y),
+    Math.abs(p2.x - p1.x),
+    Math.abs(p2.y - p1.y),
+  );
+  ctx.setLineDash([]);
+
+  const size = 14;
+  ctx.strokeStyle = 'rgba(45, 212, 160, 0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(origin.x - size, origin.y);
+  ctx.lineTo(origin.x + size, origin.y);
+  ctx.moveTo(origin.x, origin.y - size);
+  ctx.lineTo(origin.x, origin.y + size);
+  ctx.stroke();
+
+  ctx.fillStyle = 'rgba(45, 212, 160, 0.85)';
+  ctx.font = '10px monospace';
+  ctx.fillText('M(0,0)', origin.x + size + 4, origin.y + 4);
+  ctx.restore();
+}
+
 /** Bed, grid, origin, crosshair — leaves ctx with transform applied (outer save still active). */
 export function renderSceneBackground(
   ctx: CanvasRenderingContext2D,
@@ -144,6 +242,7 @@ export function renderSceneBackground(
   canvasWidth: number,
   canvasHeight: number,
   machineWorkAreaMm: { width: number; height: number } | null = null,
+  machineOverlay: SceneMachineOverlayOptions = {},
 ): void {
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
   ctx.fillStyle = '#0a0a14';
@@ -167,6 +266,9 @@ export function renderSceneBackground(
   ) {
     renderMachineWorkAreaOverlay(ctx, machineWorkAreaMm, transform);
   }
+
+  const sceneBounds = computeSceneBounds(scene);
+  renderMachineOriginOverlay(ctx, transform, sceneBounds, machineOverlay);
 
   // ─── MATERIAL RECTANGLE ─────────────────────────────────────────
   if (scene.material) {
@@ -538,8 +640,9 @@ export function renderScene(
   selectedIds?: ReadonlySet<string>,
   previewMode: boolean = false,
   machineWorkAreaMm: { width: number; height: number } | null = null,
+  machineOverlay: SceneMachineOverlayOptions = {},
 ): void {
-  renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight, machineWorkAreaMm);
+  renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight, machineWorkAreaMm, machineOverlay);
   renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode);
 }
 
