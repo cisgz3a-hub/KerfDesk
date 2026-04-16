@@ -87,8 +87,15 @@ const ACTIVE_PROFILE_KEY = 'laserforge_active_profile';
 function getBrowserLocalStorage(): Storage | null {
   if (typeof globalThis === 'undefined') return null;
   try {
-    const ls = (globalThis as unknown as { localStorage?: Storage }).localStorage;
-    return ls ?? null;
+    const ls = (globalThis as unknown as { localStorage?: unknown }).localStorage;
+    if (
+      ls != null &&
+      typeof (ls as Storage).getItem === 'function' &&
+      typeof (ls as Storage).setItem === 'function'
+    ) {
+      return ls as Storage;
+    }
+    return null;
   } catch {
     return null;
   }
