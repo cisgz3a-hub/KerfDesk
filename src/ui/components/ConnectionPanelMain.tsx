@@ -216,8 +216,9 @@ export function ConnectionPanelMain({
   const jobProgressRef = useRef<JobProgress | null>(null);
   const elapsedSecondsRef = useRef(0);
   const jobStoppedByUserRef = useRef(false);
-  const hasZeroed = useRef(false);
   const hasFramed = useRef(false);
+  const hasJogged = useRef(false);
+  const hasSetOrigin = useRef(false);
   const [workflowVersion, setWorkflowVersion] = useState(0);
 
   const notifySimulatorTx = useCallback((cmd: string) => {
@@ -313,8 +314,9 @@ export function ConnectionPanelMain({
 
   useEffect(() => {
     if (isConnected) {
-      hasZeroed.current = false;
       hasFramed.current = false;
+      hasJogged.current = false;
+      hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
     }
   }, [isConnected]);
@@ -558,6 +560,8 @@ export function ConnectionPanelMain({
 
   const handleJog = useCallback(
     (axis: 'X' | 'Y', distance: number) => {
+      hasJogged.current = true;
+      setWorkflowVersion(v => v + 1);
       const c = controllerRef.current;
       if (!c) return;
       const feedRate = 3000;
@@ -764,27 +768,6 @@ export function ConnectionPanelMain({
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
   }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
 
-  const handleZero = useCallback(async () => {
-    const ctrl = controllerRef.current;
-    if (!ctrl) return;
-    if (machineState?.status === 'alarm') {
-      await showAlert(
-        'Machine in alarm',
-        'Unlock the machine (Clear alarm / $X) before setting work zero.',
-      );
-      return;
-    }
-    try {
-      sendCmd('G10 L20 P1 X0 Y0');
-      ctrl.requestStatusReport();
-      hasZeroed.current = true;
-      setWorkflowVersion(v => v + 1);
-      setMessages(prev => [...prev, '✓ Work origin set at current position — matches “Where Head Is” G-code mode']);
-    } catch {
-      setMessages(prev => [...prev, 'Zero failed — try again']);
-    }
-  }, [machineState?.status, showAlert]);
-
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
     if (ok) sendCmd('$H');
@@ -957,14 +940,25 @@ export function ConnectionPanelMain({
           : !preflight?.canStart
             ? 'Fix issues below first'
             : 'Prepare job';
+  const estimatedTimeFormatted = gcode ? estimateJobTime(gcode).formatted : null;
 
   const workflowSection = isConnected && React.createElement(Workflow, {
-    hasZeroed: hasZeroed.current,
+    startMode,
+    onSelectMode,
+    startPositionStatus,
+    machinePositionKnown: !!machinePosition,
+    hasJogged: hasJogged.current,
+    hasSetOrigin: hasSetOrigin.current,
     hasFramed: hasFramed.current,
     canStartJob,
-    canFrame,
     startJobDesc,
-    onZero: () => { void handleZero(); },
+    estimatedTimeFormatted,
+    isConnected,
+    onSaveOrigin: () => {
+      hasSetOrigin.current = true;
+      setWorkflowVersion(v => v + 1);
+      onSaveOrigin();
+    },
   });
 
   const controlsSection = isConnected && React.createElement('div', {
@@ -979,48 +973,6 @@ export function ConnectionPanelMain({
     React.createElement('div', {
       style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },
     },
-      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 1 } }, 'Start Position'),
-      React.createElement('div', { style: { display: 'flex', gap: 3, marginBottom: 6 } },
-        ...([
-          { mode: 'absolute' as const, label: '📍 Bed' },
-          { mode: 'current' as const, label: '🎯 Head' },
-          { mode: 'savedOrigin' as const, label: '⚑ Origin' },
-        ]).map(m =>
-          React.createElement('button', {
-            type: 'button',
-            key: m.mode,
-            onClick: () => onSelectMode(m.mode),
-            disabled: m.mode === 'current' && !machinePosition,
-            style: {
-              flex: 1, padding: '4px', fontSize: 9, borderRadius: 4, cursor: 'pointer', fontFamily: font,
-              background: startMode === m.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
-              border: startMode === m.mode ? '1px solid #00d4ff' : '1px solid #252540',
-              color: startMode === m.mode ? '#00d4ff' : '#555570',
-              opacity: m.mode === 'current' && !machinePosition ? 0.4 : 1,
-            },
-          }, m.label),
-        ),
-      ),
-      React.createElement('div', { style: { fontSize: 9, color: '#555570', lineHeight: 1.25, marginBottom: 4 } }, startPositionStatus),
-      (startMode === 'savedOrigin' || isConnected) && React.createElement('button', {
-        type: 'button',
-        onClick: onSaveOrigin,
-        disabled: !isConnected,
-        title: isConnected ? 'Store current head X/Y as the saved reference' : 'Connect to laser to save origin from head position',
-        style: {
-          marginBottom: 4,
-          padding: 0,
-          background: 'none',
-          border: 'none',
-          color: '#00d4ff',
-          fontSize: 9,
-          cursor: isConnected ? 'pointer' : 'default',
-          fontFamily: font,
-          textDecoration: 'underline',
-          textAlign: 'left' as const,
-          opacity: isConnected ? 1 : 0.45,
-        },
-      }, '📌 Save current head position as origin'),
       machineState?.status === 'alarm' && React.createElement('button', {
         type: 'button',
         onClick: handleUnlock,
@@ -1071,15 +1023,6 @@ export function ConnectionPanelMain({
           opacity: canFrame ? 1 : 0.4,
         },
       }, '◉ Frame with Laser Dot'),
-      gcode && React.createElement('div', {
-        style: {
-          padding: '6px 8px', background: '#08080f', borderRadius: 6, border: '1px solid #1a1a2e',
-          display: 'flex', justifyContent: 'space-between', fontSize: 9, marginTop: 4,
-        },
-      },
-        React.createElement('span', { style: { color: '#555570' } }, 'Est. time'),
-        React.createElement('span', { style: { color: '#00d4ff', fontFamily: mono, fontWeight: 600 } }, estimateJobTime(gcode).formatted),
-      ),
     ),
   );
 
