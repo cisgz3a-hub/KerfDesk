@@ -526,12 +526,49 @@ export function App() {
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
+  const [textPreviewFontReady, setTextPreviewFontReady] = useState(true);
 
   useEffect(() => {
     if (!textPlacementHint) return;
     const id = window.setTimeout(() => setTextPlacementHint(null), 5000);
     return () => clearTimeout(id);
   }, [textPlacementHint]);
+
+  useEffect(() => {
+    if (!dialogs.showTextDialog) return;
+    if (typeof document === 'undefined' || !document.fonts?.load) {
+      setTextPreviewFontReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    const previewFontSizePx = Math.min(dialogs.textSize * 2, 48);
+    const fontSpec =
+      `${dialogs.textItalic ? 'italic ' : ''}` +
+      `${dialogs.textBold ? 'bold ' : ''}` +
+      `${previewFontSizePx}px "${dialogs.textFont}"`;
+    const sample = dialogs.textInput || 'Preview';
+
+    setTextPreviewFontReady(false);
+    void document.fonts.load(fontSpec, sample)
+      .then(() => {
+        if (!cancelled) setTextPreviewFontReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setTextPreviewFontReady(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    dialogs.showTextDialog,
+    dialogs.textBold,
+    dialogs.textFont,
+    dialogs.textInput,
+    dialogs.textItalic,
+    dialogs.textSize,
+  ]);
 
   const handleTextPlaced = useCallback(() => {
     setTextPlacementHint('Tip: Select text and click "Convert to Path" before cutting');
@@ -2522,8 +2559,10 @@ export function App() {
               fontWeight: dialogs.textBold ? 'bold' : 'normal',
               fontStyle: dialogs.textItalic ? 'italic' : 'normal',
               color: '#e0e0ec',
+              opacity: textPreviewFontReady ? 1 : 0.2,
+              transition: 'opacity 120ms ease',
             },
-          }, dialogs.textInput || 'Preview'),
+          }, textPreviewFontReady ? (dialogs.textInput || 'Preview') : 'Loading preview...'),
         ),
 
         React.createElement('div', { style: { padding: '0 18px 16px' } },
