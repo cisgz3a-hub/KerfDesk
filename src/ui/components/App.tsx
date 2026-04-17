@@ -37,8 +37,8 @@ import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { GrblController } from '../../controllers/grbl/GrblController';
-import { CanvasViewport } from './CanvasViewport';
-import { type ModeTabState } from '../renderers/SceneRenderer';
+import { CanvasViewport, type ViewportActions } from './CanvasViewport';
+import { ModeTabsOverlay } from './canvas/ModeTabsOverlay';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu } from './ContextMenu';
@@ -124,7 +124,7 @@ export function App() {
   } = useModal();
   const dialogs = useDialogs();
   const [zoomLevel, setZoomLevel] = useState(100);
-  const viewportActionsRef = useRef<{ zoomIn: () => void; zoomOut: () => void; fitToBed: () => void } | null>(null);
+  const viewportActionsRef = useRef<ViewportActions | null>(null);
 
   const [scene, setScene] = useState<Scene>(() => {
     const initial = createScene(400, 300, 'Untitled');
@@ -185,10 +185,23 @@ export function App() {
   const [activeModes, setActiveModes] = useState<Set<string>>(
     () => new Set(['cut', 'engrave', 'score', 'image']),
   );
-  const modeTabState: ModeTabState = useMemo(
-    () => ({ activeModes }),
-    [activeModes],
-  );
+  const [bedTabLayout, setBedTabLayout] = useState({
+    bedScreenX: 0,
+    bedScreenY: 0,
+    zoom: 1.5,
+  });
+  const handleViewportLayout = useCallback((layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => {
+    setBedTabLayout(prev => {
+      if (
+        prev.bedScreenX === layout.bedScreenX &&
+        prev.bedScreenY === layout.bedScreenY &&
+        prev.zoom === layout.zoom
+      ) {
+        return prev;
+      }
+      return layout;
+    });
+  }, []);
   const handleModeTabToggle = useCallback((mode: string) => {
     setActiveModes(prev => {
       const next = new Set(prev);
@@ -1977,9 +1990,18 @@ export function App() {
           bedWidthMm: scene.canvas.width,
           bedHeightMm: scene.canvas.height,
           originCorner: activeProfile?.originCorner ?? 'front-left',
-          modeTabState,
-          onModeTabToggle: handleModeTabToggle,
+          activeModes,
+          onViewportLayout: handleViewportLayout,
         }),
+          React.createElement(ModeTabsOverlay, {
+            bedScreenX: bedTabLayout.bedScreenX,
+            bedScreenY: bedTabLayout.bedScreenY,
+            viewportZoom: bedTabLayout.zoom,
+            activeModes,
+            onToggleMode: handleModeTabToggle,
+            bedWidth: scene.canvas.width,
+            bedHeight: scene.canvas.height,
+          }),
         ),
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {

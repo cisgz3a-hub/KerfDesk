@@ -34,14 +34,7 @@ import {
 import { computeFitBounds, computeObjectBounds } from '../../geometry/bounds';
 import { aabbIntersects, type Matrix3x2 } from '../../core/types';
 import { hitTestPoint } from '../../geometry/hit-test';
-import {
-  renderScene,
-  renderSceneBackground,
-  renderSceneObjects,
-  renderModeTabs,
-  hitTestModeTabs,
-  type ModeTabState,
-} from '../renderers/SceneRenderer';
+import { renderScene, renderSceneBackground, renderSceneObjects } from '../renderers/SceneRenderer';
 import {
   renderSimulationPath,
   renderLaserHead,
@@ -329,6 +322,7 @@ export type ViewportActions = {
   zoomIn: () => void;
   zoomOut: () => void;
   fitToBed: () => void;
+  getViewport: () => ViewportState;
 };
 
 export type CanvasViewportQuickActions = {
@@ -380,9 +374,10 @@ interface CanvasViewportProps {
   bedWidthMm?: number;
   bedHeightMm?: number;
   originCorner?: MachineOriginCorner;
-  /** When set, mode tabs are drawn on the bed edge and inactive modes are hidden from the canvas. */
-  modeTabState?: ModeTabState;
-  onModeTabToggle?: (mode: string) => void;
+  /** Modes currently shown at full opacity on the canvas; others drawn dimmed. */
+  activeModes?: ReadonlySet<string> | null;
+  /** Bed (0,0) in canvas pixel space + zoom — for DOM overlays aligned to the bed. */
+  onViewportLayout?: (layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -416,8 +411,8 @@ export function CanvasViewport({
   bedWidthMm = 0,
   bedHeightMm = 0,
   originCorner = 'front-left',
-  modeTabState,
-  onModeTabToggle,
+  activeModes = null,
+  onViewportLayout,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -439,17 +434,6 @@ export function CanvasViewport({
   const nodeTargetIdRef = useRef<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const prevBedRef = useRef<{ w: number; h: number } | null>(null);
-
-  const displayScene = useMemo(() => {
-    if (!modeTabState) return scene;
-    return {
-      ...scene,
-      layers: scene.layers.map(l => ({
-        ...l,
-        visible: l.visible && modeTabState.activeModes.has(l.settings.mode),
-      })),
-    };
-  }, [scene, modeTabState]);
 
   const onZoomChangeRef = useRef(onZoomChange);
   onZoomChangeRef.current = onZoomChange;
@@ -508,11 +492,12 @@ export function CanvasViewport({
         onZoomChangeRef.current?.(Math.round(next.zoom * 100));
         setViewport(next);
       },
+      getViewport: () => viewport,
     };
     return () => {
       actionsRef.current = null;
     };
-  }, [actionsRef, scene.canvas.width, scene.canvas.height, width, height]);
+  }, [actionsRef, scene.canvas.width, scene.canvas.height, width, height, viewport]);
 
   // Center bed on first load and when scene canvas (bed) size changes — not when only the viewport panel is resized
   useEffect(() => {
@@ -525,6 +510,13 @@ export function CanvasViewport({
     setViewport(next);
     onZoomChangeRef.current?.(Math.round(next.zoom * 100));
   }, [scene.canvas.width, scene.canvas.height, width, height]);
+
+  useEffect(() => {
+    if (!onViewportLayout) return;
+    const t = Transform.from(viewport);
+    const p = t.worldToScreen({ x: 0, y: 0 });
+    onViewportLayout({ bedScreenX: p.x, bedScreenY: p.y, zoom: viewport.zoom });
+  }, [viewport, width, height, onViewportLayout]);
 
   useEffect(() => {
     isPanningRef.current = isPanning;
@@ -555,7 +547,7 @@ export function CanvasViewport({
       ctx.globalAlpha = 0.15;
       renderScene(
         ctx,
-        displayScene,
+        scene,
         transform,
         width,
         height,
@@ -563,29 +555,20 @@ export function CanvasViewport({
         previewMode,
         machineWorkAreaMm,
         { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
+        activeModes,
       );
-      ctx.save();
-      ctx.globalAlpha = 1;
-      transform.applyToContext(ctx);
-      if (modeTabState) {
-        renderModeTabs(ctx, scene.canvas.height, transform, modeTabState);
-      }
-      ctx.restore();
       ctx.restore();
       drawRulers(ctx, transform, width, height);
     } else {
       renderSceneBackground(
         ctx,
-        displayScene,
+        scene,
         transform,
         width,
         height,
         machineWorkAreaMm,
         { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
       );
-      if (modeTabState) {
-        renderModeTabs(ctx, scene.canvas.height, transform, modeTabState);
-      }
       ctx.restore();
       drawRulers(ctx, transform, width, height);
       ctx.save();
@@ -600,7 +583,7 @@ export function CanvasViewport({
           console.error('[Canvas] Viewport transform invalid before scene objects');
           ctx.restore();
         } else {
-          renderSceneObjects(ctx, displayScene, transform, width, height, selectedIds, previewMode);
+          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode, activeModes);
         }
       }
     }
@@ -920,7 +903,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, displayScene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, modeTabState]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, activeModes]);
 
   useEffect(() => {
     if (activeTool !== 'node') {
@@ -1124,15 +1107,6 @@ export function CanvasViewport({
       y: e.clientY - rect.top,
     });
 
-    if (onModeTabToggle && modeTabState) {
-      const tabHit = hitTestModeTabs(worldPt.x, worldPt.y, transform);
-      if (tabHit) {
-        onModeTabToggle(tabHit.mode);
-        e.preventDefault();
-        return;
-      }
-    }
-
     if (activeTool === 'text') {
       onRequestTextPlacement?.({
         x: snapToGrid(worldPt.x, GRID_SNAP),
@@ -1278,7 +1252,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement, modeTabState, onModeTabToggle]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
