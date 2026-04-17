@@ -32,6 +32,7 @@ import { useImport } from '../hooks/useImport';
 import { useCompileManager } from '../hooks/useCompileManager';
 import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
+import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -1169,45 +1170,18 @@ export function App() {
     setSelectedIds(new Set());
   }, []);
 
-  const handleQuickActionDuplicate = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    const newIds = new Set<string>();
-    const clones: typeof scene.objects = [];
-    const parentIdMap = new Map<string, string>();
-    for (const obj of scene.objects) {
-      if (!selectedIds.has(obj.id)) continue;
-      const newId = generateId();
-      newIds.add(newId);
-      let newParentId = obj.parentId;
-      if (obj.parentId) {
-        if (!parentIdMap.has(obj.parentId)) {
-          parentIdMap.set(obj.parentId, generateId());
-        }
-        newParentId = parentIdMap.get(obj.parentId)!;
-      }
-      clones.push({
-        ...obj,
-        id: newId,
-        parentId: newParentId,
-        name: obj.name + ' copy',
-        transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
-        _bounds: null,
-        _worldTransform: null,
-      });
-    }
-    const newScene = { ...scene, objects: [...scene.objects, ...clones] };
-    handleSceneCommit(newScene);
-    setSelectedIds(newIds);
-  }, [scene, selectedIds, handleSceneCommit]);
-
-  const handleQuickActionDelete = useCallback(() => {
-    handleDelete();
-  }, [handleDelete]);
-
-  const handleQuickActionCenter = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    sceneOps.centerOnMaterial();
-  }, [selectedIds.size, sceneOps.centerOnMaterial]);
+  const {
+    handleQuickActionDuplicate,
+    handleQuickActionDelete,
+    handleQuickActionCenter,
+  } = useQuickActionHandlers({
+    scene,
+    selectedIds,
+    setSelectedIds,
+    handleSceneCommit,
+    handleDelete,
+    centerOnMaterial: sceneOps.centerOnMaterial,
+  });
 
   const handleContextMenu = useCallback(
     (e: MouseEvent) => {
