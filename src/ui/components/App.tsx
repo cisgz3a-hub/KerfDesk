@@ -31,6 +31,7 @@ import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useCompileManager } from '../hooks/useCompileManager';
 import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
+import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -57,7 +58,7 @@ import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObjec
 import { computeObjectBounds } from '../../geometry/bounds';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { theme } from '../styles/theme';
-import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
+import { WelcomeWizard } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
@@ -100,16 +101,6 @@ import {
 } from '../../core/materials/MaterialPresets';
 import { type Template } from '../../templates/TemplateLibrary';
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
-
-/** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
-function getSetupStorageKey(): string {
-  try {
-    if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
-      return 'laserforge_setup_complete_electron';
-    }
-  } catch { /* ignore */ }
-  return 'laserforge_setup_complete';
-}
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 
@@ -963,18 +954,18 @@ export function App() {
     showAlert,
   });
 
-  const handleRecover = useCallback(() => {
-    try {
-      const saved = localStorage.getItem('laserforge_autosave');
-      if (saved) {
-        const recovered = deserializeScene(saved);
-        handleNewProject(recovered);
-      }
-    } catch (e) {
-      console.error('Recovery failed:', e);
-    }
-    setShowRecover(false);
-  }, [handleNewProject]);
+  const {
+    handleRecover,
+    handleWizardComplete,
+    handleWizardSkip,
+  } = useWizardHandlers({
+    scene,
+    handleSceneCommit,
+    handleNewProject,
+    setShowSetup: dialogs.setShowSetup,
+    setShowRecover,
+    viewportActionsRef,
+  });
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -1018,45 +1009,6 @@ export function App() {
       setToastSuggestion(null);
     }
   }, [scene.material?.name, scene.activeLayerId]); // eslint-disable-line react-hooks/exhaustive-deps -- material/layer identity only
-
-  const handleWizardComplete = useCallback((result: WizardResult) => {
-    dialogs.setShowSetup(false);
-    try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
-
-    // Apply wizard results to scene
-    const matX = Math.round((result.bedWidth - result.materialWidth) / 2);
-    const matY = Math.round((result.bedHeight - result.materialHeight) / 2);
-
-    const newScene = {
-      ...scene,
-      canvas: { ...scene.canvas, width: result.bedWidth, height: result.bedHeight },
-      material: {
-        enabled: true,
-        x: matX,
-        y: matY,
-        width: result.materialWidth,
-        height: result.materialHeight,
-        thickness: result.materialThickness,
-        type: result.materialType as NonNullable<Scene['material']>['type'],
-        name: result.materialName,
-        color: result.materialColor,
-      },
-      machine: {
-        name: result.machineName || 'Custom',
-        watts: result.machineWatts || '',
-        type: result.machineType || 'diode',
-      },
-    };
-    handleSceneCommit(newScene);
-
-    // Fit to bed after a tick
-    setTimeout(() => viewportActionsRef.current?.fitToBed(), 100);
-  }, [scene, handleSceneCommit, dialogs.setShowSetup]);
-
-  const handleWizardSkip = useCallback(() => {
-    dialogs.setShowSetup(false);
-    try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
-  }, [dialogs.setShowSetup]);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 
