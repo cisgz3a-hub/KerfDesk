@@ -1771,6 +1771,10 @@ export function App() {
     textAlign: 'left' as const, cursor: 'pointer', fontFamily: theme.font.ui,
   };
 
+  const outlineFonts = BUNDLED_FONTS.filter(f => !f.hersheyFamily);
+  const engravingFonts = BUNDLED_FONTS.filter(f => !!f.hersheyFamily);
+  const systemFonts = ['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman', 'Avant Garde'];
+
   // ─── RENDER ──────────────────────────────────────────────────
 
   return React.createElement('div', {
@@ -2424,6 +2428,7 @@ export function App() {
         position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
         backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
         justifyContent: 'center', zIndex: 2000, fontFamily: "'DM Sans', system-ui, sans-serif",
+        overflowY: 'auto', padding: '20px 0',
       },
       onClick: (e: React.MouseEvent) => {
         if (e.target === e.currentTarget) {
@@ -2437,6 +2442,10 @@ export function App() {
           background: '#12121e', border: '1px solid #252540', borderRadius: 14,
           width: 420, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
           overflow: 'hidden',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          display: 'flex',
+          flexDirection: 'column' as const,
         },
         onClick: (e: React.MouseEvent) => e.stopPropagation(),
       },
@@ -2484,33 +2493,27 @@ export function App() {
                 fontFamily: "'DM Sans', system-ui, sans-serif",
               },
             },
-              ...BUNDLED_FONTS.filter(f => !f.hersheyFamily).map(bf =>
-                React.createElement('option', {
-                  key: `bundled-${bf.family}`,
-                  value: bf.family,
-                  style: { fontFamily: bf.family },
-                }, `${bf.label}  (bundled)`),
+              outlineFonts.length > 0 && React.createElement('optgroup', { key: 'g-bundled', label: 'Bundled' },
+                ...outlineFonts.map(bf =>
+                  React.createElement('option', {
+                    key: `bundled-${bf.family}`,
+                    value: bf.family,
+                    style: { fontFamily: `"${bf.family}", sans-serif` },
+                  }, bf.label.replace(/\s+\(single-line\)\s*$/i, '')),
+                ),
               ),
-              BUNDLED_FONTS.some(f => !!f.hersheyFamily) && React.createElement('option', {
-                key: '_sep_engraving',
-                value: '',
-                disabled: true,
-                style: { fontStyle: 'italic', color: '#555570' },
-              }, '— Engraving (single-line) —'),
-              ...BUNDLED_FONTS.filter(f => !!f.hersheyFamily).map(bf =>
-                React.createElement('option', {
-                  key: `hershey-${bf.family}`,
-                  value: bf.family,
-                }, bf.label),
+              engravingFonts.length > 0 && React.createElement('optgroup', { key: 'g-engraving', label: 'Engraving (single-line)' },
+                ...engravingFonts.map(bf =>
+                  React.createElement('option', {
+                    key: `hershey-${bf.family}`,
+                    value: bf.family,
+                  }, bf.label.replace(/\s+\(single-line\)\s*$/i, '')),
+                ),
               ),
-              React.createElement('option', {
-                key: '_sep_system',
-                value: '',
-                disabled: true,
-                style: { fontStyle: 'italic', color: '#555570' },
-              }, '— System fonts —'),
-              ...['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman', 'Avant Garde'].map(f =>
-                React.createElement('option', { key: `system-${f}`, value: f, style: { fontFamily: f } }, f),
+              React.createElement('optgroup', { key: 'g-system', label: 'System fonts' },
+                ...systemFonts.map(f =>
+                  React.createElement('option', { key: `system-${f}`, value: f, style: { fontFamily: f } }, f),
+                ),
               ),
             ),
           ),
