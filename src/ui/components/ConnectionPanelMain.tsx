@@ -34,6 +34,28 @@ import { Workflow } from './connection/Workflow';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 
+function jobModeLabel(scene: Scene): string {
+  const outputLayers = scene.layers.filter(l => l.visible && l.output !== false);
+  const hasObjectsByLayer = new Set(
+    scene.objects.filter(o => o.visible).map(o => o.layerId),
+  );
+  const contributing = outputLayers.filter(l => hasObjectsByLayer.has(l.id));
+
+  if (contributing.length === 0) return 'Running';
+
+  const modes = new Set(contributing.map(l => l.settings.mode));
+  if (modes.size > 1) return 'Running';
+
+  const onlyMode = modes.values().next().value as LayerMode;
+  switch (onlyMode) {
+    case 'cut': return 'Cutting';
+    case 'engrave': return 'Engraving';
+    case 'score': return 'Scoring';
+    case 'image': return 'Engraving';
+    default: return 'Running';
+  }
+}
+
 type StartMode = GcodeStartMode;
 
 const FRAME_IDLE_POLL_MS = 200;
@@ -1420,6 +1442,7 @@ export function ConnectionPanelMain({
     displayPaused,
     elapsedSeconds,
     estimatedRemaining,
+    activeLabel: jobModeLabel(scene),
   });
 
   const footerSection = isConnected && React.createElement(Controls, {

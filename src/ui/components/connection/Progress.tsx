@@ -11,6 +11,8 @@ interface ProgressProps {
   displayPaused: boolean;
   elapsedSeconds: number;
   estimatedRemaining: number | null;
+  /** Verb shown while running: "Cutting" / "Engraving" / "Scoring" / "Running". */
+  activeLabel?: string;
 }
 
 const mono = "'JetBrains Mono', monospace";
@@ -22,14 +24,20 @@ function formatJobTime(seconds: number): string {
   return `${m}:${r.toString().padStart(2, '0')}`;
 }
 
-export function Progress({ jobProgress, displayPaused, elapsedSeconds, estimatedRemaining }: ProgressProps) {
+export function Progress({
+  jobProgress,
+  displayPaused,
+  elapsedSeconds,
+  estimatedRemaining,
+  activeLabel = 'Running',
+}: ProgressProps) {
   return React.createElement('div', {
     style: { padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: 12, flexShrink: 0 },
   },
     React.createElement('div', { style: { textAlign: 'center' as const } },
       React.createElement('div', {
         style: { fontSize: 16, fontWeight: 700, color: displayPaused ? '#ffd444' : '#2dd4a0' },
-      }, displayPaused ? '⏸ Paused' : '▶ Cutting...'),
+      }, displayPaused ? '⏸ Paused' : `▶ ${activeLabel}...`),
     ),
     React.createElement('div', null,
       React.createElement('div', {
