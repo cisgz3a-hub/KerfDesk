@@ -67,8 +67,7 @@ import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
-import { NumberInput } from './NumberInput';
-import { FontPicker } from './common/FontPicker';
+import { AddTextDialog } from './AddTextDialog';
 import { FontCreditsDialog } from './FontCreditsDialog';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
@@ -639,6 +638,89 @@ export function App() {
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
+
+  const handleAddTextDialogSubmit = useCallback(() => {
+    if (!dialogs.textInput.trim()) return;
+
+    if (dialogs.editingTextId) {
+      const newScene = {
+        ...scene,
+        objects: scene.objects.map(o =>
+          o.id === dialogs.editingTextId
+            ? {
+                ...o,
+                name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
+                geometry: {
+                  ...(o.geometry as TextGeometry),
+                  type: 'text' as const,
+                  text: dialogs.textInput,
+                  fontSize: dialogs.textSize,
+                  fontFamily: dialogs.textFont,
+                  bold: dialogs.textBold,
+                  italic: dialogs.textItalic,
+                },
+                _bounds: null,
+                _worldTransform: null,
+              }
+            : o
+        ),
+      };
+      handleSceneCommit(newScene);
+    } else {
+      const layerId = scene.activeLayerId || scene.layers[0]?.id;
+      if (!layerId) return;
+
+      const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
+      const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
+
+      const textObj: SceneObject = {
+        id: generateId(),
+        type: 'text',
+        name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
+        layerId,
+        parentId: null,
+        transform: { ...IDENTITY_MATRIX, tx, ty },
+        geometry: {
+          type: 'text',
+          text: dialogs.textInput,
+          fontSize: dialogs.textSize,
+          fontFamily: dialogs.textFont,
+          bold: dialogs.textBold,
+          italic: dialogs.textItalic,
+        },
+        visible: true,
+        locked: false,
+        powerScale: 1,
+        _bounds: null,
+        _worldTransform: null,
+      };
+
+      const newScene = {
+        ...scene,
+        objects: [...scene.objects, textObj],
+      };
+      handleSceneCommit(newScene);
+      setSelectedIds(new Set([textObj.id]));
+      handleTextPlaced();
+    }
+
+    dialogs.closeTextDialog();
+    setTextPlacementPt(null);
+    setActiveTool('select');
+  }, [
+    scene,
+    handleSceneCommit,
+    dialogs.textInput,
+    dialogs.textFont,
+    dialogs.textSize,
+    dialogs.textBold,
+    dialogs.textItalic,
+    dialogs.editingTextId,
+    dialogs.closeTextDialog,
+    textPlacementPt,
+    handleTextPlaced,
+  ]);
+
   useEffect(() => {
     handleSceneCommitRef.current = handleSceneCommit;
   }, [handleSceneCommit]);
@@ -2438,236 +2520,27 @@ export function App() {
       onDismiss: () => setToastSuggestion(null),
     }),
 
-    dialogs.showTextDialog && React.createElement('div', {
-      style: {
-        position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)',
-        backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center',
-        justifyContent: 'center', zIndex: 2000, fontFamily: "'DM Sans', system-ui, sans-serif",
-        overflowY: 'auto', padding: '20px 0',
+    React.createElement(AddTextDialog, {
+      showTextDialog: dialogs.showTextDialog,
+      editingTextId: dialogs.editingTextId,
+      textInput: dialogs.textInput,
+      textFont: dialogs.textFont,
+      textSize: dialogs.textSize,
+      textBold: dialogs.textBold,
+      textItalic: dialogs.textItalic,
+      textPreviewFontReady,
+      setTextInput: dialogs.setTextInput,
+      setTextFont: dialogs.setTextFont,
+      setTextSize: dialogs.setTextSize,
+      setTextBold: dialogs.setTextBold,
+      setTextItalic: dialogs.setTextItalic,
+      onClose: () => {
+        dialogs.closeTextDialog();
+        setTextPlacementPt(null);
       },
-      onClick: (e: React.MouseEvent) => {
-        if (e.target === e.currentTarget) {
-          dialogs.closeTextDialog();
-          setTextPlacementPt(null);
-        }
-      },
-    },
-      React.createElement('div', {
-        style: {
-          background: '#12121e', border: '1px solid #252540', borderRadius: 14,
-          width: 420, padding: 0, boxShadow: '0 20px 60px rgba(0,0,0,0.6)',
-          overflow: 'hidden',
-          maxHeight: '90vh',
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column' as const,
-        },
-        onClick: (e: React.MouseEvent) => e.stopPropagation(),
-      },
-        React.createElement('div', {
-          style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-        },
-          React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, dialogs.editingTextId ? 'Edit Text' : 'Add Text'),
-          React.createElement('button', {
-            onClick: () => {
-              dialogs.closeTextDialog();
-              setTextPlacementPt(null);
-            },
-            style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' },
-          }, '×'),
-        ),
-
-        React.createElement('div', { style: { padding: '16px 18px' } },
-          React.createElement('textarea', {
-            value: dialogs.textInput,
-            onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => dialogs.setTextInput(e.target.value),
-            placeholder: 'Type your text here...',
-            autoFocus: true,
-            rows: 3,
-            style: {
-              width: '100%', padding: '10px 12px',
-              background: '#0a0a14', border: '1px solid #252540', borderRadius: 8,
-              color: '#e0e0ec', fontSize: 14, fontFamily: dialogs.textFont,
-              fontWeight: dialogs.textBold ? 'bold' : 'normal',
-              fontStyle: dialogs.textItalic ? 'italic' : 'normal',
-              outline: 'none', resize: 'vertical' as const,
-            },
-          }),
-        ),
-
-        React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Font'),
-            React.createElement(FontPicker, {
-              value: dialogs.textFont,
-              onChange: (family: string) => dialogs.setTextFont(family),
-            }),
-            React.createElement('button', {
-              type: 'button',
-              onClick: () => setShowFontCredits(true),
-              style: {
-                background: 'none',
-                border: 'none',
-                fontSize: 10,
-                color: '#555570',
-                textDecoration: 'underline',
-                cursor: 'pointer',
-                padding: 0,
-                marginTop: 4,
-              },
-            }, 'Font credits'),
-          ),
-          React.createElement('div', { style: { width: 80 } },
-            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),
-            React.createElement(NumberInput, {
-              value: dialogs.textSize,
-              min: 3,
-              max: 200,
-              integer: true,
-              inputMode: 'numeric',
-              defaultValue: 20,
-              onChange: (v: number) => dialogs.setTextSize(v),
-              onCommit: (v: number) => dialogs.setTextSize(v),
-              style: {
-                width: '100%', padding: '6px 8px',
-                background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
-                color: '#e0e0ec', fontSize: 12, outline: 'none',
-                fontFamily: "'JetBrains Mono', monospace",
-              },
-            }),
-          ),
-        ),
-
-        React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
-          React.createElement('button', {
-            onClick: () => dialogs.setTextBold(!dialogs.textBold),
-            style: {
-              padding: '6px 16px', fontSize: 13, fontWeight: 700,
-              background: dialogs.textBold ? 'rgba(0,212,255,0.1)' : '#0a0a14',
-              border: dialogs.textBold ? '1px solid #00d4ff' : '1px solid #252540',
-              borderRadius: 6, color: dialogs.textBold ? '#00d4ff' : '#555570',
-              cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
-            },
-          }, 'B'),
-          React.createElement('button', {
-            onClick: () => dialogs.setTextItalic(!dialogs.textItalic),
-            style: {
-              padding: '6px 16px', fontSize: 13, fontStyle: 'italic',
-              background: dialogs.textItalic ? 'rgba(0,212,255,0.1)' : '#0a0a14',
-              border: dialogs.textItalic ? '1px solid #00d4ff' : '1px solid #252540',
-              borderRadius: 6, color: dialogs.textItalic ? '#00d4ff' : '#555570',
-              cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
-            },
-          }, 'I'),
-        ),
-
-        React.createElement('div', {
-          style: {
-            margin: '0 18px 12px', padding: '16px',
-            background: '#08080f', borderRadius: 8, border: '1px solid #1a1a2e',
-            minHeight: 50, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          },
-        },
-          React.createElement('span', {
-            style: {
-              fontFamily: dialogs.textFont, fontSize: Math.min(dialogs.textSize * 2, 48),
-              fontWeight: dialogs.textBold ? 'bold' : 'normal',
-              fontStyle: dialogs.textItalic ? 'italic' : 'normal',
-              color: '#e0e0ec',
-              opacity: textPreviewFontReady ? 1 : 0.2,
-              transition: 'opacity 120ms ease',
-            },
-          }, textPreviewFontReady ? (dialogs.textInput || 'Preview') : 'Loading preview...'),
-        ),
-
-        React.createElement('div', { style: { padding: '0 18px 16px' } },
-          React.createElement('button', {
-            onClick: () => {
-              if (!dialogs.textInput.trim()) return;
-
-              if (dialogs.editingTextId) {
-                const newScene = {
-                  ...scene,
-                  objects: scene.objects.map(o =>
-                    o.id === dialogs.editingTextId
-                      ? {
-                          ...o,
-                          name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-                          geometry: {
-                            ...(o.geometry as TextGeometry),
-                            type: 'text' as const,
-                            text: dialogs.textInput,
-                            fontSize: dialogs.textSize,
-                            fontFamily: dialogs.textFont,
-                            bold: dialogs.textBold,
-                            italic: dialogs.textItalic,
-                          },
-                          _bounds: null,
-                          _worldTransform: null,
-                        }
-                      : o
-                  ),
-                };
-                handleSceneCommit(newScene);
-              } else {
-                const layerId = scene.activeLayerId || scene.layers[0]?.id;
-                if (!layerId) return;
-
-                const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
-                const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
-
-                const textObj: SceneObject = {
-                  id: generateId(),
-                  type: 'text',
-                  name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-                  layerId,
-                  parentId: null,
-                  transform: { ...IDENTITY_MATRIX, tx, ty },
-                  geometry: {
-                    type: 'text',
-                    text: dialogs.textInput,
-                    fontSize: dialogs.textSize,
-                    fontFamily: dialogs.textFont,
-                    bold: dialogs.textBold,
-                    italic: dialogs.textItalic,
-                  },
-                  visible: true,
-                  locked: false,
-                  powerScale: 1,
-                  _bounds: null,
-                  _worldTransform: null,
-                };
-
-                const newScene = {
-                  ...scene,
-                  objects: [...scene.objects, textObj],
-                };
-                handleSceneCommit(newScene);
-                setSelectedIds(new Set([textObj.id]));
-                handleTextPlaced();
-              }
-
-              dialogs.closeTextDialog();
-              setTextPlacementPt(null);
-              setActiveTool('select');
-            },
-            disabled: !dialogs.textInput.trim(),
-            style: {
-              width: '100%', padding: '10px',
-              background: dialogs.textInput.trim() ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
-              border: dialogs.textInput.trim() ? '1px solid #2dd4a0' : '1px solid #252540',
-              borderRadius: 8, color: dialogs.textInput.trim() ? '#2dd4a0' : '#333355',
-              fontSize: 13, fontWeight: 600, cursor: dialogs.textInput.trim() ? 'pointer' : 'default',
-              fontFamily: "'DM Sans', system-ui, sans-serif",
-            },
-          }, dialogs.editingTextId ? 'Update Text' : 'Add Text to Canvas'),
-
-          React.createElement('div', {
-            style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const },
-          }, 'After adding, select the text and click "Convert to Path" before cutting'),
-        ),
-      ),
-    ),
+      onSubmit: handleAddTextDialogSubmit,
+      onOpenFontCredits: () => setShowFontCredits(true),
+    }),
 
     showFontCredits && React.createElement(FontCreditsDialog, {
       onClose: () => setShowFontCredits(false),
