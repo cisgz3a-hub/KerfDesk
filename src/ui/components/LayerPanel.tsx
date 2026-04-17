@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
 import type { SceneObject } from '../../core/scene/SceneObject';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
@@ -66,6 +66,29 @@ export function LayerPanel({
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
   const [showTabsCustomize, setShowTabsCustomize] = useState(false);
   const [sidebarTab, setSidebarTab] = useState<'layer' | 'object'>('layer');
+
+  // Auto-switch to Object tab when a selection appears or the selected object(s)
+  // change; back to Layer when selection clears. Manual tab choice is respected
+  // until the next selection change (including A→B while on Layer).
+  const hasSelection = selectedIds.size > 0;
+  const selectionSignature = useMemo(
+    () => [...selectedIds].sort().join('\0'),
+    [selectedIds],
+  );
+  const prevSelectionRef = useRef<{ had: boolean; sig: string }>({
+    had: hasSelection,
+    sig: selectionSignature,
+  });
+  useEffect(() => {
+    const prev = prevSelectionRef.current;
+    if (!prev.had && hasSelection) setSidebarTab('object');
+    else if (prev.had && !hasSelection) setSidebarTab('layer');
+    else if (prev.had && hasSelection && selectionSignature !== prev.sig) {
+      setSidebarTab('object');
+    }
+    prevSelectionRef.current = { had: hasSelection, sig: selectionSignature };
+  }, [hasSelection, selectionSignature]);
+
   const [materialPresetRevision, setMaterialPresetRevision] = useState(0);
   const [selectedMaterialPresetId, setSelectedMaterialPresetId] = useState('');
   const [materialPresetWarning, setMaterialPresetWarning] = useState<string | null>(null);
