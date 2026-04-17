@@ -50,5 +50,20 @@ assert(maxY - minY >= 5 && maxY - minY <= 12, `Height plausible (${(maxY - minY)
 assert(textToPathOpentype({ ...geom, text: '' }, font).length === 0, 'Empty text returns empty');
 assert(textToPathOpentype({ ...geom, fontSize: 0 }, font).length === 0, 'Zero fontSize returns empty');
 
+// End-to-end dispatcher-level coverage for textGeometryToPath is browser-side
+// because canvas fallback needs document.createElement in runtime.
+// Here we validate the deterministic raw opentype origin to aid normalization checks.
+const normalized = subPaths;
+let nMinX = Infinity;
+let nMinY = Infinity;
+for (const sp of normalized) {
+  for (const seg of sp.segments) {
+    if (seg.type === 'close') continue;
+    if (seg.to.x < nMinX) nMinX = seg.to.x;
+    if (seg.to.y < nMinY) nMinY = seg.to.y;
+  }
+}
+console.log(`  ℹ raw opentype origin: (${nMinX.toFixed(2)}, ${nMinY.toFixed(2)})`);
+
 console.log(`\n=== Result: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

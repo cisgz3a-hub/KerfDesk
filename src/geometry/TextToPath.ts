@@ -9,6 +9,9 @@
 import { getPaths, traceCanvas } from '../import/trace/ImageTracerAdapter';
 import type { SubPath, PathSegment, TextGeometry } from '../core/scene/SceneObject';
 import { fillTextGeometry, measureTextGeometrySize } from './textCanvasDraw';
+import { findBundledFont } from '../fonts/fontRegistry';
+import { loadFont } from '../fonts/loadFont';
+import { textToPathOpentype } from '../fonts/textToPathOpentype';
 
 export interface TextPathResult {
   subPaths: SubPath[];
@@ -93,6 +96,21 @@ export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResul
   const text = g.text || '';
   if (!text.trim()) return null;
 
+  // Bundled-font path currently ignores spacing/alignment/line-break/style toggles.
+  // Unknown fonts continue through the existing canvas-trace implementation below.
+  const bundled = findBundledFont(g.fontFamily);
+  if (bundled) {
+    try {
+      const font = await loadFont(bundled.url);
+      const raw = textToPathOpentype(g, font);
+      if (raw.length === 0) return null;
+      return normalizeToTopLeft(raw);
+    } catch (e) {
+      console.warn(`[TextToPath] Bundled font '${g.fontFamily}' failed, falling back to canvas:`, e);
+      // Fall through to canvas path.
+    }
+  }
+
   const scale = 8;
   const baseSize = g.fontSize || 10;
   const gScaled: TextGeometry = {
@@ -154,6 +172,49 @@ export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResul
     console.error('Text to path failed:', e);
     return null;
   }
+}
+
+function normalizeToTopLeft(subPaths: SubPath[]): TextPathResult {
+  let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+
+  const visit = (x: number, y: number) => {
+    if (x < minX) minX = x;
+    if (x > maxX) maxX = x;
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  };
+
+  for (const sp of subPaths) {
+    for (const seg of sp.segments) {
+      if (seg.type === 'close') continue;
+      visit(seg.to.x, seg.to.y);
+      if (seg.type === 'cubic') {
+        visit(seg.cp1.x, seg.cp1.y);
+        visit(seg.cp2.x, seg.cp2.y);
+      } else if (seg.type === 'quadratic') {
+        visit(seg.cp.x, seg.cp.y);
+      }
+    }
+  }
+
+  if (!Number.isFinite(minX)) return { subPaths, width: 0, height: 0 };
+
+  const dx = -minX;
+  const dy = -minY;
+  for (const sp of subPaths) {
+    for (const seg of sp.segments) {
+      if (seg.type === 'close') continue;
+      seg.to.x += dx; seg.to.y += dy;
+      if (seg.type === 'cubic') {
+        seg.cp1.x += dx; seg.cp1.y += dy;
+        seg.cp2.x += dx; seg.cp2.y += dy;
+      } else if (seg.type === 'quadratic') {
+        seg.cp.x += dx; seg.cp.y += dy;
+      }
+    }
+  }
+
+  return { subPaths, width: maxX - minX, height: maxY - minY };
 }
 
 /**
