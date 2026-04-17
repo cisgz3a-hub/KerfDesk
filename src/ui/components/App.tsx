@@ -1033,8 +1033,11 @@ export function App() {
     setSelectedIds(new Set());
   }, [scene, selectedIds]);
 
-  const contextMenuActions = useMemo(
-    () => ({
+  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
+    scene,
+    selectedIds,
+    productionMode,
+    {
       handleSceneCommit,
       setSelectedIds: (ids: Set<string>) => setSelectedIds(ids),
       setActiveTool: (t: string) => setActiveTool(t as ToolType),
@@ -1073,48 +1076,7 @@ export function App() {
       flipSelected: sceneOps.flipSelected,
       toggleLock: sceneOps.toggleLock,
       toggleVisibility: sceneOps.toggleVisibility,
-    }),
-    [
-      handleSceneCommit,
-      handleCopy,
-      handlePaste,
-      handleDuplicate,
-      handleDelete,
-      dialogs.setShowTextDialog,
-      dialogs.setEditingTextId,
-      dialogs.setTextInput,
-      dialogs.setTextFont,
-      dialogs.setTextSize,
-      dialogs.setTextBold,
-      dialogs.setTextItalic,
-      setTextPlacementPt,
-      dialogs.setShowVariableText,
-      dialogs.setVariableTextSource,
-      sceneOps.alignObjects,
-      sceneOps.centerOnCanvas,
-      sceneOps.performBoolean,
-      sceneOps.offsetSelected,
-      sceneOps.convertTextToPath,
-      showAlert,
-      showPrompt,
-      sceneOps.distributeObjects,
-      sceneOps.moveToCorner,
-      sceneOps.moveToMaterialOrigin,
-      sceneOps.rotateSelected,
-      sceneOps.flipSelected,
-      sceneOps.toggleLock,
-      sceneOps.toggleVisibility,
-      setShowGridArray,
-      setShowMaterialTest,
-      setShowKerfWizard,
-    ],
-  );
-
-  const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
-    scene,
-    selectedIds,
-    productionMode,
-    contextMenuActions,
+    },
   );
 
   const {

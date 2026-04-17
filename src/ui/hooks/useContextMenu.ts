@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { gatedFeature } from '../utils/proGate';
@@ -61,8 +61,16 @@ export function useContextMenu(
 ) {
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
+  // Latest-ref pattern: actions object may change identity every render
+  // (if caller passes inline). We don't want that to destabilize
+  // showContextMenu's reference, so we stash the latest actions in a ref
+  // and read from there inside the callback.
+  const actionsRef = useRef(actions);
+  actionsRef.current = actions;
+
   const showContextMenu = useCallback(
     (x: number, y: number) => {
+      const actions = actionsRef.current;
       const hasSelection = selectedIds.size > 0;
       const selectedObjs = scene.objects.filter(o => selectedIds.has(o.id));
       const hasText = selectedObjs.some(o => o.geometry.type === 'text');
@@ -287,7 +295,7 @@ export function useContextMenu(
 
       setContextMenu({ x: clampedX, y: clampedY, items });
     },
-    [scene, selectedIds, productionMode, actions],
+    [scene, selectedIds, productionMode],
   );
 
   const hideContextMenu = useCallback(() => setContextMenu(null), []);
