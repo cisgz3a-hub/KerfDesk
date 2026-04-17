@@ -1361,27 +1361,6 @@ export function ConnectionPanelMain({
             `${objectCount} object${objectCount !== 1 ? 's' : ''}`,
           ),
         ),
-        React.createElement('div', { style: { display: 'flex', gap: 3, marginBottom: 6 } },
-          ...([
-            { mode: 'cut' as const, label: 'Cut', color: '#ff4466' },
-            { mode: 'engrave' as const, label: 'Engrave', color: '#00d4ff' },
-            { mode: 'score' as const, label: 'Score', color: '#2dd4a0' },
-            { mode: 'image' as const, label: 'Image', color: '#f0b429' },
-          ]).map(mm =>
-            React.createElement('button', {
-              type: 'button',
-              key: mm.mode,
-              onClick: () => { onUpdateLayerMode?.(layer.id, mm.mode); },
-              style: {
-                flex: 1, padding: '3px', fontSize: 9, borderRadius: 3,
-                cursor: onUpdateLayerMode ? 'pointer' : 'default', fontFamily: font,
-                background: m === mm.mode ? `${mm.color}18` : 'transparent',
-                border: m === mm.mode ? `1px solid ${mm.color}` : '1px solid #1a1a2e',
-                color: m === mm.mode ? mm.color : '#555570',
-              },
-            }, mm.label),
-          ),
-        ),
         m === 'engrave' && onUpdateLayerFillMode && React.createElement('div', {
           style: { display: 'flex', gap: 3, marginBottom: 6 },
         },
