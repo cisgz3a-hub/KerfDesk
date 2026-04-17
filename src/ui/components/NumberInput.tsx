@@ -41,14 +41,17 @@ export function NumberInput({
 
   useEffect(() => {
     if (isFocused) return;
-    // Normalize to fixed precision before stringifying — prevents float drift
-    // (e.g. 123.45678901234499 vs .501) from producing different strings
-    // every render, which would cause setState thrash → "Maximum update depth exceeded".
-    const normalized = Number.isFinite(value)
-      ? (integer ? Math.round(value) : Math.round(value * 1_000_000) / 1_000_000)
-      : value;
-    const nextStr = String(normalized);
-    setLocalValue(prev => (prev === nextStr ? prev : nextStr));
+    const nextStr = Number.isFinite(value)
+      ? (integer ? String(Math.round(value)) : String(value))
+      : String(value);
+    setLocalValue(prev => {
+      const prevNum = parseFloat(prev);
+      if (Number.isFinite(prevNum) && Number.isFinite(value)) {
+        const tolerance = integer ? 0.5 : 1e-4;
+        if (Math.abs(prevNum - value) < tolerance) return prev;
+      }
+      return prev === nextStr ? prev : nextStr;
+    });
   }, [value, isFocused, integer]);
 
   const clamp = (v: number): number => {
