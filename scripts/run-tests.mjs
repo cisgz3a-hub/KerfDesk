@@ -37,6 +37,7 @@ const files = [
   'smart-overscan.test.ts',
   'gcode-templates.test.ts',
   'e2e/rectangle-cut.test.ts',
+  'fonts.test.ts',
 ];
 
 for (const f of files) {
