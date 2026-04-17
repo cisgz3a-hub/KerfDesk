@@ -160,6 +160,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   const [traceAlphamax, setTraceAlphamax] = React.useState(DEFAULT_TRACE_OPTIONS.alphamax);
   const [traceInvert, setTraceInvert] = React.useState(DEFAULT_TRACE_OPTIONS.invert);
   const [isTracing, setIsTracing] = useState(false);
+  const [deleteImageAfterTrace, setDeleteImageAfterTrace] = useState(true);
 
   const [ditherMode, setDitherMode] = useState<DitherMode>('floyd-steinberg');
 
@@ -258,7 +259,9 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
       const newScene = {
         ...scene,
-        objects: [...scene.objects, finalObj],
+        objects: deleteImageAfterTrace
+          ? [...scene.objects.filter(o => o.id !== obj.id), finalObj]
+          : [...scene.objects, finalObj],
       };
       try {
         onSceneCommit(newScene);
@@ -279,7 +282,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     } finally {
       setIsTracing(false);
     }
-  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, onSceneCommit, onSelectionChange, showAlert]);
+  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, deleteImageAfterTrace, onSceneCommit, onSelectionChange, showAlert]);
 
   const containerStyle: React.CSSProperties = {
     padding: '10px 12px',
@@ -1344,6 +1347,15 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => setTraceInvert(e.target.checked),
             }),
             React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Trace light areas'),
+          ),
+
+          React.createElement('div', { style: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 } },
+            React.createElement('input', {
+              type: 'checkbox',
+              checked: deleteImageAfterTrace,
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => setDeleteImageAfterTrace(e.target.checked),
+            }),
+            React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Delete image after trace'),
           ),
 
           React.createElement('button', {
