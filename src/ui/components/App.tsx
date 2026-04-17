@@ -33,6 +33,7 @@ import { useCompileManager } from '../hooks/useCompileManager';
 import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
+import { useFileHandlers } from '../hooks/useFileHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -51,8 +52,7 @@ import { GcodePreview } from './GcodePreview';
 import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
-import { deserializeScene, serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
-import { saveSceneToFile } from '../../io/FileIO';
+import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -1120,55 +1120,21 @@ export function App() {
     contextMenuActions,
   );
 
-  const syncAutosaveAfterFileSave = useCallback(() => {
-    sceneIsDirtyRef.current = false;
-    try {
-      const json = serializeForAutosave(scene);
-      localStorage.setItem('laserforge_autosave', json);
-      localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
-      lastSavedSceneRef.current = json;
-    } catch { /* ignore */ }
-  }, [scene]);
-
-  const handleKeyboardSave = useCallback(async () => {
-    try {
-      await saveSceneToFile(scene);
-      syncAutosaveAfterFileSave();
-    } catch (e) {
-      await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
-    }
-  }, [scene, showAlert, syncAutosaveAfterFileSave]);
-
-  const handleKeyboardOpen = useCallback(() => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json,.laserforge.json';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      try {
-        const text = await file.text();
-        const loadedScene = deserializeScene(text);
-        handleNewProject(loadedScene);
-      } catch (err) {
-        await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
-      }
-    };
-    input.click();
-  }, [handleNewProject, showAlert]);
-
-  const handleKeyboardNew = useCallback(async () => {
-    if (scene.objects.length > 0) {
-      const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
-      if (!ok) return;
-    }
-    try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
-    handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'));
-  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, handleNewProject, showConfirm]);
-
-  const handleClearSelection = useCallback(() => {
-    setSelectedIds(new Set());
-  }, []);
+  const {
+    syncAutosaveAfterFileSave,
+    handleKeyboardSave,
+    handleKeyboardOpen,
+    handleKeyboardNew,
+    handleClearSelection,
+  } = useFileHandlers({
+    scene,
+    setSelectedIds,
+    handleNewProject,
+    sceneIsDirtyRef,
+    lastSavedSceneRef,
+    showAlert,
+    showConfirm,
+  });
 
   const {
     handleQuickActionDuplicate,
