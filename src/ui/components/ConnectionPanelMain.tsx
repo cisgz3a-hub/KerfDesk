@@ -25,6 +25,7 @@ import { MoveControls } from './MoveControls';
 import { JobControls } from './JobControls';
 import { ConsolePanel } from './ConsolePanel';
 import { StatusBar } from './connection/StatusBar';
+import { Jog } from './connection/Jog';
 import { type SettingsTab } from './SettingsModal';
 
 type StartMode = GcodeStartMode;
@@ -907,31 +908,6 @@ export function ConnectionPanelMain({
     return Math.max(0, Math.round(remaining));
   }, [jobProgress, jobStartTime, elapsedSeconds]);
 
-  const jogBtnStyle: React.CSSProperties = {
-    padding: '10px', fontSize: 16, borderRadius: 6, cursor: 'pointer',
-    background: '#0a0a14', border: '1px solid #252540', color: '#c0c0d0',
-    fontFamily: font, lineHeight: 1,
-  };
-
-  const jogCellStyle: React.CSSProperties = {
-    ...jogBtnStyle,
-    width: 38,
-    height: 38,
-    padding: 0,
-    fontSize: 14,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  };
-
-  const jogCell = (label: string, axis: 'X' | 'Y', distance: number, tooltip: string) =>
-    React.createElement('button', {
-      type: 'button',
-      onClick: () => handleJog(axis, distance),
-      title: tooltip,
-      style: jogCellStyle,
-    }, label);
-
   const posX = machinePosition?.x ?? machineState?.position.x;
   const posY = machinePosition?.y ?? machineState?.position.y;
   const canStartJob = !!gcode && !isRunning && !!preflight?.canStart && !gcodeStale;
@@ -1165,47 +1141,12 @@ export function ConnectionPanelMain({
   const controlsSection = isConnected && React.createElement('div', {
     style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 16, flexShrink: 0 },
   },
-    React.createElement('div', {
-      style: { display: 'flex', flexDirection: 'column' as const, alignItems: 'center', gap: 4 },
-    },
-      React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 2 } }, 'Jog'),
-      React.createElement('div', {
-        style: { display: 'grid', gridTemplateColumns: '38px 38px 38px', gap: 3 },
-      },
-        React.createElement('div', { key: 'j0' }),
-        jogCell('↑', 'Y', jogStep, 'Jog Y+'),
-        React.createElement('div', { key: 'j1' }),
-        jogCell('←', 'X', -jogStep, 'Jog X-'),
-        React.createElement('button', {
-          type: 'button',
-          onClick: () => { void handleHome(); },
-          title: 'Home machine ($H)',
-          style: { ...jogCellStyle, background: 'rgba(255,212,68,0.06)', fontSize: 14 },
-        }, '⌂'),
-        jogCell('→', 'X', jogStep, 'Jog X+'),
-        React.createElement('div', { key: 'j2' }),
-        jogCell('↓', 'Y', -jogStep, 'Jog Y-'),
-        React.createElement('div', { key: 'j3' }),
-      ),
-      React.createElement('div', {
-        style: { display: 'flex', gap: 2, marginTop: 4 },
-      },
-        ...[0.1, 1, 10, 50].map(j =>
-          React.createElement('button', {
-            type: 'button',
-            key: j,
-            onClick: () => setJogStep(j),
-            style: {
-              padding: '2px 7px', fontSize: 9, borderRadius: 3, cursor: 'pointer',
-              fontFamily: mono,
-              background: jogStep === j ? 'rgba(0,212,255,0.1)' : 'transparent',
-              border: jogStep === j ? '1px solid #00d4ff' : '1px solid #1a1a2e',
-              color: jogStep === j ? '#00d4ff' : '#555570',
-            },
-          }, `${j}`),
-        ),
-      ),
-    ),
+    React.createElement(Jog, {
+      jogStep,
+      setJogStep,
+      onJog: handleJog,
+      onHome: () => { void handleHome(); },
+    }),
     React.createElement('div', {
       style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },
     },
