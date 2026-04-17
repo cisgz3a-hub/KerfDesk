@@ -1,8 +1,10 @@
 /**
  * Image tracing via imagetracerjs (potrace-compatible POINT/CURVE output).
  * Thresholded bitmap on canvas → trace → SubPaths (POINT / CURVE from getPaths).
+ * Async path runs imagetracerjs in a Web Worker (see `trace.worker.ts`).
  */
 import { getPaths, traceCanvas } from './ImageTracerAdapter';
+import type { TraceWorkerMessageIn } from './trace.worker';
 import {
   type SceneObject,
   type PathGeometry,
@@ -131,4 +133,87 @@ export function traceToSceneObject(
     _bounds: null,
     _worldTransform: null,
   };
+}
+
+let traceWorkerInstance: Worker | null = null;
+let traceWorkerRequestId = 0;
+
+function getTraceWorker(): Worker {
+  if (!traceWorkerInstance) {
+    traceWorkerInstance = new Worker(
+      new URL('./trace.worker.ts', import.meta.url),
+      { type: 'module' },
+    );
+  }
+  return traceWorkerInstance;
+}
+
+/**
+ * Async version of traceToSceneObject — runs imagetracerjs in a Web Worker.
+ * UI stays responsive during tracing.
+ */
+export function traceToSceneObjectAsync(
+  grayscaleData: Uint8Array,
+  width: number,
+  height: number,
+  options: TraceOptions,
+  layerId: string,
+  sourceName: string,
+): Promise<SceneObject | null> {
+  return new Promise((resolve) => {
+    const worker = getTraceWorker();
+    const id = ++traceWorkerRequestId;
+
+    const onMessage = (ev: MessageEvent<{ id: number; contours: PotraceItem[][] }>) => {
+      if (ev.data.id !== id) return;
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+
+      const { contours } = ev.data;
+      const subPaths: SubPath[] = [];
+      for (const items of contours) {
+        const sp = contourToSubPath(items);
+        if (sp) subPaths.push(sp);
+      }
+
+      if (subPaths.length === 0) {
+        resolve(null);
+        return;
+      }
+
+      resolve({
+        id: generateId(),
+        type: 'path',
+        name: 'Traced ' + sourceName,
+        layerId,
+        parentId: null,
+        transform: { ...IDENTITY_MATRIX },
+        geometry: { type: 'path', subPaths } as PathGeometry,
+        visible: true,
+        locked: false,
+        powerScale: 1,
+        _bounds: null,
+        _worldTransform: null,
+      });
+    };
+
+    const onError = (err: ErrorEvent) => {
+      worker.removeEventListener('message', onMessage);
+      worker.removeEventListener('error', onError);
+      console.error('[trace worker] Error:', err.message, err);
+      resolve(null);
+    };
+
+    worker.addEventListener('message', onMessage);
+    worker.addEventListener('error', onError);
+
+    const payload: TraceWorkerMessageIn = {
+      id,
+      grayscaleData,
+      width,
+      height,
+      options,
+    };
+    worker.postMessage(payload);
+  });
 }

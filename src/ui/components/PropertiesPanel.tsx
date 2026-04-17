@@ -18,7 +18,7 @@ import {
   adjustGamma,
   invertImage,
 } from '../../core/image/ImageProcessing';
-import { traceToSceneObject, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
+import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
@@ -184,7 +184,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     if (pixelCount > MAX_SAFE_PIXELS) {
       const mp = (pixelCount / 1_000_000).toFixed(1);
       const proceed = window.confirm(
-        `This image is ${mp} megapixels. Tracing will freeze the app for several seconds — no way to cancel. ` +
+        `This image is ${mp} megapixels. Tracing may take a while — the UI stays responsive, but there is no way to cancel mid-trace. ` +
           'For best results, resize the image to under 1 megapixel first.\n\nTrace anyway?',
       );
       if (!proceed) return;
@@ -204,7 +204,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       const scaleX = physW / geom.grayscaleWidth;
       const scaleY = physH / geom.grayscaleHeight;
 
-      const traced = traceToSceneObject(
+      const traced = await traceToSceneObjectAsync(
         geom.grayscaleData,
         geom.grayscaleWidth,
         geom.grayscaleHeight,
@@ -1367,7 +1367,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               opacity: isTracing ? 0.6 : 1,
               cursor: isTracing ? 'wait' : 'pointer',
             },
-          }, isTracing ? '⏳ Tracing… (app may freeze)' : 'Trace to Vector (Cut layer)'),
+          }, isTracing ? '⏳ Tracing...' : 'Trace to Vector (Cut layer)'),
         ),
       );
     })(),

@@ -1,1 +1,6 @@
-export { traceToSceneObject, DEFAULT_TRACE_OPTIONS, type TraceOptions } from './PotraceTracer';
+export {
+  traceToSceneObject,
+  traceToSceneObjectAsync,
+  DEFAULT_TRACE_OPTIONS,
+  type TraceOptions,
+} from './PotraceTracer';
