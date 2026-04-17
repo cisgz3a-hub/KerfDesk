@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BUNDLED_FONTS, type BundledFont, type FontCategory } from '../../fonts/fontRegistry';
 
 interface FontCreditsDialogProps {
@@ -26,6 +26,14 @@ const LICENSE_COLOR: Record<BundledFont['license'], { bg: string; fg: string }> 
 };
 
 export function FontCreditsDialog({ onClose }: FontCreditsDialogProps) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
   const grouped = CATEGORY_ORDER.map(cat => ({
     category: cat,
     label: CATEGORY_LABEL[cat],
@@ -36,7 +44,8 @@ export function FontCreditsDialog({ onClose }: FontCreditsDialogProps) {
     style: {
       position: 'fixed' as const,
       inset: 0,
-      zIndex: 2100,
+      /** Above AddTextDialog (2000) so credits can open from within Add Text. */
+      zIndex: 2200,
       background: 'rgba(0,0,0,0.6)',
       display: 'flex',
       alignItems: 'center',
@@ -44,7 +53,9 @@ export function FontCreditsDialog({ onClose }: FontCreditsDialogProps) {
       padding: '20px 0',
       overflowY: 'auto' as const,
     },
-    onClick: onClose,
+    onClick: (e: React.MouseEvent) => {
+      if (e.target === e.currentTarget) onClose();
+    },
   },
     React.createElement('div', {
       onClick: (e: React.MouseEvent) => e.stopPropagation(),

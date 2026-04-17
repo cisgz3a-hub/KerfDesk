@@ -2539,7 +2539,7 @@ export function App() {
         setTextPlacementPt(null);
       },
       onSubmit: handleAddTextDialogSubmit,
-      onOpenFontCredits: () => setShowFontCredits(true),
+      onShowFontCredits: () => setShowFontCredits(true),
     }),
 
     showFontCredits && React.createElement(FontCreditsDialog, {

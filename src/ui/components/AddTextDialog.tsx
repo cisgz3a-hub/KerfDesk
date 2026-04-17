@@ -20,7 +20,7 @@ export interface AddTextDialogProps {
 
   onClose: () => void;
   onSubmit: () => void;
-  onOpenFontCredits: () => void;
+  onShowFontCredits: () => void;
 }
 
 export function AddTextDialog(props: AddTextDialogProps) {
@@ -41,7 +41,7 @@ export function AddTextDialog(props: AddTextDialogProps) {
     setTextItalic,
     onClose,
     onSubmit,
-    onOpenFontCredits,
+    onShowFontCredits,
   } = props;
 
   return React.createElement('div', {
@@ -105,7 +105,7 @@ export function AddTextDialog(props: AddTextDialogProps) {
           }),
           React.createElement('button', {
             type: 'button',
-            onClick: onOpenFontCredits,
+            onClick: onShowFontCredits,
             style: {
               background: 'none',
               border: 'none',
