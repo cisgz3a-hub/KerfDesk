@@ -31,6 +31,7 @@ import { Progress } from './connection/Progress';
 import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
 import { Workflow } from './connection/Workflow';
+import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 
 type StartMode = GcodeStartMode;
@@ -970,60 +971,16 @@ export function ConnectionPanelMain({
       onJog: handleJog,
       onHome: () => { void handleHome(); },
     }),
-    React.createElement('div', {
-      style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },
-    },
-      machineState?.status === 'alarm' && React.createElement('button', {
-        type: 'button',
-        onClick: handleUnlock,
-        title: 'Clear alarm state ($X)',
-        style: {
-          width: '100%', padding: '6px', fontSize: 10, fontWeight: 600, borderRadius: 6,
-          cursor: 'pointer', fontFamily: font,
-          background: 'rgba(255,212,68,0.08)', border: '1px solid rgba(255,212,68,0.3)',
-          color: '#ffd444',
-        },
-      }, '🔓 Unlock'),
-      React.createElement('button', {
-        type: 'button',
-        onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {
-          e.preventDefault();
-          beginTestFire(e);
-        },
-        onPointerUp: () => { endTestFire(); },
-        onPointerLeave: () => {
-          if (isTestFiringRef.current) endTestFire();
-        },
-        onPointerCancel: () => { endTestFire(); },
-        disabled: machineState?.status === 'alarm' || isRunning,
-        title: isTestFiring
-          ? 'Release to stop laser (deadman)'
-          : 'Hold to fire at 2% of machine max S — release to stop',
-        style: {
-          width: '100%', padding: '7px', fontSize: 11, fontWeight: 600, borderRadius: 6,
-          cursor: machineState?.status === 'alarm' || isRunning ? 'default' : 'pointer', fontFamily: font,
-          background: isTestFiring ? 'rgba(255,68,102,0.15)' : 'rgba(255,68,102,0.05)',
-          border: isTestFiring ? '1px solid #ff4466' : '1px solid rgba(255,68,102,0.2)',
-          color: isTestFiring ? '#ff4466' : '#ff6680',
-          opacity: machineState?.status === 'alarm' || isRunning ? 0.4 : 1,
-          animation: isTestFiring ? 'laserforgePulse 1s infinite' : 'none',
-          touchAction: 'none',
-          userSelect: 'none',
-        } as React.CSSProperties,
-      }, isTestFiring ? '🔴 FIRING — Release to stop' : '🔥 Test Fire (hold)'),
-      React.createElement('button', {
-        type: 'button',
-        onClick: () => { void handleFrameDot(); },
-        disabled: !canFrame,
-        title: 'Trace outline with low-power laser dot',
-        style: {
-          width: '100%', padding: '5px', fontSize: 9, borderRadius: 4,
-          cursor: canFrame ? 'pointer' : 'default', fontFamily: font,
-          background: 'transparent', border: '1px solid #1a1a2e', color: '#555570',
-          opacity: canFrame ? 1 : 0.4,
-        },
-      }, '◉ Frame with Laser Dot'),
-    ),
+    React.createElement(MachineControls, {
+      isAlarm: machineState?.status === 'alarm',
+      isRunning,
+      canFrame,
+      isTestFiring,
+      onUnlock: handleUnlock,
+      onTestFireBegin: beginTestFire,
+      onTestFireEnd: endTestFire,
+      onFrameDot: () => { void handleFrameDot(); },
+    }),
   );
 
   const layerOverviewRows: React.ReactNode[] = [];
