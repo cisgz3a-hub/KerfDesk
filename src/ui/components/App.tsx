@@ -130,6 +130,8 @@ export function App() {
     const initial = createScene(400, 300, 'Untitled');
     return initial;
   });
+  const sceneRef = useRef(scene);
+  sceneRef.current = scene;
 
   const sceneBounds = useMemo(() => {
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -595,51 +597,70 @@ export function App() {
 
   const activeLayerMode = useMemo(() => {
     const layer = scene.layers.find(l => l.id === scene.activeLayerId);
-    return layer?.settings.mode ?? 'cut';
+    return layer?.settings.mode ?? scene.layers[0]?.settings.mode ?? 'cut';
   }, [scene.layers, scene.activeLayerId]);
 
-  const interactableLayerIds = useMemo(
-    () =>
-      new Set(
-        scene.layers
-          .filter(l => l.settings.mode === activeLayerMode)
-          .map(l => l.id),
-      ),
-    [scene.layers, activeLayerMode],
-  );
+  const interactableLayerIds = useMemo(() => {
+    const activeLayer = scene.layers.find(l => l.id === scene.activeLayerId);
+    const mode =
+      activeLayer?.settings.mode ?? scene.layers[0]?.settings.mode ?? 'cut';
+    return new Set(
+      scene.layers.filter(l => l.settings.mode === mode).map(l => l.id),
+    );
+  }, [scene.layers, scene.activeLayerId]);
 
-  const handleModeTabSelect = useCallback((mode: string) => {
-    const sorted = [...scene.layers].sort((a, b) => a.order - b.order);
-    let targetLayer = sorted.find(l => l.settings.mode === mode);
-    let layersForMode = scene.layers;
+  const handleModeTabSelect = useCallback(
+    (mode: string) => {
+      const prev = sceneRef.current;
+      const targetLayer = prev.layers.find(l => l.settings.mode === mode);
 
-    if (targetLayer) {
-      setScene(prev => ({ ...prev, activeLayerId: targetLayer.id }));
-    } else {
-      const maxOrder = scene.layers.length > 0 ? Math.max(...scene.layers.map(l => l.order)) : -1;
-      const nextOrder = maxOrder + 1;
+      if (targetLayer) {
+        const next =
+          prev.activeLayerId === targetLayer.id
+            ? prev
+            : { ...prev, activeLayerId: targetLayer.id };
+        const modeLayerIds = new Set(
+          next.layers.filter(l => l.settings.mode === mode).map(l => l.id),
+        );
+        const objectsOnMode = next.objects.filter(
+          o => o.visible && modeLayerIds.has(o.layerId),
+        );
+        setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
+        if (prev.activeLayerId !== targetLayer.id) {
+          setScene(next);
+        }
+        return;
+      }
+
+      const maxOrder =
+        prev.layers.length > 0 ? Math.max(...prev.layers.map(l => l.order)) : -1;
       const modeNames: Record<string, string> = {
         cut: 'Cut',
         engrave: 'Engrave',
         score: 'Score',
         image: 'Image',
       };
-      const newLayer = createLayer(nextOrder, mode as LayerMode, modeNames[mode] ?? mode);
-      targetLayer = newLayer;
-      layersForMode = [...scene.layers, newLayer];
-      handleSceneCommit({
-        ...scene,
-        layers: [...scene.layers, newLayer],
+      const newLayer = createLayer(
+        maxOrder + 1,
+        mode as LayerMode,
+        modeNames[mode] ?? mode,
+      );
+      const next: Scene = {
+        ...prev,
+        layers: [...prev.layers, newLayer],
         activeLayerId: newLayer.id,
-      });
-    }
-
-    const modeLayerIds = new Set(
-      layersForMode.filter(l => l.settings.mode === mode).map(l => l.id),
-    );
-    const objectsOnMode = scene.objects.filter(o => o.visible && modeLayerIds.has(o.layerId));
-    setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
-  }, [scene, handleSceneCommit]);
+      };
+      const modeLayerIds = new Set(
+        next.layers.filter(l => l.settings.mode === mode).map(l => l.id),
+      );
+      const objectsOnMode = next.objects.filter(
+        o => o.visible && modeLayerIds.has(o.layerId),
+      );
+      setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
+      handleSceneCommit(next);
+    },
+    [handleSceneCommit],
+  );
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
