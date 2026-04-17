@@ -6,7 +6,7 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
-import { createLayer } from '../../core/scene/Layer';
+import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
 
 const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB — inline below, IndexedDB above
 
@@ -103,16 +103,51 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
       }
 
-      const previousActiveLayerId = scene.activeLayerId;
       let targetScene = scene;
-      let layerId = scene.layers.find(l => l.settings.mode === 'image')?.id;
-      if (!layerId) {
-        const newLayer = createLayer(scene.layers.length, 'image', 'Image');
+      let layerId: string;
+
+      const activeLayer = scene.activeLayerId
+        ? scene.layers.find(l => l.id === scene.activeLayerId)
+        : undefined;
+      const activeIsEmpty = activeLayer != null
+        && !scene.objects.some(o => o.layerId === activeLayer.id);
+
+      if (activeLayer && activeIsEmpty && activeLayer.settings.mode !== 'image') {
+        // Empty active layer -> convert it in place to image mode.
+        // Rename only if still using the default "Layer N" / mode-name pattern.
+        const defaultNames = new Set([
+          activeLayer.name,
+          'Cut', 'Engrave', 'Score',
+          `Layer ${scene.layers.indexOf(activeLayer)}`,
+        ]);
+        const isDefaultName = /^Layer \d+$/.test(activeLayer.name)
+          || defaultNames.has(activeLayer.name);
+        const converted: Layer = {
+          ...activeLayer,
+          name: isDefaultName ? 'Image' : activeLayer.name,
+          settings: defaultLaserSettings('image'),
+        };
         targetScene = {
           ...scene,
-          layers: [...scene.layers, newLayer],
+          layers: scene.layers.map(l => l.id === activeLayer.id ? converted : l),
         };
-        layerId = newLayer.id;
+        layerId = activeLayer.id;
+      } else if (activeLayer && activeLayer.settings.mode === 'image') {
+        // Active layer is already image mode -> use it.
+        layerId = activeLayer.id;
+      } else {
+        // Non-empty active, or no active layer -> find existing image layer or create one.
+        const existing = scene.layers.find(l => l.settings.mode === 'image');
+        if (existing) {
+          layerId = existing.id;
+        } else {
+          const newLayer = createLayer(scene.layers.length, 'image', 'Image');
+          targetScene = {
+            ...scene,
+            layers: [...scene.layers, newLayer],
+          };
+          layerId = newLayer.id;
+        }
       }
 
       const imageObj: SceneObject = {
@@ -145,14 +180,8 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       const newScene = {
         ...targetScene,
         objects: [...targetScene.objects, imageObj],
+        activeLayerId: layerId,
       };
-      const cutLayer = newScene.layers.find(l => l.settings.mode === 'cut');
-      const priorStillValid =
-        previousActiveLayerId != null &&
-        newScene.layers.some(l => l.id === previousActiveLayerId);
-      newScene.activeLayerId = priorStillValid
-        ? previousActiveLayerId
-        : (cutLayer?.id ?? newScene.layers[0].id);
 
       return newScene;
     } catch (err) {
