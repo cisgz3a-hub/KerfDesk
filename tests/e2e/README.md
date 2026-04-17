@@ -16,12 +16,61 @@ On Windows PowerShell:
 $env:UPDATE_SNAPSHOTS='1'; npm test
 ```
 
-## Text in jobs
+## Special case: text fixtures
 
-`compileJob` only flattens text that already has `outlineSubPaths` from
-`expandTextOutlinesForCompile` (same as `PipelineService.compileGcode`).
-Use `prepareSceneForCompile(scene)` from `helpers/prepareSceneForCompile.ts`
-before `compileSceneToGcode` for any scene that includes text objects.
+`compileJob` does not auto-convert text geometry to paths — that happens in
+the UI compile flow via `expandTextOutlinesForCompile(scene)` before
+compile. E2E fixtures with text must use `prepareSceneForCompile` from
+`helpers/prepareSceneForCompile.ts` to mirror production (`PipelineService.compileGcode`).
+
+Example:
+
+```typescript
+import { prepareSceneForCompile } from './helpers/prepareSceneForCompile';
+import { compileSceneToGcode } from './helpers/compileToGcode';
+
+const scene = makeTextScene();
+const prepared = await prepareSceneForCompile(scene);
+const gcode = compileSceneToGcode(prepared);
+```
+
+For Hershey fonts, outline data is vendored JSON — no async font file load.
+For bundled outline fonts (Inter, etc.), `loadFont` resolves `/fonts/*` URLs
+to `public/fonts/*` on disk in Node so headless tests use the same
+`textGeometryToPath` → `textToPathOpentype` path as the browser.
+
+## Perf fixtures
+
+Large-scene and similar fixtures protect against accidental O(n²) or
+allocation regressions. They do not snapshot output — snapshots of 1000+
+lines flip on every optimizer change and teach nothing. Perf fixtures
+assert a time budget and line-count bounds instead.
+
+The budget is generous (2 seconds on CI) because runner hardware varies.
+Locally, a 100-object compile should finish in well under 500 ms.
+
+## Drift risk: production vs E2E scene prep
+
+E2E currently mirrors `PipelineService.compileGcode` via
+`prepareSceneForCompile` (same `expandTextOutlinesForCompile` call). If
+production changes how scenes are prepared pre-compile and E2E does not
+follow, snapshots will stop reflecting real user output.
+
+**TODO:** extract a single `prepareForCompile(scene)` helper that both
+production and E2E import so the two cannot drift. Not blocking the harness.
+
+## Traced-image E2E (deferred)
+
+A fixture that reads a small PNG, runs `traceToSceneObject` / imagetracerjs,
+then compiles would cover import → trace → G-code. That path today uses
+`document.createElement('canvas')` in `PotraceTracer.ts` and a Web Worker
+for the async variant — neither is wired for headless Node in this repo
+(no `canvas` polyfill dependency).
+
+**Deferred:** add a checked-in reference PNG + e2e once a headless-safe trace
+entry exists (or add a devDependency such as `canvas` and a thin adapter).
+Raster/trace behavior remains covered by unit tests (e.g. image pipeline
+tests) and manual QA.
 
 ## Adding a fixture
 
@@ -33,7 +82,8 @@ before `compileSceneToGcode` for any scene that includes text objects.
    - Calls the factory (and `await prepareSceneForCompile(scene)` if it contains text)
    - Pipes through `compileSceneToGcode` from `helpers/`
    - Makes structural assertions (e.g., contains expected G-codes)
-   - Calls `expectMatchesSnapshot(gcode, 'your-scenario.gcode')`
+   - Calls `expectMatchesSnapshot(gcode, 'your-scenario.gcode')` **unless**
+     it is a perf-only fixture (see above).
 
 3. Run once with `UPDATE_SNAPSHOTS=1` to create the initial snapshot.
    Manually review `snapshots/your-scenario.gcode` before committing.

@@ -1,5 +1,7 @@
 # LaserForge
 
+![CI](https://github.com/stolkjohannjohann-sudo/LaserForge/actions/workflows/ci.yml/badge.svg)
+
 Professional laser engraving/cutting CAM software. LightBurn competitor built with TypeScript.
 
 ## Quick Start

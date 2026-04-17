@@ -49,6 +49,7 @@ const files = [
   'e2e/origin-saved.test.ts',
   'e2e/circle-cut.test.ts',
   'e2e/multi-pass-cut.test.ts',
+  'e2e/large-scene.test.ts',
 ];
 
 for (const f of files) {
