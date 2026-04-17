@@ -1,43 +1,62 @@
+import type { Scene } from '../../../src/core/scene/Scene';
 import { compileJob } from '../../../src/core/job/JobCompiler';
 import { optimizePlan } from '../../../src/core/plan/PlanOptimizer';
 import { applyMachineTransform } from '../../../src/core/plan/MachineTransform';
 import { getOutputStrategy } from '../../../src/core/output/Output';
-import '../../../src/core/output/GrblStrategy';
-import type { Scene } from '../../../src/core/scene/Scene';
 import type { GcodeStartMode } from '../../../src/core/output/GcodeOrigin';
 import type { MachineOriginCorner } from '../../../src/core/devices/DeviceProfile';
-import { EMPTY_OFFSET_TABLE } from '../../../src/core/plan/ScanningOffset';
+import '../../../src/core/output/GrblStrategy'; // side-effect: registers GRBL
 
 export interface CompileOptions {
-  machineWidth: number;
-  machineHeight: number;
-  originCorner?: MachineOriginCorner;
   startMode?: GcodeStartMode;
+  savedOrigin?: { x: number; y: number } | null;
+  originCorner?: MachineOriginCorner;
 }
 
-export function compileToGcode(scene: Scene, opts: CompileOptions): string {
-  const job = compileJob(scene, { machineAccelMmPerS2: null });
-  const plan = optimizePlan(job, { scanningOffsets: EMPTY_OFFSET_TABLE });
-  const transformed = applyMachineTransform(plan, {
-    startMode: opts.startMode ?? 'absolute',
-    savedOrigin: null,
+/**
+ * Runs the full compile pipeline and returns deterministic G-code text.
+ *
+ * Normalization: strips header lines that vary between runs
+ * (timestamps, ids, versions) so snapshots are byte-stable.
+ */
+export function compileSceneToGcode(scene: Scene, opts: CompileOptions = {}): string {
+  const job = compileJob(scene);
+  const plan = optimizePlan(job);
+  const { plan: machinePlan } = applyMachineTransform(plan, {
+    startMode: opts.startMode ?? 'current',
+    savedOrigin: opts.savedOrigin ?? null,
     originCorner: opts.originCorner ?? 'front-left',
-    bedHeightMm: opts.machineHeight,
+    bedHeightMm: scene.canvas.height,
   });
-
   const strategy = getOutputStrategy('grbl');
   if (!strategy) throw new Error('GRBL output strategy not registered');
 
-  const output = strategy.generate(transformed.plan, job, {
-    startMode: opts.startMode ?? 'absolute',
-    machineWidth: opts.machineWidth,
-    machineHeight: opts.machineHeight,
-  });
+  const output = strategy.generate(machinePlan, job);
+  if (!output.text) throw new Error('Compile produced no text output');
 
-  const text = output.text ?? '';
-  // G-code header includes an ISO Date line; normalize volatile metadata.
-  return text
-    .split('\n')
-    .filter(line => !/^;\s*(Date|Time):/i.test(line))
-    .join('\n');
+  return normalize(output.text);
+}
+
+/**
+ * Strip lines that vary between otherwise-identical runs.
+ * - Lines matching /^; Generated: / (timestamps)
+ * - Lines matching /^; Version: / (version stamps if present)
+ * - Lines matching /^; Id: / (uuid-like ids if present)
+ * - Lines matching /^; Date: / (ISO timestamps from default header)
+ * - Lines matching /^; Time: / (precautionary)
+ *
+ * Everything else — including semantic comments like feed rates and bounds —
+ * must be preserved.
+ */
+function normalize(gcode: string): string {
+  const lines = gcode.split(/\r?\n/);
+  const stable = lines.filter(line => {
+    if (/^;\s*Generated:/i.test(line)) return false;
+    if (/^;\s*Version:/i.test(line)) return false;
+    if (/^;\s*Id:/i.test(line)) return false;
+    if (/^;\s*Date:/i.test(line)) return false;
+    if (/^;\s*Time:/i.test(line)) return false;
+    return true;
+  });
+  return stable.join('\n').replace(/\n+$/, '\n');
 }

@@ -1,49 +1,81 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const here = dirname(fileURLToPath(import.meta.url));
-const snapshotDir = join(here, '..', 'snapshots');
+const __dirname = dirname(fileURLToPath(import.meta.url));
 
-export interface SnapshotResult {
-  pass: boolean;
-  message: string;
-}
+/**
+ * Snapshot matcher for text blobs.
+ *
+ * - If the snapshot file doesn't exist and UPDATE_SNAPSHOTS≠1, throws (CI failure).
+ * - If it exists, compares actual vs stored. On mismatch, prints a diff and throws.
+ * - With UPDATE_SNAPSHOTS=1, creates or overwrites the snapshot and returns.
+ *
+ * @param relativeSnapshotPath Path relative to tests/e2e/snapshots/,
+ *   e.g. 'rectangle-cut.gcode'
+ */
+export function expectMatchesSnapshot(actual: string, relativeSnapshotPath: string): void {
+  const snapshotsDir = resolve(__dirname, '..', 'snapshots');
+  const snapshotPath = resolve(snapshotsDir, relativeSnapshotPath);
 
-export function compareSnapshot(name: string, actual: string): SnapshotResult {
-  if (!existsSync(snapshotDir)) mkdirSync(snapshotDir, { recursive: true });
-  const path = join(snapshotDir, `${name}.gcode`);
-  const update = process.env.UPDATE_SNAPSHOTS === '1';
-  const hasSnapshot = existsSync(path);
+  if (!existsSync(snapshotsDir)) mkdirSync(snapshotsDir, { recursive: true });
 
-  if (!hasSnapshot || update) {
-    writeFileSync(path, actual, 'utf8');
-    if (!hasSnapshot) return { pass: true, message: `[${name}] created snapshot` };
-    return { pass: true, message: `[${name}] updated snapshot` };
+  const updating = process.env.UPDATE_SNAPSHOTS === '1';
+
+  if (!existsSync(snapshotPath)) {
+    if (!updating) {
+      throw new Error(
+        [
+          `Snapshot missing: ${relativeSnapshotPath}`,
+          `Create it with: UPDATE_SNAPSHOTS=1 npm test`,
+          `(PowerShell: $env:UPDATE_SNAPSHOTS='1'; npm test)`,
+        ].join('\n'),
+      );
+    }
+    writeFileSync(snapshotPath, actual, 'utf8');
+    console.log(`  📸 Created snapshot: ${relativeSnapshotPath} (${actual.length} chars)`);
+    return;
   }
 
-  const expected = readFileSync(path, 'utf8');
+  const expected = readFileSync(snapshotPath, 'utf8');
+
   if (actual === expected) {
-    return { pass: true, message: `[${name}] snapshot matches` };
+    console.log(`  ✓ Snapshot match: ${relativeSnapshotPath}`);
+    return;
   }
 
-  const aLines = actual.split('\n');
-  const eLines = expected.split('\n');
-  const max = Math.max(aLines.length, eLines.length);
-  let firstDiff = -1;
-  for (let i = 0; i < max; i++) {
-    if (aLines[i] !== eLines[i]) {
-      firstDiff = i;
-      break;
+  if (updating) {
+    writeFileSync(snapshotPath, actual, 'utf8');
+    console.log(`  📸 Updated snapshot: ${relativeSnapshotPath}`);
+    return;
+  }
+
+  const actualLines = actual.split('\n');
+  const expectedLines = expected.split('\n');
+  const maxLines = Math.max(actualLines.length, expectedLines.length);
+  const diffs: string[] = [];
+  for (let i = 0; i < maxLines; i++) {
+    const a = actualLines[i] ?? '<missing>';
+    const e = expectedLines[i] ?? '<missing>';
+    if (a !== e) {
+      diffs.push(`  line ${i + 1}:\n    expected: ${e}\n    actual:   ${a}`);
+      if (diffs.length >= 10) {
+        diffs.push(`  ... (more differences suppressed)`);
+        break;
+      }
     }
   }
 
-  const summary = firstDiff >= 0
-    ? `line ${firstDiff + 1}:\n  expected: ${eLines[firstDiff] ?? '(missing)'}\n  actual:   ${aLines[firstDiff] ?? '(missing)'}`
-    : `length differs (expected ${eLines.length}, actual ${aLines.length})`;
+  const msg = [
+    `Snapshot mismatch: ${relativeSnapshotPath}`,
+    `  expected length: ${expectedLines.length} lines`,
+    `  actual length:   ${actualLines.length} lines`,
+    '',
+    ...diffs,
+    '',
+    `If this change is intentional, re-run with UPDATE_SNAPSHOTS=1 to bless:`,
+    `  UPDATE_SNAPSHOTS=1 npm test`,
+  ].join('\n');
 
-  return {
-    pass: false,
-    message: `[${name}] snapshot mismatch at ${summary}\n  Run UPDATE_SNAPSHOTS=1 npm test if this change is intentional.`,
-  };
+  throw new Error(msg);
 }
