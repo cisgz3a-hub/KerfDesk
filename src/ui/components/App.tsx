@@ -38,7 +38,6 @@ import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { GrblController } from '../../controllers/grbl/GrblController';
 import { CanvasViewport } from './CanvasViewport';
-import { LayerTabs, LAYER_TABS_WIDTH } from './canvas/LayerTabs';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu } from './ContextMenu';
@@ -395,7 +394,7 @@ export function App() {
   const layersPanelWidth = connectionSidebarOpen ? 0 : 240;
   const toolbarWidth = 36;
   const canvasViewportWidth =
-    canvasSize.width - toolbarWidth - LAYER_TABS_WIDTH - connectionSidebarWidth - layersPanelWidth;
+    canvasSize.width - toolbarWidth - connectionSidebarWidth - layersPanelWidth;
 
   const toolbarLaserConnected = useMemo(() => {
     const s = grbl.machineState;
@@ -571,11 +570,6 @@ export function App() {
     historyRef.current.push(newScene);
     setScene(newScene);
   }, []);
-
-  const handleLayerTabSelect = useCallback((layerId: string) => {
-    setScene(prev => ({ ...prev, activeLayerId: layerId }));
-  }, []);
-
   useEffect(() => {
     handleSceneCommitRef.current = handleSceneCommit;
   }, [handleSceneCommit]);
@@ -1897,83 +1891,74 @@ export function App() {
             ),
           ),
         ),
-        // ── Canvas viewport + layer tabs ──────────────────
+        // ── Canvas viewport ───────────────────────────────
         React.createElement('div', {
-          style: { flex: 1, display: 'flex', overflow: 'hidden' },
+          style: { flex: 1, position: 'relative' as const, overflow: 'hidden' },
           onClick: () => materialDropdownOpen && setMaterialDropdownOpen(false),
         },
-          React.createElement(LayerTabs, {
-            scene,
-            onLayerSelect: handleLayerTabSelect,
-            onSceneCommit: handleSceneCommit,
-          }),
           React.createElement('div', {
-            style: { flex: 1, position: 'relative' as const, overflow: 'hidden' },
-          },
-            React.createElement('div', {
-              style: {
-                position: 'absolute',
-                top: 6,
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: 10,
-                fontFamily: theme.font.mono,
-                color: '#8888aa',
-                background: 'rgba(10, 10, 20, 0.75)',
-                padding: '3px 10px',
-                borderRadius: 4,
-                border: '1px solid #1a1a2e',
-                pointerEvents: 'none',
-                zIndex: 5,
-              },
+            style: {
+              position: 'absolute',
+              top: 6,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              fontSize: 10,
+              fontFamily: theme.font.mono,
+              color: '#8888aa',
+              background: 'rgba(10, 10, 20, 0.75)',
+              padding: '3px 10px',
+              borderRadius: 4,
+              border: '1px solid #1a1a2e',
+              pointerEvents: 'none',
+              zIndex: 5,
             },
-            startMode === 'absolute'
-              ? 'Canvas = Bed position'
-              : startMode === 'current'
-                ? 'Design starts at laser head'
-                : savedOrigin
-                  ? `Design starts at saved origin X:${savedOrigin.x.toFixed(0)} Y:${savedOrigin.y.toFixed(0)}`
-                  : 'No saved origin - set one below',
-            ),
-            React.createElement(CanvasViewport, {
-            scene,
-            activeTool: activeTool,
-            width: canvasViewportWidth,
-            height: canvasSize.height,
-            selectedIds: selectedIds,
-            onSelectionChange: setSelectedIds,
-            onSceneChange: handleSceneChange,
-            onSceneCommit: handleSceneCommit,
-            actionsRef: viewportActionsRef,
-            onZoomChange: setZoomLevel,
-            previewMode,
-            quickActions: !previewMode ? {
-              enabled: true,
-              selectedCount: selectedIds.size,
-              onDuplicate: handleQuickActionDuplicate,
-              onDelete: handleQuickActionDelete,
-              onCenter: handleQuickActionCenter,
-              onGridArray: handleGridArray,
-              hasSelectedText,
-              handleTextToPath: () => { void sceneOps.textToPath(); },
-            } : undefined,
-            onRequestTextPlacement: handleRequestTextPlacement,
-            onActiveTool: setActiveTool,
-            onEditText: handleEditText,
-            livePosition: liveJobCanvasPosition,
-            isJobRunning: grbl.isJobRunning,
-            jobProgress: grbl.jobProgress,
-            activeJobMoves,
-            showToolpathPreview,
-            toolpathMoves: showToolpathPreview ? toolpathPreviewMoves : null,
-            machineWorkAreaMm: machineBedFromGrbl,
-            startMode,
-            savedOrigin,
-            bedWidthMm: scene.canvas.width,
-            bedHeightMm: scene.canvas.height,
-            originCorner: activeProfile?.originCorner ?? 'front-left',
-          }),
+          },
+          startMode === 'absolute'
+            ? 'Canvas = Bed position'
+            : startMode === 'current'
+              ? 'Design starts at laser head'
+              : savedOrigin
+                ? `Design starts at saved origin X:${savedOrigin.x.toFixed(0)} Y:${savedOrigin.y.toFixed(0)}`
+                : 'No saved origin - set one below',
           ),
+          React.createElement(CanvasViewport, {
+          scene,
+          activeTool: activeTool,
+          width: canvasViewportWidth,
+          height: canvasSize.height,
+          selectedIds: selectedIds,
+          onSelectionChange: setSelectedIds,
+          onSceneChange: handleSceneChange,
+          onSceneCommit: handleSceneCommit,
+          actionsRef: viewportActionsRef,
+          onZoomChange: setZoomLevel,
+          previewMode,
+          quickActions: !previewMode ? {
+            enabled: true,
+            selectedCount: selectedIds.size,
+            onDuplicate: handleQuickActionDuplicate,
+            onDelete: handleQuickActionDelete,
+            onCenter: handleQuickActionCenter,
+            onGridArray: handleGridArray,
+            hasSelectedText,
+            handleTextToPath: () => { void sceneOps.textToPath(); },
+          } : undefined,
+          onRequestTextPlacement: handleRequestTextPlacement,
+          onActiveTool: setActiveTool,
+          onEditText: handleEditText,
+          livePosition: liveJobCanvasPosition,
+          isJobRunning: grbl.isJobRunning,
+          jobProgress: grbl.jobProgress,
+          activeJobMoves,
+          showToolpathPreview,
+          toolpathMoves: showToolpathPreview ? toolpathPreviewMoves : null,
+          machineWorkAreaMm: machineBedFromGrbl,
+          startMode,
+          savedOrigin,
+          bedWidthMm: scene.canvas.width,
+          bedHeightMm: scene.canvas.height,
+          originCorner: activeProfile?.originCorner ?? 'front-left',
+        }),
         ),
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {
