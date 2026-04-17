@@ -38,6 +38,7 @@ import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { GrblController } from '../../controllers/grbl/GrblController';
 import { CanvasViewport } from './CanvasViewport';
+import { type ModeTabState } from '../renderers/SceneRenderer';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
 import { ContextMenu } from './ContextMenu';
@@ -181,6 +182,24 @@ export function App() {
   const [showToolpathPreview, setShowToolpathPreview] = useState(false);
   const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
+  const [activeModes, setActiveModes] = useState<Set<string>>(
+    () => new Set(['cut', 'engrave', 'score', 'image']),
+  );
+  const modeTabState: ModeTabState = useMemo(
+    () => ({ activeModes }),
+    [activeModes],
+  );
+  const handleModeTabToggle = useCallback((mode: string) => {
+    setActiveModes(prev => {
+      const next = new Set(prev);
+      if (next.has(mode)) {
+        if (next.size > 1) next.delete(mode);
+      } else {
+        next.add(mode);
+      }
+      return next;
+    });
+  }, []);
   const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
   const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
     minX: number;
@@ -1958,6 +1977,8 @@ export function App() {
           bedWidthMm: scene.canvas.width,
           bedHeightMm: scene.canvas.height,
           originCorner: activeProfile?.originCorner ?? 'front-left',
+          modeTabState,
+          onModeTabToggle: handleModeTabToggle,
         }),
         ),
       ),

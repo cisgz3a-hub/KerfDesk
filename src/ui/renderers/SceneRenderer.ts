@@ -129,6 +129,113 @@ export interface SceneMachineOverlayOptions {
   originCorner?: MachineOriginCorner;
 }
 
+// ─── BED-ATTACHED MODE TABS (world space, fixed screen px) ───────
+
+export interface ModeTabState {
+  activeModes: ReadonlySet<string>;
+}
+
+export interface ModeTabHitResult {
+  mode: LayerMode;
+}
+
+const MODE_TABS = [
+  { mode: 'cut' as const, label: 'Cut', icon: '✂', color: '#e63e6d' },
+  { mode: 'engrave' as const, label: 'Eng', icon: '▤', color: '#3b8beb' },
+  { mode: 'score' as const, label: 'Scr', icon: '╌', color: '#f5a623' },
+  { mode: 'image' as const, label: 'Img', icon: '🖼', color: '#2dd4a0' },
+];
+
+const TAB_WIDTH_PX = 44;
+const TAB_HEIGHT_PX = 36;
+const TAB_GAP_PX = 2;
+const TAB_TOP_OFFSET_PX = 8;
+
+/**
+ * Draw mode tabs on the left edge of the bed rectangle.
+ * Call while the world transform is active on `ctx` (same as `renderBed`).
+ * Tabs use fixed pixel size via `transform.screenPx` so they do not scale with zoom.
+ */
+export function renderModeTabs(
+  ctx: CanvasRenderingContext2D,
+  _bedHeightMm: number,
+  transform: Transform,
+  state: ModeTabState,
+): void {
+  const px = (n: number) => transform.screenPx(n);
+  const tabW = px(TAB_WIDTH_PX);
+  const tabH = px(TAB_HEIGHT_PX);
+  const gap = px(TAB_GAP_PX);
+  const topOffset = px(TAB_TOP_OFFSET_PX);
+
+  for (let i = 0; i < MODE_TABS.length; i++) {
+    const tab = MODE_TABS[i];
+    const isActive = state.activeModes.has(tab.mode);
+    const x = -tabW;
+    const y = topOffset + i * (tabH + gap);
+
+    ctx.fillStyle = isActive ? '#0c0c18' : '#08080f';
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(x, y, tabW, tabH, [px(4), 0, 0, px(4)]);
+    } else {
+      ctx.rect(x, y, tabW, tabH);
+    }
+    ctx.fill();
+
+    if (isActive) {
+      ctx.fillStyle = tab.color;
+      ctx.fillRect(x, y, px(3), tabH);
+      ctx.fillStyle = '#06060c';
+      ctx.fillRect(0, y + px(1), px(1.5), tabH - px(2));
+    }
+
+    if (!isActive) {
+      ctx.strokeStyle = '#1a1a30';
+      ctx.lineWidth = px(1);
+      ctx.beginPath();
+      ctx.moveTo(x + tabW, y);
+      ctx.lineTo(x + tabW, y + tabH);
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = isActive ? tab.color : '#333355';
+    ctx.font = `${px(14)}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(tab.icon, x + tabW / 2, y + tabH * 0.38);
+
+    ctx.fillStyle = isActive ? '#aaaacc' : '#333355';
+    ctx.font = `${isActive ? 'bold ' : ''}${px(8)}px 'DM Sans', sans-serif`;
+    ctx.fillText(tab.label, x + tabW / 2, y + tabH * 0.72);
+  }
+
+  ctx.textAlign = 'start';
+  ctx.textBaseline = 'alphabetic';
+}
+
+/** Hit-test mode tabs in world coordinates (mm). */
+export function hitTestModeTabs(
+  worldX: number,
+  worldY: number,
+  transform: Transform,
+): ModeTabHitResult | null {
+  const px = (n: number) => transform.screenPx(n);
+  const tabW = px(TAB_WIDTH_PX);
+  const tabH = px(TAB_HEIGHT_PX);
+  const gap = px(TAB_GAP_PX);
+  const topOffset = px(TAB_TOP_OFFSET_PX);
+
+  for (let i = 0; i < MODE_TABS.length; i++) {
+    const x = -tabW;
+    const y = topOffset + i * (tabH + gap);
+    if (worldX >= x && worldX <= 0 && worldY >= y && worldY <= y + tabH) {
+      return { mode: MODE_TABS[i].mode };
+    }
+  }
+  return null;
+}
+
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
 function renderMachineWorkAreaOverlay(
