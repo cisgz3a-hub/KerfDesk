@@ -1,12 +1,20 @@
 /**
  * Preflight checker — validates a scene + machine state before job execution.
  * Returns a readiness score (0-100%) with categorized issues.
+ *
+ * Delegates core rules to `Preflight.ts` and keeps legacy-only checks here until step 3.
  */
 
 import { type Scene, getOutputLayers } from '../scene/Scene';
 import { type SceneObject } from '../scene/SceneObject';
 import { type MachineState } from '../../controllers/ControllerInterface';
 import { computeObjectBounds } from '../../geometry/bounds';
+import {
+  runPreflight as runNewPreflight,
+  type PreflightContext,
+  type PreflightResult as NewPreflightResult,
+} from './Preflight';
+import { createBlankProfile, getActiveProfile } from '../devices/DeviceProfile';
 
 function hasUsableObjectBounds(bounds: ReturnType<typeof computeObjectBounds>): boolean {
   return Number.isFinite(bounds.minX) && Number.isFinite(bounds.maxX) &&
@@ -76,6 +84,151 @@ export interface PreflightResult {
   canStart: boolean;
 }
 
+function categorizeCode(code: string): 'machine' | 'design' | 'settings' | 'output' {
+  if (code.startsWith('MACHINE_')) return 'machine';
+  if (code === 'NO_GCODE') return 'output';
+  if (code.includes('BOUNDS') || code.includes('EMPTY') || code.includes('SCENE')) return 'design';
+  if (code.includes('LAYER') || code.includes('POWER') || code.includes('SPEED')) return 'settings';
+  return 'output';
+}
+
+function mapCodeToLegacyIssueId(code: string): string {
+  if (code === 'NO_GCODE') return 'output-no-gcode';
+  return code;
+}
+
+function newEngineIssueToLegacy(r: NewPreflightResult, i: number): PreflightIssue {
+  const id = mapCodeToLegacyIssueId(r.code) || `preflight-${i}`;
+  const severity: IssueSeverity = r.severity === 'error' ? 'blocker' : r.severity;
+  const dot = r.message.indexOf('.');
+  const title = (dot >= 0 ? r.message.slice(0, dot) : r.message) || r.code;
+  return {
+    id,
+    severity,
+    title,
+    detail: r.message,
+    fix: r.fix?.label,
+    category: categorizeCode(r.code),
+  };
+}
+
+function runLegacyBoundsChecks(
+  machinePlanBounds: { minX: number; minY: number; maxX: number; maxY: number },
+  bedWidth: number,
+  bedHeight: number,
+  issues: PreflightIssue[],
+): void {
+  const { minX, maxX, minY, maxY } = machinePlanBounds;
+
+  if (minX < -1) {
+    issues.push({
+      id: 'output-negative-x',
+      severity: 'warning',
+      title: `Output has negative X (${minX.toFixed(1)}mm)`,
+      detail:
+        'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
+      fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
+      category: 'output',
+    });
+  }
+  if (minY < -1) {
+    issues.push({
+      id: 'output-negative-y',
+      severity: 'warning',
+      title: `Output has negative Y (${minY.toFixed(1)}mm)`,
+      detail:
+        'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
+      fix: 'Verify your work zero and machine limits, or adjust the design / start position',
+      category: 'output',
+    });
+  }
+  if (maxX > bedWidth + 1) {
+    issues.push({
+      id: 'output-exceed-x',
+      severity: 'blocker',
+      title: `Output exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
+      detail: 'Objects extend beyond the machine workspace',
+      category: 'output',
+    });
+  }
+  if (maxY > bedHeight + 1) {
+    issues.push({
+      id: 'output-exceed-y',
+      severity: 'blocker',
+      title: `Output exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
+      detail: 'Objects extend beyond the machine workspace',
+      category: 'output',
+    });
+  }
+}
+
+function runLegacyGcodeBoundsChecks(
+  gcode: string,
+  bedWidth: number,
+  bedHeight: number,
+  issues: PreflightIssue[],
+): void {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  for (const line of gcode.split('\n')) {
+    const xm = line.match(/X([-\d.]+)/);
+    const ym = line.match(/Y([-\d.]+)/);
+    if (xm) {
+      const x = parseFloat(xm[1]);
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+    }
+    if (ym) {
+      const y = parseFloat(ym[1]);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+  }
+
+  if (minX < -1) {
+    issues.push({
+      id: 'output-negative-x',
+      severity: 'warning',
+      title: `G-code has negative X (${minX.toFixed(1)}mm)`,
+      detail:
+        'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
+      fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
+      category: 'output',
+    });
+  }
+  if (minY < -1) {
+    issues.push({
+      id: 'output-negative-y',
+      severity: 'warning',
+      title: `G-code has negative Y (${minY.toFixed(1)}mm)`,
+      detail:
+        'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
+      fix: 'Verify your work zero and machine limits, or adjust the design / start position',
+      category: 'output',
+    });
+  }
+  if (maxX > bedWidth + 1) {
+    issues.push({
+      id: 'output-exceed-x',
+      severity: 'blocker',
+      title: `G-code exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
+      detail: 'Objects extend beyond the machine workspace',
+      category: 'output',
+    });
+  }
+  if (maxY > bedHeight + 1) {
+    issues.push({
+      id: 'output-exceed-y',
+      severity: 'blocker',
+      title: `G-code exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
+      detail: 'Objects extend beyond the machine workspace',
+      category: 'output',
+    });
+  }
+}
+
 export function runPreflight(
   scene: Scene,
   gcode: string | null,
@@ -87,58 +240,7 @@ export function runPreflight(
 ): PreflightResult {
   const issues: PreflightIssue[] = [];
 
-  // ─── MACHINE CHECKS ──────────────────────────────────
-  if (machineState) {
-    if (machineState.status === 'alarm') {
-      issues.push({
-        id: 'machine-alarm',
-        severity: 'blocker',
-        title: 'Machine in ALARM state',
-        detail: `Alarm code: ${machineState.alarmCode ?? 'unknown'}`,
-        fix: 'Click Unlock ($X) to clear the alarm',
-        category: 'machine',
-      });
-    }
-    if (machineState.status === 'hold') {
-      issues.push({
-        id: 'machine-hold',
-        severity: 'blocker',
-        title: 'Machine is paused',
-        detail: 'A previous job is paused or the machine is in feed hold',
-        fix: 'Click Resume or Stop before starting a new job',
-        category: 'machine',
-      });
-    }
-    if (machineState.status === 'run') {
-      issues.push({
-        id: 'machine-running',
-        severity: 'blocker',
-        title: 'A job is already running',
-        detail: 'Wait for the current job to finish or stop it first',
-        category: 'machine',
-      });
-    }
-    if (machineState.status === 'homing') {
-      issues.push({
-        id: 'machine-homing',
-        severity: 'blocker',
-        title: 'Machine is homing',
-        detail: 'Wait for homing to complete',
-        category: 'machine',
-      });
-    }
-    if (machineState.status !== 'idle') {
-      if (!issues.some(i => i.category === 'machine' && i.severity === 'blocker')) {
-        issues.push({
-          id: 'machine-not-idle',
-          severity: 'warning',
-          title: `Machine state: ${machineState.status}`,
-          detail: 'Machine may not be ready. Expected: idle',
-          category: 'machine',
-        });
-      }
-    }
-  } else {
+  if (!machineState) {
     issues.push({
       id: 'machine-disconnected',
       severity: 'blocker',
@@ -147,6 +249,34 @@ export function runPreflight(
       fix: 'Click Connect in the toolbar',
       category: 'machine',
     });
+  }
+
+  const activeProfile = getActiveProfile();
+  const profile =
+    activeProfile ??
+    {
+      ...createBlankProfile('Bed (scene)'),
+      bedWidth: scene.canvas.width,
+      bedHeight: scene.canvas.height,
+    };
+
+  const ctx: PreflightContext = {
+    scene,
+    profile,
+    optimizeOrderEnabled: scene.compileOptions?.optimizeOrder !== false,
+    machineStatus: machineState?.status ?? null,
+    machineAlarmCode: machineState?.alarmCode ?? null,
+    hasGcode: gcode != null && gcode.length > 0,
+    skipNoGcodeCheck: !!machinePlanBounds,
+    liveMachineInfo: {
+      bedWidthMm: bedWidth > 0 ? bedWidth : undefined,
+      bedHeightMm: bedHeight > 0 ? bedHeight : undefined,
+    },
+  };
+
+  const newResults = runNewPreflight(ctx);
+  for (let i = 0; i < newResults.length; i++) {
+    issues.push(newEngineIssueToLegacy(newResults[i]!, i));
   }
 
   // ─── DESIGN CHECKS ──────────────────────────────────
@@ -363,102 +493,13 @@ export function runPreflight(
     });
   }
 
-  // ─── OUTPUT CHECKS ──────────────────────────────────
+  // ─── OUTPUT CHECKS (legacy machine / G-code bounds; step 2 migrates to new engine) ─
   if (machinePlanBounds) {
-    // Preferred path: use pre-computed machine-space bounds from applyMachineTransform
-    const { minX, maxX, minY, maxY } = machinePlanBounds;
-
-    if (minX < -1) {
-      issues.push({
-        id: 'output-negative-x',
-        severity: 'warning',
-        title: `Output has negative X (${minX.toFixed(1)}mm)`,
-        detail:
-          'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
-        fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
-        category: 'output',
-      });
-    }
-    if (minY < -1) {
-      issues.push({
-        id: 'output-negative-y',
-        severity: 'warning',
-        title: `Output has negative Y (${minY.toFixed(1)}mm)`,
-        detail:
-          'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
-        fix: 'Verify your work zero and machine limits, or adjust the design / start position',
-        category: 'output',
-      });
-    }
-    if (maxX > bedWidth + 1) {
-      issues.push({
-        id: 'output-exceed-x',
-        severity: 'blocker',
-        title: `Output exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
-        detail: 'Objects extend beyond the machine workspace',
-        category: 'output',
-      });
-    }
-    if (maxY > bedHeight + 1) {
-      issues.push({
-        id: 'output-exceed-y',
-        severity: 'blocker',
-        title: `Output exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
-        detail: 'Objects extend beyond the machine workspace',
-        category: 'output',
-      });
-    }
+    runLegacyBoundsChecks(machinePlanBounds, bedWidth, bedHeight, issues);
   } else if (gcode) {
-    // Fallback: parse raw G-code text (legacy path, kept for backward compat)
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (const line of gcode.split('\n')) {
-      const xm = line.match(/X([-\d.]+)/);
-      const ym = line.match(/Y([-\d.]+)/);
-      if (xm) { const x = parseFloat(xm[1]); minX = Math.min(minX, x); maxX = Math.max(maxX, x); }
-      if (ym) { const y = parseFloat(ym[1]); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-    }
-
-    if (minX < -1) {
-      issues.push({
-        id: 'output-negative-x',
-        severity: 'warning',
-        title: `G-code has negative X (${minX.toFixed(1)}mm)`,
-        detail:
-          'Many setups use negative work coordinates after zeroing; this is only a problem if the job exceeds your machine travel.',
-        fix: 'Verify your work zero and soft limits match this job, or move the design in the editor',
-        category: 'output',
-      });
-    }
-    if (minY < -1) {
-      issues.push({
-        id: 'output-negative-y',
-        severity: 'warning',
-        title: `G-code has negative Y (${minY.toFixed(1)}mm)`,
-        detail:
-          'Top-left homing often uses negative Y in work space; confirm the job still fits your envelope and soft limits.',
-        fix: 'Verify your work zero and machine limits, or adjust the design / start position',
-        category: 'output',
-      });
-    }
-    if (maxX > bedWidth + 1) {
-      issues.push({
-        id: 'output-exceed-x',
-        severity: 'blocker',
-        title: `G-code exceeds bed width (${maxX.toFixed(1)}mm > ${bedWidth}mm)`,
-        detail: 'Objects extend beyond the machine workspace',
-        category: 'output',
-      });
-    }
-    if (maxY > bedHeight + 1) {
-      issues.push({
-        id: 'output-exceed-y',
-        severity: 'blocker',
-        title: `G-code exceeds bed height (${maxY.toFixed(1)}mm > ${bedHeight}mm)`,
-        detail: 'Objects extend beyond the machine workspace',
-        category: 'output',
-      });
-    }
-  } else {
+    runLegacyGcodeBoundsChecks(gcode, bedWidth, bedHeight, issues);
+  }
+  if (!machinePlanBounds && !gcode && !issues.some(i => i.id === 'output-no-gcode')) {
     issues.push({
       id: 'output-no-gcode',
       severity: 'blocker',

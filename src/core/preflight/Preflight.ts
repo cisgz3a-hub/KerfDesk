@@ -3,6 +3,7 @@
  */
 import type { DeviceProfile } from '../devices/DeviceProfile';
 import type { Scene } from '../scene/Scene';
+import type { MachineStatus } from '../../controllers/ControllerInterface';
 import { computeObjectBounds } from '../../geometry/bounds';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
@@ -51,6 +52,12 @@ export const PREFLIGHT_CODES = {
   OPTIMIZE_ORDER_OFF: 'OPTIMIZE_ORDER_OFF',
   SMART_OVERSCAN_OFF_FAST: 'SMART_OVERSCAN_OFF_FAST',
   ACCEL_AWARE_OFF_RASTER: 'ACCEL_AWARE_OFF_RASTER',
+  MACHINE_ALARM: 'MACHINE_ALARM',
+  MACHINE_HOLD: 'MACHINE_HOLD',
+  MACHINE_RUNNING: 'MACHINE_RUNNING',
+  MACHINE_HOMING: 'MACHINE_HOMING',
+  MACHINE_NOT_IDLE: 'MACHINE_NOT_IDLE',
+  NO_GCODE: 'NO_GCODE',
 } as const;
 
 export interface PreflightContext {
@@ -69,10 +76,20 @@ export interface PreflightContext {
     homingEnabled?: boolean;
   };
   gcodeHeaderPreview?: string;
+  /** When set, GRBL-style machine status for job-start guardrails. */
+  machineStatus?: MachineStatus | null;
+  machineAlarmCode?: number | null;
+  hasGcode?: boolean;
+  /**
+   * When true, skip NO_GCODE — machine-space plan bounds already imply output exists
+   * (matches legacy PreflightChecker: no `output-no-gcode` when `machinePlanBounds` is set).
+   */
+  skipNoGcodeCheck?: boolean;
 }
 
 export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   const results: PreflightResult[] = [];
+  runMachineStateChecks(ctx, results);
   runSceneChecks(ctx, results);
   runBoundsChecks(ctx, results);
   runLayerChecks(ctx, results);
@@ -95,6 +112,60 @@ export function groupBySeverity(
     warning: results.filter(r => r.severity === 'warning'),
     info: results.filter(r => r.severity === 'info'),
   };
+}
+
+function runMachineStateChecks(ctx: PreflightContext, out: PreflightResult[]): void {
+  const st = ctx.machineStatus;
+  if (st == null) return;
+
+  if (st === 'alarm') {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_ALARM,
+      message: `Machine in ALARM state${ctx.machineAlarmCode != null ? ` (code ${ctx.machineAlarmCode})` : ''}. Unlock with $X before starting.`,
+    });
+  }
+  if (st === 'hold') {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_HOLD,
+      message: 'Machine is paused. Resume or stop before starting a new job.',
+    });
+  }
+  if (st === 'run') {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_RUNNING,
+      message: 'A job is already running. Wait for it to finish or stop it.',
+    });
+  }
+  if (st === 'homing') {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_HOMING,
+      message: 'Machine is homing. Wait for homing to complete.',
+    });
+  }
+  if (
+    st !== 'idle' &&
+    st !== 'alarm' &&
+    st !== 'hold' &&
+    st !== 'run' &&
+    st !== 'homing'
+  ) {
+    out.push({
+      severity: 'warning',
+      code: PREFLIGHT_CODES.MACHINE_NOT_IDLE,
+      message: `Machine state is ${st}. Expected idle when starting a job.`,
+    });
+  }
+  if (!ctx.hasGcode && st === 'idle' && !ctx.skipNoGcodeCheck) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.NO_GCODE,
+      message: 'No G-code compiled. Update the design or recompile.',
+    });
+  }
 }
 
 function runSceneChecks(ctx: PreflightContext, out: PreflightResult[]): void {
