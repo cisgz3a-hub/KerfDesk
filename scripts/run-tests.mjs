@@ -40,6 +40,15 @@ const files = [
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',
+  'e2e/text-bundled-inter.test.ts',
+  'e2e/text-hershey-sans.test.ts',
+  'e2e/engrave-fill.test.ts',
+  'e2e/score-line.test.ts',
+  'e2e/mixed-scene.test.ts',
+  'e2e/origin-absolute.test.ts',
+  'e2e/origin-saved.test.ts',
+  'e2e/circle-cut.test.ts',
+  'e2e/multi-pass-cut.test.ts',
 ];
 
 for (const f of files) {

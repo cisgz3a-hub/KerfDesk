@@ -16,6 +16,13 @@ On Windows PowerShell:
 $env:UPDATE_SNAPSHOTS='1'; npm test
 ```
 
+## Text in jobs
+
+`compileJob` only flattens text that already has `outlineSubPaths` from
+`expandTextOutlinesForCompile` (same as `PipelineService.compileGcode`).
+Use `prepareSceneForCompile(scene)` from `helpers/prepareSceneForCompile.ts`
+before `compileSceneToGcode` for any scene that includes text objects.
+
 ## Adding a fixture
 
 1. Create a scene factory in `fixtures/yourScenario.ts` that returns a
@@ -23,7 +30,7 @@ $env:UPDATE_SNAPSHOTS='1'; npm test
    time references.
 
 2. Create `yourScenario.test.ts` that:
-   - Calls the factory
+   - Calls the factory (and `await prepareSceneForCompile(scene)` if it contains text)
    - Pipes through `compileSceneToGcode` from `helpers/`
    - Makes structural assertions (e.g., contains expected G-codes)
    - Calls `expectMatchesSnapshot(gcode, 'your-scenario.gcode')`
