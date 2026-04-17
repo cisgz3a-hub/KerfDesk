@@ -70,6 +70,7 @@ import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
+import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
 import {
   deleteDeviceProfile,
@@ -2439,8 +2440,21 @@ export function App() {
                 fontFamily: "'DM Sans', system-ui, sans-serif",
               },
             },
+              ...BUNDLED_FONTS.map(bf =>
+                React.createElement('option', {
+                  key: `bundled-${bf.family}`,
+                  value: bf.family,
+                  style: { fontFamily: bf.family },
+                }, `${bf.label}  (bundled)`),
+              ),
+              React.createElement('option', {
+                key: '_sep_system',
+                value: '',
+                disabled: true,
+                style: { fontStyle: 'italic', color: '#555570' },
+              }, '— System fonts —'),
               ...['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman', 'Avant Garde'].map(f =>
-                React.createElement('option', { key: f, value: f, style: { fontFamily: f } }, f),
+                React.createElement('option', { key: `system-${f}`, value: f, style: { fontFamily: f } }, f),
               ),
             ),
           ),
