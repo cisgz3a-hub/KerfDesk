@@ -247,6 +247,17 @@ export function ConnectionPanelMain({
   }, []);
 
   useEffect(() => {
+    return () => {
+      try {
+        const api = (window as { electronAPI?: { stopBridge?: () => Promise<void> } }).electronAPI;
+        void api?.stopBridge?.();
+      } catch {
+        /* ignore */
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     isTestFiringRef.current = isTestFiring;
   }, [isTestFiring]);
 
@@ -441,6 +452,25 @@ export function ConnectionPanelMain({
       console.warn('WiFi connect: invalid port', wifiBridgePort);
       return;
     }
+
+    const electronAPI = (window as { electronAPI?: { startBridge?: (ip: string, port: number) => Promise<{ ok: boolean; error?: string }> } }).electronAPI;
+    if (electronAPI?.startBridge) {
+      appendMessage('Starting WiFi bridge...');
+      try {
+        const result = await electronAPI.startBridge('192.168.0.1', parsedPort);
+        if (!result.ok) {
+          appendMessage(`Bridge start failed: ${result.error ?? 'unknown error'}`);
+          return;
+        }
+        appendMessage('Bridge started');
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e);
+        appendMessage(`Bridge start error: ${msg}`);
+        console.error('Bridge start failed', e);
+        /* Continue anyway — bridge might already be running externally */
+      }
+    }
+
     const url = `ws://${host}:${parsedPort}`;
     const wsPort = createSerialPort('websocket') as WebSocketSerialPort;
     portRef.current = wsPort;
@@ -497,6 +527,12 @@ export function ConnectionPanelMain({
     }
 
     portRef.current = null;
+    try {
+      const api = (window as { electronAPI?: { stopBridge?: () => Promise<void> } }).electronAPI;
+      await api?.stopBridge?.();
+    } catch {
+      /* ignore */
+    }
     setShowSimulator(false);
     clearMessages();
     onDisconnect?.();
