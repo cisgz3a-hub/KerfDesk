@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFontBuffer } from '../src/fonts/loadFont';
 import { textToPathOpentype } from '../src/fonts/textToPathOpentype';
+import { BUNDLED_FONTS } from '../src/fonts/fontRegistry';
 import type { TextGeometry } from '../src/core/scene/SceneObject';
 
 let passed = 0;
@@ -64,6 +65,19 @@ for (const sp of normalized) {
   }
 }
 console.log(`  ℹ raw opentype origin: (${nMinX.toFixed(2)}, ${nMinY.toFixed(2)})`);
+
+console.log('\n=== Fonts: all bundled fonts load ===');
+
+for (const bf of BUNDLED_FONTS) {
+  const path = join(process.cwd(), 'public', bf.url.replace(/^\//, ''));
+  try {
+    const buf = readFileSync(path);
+    const f = parseFontBuffer(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    assert(f != null && f.unitsPerEm > 0, `${bf.family} parses as a valid font`);
+  } catch (e) {
+    assert(false, `${bf.family} at ${bf.url}: ${(e as Error).message}`);
+  }
+}
 
 console.log(`\n=== Result: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);
