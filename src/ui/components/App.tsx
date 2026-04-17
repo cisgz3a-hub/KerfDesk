@@ -71,6 +71,7 @@ import { NumberInput } from './NumberInput';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
+import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
 import {
   deleteDeviceProfile,
@@ -126,6 +127,12 @@ export function App() {
   const dialogs = useDialogs();
   const [zoomLevel, setZoomLevel] = useState(100);
   const viewportActionsRef = useRef<ViewportActions | null>(null);
+
+  // Load bundled fonts into browser font lookup so dialog/preview canvas text
+  // resolves families like "Inter" instead of falling back to a default serif.
+  useEffect(() => {
+    void injectBundledFontFaces();
+  }, []);
 
   const [scene, setScene] = useState<Scene>(() => {
     const initial = createScene(400, 300, 'Untitled');
