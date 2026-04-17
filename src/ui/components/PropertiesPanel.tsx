@@ -8,6 +8,7 @@ import {
   type RectGeometry,
   type TextGeometry,
 } from '../../core/scene/SceneObject';
+import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { ditherImage, getDitherModes, type DitherMode } from '../../import/Dithering';
@@ -171,7 +172,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     if (L) setDitherMode(L.settings.image.dithering ?? 'floyd-steinberg');
   }, [scene, selectedIds]);
 
-  const handleTrace = useCallback(async () => {
+  const handleTrace = useCallback(async (targetMode: 'cut' | 'engrave') => {
     if (selectedObjects.length !== 1) return;
     const obj = selectedObjects[0];
     if (obj.geometry.type !== 'image') return;
@@ -196,7 +197,19 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     });
 
     try {
-      const cutLayerId = scene.layers.find(l => l.settings.mode === 'cut')?.id || scene.layers[0].id;
+      // Find existing layer of the chosen mode, or create one.
+      let targetLayer = scene.layers.find(l => l.settings.mode === targetMode);
+      let layersForCommit = scene.layers;
+      if (!targetLayer) {
+        const newLayer = createLayer(
+          scene.layers.length,
+          targetMode as LayerMode,
+          targetMode === 'cut' ? 'Cut' : 'Engrave',
+        );
+        targetLayer = newLayer;
+        layersForCommit = [...scene.layers, newLayer];
+      }
+      const targetLayerId = targetLayer.id;
 
       const dpi = 96;
       const physW = (geom.originalWidth / dpi) * 25.4;
@@ -215,7 +228,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           opttolerance: DEFAULT_TRACE_OPTIONS.opttolerance,
           invert: traceInvert,
         },
-        cutLayerId,
+        targetLayerId,
         obj.name || 'Image',
       );
 
@@ -259,6 +272,8 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
       const newScene = {
         ...scene,
+        layers: layersForCommit,
+        activeLayerId: targetLayerId,
         objects: deleteImageAfterTrace
           ? [...scene.objects.filter(o => o.id !== obj.id), finalObj]
           : [...scene.objects, finalObj],
@@ -1358,16 +1373,32 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
             React.createElement('span', { style: { color: theme.text.secondary, fontSize: theme.font.size.sm } }, 'Delete image after trace'),
           ),
 
-          React.createElement('button', {
-            type: 'button',
-            onClick: () => { void handleTrace(); },
-            disabled: isTracing,
-            style: {
-              ...traceButtonStyle,
-              opacity: isTracing ? 0.6 : 1,
-              cursor: isTracing ? 'wait' : 'pointer',
-            },
-          }, isTracing ? '⏳ Tracing...' : 'Trace to Vector (Cut layer)'),
+          React.createElement('div', {
+            style: { display: 'flex', gap: 6 },
+          },
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => { void handleTrace('cut'); },
+              disabled: isTracing,
+              style: {
+                ...traceButtonStyle,
+                flex: 1,
+                opacity: isTracing ? 0.6 : 1,
+                cursor: isTracing ? 'wait' : 'pointer',
+              },
+            }, isTracing ? '⏳ Tracing...' : 'Trace to Cut'),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => { void handleTrace('engrave'); },
+              disabled: isTracing,
+              style: {
+                ...traceButtonStyle,
+                flex: 1,
+                opacity: isTracing ? 0.6 : 1,
+                cursor: isTracing ? 'wait' : 'pointer',
+              },
+            }, isTracing ? '⏳ Tracing...' : 'Trace to Engrave'),
+          ),
         ),
       );
     })(),
