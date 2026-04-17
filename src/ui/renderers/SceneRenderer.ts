@@ -398,8 +398,6 @@ export function renderSceneObjects(
   canvasHeight: number,
   selectedIds?: ReadonlySet<string>,
   previewMode: boolean = false,
-  /** When set, objects whose layer mode is not in this set are drawn dimmed (canvas UI). */
-  activeModes?: ReadonlySet<string> | null,
 ): void {
   const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
 
@@ -462,13 +460,11 @@ export function renderSceneObjects(
 
       const mode = layer.settings.mode;
       const power = layer.settings.power.max / 100;
-      const modeDimmed = activeModes != null && !activeModes.has(mode);
 
       const t = obj.transform;
       if (!isSafeObjectMatrix(t)) continue;
 
       ctx.save();
-      if (modeDimmed) ctx.globalAlpha = 0.12;
       ctx.transform(t.a, t.b, t.c, t.d, t.tx, t.ty);
       if (!isCurrentTransformFinite(ctx)) {
         console.error('[Canvas] Preview: bad object transform', obj.id);
@@ -514,7 +510,6 @@ export function renderSceneObjects(
         ctx.restore();
         continue;
       } else {
-        if (modeDimmed) ctx.globalAlpha = 1;
         ctx.restore();
         continue;
       }
@@ -545,12 +540,10 @@ export function renderSceneObjects(
         ctx.lineWidth = transform.screenPx(0.8);
         ctx.stroke();
       } else {
-        if (modeDimmed) ctx.globalAlpha = 1;
         ctx.restore();
         continue;
       }
 
-      if (modeDimmed) ctx.globalAlpha = 1;
       ctx.restore();
     }
 
@@ -588,15 +581,7 @@ export function renderSceneObjects(
     }
 
     try {
-      const modeDimmed = activeModes != null && !activeModes.has(layer.settings.mode);
-      if (modeDimmed) {
-        ctx.save();
-        ctx.globalAlpha = 0.12;
-      }
       renderObject(ctx, obj, layer, transform);
-      if (modeDimmed) {
-        ctx.restore();
-      }
     } catch (err) {
       console.error('[Canvas] Failed to render object:', obj.id, err);
     }
@@ -674,10 +659,9 @@ export function renderScene(
   previewMode: boolean = false,
   machineWorkAreaMm: { width: number; height: number } | null = null,
   machineOverlay: SceneMachineOverlayOptions = {},
-  activeModes?: ReadonlySet<string> | null,
 ): void {
   renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight, machineWorkAreaMm, machineOverlay);
-  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode, activeModes);
+  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode);
 }
 
 // ─── BED ─────────────────────────────────────────────────────────

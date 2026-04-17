@@ -374,8 +374,6 @@ interface CanvasViewportProps {
   bedWidthMm?: number;
   bedHeightMm?: number;
   originCorner?: MachineOriginCorner;
-  /** Modes currently shown at full opacity on the canvas; others drawn dimmed. */
-  activeModes?: ReadonlySet<string> | null;
   /** Bed (0,0) in canvas pixel space + zoom — for DOM overlays aligned to the bed. */
   onViewportLayout?: (layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => void;
 }
@@ -411,7 +409,6 @@ export function CanvasViewport({
   bedWidthMm = 0,
   bedHeightMm = 0,
   originCorner = 'front-left',
-  activeModes = null,
   onViewportLayout,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -555,7 +552,6 @@ export function CanvasViewport({
         previewMode,
         machineWorkAreaMm,
         { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
-        activeModes,
       );
       ctx.restore();
       drawRulers(ctx, transform, width, height);
@@ -583,7 +579,7 @@ export function CanvasViewport({
           console.error('[Canvas] Viewport transform invalid before scene objects');
           ctx.restore();
         } else {
-          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode, activeModes);
+          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
         }
       }
     }
@@ -903,7 +899,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, activeModes]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

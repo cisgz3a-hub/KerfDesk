@@ -182,9 +182,6 @@ export function App() {
   const [showToolpathPreview, setShowToolpathPreview] = useState(false);
   const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
-  const [activeModes, setActiveModes] = useState<Set<string>>(
-    () => new Set(['cut', 'engrave', 'score', 'image']),
-  );
   const [bedTabLayout, setBedTabLayout] = useState({
     bedScreenX: 0,
     bedScreenY: 0,
@@ -202,17 +199,7 @@ export function App() {
       return layout;
     });
   }, []);
-  const handleModeTabToggle = useCallback((mode: string) => {
-    setActiveModes(prev => {
-      const next = new Set(prev);
-      if (next.has(mode)) {
-        if (next.size > 1) next.delete(mode);
-      } else {
-        next.add(mode);
-      }
-      return next;
-    });
-  }, []);
+
   const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
   const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
     minX: number;
@@ -605,6 +592,34 @@ export function App() {
   useEffect(() => {
     handleSceneCommitRef.current = handleSceneCommit;
   }, [handleSceneCommit]);
+
+  const activeLayerMode = useMemo(() => {
+    const layer = scene.layers.find(l => l.id === scene.activeLayerId);
+    return layer?.settings.mode ?? 'cut';
+  }, [scene.layers, scene.activeLayerId]);
+
+  const handleModeTabSelect = useCallback((mode: string) => {
+    const sorted = [...scene.layers].sort((a, b) => a.order - b.order);
+    const targetLayer = sorted.find(l => l.settings.mode === mode);
+    if (targetLayer) {
+      setScene(prev => ({ ...prev, activeLayerId: targetLayer.id }));
+      return;
+    }
+    const maxOrder = scene.layers.length > 0 ? Math.max(...scene.layers.map(l => l.order)) : -1;
+    const nextOrder = maxOrder + 1;
+    const modeNames: Record<string, string> = {
+      cut: 'Cut',
+      engrave: 'Engrave',
+      score: 'Score',
+      image: 'Image',
+    };
+    const newLayer = createLayer(nextOrder, mode as LayerMode, modeNames[mode] ?? mode);
+    handleSceneCommit({
+      ...scene,
+      layers: [...scene.layers, newLayer],
+      activeLayerId: newLayer.id,
+    });
+  }, [scene, handleSceneCommit]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
@@ -1990,15 +2005,14 @@ export function App() {
           bedWidthMm: scene.canvas.width,
           bedHeightMm: scene.canvas.height,
           originCorner: activeProfile?.originCorner ?? 'front-left',
-          activeModes,
           onViewportLayout: handleViewportLayout,
         }),
           React.createElement(ModeTabsOverlay, {
-            bedScreenX: bedTabLayout.bedScreenX,
-            bedScreenY: bedTabLayout.bedScreenY,
+            viewportX: bedTabLayout.bedScreenX,
+            viewportY: bedTabLayout.bedScreenY,
             viewportZoom: bedTabLayout.zoom,
-            activeModes,
-            onToggleMode: handleModeTabToggle,
+            activeMode: activeLayerMode,
+            onSelectMode: handleModeTabSelect,
             bedWidth: scene.canvas.width,
             bedHeight: scene.canvas.height,
           }),

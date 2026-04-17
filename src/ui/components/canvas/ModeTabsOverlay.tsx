@@ -1,12 +1,13 @@
 import React from 'react';
 
 export interface ModeTabsOverlayProps {
-  /** Bed origin (0,0) in canvas pixel space (same coords as the `<canvas>`). */
-  bedScreenX: number;
-  bedScreenY: number;
+  /** Bed origin (0,0) in canvas pixel space — same coordinates as the `<canvas>`. */
+  viewportX: number;
+  viewportY: number;
   viewportZoom: number;
-  activeModes: ReadonlySet<string>;
-  onToggleMode: (mode: string) => void;
+  /** Current active layer's `settings.mode` (which tab is highlighted). */
+  activeMode: string;
+  onSelectMode: (mode: string) => void;
   bedWidth: number;
   bedHeight: number;
 }
@@ -23,16 +24,16 @@ const TAB_H = 28;
 const TAB_GAP = 3;
 
 export function ModeTabsOverlay({
-  bedScreenX,
-  bedScreenY,
+  viewportX,
+  viewportY,
   viewportZoom: _viewportZoom,
-  activeModes,
-  onToggleMode,
+  activeMode,
+  onSelectMode,
   bedWidth: _bedWidth,
   bedHeight: _bedHeight,
 }: ModeTabsOverlayProps) {
-  const tabsLeft = bedScreenX - TAB_W - 2;
-  const tabsTop = bedScreenY + 8;
+  const tabsLeft = viewportX - TAB_W - 2;
+  const tabsTop = viewportY + 8;
 
   return React.createElement('div', {
     style: {
@@ -47,13 +48,13 @@ export function ModeTabsOverlay({
     },
   },
   ...MODES.map((mode, i) => {
-    const isActive = activeModes.has(mode.key);
+    const isActive = activeMode === mode.key;
     const top = tabsTop + i * (TAB_H + TAB_GAP);
 
     return React.createElement('button', {
       key: mode.key,
       type: 'button',
-      onClick: () => onToggleMode(mode.key),
+      onClick: () => onSelectMode(mode.key),
       style: {
         position: 'absolute' as const,
         left: tabsLeft,
