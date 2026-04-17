@@ -28,6 +28,8 @@ export interface UseCompileManagerOptions {
   controllerAccelMmPerS2: number | null;
   connectionSidebarOpen: boolean;
   outputFormat?: OutputFormat;
+  /** When true, suppress sceneCompileTick bumps — avoids main-thread compiles during streaming. */
+  isJobRunning: boolean;
 }
 
 export interface UseCompileManagerResult {
@@ -60,6 +62,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     controllerAccelMmPerS2,
     connectionSidebarOpen,
     outputFormat = 'grbl',
+    isJobRunning,
   } = options;
 
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
@@ -80,6 +83,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   const machineBedHeight = machineBedFromController?.height ?? null;
 
   useLayoutEffect(() => {
+    if (isJobRunning) return;
     sceneRevisionRef.current += 1;
     setSceneCompileTick(sceneRevisionRef.current);
   }, [
@@ -91,6 +95,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     machineBedWidth,
     machineBedHeight,
     controllerAccelMmPerS2,
+    isJobRunning,
   ]);
 
   useEffect(() => {

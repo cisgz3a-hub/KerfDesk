@@ -368,6 +368,7 @@ export function App() {
     controllerAccelMmPerS2: machineAccelFromGrbl,
     connectionSidebarOpen,
     outputFormat: 'grbl',
+    isJobRunning: grbl.isJobRunning,
   });
 
   useEffect(() => {
@@ -921,6 +922,11 @@ export function App() {
 
   // Toolpath overlay follows the same `scene` as the canvas (fingerprint includes geometry, layers, transforms).
   useEffect(() => {
+    // Never recompile during a running job — main-thread stalls starve the
+    // WiFi bridge and cause GRBL's planner buffer to drain, silently stopping
+    // the machine mid-job. The auto-recompile effect has this same guard.
+    if (grbl.isJobRunning) return;
+
     if (!showToolpathPreview) {
       setToolpathPreviewMoves(null);
       return;
@@ -937,7 +943,7 @@ export function App() {
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert]);
+  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning]);
 
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
