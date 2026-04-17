@@ -715,6 +715,20 @@ export function App() {
     })();
   }, [scene, compileGcode, setCurrentGcode]);
 
+  // Auto-recompile G-code when the design changes (debounced).
+  // Replaces the manual "↻ Update" step in the connection panel.
+  useEffect(() => {
+    if (!connectionSidebarOpen) return;
+    if (grbl.isJobRunning) return;
+    if (!gcodeStale) return;
+
+    const timer = setTimeout(() => {
+      handleConnectionRecompile();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [gcodeStale, connectionSidebarOpen, grbl.isJobRunning, handleConnectionRecompile]);
+
   const bumpCanvasRepaint = useCallback(() => {
     try {
       window.dispatchEvent(new Event('laserforge-canvas-repaint'));
