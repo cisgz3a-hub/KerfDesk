@@ -68,6 +68,7 @@ import { CameraDialog } from './CameraDialog';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
+import { FontPicker } from './common/FontPicker';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
@@ -1771,10 +1772,6 @@ export function App() {
     textAlign: 'left' as const, cursor: 'pointer', fontFamily: theme.font.ui,
   };
 
-  const outlineFonts = BUNDLED_FONTS.filter(f => !f.hersheyFamily);
-  const engravingFonts = BUNDLED_FONTS.filter(f => !!f.hersheyFamily);
-  const systemFonts = ['Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana', 'Impact', 'Comic Sans MS', 'Trebuchet MS', 'Palatino', 'Garamond', 'Bookman', 'Avant Garde'];
-
   // ─── RENDER ──────────────────────────────────────────────────
 
   return React.createElement('div', {
@@ -2483,39 +2480,10 @@ export function App() {
         React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
           React.createElement('div', { style: { flex: 1 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Font'),
-            React.createElement('select', {
+            React.createElement(FontPicker, {
               value: dialogs.textFont,
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => dialogs.setTextFont(e.target.value),
-              style: {
-                width: '100%', padding: '6px 8px',
-                background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
-                color: '#e0e0ec', fontSize: 12, outline: 'none',
-                fontFamily: "'DM Sans', system-ui, sans-serif",
-              },
-            },
-              outlineFonts.length > 0 && React.createElement('optgroup', { key: 'g-bundled', label: 'Bundled' },
-                ...outlineFonts.map(bf =>
-                  React.createElement('option', {
-                    key: `bundled-${bf.family}`,
-                    value: bf.family,
-                    style: { fontFamily: `"${bf.family}", sans-serif` },
-                  }, bf.label.replace(/\s+\(single-line\)\s*$/i, '')),
-                ),
-              ),
-              engravingFonts.length > 0 && React.createElement('optgroup', { key: 'g-engraving', label: 'Engraving (single-line)' },
-                ...engravingFonts.map(bf =>
-                  React.createElement('option', {
-                    key: `hershey-${bf.family}`,
-                    value: bf.family,
-                  }, bf.label.replace(/\s+\(single-line\)\s*$/i, '')),
-                ),
-              ),
-              React.createElement('optgroup', { key: 'g-system', label: 'System fonts' },
-                ...systemFonts.map(f =>
-                  React.createElement('option', { key: `system-${f}`, value: f, style: { fontFamily: f } }, f),
-                ),
-              ),
-            ),
+              onChange: (family: string) => dialogs.setTextFont(family),
+            }),
           ),
           React.createElement('div', { style: { width: 80 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),

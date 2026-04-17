@@ -21,10 +21,10 @@ import {
 } from '../../core/image/ImageProcessing';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
+import { FontPicker } from './common/FontPicker';
 import { isProUnlocked } from './TrialGuard';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
-import { BUNDLED_FONTS, type BundledFont } from '../../fonts/fontRegistry';
 
 export interface ObjectPropertiesTabProps {
   scene: Scene;
@@ -701,28 +701,10 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
           React.createElement('div', { style: { marginBottom: 8 } },
             React.createElement('div', { style: subLabel }, 'Font'),
-            React.createElement('select', {
+            React.createElement(FontPicker, {
               value: tg.fontFamily ?? 'Arial',
-              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-                const nextFamily = e.target.value;
-                patchTextGeometry({ fontFamily: nextFamily });
-              },
-              style: { ...selectStyle, fontFamily: font },
-            },
-              React.createElement('option', { value: 'Arial' }, 'System default (Arial)'),
-              BUNDLED_FONTS.some((f: BundledFont) => !f.hersheyFamily) &&
-                React.createElement('optgroup', { label: 'Bundled' },
-                  ...BUNDLED_FONTS.filter((f: BundledFont) => !f.hersheyFamily).map((f: BundledFont) =>
-                    React.createElement('option', { key: f.family, value: f.family }, f.label.replace(/\s+\(single-line\)\s*$/i, '')),
-                  ),
-                ),
-              BUNDLED_FONTS.some((f: BundledFont) => !!f.hersheyFamily) &&
-                React.createElement('optgroup', { label: 'Engraving (single-line)' },
-                  ...BUNDLED_FONTS.filter((f: BundledFont) => !!f.hersheyFamily).map((f: BundledFont) =>
-                    React.createElement('option', { key: f.family, value: f.family }, f.label.replace(/\s+\(single-line\)\s*$/i, '')),
-                  ),
-                ),
-            ),
+              onChange: (nextFamily: string) => patchTextGeometry({ fontFamily: nextFamily }),
+            }),
           ),
 
           React.createElement('div', { style: { marginBottom: 8 } },
