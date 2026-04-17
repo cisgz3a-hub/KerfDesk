@@ -24,12 +24,7 @@ import { NumberInput } from './NumberInput';
 import { isProUnlocked } from './TrialGuard';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
-
-const TEXT_FONT_OPTIONS = [
-  'Arial', 'Helvetica', 'Times New Roman', 'Georgia', 'Courier New', 'Verdana',
-  'Trebuchet MS', 'Impact', 'Comic Sans MS', 'Palatino', 'Garamond',
-  'Bookman', 'Avant Garde',
-] as const;
+import { BUNDLED_FONTS, type BundledFont } from '../../fonts/fontRegistry';
 
 export interface ObjectPropertiesTabProps {
   scene: Scene;
@@ -707,17 +702,21 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           React.createElement('div', { style: { marginBottom: 8 } },
             React.createElement('div', { style: subLabel }, 'Font'),
             React.createElement('select', {
-              value: tg.fontFamily || 'Arial',
+              value: tg.fontFamily ?? 'Arial',
               onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
-                patchTextGeometry({ fontFamily: e.target.value });
+                const nextFamily = e.target.value;
+                patchTextGeometry({ fontFamily: nextFamily });
               },
               style: { ...selectStyle, fontFamily: font },
             },
-              ...(TEXT_FONT_OPTIONS as readonly string[]).includes(tg.fontFamily || 'Arial')
-                ? []
-                : [React.createElement('option', { key: '__ff', value: tg.fontFamily }, tg.fontFamily || 'Arial')],
-              ...TEXT_FONT_OPTIONS.map(f =>
-                React.createElement('option', { key: f, value: f, style: { fontFamily: f } }, f),
+              React.createElement('option', { value: 'Arial' }, 'System default (Arial)'),
+              React.createElement('option', {
+                value: '',
+                disabled: true,
+                style: { fontStyle: 'italic', color: '#555570' },
+              }, '— Bundled —'),
+              ...BUNDLED_FONTS.map((f: BundledFont) =>
+                React.createElement('option', { key: f.family, value: f.family }, f.label),
               ),
             ),
           ),
