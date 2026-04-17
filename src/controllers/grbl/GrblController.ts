@@ -560,6 +560,22 @@ export class GrblController implements LaserController {
       }
     }
 
+    // Defensive: if a job is marked running but the status report shows alarm, or
+    // idle with queue drained, reset internal job state. Covers alarm reported only
+    // via periodic '?' (no `ALARM:N` line) or a stuck _isJobRunning after completion.
+    if (this._isJobRunning) {
+      const st = this._state.status;
+      if (
+        st === 'alarm' ||
+        (st === 'idle' &&
+          this._queueIndex >= this._jobLines.length &&
+          this._pending.length === 0)
+      ) {
+        this._abortJob();
+        this._emitProgress();
+      }
+    }
+
     let mPos: MachinePosition | null = null;
     let wPos: MachinePosition | null = null;
 

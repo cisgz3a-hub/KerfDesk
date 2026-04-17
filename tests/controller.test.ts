@@ -278,6 +278,47 @@ async function testStatusParsing() {
   await ctrl.disconnect();
 }
 
+// ─── TEST: ALARM VIA STATUS REPORT CLEARS STUCK JOB RUNNING ──────
+
+async function testAlarmStatusReportResetsStuckJobRunning() {
+  console.log('\n=== Test: Alarm status report resets stuck job running ===');
+
+  const ctrl = new GrblController();
+  const port = new MockSerialPort();
+  port.open();
+  await ctrl.connect(port);
+  await flush();
+
+  // Simulate stuck _isJobRunning (e.g. alarm only from periodic '?', no ALARM:N line)
+  (ctrl as unknown as { _isJobRunning: boolean })._isJobRunning = true;
+
+  assert(ctrl.isJobRunning, 'Precondition: controller thinks a job is running');
+
+  let blocked = false;
+  try {
+    ctrl.sendCommand('$X');
+  } catch {
+    blocked = true;
+  }
+  assert(blocked, 'Precondition: manual $X blocked while job running');
+
+  port.injectResponse('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
+  await flush();
+
+  assert(ctrl.state.status === 'alarm', 'Status parsed as alarm from report');
+  assert(!ctrl.isJobRunning, 'Alarm status report clears stuck _isJobRunning');
+
+  let threwAfterReset = false;
+  try {
+    ctrl.sendCommand('$X');
+  } catch {
+    threwAfterReset = true;
+  }
+  assert(!threwAfterReset, 'sendCommand($X) no longer throws after defensive reset');
+
+  await ctrl.disconnect();
+}
+
 // ─── TEST: PAUSE / RESUME ────────────────────────────────────────
 
 async function testPauseResume() {
@@ -452,6 +493,7 @@ async function runAll() {
   await testSimpleStreaming();
   await testBufferManagement();
   await testStatusParsing();
+  await testAlarmStatusReportResetsStuckJobRunning();
   await testPauseResume();
   await testErrorHandling();
   await testRawLineLogging();
