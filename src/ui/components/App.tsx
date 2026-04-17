@@ -34,6 +34,7 @@ import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
+import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -49,7 +50,7 @@ import { ContextMenu } from './ContextMenu';
 import { GridArrayDialog, type GridArrayConfig } from './GridArrayDialog';
 import { MaterialTestDialog } from './MaterialTestDialog';
 import { GcodePreview } from './GcodePreview';
-import { MaterialDialog, type MaterialConfig } from './MaterialDialog';
+import { MaterialDialog } from './MaterialDialog';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
@@ -96,10 +97,6 @@ import { entitlementService, tierDisplayName } from '../../entitlements';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
 
 type StartMode = GcodeStartMode;
-import {
-  getPresetSettings,
-  getAllMaterials,
-} from '../../core/materials/MaterialPresets';
 import { type Template } from '../../templates/TemplateLibrary';
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
 
@@ -1366,76 +1363,15 @@ export function App() {
     } catch { /* ignore */ }
   }, []);
 
-  const handleMaterialConfirm = useCallback((config: MaterialConfig) => {
-    dialogs.setShowMaterial(false);
-    const newScene = {
-      ...scene,
-      material: {
-        ...config,
-        x: (scene.canvas.width - config.width) / 2,
-        y: (scene.canvas.height - config.height) / 2,
-        color: '',
-        enabled: true,
-      },
-    };
-    handleSceneCommit(newScene);
-  }, [scene, handleSceneCommit]);
-
-  const handleMaterialClear = useCallback(() => {
-    dialogs.setShowMaterial(false);
-    handleSceneCommit({ ...scene, material: null });
-  }, [scene, handleSceneCommit]);
-
-  /** Apply a material preset — updates scene.material and adjusts ALL output layers. */
-  const handleMaterialPresetApply = useCallback((presetName: string): boolean => {
-    const machineType = scene.machine?.type || 'diode';
-    const machineWatts = scene.machine?.watts || '10';
-    const settings = getPresetSettings(presetName, machineType, machineWatts);
-    if (!settings) return false;
-
-    // Apply mode-appropriate settings to every output layer
-    const newLayers = scene.layers.map(l => {
-      if (!l.visible || l.output === false) return l;
-      const mode = l.settings.mode;
-      const s = mode === 'cut' ? settings.cut
-        : mode === 'engrave' ? settings.engrave
-        : mode === 'score' ? settings.score
-        : settings.engrave;
-      return {
-        ...l,
-        settings: {
-          ...l.settings,
-          power: { ...l.settings.power, max: s.power },
-          speed: s.speed,
-          passes: 'passes' in s ? s.passes : l.settings.passes,
-        },
-      };
-    });
-
-    // Determine material type from category
-    const preset = getAllMaterials().find(p => p.name === presetName);
-    const catMap: Record<string, NonNullable<Scene['material']>['type']> = {
-      Acrylic: 'acrylic', Leather: 'leather', 'Paper & Card': 'paper',
-      Fabric: 'fabric', Wood: 'wood', Plywood: 'wood', MDF: 'wood',
-    };
-    const matType = preset ? (catMap[preset.category] || 'custom') : 'custom';
-
-    const matWidth = scene.canvas.width * 0.6;
-    const matHeight = scene.canvas.height * 0.5;
-
-    const updatedMaterial = scene.material
-      ? { ...scene.material, name: presetName, type: matType, thickness: preset?.thickness ?? scene.material.thickness }
-      : {
-          type: matType, name: presetName,
-          width: matWidth, height: matHeight,
-          x: (scene.canvas.width - matWidth) / 2,
-          y: (scene.canvas.height - matHeight) / 2,
-          thickness: preset?.thickness ?? 3, color: '#c4956a', enabled: true,
-        };
-
-    handleSceneCommit({ ...scene, layers: newLayers, material: updatedMaterial });
-    return true;
-  }, [scene, handleSceneCommit]);
+  const {
+    handleMaterialConfirm,
+    handleMaterialClear,
+    handleMaterialPresetApply,
+  } = useMaterialHandlers({
+    scene,
+    handleSceneCommit,
+    setShowMaterial: dialogs.setShowMaterial,
+  });
 
   const handleTemplateSelect = useCallback(async (template: Template) => {
     dialogs.setShowTemplates(false);
