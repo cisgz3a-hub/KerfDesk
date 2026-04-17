@@ -30,6 +30,7 @@ import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useCompileManager } from '../hooks/useCompileManager';
+import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -50,9 +51,8 @@ import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { deserializeScene, serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
-import { generateId, IDENTITY_MATRIX, MAX_LASER_SPEED, MIN_LASER_SPEED } from '../../core/types';
-import { createLayer, type Layer, type LayerMode, type FillMode } from '../../core/scene/Layer';
-import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
+import { generateId, IDENTITY_MATRIX } from '../../core/types';
+import { createLayer, type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { offsetObject } from '../../geometry/OffsetPath';
@@ -724,6 +724,24 @@ export function App() {
     handleSceneCommitRef.current = handleSceneCommit;
   }, [handleSceneCommit]);
 
+  const {
+    handleConnectionRecompile,
+    handleConnectionUpdateLayerMode,
+    handleConnectionUpdateLayerSetting,
+    handleConnectionUpdateLayerFillMode,
+    handleConnectionUpdateLayerFillInterval,
+    handleConnectionUpdateLayerFillBidirectional,
+  } = useConnectionHandlers({
+    scene,
+    handleSceneCommit,
+    compileGcode,
+    setCurrentGcode,
+    connectionSidebarOpen,
+    gcodeStale,
+    setGcodeStale,
+    grbl,
+  });
+
   const activeLayerMode = useMemo(() => {
     const layer = scene.layers.find(l => l.id === scene.activeLayerId);
     return layer?.settings.mode ?? scene.layers[0]?.settings.mode ?? 'cut';
@@ -931,163 +949,6 @@ export function App() {
     });
     return () => { cancelled = true; };
   }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert]);
-
-  const handleConnectionRecompile = useCallback(() => {
-    void (async () => {
-      const gc = await compileGcode(scene);
-      setCurrentGcode(gc);
-    })();
-  }, [scene, compileGcode, setCurrentGcode]);
-
-  // Auto-recompile G-code when the design changes (debounced).
-  // Replaces the manual "↻ Update" step in the connection panel.
-  useEffect(() => {
-    if (!connectionSidebarOpen) return;
-    if (grbl.isJobRunning) return;
-    if (!gcodeStale) return;
-
-    const timer = setTimeout(() => {
-      handleConnectionRecompile();
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [gcodeStale, connectionSidebarOpen, grbl.isJobRunning, handleConnectionRecompile]);
-
-  const bumpCanvasRepaint = useCallback(() => {
-    try {
-      window.dispatchEvent(new Event('laserforge-canvas-repaint'));
-    } catch { /* ignore */ }
-  }, []);
-
-  /** Connection sidebar edits arbitrary layers; LayerPanel’s mode UI is for `activeLayerId` only — align selection here. */
-  const handleConnectionUpdateLayerMode = useCallback(
-    (layerId: string, mode: LayerMode) => {
-      const layer = scene.layers.find(l => l.id === layerId);
-      if (!layer) return;
-      let next = applyLayerModeChange(layer, mode);
-      // Auto-rename if the name matches the old mode (e.g. "Cut" → "Engrave")
-      const modeNames: Record<LayerMode, string> = { cut: 'Cut', engrave: 'Engrave', score: 'Score', image: 'Image' };
-      if (layer.name.toLowerCase() === layer.settings.mode) {
-        next = { ...next, name: modeNames[mode] };
-      }
-      handleSceneCommit({
-        ...scene,
-        activeLayerId: layerId,
-        layers: scene.layers.map(l => (l.id === layerId ? next : l)),
-      });
-      if (connectionSidebarOpen) setGcodeStale(true);
-      bumpCanvasRepaint();
-    },
-    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
-  );
-
-  const handleConnectionUpdateLayerSetting = useCallback(
-    (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => {
-      handleSceneCommit({
-        ...scene,
-        activeLayerId: layerId,
-        layers: scene.layers.map(l => {
-          if (l.id !== layerId) return l;
-          if (key === 'powerMax') {
-            const v = Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 0)));
-            return { ...l, settings: { ...l.settings, power: { ...l.settings.power, max: v } } };
-          }
-          if (key === 'speed') {
-            const v = Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, Math.round(Number.isFinite(value) ? value : 1000)));
-            return { ...l, settings: { ...l.settings, speed: v } };
-          }
-          const v = Math.max(1, Math.min(99, Math.round(Number.isFinite(value) ? value : 1)));
-          return { ...l, settings: { ...l.settings, passes: v } };
-        }),
-      });
-      if (connectionSidebarOpen) setGcodeStale(true);
-      bumpCanvasRepaint();
-    },
-    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
-  );
-
-  const handleConnectionUpdateLayerFillMode = useCallback(
-    (layerId: string, fillMode: FillMode) => {
-      handleSceneCommit({
-        ...scene,
-        activeLayerId: layerId,
-        layers: scene.layers.map(l => {
-          if (l.id !== layerId) return l;
-          const f = l.settings.fill;
-          const interval = Number(f.interval) > 0 ? f.interval : 0.1;
-          return {
-            ...l,
-            settings: {
-              ...l.settings,
-              fill: {
-                ...f,
-                enabled: true,
-                mode: fillMode,
-                interval,
-              },
-            },
-          };
-        }),
-      });
-      if (connectionSidebarOpen) setGcodeStale(true);
-      bumpCanvasRepaint();
-    },
-    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
-  );
-
-  const handleConnectionUpdateLayerFillInterval = useCallback(
-    (layerId: string, intervalMm: number) => {
-      const interval = Math.max(0.02, Math.min(1, Number.isFinite(intervalMm) ? intervalMm : 0.1));
-      handleSceneCommit({
-        ...scene,
-        activeLayerId: layerId,
-        layers: scene.layers.map(l => {
-          if (l.id !== layerId) return l;
-          const f = l.settings.fill;
-          return {
-            ...l,
-            settings: {
-              ...l.settings,
-              fill: {
-                ...f,
-                enabled: true,
-                interval,
-              },
-            },
-          };
-        }),
-      });
-      if (connectionSidebarOpen) setGcodeStale(true);
-      bumpCanvasRepaint();
-    },
-    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
-  );
-
-  const handleConnectionUpdateLayerFillBidirectional = useCallback(
-    (layerId: string, bidirectional: boolean) => {
-      handleSceneCommit({
-        ...scene,
-        activeLayerId: layerId,
-        layers: scene.layers.map(l => {
-          if (l.id !== layerId) return l;
-          const f = l.settings.fill;
-          return {
-            ...l,
-            settings: {
-              ...l.settings,
-              fill: {
-                ...f,
-                biDirectional: bidirectional,
-              },
-            },
-          };
-        }),
-      });
-      if (connectionSidebarOpen) setGcodeStale(true);
-      bumpCanvasRepaint();
-    },
-    [scene, handleSceneCommit, connectionSidebarOpen, bumpCanvasRepaint],
-  );
 
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
