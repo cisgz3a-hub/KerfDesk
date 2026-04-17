@@ -144,6 +144,20 @@ test('clean scene returns no errors', () => {
   assert.equal(results.some(r => r.severity === 'error'), false);
 });
 
+test('connected with missing machineStatus triggers MACHINE_DISCONNECTED', () => {
+  const results = runPreflight(
+    makeCtx({ connectedToMachine: true, machineStatus: null }),
+  );
+  assert.ok(
+    results.some(
+      r =>
+        r.code === PREFLIGHT_CODES.MACHINE_DISCONNECTED &&
+        r.severity === 'error' &&
+        r.message === 'Not connected to a machine',
+    ),
+  );
+});
+
 test('hasBlockingErrors true iff error exists', () => {
   const clean = runPreflight(makeCtx());
   const withError = runPreflight(makeCtx({ scene: makeScene({ objects: [] }) }));

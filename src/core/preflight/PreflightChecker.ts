@@ -2,7 +2,7 @@
  * Preflight checker — validates a scene + machine state before job execution.
  * Returns a readiness score (0-100%) with categorized issues.
  *
- * Thin adapter over `Preflight.ts` (step 2). Maps structured results to the legacy UI shape.
+ * Thin adapter over `Preflight.ts`. Maps structured results to the legacy UI shape.
  */
 
 import { type Scene } from '../scene/Scene';

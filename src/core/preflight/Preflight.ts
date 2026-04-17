@@ -102,7 +102,7 @@ export interface PreflightContext {
   machineStatus?: MachineStatus | null;
   machineAlarmCode?: number | null;
   hasGcode?: boolean;
-  /** Machine-space plan bounds from applyMachineTransform (preferred for output vs bed). */
+  /** Machine-space plan bounds from applyMachineTransform (preferred over scene bounds for output checks). */
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
   /**
    * When false, machine is not connected (UI checker). When undefined, machine connection is not asserted (standalone tests).
@@ -149,6 +149,14 @@ function runMachineStateChecks(ctx: PreflightContext, out: PreflightResult[]): v
       severity: 'error',
       code: PREFLIGHT_CODES.MACHINE_DISCONNECTED,
       message: 'Not connected to a machine. Connect to a laser or use the simulator.',
+    });
+  }
+
+  if (ctx.connectedToMachine === true && ctx.machineStatus == null) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_DISCONNECTED,
+      message: 'Not connected to a machine',
     });
   }
 
@@ -371,7 +379,7 @@ function runDesignOutputLayerChecks(ctx: PreflightContext, out: PreflightResult[
     if (layer?.settings.mode === 'image') {
       const g = obj.geometry;
       const hasRasterPixels =
-        ((g.adjustedData?.length ?? 0) > 0 || (g.grayscaleData?.length ?? 0) > 0) &&
+        (g.grayscaleData?.length ?? 0) > 0 &&
         (g.grayscaleWidth ?? 0) > 0 &&
         (g.grayscaleHeight ?? 0) > 0;
       if (!hasRasterPixels) {
@@ -434,30 +442,28 @@ function runOutputBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): v
     out.push({
       severity: 'warning',
       code: PREFLIGHT_CODES.OUTPUT_NEGATIVE_X,
-      message:
-        `Output has negative X (${bounds.minX.toFixed(1)}mm). Many setups use negative work coordinates after zeroing; verify work zero and soft limits.`,
+      message: `Output has negative X (${bounds.minX.toFixed(1)}mm). Verify work zero and soft limits.`,
     });
   }
   if (bounds.minY < -1) {
     out.push({
       severity: 'warning',
       code: PREFLIGHT_CODES.OUTPUT_NEGATIVE_Y,
-      message:
-        `Output has negative Y (${bounds.minY.toFixed(1)}mm). Top-left homing often uses negative Y; verify work zero and machine limits.`,
+      message: `Output has negative Y (${bounds.minY.toFixed(1)}mm). Verify work zero and machine limits.`,
     });
   }
   if (bedW != null && bedW > 0 && bounds.maxX > bedW + 1) {
     out.push({
       severity: 'error',
       code: PREFLIGHT_CODES.OUTPUT_EXCEEDS_BED_X,
-      message: `Output exceeds bed width (${bounds.maxX.toFixed(1)}mm > ${bedW}mm). Objects extend beyond the machine workspace.`,
+      message: `Output exceeds bed width (${bounds.maxX.toFixed(1)}mm > ${bedW}mm).`,
     });
   }
   if (bedH != null && bedH > 0 && bounds.maxY > bedH + 1) {
     out.push({
       severity: 'error',
       code: PREFLIGHT_CODES.OUTPUT_EXCEEDS_BED_Y,
-      message: `Output exceeds bed height (${bounds.maxY.toFixed(1)}mm > ${bedH}mm). Objects extend beyond the machine workspace.`,
+      message: `Output exceeds bed height (${bounds.maxY.toFixed(1)}mm > ${bedH}mm).`,
     });
   }
 }
