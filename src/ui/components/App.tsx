@@ -2175,6 +2175,7 @@ export function App() {
           onSelectionChange: setSelectedIds,
           showAlert,
           handleTextToPath: () => void sceneOps.textToPath(),
+          onEditText: handleEditText,
         }),
       ),
     ),

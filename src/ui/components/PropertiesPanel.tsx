@@ -6,6 +6,7 @@ import {
   type PathGeometry,
   type PolygonGeometry,
   type RectGeometry,
+  type SceneObject,
   type TextGeometry,
 } from '../../core/scene/SceneObject';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
@@ -35,11 +36,13 @@ export interface ObjectPropertiesTabProps {
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   handleTextToPath: () => void;
+  /** Same entry point as double-click edit on canvas (Add Text dialog, edit mode). */
+  onEditText?: (obj: SceneObject) => void;
   productionMode?: boolean;
 }
 
 /** Object properties UI (embedded in LayerPanel Object tab). */
-export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, productionMode = false }: ObjectPropertiesTabProps) {
+export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, onEditText, productionMode = false }: ObjectPropertiesTabProps) {
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
 
@@ -894,6 +897,23 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
             },
           }, '↺ Text on Path (coming soon)'),
         ),
+
+        onEditText && React.createElement('button', {
+          type: 'button',
+          onClick: () => onEditText(obj),
+          style: {
+            width: '100%',
+            padding: '8px',
+            fontSize: 11,
+            borderRadius: 6,
+            cursor: 'pointer',
+            fontFamily: font,
+            background: 'rgba(0,212,255,0.08)',
+            border: '1px solid rgba(0,212,255,0.3)',
+            color: '#00d4ff',
+            marginBottom: 6,
+          },
+        }, '✏ Edit text...'),
 
         React.createElement('div', {
           style: {

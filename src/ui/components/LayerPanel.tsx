@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { type Scene, getActiveLayer } from '../../core/scene/Scene';
+import type { SceneObject } from '../../core/scene/SceneObject';
 import { type Layer, type LayerMode, type FillMode, createLayer } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { MAX_LASER_SPEED } from '../../core/types';
@@ -25,6 +26,7 @@ interface LayerPanelProps {
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   handleTextToPath: () => void;
+  onEditText?: (obj: SceneObject) => void;
 }
 
 function updateLayer(
@@ -59,6 +61,7 @@ export function LayerPanel({
   onSelectionChange,
   showAlert,
   handleTextToPath,
+  onEditText,
 }: LayerPanelProps) {
   const activeLayer = getActiveLayer(scene) ?? scene.layers[0];
   const [showTabsCustomize, setShowTabsCustomize] = useState(false);
@@ -515,6 +518,7 @@ export function LayerPanel({
         onSelectionChange,
         showAlert,
         handleTextToPath,
+        onEditText,
         productionMode,
       }),
       sidebarTab === 'layer' && activeLayer && React.createElement('div', { style: settingsStyle },
