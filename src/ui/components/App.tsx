@@ -36,6 +36,7 @@ import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
 import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
+import { useKerfHandlers } from '../hooks/useKerfHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -58,7 +59,6 @@ import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type Layer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
-import { offsetObject } from '../../geometry/OffsetPath';
 import { theme } from '../styles/theme';
 import { WelcomeWizard } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
@@ -1265,54 +1265,15 @@ export function App() {
     });
   }, [scene, handleSceneCommit]);
 
-  const handleKerfGenerateTest = useCallback((objects: SceneObject[]) => {
-    handleSceneCommit({
-      ...scene,
-      objects: [...scene.objects, ...objects],
-    });
-  }, [scene, handleSceneCommit]);
-
-  const handleKerfApply = useCallback(async (offsetMm: number, objectIds: string[]) => {
-    const idsSet = new Set(objectIds);
-    const next: SceneObject[] = [];
-    let changed = 0;
-    for (const obj of scene.objects) {
-      if (!idsSet.has(obj.id)) {
-        next.push(obj);
-        continue;
-      }
-      if (obj.locked || !obj.visible) {
-        next.push(obj);
-        continue;
-      }
-      const resultGeom = offsetObject(obj, offsetMm);
-      if (!resultGeom) {
-        next.push(obj);
-        continue;
-      }
-      changed += 1;
-      next.push({
-        ...obj,
-        type: 'path',
-        name: obj.name.startsWith('Kerf Test') ? obj.name : `Kerf ${offsetMm >= 0 ? '+' : ''}${offsetMm.toFixed(3)}mm ${obj.name}`,
-        transform: { ...IDENTITY_MATRIX },
-        geometry: resultGeom,
-        _bounds: null,
-        _worldTransform: null,
-      } as SceneObject);
-    }
-    if (changed === 0) {
-      await showAlert('Kerf', 'Offset failed — select cut paths or shapes, or try a smaller kerf.');
-      return;
-    }
-    handleSceneCommit({ ...scene, objects: next });
-  }, [scene, handleSceneCommit, showAlert]);
-
-  const handleKerfSaveToPreset = useCallback((kerfMm: number) => {
-    try {
-      localStorage.setItem('laserforge_kerf', String(kerfMm));
-    } catch { /* ignore */ }
-  }, []);
+  const {
+    handleKerfGenerateTest,
+    handleKerfApply,
+    handleKerfSaveToPreset,
+  } = useKerfHandlers({
+    scene,
+    handleSceneCommit,
+    showAlert,
+  });
 
   const {
     handleMaterialConfirm,
