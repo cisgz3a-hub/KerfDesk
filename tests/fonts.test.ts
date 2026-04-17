@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { parseFontBuffer } from '../src/fonts/loadFont';
 import { textToPathOpentype } from '../src/fonts/textToPathOpentype';
+import { textToPathHershey } from '../src/fonts/textToPathHershey';
 import { BUNDLED_FONTS } from '../src/fonts/fontRegistry';
 import type { TextGeometry } from '../src/core/scene/SceneObject';
 
@@ -69,6 +70,7 @@ console.log(`  ℹ raw opentype origin: (${nMinX.toFixed(2)}, ${nMinY.toFixed(2)
 console.log('\n=== Fonts: all bundled fonts load ===');
 
 for (const bf of BUNDLED_FONTS) {
+  if (bf.hersheyFamily || !bf.url) continue;
   const path = join(process.cwd(), 'public', bf.url.replace(/^\//, ''));
   try {
     const buf = readFileSync(path);
@@ -78,6 +80,38 @@ for (const bf of BUNDLED_FONTS) {
     assert(false, `${bf.family} at ${bf.url}: ${(e as Error).message}`);
   }
 }
+
+console.log('\n=== Fonts: Hershey Sans renders "HI" ===');
+
+const hersheyGeom: TextGeometry = {
+  type: 'text',
+  text: 'HI',
+  fontFamily: 'Hershey Sans',
+  fontSize: 10,
+};
+
+const hsPaths = textToPathHershey(hersheyGeom, 'futural');
+
+assert(hsPaths.length >= 2, `Hershey "HI" produces at least 2 strokes (got ${hsPaths.length})`);
+assert(hsPaths.every(sp => sp.closed === false), 'All Hershey subpaths are open (single-line)');
+assert(hsPaths.every(sp => sp.segments[0].type === 'move'), 'All Hershey subpaths start with move');
+assert(
+  hsPaths.every(sp => sp.segments.slice(1).every(s => s.type === 'line' || s.type === 'close')),
+  'All Hershey segments after move are lines (no curves)',
+);
+
+let hsMinX = Infinity; let hsMaxX = -Infinity; let hsMinY = Infinity; let hsMaxY = -Infinity;
+for (const sp of hsPaths) {
+  for (const seg of sp.segments) {
+    if (seg.type === 'close') continue;
+    if (seg.to.x < hsMinX) hsMinX = seg.to.x;
+    if (seg.to.x > hsMaxX) hsMaxX = seg.to.x;
+    if (seg.to.y < hsMinY) hsMinY = seg.to.y;
+    if (seg.to.y > hsMaxY) hsMaxY = seg.to.y;
+  }
+}
+assert(hsMaxX - hsMinX > 5 && hsMaxX - hsMinX < 30, `Hershey "HI" width plausible: ${(hsMaxX - hsMinX).toFixed(2)} mm`);
+assert(hsMaxY - hsMinY > 4 && hsMaxY - hsMinY < 15, `Hershey "HI" height plausible: ${(hsMaxY - hsMinY).toFixed(2)} mm`);
 
 console.log(`\n=== Result: ${passed} passed, ${failed} failed ===`);
 if (failed > 0) process.exit(1);

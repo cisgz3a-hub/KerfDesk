@@ -19,6 +19,11 @@ export interface BundledFont {
   license: 'OFL-1.1' | 'Apache-2.0' | 'Public-Domain';
   /** Copyright attribution shown in credits */
   copyright: string;
+  /**
+   * Optional Hershey family key from the hersheytext package.
+   * When set, compile routes through single-line polyline generation.
+   */
+  hersheyFamily?: string;
 }
 
 export const BUNDLED_FONTS: BundledFont[] = [
@@ -48,6 +53,11 @@ export const BUNDLED_FONTS: BundledFont[] = [
   { family: 'Fira Code',        label: 'Fira Code',        category: 'mono',    url: '/fonts/FiraCode-Regular.ttf',        license: 'OFL-1.1',    copyright: 'Copyright (c) 2014 The Fira Code Project Authors' },
   // --- Stencil ---
   { family: 'Stardos Stencil',  label: 'Stardos Stencil',  category: 'stencil', url: '/fonts/StardosStencil-Regular.ttf',  license: 'OFL-1.1',    copyright: 'Copyright (c) The Stardos Stencil Project Authors' },
+  // --- Engraving (Hershey single-line) ---
+  { family: 'Hershey Sans',     label: 'Hershey Sans  (single-line)',   category: 'engraving', url: '', license: 'Public-Domain', copyright: 'Hershey fonts by Dr. A.V. Hershey, US National Bureau of Standards (public domain)', hersheyFamily: 'futural' },
+  { family: 'Hershey Roman',    label: 'Hershey Roman  (single-line)',  category: 'engraving', url: '', license: 'Public-Domain', copyright: 'Hershey fonts by Dr. A.V. Hershey, US National Bureau of Standards (public domain)', hersheyFamily: 'timesr' },
+  { family: 'Hershey Script',   label: 'Hershey Script  (single-line)', category: 'engraving', url: '', license: 'Public-Domain', copyright: 'Hershey fonts by Dr. A.V. Hershey, US National Bureau of Standards (public domain)', hersheyFamily: 'cursive' },
+  { family: 'Hershey Gothic',   label: 'Hershey Gothic  (single-line)', category: 'engraving', url: '', license: 'Public-Domain', copyright: 'Hershey fonts by Dr. A.V. Hershey, US National Bureau of Standards (public domain)', hersheyFamily: 'gothiceng' },
 ];
 
 export function findBundledFont(family: string): BundledFont | undefined {

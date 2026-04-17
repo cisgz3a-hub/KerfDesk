@@ -715,7 +715,15 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
                 disabled: true,
                 style: { fontStyle: 'italic', color: '#555570' },
               }, '— Bundled —'),
-              ...BUNDLED_FONTS.map((f: BundledFont) =>
+              ...BUNDLED_FONTS.filter((f: BundledFont) => !f.hersheyFamily).map((f: BundledFont) =>
+                React.createElement('option', { key: f.family, value: f.family }, f.label),
+              ),
+              BUNDLED_FONTS.some((f: BundledFont) => !!f.hersheyFamily) && React.createElement('option', {
+                value: '',
+                disabled: true,
+                style: { fontStyle: 'italic', color: '#555570' },
+              }, '— Engraving (single-line) —'),
+              ...BUNDLED_FONTS.filter((f: BundledFont) => !!f.hersheyFamily).map((f: BundledFont) =>
                 React.createElement('option', { key: f.family, value: f.family }, f.label),
               ),
             ),

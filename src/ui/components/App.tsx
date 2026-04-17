@@ -2484,12 +2484,24 @@ export function App() {
                 fontFamily: "'DM Sans', system-ui, sans-serif",
               },
             },
-              ...BUNDLED_FONTS.map(bf =>
+              ...BUNDLED_FONTS.filter(f => !f.hersheyFamily).map(bf =>
                 React.createElement('option', {
                   key: `bundled-${bf.family}`,
                   value: bf.family,
                   style: { fontFamily: bf.family },
                 }, `${bf.label}  (bundled)`),
+              ),
+              BUNDLED_FONTS.some(f => !!f.hersheyFamily) && React.createElement('option', {
+                key: '_sep_engraving',
+                value: '',
+                disabled: true,
+                style: { fontStyle: 'italic', color: '#555570' },
+              }, '— Engraving (single-line) —'),
+              ...BUNDLED_FONTS.filter(f => !!f.hersheyFamily).map(bf =>
+                React.createElement('option', {
+                  key: `hershey-${bf.family}`,
+                  value: bf.family,
+                }, bf.label),
               ),
               React.createElement('option', {
                 key: '_sep_system',

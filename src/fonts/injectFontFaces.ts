@@ -14,6 +14,7 @@ export async function injectBundledFontFaces(): Promise<void> {
   injected = true;
 
   const loads = BUNDLED_FONTS.map(async (bf) => {
+    if (bf.hersheyFamily || !bf.url) return;
     try {
       const face = new FontFace(bf.family, `url(${bf.url})`);
       const loaded = await face.load();

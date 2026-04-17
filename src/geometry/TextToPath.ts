@@ -12,6 +12,7 @@ import { fillTextGeometry, measureTextGeometrySize } from './textCanvasDraw';
 import { findBundledFont } from '../fonts/fontRegistry';
 import { loadFont } from '../fonts/loadFont';
 import { textToPathOpentype } from '../fonts/textToPathOpentype';
+import { textToPathHershey } from '../fonts/textToPathHershey';
 
 export interface TextPathResult {
   subPaths: SubPath[];
@@ -99,6 +100,16 @@ export async function textGeometryToPath(g: TextGeometry): Promise<TextPathResul
   // Bundled-font path currently ignores spacing/alignment/line-break/style toggles.
   // Unknown fonts continue through the existing canvas-trace implementation below.
   const bundled = findBundledFont(g.fontFamily);
+  if (bundled?.hersheyFamily) {
+    try {
+      const raw = textToPathHershey(g, bundled.hersheyFamily);
+      if (raw.length === 0) return null;
+      return normalizeToTopLeft(raw);
+    } catch (e) {
+      console.warn(`[TextToPath] Hershey font '${g.fontFamily}' failed, falling back to canvas:`, e);
+      // Fall through to fallback paths.
+    }
+  }
   if (bundled) {
     try {
       const font = await loadFont(bundled.url);
