@@ -69,6 +69,7 @@ import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
 import { NumberInput } from './NumberInput';
 import { FontPicker } from './common/FontPicker';
+import { FontCreditsDialog } from './FontCreditsDialog';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
@@ -169,6 +170,7 @@ export function App() {
   const [materialDropdownOpen, setMaterialDropdownOpen] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
   const [showKerfWizard, setShowKerfWizard] = useState(false);
+  const [showFontCredits, setShowFontCredits] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('machine');
   const [profileRevision, setProfileRevision] = useState(0);
@@ -2394,6 +2396,21 @@ export function App() {
         ),
         React.createElement('p', { style: { fontSize: 11, color: '#888', marginTop: 20 } },
           'Third-party licenses: see LICENSES-THIRD-PARTY.md'),
+        React.createElement('p', { style: { marginTop: 12 } },
+          React.createElement('button', {
+            type: 'button',
+            onClick: () => setShowFontCredits(true),
+            style: {
+              background: 'rgba(0,212,255,0.08)',
+              border: '1px solid rgba(0,212,255,0.25)',
+              borderRadius: 6,
+              padding: '8px 14px',
+              fontSize: 12,
+              color: '#00d4ff',
+              cursor: 'pointer',
+              fontFamily: "'DM Sans', system-ui, sans-serif",
+            },
+          }, 'Font credits (bundled fonts)')),
       ),
     }),
 
@@ -2485,6 +2502,20 @@ export function App() {
               value: dialogs.textFont,
               onChange: (family: string) => dialogs.setTextFont(family),
             }),
+            React.createElement('button', {
+              type: 'button',
+              onClick: () => setShowFontCredits(true),
+              style: {
+                background: 'none',
+                border: 'none',
+                fontSize: 10,
+                color: '#555570',
+                textDecoration: 'underline',
+                cursor: 'pointer',
+                padding: 0,
+                marginTop: 4,
+              },
+            }, 'Font credits'),
           ),
           React.createElement('div', { style: { width: 80 } },
             React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 4 } }, 'Size (mm)'),
@@ -2637,6 +2668,10 @@ export function App() {
         ),
       ),
     ),
+
+    showFontCredits && React.createElement(FontCreditsDialog, {
+      onClose: () => setShowFontCredits(false),
+    }),
 
     modal && React.createElement(AppModal, {
       title: modal.title,
