@@ -389,7 +389,16 @@ export function renderSceneBackground(
   ctx.restore();
 }
 
-/** Objects + selection highlights + restores outer ctx.save from renderSceneBackground. */
+export type RenderSceneObjectsOptions = {
+  /**
+   * When true, skip the final `ctx.restore()` so the caller can pop a nested save
+   * (e.g. globalAlpha) between two `renderSceneObjects` passes without the trailing
+   * restore consuming the viewport world save.
+   */
+  skipTrailingContextRestore?: boolean;
+};
+
+/** Objects + selection highlights + restores one pushed graphics state (caller save). */
 export function renderSceneObjects(
   ctx: CanvasRenderingContext2D,
   scene: Scene,
@@ -398,6 +407,7 @@ export function renderSceneObjects(
   canvasHeight: number,
   selectedIds?: ReadonlySet<string>,
   previewMode: boolean = false,
+  options?: RenderSceneObjectsOptions,
 ): void {
   const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
 
@@ -646,7 +656,9 @@ export function renderSceneObjects(
     }
   }
 
-  ctx.restore();
+  if (!options?.skipTrailingContextRestore) {
+    ctx.restore();
+  }
 }
 
 export function renderScene(

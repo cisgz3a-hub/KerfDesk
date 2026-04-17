@@ -604,7 +604,10 @@ export function CanvasViewport({
           };
           ctx.save();
           ctx.globalAlpha = 0.15;
-          renderSceneObjects(ctx, dimScene, transform, width, height, new Set(), previewMode);
+          renderSceneObjects(ctx, dimScene, transform, width, height, new Set(), previewMode, {
+            skipTrailingContextRestore: true,
+          });
+          ctx.restore();
 
           const activeScene = {
             ...scene,
