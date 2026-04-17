@@ -666,8 +666,8 @@ export function App() {
     const prev = sceneRef.current;
     if (prev.activeLayerId === layerId) return;
     // View-state change, no history entry — use handleSceneChange, not handleSceneCommit.
-    handleSceneChangeRef.current?.({ ...prev, activeLayerId: layerId });
-  }, []);
+  handleSceneChange({ ...prev, activeLayerId: layerId });
+}, [handleSceneChange]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
