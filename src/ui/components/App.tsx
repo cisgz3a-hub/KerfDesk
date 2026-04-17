@@ -598,6 +598,16 @@ export function App() {
     return layer?.settings.mode ?? 'cut';
   }, [scene.layers, scene.activeLayerId]);
 
+  const interactableLayerIds = useMemo(
+    () =>
+      new Set(
+        scene.layers
+          .filter(l => l.settings.mode === activeLayerMode)
+          .map(l => l.id),
+      ),
+    [scene.layers, activeLayerMode],
+  );
+
   const handleModeTabSelect = useCallback((mode: string) => {
     const sorted = [...scene.layers].sort((a, b) => a.order - b.order);
     let targetLayer = sorted.find(l => l.settings.mode === mode);
@@ -2016,6 +2026,7 @@ export function App() {
           bedHeightMm: scene.canvas.height,
           originCorner: activeProfile?.originCorner ?? 'front-left',
           onViewportLayout: handleViewportLayout,
+          interactableLayerIds,
         }),
           React.createElement(ModeTabsOverlay, {
             viewportX: bedTabLayout.bedScreenX,

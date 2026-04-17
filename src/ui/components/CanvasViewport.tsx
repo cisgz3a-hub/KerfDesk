@@ -376,6 +376,8 @@ interface CanvasViewportProps {
   originCorner?: MachineOriginCorner;
   /** Bed (0,0) in canvas pixel space + zoom — for DOM overlays aligned to the bed. */
   onViewportLayout?: (layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => void;
+  /** Only objects on these layers can be selected, dragged, or edited; others stay visible but inert. */
+  interactableLayerIds?: ReadonlySet<string> | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -410,6 +412,7 @@ export function CanvasViewport({
   bedHeightMm = 0,
   originCorner = 'front-left',
   onViewportLayout,
+  interactableLayerIds = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -451,6 +454,9 @@ export function CanvasViewport({
     for (const id of selectedIds) {
       const obj = scene.objects.find(o => o.id === id);
       if (!obj) continue;
+      if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+        continue;
+      }
       const b = computeObjectBounds(obj);
       if (b.minX > b.maxX) continue;
       minX = Math.min(minX, b.minX);
@@ -465,7 +471,7 @@ export function CanvasViewport({
     const screen = transform.worldToScreen({ x: cx, y: minY });
     const rect = canvas.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
-  }, [scene, viewport, selectedIds, quickActions?.enabled, width, height]);
+  }, [scene, viewport, selectedIds, quickActions?.enabled, width, height, interactableLayerIds]);
 
   useEffect(() => {
     if (!actionsRef) return;
@@ -514,6 +520,16 @@ export function CanvasViewport({
     const p = t.worldToScreen({ x: 0, y: 0 });
     onViewportLayout({ bedScreenX: p.x, bedScreenY: p.y, zoom: viewport.zoom });
   }, [viewport, width, height, onViewportLayout]);
+
+  useEffect(() => {
+    if (!interactableLayerIds || interactableLayerIds.size === 0) return;
+    const id = nodeTargetIdRef.current;
+    if (!id) return;
+    const obj = scene.objects.find(o => o.id === id);
+    if (!obj || !interactableLayerIds.has(obj.layerId)) {
+      nodeTargetIdRef.current = null;
+    }
+  }, [interactableLayerIds, scene.objects]);
 
   useEffect(() => {
     isPanningRef.current = isPanning;
@@ -578,6 +594,25 @@ export function CanvasViewport({
         if (!ok) {
           console.error('[Canvas] Viewport transform invalid before scene objects');
           ctx.restore();
+        } else if (
+          interactableLayerIds &&
+          interactableLayerIds.size > 0 &&
+          !previewMode
+        ) {
+          const dimScene = {
+            ...scene,
+            objects: scene.objects.filter(o => !interactableLayerIds.has(o.layerId)),
+          };
+          ctx.save();
+          ctx.globalAlpha = 0.15;
+          renderSceneObjects(ctx, dimScene, transform, width, height, new Set(), previewMode);
+          ctx.restore();
+
+          const activeScene = {
+            ...scene,
+            objects: scene.objects.filter(o => interactableLayerIds.has(o.layerId)),
+          };
+          renderSceneObjects(ctx, activeScene, transform, width, height, selectedIds, previewMode);
         } else {
           renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
         }
@@ -592,6 +627,9 @@ export function CanvasViewport({
       for (const obj of scene.objects) {
         if (!selectedIds.has(obj.id)) continue;
         if (!obj.visible || obj.locked) continue;
+        if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+          continue;
+        }
         const layer = scene.layers.find(l => l.id === obj.layerId);
         if (!layer || !layer.visible || layer.locked) continue;
         const b = computeObjectBounds(obj);
@@ -631,7 +669,8 @@ export function CanvasViewport({
     // Cut start point indicator on selected closed shapes (screen space)
     if (selectedIds.size === 1) {
       const obj = scene.objects.find(o => selectedIds.has(o.id));
-      if (obj && obj.visible && obj.geometry.type !== 'text' && obj.geometry.type !== 'image') {
+      const objInteractable = !interactableLayerIds || interactableLayerIds.size === 0 || (obj && interactableLayerIds.has(obj.layerId));
+      if (obj && objInteractable && obj.visible && obj.geometry.type !== 'text' && obj.geometry.type !== 'image') {
         const groups = geometryToPoints(obj.geometry);
         const grp = groups.find(g => g.closed && g.points.length > 0);
         if (grp) {
@@ -691,7 +730,8 @@ export function CanvasViewport({
     // Node editing overlay — single targeted path/polygon
     if (activeTool === 'node' && nodeTargetIdRef.current) {
       const obj = scene.objects.find(o => o.id === nodeTargetIdRef.current);
-      if (obj && selectedIds.has(obj.id) && (obj.geometry.type === 'path' || obj.geometry.type === 'polygon')) {
+      const nodeInteractable = !interactableLayerIds || interactableLayerIds.size === 0 || (obj && interactableLayerIds.has(obj.layerId));
+      if (obj && nodeInteractable && selectedIds.has(obj.id) && (obj.geometry.type === 'path' || obj.geometry.type === 'polygon')) {
         ctx.save();
         transform.applyToContext(ctx);
 
@@ -899,7 +939,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, interactableLayerIds]);
 
   useEffect(() => {
     if (activeTool !== 'node') {
@@ -988,8 +1028,13 @@ export function CanvasViewport({
   const getHandleAtPoint = useCallback((screenX: number, screenY: number, selectedObjs: typeof scene.objects) => {
     if (selectedObjs.length === 0) return null;
 
+    const objs = interactableLayerIds && interactableLayerIds.size > 0
+      ? selectedObjs.filter(o => interactableLayerIds.has(o.layerId))
+      : selectedObjs;
+    if (objs.length === 0) return null;
+
     let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
-    for (const obj of selectedObjs) {
+    for (const obj of objs) {
       if (!obj.visible || obj.locked) continue;
       const layer = scene.layers.find(l => l.id === obj.layerId);
       if (!layer || !layer.visible || layer.locked) continue;
@@ -1025,7 +1070,7 @@ export function CanvasViewport({
       }
     }
     return null;
-  }, [scene, viewport]);
+  }, [scene, viewport, interactableLayerIds]);
 
   // Native wheel listener — must be non-passive for preventDefault to work.
   // React synthetic onWheel is passive in Chrome 73+, making preventDefault a no-op.
@@ -1127,7 +1172,10 @@ export function CanvasViewport({
     if (selectedIds.size >= 1) {
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
+      const selObjs = scene.objects.filter(o =>
+        selectedIds.has(o.id) &&
+        (!interactableLayerIds || interactableLayerIds.size === 0 || interactableLayerIds.has(o.layerId)),
+      );
       const handleHit = getHandleAtPoint(sx, sy, selObjs);
       if (handleHit) {
         let gMinX = Infinity, gMinY = Infinity, gMaxX = -Infinity, gMaxY = -Infinity;
@@ -1135,6 +1183,9 @@ export function CanvasViewport({
 
         for (const obj of scene.objects) {
           if (!selectedIds.has(obj.id)) continue;
+          if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+            continue;
+          }
           origTransforms.set(obj.id, { ...obj.transform });
           const ob = computeObjectBounds(obj);
           if (!ob) continue;
@@ -1173,7 +1224,10 @@ export function CanvasViewport({
 
     if (activeTool === 'node' && nodeTargetIdRef.current) {
       const obj = scene.objects.find(o => o.id === nodeTargetIdRef.current);
-      if (obj) {
+      if (
+        obj &&
+        (!interactableLayerIds || interactableLayerIds.size === 0 || interactableLayerIds.has(obj.layerId))
+      ) {
         const hitRadius = 6 / (viewport.zoom || 1);
         // Transform world point to object-local coordinates
         const localX = (worldPt.x - obj.transform.tx) / (obj.transform.a || 1);
@@ -1229,7 +1283,7 @@ export function CanvasViewport({
 
     // Hit test to determine if this is a potential drag
     const tolerance = transform.screenPx(5);
-    const hit = hitTestPoint(worldPt, scene, tolerance);
+    const hit = hitTestPoint(worldPt, scene, tolerance, interactableLayerIds);
     const hitIsSelected = hit !== null && selectedIds.has(hit.id);
 
     dragRef.current = {
@@ -1248,7 +1302,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement, interactableLayerIds]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -1456,37 +1510,47 @@ export function CanvasViewport({
       if ((worldDx !== 0 || worldDy !== 0) && onSceneChange) {
         let dx = worldDx;
         let dy = worldDy;
-        const dragIds = dragRef.current.dragIds;
-        const primaryObj = scene.objects.find(o => dragIds.has(o.id));
-        if (primaryObj) {
-          const candidateX = primaryObj.transform.tx + dx;
-          const candidateY = primaryObj.transform.ty + dy;
-          const snap = findSnapPoint(candidateX, candidateY, new Set(dragIds), scene.objects, 2);
-          if (snap.snapped) {
-            dx = snap.x - primaryObj.transform.tx;
-            dy = snap.y - primaryObj.transform.ty;
+        const rawDragIds = dragRef.current.dragIds;
+        const dragIds = interactableLayerIds && interactableLayerIds.size > 0
+          ? new Set(
+            [...rawDragIds].filter(id => {
+              const o = scene.objects.find(x => x.id === id);
+              return o && interactableLayerIds.has(o.layerId);
+            }),
+          )
+          : rawDragIds;
+        if (dragIds.size > 0) {
+          const primaryObj = scene.objects.find(o => dragIds.has(o.id));
+          if (primaryObj) {
+            const candidateX = primaryObj.transform.tx + dx;
+            const candidateY = primaryObj.transform.ty + dy;
+            const snap = findSnapPoint(candidateX, candidateY, new Set(dragIds), scene.objects, 2);
+            if (snap.snapped) {
+              dx = snap.x - primaryObj.transform.tx;
+              dy = snap.y - primaryObj.transform.ty;
+            }
           }
+
+          const moved = moveObjects(scene, dragIds, dx, dy);
+
+          const snapped = {
+            ...moved,
+            objects: moved.objects.map(o => {
+              if (!dragIds.has(o.id)) return o;
+              return {
+                ...o,
+                transform: {
+                  ...o.transform,
+                  tx: snapToGrid(o.transform.tx, GRID_SNAP),
+                  ty: snapToGrid(o.transform.ty, GRID_SNAP),
+                },
+                _bounds: null,
+                _worldTransform: null,
+              };
+            }),
+          };
+          onSceneChange(snapped);
         }
-
-        let moved = moveObjects(scene, dragIds, dx, dy);
-
-        const snapped = {
-          ...moved,
-          objects: moved.objects.map(o => {
-            if (!dragIds.has(o.id)) return o;
-            return {
-              ...o,
-              transform: {
-                ...o.transform,
-                tx: snapToGrid(o.transform.tx, GRID_SNAP),
-                ty: snapToGrid(o.transform.ty, GRID_SNAP),
-              },
-              _bounds: null,
-              _worldTransform: null,
-            };
-          }),
-        };
-        onSceneChange(snapped);
       }
     }
 
@@ -1506,7 +1570,10 @@ export function CanvasViewport({
       } else if (activeTool === 'select' && selectedIds.size >= 1 && !dragRef.current?.isDragging && !resizeRef.current) {
         const sx = e.clientX - rect.left;
         const sy = e.clientY - rect.top;
-        const selObjs = scene.objects.filter(o => selectedIds.has(o.id));
+        const selObjs = scene.objects.filter(o =>
+          selectedIds.has(o.id) &&
+          (!interactableLayerIds || interactableLayerIds.size === 0 || interactableLayerIds.has(o.layerId)),
+        );
         const handleHit = getHandleAtPoint(sx, sy, selObjs);
         if (handleHit) {
           const cursors: Record<string, string> = {
@@ -1521,7 +1588,7 @@ export function CanvasViewport({
         canvas.style.cursor = defaultCursorForTool(activeTool);
       }
     }
-  }, [viewport, isPanning, panStart, scene, selectedIds, onSceneChange, activeTool, render, getHandleAtPoint]);
+  }, [viewport, isPanning, panStart, scene, selectedIds, onSceneChange, activeTool, render, getHandleAtPoint, interactableLayerIds]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     setIsPanning(false);
@@ -1599,6 +1666,9 @@ export function CanvasViewport({
         if (!obj.visible || obj.locked) continue;
         const layer = scene.layers.find(l => l.id === obj.layerId);
         if (!layer || !layer.visible || layer.locked) continue;
+        if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+          continue;
+        }
         const objBounds = computeObjectBounds(obj);
         if (aabbIntersects(objBounds, marqueeBox)) {
           hits.add(obj.id);
@@ -1651,7 +1721,7 @@ export function CanvasViewport({
           y: e.clientY - rect.top,
         });
         const tolerance = transform.screenPx(5);
-        const hit = hitTestPoint(worldPt, scene, tolerance);
+        const hit = hitTestPoint(worldPt, scene, tolerance, interactableLayerIds);
 
         let newSelection: ReadonlySet<string>;
 
@@ -1679,7 +1749,10 @@ export function CanvasViewport({
               // Single click: select entire group
               newSelection = new Set(
                 scene.objects
-                  .filter(o => o.parentId === hitObj.parentId)
+                  .filter(o =>
+                    o.parentId === hitObj.parentId &&
+                    (!interactableLayerIds || interactableLayerIds.size === 0 || interactableLayerIds.has(o.layerId)),
+                  )
                   .map(o => o.id)
               );
             } else {
@@ -1706,7 +1779,7 @@ export function CanvasViewport({
       }
       clickStartRef.current = null;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool, interactableLayerIds]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -1721,6 +1794,9 @@ export function CanvasViewport({
     for (let i = scene.objects.length - 1; i >= 0; i--) {
       const obj = scene.objects[i];
       if (!obj.visible || obj.locked) continue;
+      if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+        continue;
+      }
       const bounds = computeObjectBounds(obj);
       if (!bounds) continue;
       if (worldX >= bounds.minX && worldX <= bounds.maxX &&
@@ -1732,7 +1808,7 @@ export function CanvasViewport({
         break;
       }
     }
-  }, [scene, viewport, onEditText]);
+  }, [scene, viewport, onEditText, interactableLayerIds]);
 
   const handleFitView = useCallback(() => {
     const bounds = computeFitBounds(scene, simulation);

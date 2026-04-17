@@ -39,12 +39,14 @@ import { measureTextGeometrySize } from './textCanvasDraw';
  *                    near thin lines/strokes. Typically 1–3mm depending
  *                    on zoom level. Pass `transform.screenPx(5)` for
  *                    a consistent 5-pixel tolerance.
+ * @param interactableLayerIds When set, only objects on these layers can be hit (others pass through).
  * @returns           The hit object, or null if nothing was hit.
  */
 export function hitTestPoint(
   worldPoint: Point,
   scene: Scene,
-  tolerance: number = 2
+  tolerance: number = 2,
+  interactableLayerIds?: ReadonlySet<string> | null,
 ): SceneObject | null {
   // Build layer visibility/lock map
   const layerMap = new Map<string, Layer>();
@@ -59,6 +61,9 @@ export function hitTestPoint(
 
     const layer = layerMap.get(obj.layerId);
     if (!layer || !layer.visible || layer.locked) continue;
+    if (interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(obj.layerId)) {
+      continue;
+    }
 
     // AABB pre-filter (expanded by tolerance)
     const bounds = computeObjectBounds(obj);
