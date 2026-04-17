@@ -600,25 +600,35 @@ export function App() {
 
   const handleModeTabSelect = useCallback((mode: string) => {
     const sorted = [...scene.layers].sort((a, b) => a.order - b.order);
-    const targetLayer = sorted.find(l => l.settings.mode === mode);
+    let targetLayer = sorted.find(l => l.settings.mode === mode);
+    let layersForMode = scene.layers;
+
     if (targetLayer) {
       setScene(prev => ({ ...prev, activeLayerId: targetLayer.id }));
-      return;
+    } else {
+      const maxOrder = scene.layers.length > 0 ? Math.max(...scene.layers.map(l => l.order)) : -1;
+      const nextOrder = maxOrder + 1;
+      const modeNames: Record<string, string> = {
+        cut: 'Cut',
+        engrave: 'Engrave',
+        score: 'Score',
+        image: 'Image',
+      };
+      const newLayer = createLayer(nextOrder, mode as LayerMode, modeNames[mode] ?? mode);
+      targetLayer = newLayer;
+      layersForMode = [...scene.layers, newLayer];
+      handleSceneCommit({
+        ...scene,
+        layers: [...scene.layers, newLayer],
+        activeLayerId: newLayer.id,
+      });
     }
-    const maxOrder = scene.layers.length > 0 ? Math.max(...scene.layers.map(l => l.order)) : -1;
-    const nextOrder = maxOrder + 1;
-    const modeNames: Record<string, string> = {
-      cut: 'Cut',
-      engrave: 'Engrave',
-      score: 'Score',
-      image: 'Image',
-    };
-    const newLayer = createLayer(nextOrder, mode as LayerMode, modeNames[mode] ?? mode);
-    handleSceneCommit({
-      ...scene,
-      layers: [...scene.layers, newLayer],
-      activeLayerId: newLayer.id,
-    });
+
+    const modeLayerIds = new Set(
+      layersForMode.filter(l => l.settings.mode === mode).map(l => l.id),
+    );
+    const objectsOnMode = scene.objects.filter(o => o.visible && modeLayerIds.has(o.layerId));
+    setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
   }, [scene, handleSceneCommit]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
