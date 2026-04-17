@@ -662,6 +662,13 @@ export function App() {
     [handleSceneCommit],
   );
 
+  const handleActivateLayer = useCallback((layerId: string) => {
+    const prev = sceneRef.current;
+    if (prev.activeLayerId === layerId) return;
+    // View-state change, no history entry — use handleSceneChange, not handleSceneCommit.
+    handleSceneChangeRef.current?.({ ...prev, activeLayerId: layerId });
+  }, []);
+
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
     try {
@@ -2048,6 +2055,7 @@ export function App() {
           originCorner: activeProfile?.originCorner ?? 'front-left',
           onViewportLayout: handleViewportLayout,
           interactableLayerIds,
+          onActivateLayer: handleActivateLayer,
         }),
           React.createElement(ModeTabsOverlay, {
             viewportX: bedTabLayout.bedScreenX,

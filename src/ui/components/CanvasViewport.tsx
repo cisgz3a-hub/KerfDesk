@@ -378,6 +378,8 @@ interface CanvasViewportProps {
   onViewportLayout?: (layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => void;
   /** Only objects on these layers can be selected, dragged, or edited; others stay visible but inert. */
   interactableLayerIds?: ReadonlySet<string> | null;
+  /** Called when a hit-test lands on an object whose layer is not currently interactable. The parent should activate that layer. */
+  onActivateLayer?: (layerId: string) => void;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -413,6 +415,7 @@ export function CanvasViewport({
   originCorner = 'front-left',
   onViewportLayout,
   interactableLayerIds = null,
+  onActivateLayer,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -1273,7 +1276,13 @@ export function CanvasViewport({
 
     // Hit test to determine if this is a potential drag
     const tolerance = transform.screenPx(5);
-    const hit = hitTestPoint(worldPt, scene, tolerance, interactableLayerIds);
+    // Hit against ALL visible objects (not filtered by interactableLayerIds).
+    // If the hit lands on a non-active-mode layer, ask the parent to switch first,
+    // then proceed with selection.
+    const hit = hitTestPoint(worldPt, scene, tolerance, null);
+    if (hit && interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(hit.layerId)) {
+      onActivateLayer?.(hit.layerId);
+    }
     const hitIsSelected = hit !== null && selectedIds.has(hit.id);
 
     dragRef.current = {
@@ -1292,7 +1301,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement, interactableLayerIds]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement, interactableLayerIds, onActivateLayer]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -1711,7 +1720,10 @@ export function CanvasViewport({
           y: e.clientY - rect.top,
         });
         const tolerance = transform.screenPx(5);
-        const hit = hitTestPoint(worldPt, scene, tolerance, interactableLayerIds);
+        const hit = hitTestPoint(worldPt, scene, tolerance, null);
+        if (hit && interactableLayerIds && interactableLayerIds.size > 0 && !interactableLayerIds.has(hit.layerId)) {
+          onActivateLayer?.(hit.layerId);
+        }
 
         let newSelection: ReadonlySet<string>;
 
@@ -1769,7 +1781,7 @@ export function CanvasViewport({
       }
       clickStartRef.current = null;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool, interactableLayerIds]);
+  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, onSceneChange, render, onActiveTool, interactableLayerIds, onActivateLayer]);
 
   const handleCanvasDoubleClick = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
