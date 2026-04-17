@@ -593,7 +593,6 @@ export function CanvasViewport({
           Number.isFinite(m.e) && Number.isFinite(m.f);
         if (!ok) {
           console.error('[Canvas] Viewport transform invalid before scene objects');
-          ctx.restore();
         } else if (
           interactableLayerIds &&
           interactableLayerIds.size > 0 &&
@@ -616,6 +615,7 @@ export function CanvasViewport({
           renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
         }
       }
+      ctx.restore();
     }
 
     if (!previewMode) {
