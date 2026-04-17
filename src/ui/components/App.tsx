@@ -37,6 +37,7 @@ import { useFileHandlers } from '../hooks/useFileHandlers';
 import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
 import { useKerfHandlers } from '../hooks/useKerfHandlers';
+import { useMaterialTestHandlers } from '../hooks/useMaterialTestHandlers';
 import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
@@ -56,7 +57,7 @@ import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { createLayer, type Layer, type LayerMode } from '../../core/scene/Layer';
+import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
@@ -1215,55 +1216,10 @@ export function App() {
     showAlert,
   });
 
-  const handleMaterialTestApply = useCallback((
-    rawObjects: SceneObject[],
-    layerSettings: Array<{ power: number; speed: number }>,
-    testMode: 'cut' | 'engrave',
-  ) => {
-    const baseOrder = scene.layers.length;
-    const newLayers: Layer[] = layerSettings.map((ls, i) => {
-      const layer = createLayer(baseOrder + i, testMode, `Test P${ls.power} S${ls.speed}`);
-      const p = Math.max(0, Math.min(100, ls.power));
-      const sp = Math.max(1, ls.speed);
-      return {
-        ...layer,
-        order: baseOrder + i,
-        settings: {
-          ...layer.settings,
-          mode: testMode,
-          power: { min: 0, max: p },
-          speed: sp,
-          fill: {
-            ...layer.settings.fill,
-            enabled: testMode === 'engrave',
-          },
-          airAssist: testMode === 'cut',
-        },
-      };
-    });
-
-    const layerIds = newLayers.map(l => l.id);
-    let squareIndex = 0;
-    const remapped = rawObjects.map(obj => {
-      if (obj.name.startsWith('Test P')) {
-        const lid = layerIds[squareIndex] ?? layerIds[0];
-        squareIndex += 1;
-        return { ...obj, layerId: lid };
-      }
-      if (obj.name.startsWith('Label P')) {
-        const lid = layerIds[Math.max(0, squareIndex - 1)] ?? layerIds[0];
-        return { ...obj, layerId: lid };
-      }
-      const lid = layerIds[0] ?? scene.layers[0]?.id ?? '';
-      return { ...obj, layerId: lid };
-    });
-
-    handleSceneCommit({
-      ...scene,
-      layers: [...scene.layers, ...newLayers],
-      objects: [...scene.objects, ...remapped],
-    });
-  }, [scene, handleSceneCommit]);
+  const { handleMaterialTestApply } = useMaterialTestHandlers({
+    scene,
+    handleSceneCommit,
+  });
 
   const {
     handleKerfGenerateTest,
