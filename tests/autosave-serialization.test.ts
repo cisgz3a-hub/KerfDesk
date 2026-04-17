@@ -14,7 +14,7 @@ import { compileJob } from '../src/core/job/JobCompiler';
 import { optimizePlan } from '../src/core/plan/PlanOptimizer';
 import { applyMachineTransform } from '../src/core/plan/MachineTransform';
 import { getOutputStrategy } from '../src/core/output/Output';
-import { runPreflight } from '../src/core/preflight/PreflightChecker';
+import { runPreflightSummary } from '../src/core/preflight/Preflight';
 import '../src/core/output/GrblStrategy';
 
 let passed = 0;
@@ -194,7 +194,7 @@ const machineIdle = {
   alarmCode: null,
   errorCode: null,
 } as const;
-const preflight = runPreflight(recoveredRaster, null, machineIdle, 300, 200, null);
+const preflight = runPreflightSummary(recoveredRaster, null, machineIdle, 300, 200, null);
 assert(preflight.canStart === false, 'preflight blocks recovered image with missing raster data');
 assert(
   preflight.issues.some(i => i.id.startsWith('design-image-missing-raster-data-') && i.severity === 'blocker'),

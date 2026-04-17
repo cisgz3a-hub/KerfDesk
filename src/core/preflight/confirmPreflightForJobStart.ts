@@ -1,10 +1,10 @@
-import type { PreflightResult } from './PreflightChecker';
+import type { PreflightSummary } from './Preflight';
 
 /**
  * Prompts for blockers/warnings before starting a job. Returns false if the user must not start.
  */
 export async function confirmPreflightForJobStart(
-  preflight: PreflightResult | null,
+  preflight: PreflightSummary | null,
   showAlert: (title: string, message: string, details?: string) => Promise<void>,
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>,
 ): Promise<boolean> {

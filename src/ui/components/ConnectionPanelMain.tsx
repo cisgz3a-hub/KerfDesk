@@ -12,7 +12,7 @@ import { type PathGeometry, type TextGeometry } from '../../core/scene/SceneObje
 import { textGeometryToPath } from '../../geometry/TextToPath';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
-import { runPreflight, type PreflightResult, type PreflightIssue } from '../../core/preflight/PreflightChecker';
+import { runPreflightSummary, type PreflightSummary, type PreflightIssue } from '../../core/preflight/Preflight';
 import { confirmPreflightForJobStart } from '../../core/preflight/confirmPreflightForJobStart';
 import { getActiveProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
@@ -173,7 +173,7 @@ export function ConnectionPanelMain({
   isSimulator,
   setSimulator,
 }: ConnectionPanelMainProps) {
-  const [preflight, setPreflight] = useState<PreflightResult | null>(null);
+  const [preflight, setPreflight] = useState<PreflightSummary | null>(null);
   const [showSimulator, setShowSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
   const [showMore, setShowMore] = useState(false);
@@ -296,7 +296,7 @@ export function ConnectionPanelMain({
   }, [messages]);
 
   useEffect(() => {
-    const result = runPreflight(scene, gcode, machineState, bedWidth, bedHeight, machinePlanBounds);
+    const result = runPreflightSummary(scene, gcode, machineState, bedWidth, bedHeight, machinePlanBounds);
     setPreflight(result);
   }, [gcode, machineState, scene, bedWidth, bedHeight, machinePlanBounds]);
 
