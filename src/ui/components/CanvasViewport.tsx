@@ -16,7 +16,7 @@
  * Last updated: Refactor — Transform, pure orchestration
  */
 
-import React, { useRef, useEffect, useState, useCallback, type MutableRefObject } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo, type MutableRefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { createRect, createEllipse, createLine, type SceneObject } from '../../core/scene/SceneObject';
 import { moveObjects } from '../../core/scene/SceneOps';
@@ -46,6 +46,7 @@ import { geometryToPoints } from '../../core/job/JobCompiler';
 import { type JobProgress } from '../../controllers/ControllerInterface';
 import { type Move } from '../../core/plan/Plan';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { QuickActions } from './QuickActions';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -323,6 +324,17 @@ export type ViewportActions = {
   fitToBed: () => void;
 };
 
+export type CanvasViewportQuickActions = {
+  enabled: boolean;
+  selectedCount: number;
+  onDuplicate: () => void;
+  onDelete: () => void;
+  onCenter: () => void;
+  onGridArray: () => void;
+  hasSelectedText: boolean;
+  handleTextToPath: () => void;
+};
+
 interface CanvasViewportProps {
   scene: Scene;
   simulation?: SimulationResult | null;
@@ -340,8 +352,7 @@ interface CanvasViewportProps {
   onZoomChange?: (zoom: number) => void;
   actionsRef?: MutableRefObject<ViewportActions | null>;
   previewMode?: boolean;
-  /** Screen-space anchor for floating UI (selection top-center), canvas coordinates + getBoundingClientRect. */
-  onSelectionScreenPos?: (pos: { x: number; y: number } | null) => void;
+  quickActions?: CanvasViewportQuickActions;
   /** Text tool: user clicked canvas — open text dialog with this world position. */
   onRequestTextPlacement?: (world: { x: number; y: number }) => void;
   /** Double-clicked a text object — open edit dialog. */
@@ -380,7 +391,7 @@ export function CanvasViewport({
   onZoomChange,
   actionsRef,
   previewMode = false,
-  onSelectionScreenPos,
+  quickActions,
   onRequestTextPlacement,
   onEditText,
   livePosition = null,
@@ -420,94 +431,37 @@ export function CanvasViewport({
   const onZoomChangeRef = useRef(onZoomChange);
   onZoomChangeRef.current = onZoomChange;
 
-  const onSelectionScreenPosRef = useRef(onSelectionScreenPos);
-  onSelectionScreenPosRef.current = onSelectionScreenPos;
-  const lastSelectionScreenPosRef = useRef<{ x: number; y: number } | null | undefined>(undefined);
-
   useEffect(() => {
     onZoomChangeRef.current?.(Math.round(viewport.zoom * 100));
   }, [viewport.zoom]);
 
-  const selectionKey = [...selectedIds].sort().join(',');
+  const quickActionScreenPos = useMemo(() => {
+    if (!quickActions?.enabled || selectedIds.size === 0) return null;
+    const canvas = canvasRef.current;
+    if (!canvas) return null;
 
-  useEffect(() => {
-    const POSITION_EPSILON = 0.5; // half a pixel — tighter than any real UI change
-    const notify = (pos: { x: number; y: number } | null) => {
-      const cb = onSelectionScreenPosRef.current;
-      if (!cb) return;
-      const prev = lastSelectionScreenPosRef.current;
-      if (pos === null) {
-        if (prev !== null && prev !== undefined) {
-          lastSelectionScreenPosRef.current = null;
-          cb(null);
-        }
-        return;
-      }
-      if (
-        prev !== null &&
-        prev !== undefined &&
-        Math.abs(prev.x - pos.x) < POSITION_EPSILON &&
-        Math.abs(prev.y - pos.y) < POSITION_EPSILON
-      ) {
-        return;
-      }
-      lastSelectionScreenPosRef.current = pos;
-      cb(pos);
-    };
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+    for (const id of selectedIds) {
+      const obj = scene.objects.find(o => o.id === id);
+      if (!obj) continue;
+      const b = computeObjectBounds(obj);
+      if (b.minX > b.maxX) continue;
+      minX = Math.min(minX, b.minX);
+      minY = Math.min(minY, b.minY);
+      maxX = Math.max(maxX, b.maxX);
+      maxY = Math.max(maxY, b.maxY);
+    }
+    if (minX === Infinity) return null;
 
-    const report = () => {
-      const canvas = canvasRef.current;
-      if (selectedIds.size === 0) {
-        notify(null);
-        return;
-      }
-      if (!canvas) {
-        notify(null);
-        return;
-      }
-
-      let minX = Infinity;
-      let minY = Infinity;
-      let maxX = -Infinity;
-      let maxY = -Infinity;
-
-      for (const id of selectedIds) {
-        const obj = scene.objects.find(o => o.id === id);
-        if (!obj) continue;
-        const b = computeObjectBounds(obj);
-        if (b.minX > b.maxX) continue;
-        minX = Math.min(minX, b.minX);
-        minY = Math.min(minY, b.minY);
-        maxX = Math.max(maxX, b.maxX);
-        maxY = Math.max(maxY, b.maxY);
-      }
-
-      if (minX === Infinity) {
-        notify(null);
-        return;
-      }
-
-      const transform = Transform.from(viewport);
-      const cx = (minX + maxX) / 2;
-      const screen = transform.worldToScreen({ x: cx, y: minY });
-      const rect = canvas.getBoundingClientRect();
-      notify({ x: rect.left + screen.x, y: rect.top + screen.y });
-    };
-
-    // Run report on next frame — not synchronously. This gives React a chance
-    // to settle state between effect invocations and prevents feedback loops
-    // where notify triggers a re-render that triggers this effect again.
-    let raf = requestAnimationFrame(report);
-    const onResize = () => {
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(report);
-    };
-    window.addEventListener('resize', onResize);
-    return () => {
-      window.removeEventListener('resize', onResize);
-      cancelAnimationFrame(raf);
-    };
-  }, [scene, viewport, selectionKey, width, height, selectedIds]);
+    const transform = Transform.from(viewport);
+    const cx = (minX + maxX) / 2;
+    const screen = transform.worldToScreen({ x: cx, y: minY });
+    const rect = canvas.getBoundingClientRect();
+    return { x: rect.left + screen.x, y: rect.top + screen.y };
+  }, [scene, viewport, selectedIds, quickActions?.enabled, width, height]);
 
   useEffect(() => {
     if (!actionsRef) return;
@@ -1802,6 +1756,18 @@ export function CanvasViewport({
       onScrub: (t: number) => { setPlaybackTime(t); setIsPlaying(false); },
       onReset: () => { setPlaybackTime(0); setIsPlaying(false); },
       onFitView: handleFitView,
+    }),
+
+    quickActionScreenPos && quickActions && React.createElement(QuickActions, {
+      x: quickActionScreenPos.x,
+      y: quickActionScreenPos.y,
+      selectedCount: quickActions.selectedCount,
+      onDuplicate: quickActions.onDuplicate,
+      onDelete: quickActions.onDelete,
+      onCenter: quickActions.onCenter,
+      onGridArray: quickActions.onGridArray,
+      hasSelectedText: quickActions.hasSelectedText,
+      handleTextToPath: quickActions.handleTextToPath,
     }),
   );
 }

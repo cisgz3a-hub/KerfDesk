@@ -58,7 +58,6 @@ import { offsetObject } from '../../geometry/OffsetPath';
 import { theme } from '../styles/theme';
 import { WelcomeWizard, type WizardResult } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
-import { QuickActions } from './QuickActions';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
@@ -112,23 +111,6 @@ function getSetupStorageKey(): string {
 // ─── COMPONENT ───────────────────────────────────────────────────
 
 export function App() {
-  if (typeof window !== 'undefined' && !(window as any).__LF_DEBUG_CONSOLE_PATCHED__) {
-    (window as any).__LF_DEBUG_CONSOLE_PATCHED__ = true;
-    const origError = console.error;
-    console.error = function (...args: unknown[]) {
-      const first = args[0];
-      if (
-        typeof first === 'string' &&
-        first.includes('Cannot update a component') &&
-        first.includes('while rendering a different component')
-      ) {
-        origError.apply(console, args);
-        throw new Error('[DEBUG] React render-phase setState detected');
-      }
-      origError.apply(console, args);
-    };
-  }
-
   const {
     modal,
     showAlert,
@@ -164,7 +146,6 @@ export function App() {
 
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
-  const [quickActionPos, setQuickActionPos] = useState<{ x: number; y: number } | null>(null);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [isDragOver, setIsDragOver] = useState(false);
   const [showGridArray, setShowGridArray] = useState(false);
@@ -699,7 +680,6 @@ export function App() {
   const handleNewProject = useCallback((newScene: Scene) => {
     sceneIsDirtyRef.current = false;
     setSelectedIds(new Set());
-    setQuickActionPos(null);
     historyRef.current.reset(newScene);
     setScene(newScene);
   }, []);
@@ -1136,7 +1116,6 @@ export function App() {
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
-    setQuickActionPos(null);
   }, []);
 
   const handleQuickActionDuplicate = useCallback(() => {
@@ -1172,7 +1151,6 @@ export function App() {
 
   const handleQuickActionDelete = useCallback(() => {
     handleDelete();
-    setQuickActionPos(null);
   }, [handleDelete]);
 
   const handleQuickActionCenter = useCallback(() => {
@@ -1941,7 +1919,16 @@ export function App() {
           actionsRef: viewportActionsRef,
           onZoomChange: setZoomLevel,
           previewMode,
-          onSelectionScreenPos: setQuickActionPos,
+          quickActions: !previewMode ? {
+            enabled: true,
+            selectedCount: selectedIds.size,
+            onDuplicate: handleQuickActionDuplicate,
+            onDelete: handleQuickActionDelete,
+            onCenter: handleQuickActionCenter,
+            onGridArray: handleGridArray,
+            hasSelectedText,
+            handleTextToPath: () => { void sceneOps.textToPath(); },
+          } : undefined,
           onRequestTextPlacement: handleRequestTextPlacement,
           onActiveTool: setActiveTool,
           onEditText: handleEditText,
@@ -2240,18 +2227,6 @@ export function App() {
         React.createElement('p', { style: { fontSize: 11, color: '#888', marginTop: 20 } },
           'Third-party licenses: see LICENSES-THIRD-PARTY.md'),
       ),
-    }),
-
-    quickActionPos && selectedIds.size > 0 && !previewMode && React.createElement(QuickActions, {
-      x: quickActionPos.x,
-      y: quickActionPos.y,
-      selectedCount: selectedIds.size,
-      onDuplicate: handleQuickActionDuplicate,
-      onDelete: handleQuickActionDelete,
-      onCenter: handleQuickActionCenter,
-      onGridArray: handleGridArray,
-      hasSelectedText,
-      handleTextToPath: () => void sceneOps.textToPath(),
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {
