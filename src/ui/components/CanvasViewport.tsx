@@ -477,18 +477,10 @@ export function CanvasViewport({
     if (!actionsRef) return;
     actionsRef.current = {
       zoomIn: () => {
-        setViewport(vp => {
-          const next = zoomAt(vp, width / 2, height / 2, 1.3);
-          onZoomChangeRef.current?.(Math.round(next.zoom * 100));
-          return next;
-        });
+        setViewport(vp => zoomAt(vp, width / 2, height / 2, 1.3));
       },
       zoomOut: () => {
-        setViewport(vp => {
-          const next = zoomAt(vp, width / 2, height / 2, 1 / 1.3);
-          onZoomChangeRef.current?.(Math.round(next.zoom * 100));
-          return next;
-        });
+        setViewport(vp => zoomAt(vp, width / 2, height / 2, 1 / 1.3));
       },
       fitToBed: () => {
         const next = fitToBounds(0, 0, scene.canvas.width, scene.canvas.height, width, height, 20);
@@ -1084,11 +1076,7 @@ export function CanvasViewport({
       const rect = canvas.getBoundingClientRect();
       const sx = e.clientX - rect.left;
       const sy = e.clientY - rect.top;
-      setViewport(vp => {
-        const next = zoomAt(vp, sx, sy, wheelToZoomFactor(e.deltaY));
-        onZoomChangeRef.current?.(Math.round(next.zoom * 100));
-        return next;
-      });
+      setViewport(vp => zoomAt(vp, sx, sy, wheelToZoomFactor(e.deltaY)));
     };
     canvas.addEventListener('wheel', handler, { passive: false });
     return () => canvas.removeEventListener('wheel', handler);
