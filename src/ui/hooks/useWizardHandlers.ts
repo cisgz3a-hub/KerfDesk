@@ -3,8 +3,10 @@ import { type Scene } from '../../core/scene/Scene';
 import { deserializeScene } from '../../io/SceneSerializer';
 import {
   createBlankProfile,
+  getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
+  type DeviceProfile,
 } from '../../core/devices/DeviceProfile';
 import { type WizardResult } from '../components/WelcomeWizard';
 import { type ViewportActions } from '../components/CanvasViewport';
@@ -17,6 +19,25 @@ export function getSetupStorageKey(): string {
     }
   } catch { /* ignore */ }
   return 'laserforge_setup_complete';
+}
+
+/** Keep calibration / G-code / connection fields when wizard updates machine basics. */
+function mergePreservedProfileFields(target: DeviceProfile, previous: DeviceProfile): void {
+  target.scanningOffsets = previous.scanningOffsets;
+  target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
+  target.accelAwarePower = previous.accelAwarePower;
+  target.minPowerRatioAccel = previous.minPowerRatioAccel;
+  target.smartOverscanEnabled = previous.smartOverscanEnabled;
+  target.overscanMm = previous.overscanMm;
+  target.preferredPort = previous.preferredPort;
+  target.startGcode = previous.startGcode;
+  target.endGcode = previous.endGcode;
+  target.gcodeHeaderTemplate = previous.gcodeHeaderTemplate;
+  target.gcodeFooterTemplate = previous.gcodeFooterTemplate;
+  target.maxRateX = previous.maxRateX;
+  target.maxRateY = previous.maxRateY;
+  target.maxAccelX = previous.maxAccelX;
+  target.maxAccelY = previous.maxAccelY;
 }
 
 export interface UseWizardHandlersParams {
@@ -71,19 +92,44 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     const wattsRaw = result.machineWatts || '10';
     const wattsParsed = parseInt(wattsRaw.split(/[-]/)[0]?.replace(/\D/g, '') || '10', 10) || 10;
     const mt = result.machineType || 'diode';
-    const profile = createBlankProfile(result.machineName || 'My Laser');
-    profile.machineType = mt === 'co2' || mt === 'fiber' || mt === 'diode' ? mt : 'diode';
-    profile.watts = wattsParsed;
-    profile.bedWidth = result.bedWidth;
-    profile.bedHeight = result.bedHeight;
-    profile.originCorner = result.originCorner;
-    profile.homingEnabled = result.homingEnabled;
-    profile.softLimitsEnabled = result.homingEnabled;
-    profile.maxSpindle = result.maxSpindle;
-    profile.invertY = result.originCorner === 'front-left' || result.originCorner === 'front-right';
+    const machineTypeSafe = mt === 'co2' || mt === 'fiber' || mt === 'diode' ? mt : 'diode';
+    const invertY = result.originCorner === 'front-left' || result.originCorner === 'front-right';
 
-    saveDeviceProfile(profile);
-    setActiveProfileId(profile.id);
+    const existing = getActiveProfile();
+    let profileId: string;
+    if (existing) {
+      const updated: DeviceProfile = {
+        ...existing,
+        name: result.machineName || existing.name,
+        machineType: machineTypeSafe,
+        watts: wattsParsed,
+        bedWidth: result.bedWidth,
+        bedHeight: result.bedHeight,
+        originCorner: result.originCorner,
+        homingEnabled: result.homingEnabled,
+        softLimitsEnabled: result.homingEnabled,
+        maxSpindle: result.maxSpindle,
+        invertY,
+      };
+      mergePreservedProfileFields(updated, existing);
+      saveDeviceProfile(updated);
+      setActiveProfileId(existing.id);
+      profileId = existing.id;
+    } else {
+      const profile = createBlankProfile(result.machineName || 'My Laser');
+      profile.machineType = machineTypeSafe;
+      profile.watts = wattsParsed;
+      profile.bedWidth = result.bedWidth;
+      profile.bedHeight = result.bedHeight;
+      profile.originCorner = result.originCorner;
+      profile.homingEnabled = result.homingEnabled;
+      profile.softLimitsEnabled = result.homingEnabled;
+      profile.maxSpindle = result.maxSpindle;
+      profile.invertY = invertY;
+      saveDeviceProfile(profile);
+      setActiveProfileId(profile.id);
+      profileId = profile.id;
+    }
     refreshProfiles();
 
     const newScene = {
@@ -107,7 +153,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       },
       metadata: {
         ...scene.metadata,
-        deviceProfileId: profile.id,
+        deviceProfileId: profileId,
       },
     };
     handleSceneCommit(newScene);

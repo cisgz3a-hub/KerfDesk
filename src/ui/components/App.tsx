@@ -1708,6 +1708,20 @@ export function App() {
     dialogs.showSetup && React.createElement(WelcomeWizard, {
       onComplete: handleWizardComplete,
       onSkip: handleWizardSkip,
+      initialBedWidth: activeProfile?.bedWidth ?? scene.canvas.width,
+      initialBedHeight: activeProfile?.bedHeight ?? scene.canvas.height,
+      initialMaterialType: scene.material?.type,
+      initialMaterialName: scene.material?.name,
+      initialMaterialColor: scene.material?.color,
+      initialMaterialWidth: scene.material?.width,
+      initialMaterialHeight: scene.material?.height,
+      initialMaterialThickness: scene.material?.thickness,
+      initialMachineName: scene.machine?.name,
+      initialMachineWatts: scene.machine?.watts,
+      initialMachineType: scene.machine?.type,
+      initialOriginCorner: activeProfile?.originCorner,
+      initialHomingEnabled: activeProfile?.homingEnabled,
+      initialMaxSpindle: activeProfile?.maxSpindle,
     }),
 
     dialogs.showShortcuts && React.createElement(ShortcutsPanel, {
@@ -1724,6 +1738,10 @@ export function App() {
         canAutoDetect: !!grblMachineInfo,
         onAutoDetect: handleAutoDetectMachine,
         autoDetecting: false,
+        onReRunSetup: () => {
+          setSettingsOpen(false);
+          dialogs.setShowSetup(true);
+        },
       }),
       gcodeTab: React.createElement(GcodeSettingsTab, {
         activeProfile,

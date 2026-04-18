@@ -21,12 +21,32 @@ export interface WizardResult {
   maxSpindle: number;
 }
 
-interface WelcomeWizardProps {
+export interface WelcomeWizardProps {
   onComplete: (result: WizardResult) => void;
   onSkip: () => void;
+  /** When re-running setup, seed from active profile + scene so users can edit in place. */
+  initialBedWidth?: number;
+  initialBedHeight?: number;
+  initialMaterialType?: string;
+  initialMaterialName?: string;
+  initialMaterialColor?: string;
+  initialMaterialWidth?: number;
+  initialMaterialHeight?: number;
+  initialMaterialThickness?: number;
+  initialMachineName?: string;
+  initialMachineWatts?: string;
+  initialMachineType?: string;
+  initialOriginCorner?: MachineOriginCorner;
+  initialHomingEnabled?: boolean;
+  initialMaxSpindle?: number;
 }
 
 type MachineKind = 'diode' | 'co2' | 'fiber';
+
+function parseMachineKind(t: string | undefined): MachineKind {
+  if (t === 'co2' || t === 'fiber' || t === 'diode') return t;
+  return 'diode';
+}
 
 const MACHINES: {
   name: string;
@@ -64,23 +84,54 @@ const SIZE_PRESETS = [
   { label: '150×100', w: 150, h: 100 },
 ];
 
-export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
+export function WelcomeWizard({
+  onComplete,
+  onSkip,
+  initialBedWidth,
+  initialBedHeight,
+  initialMaterialType,
+  initialMaterialName,
+  initialMaterialColor,
+  initialMaterialWidth,
+  initialMaterialHeight,
+  initialMaterialThickness,
+  initialMachineName,
+  initialMachineWatts,
+  initialMachineType,
+  initialOriginCorner,
+  initialHomingEnabled,
+  initialMaxSpindle,
+}: WelcomeWizardProps) {
+  const bedIw = initialBedWidth ?? 400;
+  const bedIh = initialBedHeight ?? 300;
+  const bedPresetMatch = MACHINES.find(m => m.w === bedIw && m.h === bedIh);
+
   const [step, setStep] = useState(0);
-  const [bedW, setBedW] = useState(400);
-  const [bedH, setBedH] = useState(300);
-  const [matType, setMatType] = useState('wood');
-  const [matName, setMatName] = useState('Plywood');
-  const [matColor, setMatColor] = useState('#c4a882');
-  const [matW, setMatW] = useState(200);
-  const [matH, setMatH] = useState(150);
-  const [matThick, setMatThick] = useState(3);
-  const [customBed, setCustomBed] = useState(true);
-  const [machineName, setMachineName] = useState('Custom');
-  const [machineWatts, setMachineWatts] = useState('');
-  const [machineType, setMachineType] = useState<MachineKind>('diode');
-  const [originCorner, setOriginCorner] = useState<MachineOriginCorner>('front-left');
-  const [homingEnabled, setHomingEnabled] = useState(false);
-  const [maxSpindle, setMaxSpindle] = useState(1000);
+  const [bedW, setBedW] = useState(bedIw);
+  const [bedH, setBedH] = useState(bedIh);
+  const [matType, setMatType] = useState(initialMaterialType ?? 'wood');
+  const [matName, setMatName] = useState(initialMaterialName ?? 'Plywood');
+  const [matColor, setMatColor] = useState(initialMaterialColor ?? '#c4a882');
+  const [matW, setMatW] = useState(initialMaterialWidth ?? 200);
+  const [matH, setMatH] = useState(initialMaterialHeight ?? 150);
+  const [matThick, setMatThick] = useState(initialMaterialThickness ?? 3);
+  const [customBed, setCustomBed] = useState(!bedPresetMatch);
+  const [machineName, setMachineName] = useState(
+    initialMachineName ?? bedPresetMatch?.name ?? 'Custom',
+  );
+  const [machineWatts, setMachineWatts] = useState(
+    initialMachineWatts ?? bedPresetMatch?.watts ?? '',
+  );
+  const [machineType, setMachineType] = useState<MachineKind>(
+    parseMachineKind(initialMachineType ?? bedPresetMatch?.type),
+  );
+  const [originCorner, setOriginCorner] = useState<MachineOriginCorner>(
+    initialOriginCorner ?? 'front-left',
+  );
+  const [homingEnabled, setHomingEnabled] = useState(initialHomingEnabled ?? false);
+  const [maxSpindle, setMaxSpindle] = useState(
+    initialMaxSpindle === 255 ? 255 : (initialMaxSpindle ?? 1000),
+  );
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";

@@ -10,10 +10,12 @@ export interface MachineSettingsTabProps {
   canAutoDetect: boolean;
   onAutoDetect: () => void;
   autoDetecting?: boolean;
+  /** Opens the welcome / setup wizard (e.g. re-run initial machine questions). */
+  onReRunSetup?: () => void;
 }
 
 export function MachineSettingsTab(props: MachineSettingsTabProps) {
-  const { activeProfile, onUpdateProfile, canAutoDetect, onAutoDetect, autoDetecting } = props;
+  const { activeProfile, onUpdateProfile, canAutoDetect, onAutoDetect, autoDetecting, onReRunSetup } = props;
 
   if (!activeProfile) {
     return React.createElement('div', { style: { color: '#888', fontSize: 13 } },
@@ -34,6 +36,36 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     borderRadius: 4, color: '#e0e0ec', fontSize: 12, outline: 'none', width: '100%',
   };
   const hintStyle: React.CSSProperties = { fontSize: 10, color: '#666' };
+
+  const rerunSection = onReRunSetup && React.createElement('div', {
+    style: {
+      marginBottom: 20,
+      padding: 12,
+      background: '#0a0a14',
+      border: '1px solid #252540',
+      borderRadius: 8,
+    },
+  },
+    React.createElement('button', {
+      type: 'button',
+      onClick: onReRunSetup,
+      style: {
+        padding: '6px 12px',
+        background: 'transparent',
+        border: '1px solid #3a3a55',
+        borderRadius: 6,
+        color: '#a0a0c0',
+        fontSize: 12,
+        cursor: 'pointer',
+        fontWeight: 500,
+      },
+    }, '⚙ Re-run setup wizard'),
+    React.createElement('p', {
+      style: { fontSize: 10, color: '#555570', marginTop: 10, marginBottom: 0, lineHeight: 1.45 },
+    },
+      'Reconfigure your machine settings. Your current settings will be preserved unless you change them during setup.',
+    ),
+  );
 
   const numberField = (label: string, field: keyof DeviceProfile, step: number, unit: string, hint?: string) => {
     const value = (activeProfile[field] as number | undefined) ?? '';
@@ -76,6 +108,7 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
   };
 
   return React.createElement('div', null,
+    rerunSection,
     canAutoDetect && React.createElement('div', {
       style: {
         marginBottom: 20, padding: 12,
