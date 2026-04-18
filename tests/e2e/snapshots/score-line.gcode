@@ -12,4 +12,5 @@ G1 X160.000 Y0.000 F2200 S150
 M5 S0
 
 M5 S0
+G0 X0.000 Y0.000 ; return to job origin
 M2 ; program end

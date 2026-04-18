@@ -65,6 +65,7 @@ export function applyMachineTransform(
   }
   const minX = Number.isFinite(bounds.minX) ? bounds.minX : 0;
   const minY = Number.isFinite(bounds.minY) ? bounds.minY : 0;
+  const maxX = Number.isFinite(bounds.maxX) ? bounds.maxX : 0;
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
   const flipY = useFrontOriginYFlip(options.originCorner);
@@ -110,13 +111,24 @@ export function applyMachineTransform(
     },
   };
 
+  // Return point after job completes. Coordinates must match emitted move space
+  // (canvas + offset, with front-origin Y flip when applicable).
+  //   - absolute: (0,0) → machine origin in emitted space
+  //   - current: (0,0) → start-of-job corner in emitted space
+  //   - savedOrigin: saved point in canvas space, transformed like any other XY
+  const sceneBoundsForReturn = { minX, minY, maxX, maxY };
+  const returnPosition =
+    options.startMode === 'savedOrigin' && options.savedOrigin
+      ? transformPointToMachine(options.savedOrigin, sceneBoundsForReturn, options)
+      : { x: 0, y: 0 };
+
   return {
     plan: transformedPlan,
     offsetX: offset.x,
     offsetY: offset.y,
     flipReferenceY,
     flipY,
-    returnPosition: { x: 0, y: 0 },
+    returnPosition,
   };
 }
 

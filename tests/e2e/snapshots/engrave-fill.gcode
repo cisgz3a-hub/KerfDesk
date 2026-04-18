@@ -1210,4 +1210,5 @@ G1 X0.000 Y0.000 S0
 M5 S0
 
 M5 S0
+G0 X0.000 Y0.000 ; return to job origin
 M2 ; program end

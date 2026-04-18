@@ -22,16 +22,17 @@ export interface CompileOptions {
 export function compileSceneToGcode(scene: Scene, opts: CompileOptions = {}): string {
   const job = compileJob(scene);
   const plan = optimizePlan(job);
-  const { plan: machinePlan } = applyMachineTransform(plan, {
+  const machineTransform = applyMachineTransform(plan, {
     startMode: opts.startMode ?? 'current',
     savedOrigin: opts.savedOrigin ?? null,
     originCorner: opts.originCorner ?? 'front-left',
     bedHeightMm: scene.canvas.height,
   });
+  const { plan: machinePlan, returnPosition } = machineTransform;
   const strategy = getOutputStrategy('grbl');
   if (!strategy) throw new Error('GRBL output strategy not registered');
 
-  const output = strategy.generate(machinePlan, job);
+  const output = strategy.generate(machinePlan, job, { returnPosition });
   if (!output.text) throw new Error('Compile produced no text output');
 
   return normalize(output.text);

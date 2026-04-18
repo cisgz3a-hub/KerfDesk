@@ -1704,4 +1704,5 @@ M5 S0
 M9 ; air assist OFF
 
 M5 S0
+G0 X0.000 Y0.000 ; return to job origin
 M2 ; program end
