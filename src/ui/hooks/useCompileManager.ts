@@ -109,8 +109,12 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   }, [sceneCompileTick, connectionSidebarOpen]);
 
   const compileToResult = useCallback(
-    (targetScene: Scene) =>
-      pipelineCompileGcode(
+    (targetScene: Scene) => {
+      if (isJobRunning) {
+        console.warn('[useCompileManager] compileToResult suppressed: job is running');
+        return Promise.resolve(null);
+      }
+      return pipelineCompileGcode(
         targetScene,
         startMode,
         savedOrigin,
@@ -118,7 +122,8 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         outputFormat,
         machineBedFromController,
         controllerAccelMmPerS2,
-      ),
+      );
+    },
     [
       startMode,
       savedOriginX,
@@ -128,6 +133,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       machineBedWidth,
       machineBedHeight,
       controllerAccelMmPerS2,
+      isJobRunning,
     ],
   );
 
