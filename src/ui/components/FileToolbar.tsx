@@ -374,8 +374,8 @@ export function FileToolbar({
     sep(),
     toolbarBtn('G-code', 'Export G-code for laser', () => { void handleGenerateGcode(); }, { color: '#2dd4a0' }),
     toolbarBtn(
-      'Test grid',
-      'Generate power/speed calibration test grid (download G-code)',
+      'G-code Test',
+      'Generate G-code power/speed calibration grid (download raw G-code)',
       () => setTestGridOpen(true),
     ),
     React.createElement('label', {
@@ -473,7 +473,7 @@ export function FileToolbar({
     productionMode &&
       toolbarBtn('📐 Kerf', 'Kerf & fit wizard', () => onKerfWizard?.()),
     productionMode &&
-      toolbarBtn('🧪 Test Grid', 'Material test grid', () => onMaterialTest?.()),
+      toolbarBtn('🧪 Material Test', 'Material test — add calibration squares to the scene', () => onMaterialTest?.()),
     spacer(),
     materialName
       ? React.createElement(
