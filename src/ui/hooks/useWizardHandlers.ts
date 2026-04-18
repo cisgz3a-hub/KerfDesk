@@ -1,6 +1,11 @@
 import { useCallback, type RefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { deserializeScene } from '../../io/SceneSerializer';
+import {
+  createBlankProfile,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../../core/devices/DeviceProfile';
 import { type WizardResult } from '../components/WelcomeWizard';
 import { type ViewportActions } from '../components/CanvasViewport';
 
@@ -21,6 +26,8 @@ export interface UseWizardHandlersParams {
   setShowSetup: (show: boolean) => void;
   setShowRecover: (show: boolean) => void;
   viewportActionsRef: RefObject<ViewportActions | null>;
+  /** Bump so `getActiveProfile()` / device list re-read after wizard creates a profile. */
+  refreshProfiles: () => void;
 }
 
 export interface WizardHandlers {
@@ -37,6 +44,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     setShowSetup,
     setShowRecover,
     viewportActionsRef,
+    refreshProfiles,
   } = params;
 
   const handleRecover = useCallback(() => {
@@ -60,6 +68,24 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     const matX = Math.round((result.bedWidth - result.materialWidth) / 2);
     const matY = Math.round((result.bedHeight - result.materialHeight) / 2);
 
+    const wattsRaw = result.machineWatts || '10';
+    const wattsParsed = parseInt(wattsRaw.split(/[-]/)[0]?.replace(/\D/g, '') || '10', 10) || 10;
+    const mt = result.machineType || 'diode';
+    const profile = createBlankProfile(result.machineName || 'My Laser');
+    profile.machineType = mt === 'co2' || mt === 'fiber' || mt === 'diode' ? mt : 'diode';
+    profile.watts = wattsParsed;
+    profile.bedWidth = result.bedWidth;
+    profile.bedHeight = result.bedHeight;
+    profile.originCorner = result.originCorner;
+    profile.homingEnabled = result.homingEnabled;
+    profile.softLimitsEnabled = result.homingEnabled;
+    profile.maxSpindle = result.maxSpindle;
+    profile.invertY = result.originCorner === 'front-left' || result.originCorner === 'front-right';
+
+    saveDeviceProfile(profile);
+    setActiveProfileId(profile.id);
+    refreshProfiles();
+
     const newScene = {
       ...scene,
       canvas: { ...scene.canvas, width: result.bedWidth, height: result.bedHeight },
@@ -79,12 +105,16 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
         watts: result.machineWatts || '',
         type: result.machineType || 'diode',
       },
+      metadata: {
+        ...scene.metadata,
+        deviceProfileId: profile.id,
+      },
     };
     handleSceneCommit(newScene);
 
     // Fit to bed after a tick
     setTimeout(() => viewportActionsRef.current?.fitToBed(), 100);
-  }, [scene, handleSceneCommit, setShowSetup]);
+  }, [scene, handleSceneCommit, setShowSetup, refreshProfiles]);
 
   const handleWizardSkip = useCallback(() => {
     setShowSetup(false);

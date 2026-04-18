@@ -969,6 +969,7 @@ export function App() {
     setShowSetup: dialogs.setShowSetup,
     setShowRecover,
     viewportActionsRef,
+    refreshProfiles,
   });
 
   useEffect(() => {

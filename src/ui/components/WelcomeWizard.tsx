@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { NumberInput } from './NumberInput';
+import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 
 export interface WizardResult {
   bedWidth: number;
@@ -13,6 +14,11 @@ export interface WizardResult {
   machineName?: string;
   machineWatts?: string;
   machineType?: string;
+  /** Future-proof; only `grbl` is used today. */
+  controllerType: 'grbl';
+  originCorner: MachineOriginCorner;
+  homingEnabled: boolean;
+  maxSpindle: number;
 }
 
 interface WelcomeWizardProps {
@@ -72,14 +78,17 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
   const [machineName, setMachineName] = useState('Custom');
   const [machineWatts, setMachineWatts] = useState('');
   const [machineType, setMachineType] = useState<MachineKind>('diode');
+  const [originCorner, setOriginCorner] = useState<MachineOriginCorner>('front-left');
+  const [homingEnabled, setHomingEnabled] = useState(false);
+  const [maxSpindle, setMaxSpindle] = useState(1000);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
   const mono = "'JetBrains Mono', 'Consolas', monospace";
 
-  // Preview canvas for step 3
+  // Preview canvas for material step
   useEffect(() => {
-    if (step !== 2) return;
+    if (step !== 3) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d')!;
@@ -147,6 +156,26 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
     minWidth: 100,
   });
 
+  const inputLabel: React.CSSProperties = {
+    fontSize: 10,
+    color: '#8888aa',
+    fontWeight: 600,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.5px',
+  };
+
+  const pickCardStyle = (selected: boolean): React.CSSProperties => ({
+    ...cardStyle(selected),
+    flex: 'none',
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: 11,
+    fontWeight: 500,
+    color: selected ? '#00d4ff' : '#e0e0ec',
+  });
+
   const renderStep = () => {
     switch (step) {
       // Step 0: Welcome
@@ -155,7 +184,7 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           React.createElement('div', { style: { fontSize: 48, marginBottom: 16 } }, '⚡'),
           React.createElement('h2', { style: { color: '#e0e0ec', fontSize: 22, fontWeight: 700, marginBottom: 8 } }, 'Welcome to LaserForge'),
           React.createElement('p', { style: { color: '#8888aa', fontSize: 13, lineHeight: 1.6, maxWidth: 360, margin: '0 auto' } },
-            "Let's set up your workspace in 3 quick steps. This takes about 30 seconds and makes everything work perfectly for your laser."
+            "Let's set up your workspace in a few quick steps. This takes about a minute and makes everything work better for your laser."
           ),
           React.createElement('p', { style: { color: '#555570', fontSize: 11, marginTop: 16 } },
             "You can always change these settings later."
@@ -243,8 +272,91 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           ),
         );
 
-      // Step 2: Material
+      // Step 2: Machine setup (GRBL-oriented defaults)
       case 2:
+        return React.createElement('div', null,
+          React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 16, fontWeight: 600, marginBottom: 4 } }, 'Machine setup'),
+          React.createElement('p', { style: { color: '#8888aa', fontSize: 11, marginBottom: 16 } },
+            "How is your machine configured? If you're not sure, the defaults are safe.",
+          ),
+          React.createElement('div', { style: { marginBottom: 20 } },
+            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Origin corner (machine zero)'),
+            React.createElement('div', {
+              style: {
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 6,
+                maxWidth: 280,
+                margin: '0 auto',
+                aspectRatio: '1.4 / 1',
+              },
+            },
+              React.createElement('div', {
+                onClick: () => setOriginCorner('rear-left'),
+                style: pickCardStyle(originCorner === 'rear-left'),
+              }, 'Rear-left'),
+              React.createElement('div', {
+                onClick: () => setOriginCorner('rear-right'),
+                style: pickCardStyle(originCorner === 'rear-right'),
+              }, 'Rear-right'),
+              React.createElement('div', {
+                onClick: () => setOriginCorner('front-left'),
+                style: pickCardStyle(originCorner === 'front-left'),
+              }, 'Front-left'),
+              React.createElement('div', {
+                onClick: () => setOriginCorner('front-right'),
+                style: pickCardStyle(originCorner === 'front-right'),
+              }, 'Front-right'),
+            ),
+            React.createElement('p', { style: { color: '#555570', fontSize: 10, marginTop: 8, textAlign: 'center' } },
+              'Most diode lasers use Front-left. CNC routers often use Rear-right.',
+            ),
+          ),
+          React.createElement('div', { style: { marginBottom: 20 } },
+            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Auto-home on startup'),
+            React.createElement('div', { style: { display: 'flex', gap: 8 } },
+              React.createElement('div', {
+                onClick: () => setHomingEnabled(false),
+                style: { ...pickCardStyle(!homingEnabled), flex: 1 },
+              }, 'No'),
+              React.createElement('div', {
+                onClick: () => setHomingEnabled(true),
+                style: { ...pickCardStyle(homingEnabled), flex: 1 },
+              }, 'Yes'),
+            ),
+            React.createElement('p', {
+              style: {
+                color: homingEnabled ? '#ffaa50' : '#555570',
+                fontSize: 10,
+                marginTop: 8,
+                textAlign: 'center',
+              },
+            },
+              homingEnabled
+                ? 'Requires limit switches. Without them, homing can cause GRBL errors.'
+                : 'Set origin manually by jogging before each job. Recommended without limit switches.',
+            ),
+          ),
+          React.createElement('div', { style: { marginBottom: 8 } },
+            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Max power value (S-max)'),
+            React.createElement('div', { style: { display: 'flex', gap: 8 } },
+              React.createElement('div', {
+                onClick: () => setMaxSpindle(1000),
+                style: { ...pickCardStyle(maxSpindle === 1000), flex: 1, fontSize: 10 },
+              }, '1000 (modern GRBL 1.1+)'),
+              React.createElement('div', {
+                onClick: () => setMaxSpindle(255),
+                style: { ...pickCardStyle(maxSpindle === 255), flex: 1, fontSize: 10 },
+              }, '255 (legacy)'),
+            ),
+            React.createElement('p', { style: { color: '#555570', fontSize: 10, marginTop: 8, textAlign: 'center' } },
+              'GRBL setting $30. Use 1000 unless your controller is older (pre-2018).',
+            ),
+          ),
+        );
+
+      // Step 3: Material
+      case 3:
         return React.createElement('div', null,
           React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 16, fontWeight: 600, marginBottom: 4 } }, "What are you cutting?"),
           React.createElement('p', { style: { color: '#8888aa', fontSize: 11, marginBottom: 12 } }, "This sets recommended power and speed. You can skip if you're just exploring."),
@@ -332,8 +444,8 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
           React.createElement('canvas', { ref: canvasRef, style: { width: '100%', height: 160, borderRadius: 8, border: '1px solid #1a1a2e' } }),
         );
 
-      // Step 3: Ready
-      case 3:
+      // Step 4: Ready
+      case 4:
         return React.createElement('div', { style: { textAlign: 'center' as const, padding: '10px 0' } },
           React.createElement('div', { style: { fontSize: 48, marginBottom: 12 } }, '✅'),
           React.createElement('h2', { style: { color: '#e0e0ec', fontSize: 20, fontWeight: 700, marginBottom: 12 } }, "You're ready!"),
@@ -349,6 +461,18 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
               React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Laser bed'),
               React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, `${bedW} × ${bedH} mm`),
+            ),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Origin'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, originCorner.replace(/-/g, ' ')),
+            ),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Auto-home'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, homingEnabled ? 'Yes' : 'No'),
+            ),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'S-max'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, String(maxSpindle)),
             ),
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
               React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Material'),
@@ -389,7 +513,7 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
       React.createElement('div', {
         style: { padding: '16px 24px 0', display: 'flex', gap: 4 },
       },
-        ...[0, 1, 2, 3].map(i =>
+        ...[0, 1, 2, 3, 4].map(i =>
           React.createElement('div', {
             key: i,
             style: {
@@ -404,7 +528,7 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
       // Step label
       React.createElement('div', {
         style: { padding: '8px 24px 0', fontSize: 10, color: '#555570' },
-      }, step === 0 ? '' : `Step ${step} of 3`),
+      }, step === 0 ? '' : `Step ${step} of 4`),
 
       // Content
       React.createElement('div', {
@@ -431,7 +555,7 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
             }, '← Back'),
 
         // Right: next or finish
-        step < 3
+        step < 4
           ? React.createElement('button', {
               onClick: () => setStep(s => s + 1),
               style: {
@@ -453,6 +577,10 @@ export function WelcomeWizard({ onComplete, onSkip }: WelcomeWizardProps) {
                 machineName: machineName || 'Custom',
                 machineWatts: machineWatts || '',
                 machineType: machineType || 'diode',
+                controllerType: 'grbl',
+                originCorner,
+                homingEnabled,
+                maxSpindle,
               }),
               style: {
                 padding: '8px 28px', background: 'rgba(45, 212, 160, 0.15)',
