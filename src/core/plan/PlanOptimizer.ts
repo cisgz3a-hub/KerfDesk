@@ -491,6 +491,9 @@ function planFillOperation(
   const moves: Move[] = [];
   const power = settings.powerMax;
   const speed = settings.speed;
+  const useFillAccel = settings.accelAwarePower !== false;
+  const maxAccelFill = Math.max(1, settings.maxAccelMmPerS2);
+  const minRatioFill = Math.max(0, Math.min(1, settings.minPowerRatioAccel));
 
   // Set M4 dynamic mode ONCE at the start with S0 (laser off).
   // Per GRBL spec, M4 inline S changes don't cause motion stops.
@@ -523,13 +526,17 @@ function planFillOperation(
     for (let i = 0; i < row.segments.length; i++) {
       const seg = row.segments[i];
 
-      // Burn across this segment (laser ON at full power)
-      moves.push({
-        type: 'linear',
-        to: seg.actualTo,
+      // Burn across this segment with velocity-scaled power (D.15)
+      appendBurnMoves2D(
+        moves,
+        seg.actualFrom,
+        seg.actualTo,
         power,
         speed,
-      });
+        useFillAccel,
+        maxAccelFill,
+        minRatioFill,
+      );
 
       // Gap to next segment: G1 with S0 (laser off, maintain speed)
       if (i < row.segments.length - 1) {
@@ -644,6 +651,97 @@ function planRasterOperation(
   return moves;
 }
 
+/**
+ * 2D generalization of velocity-scaled burn segments: splits any burn line into
+ * 2–3 G1 moves so power tracks velocity during acceleration/deceleration.
+ * Used by vector fill engraves at arbitrary scan angles; rasters use
+ * {@link appendRasterBurnMoves} (thin wrapper around this).
+ */
+export function appendBurnMoves2D(
+  moves: Move[],
+  from: Point,
+  to: Point,
+  powerPct: number,
+  speed: number,
+  useAccel: boolean,
+  maxAccelMmPerS2: number,
+  minPowerRatio: number,
+): void {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const lineLen = Math.hypot(dx, dy);
+
+  let curX = from.x;
+  let curY = from.y;
+
+  const pushLinear = (px: number, py: number, pow: number): void => {
+    if (Math.hypot(px - curX, py - curY) < 1e-4) return;
+    moves.push({
+      type: 'linear',
+      to: { x: px, y: py },
+      power: pow,
+      speed,
+    });
+    curX = px;
+    curY = py;
+  };
+
+  if (!useAccel || lineLen <= 0.5) {
+    pushLinear(to.x, to.y, powerPct);
+    return;
+  }
+
+  const tx = dx / lineLen;
+  const ty = dy / lineLen;
+  const pointAt = (distFromStart: number): Point => ({
+    x: from.x + tx * distFromStart,
+    y: from.y + ty * distFromStart,
+  });
+
+  const k: MoveKinematics = {
+    distanceMm: lineLen,
+    feedrateMmPerMin: speed,
+    entryVelocityMmPerMin: 0,
+    exitVelocityMmPerMin: 0,
+    maxAccelMmPerS2: maxAccelMmPerS2,
+  };
+  const zones = computeVelocityZones(k);
+
+  const goPt = (p: Point, pow: number): void => {
+    pushLinear(p.x, p.y, pow);
+  };
+
+  const triangular =
+    zones.isTriangular || zones.decelStartMm <= zones.accelEndMm + 1e-6;
+
+  if (triangular) {
+    const apexDist = zones.accelEndMm;
+    const apexPt = pointAt(apexDist);
+    const vMidA = velocityAt(apexDist / 2, k, zones);
+    const s1 = scalePowerByVelocity(powerPct, vMidA, speed, minPowerRatio);
+    goPt(apexPt, s1);
+
+    const midD = (apexDist + lineLen) / 2;
+    const vMidD = velocityAt(midD, k, zones);
+    const s2 = scalePowerByVelocity(powerPct, vMidD, speed, minPowerRatio);
+    goPt(to, s2);
+    return;
+  }
+
+  const ptAccelEnd = pointAt(zones.accelEndMm);
+  const ptDecelStart = pointAt(zones.decelStartMm);
+
+  const vA = velocityAt(zones.accelEndMm / 2, k, zones);
+  const sA = scalePowerByVelocity(powerPct, vA, speed, minPowerRatio);
+  goPt(ptAccelEnd, sA);
+
+  goPt(ptDecelStart, powerPct);
+
+  const vD = velocityAt((zones.decelStartMm + lineLen) / 2, k, zones);
+  const sD = scalePowerByVelocity(powerPct, vD, speed, minPowerRatio);
+  goPt(to, sD);
+}
+
 /** Split a horizontal raster burn into 2–3 G1 moves with velocity-scaled power. */
 function appendRasterBurnMoves(
   moves: Move[],
@@ -656,68 +754,16 @@ function appendRasterBurnMoves(
   maxAccelMmPerS2: number,
   minPowerRatio: number,
 ): void {
-  const lineLen = Math.abs(endX - startX);
-  const dir = endX >= startX ? 1 : -1;
-  const xAt = (distFromStart: number) => startX + dir * distFromStart;
-
-  const pushLinear = (nextX: number, pow: number): void => {
-    moves.push({
-      type: 'linear',
-      to: { x: nextX, y },
-      power: pow,
-      speed,
-    });
-  };
-
-  if (!useAccel || lineLen <= 0.5) {
-    pushLinear(endX, powerPct);
-    return;
-  }
-
-  const k: MoveKinematics = {
-    distanceMm: lineLen,
-    feedrateMmPerMin: speed,
-    entryVelocityMmPerMin: 0,
-    exitVelocityMmPerMin: 0,
-    maxAccelMmPerS2: maxAccelMmPerS2,
-  };
-  const zones = computeVelocityZones(k);
-
-  let curX = startX;
-  const go = (nextX: number, pow: number): void => {
-    if (Math.abs(nextX - curX) < 1e-4) return;
-    pushLinear(nextX, pow);
-    curX = nextX;
-  };
-
-  const triangular =
-    zones.isTriangular || zones.decelStartMm <= zones.accelEndMm + 1e-6;
-
-  if (triangular) {
-    const apexDist = zones.accelEndMm;
-    const apexX = xAt(apexDist);
-    const vMidA = velocityAt(apexDist / 2, k, zones);
-    const s1 = scalePowerByVelocity(powerPct, vMidA, speed, minPowerRatio);
-    go(apexX, s1);
-    const midD = (apexDist + lineLen) / 2;
-    const vMidD = velocityAt(midD, k, zones);
-    const s2 = scalePowerByVelocity(powerPct, vMidD, speed, minPowerRatio);
-    go(endX, s2);
-    return;
-  }
-
-  const xAccelEnd = xAt(zones.accelEndMm);
-  const xDecelStart = xAt(zones.decelStartMm);
-
-  const vA = velocityAt(zones.accelEndMm / 2, k, zones);
-  const sA = scalePowerByVelocity(powerPct, vA, speed, minPowerRatio);
-  go(xAccelEnd, sA);
-
-  go(xDecelStart, powerPct);
-
-  const vD = velocityAt((zones.decelStartMm + lineLen) / 2, k, zones);
-  const sD = scalePowerByVelocity(powerPct, vD, speed, minPowerRatio);
-  go(endX, sD);
+  appendBurnMoves2D(
+    moves,
+    { x: startX, y },
+    { x: endX, y },
+    powerPct,
+    speed,
+    useAccel,
+    maxAccelMmPerS2,
+    minPowerRatio,
+  );
 }
 
 // ─── PATH ORDERING (INSIDE-FIRST + NEAREST-NEIGHBOR) ─────────────

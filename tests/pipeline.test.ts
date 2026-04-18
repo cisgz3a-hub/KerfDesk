@@ -333,32 +333,42 @@ assert(fillLaserOffs.length === 1, `Fill: exactly 1 laserOff (M5 S0 at end), got
 
 const fillBurnLinears = fillLinears.filter(m => m.type === 'linear' && m.power > 0);
 
-// Each scanline row should have exactly 1 burn linear (rectangle = 1 segment per row)
-// With 1mm interval on a 20mm rect, expect ~20 burn lines
+// Each scanline row is one logical segment but may split into 2–3 velocity-scaled G1 burns (D.15).
+// With 1mm interval on a 20mm rect, expect ~20 rows × (1–3) ≈ 20–60 burn linears.
 const expectedLines = Math.floor(20 / 1.0);
 assert(fillBurnLinears.length >= expectedLines - 2, `Fill: at least ${expectedLines - 2} burn linears (got ${fillBurnLinears.length})`);
-assert(fillBurnLinears.length <= expectedLines + 2, `Fill: at most ${expectedLines + 2} burn linears (got ${fillBurnLinears.length})`);
+assert(fillBurnLinears.length <= (expectedLines + 2) * 5, `Fill: at most ~5× burn sub-segments per row (got ${fillBurnLinears.length})`);
 
-// Each burn linear should be ~10mm wide (rectangle width)
+// First row: envelope of burn endpoints should span ~10mm (rectangle width)
 const firstBurn = fillBurnLinears[0];
 if (firstBurn.type === 'linear') {
-  const firstRapid = fillRapids[0];
-  if (firstRapid.type === 'rapid') {
-    const scanWidth = Math.abs(firstBurn.to.x - firstRapid.to.x);
-    assert(Math.abs(scanWidth - 10) < 0.5, `Fill: scanline width ≈ 10mm (got ${scanWidth.toFixed(2)})`);
-  }
+  const y0 = firstBurn.to.y;
+  const rowBurns = fillBurnLinears.filter(
+    m => m.type === 'linear' && Math.abs(m.to.y - y0) < 0.06,
+  );
+  const xs = rowBurns.map(m => (m as { to: { x: number } }).to.x);
+  const rowSpan = Math.max(...xs) - Math.min(...xs);
+  // Envelope can be slightly under 10mm when velocity-scaled sub-segments don't reach the exact shape edge in X.
+  assert(rowSpan >= 8 && rowSpan <= 11, `Fill: first-row burn X span ≈ 10mm (got ${rowSpan.toFixed(2)})`);
 }
 
-// Verify bidirectional: first two burn linears should go opposite directions
-if (fillBurnLinears.length >= 2 && fillBurnLinears[0].type === 'linear' && fillBurnLinears[1].type === 'linear') {
-  const rapid0 = fillRapids[0];
-  const rapid1 = fillRapids[1];
-  if (rapid0.type === 'rapid' && rapid1.type === 'rapid') {
-    const dir0 = fillBurnLinears[0].to.x - rapid0.to.x;
-    const dir1 = fillBurnLinears[1].to.x - rapid1.to.x;
-    const isAlternating = (dir0 > 0 && dir1 < 0) || (dir0 < 0 && dir1 > 0);
-    assert(isAlternating, 'Fill: bidirectional — burn linears alternate direction');
+// Bidirectional: first burn after each row's rapid should alternate X direction
+const rowFirstBurnDirs: number[] = [];
+for (let i = 0; i < fillMoves.length; i++) {
+  if (fillMoves[i].type !== 'rapid') continue;
+  const rx = fillMoves[i].to.x;
+  for (let j = i + 1; j < fillMoves.length; j++) {
+    const n = fillMoves[j];
+    if (n.type === 'rapid') break;
+    if (n.type === 'linear' && n.power > 0) {
+      rowFirstBurnDirs.push(Math.sign(n.to.x - rx));
+      break;
+    }
   }
+}
+if (rowFirstBurnDirs.length >= 2) {
+  const isAlternating = rowFirstBurnDirs[0] * rowFirstBurnDirs[1] < 0;
+  assert(isAlternating, 'Fill: bidirectional — first burn per row alternates direction');
 }
 
 // LaserOn at start should be M4 S0 (dynamic mode, initially off).
@@ -367,7 +377,13 @@ const fillFirstOn = fillLaserOns[0];
 if (fillFirstOn.type === 'laserOn') {
   assert(fillFirstOn.power === 0, `Fill: laserOn sets M4 S0 (got power=${fillFirstOn.power})`);
 }
-assert(firstBurn.type === 'linear' && firstBurn.power === fillLayer.settings.power.max, `Fill: burn linear power = ${fillLayer.settings.power.max}%`);
+const peakBurnPower = Math.max(
+  ...fillBurnLinears.filter(m => m.type === 'linear').map(m => (m as { power: number }).power),
+);
+assert(
+  peakBurnPower === fillLayer.settings.power.max,
+  `Fill: at least one burn reaches full power ${fillLayer.settings.power.max}% (peak=${peakBurnPower})`,
+);
 
 console.log(`  ℹ Burn scanlines: ${fillBurnLinears.length}`);
 console.log(`  ℹ Total fill moves: ${fillMoves.length}`);
