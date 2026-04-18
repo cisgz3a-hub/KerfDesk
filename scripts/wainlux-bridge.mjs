@@ -9,9 +9,10 @@
  * This bridge unifies both into a single WebSocket that LaserForge connects to.
  *
  * Usage:
- *   node scripts/wainlux-bridge.mjs [laser-ip] [--ws-port <port>]
+ *   node scripts/wainlux-bridge.mjs [laser-ip] [--ws-port <port>] [--verbose]
  *   node scripts/wainlux-bridge.mjs 192.168.0.1
  *   node scripts/wainlux-bridge.mjs 192.168.0.1 --ws-port 8765
+ *   node scripts/wainlux-bridge.mjs 192.168.0.1 --verbose   # diagnostic mode
  *
  * Then in LaserForge: Connect via WiFi → localhost:8765
  */
@@ -31,6 +32,8 @@ for (let i = 1; i < args.length; i++) {
     i++;
   }
 }
+
+const verbose = args.includes('--verbose');
 
 // ─── HTTP COMMAND QUEUE ─────────────────────────────────────────
 // Commands must be sent one at a time to preserve order.
@@ -125,14 +128,16 @@ wss.on('connection', (browserWs) => {
       });
       sentLineLengths.push(byteCount);
       bufferUsed += byteCount;
-      console.log(
-        '[STREAM] sent: ' +
-          trimmed.substring(0, 30) +
-          ' | buffer: ' +
-          bufferUsed +
-          '/128, queued: ' +
-          commandQueue.length
-      );
+      if (verbose) {
+        console.log(
+          '[STREAM] sent: ' +
+            trimmed.substring(0, 30) +
+            ' | buffer: ' +
+            bufferUsed +
+            '/128, queued: ' +
+            commandQueue.length
+        );
+      }
     }
   }
 
@@ -149,14 +154,16 @@ wss.on('connection', (browserWs) => {
     } else {
       commandQueue.push({ line: trimmed, byteCount });
     }
-    console.log(
-      '[STREAM] sent: ' +
-        trimmed.substring(0, 30) +
-        ' | buffer: ' +
-        bufferUsed +
-        '/128, queued: ' +
-        commandQueue.length
-    );
+    if (verbose) {
+      console.log(
+        '[STREAM] sent: ' +
+          trimmed.substring(0, 30) +
+          ' | buffer: ' +
+          bufferUsed +
+          '/128, queued: ' +
+          commandQueue.length
+      );
+    }
   }
 
   // Connect to laser's WebSocket for receiving GRBL data
@@ -223,16 +230,17 @@ wss.on('connection', (browserWs) => {
         browserWs.send(trimmed);
       }
 
-      // Log concisely
+      // Log concisely (status reports are high-frequency — quiet unless --verbose)
       if (trimmed.startsWith('<')) {
-        // Status report — log briefly
-        const state = trimmed.substring(1, trimmed.indexOf('|'));
-        process.stdout.write(`  ← [${state}] `);
-        if (trimmed.includes('MPos:')) {
-          const mpos = trimmed.match(/MPos:([^|>]+)/);
-          if (mpos) process.stdout.write(mpos[1]);
+        if (verbose) {
+          const state = trimmed.substring(1, trimmed.indexOf('|'));
+          process.stdout.write(`  ← [${state}] `);
+          if (trimmed.includes('MPos:')) {
+            const mpos = trimmed.match(/MPos:([^|>]+)/);
+            if (mpos) process.stdout.write(mpos[1]);
+          }
+          console.log('');
         }
-        console.log('');
       } else if (trimmed === 'ok') {
         // Don't log every ok
       } else {
