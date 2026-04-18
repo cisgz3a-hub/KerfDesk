@@ -28,6 +28,10 @@ export interface GcodeTemplateContext {
   materialName: string;
   /** Primary material thickness in mm. 0 if unknown. */
   materialThicknessMm: number;
+  /** Machine-space X for end-of-job return rapid (WCS / emitted coords). */
+  returnX: number;
+  /** Machine-space Y for end-of-job return rapid (WCS / emitted coords). */
+  returnY: number;
 }
 
 /**
@@ -46,6 +50,8 @@ export function emptyTemplateContext(): GcodeTemplateContext {
     estimatedTime: '',
     materialName: '',
     materialThicknessMm: 0,
+    returnX: 0,
+    returnY: 0,
   };
 }
 
@@ -68,6 +74,8 @@ export function renderTemplate(template: string, context: GcodeTemplateContext):
       case 'ESTIMATED_TIME': return context.estimatedTime || 'unknown';
       case 'MATERIAL_NAME': return context.materialName || 'none';
       case 'MATERIAL_THICKNESS': return context.materialThicknessMm.toFixed(2);
+      case 'RETURN_X': return context.returnX.toFixed(3);
+      case 'RETURN_Y': return context.returnY.toFixed(3);
       default: return match;
     }
   });
@@ -118,7 +126,7 @@ export const BUILT_IN_HEADER_TEMPLATES: Record<string, string> = {
 export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
   'Park at origin': [
     'M5 ; laser off',
-    'G0 X0 Y0 ; return to origin',
+    'G0 X{RETURN_X} Y{RETURN_Y} ; return to origin',
     '; Total lines: {TOTAL_LINES}',
     '; Estimated time: {ESTIMATED_TIME}',
   ].join('\n'),
@@ -137,7 +145,7 @@ export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
 
   'With beep on completion': [
     'M5 ; laser off',
-    'G0 X0 Y0 ; return to origin',
+    'G0 X{RETURN_X} Y{RETURN_Y} ; return to origin',
     'M300 P500 S1000 ; 500ms beep at 1kHz (Marlin)',
     '; Total lines: {TOTAL_LINES}',
   ].join('\n'),
@@ -145,7 +153,7 @@ export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
   'With air assist off': [
     'M5 ; laser off',
     'M9 ; air assist off',
-    'G0 X0 Y0 ; return to origin',
+    'G0 X{RETURN_X} Y{RETURN_Y} ; return to origin',
   ].join('\n'),
 };
 

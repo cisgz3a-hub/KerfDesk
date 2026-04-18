@@ -144,6 +144,8 @@ export async function compileGcode(
       materialName: scene.material?.name ?? '',
       materialThicknessMm: scene.material?.thickness ?? 0,
       estimatedTime: 'TBD',
+      returnX: machineTransform.returnPosition.x,
+      returnY: machineTransform.returnPosition.y,
     },
     maxSpindle,
   });

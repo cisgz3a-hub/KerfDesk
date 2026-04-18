@@ -98,6 +98,18 @@ console.log('\n=== GcodeTemplates ===\n');
 {
   const ctx = {
     ...emptyTemplateContext(),
+    returnX: 100,
+    returnY: 75.25,
+  };
+  assert(
+    renderTemplate('G0 X{RETURN_X} Y{RETURN_Y}', ctx) === 'G0 X100.000 Y75.250',
+    'return coordinates three decimals',
+  );
+}
+
+{
+  const ctx = {
+    ...emptyTemplateContext(),
     jobName: 'Test',
     bedWidthMm: 300,
     bedHeightMm: 300,
