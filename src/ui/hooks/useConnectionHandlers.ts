@@ -1,4 +1,4 @@
-import { useCallback, useEffect, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useRef, type Dispatch, type SetStateAction } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
@@ -44,6 +44,9 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
     grbl,
   } = params;
 
+  const isJobRunningRef = useRef(grbl.isJobRunning);
+  isJobRunningRef.current = grbl.isJobRunning;
+
   const handleConnectionRecompile = useCallback(() => {
     void (async () => {
       const gc = await compileGcode(scene);
@@ -59,6 +62,9 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
     if (!gcodeStale) return;
 
     const timer = setTimeout(() => {
+      // Re-check at fire time — job may have started between scheduling and firing.
+      // The effect-level guard only covers scheduling time.
+      if (isJobRunningRef.current) return;
       handleConnectionRecompile();
     }, 500);
 

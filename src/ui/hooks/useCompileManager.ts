@@ -133,6 +133,13 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
 
   const compileGcode = useCallback(
     async (targetScene: Scene): Promise<string | null> => {
+      // Defense in depth: never compile during a running job. Compiles block the
+      // main thread and starve the WiFi bridge event loop, causing GRBL's planner
+      // buffer to drain and the laser to physically stop. A.1 fix.
+      if (isJobRunning) {
+        console.warn('[useCompileManager] compileGcode suppressed: job is running');
+        return null;
+      }
       setIsCompiling(true);
       try {
         const result = await pipelineCompileGcode(
@@ -170,10 +177,15 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       machineBedWidth,
       machineBedHeight,
       controllerAccelMmPerS2,
+      isJobRunning,
     ],
   );
 
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {
+    if (isJobRunning) {
+      console.warn('[useCompileManager] compileToolpath suppressed: job is running');
+      return null;
+    }
     try {
       const result = await pipelineCompileToolpath(targetScene, controllerAccelMmPerS2);
       if (!result) return null;
@@ -182,7 +194,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       console.error('Toolpath compilation failed:', err);
       return null;
     }
-  }, [controllerAccelMmPerS2]);
+  }, [controllerAccelMmPerS2, isJobRunning]);
 
   return {
     currentGcode,
