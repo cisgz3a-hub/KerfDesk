@@ -158,6 +158,8 @@ async function testSimpleStreaming() {
   const lastProgress = progressUpdates[progressUpdates.length - 1];
   assert(lastProgress.linesAcknowledged === 9, `All 9 lines acknowledged (got ${lastProgress.linesAcknowledged})`);
   assert(lastProgress.percentComplete === 100, `Progress = 100% (got ${lastProgress.percentComplete.toFixed(1)}%)`);
+  assert(lastProgress.healthStatus === 'healthy', 'Streaming health healthy on fast mock');
+  assert(lastProgress.ackRateHz != null, 'Ack rate computed after job');
 
   // Verify state transitions: idle → run → idle
   assert(stateChanges.includes('run'), 'State transitioned to run');

@@ -38,6 +38,12 @@ export interface JobProgress {
   percentComplete: number;
   elapsedMs: number;
   bufferFill: number;
+  /** GRBL streaming health: buffer fill vs ok-ack rate. */
+  healthStatus: 'healthy' | 'warning' | 'saturated';
+  /** Rolling ok rate from recent acks (acks/s). Null until enough samples. */
+  ackRateHz: number | null;
+  /** Recent command send rate (sends/s), used as expected ack rate. Null until enough samples. */
+  expectedAckRateHz: number | null;
 }
 
 export type StateChangeCallback = (state: MachineState) => void;

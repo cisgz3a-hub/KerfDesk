@@ -16,6 +16,7 @@ import {
   type Unsubscribe,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
+import { computeStreamingHealth } from './streamingHealth';
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
@@ -59,6 +60,12 @@ export class GrblController implements LaserController {
   private _bufferAvailable = GRBL_BUFFER_SIZE;
   private _linesAcknowledged = 0;
   private _jobStartTime = 0;
+
+  /** Ring buffer of ok-ack timestamps (ms) for rolling ack rate. */
+  private _ackTimestamps: number[] = [];
+  /** Ring buffer of job-line send timestamps (ms) for expected ack rate. */
+  private _sendTimestamps: number[] = [];
+  private readonly ACK_RATE_WINDOW_SIZE = 100;
   private _stopOnError = true;
   /** Feed-hold sent; ignore stale Run in status reports until Hold is confirmed. */
   private _pausePending = false;
@@ -304,6 +311,8 @@ export class GrblController implements LaserController {
     this._jobStartTime = Date.now();
     this._pausePending = false;
     this._resumeRequested = false;
+    this._ackTimestamps = [];
+    this._sendTimestamps = [];
 
     // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
     if (this._jobLines.length === 0) {
@@ -473,6 +482,7 @@ export class GrblController implements LaserController {
     const oldest = this._pending.shift()!;
     this._bufferAvailable += oldest.byteCount;
     this._linesAcknowledged++;
+    this._recordAckTimestamp();
     this._emitProgress();
 
     if (this._isJobRunning &&
@@ -492,6 +502,7 @@ export class GrblController implements LaserController {
       const oldest = this._pending.shift()!;
       this._bufferAvailable += oldest.byteCount;
       this._linesAcknowledged++;
+      this._recordAckTimestamp();
 
       for (const cb of this._errorListeners) {
         cb(code, `GRBL error ${code} on line: ${oldest.text}`);
@@ -646,6 +657,7 @@ export class GrblController implements LaserController {
       this._pending.push({ text: line, byteCount });
       this._bufferAvailable -= byteCount;
       this._queueIndex++;
+      this._recordSendTimestamp();
     }
   }
 
@@ -665,6 +677,8 @@ export class GrblController implements LaserController {
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._pausePending = false;
     this._resumeRequested = false;
+    this._ackTimestamps = [];
+    this._sendTimestamps = [];
   }
 
   // ─── INTERNALS ──────────────────────────────────────────────
@@ -688,15 +702,43 @@ export class GrblController implements LaserController {
     }
   }
 
+  private _recordAckTimestamp(): void {
+    const now = Date.now();
+    this._ackTimestamps.push(now);
+    if (this._ackTimestamps.length > this.ACK_RATE_WINDOW_SIZE) {
+      this._ackTimestamps.shift();
+    }
+  }
+
+  private _recordSendTimestamp(): void {
+    const now = Date.now();
+    this._sendTimestamps.push(now);
+    if (this._sendTimestamps.length > this.ACK_RATE_WINDOW_SIZE) {
+      this._sendTimestamps.shift();
+    }
+  }
+
   private _emitProgress(): void {
     const total = this._jobLines.length;
+    const bufferFill = GRBL_BUFFER_SIZE - this._bufferAvailable;
+    const { healthStatus, ackRateHz, expectedAckRateHz } = computeStreamingHealth({
+      now: Date.now(),
+      ackTimestamps: this._ackTimestamps,
+      sendTimestamps: this._sendTimestamps,
+      bufferFill,
+      grblBufferCapacity: GRBL_BUFFER_SIZE,
+      isJobRunning: this._isJobRunning,
+    });
     const progress: JobProgress = {
       linesSent: this._queueIndex,
       linesAcknowledged: this._linesAcknowledged,
       totalLines: total,
       percentComplete: total > 0 ? (this._linesAcknowledged / total) * 100 : 0,
       elapsedMs: Date.now() - this._jobStartTime,
-      bufferFill: GRBL_BUFFER_SIZE - this._bufferAvailable,
+      bufferFill,
+      healthStatus,
+      ackRateHz,
+      expectedAckRateHz,
     };
     for (const cb of this._progressListeners) {
       cb(progress);

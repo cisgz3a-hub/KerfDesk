@@ -28,6 +28,7 @@ const files = [
   'preflight-bounds.test.ts',
   'preflight.test.ts',
   'controller-stop-safety.test.ts',
+  'streaming-health.test.ts',
   'materials.test.ts',
   'image-processing.test.ts',
   'operation-ordering.test.ts',

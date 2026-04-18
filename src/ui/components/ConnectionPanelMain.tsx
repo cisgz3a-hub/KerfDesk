@@ -62,6 +62,8 @@ const FRAME_IDLE_POLL_MS = 200;
 const FRAME_IDLE_TIMEOUT_MS = 15_000;
 /** Backup stop if pointer-up is missed (deadman test fire). */
 const TEST_FIRE_MAX_MS = 5000;
+/** Keep streaming-health banner visible briefly after status recovers (reduces flicker). */
+const STREAMING_WARNING_HOLD_MS = 3000;
 
 /** Poll until GRBL reports idle (e.g. after framing moves). */
 async function waitForGrblIdle(ctrl: LaserController): Promise<boolean> {
@@ -218,6 +220,7 @@ export function ConnectionPanelMain({
   const [jobCompleted, setJobCompleted] = useState(false);
   const [completedTime, setCompletedTime] = useState(0);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
+  const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
   const [wifiBridgeHost, setWifiBridgeHost] = useState('localhost');
   const [wifiBridgePort, setWifiBridgePort] = useState('8765');
 
@@ -380,6 +383,29 @@ export function ConnectionPanelMain({
     }
     prevRunningRef.current = isRunning;
   }, [isRunning]);
+
+  useEffect(() => {
+    if (!isRunning && !displayPaused) {
+      setStreamingLastUnhealthyAt(null);
+      return;
+    }
+    const h = jobProgress?.healthStatus;
+    if (h === 'warning' || h === 'saturated') {
+      setStreamingLastUnhealthyAt(Date.now());
+    }
+  }, [jobProgress, isRunning, displayPaused]);
+
+  useEffect(() => {
+    if (jobProgress?.healthStatus !== 'healthy' || streamingLastUnhealthyAt == null) {
+      return undefined;
+    }
+    const elapsed = Date.now() - streamingLastUnhealthyAt;
+    const wait = Math.max(0, STREAMING_WARNING_HOLD_MS - elapsed);
+    const id = window.setTimeout(() => {
+      setStreamingLastUnhealthyAt(null);
+    }, wait);
+    return () => clearTimeout(id);
+  }, [jobProgress?.healthStatus, streamingLastUnhealthyAt]);
 
   useEffect(() => {
     if (!isRunning || displayPaused) return;
@@ -1437,13 +1463,56 @@ export function ConnectionPanelMain({
     outcomeReplaySection,
   );
 
-  const jobProgressSection = isConnected && (isRunning || displayPaused) && React.createElement(Progress, {
-    jobProgress,
-    displayPaused,
-    elapsedSeconds,
-    estimatedRemaining,
-    activeLabel: jobModeLabel(scene),
-  });
+  const showStreamingHealthBanner = Boolean(
+    jobProgress &&
+    (isRunning || displayPaused) &&
+    (jobProgress.healthStatus !== 'healthy' || streamingLastUnhealthyAt !== null),
+  );
+
+  const streamingHealthBanner =
+    jobProgress &&
+    showStreamingHealthBanner &&
+    React.createElement('div', {
+      style: {
+        padding: '8px 12px',
+        margin: '0 16px 8px',
+        background: jobProgress.healthStatus === 'saturated'
+          ? 'rgba(255, 68, 102, 0.12)'
+          : 'rgba(255, 170, 80, 0.12)',
+        border: jobProgress.healthStatus === 'saturated'
+          ? '1px solid rgba(255, 68, 102, 0.4)'
+          : '1px solid rgba(255, 170, 80, 0.4)',
+        borderRadius: 6,
+        fontSize: 11,
+        color: jobProgress.healthStatus === 'saturated' ? '#ff4466' : '#ffaa50',
+        lineHeight: 1.4,
+        flexShrink: 0,
+      },
+    },
+      React.createElement('div', { style: { fontWeight: 600, marginBottom: 2 } },
+        jobProgress.healthStatus === 'saturated'
+          ? '⚠ Connection saturated'
+          : 'Connection under pressure',
+      ),
+      React.createElement('div', { style: { color: '#8888aa', fontSize: 10 } },
+        jobProgress.healthStatus === 'saturated'
+          ? 'Your connection cannot keep up with the job speed. The laser may stall. Try: reduce scan speed, or switch from WiFi to USB.'
+          : 'Streaming is slower than expected. The job should continue, but consider reducing scan speed if this worsens.',
+      ),
+    );
+
+  const jobProgressSection = isConnected && (isRunning || displayPaused) && React.createElement(
+    React.Fragment,
+    null,
+    streamingHealthBanner,
+    React.createElement(Progress, {
+      jobProgress,
+      displayPaused,
+      elapsedSeconds,
+      estimatedRemaining,
+      activeLabel: jobModeLabel(scene),
+    }),
+  );
 
   const footerSection = isConnected && React.createElement(Controls, {
     canFrame,
@@ -1516,8 +1585,40 @@ export function ConnectionPanelMain({
         style: { color: messages[messages.length - 1].startsWith('✓') ? '#2dd4a0' : messages[messages.length - 1].startsWith('ERROR') ? '#ff4466' : '#8888aa' } },
       messages[messages.length - 1])),
       productionMode && jobProgress && React.createElement('div', {
-        style: { fontSize: 10, color: '#555570', fontFamily: mono },
-      }, `Buffer ${jobProgress.bufferFill ?? 0}/127`),
+        style: {
+          fontSize: 10,
+          color: '#555570',
+          fontFamily: mono,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        },
+      },
+        React.createElement('span', {
+          style: {
+            display: 'inline-block',
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            background:
+              jobProgress.healthStatus === 'saturated'
+                ? '#ff4466'
+                : jobProgress.healthStatus === 'warning'
+                  ? '#ffaa50'
+                  : '#2dd4a0',
+          },
+          title:
+            jobProgress.healthStatus === 'saturated'
+              ? 'Streaming saturated — laser may stall'
+              : jobProgress.healthStatus === 'warning'
+                ? 'Streaming under pressure'
+                : 'Streaming healthy',
+        }),
+        `Buffer ${jobProgress.bufferFill ?? 0}/127`,
+        jobProgress.ackRateHz != null &&
+          React.createElement('span', { style: { color: '#444460' } },
+            ` · ${jobProgress.ackRateHz.toFixed(0)} acks/s`),
+      ),
       productionMode && React.createElement('div', { style: { display: 'flex', gap: 6 } },
         React.createElement('input', {
           type: 'text', value: manualCmd, placeholder: 'G-code…',
