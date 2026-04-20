@@ -3,6 +3,7 @@ import { spawn, type ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
+import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -104,6 +105,8 @@ function createWindow() {
   });
 }
 
+registerFalconWiFiIpc(() => mainWindow);
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
@@ -121,6 +124,7 @@ app.on('before-quit', (e) => {
   e.preventDefault();
   safeShutdownDone = true;
   killBridge();
+  shutdownFalconWiFi();
   safeCloseSerial()
     .catch(err => console.error('[before-quit] safe close failed:', err))
     .finally(() => app.quit());

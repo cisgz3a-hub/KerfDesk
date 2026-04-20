@@ -6,6 +6,12 @@ import {
 } from './ConnectionPanelMain';
 import { JobOutcomeDialog } from './JobOutcomeDialog';
 import { useMachineService } from '../hooks/useMachineService';
+import {
+  getActiveProfile,
+  setActiveProfileId,
+  type DeviceProfile,
+} from '../../core/devices/DeviceProfile';
+import { FalconWiFiStatusPanel, FalconAlarmToastStack } from './falcon-wifi';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -21,7 +27,89 @@ export type ConnectionPanelProps = Omit<
 
 const FONT = "'DM Sans', system-ui, sans-serif";
 
+/**
+ * Read the active profile and subscribe to `storage` events so the panel
+ * flips to Falcon mode the moment `FalconWiFiConnectBlock` activates a profile
+ * (even if the activation happens in a different tab or component tree).
+ */
+function useActiveProfile(): DeviceProfile | null {
+  const [profile, setProfile] = useState<DeviceProfile | null>(() => getActiveProfile());
+  useEffect(() => {
+    const refresh = () => setProfile(getActiveProfile());
+    window.addEventListener('storage', refresh);
+    window.addEventListener('laserforge:active-profile-changed', refresh);
+    const pollId = window.setInterval(refresh, 1000);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('laserforge:active-profile-changed', refresh);
+      clearInterval(pollId);
+    };
+  }, []);
+  return profile;
+}
+
+function FalconWiFiSidebar({
+  profile,
+  sidebarWidth,
+}: {
+  profile: DeviceProfile;
+  sidebarWidth: number;
+}): React.ReactElement | null {
+  if (profile.connection?.kind !== 'falcon-wifi') return null;
+  const conn = profile.connection;
+  const handleDisconnect = () => {
+    setActiveProfileId(null);
+    try {
+      window.dispatchEvent(new Event('laserforge:active-profile-changed'));
+    } catch {
+      /* non-DOM env */
+    }
+  };
+  return React.createElement(
+    'div',
+    {
+      style: {
+        width: sidebarWidth,
+        flexShrink: 0,
+        height: '100%',
+        minHeight: 0,
+        background: '#0d0d18',
+        borderLeft: '1px solid #1a1a2e',
+        display: 'flex',
+        flexDirection: 'column' as const,
+        overflow: 'hidden',
+        fontFamily: FONT,
+      },
+    },
+    React.createElement(FalconWiFiStatusPanel, {
+      ip: conn.ip,
+      deviceModel: conn.deviceModel,
+      firmwareVersion: conn.firmwareVersion,
+      laserInfo: conn.laserInfo,
+      macAddress: conn.macAddress,
+      onDisconnect: handleDisconnect,
+    }),
+  );
+}
+
 export function ConnectionPanel(props: ConnectionPanelProps) {
+  const activeProfile = useActiveProfile();
+  const isFalcon = activeProfile?.connection?.kind === 'falcon-wifi';
+
+  const body = isFalcon && activeProfile
+    ? React.createElement(FalconWiFiSidebar, {
+        profile: activeProfile,
+        sidebarWidth: props.sidebarWidth ?? 500,
+      })
+    : React.createElement(ConnectionPanelLegacy, props);
+
+  return React.createElement(React.Fragment, null,
+    body,
+    React.createElement(FalconAlarmToastStack, {}),
+  );
+}
+
+function ConnectionPanelLegacy(props: ConnectionPanelProps) {
   const { controller, portRef, machineState, jobProgress } = props;
   const controllerRef = useRef(controller);
   controllerRef.current = controller;

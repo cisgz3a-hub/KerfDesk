@@ -15,6 +15,46 @@ import {
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
 
+/**
+ * Connection metadata for a DeviceProfile. When absent, profiles are treated as
+ * the historical `serial` flavour (GRBL over USB or WiFi bridge). Falcon A1 Pro
+ * WiFi profiles use the `falcon-wifi` variant and talk to the device directly
+ * via the Creality HTTP + WebSocket API (see electron/falcon-wifi/).
+ */
+export type DeviceConnection =
+  | {
+      kind: 'serial';
+      /** Kept here for future parity; currently DeviceProfile.baudRate is the source of truth. */
+      baudRate?: number;
+      preferredPort?: string;
+    }
+  | {
+      kind: 'falcon-wifi';
+      /** IPv4 or hostname of the Falcon on the LAN. */
+      ip: string;
+      /** MAC address (lowercased, colon-separated) for DHCP-reservation hint. Optional. */
+      macAddress?: string;
+      /** Cached from last successful /system/getDeviceModel. */
+      deviceModel?: string;
+      /** Cached from last successful /system/getCurVersion. */
+      firmwareVersion?: string;
+      /** Cached from last successful /work/getLayerType. */
+      laserInfo?: {
+        laserType: string;
+        laserClass: string;
+        zaxisVersion: string;
+        laserSN: string;
+      };
+      /** Device serial from /system/getSN (if supported by firmware). */
+      serialNumber?: string;
+    };
+
+export type DeviceConnectionKind = DeviceConnection['kind'];
+
+export function getProfileConnectionKind(p: DeviceProfile | null | undefined): DeviceConnectionKind {
+  return p?.connection?.kind ?? 'serial';
+}
+
 export interface DeviceProfile {
   id: string;
   name: string;
@@ -78,6 +118,13 @@ export interface DeviceProfile {
   smartOverscanEnabled?: boolean;
   /** Default manual overscan (mm) when smart overscan is off; also fallback if layer value missing. */
   overscanMm?: number;
+
+  /**
+   * Optional connection metadata. When omitted, the profile is treated as
+   * serial/GRBL (the historical shape). Present for Falcon A1 Pro WiFi
+   * profiles so the UI can pick the correct connection & status widgets.
+   */
+  connection?: DeviceConnection;
 }
 
 const STORAGE_KEY = 'laserforge_device_profiles';
@@ -213,6 +260,35 @@ export function createBlankProfile(name: string): DeviceProfile {
 
 function isMachineType(v: string): v is DeviceProfile['machineType'] {
   return v === 'diode' || v === 'co2' || v === 'fiber';
+}
+
+/**
+ * Create a DeviceProfile pre-populated for a Falcon A1 Pro WiFi device.
+ * Caller supplies the IP; connection metadata (model/firmware/laserInfo)
+ * is attached after a successful test connection.
+ *
+ * Bed size 400×400 and 20W diode are Creality Falcon A1 Pro factory specs;
+ * users can edit them in device settings like any other profile.
+ */
+export function createFalconWiFiProfile(name: string, ip: string): DeviceProfile {
+  const base = createBlankProfile(name);
+  return {
+    ...base,
+    brand: 'Creality',
+    model: 'Falcon A1 Pro',
+    machineType: 'diode',
+    watts: 20,
+    bedWidth: 400,
+    bedHeight: 400,
+    maxFeedRate: 6000,
+    maxSpindle: 1000,
+    // GRBL-specific fields remain at defaults; they are ignored for falcon-wifi
+    // but kept so existing code paths that look them up don't crash.
+    connection: {
+      kind: 'falcon-wifi',
+      ip,
+    },
+  };
 }
 
 /** Create a profile from current scene machine settings */
