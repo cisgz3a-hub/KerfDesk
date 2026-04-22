@@ -5,6 +5,7 @@
 
 import { type Scene } from '../scene/Scene';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { type ResponseCurve } from '../materials/ResponseCurve';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
   BUILT_IN_HEADER_TEMPLATES,
@@ -125,6 +126,12 @@ export interface DeviceProfile {
    * profiles so the UI can pick the correct connection & status widgets.
    */
   connection?: DeviceConnection;
+
+  /**
+   * Material response curves keyed by material name. D.13 Phase 1 stores
+   * 1D curves (single scan speed per material). Phase 2 extends to 2D.
+   */
+  responseCurves?: Record<string, ResponseCurve>;
 }
 
 const STORAGE_KEY = 'laserforge_device_profiles';
