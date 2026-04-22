@@ -70,6 +70,11 @@ export interface LaserController {
   emergencyStop(): void;
 
   sendCommand(command: string): void;
+  /**
+   * Optional controller-native autofocus trigger.
+   * Serial GRBL controllers can implement this; other controllers may omit it.
+   */
+  runAutoFocus?(command: string, timeoutMs?: number): Promise<void>;
   requestStatusReport(): void;
 
   onStateChange(callback: StateChangeCallback): Unsubscribe;

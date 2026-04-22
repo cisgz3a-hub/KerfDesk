@@ -423,6 +423,63 @@ export class GrblController implements LaserController {
     this._sendRealtime(REALTIME_STATUS);
   }
 
+  /**
+   * Trigger a machine autofocus macro/command and wait for a full motion cycle.
+   * Resolves only after the machine leaves Idle (Home/Run) and then returns to Idle.
+   */
+  async runAutoFocus(command: string, timeoutMs: number = 15000): Promise<void> {
+    if (!this._port?.isOpen) throw new Error('Not connected');
+    if (this._state.status !== 'idle') throw new Error('Machine not idle — cannot auto-focus');
+    if (typeof command !== 'string' || command.length === 0) {
+      throw new Error('Invalid autofocus command: empty');
+    }
+    if (command.length > 127) {
+      throw new Error('Autofocus command exceeds GRBL buffer size (127 bytes)');
+    }
+    if (/[\r\n]/.test(command)) {
+      throw new Error('Autofocus command must be single-line');
+    }
+
+    return await new Promise<void>((resolve, reject) => {
+      let completed = false;
+      let sawActiveState = false;
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error('Auto-focus timed out'));
+      }, timeoutMs);
+
+      const cleanup = (): void => {
+        if (completed) return;
+        completed = true;
+        clearTimeout(timer);
+        unsubState();
+      };
+
+      const unsubState = this.onStateChange((next) => {
+        if (next.status === 'alarm') {
+          cleanup();
+          reject(new Error(`Auto-focus alarm: ALARM:${next.alarmCode ?? 'unknown'}`));
+          return;
+        }
+        if (next.status === 'homing' || next.status === 'run') {
+          sawActiveState = true;
+          return;
+        }
+        if (sawActiveState && next.status === 'idle') {
+          cleanup();
+          resolve();
+        }
+      });
+
+      try {
+        this._writeLine(command);
+      } catch (err: unknown) {
+        cleanup();
+        reject(err instanceof Error ? err : new Error(String(err)));
+      }
+    });
+  }
+
   // ─── EVENTS ─────────────────────────────────────────────────
 
   onStateChange(callback: StateChangeCallback): Unsubscribe {

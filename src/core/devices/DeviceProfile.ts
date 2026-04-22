@@ -121,6 +121,19 @@ export interface DeviceProfile {
   overscanMm?: number;
 
   /**
+   * Whether this machine exposes an autofocus trigger command.
+   * If false or missing, Focus UI controls stay hidden.
+   */
+  autoFocusSupported?: boolean;
+  /**
+   * Raw autofocus command sent to the machine (no trailing newline).
+   * Examples: "$HZ1", "G38.2 Z-10 F100"
+   */
+  autoFocusCommand?: string;
+  /** Autofocus timeout in milliseconds. Default used by UI/service is 15000. */
+  autoFocusTimeoutMs?: number;
+
+  /**
    * Optional connection metadata. When omitted, the profile is treated as
    * serial/GRBL (the historical shape). Present for Falcon A1 Pro WiFi
    * profiles so the UI can pick the correct connection & status widgets.
@@ -289,6 +302,9 @@ export function createFalconWiFiProfile(name: string, ip: string): DeviceProfile
     bedHeight: 400,
     maxFeedRate: 6000,
     maxSpindle: 1000,
+    autoFocusSupported: true,
+    autoFocusCommand: '$HZ1',
+    autoFocusTimeoutMs: 15_000,
     // GRBL-specific fields remain at defaults; they are ignored for falcon-wifi
     // but kept so existing code paths that look them up don't crash.
     connection: {

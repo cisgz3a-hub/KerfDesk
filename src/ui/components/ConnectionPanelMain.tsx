@@ -219,6 +219,7 @@ export function ConnectionPanelMain({
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [jobCompleted, setJobCompleted] = useState(false);
   const [completedTime, setCompletedTime] = useState(0);
+  const [isAutoFocusing, setIsAutoFocusing] = useState(false);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
   const [wifiBridgeHost, setWifiBridgeHost] = useState('localhost');
@@ -337,6 +338,9 @@ export function ConnectionPanelMain({
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
+  const activeProfile = getActiveProfile();
+  const showAutoFocus = activeProfile?.autoFocusSupported === true;
+  const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
 
   useEffect(() => {
     if (isConnected) {
@@ -822,6 +826,23 @@ export function ConnectionPanelMain({
     if (ok) sendCmd('$H');
   }, [showConfirm]);
 
+  const handleAutoFocus = useCallback(async () => {
+    if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
+    setIsAutoFocusing(true);
+    setMessages(prev => [...prev, 'Focusing...']);
+    try {
+      const result = await machineService.autoFocus();
+      if (result.ok) {
+        setMessages(prev => [...prev, '✓ Focus complete']);
+        return;
+      }
+      setMessages(prev => [...prev, `⚠ Focus failed: ${result.error}`]);
+      await showAlert('Autofocus failed', result.error);
+    } finally {
+      setIsAutoFocusing(false);
+    }
+  }, [canAutoFocus, machineService, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
+
   const handleUnlock = useCallback(() => {
     sendCmd('$X');
   }, []);
@@ -1061,7 +1082,14 @@ export function ConnectionPanelMain({
       setJogStep,
       onJog: handleJog,
       onHome: () => { void handleHome(); },
+      showFocus: showAutoFocus,
+      canFocus: canAutoFocus,
+      focusBusy: isAutoFocusing,
+      onFocus: () => { void handleAutoFocus(); },
     }),
+    isAutoFocusing && React.createElement('div', {
+      style: { fontSize: 10, color: '#00d4ff', alignSelf: 'center' },
+    }, 'Focusing...'),
     React.createElement(MachineControls, {
       isAlarm: machineState?.status === 'alarm',
       isRunning,

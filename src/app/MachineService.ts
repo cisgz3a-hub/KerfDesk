@@ -23,6 +23,7 @@ import {
 } from '../core/job/JobLog';
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
+import { getActiveProfile } from '../core/devices/DeviceProfile';
 
 export interface MachineServiceState {
   isSimulator: boolean;
@@ -268,6 +269,37 @@ export class MachineService {
 
   sendCommand(command: string): void {
     this.controllerRef.current.sendCommand(command);
+  }
+
+  async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
+    const profile = getActiveProfile();
+    if (!profile?.autoFocusSupported) {
+      return { ok: false, error: 'Autofocus not supported on this machine' };
+    }
+    if (!profile.autoFocusCommand || profile.autoFocusCommand.trim().length === 0) {
+      return { ok: false, error: 'Autofocus not supported on this machine' };
+    }
+    if (!this.controllerRef.current) {
+      return { ok: false, error: 'Not connected' };
+    }
+    if (typeof this.controllerRef.current.runAutoFocus !== 'function') {
+      return { ok: false, error: 'Autofocus not supported on this controller' };
+    }
+
+    const timeoutMs =
+      Number.isFinite(profile.autoFocusTimeoutMs) && (profile.autoFocusTimeoutMs ?? 0) > 0
+        ? profile.autoFocusTimeoutMs!
+        : 15_000;
+
+    try {
+      await this.controllerRef.current.runAutoFocus(profile.autoFocusCommand, timeoutMs);
+      return { ok: true };
+    } catch (err: unknown) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : 'Autofocus failed',
+      };
+    }
   }
 
   jog(axis: 'X' | 'Y', distance: number, feedRate: number): void {

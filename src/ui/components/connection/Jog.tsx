@@ -5,6 +5,10 @@ interface JogProps {
   setJogStep: (step: number) => void;
   onJog: (axis: 'X' | 'Y', distance: number) => void;
   onHome: () => void;
+  showFocus?: boolean;
+  canFocus?: boolean;
+  focusBusy?: boolean;
+  onFocus?: () => void;
 }
 
 const font = "'DM Sans', system-ui, sans-serif";
@@ -27,7 +31,16 @@ const jogCellStyle: React.CSSProperties = {
   justifyContent: 'center',
 };
 
-export function Jog({ jogStep, setJogStep, onJog, onHome }: JogProps) {
+export function Jog({
+  jogStep,
+  setJogStep,
+  onJog,
+  onHome,
+  showFocus = false,
+  canFocus = false,
+  focusBusy = false,
+  onFocus,
+}: JogProps) {
   const jogCell = (label: string, axis: 'X' | 'Y', distance: number, tooltip: string) =>
     React.createElement('button', {
       type: 'button',
@@ -47,12 +60,32 @@ export function Jog({ jogStep, setJogStep, onJog, onHome }: JogProps) {
       jogCell('↑', 'Y', jogStep, 'Jog Y+'),
       React.createElement('div', { key: 'j1' }),
       jogCell('←', 'X', -jogStep, 'Jog X-'),
+      React.createElement('div', {
+        style: { display: 'flex', flexDirection: 'column' as const, gap: 2 },
+      },
       React.createElement('button', {
         type: 'button',
         onClick: () => { onHome(); },
         title: 'Home machine ($H)',
         style: { ...jogCellStyle, background: 'rgba(255,212,68,0.06)', fontSize: 14 },
       }, '⌂'),
+      showFocus && React.createElement('button', {
+        type: 'button',
+        onClick: () => { onFocus?.(); },
+        disabled: !canFocus || focusBusy,
+        title: focusBusy ? 'Autofocus in progress...' : 'Run autofocus command',
+        style: {
+          ...jogCellStyle,
+          fontSize: 10,
+          height: 22,
+          background: 'rgba(0,212,255,0.08)',
+          border: '1px solid rgba(0,212,255,0.35)',
+          color: '#00d4ff',
+          opacity: !canFocus || focusBusy ? 0.5 : 1,
+          cursor: !canFocus || focusBusy ? 'default' : 'pointer',
+        },
+      }, focusBusy ? '⊙…' : '⊙'),
+      ),
       jogCell('→', 'X', jogStep, 'Jog X+'),
       React.createElement('div', { key: 'j2' }),
       jogCell('↓', 'Y', -jogStep, 'Jog Y-'),
