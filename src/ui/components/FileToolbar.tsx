@@ -39,6 +39,7 @@ interface FileToolbarProps {
   onExit?: () => void;
   onSetup?: () => void;
   onMaterialTest?: () => void;
+  onCalibrateMaterial?: () => void;
   onMaterialSetup?: () => void;
   onMaterialLibrary?: () => void;
   onCamera?: () => void;
@@ -88,6 +89,7 @@ export function FileToolbar({
   onDisconnect,
   onExit,
   onMaterialTest,
+  onCalibrateMaterial,
   onCamera,
   onImportImageFile,
   onBoxGenerator,
@@ -474,6 +476,7 @@ export function FileToolbar({
       toolbarBtn('📐 Kerf', 'Kerf & fit wizard', () => onKerfWizard?.()),
     productionMode &&
       toolbarBtn('🧪 Material Test', 'Material test — add calibration squares to the scene', () => onMaterialTest?.()),
+    toolbarBtn('🧫 Calibrate Material', 'Emit material response calibration grid and capture photo ROI', () => onCalibrateMaterial?.()),
     spacer(),
     materialName
       ? React.createElement(

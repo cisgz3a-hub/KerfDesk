@@ -75,8 +75,10 @@ import { AddTextDialog } from './AddTextDialog';
 import { FontCreditsDialog } from './FontCreditsDialog';
 import { StatusFooter } from './StatusFooter';
 import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
+import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
+import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
@@ -153,6 +155,7 @@ export function App() {
   const [showNesting, setShowNesting] = useState(false);
   const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
   const [showMaterialTest, setShowMaterialTest] = useState(false);
+  const [showCalibrateMaterial, setShowCalibrateMaterial] = useState(false);
   const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
   const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
   const [showCamera, setShowCamera] = useState(false);
@@ -518,6 +521,12 @@ export function App() {
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
   const [textPreviewFontReady, setTextPreviewFontReady] = useState(true);
+  const [lastCalibrationGridResult, setLastCalibrationGridResult] = useState<CalibrationGridResult | null>(null);
+  const [pendingCalibration, setPendingCalibration] = useState<{
+    photoData: ImageData;
+    result: CalibrationGridResult;
+    roi: { x: number; y: number; width: number; height: number };
+  } | null>(null);
 
   useEffect(() => {
     if (!textPlacementHint) return;
@@ -1190,6 +1199,27 @@ export function App() {
     handleSceneCommit,
   });
 
+  const handleCalibrationGridEmitted = useCallback((result: CalibrationGridResult) => {
+    const nextScene: Scene = {
+      ...scene,
+      layers: [...scene.layers, ...result.layers],
+      objects: [...scene.objects, ...result.objects],
+      activeLayerId: result.layers[0]?.id ?? scene.activeLayerId,
+    };
+    setLastCalibrationGridResult(result);
+    handleSceneCommit(nextScene);
+  }, [scene, handleSceneCommit]);
+
+  const handleCalibrationPhotoReady = useCallback((
+    photoData: ImageData,
+    result: CalibrationGridResult,
+    roi: { x: number; y: number; width: number; height: number },
+  ) => {
+    setPendingCalibration({ photoData, result, roi });
+    // TODO D.13 Phase 1 Step 4: pass to analyzeCalibrationPhoto()
+    console.log('Photo ready for analysis, squares:', result.squares.length);
+  }, []);
+
   const {
     handleKerfGenerateTest,
     handleKerfApply,
@@ -1357,6 +1387,7 @@ export function App() {
       onMaterialTest: () => {
         if (gatedFeature('material_test')) setShowMaterialTest(true);
       },
+      onCalibrateMaterial: () => setShowCalibrateMaterial(true),
       onMaterialSetup: () => dialogs.setShowMaterial(true),
       onMaterialLibrary: () => setShowMaterialLibrary(true),
       onCamera: () => setShowCamera(true),
@@ -1642,6 +1673,15 @@ export function App() {
       scene,
       onApply: handleMaterialTestApply,
       onClose: () => setShowMaterialTest(false),
+    }),
+
+    React.createElement(CalibrateMaterialDialog, {
+      isOpen: showCalibrateMaterial,
+      onClose: () => setShowCalibrateMaterial(false),
+      onGridEmitted: handleCalibrationGridEmitted,
+      onPhotoReady: handleCalibrationPhotoReady,
+      initialResult: lastCalibrationGridResult,
+      initialStage: lastCalibrationGridResult ? 'burn' : 'configure',
     }),
 
     showKerfWizard && React.createElement(KerfWizard, {
