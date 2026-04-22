@@ -1,6 +1,5 @@
 import React from 'react';
 import { FalconWiFiConnectBlock } from '../falcon-wifi';
-import { type DeviceProfile } from '../../../core/devices/DeviceProfile';
 
 interface ConnectWizardProps {
   webSerialSupported: boolean;
@@ -11,13 +10,6 @@ interface ConnectWizardProps {
   onConnectUsb: () => void;
   onConnectWifi: () => void;
   onConnectSimulator: () => void;
-  /**
-   * Called after the user completes the Falcon WiFi setup. Host should refresh
-   * the active device profile so the sidebar switches to the Falcon status panel.
-   * When omitted, the Falcon option is still shown (it still activates the
-   * profile), but the host is not notified explicitly.
-   */
-  onFalconWifiActivated?: (profile: DeviceProfile) => void;
 }
 
 const font = "'DM Sans', system-ui, sans-serif";
@@ -32,7 +24,6 @@ export function ConnectWizard({
   onConnectUsb,
   onConnectWifi,
   onConnectSimulator,
-  onFalconWifiActivated,
 }: ConnectWizardProps) {
   return React.createElement('div', {
     style: {
@@ -123,9 +114,10 @@ export function ConnectWizard({
         },
       }, '📡 Connect via WiFi'),
     ),
-    React.createElement(FalconWiFiConnectBlock, {
-      onActivated: onFalconWifiActivated,
-    }),
+    // Falcon WiFi UI hidden 2026-04-20 — WiFi integration paused indefinitely, Falcon now supported via USB/GRBL. Code preserved in src/ui/components/falcon-wifi/ for future use.
+    // React.createElement(FalconWiFiConnectBlock, {
+    //   onActivated: onFalconWifiActivated,
+    // }),
     React.createElement('button', {
       type: 'button',
       onClick: () => { onConnectSimulator(); },
