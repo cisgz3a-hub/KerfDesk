@@ -225,7 +225,7 @@ async function testBufferManagement() {
   }
   await flush();
 
-  // Exclude post-connect WCO line `G10 L2...` — it also begins with `G1` if tested naïvely.
+  // Exclude any non-job lines (e.g. `$$`); count only streamed G1 job moves.
   const jobLines = port.received.filter(l => {
     const s = l.endsWith('\n') ? l.slice(0, -1) : l;
     return /^G1 X\d/.test(s);

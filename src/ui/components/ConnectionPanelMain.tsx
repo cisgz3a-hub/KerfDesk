@@ -303,7 +303,11 @@ export function ConnectionPanelMain({
     try {
       controllerRef.current?.sendCommand('M5 S0');
     } catch (err: unknown) {
-      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+      const msg = err instanceof Error ? err.message : String(err);
+      // Disconnect races test-fire release — laser should already be off via port close / feed hold.
+      if (!msg.includes('Not connected')) {
+        console.warn('[Command blocked]', msg);
+      }
     }
     setIsTestFiring(false);
   }, [notifySimulatorTx]);
@@ -895,13 +899,29 @@ export function ConnectionPanelMain({
 
   const posX = machinePosition?.x ?? machineState?.position.x;
   const posY = machinePosition?.y ?? machineState?.position.y;
-  const canStartJob = !!gcode && !isRunning && !!preflight?.canStart && !gcodeStale;
+  const machineStatus = machineState?.status;
+  const machineBlocksJobStart =
+    isConnected &&
+    !isSimulator &&
+    machineStatus != null &&
+    machineStatus !== 'idle' &&
+    machineStatus !== 'disconnected' &&
+    machineStatus !== 'connecting';
+  const canStartJob =
+    !!gcode &&
+    !isRunning &&
+    !!preflight?.canStart &&
+    !gcodeStale &&
+    !machineBlocksJobStart;
   /** Human-readable reason the Start button is disabled, or null if ready. */
   const startDisabledReason: string | null = (() => {
     if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
     if (!gcode) return 'Click G-code in the toolbar to compile this design';
     if (gcodeStale) return 'Design changed - click ↻ Update above';
     if (!preflight?.canStart) return 'Fix the issues listed below first';
+    if (machineBlocksJobStart) {
+      return `Machine is "${machineStatus}" — wait for idle (stop or reset on the controller if needed)`;
+    }
     return null; // ready to start
   })();
   void workflowVersion;

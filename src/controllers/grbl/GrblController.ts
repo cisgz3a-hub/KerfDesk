@@ -32,6 +32,35 @@ interface PendingLine {
   byteCount: number;
 }
 
+/** First field inside `<...|...>` GRBL realtime reports (e.g. `Hold:0`). */
+function parseGrblStatusReportStateToken(line: string): string | null {
+  if (!line.startsWith('<') || !line.endsWith('>')) return null;
+  const pipe = line.indexOf('|');
+  if (pipe <= 1) return null;
+  return line.slice(1, pipe).toLowerCase();
+}
+
+/** Map GRBL report token to app status; null if this is not a GRBL status line we should trust. */
+function machineStatusFromGrblReportToken(token: string): MachineStatus | null {
+  const exact: Record<string, MachineStatus> = {
+    idle: 'idle',
+    run: 'run',
+    hold: 'hold',
+    'hold:0': 'hold',
+    'hold:1': 'hold',
+    alarm: 'alarm',
+    home: 'homing',
+    check: 'check',
+  };
+  if (exact[token]) return exact[token];
+  if (token.startsWith('hold')) return 'hold';
+  if (token.startsWith('door')) return 'hold';
+  if (token.startsWith('sleep')) return 'check';
+  if (token.startsWith('jog')) return 'run';
+  if (token.startsWith('alarm')) return 'alarm';
+  return null;
+}
+
 /** Parsed machine limits from GRBL $$ (defaults until first successful dump). */
 export interface GrblMachineInfo {
   bedWidth: number;
@@ -74,7 +103,7 @@ export class GrblController implements LaserController {
 
   /** Parsed GRBL $30 (max spindle/PWM). Null until a $$ response includes $30=. */
   private _maxSpindle: number | null = null;
-  /** True after post-connect $$ completes (ok received) and WCO / $10 steps are issued. */
+  /** True after post-connect $$ completes (ok received) and optional WCO / $10 sync runs. */
   private _settingsQueried = false;
 
   /** All $N=value lines from the latest $$ dump (number → raw value string). */
@@ -164,20 +193,32 @@ export class GrblController implements LaserController {
       port.onData((line) => {
         this._emitRawLine(line, 'rx');
 
+        // USB: stay quiet until polled; `?` yields `<State|...>`. Only treat lines
+        // with a known GRBL state token as welcome — random `<` noise must not connect.
+        const statusToken = parseGrblStatusReportStateToken(line);
+        const statusWelcome = statusToken != null ? machineStatusFromGrblReportToken(statusToken) : null;
+        const isGrblStatusWelcome = statusWelcome != null;
+
         const isWelcome =
           line.toLowerCase().includes('grbl') ||
           line.startsWith('[VER:') ||
+          line.startsWith('[MSG:') ||
+          isGrblStatusWelcome ||
           line === 'ok';
 
         if (!welcomeReceived && isWelcome) {
           welcomeReceived = true;
           clearTimeout(timeout);
           clearProbeTimers();
-          this._updateStatus('idle');
+          // Never claim idle if the controller is already in motion (avoids overlapping streams).
+          this._updateStatus(statusWelcome ?? 'idle');
           this._startStatusPolling();
           resolve();
           queueMicrotask(() => {
             try {
+              if (isGrblStatusWelcome) {
+                this._handleLine(line);
+              }
               this._queryMachineSettings();
             } catch {
               /* ignore */
@@ -235,6 +276,11 @@ export class GrblController implements LaserController {
       });
 
       port.write('\n');
+      try {
+        port.write('?\n');
+      } catch {
+        /* ignore */
+      }
       if (!welcomeReceived) {
         probeI = setTimeout(() => {
           try {
@@ -302,6 +348,11 @@ export class GrblController implements LaserController {
   sendJob(lines: string[]): void {
     if (!this._port?.isOpen) throw new Error('Not connected');
     if (this._isJobRunning) throw new Error('Job already running');
+    if (this._state.status !== 'idle') {
+      throw new Error(
+        `Cannot start job — machine is "${this._state.status}" (stop or reset on the controller until idle, then try again)`,
+      );
+    }
 
     this._jobLines = lines.filter(l => l.trim().length > 0 && !l.trim().startsWith(';'));
     this._queueIndex = 0;
@@ -347,7 +398,8 @@ export class GrblController implements LaserController {
   resume(): void {
     if (!this._port?.isOpen) return;
     if (this._state.status !== 'hold' && !this._pausePending) return;
-    console.info('[GrblController] resume() — cycle start');
+    // Realtime `~` releases GRBL feed-hold; only continues streaming when a job is active.
+    console.info('[GrblController] feed-hold release (~ / cycle-start)');
     this._sendRealtime(REALTIME_CYCLE_START);
     if (!this._isJobRunning) return;
     this._resumeRequested = true;
@@ -926,6 +978,8 @@ export class GrblController implements LaserController {
     if (!this._port?.isOpen) return;
 
     this._settingsQueried = true;
+    // LaserForge G-code assumes a predictable WCS + status mask. Without this, stale
+    // G54 offsets or $10 masks from other software cause jobs in the wrong place / wrong parser behavior.
     this._writeLine('G10 L2 P1 X0 Y0 Z0');
     this._writeLine('$10=0');
     console.log(
