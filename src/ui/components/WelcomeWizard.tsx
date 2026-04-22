@@ -19,6 +19,12 @@ export interface WizardResult {
   originCorner: MachineOriginCorner;
   homingEnabled: boolean;
   maxSpindle: number;
+  /**
+   * Optional machine preset identifier. When set, the wizard handler uses a
+   * brand-specific profile factory instead of `createBlankProfile`.
+   * Currently only 'falcon-a1-pro' is recognized.
+   */
+  machinePresetKey?: 'falcon-a1-pro';
 }
 
 export interface WelcomeWizardProps {
@@ -56,7 +62,11 @@ const MACHINES: {
   watts: string;
   desc: string;
   type: MachineKind;
+  presetKey?: 'falcon-a1-pro';
 }[] = [
+  { name: 'Creality Falcon A1 Pro', icon: '🎯', w: 400, h: 400, watts: '20W',
+    desc: 'USB connection, autofocus supported', type: 'diode',
+    presetKey: 'falcon-a1-pro' },
   { name: 'Small Diode', icon: '🔹', w: 200, h: 200, watts: '5-10W', desc: 'Atomstack, Ortur, Sculpfun S9', type: 'diode' },
   { name: 'Medium Diode', icon: '🔷', w: 400, h: 400, watts: '10-20W', desc: 'xTool D1 Pro, Sculpfun S30', type: 'diode' },
   { name: 'Large Diode', icon: '🟦', w: 800, h: 400, watts: '20-40W', desc: 'Large format diode laser', type: 'diode' },
@@ -104,7 +114,12 @@ export function WelcomeWizard({
 }: WelcomeWizardProps) {
   const bedIw = initialBedWidth ?? 400;
   const bedIh = initialBedHeight ?? 300;
-  const bedPresetMatch = MACHINES.find(m => m.w === bedIw && m.h === bedIh);
+  // Prefer a preset whose NAME also matches the seeded machine name (so a
+  // legacy Medium-Diode 400×400 profile doesn't light up the Falcon card,
+  // and vice-versa). Fall back to size-only match otherwise.
+  const bedPresetMatch =
+    MACHINES.find(m => m.w === bedIw && m.h === bedIh && m.name === initialMachineName)
+    ?? MACHINES.find(m => m.w === bedIw && m.h === bedIh);
 
   const [step, setStep] = useState(0);
   const [bedW, setBedW] = useState(bedIw);
@@ -124,6 +139,9 @@ export function WelcomeWizard({
   );
   const [machineType, setMachineType] = useState<MachineKind>(
     parseMachineKind(initialMachineType ?? bedPresetMatch?.type),
+  );
+  const [machinePresetKey, setMachinePresetKey] = useState<'falcon-a1-pro' | undefined>(
+    bedPresetMatch?.presetKey,
   );
   const [originCorner, setOriginCorner] = useState<MachineOriginCorner>(
     initialOriginCorner ?? 'front-left',
@@ -248,25 +266,31 @@ export function WelcomeWizard({
           React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 16, fontWeight: 600, marginBottom: 4 } }, "What's your laser?"),
           React.createElement('p', { style: { color: '#8888aa', fontSize: 11, marginBottom: 16 } }, "Pick the closest match — this sets your bed size."),
           React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 } },
-            ...MACHINES.map(m =>
-              React.createElement('div', {
+            ...MACHINES.map(m => {
+              const isSelected =
+                !customBed
+                && bedW === m.w
+                && bedH === m.h
+                && machineName === m.name;
+              return React.createElement('div', {
                 key: m.name,
                 onClick: () => {
                   setBedW(m.w); setBedH(m.h); setCustomBed(false);
                   setMachineName(m.name); setMachineWatts(m.watts); setMachineType(m.type);
+                  setMachinePresetKey(m.presetKey);
                 },
-                style: cardStyle(bedW === m.w && bedH === m.h && !customBed),
+                style: cardStyle(isSelected),
               },
                 React.createElement('div', { style: { fontSize: 24, marginBottom: 4 } }, m.icon),
-                React.createElement('div', { style: { color: bedW === m.w && bedH === m.h && !customBed ? '#00d4ff' : '#e0e0ec', fontSize: 12, fontWeight: 500 } }, m.name),
+                React.createElement('div', { style: { color: isSelected ? '#00d4ff' : '#e0e0ec', fontSize: 12, fontWeight: 500 } }, m.name),
                 React.createElement('div', { style: { color: '#00d4ff', fontSize: 10, fontFamily: mono, marginTop: 2 } }, m.watts),
                 React.createElement('div', { style: { color: '#555570', fontSize: 9, marginTop: 2 } }, `${m.w}×${m.h}mm`),
                 React.createElement('div', { style: { color: '#444460', fontSize: 8, marginTop: 2 } }, m.desc),
-              ),
-            ),
+              );
+            }),
           ),
           React.createElement('div', {
-            onClick: () => { setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
+            onClick: () => { setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
             style: { ...cardStyle(customBed), marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' },
           },
             React.createElement('span', { style: { color: customBed ? '#00d4ff' : '#8888aa', fontSize: 12 } }, 'Custom size:'),
@@ -277,7 +301,7 @@ export function WelcomeWizard({
               integer: true,
               inputMode: 'numeric',
               defaultValue: bedW,
-              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
+              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
               style: { ...inputStyle, width: 70 },
               onChange: (v: number) => {
                 setBedW(v);
@@ -285,6 +309,7 @@ export function WelcomeWizard({
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
+                setMachinePresetKey(undefined);
               },
               onCommit: (v: number) => {
                 setBedW(v);
@@ -292,6 +317,7 @@ export function WelcomeWizard({
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
+                setMachinePresetKey(undefined);
               },
             }),
             React.createElement('span', { style: { color: '#555570' } }, '×'),
@@ -302,7 +328,7 @@ export function WelcomeWizard({
               integer: true,
               inputMode: 'numeric',
               defaultValue: bedH,
-              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); },
+              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
               style: { ...inputStyle, width: 70 },
               onChange: (v: number) => {
                 setBedH(v);
@@ -310,6 +336,7 @@ export function WelcomeWizard({
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
+                setMachinePresetKey(undefined);
               },
               onCommit: (v: number) => {
                 setBedH(v);
@@ -317,6 +344,7 @@ export function WelcomeWizard({
                 setMachineName('Custom');
                 setMachineWatts('');
                 setMachineType('diode');
+                setMachinePresetKey(undefined);
               },
             }),
             React.createElement('span', { style: { color: '#555570', fontSize: 11 } }, 'mm'),
@@ -632,6 +660,7 @@ export function WelcomeWizard({
                 originCorner,
                 homingEnabled,
                 maxSpindle,
+                machinePresetKey,
               }),
               style: {
                 padding: '8px 28px', background: 'rgba(45, 212, 160, 0.15)',

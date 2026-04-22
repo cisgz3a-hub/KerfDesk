@@ -29,6 +29,7 @@ const files = [
   'preflight.test.ts',
   'controller-stop-safety.test.ts',
   'autofocus.test.ts',
+  'falcon-serial-profile.test.ts',
   'streaming-health.test.ts',
   'materials.test.ts',
   'response-curve.test.ts',

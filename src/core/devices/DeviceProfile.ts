@@ -177,13 +177,16 @@ export function getDeviceProfiles(): DeviceProfile[] {
     if (!raw) return [];
     const parsed = JSON.parse(raw) as DeviceProfile[];
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(p => ({
-      ...p,
-      returnToOrigin: p.returnToOrigin ?? true,
-      originCorner:
-        (p as DeviceProfile).originCorner
-        ?? (p.invertY === false ? 'rear-left' : 'front-left'),
-    }));
+    return parsed.map(p => {
+      const profile: DeviceProfile = {
+        ...p,
+        returnToOrigin: p.returnToOrigin ?? true,
+        originCorner:
+          (p as DeviceProfile).originCorner
+          ?? (p.invertY === false ? 'rear-left' : 'front-left'),
+      };
+      return backfillFalconAutofocus(profile);
+    });
   } catch {
     return [];
   }
@@ -283,6 +286,35 @@ function isMachineType(v: string): v is DeviceProfile['machineType'] {
 }
 
 /**
+ * Backfill autofocus config for Falcon A1 Pro profiles that predate the
+ * autofocus feature. Detection: brand === 'Creality' AND model contains
+ * 'Falcon A1 Pro'. Only fills fields that are currently undefined — never
+ * overwrites a user's explicit value, even if it's `false`. This means a
+ * user who deliberately disabled autofocus stays disabled.
+ *
+ * Exported so the migration can be unit-tested without touching localStorage.
+ */
+export function backfillFalconAutofocus(profile: DeviceProfile): DeviceProfile {
+  const isFalconA1Pro =
+    profile.brand === 'Creality' &&
+    typeof profile.model === 'string' &&
+    profile.model.includes('Falcon A1 Pro');
+  if (!isFalconA1Pro) return profile;
+
+  const next: DeviceProfile = { ...profile };
+  if (next.autoFocusSupported === undefined) {
+    next.autoFocusSupported = true;
+  }
+  if (next.autoFocusCommand === undefined) {
+    next.autoFocusCommand = '$HZ1';
+  }
+  if (next.autoFocusTimeoutMs === undefined) {
+    next.autoFocusTimeoutMs = 15_000;
+  }
+  return next;
+}
+
+/**
  * Create a DeviceProfile pre-populated for a Falcon A1 Pro WiFi device.
  * Caller supplies the IP; connection metadata (model/firmware/laserInfo)
  * is attached after a successful test connection.
@@ -311,6 +343,40 @@ export function createFalconWiFiProfile(name: string, ip: string): DeviceProfile
       kind: 'falcon-wifi',
       ip,
     },
+  };
+}
+
+/**
+ * Create a DeviceProfile pre-populated for a Falcon A1 Pro connected over
+ * USB/serial. Includes the optical-rangefinder autofocus command ($HZ1,
+ * Creality firmware extension requiring fw ≥ 1.0.38) so the Focus button
+ * appears in the machine panel out of the box.
+ *
+ * Bed 400×400, 20W diode, front-left origin and 115200 baud GRBL-LPC are
+ * Creality Falcon A1 Pro factory specs; users can edit them in device
+ * settings like any other profile. No `connection` field is attached —
+ * USB/serial profiles discover the port at connect time via port picker.
+ */
+export function createFalconSerialProfile(name: string = 'Creality Falcon A1 Pro'): DeviceProfile {
+  const base = createBlankProfile(name);
+  return {
+    ...base,
+    brand: 'Creality',
+    model: 'Falcon A1 Pro',
+    machineType: 'diode',
+    watts: 20,
+    bedWidth: 400,
+    bedHeight: 400,
+    originCorner: 'front-left',
+    invertY: true,
+    maxFeedRate: 6000,
+    maxSpindle: 1000,
+    baudRate: 115200,
+    homingEnabled: true,
+    softLimitsEnabled: true,
+    autoFocusSupported: true,
+    autoFocusCommand: '$HZ1',
+    autoFocusTimeoutMs: 15_000,
   };
 }
 

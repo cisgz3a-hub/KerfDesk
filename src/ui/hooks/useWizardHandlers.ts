@@ -3,6 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { deserializeScene } from '../../io/SceneSerializer';
 import {
   createBlankProfile,
+  createFalconSerialProfile,
   getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
@@ -116,7 +117,15 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       setActiveProfileId(existing.id);
       profileId = existing.id;
     } else {
-      const profile = createBlankProfile(result.machineName || 'My Laser');
+      // Pick a brand-specific factory when the wizard signals a known preset;
+      // otherwise fall back to the generic blank profile. Subsequent field
+      // assignments (bedWidth, etc.) overwrite factory defaults the user
+      // edited in the wizard — autofocus fields are left intact because the
+      // wizard never touches them.
+      const profile =
+        result.machinePresetKey === 'falcon-a1-pro'
+          ? createFalconSerialProfile(result.machineName || 'Creality Falcon A1 Pro')
+          : createBlankProfile(result.machineName || 'My Laser');
       profile.machineType = machineTypeSafe;
       profile.watts = wattsParsed;
       profile.bedWidth = result.bedWidth;
