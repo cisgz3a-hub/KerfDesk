@@ -1650,6 +1650,7 @@ export function ConnectionPanelMain({
       onSubscribe: onSimulatorSubscribe,
       bedWidth,
       bedHeight,
+      originCorner,
       liveHead:
         machineState && machineState.status !== 'disconnected' && machineState.status !== 'connecting'
           ? { x: machineState.position.x, y: machineState.position.y }

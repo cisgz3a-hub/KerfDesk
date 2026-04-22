@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { useFrontOriginYFlip as shouldFlipYForFrontOrigin } from '../../core/plan/MachineTransform';
 
 interface SimulatorViewProps {
   onSubscribe: (callback: (line: string) => void) => () => void;
   bedWidth: number;
   bedHeight: number;
+  originCorner: MachineOriginCorner;
   /** GRBL work position when idle (e.g. after jog); ignored while jobRunning */
   liveHead: { x: number; y: number } | null;
   jobRunning: boolean;
@@ -22,10 +25,19 @@ interface MachineState {
   isAbsolute: boolean;
 }
 
+export function mapMachineYToCanvasY(
+  machineY: number,
+  bedHeight: number,
+  originCorner: MachineOriginCorner,
+): number {
+  return shouldFlipYForFrontOrigin(originCorner) ? (bedHeight - machineY) : machineY;
+}
+
 export function SimulatorView({
   onSubscribe,
   bedWidth,
   bedHeight,
+  originCorner,
   liveHead,
   jobRunning,
 }: SimulatorViewProps) {
@@ -69,6 +81,8 @@ export function SimulatorView({
     const scale = Math.min((w - pad * 2) / bedWidth, (h - pad * 2) / bedHeight);
     const ox = (w - bedWidth * scale) / 2;
     const oy = (h - bedHeight * scale) / 2;
+    const toCanvasY = (machineY: number) =>
+      oy + mapMachineYToCanvasY(machineY, bedHeight, originCorner) * scale;
 
     ctx.strokeStyle = '#252540';
     ctx.lineWidth = 1;
@@ -93,7 +107,7 @@ export function SimulatorView({
     const zm = zeroRef.current;
     if (zm) {
       const woX = ox + zm.x * scale;
-      const woY = oy + zm.y * scale;
+      const woY = toCanvasY(zm.y);
       ctx.strokeStyle = '#ffd444';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -112,13 +126,13 @@ export function SimulatorView({
       ctx.strokeStyle = `rgba(255, ${Math.round(100 - intensity * 100)}, ${Math.round(50 - intensity * 50)}, ${0.3 + intensity * 0.7})`;
       ctx.lineWidth = 1 + intensity;
       ctx.beginPath();
-      ctx.moveTo(ox + seg.from.x * scale, oy + seg.from.y * scale);
-      ctx.lineTo(ox + seg.to.x * scale, oy + seg.to.y * scale);
+      ctx.moveTo(ox + seg.from.x * scale, toCanvasY(seg.from.y));
+      ctx.lineTo(ox + seg.to.x * scale, toCanvasY(seg.to.y));
       ctx.stroke();
     }
 
     const hx = ox + state.x * scale;
-    const hy = oy + state.y * scale;
+    const hy = toCanvasY(state.y);
 
     if (state.laserOn && state.laserPower > 0) {
       const glow = ctx.createRadialGradient(hx, hy, 0, hx, hy, 12);
@@ -149,7 +163,7 @@ export function SimulatorView({
     ctx.fillText(`Laser: ${state.laserOn ? `ON S${state.laserPower}` : 'OFF'} F${state.feedRate}`, 8, h - 4);
     ctx.fillStyle = '#333355';
     ctx.fillText(`${pathRef.current.length} cut segs`, w - 80, h - 4);
-  }, [bedWidth, bedHeight]);
+  }, [bedWidth, bedHeight, originCorner]);
 
   drawRef.current = draw;
 
