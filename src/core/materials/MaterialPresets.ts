@@ -1,15 +1,19 @@
-// Single source of truth for material presets. Do not duplicate.
+// Single source of truth for starter catalog presets. Do not duplicate.
 /**
- * Material presets with recommended power/speed settings.
+ * Starter presets with recommended power/speed settings, keyed by machine class.
  * Values sourced from xTool, LightBurn community, Snapmaker, and TwoTrees guides.
  *
  * IMPORTANT: These are STARTING POINTS. Users should always run a material test.
  * Settings vary by: specific machine, lens, focus, humidity, material brand/batch.
  *
  * Speed is in mm/min. Power is 0-100%.
+ *
+ * NOTE: Renamed from `MaterialPreset` to `StarterPreset` to disambiguate from the
+ * unrelated `MaterialPreset` schema in core/materials/MaterialPreset.ts (the
+ * user-library preset type consumed by MaterialLibrary / applyMaterialPresetToLayer).
  */
 
-export interface MaterialPreset {
+export interface StarterPreset {
   name: string;
   category: string;
   thickness: number;
@@ -24,7 +28,7 @@ export interface MaterialPreset {
   };
 }
 
-export interface UserMaterial extends MaterialPreset {
+export interface UserStarterMaterial extends StarterPreset {
   id: string;
   isUser: true;
   createdAt: string;
@@ -64,7 +68,7 @@ export const MATERIAL_CATEGORIES = [
   'Paper & Card', 'Fabric', 'Cork', 'Rubber', 'Stone & Ceramic',
 ];
 
-export const MATERIAL_PRESETS: MaterialPreset[] = [
+export const MATERIAL_PRESETS: StarterPreset[] = [
   // ═══════════════════════════════════════════════
   // WOOD — Natural
   // ═══════════════════════════════════════════════
@@ -422,13 +426,13 @@ export function getMachineSettingsKey(machineType: string, watts: string): strin
 }
 
 /** Get all user-created materials from localStorage */
-export function getUserMaterials(): UserMaterial[] {
+export function getUserMaterials(): UserStarterMaterial[] {
   try {
     const raw = localStorage.getItem(USER_MATERIALS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((m): m is UserMaterial =>
+    return parsed.filter((m): m is UserStarterMaterial =>
       m != null && typeof m === 'object' && 'id' in m && 'name' in m && 'settings' in m,
     );
   } catch {
@@ -437,7 +441,7 @@ export function getUserMaterials(): UserMaterial[] {
 }
 
 /** Save a user material (create or update) */
-export function saveUserMaterial(material: UserMaterial): void {
+export function saveUserMaterial(material: UserStarterMaterial): void {
   const all = getUserMaterials();
   const idx = all.findIndex(m => m.id === material.id);
   material.updatedAt = new Date().toISOString();
@@ -466,11 +470,11 @@ export function createUserMaterialFromLayer(
   cutSettings: { power: number; speed: number; passes: number },
   engraveSettings: { power: number; speed: number; passes: number },
   notes?: string,
-): UserMaterial {
-  const machineKey = getMachineSettingsKey(machineType, machineWatts) as keyof MaterialPreset['settings'];
+): UserStarterMaterial {
+  const machineKey = getMachineSettingsKey(machineType, machineWatts) as keyof StarterPreset['settings'];
 
   const emptyOp: LaserOp = { power: 0, speed: 0, passes: 0 };
-  const settings: MaterialPreset['settings'] = {
+  const settings: StarterPreset['settings'] = {
     diode_5w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
     diode_10w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
     diode_20w: { cut: emptyOp, engrave: emptyOp, score: deriveScoreFromCut(emptyOp) },
@@ -571,8 +575,8 @@ export function importUserMaterials(jsonString: string): number {
       const newId = existingIds.has(idBase) ? `user_mat_${Date.now()}_${imported}_${Math.random().toString(36).slice(2, 5)}` : idBase;
       existingIds.add(newId);
 
-      const newMat: UserMaterial = {
-        ...(m as unknown as UserMaterial),
+      const newMat: UserStarterMaterial = {
+        ...(m as unknown as UserStarterMaterial),
         id: newId,
         isUser: true,
         createdAt: typeof m.createdAt === 'string' ? m.createdAt : new Date().toISOString(),
@@ -592,7 +596,7 @@ export function importUserMaterials(jsonString: string): number {
 }
 
 /** Get all available materials (built-in + user) for the dropdown */
-export function getAllMaterials(): Array<MaterialPreset | UserMaterial> {
+export function getAllMaterials(): Array<StarterPreset | UserStarterMaterial> {
   return [...MATERIAL_PRESETS, ...getUserMaterials()];
 }
 
@@ -604,7 +608,7 @@ export function getPresetSettings(
   machineType: string,
   machineWatts: string = '10',
 ): MaterialPresetOps | null {
-  let preset: MaterialPreset | UserMaterial | undefined = MATERIAL_PRESETS.find(p => p.name === presetName);
+  let preset: StarterPreset | UserStarterMaterial | undefined = MATERIAL_PRESETS.find(p => p.name === presetName);
 
   if (!preset) {
     preset = getUserMaterials().find(m => m.name === presetName);
@@ -612,7 +616,7 @@ export function getPresetSettings(
 
   if (!preset) return null;
 
-  const key = getMachineSettingsKey(machineType, machineWatts) as keyof MaterialPreset['settings'];
+  const key = getMachineSettingsKey(machineType, machineWatts) as keyof StarterPreset['settings'];
   const row = preset.settings[key];
   if (!row) return null;
   return normalizePresetOps(row);

@@ -119,6 +119,14 @@ export interface LaserSettings {
 
   /** When true (default), overscan is computed from speed and machine acceleration. */
   smartOverscanEnabled?: boolean;
+
+  /**
+   * When set, this layer is linked to the MaterialPreset with this id.
+   * JobCompiler reads the preset (via MaterialLibrary.getPresetById) to
+   * fetch compile-time fields like responseCurve / kerf / zOffset.
+   * OPTIONAL.
+   */
+  materialPresetId?: string;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

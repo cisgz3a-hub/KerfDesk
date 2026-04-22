@@ -42,6 +42,7 @@ import { orderOperationsWithMetrics, type OrderableShape } from '../plan/Operati
 import { getActiveProfile } from '../devices/DeviceProfile';
 import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { computeSmartOverscan } from '../plan/SmartOverscan';
+import { getPresetById } from '../materials/MaterialLibrary';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -255,10 +256,26 @@ function resolveSettings(
 ): ResolvedLaserSettings {
   const s = layer.settings;
   const profile = getActiveProfile();
-  const responseCurve =
-    sceneMaterialName != null && sceneMaterialName.trim().length > 0
-      ? profile?.responseCurves?.[sceneMaterialName]
-      : undefined;
+
+  // Prefer the linked preset's responseCurve (post-D.13-migration path).
+  // Fall back to the legacy per-device-profile map keyed by scene material
+  // name, so existing user data keeps working until it migrates.
+  const linkedPreset = s.materialPresetId ? getPresetById(s.materialPresetId) : undefined;
+  let responseCurve = linkedPreset?.responseCurve;
+  if (!responseCurve && sceneMaterialName != null && sceneMaterialName.trim().length > 0) {
+    const curves = profile?.responseCurves;
+    if (curves) {
+      const exact = curves[sceneMaterialName];
+      if (exact) {
+        responseCurve = exact;
+      } else {
+        const key = Object.keys(curves).find(
+          k => k.toLowerCase() === sceneMaterialName.toLowerCase(),
+        );
+        if (key) responseCurve = curves[key];
+      }
+    }
+  }
 
   const detectedAccel = jobOpts?.machineAccelMmPerS2;
   const accelFromProfile = profile?.maxAccelMmPerS2 ?? 1000;

@@ -80,6 +80,8 @@ import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
 import { type ResponseCurve } from '../../core/materials/ResponseCurve';
+import { getPresets, savePreset, migrateDeviceProfileResponseCurves } from '../../core/materials/MaterialLibrary';
+import type { MaterialPreset } from '../../core/materials/MaterialPreset';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
@@ -125,6 +127,12 @@ export function App() {
   // resolves families like "Inter" instead of falling back to a default serif.
   useEffect(() => {
     void injectBundledFontFaces();
+  }, []);
+
+  // One-time migration: move D.13 response curves stored on DeviceProfile
+  // onto matching MaterialPresets. Idempotent and cheap — safe on every mount.
+  useEffect(() => {
+    migrateDeviceProfileResponseCurves();
   }, []);
 
   const [scene, setScene] = useState<Scene>(() => {
@@ -1215,6 +1223,21 @@ export function App() {
     curve: ResponseCurve,
     _measurements: Array<{ index: number; commandedPower: number; meanLuminance: number; observedDarkness: number }>,
   ) => {
+    // Preferred path: bind the curve to a matching MaterialPreset so it
+    // follows the material (and any layers linked via materialPresetId)
+    // across jobs and device profiles.
+    const matching = getPresets().find(
+      p => p.material.toLowerCase() === curve.materialName.toLowerCase(),
+    );
+    if (matching) {
+      const updatedPreset: MaterialPreset = { ...matching, responseCurve: curve };
+      savePreset(updatedPreset);
+      setPendingCalibration(null);
+      return;
+    }
+
+    // Fallback: no matching preset — keep writing to the device profile so
+    // the legacy JobCompiler read path still finds the curve.
     const profile = getActiveProfile();
     if (!profile) return;
     const updated: DeviceProfile = {

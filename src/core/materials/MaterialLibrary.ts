@@ -1,7 +1,9 @@
 import type { MaterialPreset, MaterialOperation } from './MaterialPreset';
 import { getDefaultMaterialPresets, isDefaultMaterialPresetId } from './defaultPresets';
-import { type Layer, type LayerMode } from '../scene/Layer';
+import { type Layer, type LaserSettings, type LayerMode } from '../scene/Layer';
 import { MAX_LASER_SPEED } from '../types';
+import { getDeviceProfiles, saveDeviceProfile, type DeviceProfile } from '../devices/DeviceProfile';
+import type { ResponseCurve } from './ResponseCurve';
 
 const STORAGE_KEY = 'laserforge-material-presets';
 
@@ -83,8 +85,15 @@ function operationForMode(preset: MaterialPreset, mode: LayerMode): MaterialOper
 }
 
 /**
- * Apply preset power/speed/passes (and optional image dither/resolution) to a layer.
+ * Apply preset power/speed/passes (and optional image/cut/tabs fields) to a layer,
+ * and stamp `materialPresetId` so JobCompiler can look up compile-time fields
+ * (kerf, zOffset, responseCurve) from the preset later.
+ *
  * Returns null if the preset has no operation for the layer's current mode.
+ *
+ * NOTE: kerf, zOffset, and responseCurve are NOT written onto the layer — they
+ * stay on the preset and are read at compile time via the preset id. This keeps
+ * a single source of truth and avoids stale layer copies of calibration data.
  */
 export function applyMaterialPresetToLayer(layer: Layer, preset: MaterialPreset): Layer | null {
   const mode = layer.settings.mode;
@@ -95,15 +104,113 @@ export function applyMaterialPresetToLayer(layer: Layer, preset: MaterialPreset)
   const speed = Math.max(1, Math.min(MAX_LASER_SPEED, Number(op.speed) || 1));
   const passes = Math.max(1, Math.min(99, Math.round(Number(op.passes) || 1)));
 
-  return {
-    ...layer,
-    settings: {
-      ...layer.settings,
-      power: { ...layer.settings.power, min: Math.min(layer.settings.power.min, powerMax), max: powerMax },
-      speed,
-      passes,
-    },
+  const nextSettings: LaserSettings = {
+    ...layer.settings,
+    power: { ...layer.settings.power, min: Math.min(layer.settings.power.min, powerMax), max: powerMax },
+    speed,
+    passes,
+    materialPresetId: preset.id,
   };
+
+  // Image-mode fields from operation (each applied only when the preset specifies it)
+  if (op.dithering !== undefined) {
+    nextSettings.image = { ...nextSettings.image, dithering: op.dithering };
+  }
+  if (op.dpi !== undefined) {
+    nextSettings.image = { ...nextSettings.image, resolution: op.dpi };
+  }
+  if (op.threshold !== undefined) {
+    nextSettings.image = { ...nextSettings.image, imageThreshold: op.threshold };
+  }
+  if (op.airAssist !== undefined) {
+    nextSettings.airAssist = op.airAssist;
+  }
+
+  // Preset-level fields that DO get mirrored onto the layer
+  if (preset.leadIn !== undefined) {
+    nextSettings.cut = { ...nextSettings.cut, leadIn: preset.leadIn };
+  }
+  if (preset.tabs !== undefined) {
+    nextSettings.tabs = { ...preset.tabs };
+  }
+
+  // kerf, zOffset, responseCurve: consumed at compile time via materialPresetId
+  // lookup; intentionally NOT copied to the layer.
+
+  return { ...layer, settings: nextSettings };
+}
+
+/**
+ * One-time migration: move any DeviceProfile.responseCurves entries onto
+ * matching MaterialPresets (via the new `responseCurve` field). Entries
+ * that were migrated are cleared from the device profile; entries that
+ * couldn't be safely migrated stay put as a fallback read path.
+ *
+ * Idempotent: running twice has no additional effect once all migratable
+ * entries have moved. Safe to call on every app mount.
+ *
+ * Matching rules (applied per curve key):
+ *   1. Candidates = presets whose `material` equals the curve key,
+ *      case-insensitively.
+ *   2. If ANY candidate already has a `responseCurve` set, skip migration
+ *      for this entry and keep it on the device profile. This protects
+ *      fresher user calibration data from being clobbered by older data
+ *      left on the profile.
+ *   3. Otherwise, pick the first user-owned candidate (non-default id).
+ *      This avoids cloning a default preset just because it happens to
+ *      share a material name.
+ *   4. Only if there are no user candidates do we fall back to the first
+ *      default-id candidate — saving it as a new user preset (via
+ *      savePreset's default-id rewrite) so the calibration is preserved.
+ *   5. Anything unmatched remains on the device profile.
+ */
+export function migrateDeviceProfileResponseCurves(): void {
+  const profiles = getDeviceProfiles();
+  let profilesChanged = false;
+
+  for (const profile of profiles) {
+    const curves = profile.responseCurves;
+    if (!curves || Object.keys(curves).length === 0) continue;
+
+    const allPresets = getPresets();
+    const remainingCurves: Record<string, ResponseCurve> = {};
+    let profileHadAnyMigrated = false;
+
+    for (const [materialName, curve] of Object.entries(curves)) {
+      const candidates = allPresets.filter(
+        p => p.material.toLowerCase() === materialName.toLowerCase(),
+      );
+
+      const anyAlreadyCalibrated = candidates.some(p => p.responseCurve !== undefined);
+      if (anyAlreadyCalibrated) {
+        remainingCurves[materialName] = curve;
+        continue;
+      }
+
+      const userMatch = candidates.find(p => !isDefaultMaterialPresetId(p.id));
+      const match = userMatch ?? candidates[0];
+      if (match) {
+        savePreset({ ...match, responseCurve: curve });
+        profileHadAnyMigrated = true;
+      } else {
+        remainingCurves[materialName] = curve;
+      }
+    }
+
+    if (profileHadAnyMigrated) {
+      const updated: DeviceProfile = {
+        ...profile,
+        responseCurves: remainingCurves,
+      };
+      saveDeviceProfile(updated);
+      profilesChanged = true;
+    }
+  }
+
+  if (profilesChanged) {
+    // eslint-disable-next-line no-console
+    console.log('[MaterialLibrary] Migrated response curves to presets');
+  }
 }
 
 export function importPresets(json: string): MaterialPreset[] {

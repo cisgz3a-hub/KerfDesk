@@ -6,7 +6,7 @@ import {
   exportUserMaterials,
   importUserMaterials,
   createUserMaterialFromLayer,
-  type UserMaterial,
+  type UserStarterMaterial,
 } from '../../core/materials/MaterialPresets';
 import { type Scene } from '../../core/scene/Scene';
 import { NumberInput } from './NumberInput';
@@ -18,7 +18,7 @@ interface MaterialLibraryDialogProps {
 }
 
 export function MaterialLibraryDialog({ scene, onClose, onMaterialApplied }: MaterialLibraryDialogProps) {
-  const [materials, setMaterials] = useState<UserMaterial[]>(getUserMaterials());
+  const [materials, setMaterials] = useState<UserStarterMaterial[]>(getUserMaterials());
   const [view, setView] = useState<'list' | 'add'>('list');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
