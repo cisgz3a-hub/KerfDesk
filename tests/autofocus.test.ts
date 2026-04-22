@@ -226,6 +226,22 @@ async function testGrblRunAutoFocus(): Promise<void> {
   }
 
   {
+    const { ctrl, port } = await connectGrbl();
+    const p = ctrl.runAutoFocus('$HZ1', 1000);
+    await flush();
+    // Non-standard Falcon status token should still count as active.
+    port.injectResponse('<Focus|MPos:0.000,0.000,-2.000|FS:0,0>');
+    await flush();
+    port.injectResponse('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    let resolved = false;
+    await p.then(() => {
+      resolved = true;
+    });
+    assert(resolved, 'resolves when active phase uses unknown status token before idle');
+    await ctrl.disconnect();
+  }
+
+  {
     const { ctrl } = await connectGrbl();
     let timedOut = false;
     try {

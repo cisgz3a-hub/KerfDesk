@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { MockSerialPort, type SerialPortLike } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
-import { WebSocketSerialPort } from '../../communication/WebSocketSerialPort';
 import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
@@ -222,8 +221,6 @@ export function ConnectionPanelMain({
   const [isAutoFocusing, setIsAutoFocusing] = useState(false);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
-  const [wifiBridgeHost, setWifiBridgeHost] = useState('localhost');
-  const [wifiBridgePort, setWifiBridgePort] = useState('8765');
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -268,17 +265,6 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessages([]);
     setShowSimulator(false);
-  }, []);
-
-  useEffect(() => {
-    try {
-      const host = localStorage.getItem('laserforge_wifi_bridge_host');
-      const port = localStorage.getItem('laserforge_wifi_bridge_port');
-      if (host) setWifiBridgeHost(host);
-      if (port) setWifiBridgePort(port);
-    } catch {
-      /* ignore */
-    }
   }, []);
 
   useEffect(() => {
@@ -496,65 +482,6 @@ export function ConnectionPanelMain({
       appendMessage('✓ Real laser connected via USB');
     } catch (e: any) {
       appendMessage(`Connection failed: ${e.message}`);
-    }
-  };
-
-  const connectWifiLaser = async () => {
-    console.log('WiFi button clicked');
-    const ctrl = controllerRef.current;
-    if (!ctrl) {
-      appendMessage('ERROR: Controller not ready');
-      console.error('WiFi connect: controller missing');
-      return;
-    }
-    const host = wifiBridgeHost.trim() || 'localhost';
-    const parsedPort = Number.parseInt(wifiBridgePort.trim(), 10);
-    if (!Number.isFinite(parsedPort) || parsedPort <= 0 || parsedPort > 65535) {
-      appendMessage('ERROR: WiFi bridge port must be 1-65535');
-      console.warn('WiFi connect: invalid port', wifiBridgePort);
-      return;
-    }
-
-    const electronAPI = (window as { electronAPI?: { startBridge?: (ip: string, port: number) => Promise<{ ok: boolean; error?: string }> } }).electronAPI;
-    if (electronAPI?.startBridge) {
-      appendMessage('Starting WiFi bridge...');
-      try {
-        const result = await electronAPI.startBridge('192.168.0.1', parsedPort);
-        if (!result.ok) {
-          appendMessage(`Bridge start failed: ${result.error ?? 'unknown error'}`);
-          return;
-        }
-        appendMessage('Bridge started');
-      } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : String(e);
-        appendMessage(`Bridge start error: ${msg}`);
-        console.error('Bridge start failed', e);
-        /* Continue anyway — bridge might already be running externally */
-      }
-    }
-
-    const url = `ws://${host}:${parsedPort}`;
-    const wsPort = createSerialPort('websocket') as WebSocketSerialPort;
-    portRef.current = wsPort;
-    try {
-      appendMessage(`Connecting to WiFi bridge ${url} ...`);
-      await wsPort.connect(url);
-      await ctrl.connect(wsPort);
-      try {
-        localStorage.setItem('laserforge_wifi_bridge_host', host);
-        localStorage.setItem('laserforge_wifi_bridge_port', String(parsedPort));
-      } catch {
-        /* ignore */
-      }
-      setSimulator(false);
-      const ok = '✓ Connected to laser via WiFi';
-      appendMessage(ok);
-      console.log(ok);
-    } catch (e: unknown) {
-      portRef.current = null;
-      const msg = e instanceof Error ? e.message : String(e);
-      appendMessage(`Connection failed: ${msg}`);
-      console.error('WiFi connect failed', e);
     }
   };
 
@@ -1033,12 +960,7 @@ export function ConnectionPanelMain({
 
   const connectSection = React.createElement(ConnectWizard, {
     webSerialSupported: WebSerialPort.isSupported(),
-    wifiBridgeHost,
-    setWifiBridgeHost,
-    wifiBridgePort,
-    setWifiBridgePort,
     onConnectUsb: () => { void connectRealLaser(); },
-    onConnectWifi: () => { void connectWifiLaser(); },
     onConnectSimulator: () => { void connectSimulator(); },
   });
 

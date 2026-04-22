@@ -453,6 +453,7 @@ export class GrblController implements LaserController {
         completed = true;
         clearTimeout(timer);
         unsubState();
+        unsubRaw();
       };
 
       const unsubState = this.onStateChange((next) => {
@@ -468,6 +469,16 @@ export class GrblController implements LaserController {
         if (sawActiveState && next.status === 'idle') {
           cleanup();
           resolve();
+        }
+      });
+      const unsubRaw = this.onRawLine((line, direction) => {
+        if (direction !== 'rx') return;
+        if (!(line.startsWith('<') && line.endsWith('>'))) return;
+        const token = line.slice(1, -1).split('|')[0]?.toLowerCase() ?? '';
+        // Falcon firmware can emit non-standard states during $HZ1; treat any
+        // non-idle/non-alarm status token as active so success doesn't false-timeout.
+        if (token.length > 0 && token !== 'idle' && !token.startsWith('alarm')) {
+          sawActiveState = true;
         }
       });
 
