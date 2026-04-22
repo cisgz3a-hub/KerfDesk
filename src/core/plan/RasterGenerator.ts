@@ -22,6 +22,7 @@
  */
 
 import { type ProcessedBitmap } from '../job/Job';
+import { darknessToPower, type ResponseCurve } from '../materials/ResponseCurve';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
@@ -51,6 +52,7 @@ export interface RasterSettings {
   speed: number;           // mm/min
   biDirectional: boolean;
   overscanning: number;    // mm extension beyond segment boundaries
+  responseCurve?: ResponseCurve;
 }
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
@@ -155,9 +157,19 @@ function extractSegments1Bit(
 // ─── GRAYSCALE (VARIABLE S) SEGMENT EXTRACTION ───────────────────
 
 /** Map luminance 0–255 (dark→light) to laser power %; white → powerMin, black → powerMax. */
-export function luminanceToLaserPower(pixelValue: number, powerMin: number, powerMax: number): number {
+export function luminanceToLaserPower(
+  pixelValue: number,
+  powerMin: number,
+  powerMax: number,
+  responseCurve?: ResponseCurve,
+): number {
   const v = Math.max(0, Math.min(255, pixelValue));
-  return Math.round(powerMin + (powerMax - powerMin) * (1 - v / 255));
+  const darknessNormalized = 1 - v / 255;
+  if (responseCurve) {
+    const mapped = darknessToPower(responseCurve, darknessNormalized);
+    return Math.round(Math.max(powerMin, Math.min(powerMax, mapped)));
+  }
+  return Math.round(powerMin + (powerMax - powerMin) * darknessNormalized);
 }
 
 /**
@@ -193,7 +205,12 @@ function extractSegmentsGrayscale(
 
   for (let col = 0; col < width; col++) {
     const lum = data[rowStart + col];
-    const S = luminanceToLaserPower(lum, settings.powerMin, settings.powerMax);
+    const S = luminanceToLaserPower(
+      lum,
+      settings.powerMin,
+      settings.powerMax,
+      settings.responseCurve,
+    );
 
     if (S <= 0) {
       flush(col);

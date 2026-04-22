@@ -33,6 +33,8 @@ const files = [
   'response-curve.test.ts',
   'calibration-grid.test.ts',
   'calibrate-dialog.test.ts',
+  'calibration-analyzer.test.ts',
+  'raster-with-curve.test.ts',
   'image-processing.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',

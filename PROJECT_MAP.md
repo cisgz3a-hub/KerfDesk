@@ -127,6 +127,24 @@ Scene → Job → Plan → Output → Device
 
 ---
 
+### /src/core/materials/ResponseCurve.ts
+- **Responsibility**: D.13 material response curve model (power→darkness samples) with interpolation utilities and validation guards.
+- **Exports**: `ResponseCurve`, `ResponseCurvePoint`, `powerToDarkness()`, `darknessToPower()`, `validateCurve()`
+
+### /src/core/materials/CalibrationGrid.ts
+- **Responsibility**: Emits one-square-per-power calibration grids as scene objects plus per-step layers and square metadata for photo analysis.
+- **Exports**: `emitCalibrationGrid()`, `CalibrationGridOptions`, `CalibrationGridResult`
+
+### /src/core/materials/CalibrationAnalyzer.ts
+- **Responsibility**: Maps ROI photo pixels to calibration squares, measures luminance/darkness, drops non-monotonic samples, and builds validated `ResponseCurve` output.
+- **Exports**: `analyzeCalibrationPhoto()`, `AnalyzePhotoInput`, `AnalyzePhotoResult`
+
+### /src/ui/components/materials/CalibrateMaterialDialog.tsx
+- **Responsibility**: D.13 UI flow: configure calibration grid, burn instructions, upload photo + ROI selection, analyze preview, and save curve callback to app state/profile persistence.
+- **Depends on**: `CalibrationGrid.ts`, `CalibrationAnalyzer.ts`, `ResponseCurve.ts`
+
+---
+
 ### /src/core/plan/Simulation.ts
 - **Responsibility**: Simulates execution of a Plan by stepping through every Move and producing a timeline of SimulationFrames. Each frame is a snapshot: time, position, laser state, power, speed, operation metadata, and progress. Provides four output modes: event-based frames (compact, for path drawing), interpolated frames at fixed intervals (for smooth animation), laser path extraction (only segments where laser is ON), and binary-search frame-at-time lookup. Uses trapezoidal velocity model for time estimation.
 - **Exports**: `simulatePlan(plan, config): SimulationResult`, `interpolateFrames(result, intervalMs): SimulationFrame[]`, `extractLaserPath(result): PathSegment[]`, `getFrameAtTime(result, time): SimulationFrame`, `SimulationFrame`, `SimulationConfig`, `SimulationResult`

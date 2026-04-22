@@ -598,6 +598,7 @@ function planRasterOperation(
     speed: settings.speed,
     biDirectional: settings.fillBiDirectional,
     overscanning: settings.overscanning,
+    responseCurve: settings.responseCurve,
   };
 
   const scanlines = generateRasterScanlines(bitmap, rasterSettings);

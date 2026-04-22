@@ -85,6 +85,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
   const optimizeOrder = options?.optimizeOrder ?? scene.compileOptions?.optimizeOrder !== false;
   const compileOpts = options;
+  const sceneMaterialName = scene.material?.name ?? null;
 
   let totalObjects = 0;
 
@@ -96,7 +97,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of objects) {
           if (!obj.visible || obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj], compileOpts);
+          const imgOp = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
           if (imgOp) {
             job.operations.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -106,7 +107,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
         continue;
       }
 
-      const operation = compileOperation(layer, objects, compileOpts);
+      const operation = compileOperation(layer, objects, sceneMaterialName, compileOpts);
       if (operation) {
         job.operations.push(operation);
         job.bounds = mergeAABB(job.bounds, operation.bounds);
@@ -129,7 +130,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of orderedObjs) {
           if (obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj], compileOpts);
+          const imgOp = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
           if (imgOp) {
             rasterOps.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -143,7 +144,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       const sceneIndexById = new Map(scene.objects.map((o, i) => [o.id, i]));
 
       for (const obj of orderedObjs) {
-        const op = compileOperation(layer, [obj], compileOpts);
+        const op = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
         if (!op) continue;
         if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') continue;
         const shape = vectorOpToOrderableShape(op, phase, sceneIndexById.get(obj.id) ?? 0);
@@ -193,10 +194,11 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
 function compileOperation(
   layer: Layer,
   objects: SceneObject[],
+  sceneMaterialName: string | null,
   jobOpts?: CompileJobOptions,
 ): Operation | null {
   const type = mapModeToType(layer.settings.mode);
-  const settings = resolveSettings(layer, jobOpts);
+  const settings = resolveSettings(layer, sceneMaterialName, jobOpts);
   const geometry = compileGeometry(type, layer, objects);
 
   if (!geometry) return null;
@@ -246,9 +248,18 @@ function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType 
  * Convert Layer's LaserSettings into fully resolved ResolvedLaserSettings.
  * No nulls, no defaults, no conditional logic downstream.
  */
-function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLaserSettings {
+function resolveSettings(
+  layer: Layer,
+  sceneMaterialName: string | null,
+  jobOpts?: CompileJobOptions,
+): ResolvedLaserSettings {
   const s = layer.settings;
   const profile = getActiveProfile();
+  const responseCurve =
+    sceneMaterialName != null && sceneMaterialName.trim().length > 0
+      ? profile?.responseCurves?.[sceneMaterialName]
+      : undefined;
+
   const detectedAccel = jobOpts?.machineAccelMmPerS2;
   const accelFromProfile = profile?.maxAccelMmPerS2 ?? 1000;
   const maxAccelMmPerS2 =
@@ -330,6 +341,7 @@ function resolveSettings(layer: Layer, jobOpts?: CompileJobOptions): ResolvedLas
     minPowerRatioAccel,
 
     scanningOffsets,
+    responseCurve,
   };
 }
 

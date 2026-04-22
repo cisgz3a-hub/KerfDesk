@@ -4,18 +4,19 @@ import {
   type CalibrationGridOptions,
   type CalibrationGridResult,
 } from '../../../core/materials/CalibrationGrid';
+import {
+  analyzeCalibrationPhoto,
+  type AnalyzePhotoResult,
+} from '../../../core/materials/CalibrationAnalyzer';
+import { type ResponseCurve } from '../../../core/materials/ResponseCurve';
 
-type Stage = 'configure' | 'burn' | 'analyze';
+type Stage = 'configure' | 'burn' | 'analyze' | 'review';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   onGridEmitted: (result: CalibrationGridResult) => void;
-  onPhotoReady?: (
-    photoData: ImageData,
-    result: CalibrationGridResult,
-    roi: { x: number; y: number; width: number; height: number },
-  ) => void;
+  onCurveReady: (curve: ResponseCurve, measurements: AnalyzePhotoResult['measurements']) => void;
   initialResult?: CalibrationGridResult | null;
   initialStage?: Stage;
   emitGridFn?: (opts: CalibrationGridOptions) => CalibrationGridResult;
@@ -24,7 +25,8 @@ interface Props {
 export function getStageLabel(stage: Stage): string {
   if (stage === 'configure') return 'Configure';
   if (stage === 'burn') return 'Burn';
-  return 'Analyze';
+  if (stage === 'analyze') return 'Analyze';
+  return 'Review';
 }
 
 export function buildCalibrationGridOptions(form: {
@@ -47,7 +49,7 @@ export function CalibrateMaterialDialog({
   isOpen,
   onClose,
   onGridEmitted,
-  onPhotoReady,
+  onCurveReady,
   initialResult = null,
   initialStage,
   emitGridFn = emitCalibrationGrid,
@@ -61,6 +63,9 @@ export function CalibrateMaterialDialog({
   const [gridResult, setGridResult] = useState<CalibrationGridResult | null>(initialResult);
   const [photoLoaded, setPhotoLoaded] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalyzePhotoResult | null>(null);
+  const [reviewMeasurementRows, setReviewMeasurementRows] = useState<AnalyzePhotoResult['measurements']>([]);
   const [roi, setRoi] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -101,6 +106,9 @@ export function CalibrateMaterialDialog({
     const emitted = emitGridFn(opts);
     setGridResult(emitted);
     onGridEmitted(emitted);
+    setAnalysisError(null);
+    setAnalysisResult(null);
+    setReviewMeasurementRows([]);
     setStage('burn');
   };
 
@@ -131,6 +139,9 @@ export function CalibrateMaterialDialog({
       ctx.drawImage(img, 0, 0);
       setPhotoLoaded(true);
       setPhotoError(null);
+      setAnalysisError(null);
+      setAnalysisResult(null);
+      setReviewMeasurementRows([]);
       setRoi(null);
       setDragStart(null);
     };
@@ -170,16 +181,44 @@ export function CalibrateMaterialDialog({
     setDragStart(null);
   };
 
-  const handleAnalyze = () => {
+  const handleAnalyze = (): void => {
     if (!analyzeEnabled || !resultForAnalyze || !roi) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    onPhotoReady?.(imageData, resultForAnalyze, roi);
-    onClose();
+    const calibrationSpeed = scanSpeed;
+    const analyzed = analyzeCalibrationPhoto({
+      photo: imageData,
+      roi,
+      grid: resultForAnalyze,
+      calibrationSpeed,
+      materialName: materialName.trim(),
+    });
+    if (!analyzed.ok) {
+      setAnalysisError(analyzed.error);
+      setAnalysisResult(null);
+      return;
+    }
+    setAnalysisError(null);
+    setAnalysisResult(analyzed);
+    setReviewMeasurementRows(analyzed.measurements);
+    setStage('review');
   };
+
+  const reviewPath = useMemo(() => {
+    if (!analysisResult?.ok || analysisResult.curve.points.length === 0) return '';
+    const width = 300;
+    const height = 180;
+    const pad = 20;
+    const pts = analysisResult.curve.points.map((p) => {
+      const x = pad + (p.commandedPower / 100) * (width - pad * 2);
+      const y = height - pad - p.observedDarkness * (height - pad * 2);
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    return pts.join(' ');
+  }, [analysisResult]);
 
   return React.createElement('div', {
     style: {
@@ -327,6 +366,8 @@ export function CalibrateMaterialDialog({
           setPhotoLoaded(false);
           setRoi(null);
           setPhotoError(null);
+            setAnalysisError(null);
+            setAnalysisResult(null);
           const canvas = canvasRef.current;
           const ctx = canvas?.getContext('2d');
           if (canvas && ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -351,6 +392,7 @@ export function CalibrateMaterialDialog({
         ? `ROI: x ${Math.round(roi.x)}, y ${Math.round(roi.y)}, w ${Math.round(roi.width)}, h ${Math.round(roi.height)}`
         : 'Draw ROI by click-dragging over the grid area.',
     ),
+      analysisError && React.createElement('div', { style: { fontSize: 11, color: '#ff6b6b' } }, analysisError),
     React.createElement('button', {
       type: 'button',
       disabled: !analyzeEnabled,
@@ -368,6 +410,78 @@ export function CalibrateMaterialDialog({
       },
     }, 'Analyze'),
   ),
+
+    stage === 'review' && React.createElement(React.Fragment, null,
+      React.createElement('div', { style: { fontSize: 12, color: '#c0c0d0' } }, 'Calibration curve preview'),
+      React.createElement('svg', {
+        width: 300,
+        height: 180,
+        style: { border: '1px solid #252540', borderRadius: 8, background: '#0a0a14' },
+      },
+      React.createElement('line', { x1: 20, y1: 160, x2: 280, y2: 160, stroke: '#2a2a44', strokeWidth: 1 }),
+      React.createElement('line', { x1: 20, y1: 20, x2: 20, y2: 160, stroke: '#2a2a44', strokeWidth: 1 }),
+      reviewPath.length > 0 && React.createElement('polyline', {
+        points: reviewPath,
+        fill: 'none',
+        stroke: '#00d4ff',
+        strokeWidth: 2,
+      }),
+      analysisResult?.ok && analysisResult.curve.points.map((p, i) =>
+        React.createElement('circle', {
+          key: `${p.commandedPower}-${i}`,
+          cx: 20 + (p.commandedPower / 100) * 260,
+          cy: 160 - p.observedDarkness * 140,
+          r: 2.8,
+          fill: '#2dd4a0',
+        }),
+      ),
+      ),
+      React.createElement('div', {
+        style: {
+          border: '1px solid #1a1a2e',
+          borderRadius: 8,
+          overflow: 'auto',
+          maxHeight: 220,
+          fontSize: 11,
+        },
+      },
+      React.createElement('table', { style: { width: '100%', borderCollapse: 'collapse' } },
+        React.createElement('thead', null,
+          React.createElement('tr', { style: { color: '#8888aa', background: '#0a0a14' } },
+            React.createElement('th', { style: { textAlign: 'left', padding: 6 } }, '#'),
+            React.createElement('th', { style: { textAlign: 'left', padding: 6 } }, 'Power %'),
+            React.createElement('th', { style: { textAlign: 'left', padding: 6 } }, 'Darkness'),
+          ),
+        ),
+        React.createElement('tbody', null,
+          reviewMeasurementRows.map((m) => React.createElement('tr', { key: `m-${m.index}` },
+            React.createElement('td', { style: { padding: 6, color: '#c0c0d0' } }, String(m.index)),
+            React.createElement('td', { style: { padding: 6, color: '#c0c0d0' } }, m.commandedPower.toFixed(2)),
+            React.createElement('td', { style: { padding: 6, color: '#c0c0d0' } }, m.observedDarkness.toFixed(4)),
+          )),
+        ),
+      )),
+      React.createElement('button', {
+        type: 'button',
+        disabled: !analysisResult?.ok,
+        onClick: () => {
+          if (!analysisResult?.ok) return;
+          onCurveReady(analysisResult.curve, analysisResult.measurements);
+          onClose();
+        },
+        style: {
+          alignSelf: 'flex-start',
+          padding: '9px 12px',
+          border: '1px solid #2dd4a0',
+          borderRadius: 8,
+          background: 'rgba(45,212,160,0.08)',
+          color: '#2dd4a0',
+          cursor: analysisResult?.ok ? 'pointer' : 'default',
+          opacity: analysisResult?.ok ? 1 : 0.5,
+          fontFamily: font,
+        },
+      }, 'Save curve'),
+    ),
   ),
 
   React.createElement('div', {

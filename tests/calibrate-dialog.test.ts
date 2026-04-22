@@ -42,6 +42,7 @@ const configureHtml = renderToStaticMarkup(
     isOpen: true,
     onClose: () => {},
     onGridEmitted: () => {},
+    onCurveReady: () => {},
   }),
 );
 assert(configureHtml.includes('Calibrate Material'), 'dialog mounts without throwing');
@@ -52,6 +53,7 @@ const burnHtml = renderToStaticMarkup(
     isOpen: true,
     onClose: () => {},
     onGridEmitted: () => {},
+    onCurveReady: () => {},
     initialResult: result,
     initialStage: 'burn',
   }),
@@ -63,6 +65,7 @@ const analyzeHtml = renderToStaticMarkup(
     isOpen: true,
     onClose: () => {},
     onGridEmitted: () => {},
+    onCurveReady: () => {},
     initialResult: result,
     initialStage: 'analyze',
   }),

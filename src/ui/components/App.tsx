@@ -79,6 +79,7 @@ import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
+import { type ResponseCurve } from '../../core/materials/ResponseCurve';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
@@ -522,7 +523,7 @@ export function App() {
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
   const [textPreviewFontReady, setTextPreviewFontReady] = useState(true);
   const [lastCalibrationGridResult, setLastCalibrationGridResult] = useState<CalibrationGridResult | null>(null);
-  const [pendingCalibration, setPendingCalibration] = useState<{
+  const [, setPendingCalibration] = useState<{
     photoData: ImageData;
     result: CalibrationGridResult;
     roi: { x: number; y: number; width: number; height: number };
@@ -1210,15 +1211,23 @@ export function App() {
     handleSceneCommit(nextScene);
   }, [scene, handleSceneCommit]);
 
-  const handleCalibrationPhotoReady = useCallback((
-    photoData: ImageData,
-    result: CalibrationGridResult,
-    roi: { x: number; y: number; width: number; height: number },
+  const handleCalibrationCurveReady = useCallback((
+    curve: ResponseCurve,
+    _measurements: Array<{ index: number; commandedPower: number; meanLuminance: number; observedDarkness: number }>,
   ) => {
-    setPendingCalibration({ photoData, result, roi });
-    // TODO D.13 Phase 1 Step 4: pass to analyzeCalibrationPhoto()
-    console.log('Photo ready for analysis, squares:', result.squares.length);
-  }, []);
+    const profile = getActiveProfile();
+    if (!profile) return;
+    const updated: DeviceProfile = {
+      ...profile,
+      responseCurves: {
+        ...(profile.responseCurves ?? {}),
+        [curve.materialName]: curve,
+      },
+    };
+    saveDeviceProfile(updated);
+    refreshProfiles();
+    setPendingCalibration(null);
+  }, [refreshProfiles]);
 
   const {
     handleKerfGenerateTest,
@@ -1679,7 +1688,7 @@ export function App() {
       isOpen: showCalibrateMaterial,
       onClose: () => setShowCalibrateMaterial(false),
       onGridEmitted: handleCalibrationGridEmitted,
-      onPhotoReady: handleCalibrationPhotoReady,
+      onCurveReady: handleCalibrationCurveReady,
       initialResult: lastCalibrationGridResult,
       initialStage: lastCalibrationGridResult ? 'burn' : 'configure',
     }),

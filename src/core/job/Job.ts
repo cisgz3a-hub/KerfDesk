@@ -18,6 +18,7 @@
 import { type AABB, type Point, emptyAABB, generateId } from '../types';
 import { type FillMode, type ImageRasterMode } from '../scene/Layer';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { type ResponseCurve } from '../materials/ResponseCurve';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -115,6 +116,9 @@ export interface ResolvedLaserSettings {
 
   /** Raster: scanning offset table (empty = no lateral shift). */
   scanningOffsets: ScanningOffsetTable;
+
+  /** Optional material response curve for raster power mapping. */
+  responseCurve?: ResponseCurve;
 }
 
 // ─── OPERATION ───────────────────────────────────────────────────
