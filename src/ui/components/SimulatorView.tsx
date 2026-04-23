@@ -7,7 +7,7 @@ interface SimulatorViewProps {
   bedWidth: number;
   bedHeight: number;
   originCorner: MachineOriginCorner;
-  /** GRBL work position when idle (e.g. after jog); ignored while jobRunning */
+  /** GRBL work position (WPos from status); drives head marker always — MPos is source of truth */
   liveHead: { x: number; y: number } | null;
   jobRunning: boolean;
 }
@@ -54,6 +54,8 @@ export function SimulatorView({
   });
   const pathRef = useRef<Array<{ from: { x: number; y: number }; to: { x: number; y: number }; power: number }>>([]);
   const zeroRef = useRef<{ x: number; y: number } | null>(null);
+  /** Running XY for gcode echo (trail segments). Kept in sync with state when idle; advances on every move line during jobs while state.x/y follow liveHead. */
+  const trailCursorRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
   const drawRef = useRef<() => void>(() => {});
 
   const font = "'DM Sans', system-ui, sans-serif";
@@ -170,6 +172,7 @@ export function SimulatorView({
   const processLine = useCallback(
     (line: string) => {
       const state = stateRef.current;
+      const trail = trailCursorRef.current;
       const upper = line.trim().toUpperCase();
       if (!upper || upper.startsWith(';')) return;
       if (upper === '?' || upper === '') return;
@@ -178,8 +181,10 @@ export function SimulatorView({
         const xMatch = upper.match(/X([-\d.]+)/);
         const yMatch = upper.match(/Y([-\d.]+)/);
         const isInc = upper.includes('G91');
-        let newX = state.x;
-        let newY = state.y;
+        const bx = jobRunning ? trail.x : state.x;
+        const by = jobRunning ? trail.y : state.y;
+        let newX = bx;
+        let newY = by;
         if (isInc) {
           if (xMatch) newX += parseFloat(xMatch[1]);
           if (yMatch) newY += parseFloat(yMatch[1]);
@@ -187,8 +192,11 @@ export function SimulatorView({
           if (xMatch) newX = parseFloat(xMatch[1]) + state.workOffsetX;
           if (yMatch) newY = parseFloat(yMatch[1]) + state.workOffsetY;
         }
-        state.x = newX;
-        state.y = newY;
+        trailCursorRef.current = { x: newX, y: newY };
+        if (!jobRunning) {
+          state.x = newX;
+          state.y = newY;
+        }
         drawRef.current();
         return;
       }
@@ -247,8 +255,10 @@ export function SimulatorView({
         const inlineS = upper.match(/S([-\d.]+)/);
         if (inlineS) state.laserPower = parseFloat(inlineS[1]);
 
-        let newX = state.x;
-        let newY = state.y;
+        const bx = jobRunning ? trail.x : state.x;
+        const by = jobRunning ? trail.y : state.y;
+        let newX = bx;
+        let newY = by;
         if (incremental) {
           if (xMatch) newX += parseFloat(xMatch[1]);
           if (yMatch) newY += parseFloat(yMatch[1]);
@@ -263,19 +273,23 @@ export function SimulatorView({
         const isG1Move = isG1 || (!isG0 && state.laserOn);
         if (isG1Move && state.laserOn && state.laserPower > 0) {
           pathRef.current.push({
-            from: { x: state.x, y: state.y },
+            from: { x: bx, y: by },
             to: { x: newX, y: newY },
             power: state.laserPower,
           });
         }
 
-        state.x = newX;
-        state.y = newY;
+        trailCursorRef.current = { x: newX, y: newY };
+        // Echo position: only drives head when idle. During a job, liveHead (MPos/WPos) drives the marker — see useEffect below.
+        if (!jobRunning) {
+          state.x = newX;
+          state.y = newY;
+        }
       }
 
       drawRef.current();
     },
-    [],
+    [jobRunning],
   );
 
   useEffect(() => {
@@ -283,12 +297,18 @@ export function SimulatorView({
   }, [onSubscribe, processLine]);
 
   useEffect(() => {
-    if (jobRunning || !liveHead) return;
+    if (!liveHead) return;
     const s = stateRef.current;
     s.x = liveHead.x + s.workOffsetX;
     s.y = liveHead.y + s.workOffsetY;
     drawRef.current();
-  }, [liveHead?.x, liveHead?.y, jobRunning]);
+  }, [liveHead?.x, liveHead?.y]);
+
+  /** Keep echo trail cursor aligned with machine/head when toggling job mode so the next gcode line parses from the right base. */
+  useEffect(() => {
+    const s = stateRef.current;
+    trailCursorRef.current = { x: s.x, y: s.y };
+  }, [jobRunning]);
 
   useEffect(() => {
     draw();
@@ -334,6 +354,7 @@ export function SimulatorView({
               workOffsetY: 0,
               isAbsolute: true,
             };
+            trailCursorRef.current = { x: 0, y: 0 };
             drawRef.current();
           },
           style: {
