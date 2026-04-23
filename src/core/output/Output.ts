@@ -175,10 +175,26 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         'G90 ; absolute positioning',
         this.encodeLaserOff(),
       ].join('\n');
+
+    // Head mode: zero the GRBL work coordinate system at the head's current
+    // physical position so the design's (0,0) corner maps to wherever the user
+    // jogged. The post-connect handshake sets WCS to machine origin via
+    // G10 L2 P1 X0 Y0 Z0, so without this line Head-mode jobs would execute
+    // at the bed corner instead of the jogged position. Bed (absolute) and
+    // savedOrigin modes intentionally skip this and rely on WCS==machine.
+    const headZero = options?.startMode === 'current'
+      ? 'G10 L20 P1 X0 Y0 ; zero WCS at head position (Head mode)'
+      : null;
+
     const extra = options?.customStartGcode?.trim();
-    if (!extra) return base;
-    const lines = extra.split(/\r?\n/).map(l => l.trimEnd()).filter(l => l.length > 0);
-    return lines.length ? [base, ...lines].join('\n') : base;
+    const extraLines = extra
+      ? extra.split(/\r?\n/).map(l => l.trimEnd()).filter(l => l.length > 0)
+      : [];
+
+    const parts: string[] = [base];
+    if (headZero) parts.push(headZero);
+    if (extraLines.length) parts.push(...extraLines);
+    return parts.join('\n');
   }
 
   encodeRapid(to: { x: number; y: number }): string {

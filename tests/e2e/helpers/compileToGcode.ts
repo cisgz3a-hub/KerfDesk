@@ -20,11 +20,13 @@ export interface CompileOptions {
  * (timestamps, ids, versions) so snapshots are byte-stable.
  */
 export function compileSceneToGcode(scene: Scene, opts: CompileOptions = {}): string {
+  const startMode = opts.startMode ?? 'current';
+  const savedOrigin = opts.savedOrigin ?? null;
   const job = compileJob(scene);
   const plan = optimizePlan(job);
   const machineTransform = applyMachineTransform(plan, {
-    startMode: opts.startMode ?? 'current',
-    savedOrigin: opts.savedOrigin ?? null,
+    startMode,
+    savedOrigin,
     originCorner: opts.originCorner ?? 'front-left',
     bedHeightMm: scene.canvas.height,
   });
@@ -32,7 +34,11 @@ export function compileSceneToGcode(scene: Scene, opts: CompileOptions = {}): st
   const strategy = getOutputStrategy('grbl');
   if (!strategy) throw new Error('GRBL output strategy not registered');
 
-  const output = strategy.generate(machinePlan, job, { returnPosition });
+  const output = strategy.generate(machinePlan, job, {
+    startMode,
+    savedOrigin,
+    returnPosition,
+  });
   if (!output.text) throw new Error('Compile produced no text output');
 
   return normalize(output.text);

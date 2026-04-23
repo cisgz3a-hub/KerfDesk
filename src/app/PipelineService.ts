@@ -123,6 +123,8 @@ export async function compileGcode(
   if (!strategy) return null;
 
   const output = strategy.generate(machineTransform.plan, job, {
+    startMode,
+    savedOrigin,
     returnPosition: (profile?.returnToOrigin ?? true)
       ? machineTransform.returnPosition
       : null,
