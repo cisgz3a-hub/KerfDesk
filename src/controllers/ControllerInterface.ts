@@ -49,7 +49,22 @@ export interface JobProgress {
 export type StateChangeCallback = (state: MachineState) => void;
 export type ProgressCallback = (progress: JobProgress) => void;
 export type ErrorCallback = (code: number, message: string) => void;
-export type RawLineCallback = (line: string, direction: 'tx' | 'rx') => void;
+/**
+ * Called for each line crossing the serial boundary.
+ *
+ * @param line      The raw line text (no trailing newline).
+ * @param direction 'tx' = app → machine, 'rx' = machine → app.
+ * @param kind      'user' (default) for lines a user typed or that
+ *                  originated from a scene job. 'system' for lines
+ *                  the controller emits automatically on its own
+ *                  behalf (post-connect handshake, internal config).
+ *                  Consumers that don't care can ignore this arg.
+ */
+export type RawLineCallback = (
+  line: string,
+  direction: 'tx' | 'rx',
+  kind?: 'user' | 'system',
+) => void;
 export type Unsubscribe = () => void;
 
 export interface LaserController {

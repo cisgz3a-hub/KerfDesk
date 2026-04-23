@@ -321,7 +321,7 @@ export class GrblController implements LaserController {
         this._sendRealtime(REALTIME_FEED_HOLD);
         await new Promise(r => setTimeout(r, 50));
         this._port.write('M5 S0\n');
-        this._emitRawLine('M5 S0', 'tx');
+        this._emitRawLine('M5 S0', 'tx', 'user');
       } catch {
         // Best effort — port may already be closing or in error state
       }
@@ -811,7 +811,18 @@ export class GrblController implements LaserController {
   private _writeLine(line: string): void {
     if (!this._port?.isOpen) return;
     this._port.write(line + '\n');
-    this._emitRawLine(line, 'tx');
+    this._emitRawLine(line, 'tx', 'user');
+  }
+
+  /**
+   * Like _writeLine, but tags the emission as 'system' so consumers
+   * can visually distinguish handshake / internal config traffic from
+   * user-driven commands. Used for post-connect $$ / G10 / $10 only.
+   */
+  private _writeSystemLine(line: string): void {
+    if (!this._port?.isOpen) return;
+    this._port.write(line + '\n');
+    this._emitRawLine(line, 'tx', 'system');
   }
 
   private _sendRealtime(byte: number): void {
@@ -870,9 +881,13 @@ export class GrblController implements LaserController {
     }
   }
 
-  private _emitRawLine(line: string, direction: 'tx' | 'rx'): void {
+  private _emitRawLine(
+    line: string,
+    direction: 'tx' | 'rx',
+    kind: 'user' | 'system' = 'user',
+  ): void {
     for (const cb of this._rawLineListeners) {
-      cb(line, direction);
+      cb(line, direction, kind);
     }
   }
 
@@ -913,7 +928,7 @@ export class GrblController implements LaserController {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = true;
-    this._writeLine('$$');
+    this._writeSystemLine('$$');
   }
 
   /** Returns true if `line` was a `$N=value` setting (stored in `_grblSettings`). */
@@ -985,8 +1000,8 @@ export class GrblController implements LaserController {
     this._settingsQueried = true;
     // LaserForge G-code assumes a predictable WCS + status mask. Without this, stale
     // G54 offsets or $10 masks from other software cause jobs in the wrong place / wrong parser behavior.
-    this._writeLine('G10 L2 P1 X0 Y0 Z0');
-    this._writeLine('$10=0');
+    this._writeSystemLine('G10 L2 P1 X0 Y0 Z0');
+    this._writeSystemLine('$10=0');
     console.log(
       '[GRBL] Machine: ' +
         this._bedWidth +

@@ -1551,14 +1551,37 @@ export function ConnectionPanelMain({
         messages.length === 0
           ? React.createElement('span', { style: { color: '#333355' } }, 'Console…')
           : messages.map((msg, i) =>
-              React.createElement('div', { key: i, style: { color: msg.startsWith('ERROR') || msg.startsWith('⚠') ? '#ff4466' : msg.startsWith('>') ? '#00d4ff' : msg.startsWith('✓') ? '#2dd4a0' : '#555570' } }, msg),
+              React.createElement('div', {
+                key: i,
+                style: {
+                  color: msg.startsWith('[sys]')
+                    ? '#3a3a55'
+                    : msg.startsWith('ERROR') || msg.startsWith('⚠')
+                      ? '#ff4466'
+                      : msg.startsWith('>')
+                        ? '#00d4ff'
+                        : msg.startsWith('✓')
+                          ? '#2dd4a0'
+                          : '#555570',
+                  fontStyle: msg.startsWith('[sys]') ? 'italic' : 'normal',
+                },
+              }, msg),
             ),
       ),
       !productionMode && messages.length > 0 && React.createElement('div', {
         style: { fontSize: 10, color: '#555570', lineHeight: 1.4 },
       }, React.createElement('span', {
-        style: { color: messages[messages.length - 1].startsWith('✓') ? '#2dd4a0' : messages[messages.length - 1].startsWith('ERROR') ? '#ff4466' : '#8888aa' } },
-      messages[messages.length - 1])),
+        style: {
+          color: messages[messages.length - 1].startsWith('[sys]')
+            ? '#3a3a55'
+            : messages[messages.length - 1].startsWith('✓')
+              ? '#2dd4a0'
+              : messages[messages.length - 1].startsWith('ERROR')
+                ? '#ff4466'
+                : '#8888aa',
+          fontStyle: messages[messages.length - 1].startsWith('[sys]') ? 'italic' : 'normal',
+        },
+      }, messages[messages.length - 1])),
       productionMode && jobProgress && React.createElement('div', {
         style: {
           fontSize: 10,

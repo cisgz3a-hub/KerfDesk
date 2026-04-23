@@ -109,15 +109,17 @@ export class MachineService {
       }
     });
 
-    const unsubRaw = controller.onRawLine((line, dir) => {
-      recordingSink.appendConsoleLine(`${dir === 'tx' ? '>' : '<'} ${line}`);
+    const unsubRaw = controller.onRawLine((line, dir, kind) => {
+      const sysTag = kind === 'system' ? '[sys] ' : '';
+      const arrow = dir === 'tx' ? '>' : '<';
+      recordingSink.appendConsoleLine(`${sysTag}${arrow} ${line}`);
       const r = this.activeReplay;
       if (r && r.status === 'running') {
         addReplayEntry(r, dir === 'tx' ? 'tx' : 'rx', line);
       }
       const jl = this.currentJobLog;
       if (jl && jl.status === 'running') {
-        addLogEntry(jl, dir === 'tx' ? 'sent' : 'received', line);
+        addLogEntry(jl, dir === 'tx' ? 'sent' : 'received', `${sysTag}${line}`);
       }
     });
 
