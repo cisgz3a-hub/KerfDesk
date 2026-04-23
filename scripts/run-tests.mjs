@@ -51,6 +51,7 @@ const files = [
   'scanning-offset.test.ts',
   'smart-overscan.test.ts',
   'gcode-templates.test.ts',
+  'gcode-relative-mode.test.ts',
   'fonts.test.ts',
 
   // E2E snapshot tests

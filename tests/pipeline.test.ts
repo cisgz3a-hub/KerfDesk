@@ -607,7 +607,7 @@ if (grblStrategy) {
     originCorner: 'front-left',
     bedHeightMm: scene.canvas.height,
   });
-  const output = grblStrategy.generate(machinePlan, job);
+  const output = grblStrategy.generate(machinePlan, job, { startMode: 'current' });
   
   assert(output.format === 'grbl', 'Output format is GRBL');
   assert(output.text !== null, 'Output has text content');
@@ -616,7 +616,10 @@ if (grblStrategy) {
   
   const text = output.text!;
   assert(text.includes('G21'), 'G-code includes G21 (mm mode)');
-  assert(text.includes('G90'), 'G-code includes G90 (absolute)');
+  assert(
+    /\bG91\b.*relative positioning/i.test(text) || text.includes('G90'),
+    'G-code includes G91 (Head relative) or G90',
+  );
   assert(text.includes('M4'), 'G-code includes M4 (dynamic laser ON)');
   assert(text.includes('M5'), 'G-code includes M5 (laser OFF)');
   assert(text.includes('G0'), 'G-code includes G0 (rapid moves)');

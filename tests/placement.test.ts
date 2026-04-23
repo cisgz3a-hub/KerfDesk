@@ -102,6 +102,14 @@ function runCase(
     `${label} ${startMode}: return-to-origin move omitted (returnPosition null)`,
   );
 
+  assertClose(pe.maxX - pe.minX, 40, 0.02, `${label} ${startMode}: span X = 40mm (rect width)`);
+  assertClose(pe.maxY - pe.minY, 30, 0.02, `${label} ${startMode}: span Y = 30mm (rect height)`);
+
+  if (startMode === 'current') {
+    assert(/\bG91\b.*relative positioning/i.test(text), `${label} current: header uses G91 (relative)`);
+    return;
+  }
+
   const ge = gcodeXYExtents(text);
   assert(Number.isFinite(ge.minX) && Number.isFinite(pe.minX), `${label} ${startMode}: extents are finite`);
 
@@ -109,9 +117,6 @@ function runCase(
   assertClose(ge.maxX, pe.maxX, 0.02, `${label} ${startMode}: gcode maxX vs plan`);
   assertClose(ge.minY, pe.minY, 0.02, `${label} ${startMode}: gcode minY vs plan`);
   assertClose(ge.maxY, pe.maxY, 0.02, `${label} ${startMode}: gcode maxY vs plan`);
-
-  assertClose(pe.maxX - pe.minX, 40, 0.02, `${label} ${startMode}: span X = 40mm (rect width)`);
-  assertClose(pe.maxY - pe.minY, 30, 0.02, `${label} ${startMode}: span Y = 30mm (rect height)`);
 }
 
 console.log('\n=== Placement: G-code extents match machine plan (golden) ===');

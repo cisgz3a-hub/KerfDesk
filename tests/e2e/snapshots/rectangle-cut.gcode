@@ -2,21 +2,22 @@
 ; Job: rectangle-cut fixture
 ; Objects: 1, Layers: 1
 G21 ; mm mode
-G90 ; absolute positioning
+G91 ; relative positioning (Head mode)
 M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm0s3n-3-oeosjh
-G0 X0.000 Y20.000
+; OBJ ids=mobm3trp-3-70qntq
+G0 Y20.000
 M4 S800
-G1 X40.000 Y20.000 F150 S800
-G1 X40.000 Y0.000 S800
-G1 X0.000 Y0.000 S800
-G1 X0.000 Y20.000 S800
+G1 X40.000 F150 S800
+G1 Y-20.000 S800
+G1 X-40.000 S800
+G1 Y20.000 S800
 M5 S0
 M9 ; air assist OFF
 
 M5 S0
-G0 X0.000 Y0.000 ; return to job origin
+G0 X0.000 Y-20.000 ; return to start
+G90 ; restore absolute positioning
 M2 ; program end

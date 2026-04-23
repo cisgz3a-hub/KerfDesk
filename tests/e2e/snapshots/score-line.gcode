@@ -2,16 +2,17 @@
 ; Job: score-line fixture
 ; Objects: 1, Layers: 1
 G21 ; mm mode
-G90 ; absolute positioning
+G91 ; relative positioning (Head mode)
 M5 S0
 
 ; --- Score (pass 1) ---
-; OBJ ids=mobm0tab-4-w01ytv
-G0 X0.000 Y0.000
+; OBJ ids=mobm3uwh-4-pizk7o
+; G0 skipped (no motion)
 M4 S150
-G1 X160.000 Y0.000 F2200 S150
+G1 X160.000 F2200 S150
 M5 S0
 
 M5 S0
-G0 X0.000 Y0.000 ; return to job origin
+G0 X-160.000 Y0.000 ; return to start
+G90 ; restore absolute positioning
 M2 ; program end

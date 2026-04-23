@@ -667,13 +667,31 @@ export function ConnectionPanelMain({
       `Framing (safe): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    const lines: string[] = [
-      'G90',
-      'G21',
-      'M5 S0',
-      ...corners.map(c => `G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`),
-      'M5 S0',
-    ];
+    const eps = 0.0005;
+    const lines: string[] =
+      startMode === 'current'
+        ? (() => {
+          const out: string[] = ['G91', 'G21', 'M5 S0'];
+          let prev = corners[0];
+          for (let i = 1; i < corners.length; i++) {
+            const dx = corners[i].x - prev.x;
+            const dy = corners[i].y - prev.y;
+            if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
+              out.push(`G0 X${dx.toFixed(3)} Y${dy.toFixed(3)}`);
+            }
+            prev = corners[i];
+          }
+          out.push('M5 S0');
+          out.push('G90');
+          return out;
+        })()
+        : [
+          'G90',
+          'G21',
+          'M5 S0',
+          ...corners.map(c => `G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`),
+          'M5 S0',
+        ];
 
     for (const line of lines) {
       await sendFrameLine(ctrl, line);
@@ -734,13 +752,31 @@ export function ConnectionPanelMain({
     const maxSpindle = activeProfile?.maxSpindle ?? 1000;
     const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
 
-    const lines: string[] = [
-      'G90', 'G21',
-      // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
-      `M4 S${frameDotS}`,
-      ...corners.map(c => `G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`),
-      'M5 S0',
-    ];
+    const eps = 0.0005;
+    const lines: string[] =
+      startMode === 'current'
+        ? (() => {
+          const out: string[] = ['G91', 'G21', `M4 S${frameDotS}`];
+          let prev = corners[0];
+          for (let i = 1; i < corners.length; i++) {
+            const dx = corners[i].x - prev.x;
+            const dy = corners[i].y - prev.y;
+            if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
+              out.push(`G1 X${dx.toFixed(3)} Y${dy.toFixed(3)} F3000`);
+            }
+            prev = corners[i];
+          }
+          out.push('M5 S0');
+          out.push('G90');
+          return out;
+        })()
+        : [
+          'G90', 'G21',
+          // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
+          `M4 S${frameDotS}`,
+          ...corners.map(c => `G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`),
+          'M5 S0',
+        ];
 
     for (const line of lines) {
       await sendFrameLine(ctrl, line);
