@@ -289,6 +289,11 @@ export function App() {
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
 
   const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
+  useEffect(() => {
+    const onExternalProfileChange = () => refreshProfiles();
+    window.addEventListener('laserforge:active-profile-changed', onExternalProfileChange);
+    return () => window.removeEventListener('laserforge:active-profile-changed', onExternalProfileChange);
+  }, [refreshProfiles]);
   const updateActiveProfile = useCallback((updates: Partial<DeviceProfile>) => {
     const current = getActiveProfile();
     if (!current) return;
@@ -1640,6 +1645,7 @@ export function App() {
         startMode,
         savedOrigin,
         originCorner: activeProfile?.originCorner ?? 'front-left',
+        activeProfile,
         machinePosition: machinePositionForStartWizard,
         onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
         onSaveOrigin: handleSaveOrigin,

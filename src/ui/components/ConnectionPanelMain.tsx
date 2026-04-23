@@ -13,7 +13,7 @@ import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflightSummary, type PreflightSummary, type PreflightIssue } from '../../core/preflight/Preflight';
 import { confirmPreflightForJobStart } from '../../core/preflight/confirmPreflightForJobStart';
-import { getActiveProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
@@ -126,6 +126,11 @@ export interface ConnectionPanelMainProps {
   boundsMaxX?: number;
   boundsMaxY?: number;
   onClose: () => void;
+  /**
+   * Active device profile (memoized in App; re-reads when profileRevision increments).
+   * Null if no profile is selected.
+   */
+  activeProfile: DeviceProfile | null;
   /** Called after a successful disconnect cleanup so the host can hide the panel */
   onDisconnect?: () => void;
   productionMode?: boolean;
@@ -174,6 +179,7 @@ export function ConnectionPanelMain({
   boundsMaxX,
   boundsMaxY,
   onClose,
+  activeProfile,
   onDisconnect,
   productionMode = false,
   showAlert,
@@ -328,7 +334,6 @@ export function ConnectionPanelMain({
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
-  const activeProfile = getActiveProfile();
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
   const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
 
@@ -481,7 +486,7 @@ export function ConnectionPanelMain({
     }
     try {
       appendMessage('Port opened, waiting for GRBL welcome...');
-      await machineService.connectRealLaser(getActiveProfile()?.baudRate ?? 115200);
+      await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200);
       setSimulator(false);
       appendMessage('✓ Real laser connected via USB');
     } catch (e: any) {
@@ -726,7 +731,7 @@ export function ConnectionPanelMain({
       `Framing (laser dot): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    const maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
+    const maxSpindle = activeProfile?.maxSpindle ?? 1000;
     const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
 
     const lines: string[] = [
@@ -750,7 +755,7 @@ export function ConnectionPanelMain({
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
+  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
@@ -823,7 +828,7 @@ export function ConnectionPanelMain({
         return;
       }
 
-      const maxSpindle = getActiveProfile()?.maxSpindle ?? 1000;
+      const maxSpindle = activeProfile?.maxSpindle ?? 1000;
       const sVal = Math.max(0, Math.round((2 / 100) * maxSpindle));
       const cmd = `M3 S${sVal}`;
 
@@ -858,7 +863,7 @@ export function ConnectionPanelMain({
         stopTestFire();
       }, TEST_FIRE_MAX_MS);
     },
-    [machineState?.status, notifySimulatorTx, stopTestFire],
+    [activeProfile, machineState?.status, notifySimulatorTx, stopTestFire],
   );
 
   const endTestFire = useCallback(() => {
