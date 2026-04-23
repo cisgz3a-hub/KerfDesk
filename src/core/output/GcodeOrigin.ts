@@ -39,22 +39,17 @@ export function designMinFromJob(job: Job): { minX: number; minY: number } {
 export function computeGcodeOffset(
   startMode: GcodeStartMode,
   designBounds: { minX: number; minY: number },
-  savedOrigin: { x: number; y: number } | null | undefined,
+  _savedOrigin: { x: number; y: number } | null | undefined,
 ): { x: number; y: number } {
   switch (startMode) {
     case 'absolute':
       return { x: 0, y: 0 };
     case 'current':
       return { x: -designBounds.minX, y: -designBounds.minY };
-    case 'savedOrigin': {
-      if (!savedOrigin) {
-        return { x: -designBounds.minX, y: -designBounds.minY };
-      }
-      return {
-        x: savedOrigin.x - designBounds.minX,
-        y: savedOrigin.y - designBounds.minY,
-      };
-    }
+    case 'savedOrigin':
+      // Set Origin (UI) sends G10 L20 at click time; WCS zero is the saved
+      // physical point. Emit design-local absolute coords (same offset as Head).
+      return { x: -designBounds.minX, y: -designBounds.minY };
     default:
       return { x: -designBounds.minX, y: -designBounds.minY };
   }

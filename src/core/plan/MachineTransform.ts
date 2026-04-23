@@ -111,16 +111,10 @@ export function applyMachineTransform(
     },
   };
 
-  // Return point after job completes. Coordinates must match emitted move space
-  // (canvas + offset, with front-origin Y flip when applicable).
-  //   - absolute: (0,0) → machine origin in emitted space
-  //   - current: (0,0) → start-of-job corner in emitted space
-  //   - savedOrigin: saved point in canvas space, transformed like any other XY
-  const sceneBoundsForReturn = { minX, minY, maxX, maxY };
-  const returnPosition =
-    options.startMode === 'savedOrigin' && options.savedOrigin
-      ? transformPointToMachine(options.savedOrigin, sceneBoundsForReturn, options)
-      : { x: 0, y: 0 };
+  // Return point after job completes (absolute G90 space). Head mode uses
+  // relative G91 and the output strategy returns via negated path deltas.
+  // Origin mode: WCS was zeroed at Set Origin, so work (0,0) is the anchor.
+  const returnPosition = { x: 0, y: 0 };
 
   return {
     plan: transformedPlan,

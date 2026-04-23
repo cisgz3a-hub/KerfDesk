@@ -7,7 +7,7 @@ M5 S0
 
 ; --- Cut (pass 1/3) ---
 M8 ; air assist ON
-; OBJ ids=mobm3wb5-3-qtd0nx
+; OBJ ids=mobm7fpl-3-mp0t1n
 G0 Y20.000
 M4 S800
 G1 X40.000 F150 S800
@@ -17,7 +17,7 @@ G1 Y20.000 S800
 M5 S0
 
 ; --- Cut (pass 2/3) ---
-; OBJ ids=mobm3wb5-3-qtd0nx
+; OBJ ids=mobm7fpl-3-mp0t1n
 ; G0 skipped (no motion)
 M4 S800
 G1 X40.000 S800
@@ -27,7 +27,7 @@ G1 Y20.000 S800
 M5 S0
 
 ; --- Cut (pass 3/3) ---
-; OBJ ids=mobm3wb5-3-qtd0nx
+; OBJ ids=mobm7fpl-3-mp0t1n
 ; G0 skipped (no motion)
 M4 S800
 G1 X40.000 S800

@@ -7,16 +7,16 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm3vsd-3-i1f62g
-G0 X100.000 Y95.000
+; OBJ ids=mobm7f65-3-6tuq0g
+G0 X0.000 Y20.000
 M4 S800
-G1 X140.000 Y95.000 F150 S800
-G1 X140.000 Y75.000 S800
-G1 X100.000 Y75.000 S800
-G1 X100.000 Y95.000 S800
+G1 X40.000 Y20.000 F150 S800
+G1 X40.000 Y0.000 S800
+G1 X0.000 Y0.000 S800
+G1 X0.000 Y20.000 S800
 M5 S0
 M9 ; air assist OFF
 
 M5 S0
-G0 X170.000 Y50.000 ; return to job origin
+G0 X0.000 Y0.000 ; return to job origin
 M2 ; program end

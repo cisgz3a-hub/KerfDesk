@@ -6,7 +6,7 @@ G91 ; relative positioning (Head mode)
 M5 S0
 
 ; --- Score (pass 1) ---
-; OBJ ids=mobm3uwh-4-pizk7o
+; OBJ ids=mobm7ebb-4-8y9i2z
 ; G0 skipped (no motion)
 M4 S150
 G1 X160.000 F2200 S150

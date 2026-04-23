@@ -6,7 +6,7 @@ G91 ; relative positioning (Head mode)
 M5 S0
 
 ; --- Engrave (pass 1) ---
-; OBJ ids=mobm3v6f-6-fawsvn
+; OBJ ids=mobm7eld-6-lqhf73
 M4 S0
 G0 X76.749 Y79.950
 G1 X1.250 F3000 S0
@@ -2411,7 +2411,7 @@ G1 X-1.250 S0
 M5 S0
 
 ; --- Score (pass 1) ---
-; OBJ ids=mobm3v6g-7-2o0n27
+; OBJ ids=mobm7eld-7-ysvkiv
 G0 X-76.749 Y-40.050
 M4 S150
 G1 X160.000 F2200 S150
@@ -2419,7 +2419,7 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm3v6g-8-jy9l3m
+; OBJ ids=mobm7eld-8-4rrj4s
 G0 X-131.741 Y19.087
 M4 S800
 G1 X-1.582 F150 S800
@@ -2450,7 +2450,7 @@ G1 S800
 G1 X-1.926 Y-2.769 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm3v6g-8-jy9l3m
+; OBJ ids=mobm7eld-8-4rrj4s
 G0 X-4.709 Y10.913
 M4 S800
 G1 X1.392 S800
@@ -2459,7 +2459,7 @@ G1 X-1.392 S800
 G1 Y10.913 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm3v6g-8-jy9l3m
+; OBJ ids=mobm7eld-8-4rrj4s
 G0 X-12.224 Y-10.913
 M4 S800
 G1 X-1.326 S800
@@ -2499,7 +2499,7 @@ M9 ; air assist OFF
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm3v6f-5-ykv4sm
+; OBJ ids=mobm7eld-5-ni1g0v
 G0 X-11.326 Y70.913
 M4 S800
 G1 X40.000 S800

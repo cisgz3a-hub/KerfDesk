@@ -7,37 +7,37 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 Y20.000
 M4 S800
 G1 Y-20.000 F150 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 Y10.476
 M4 S800
 G1 X13.333 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X-2.857
 M4 S800
 G1 X7.619 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X0.952 Y9.524
 M4 S800
 G1 Y-20.000 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 ; G0 skipped (no motion)
 M4 S800
 G1 X11.429 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X-4.762
 M4 S800
 G1 X11.429 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 Y20.000
 M4 S800
 G1 X-1.905 Y-0.952 S800
@@ -61,27 +61,27 @@ G1 X-1.905 Y1.905 S800
 G1 X-1.905 Y0.952 S800
 G1 X-3.810 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X-26.667
 M4 S800
 G1 Y-20.000 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 ; G0 skipped (no motion)
 M4 S800
 G1 X12.381 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X-9.524
 M4 S800
 G1 Y20.000 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X-2.857
 M4 S800
 G1 X12.381 S800
 M5 S0
-; OBJ ids=mobm3ucw-3-8nkfrp
+; OBJ ids=mobm7dqw-3-jnybpo
 G0 X2.857
 M4 S800
 G1 Y-20.000 S800
