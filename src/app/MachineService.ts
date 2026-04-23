@@ -324,12 +324,9 @@ export class MachineService {
 
   async stopAndEnsureLaserOff(sendTx?: (line: string) => void): Promise<void> {
     this.controllerRef.current.stop();
-    await new Promise(r => setTimeout(r, 500));
-    sendTx?.('M5 S0');
-    try {
-      this.controllerRef.current.sendCommand('M5 S0');
-    } catch {
-      /* ignore */
-    }
+    // Soft reset handles laser-off as part of GRBL's reset sequence.
+    // M5 via sendCommand would race the reset and usually throw
+    // 'Not connected' anyway. Intentionally no follow-up writes here.
+    void sendTx;
   }
 }

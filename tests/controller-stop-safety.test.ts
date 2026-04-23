@@ -1,6 +1,7 @@
 /**
- * Guardrails: GrblController.stop() must not send $X (unlock) or soft reset (0x18);
- * clean stop uses feed hold (0x21). emergencyStop() uses 0x18.
+ * GrblController.stop() must send soft reset (0x18) so the planner
+ * buffer is purged; M5 is not a realtime command and must not be relied
+ * on to stop an in-flight job. emergencyStop() also uses 0x18.
  * Run: npx tsx tests/controller-stop-safety.test.ts
  */
 
@@ -24,13 +25,16 @@ function flush(): Promise<void> {
   return new Promise(r => setTimeout(r, 15));
 }
 
-
 function hasUnlock(lines: string[]): boolean {
   return lines.some(l => l.includes('$X'));
 }
 
+function hasM5S0InReceived(lines: string[]): boolean {
+  return lines.some(l => /M5\s*S0/i.test(l) || l.trim() === 'M5');
+}
+
 async function main(): Promise<void> {
-  console.log('\n=== Controller stop safety guardrails ===');
+  console.log('\n=== Controller stop safety (soft reset) ===');
 
   {
     const ctrl = new GrblController();
@@ -44,15 +48,21 @@ async function main(): Promise<void> {
     await flush();
     assert(!hasUnlock(port.received), 'stop() while idle: no $X in port.received');
     assert(
-      port.realtimeBytes.includes(0x21) && !port.realtimeBytes.includes(0x18),
-      'stop() while idle: feed hold (0x21), not soft reset (0x18)',
+      port.realtimeBytes.includes(0x18) && !port.realtimeBytes.includes(0x21),
+      'stop() while idle: soft reset (0x18), not feed hold (0x21)',
     );
+    assert(!hasM5S0InReceived(port.received), 'stop() while idle: no M5 in g-code stream');
     await ctrl.disconnect();
   }
 
   {
+    // No `ok` for G0 so the buffer does not finish before stop() (job stays "running" like real undrained queue).
+    const port = new MockSerialPort((line: string) => {
+      if (line.startsWith(';')) return [];
+      if (/\bG0\b|\bG00\b/.test(line)) return [];
+      return ['ok'];
+    });
     const ctrl = new GrblController();
-    const port = new MockSerialPort();
     port.open();
     await ctrl.connect(port);
     await flush();
@@ -61,14 +71,33 @@ async function main(): Promise<void> {
     await flush();
     port.received.length = 0;
     port.realtimeBytes.length = 0;
+    assert(ctrl.isJobRunning, 'sanity: job is running before stop()');
+    let progressFires = 0;
+    ctrl.onProgress(() => {
+      progressFires++;
+    });
+    const before = progressFires;
     ctrl.stop();
     await flush();
-    assert(!hasUnlock(port.received), 'stop() during job: no $X in port.received');
+    assert(!ctrl.isJobRunning, 'stop() during job: isJobRunning is false');
     assert(
-      port.realtimeBytes.includes(0x21) && !port.realtimeBytes.includes(0x18),
-      'stop() during job: feed hold (0x21), not soft reset (0x18)',
+      port.realtimeBytes.includes(0x18) && !port.realtimeBytes.includes(0x21),
+      'stop() during job: soft reset (0x18), not feed hold (0x21)',
     );
+    assert(!hasM5S0InReceived(port.received), 'stop() during job: no M5 in g-code stream');
+    assert(progressFires > before, 'stop() notifies progress listener');
     await ctrl.disconnect();
+  }
+
+  {
+    const ctrl = new GrblController();
+    let threw = false;
+    try {
+      ctrl.stop();
+    } catch {
+      threw = true;
+    }
+    assert(!threw, 'stop() with no connection: does not throw');
   }
 
   {
@@ -77,10 +106,14 @@ async function main(): Promise<void> {
     port.open();
     await ctrl.connect(port);
     await flush();
-    ctrl.sendCommand('$X');
-    await flush();
-    assert(hasUnlock(port.received), 'sanity: explicit sendCommand("$X") appears in port.received');
     await ctrl.disconnect();
+    let threw = false;
+    try {
+      ctrl.stop();
+    } catch {
+      threw = true;
+    }
+    assert(!threw, 'stop() after disconnect: does not throw');
   }
 
   {

@@ -409,24 +409,29 @@ export class GrblController implements LaserController {
   }
 
   /**
-   * Abort current job cleanly. Pauses first, then clears job queue.
-   * Does not soft-reset. Position preserved. User can continue with new commands.
+   * Stop the current job and halt motion immediately.
+   *
+   * Uses GRBL soft reset (0x18), which purges the planner buffer
+   * and stops all motion within the current deceleration cycle.
+   * M5 is not useful here because GRBL does not execute M5 as a
+   * realtime command — a queued M5 will not fire until every move
+   * already in the planner has executed. Soft reset is the only way
+   * to stop motion + laser immediately on a real GRBL machine.
+   *
+   * After stop() the machine may enter ALARM state and will
+   * require $X to unlock plus $H to re-home before running another
+   * job. This is GRBL's designed post-reset behavior — do not
+   * auto-unlock here. The operator should inspect the machine.
+   *
+   * For a pause/resume that preserves position, use pause() +
+   * resume() (feed-hold / cycle-start).
    */
   stop(): void {
     if (!this._port?.isOpen) return;
-    console.info('[GrblController] stop() — clean pause + laser off, job aborted, position preserved');
-    this._sendRealtime(REALTIME_FEED_HOLD);
-    // Abort streaming immediately so sendCommand / disconnect are not blocked while GRBL decelerates.
+    console.info('[GrblController] stop() — soft reset, job aborted, re-home required');
+    this._sendRealtime(REALTIME_RESET);
     this._abortJob();
     this._emitProgress();
-    setTimeout(() => {
-      try {
-        this._port?.write('M5 S0\n');
-        this._emitRawLine('M5 S0', 'tx');
-      } catch {
-        /* port gone */
-      }
-    }, 100);
   }
 
   /**

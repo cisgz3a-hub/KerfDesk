@@ -374,7 +374,7 @@ async function testPauseResume() {
     await flush();
   }
 
-  // Stop (feed hold + immediate job abort; M5 follows after short delay)
+  // Stop (soft reset + immediate job abort; motion/laser halt now, re-home may be required)
   ctrl.stop();
   await flush();
   assert(!ctrl.isJobRunning, 'Stop → job aborted');
