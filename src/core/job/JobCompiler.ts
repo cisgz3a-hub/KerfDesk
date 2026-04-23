@@ -651,8 +651,7 @@ export function geometryToPoints(geom: Geometry): PointGroup[] {
       }];
     }
     case 'path': {
-      // Convert path segments to polylines
-      // Bezier curves are subdivided into line segments
+      // SVG-imported paths: default 0.5mm tolerance is fine for typical cutting at 100+ mm scale.
       return geom.subPaths.map(sub => ({
         points: subPathToPoints(sub.segments),
         closed: sub.closed,
@@ -661,8 +660,12 @@ export function geometryToPoints(geom: Geometry): PointGroup[] {
     case 'text': {
       const subPaths = geom.outlineSubPaths;
       if (!subPaths?.length) return [];
+      // Tight flatness for text. Glyph curves are small (5–15mm stroke radius on a typical
+      // 10–30mm font), so 0.5mm is visibly faceted. 0.05mm is below kerf width on any diode
+      // laser and gives smooth curves at the cost of more subdivision vs large canvas paths.
+      const TEXT_FLATNESS_MM = 0.05;
       return subPaths.map(sub => ({
-        points: subPathToPoints(sub.segments),
+        points: subPathToPoints(sub.segments, TEXT_FLATNESS_MM),
         closed: sub.closed,
       }));
     }
@@ -672,7 +675,10 @@ export function geometryToPoints(geom: Geometry): PointGroup[] {
   }
 }
 
-function subPathToPoints(segments: import('../scene/SceneObject').PathSegment[]): Point[] {
+export function subPathToPoints(
+  segments: import('../scene/SceneObject').PathSegment[],
+  tolerance: number = 0.5,
+): Point[] {
   const points: Point[] = [];
 
   for (const seg of segments) {
@@ -686,14 +692,14 @@ function subPathToPoints(segments: import('../scene/SceneObject').PathSegment[])
         subdivideCubic(
           points[points.length - 1] || { x: 0, y: 0 },
           seg.cp1, seg.cp2, seg.to,
-          points, 0.5 // tolerance in mm
+          points, tolerance,
         );
         break;
       case 'quadratic':
         subdivideQuadratic(
           points[points.length - 1] || { x: 0, y: 0 },
           seg.cp, seg.to,
-          points, 0.5
+          points, tolerance,
         );
         break;
       case 'close':

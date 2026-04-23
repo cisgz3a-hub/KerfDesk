@@ -27,6 +27,7 @@ const files = [
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
   'preflight.test.ts',
+  'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',
   'autofocus.test.ts',
   'falcon-serial-profile.test.ts',
