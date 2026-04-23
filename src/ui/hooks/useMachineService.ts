@@ -1,13 +1,13 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { type MockSerialPort } from '../../communication/SerialPort';
 import { type WebSerialPort } from '../../communication/WebSerialPort';
 import { type WebSocketSerialPort } from '../../communication/WebSocketSerialPort';
-import { MachineService } from '../../app/MachineService';
+import { MachineService, type BurnState } from '../../app/MachineService';
 
 interface UseMachineServiceArgs {
-  controllerRef: MutableRefObject<LaserController>;
+  controllerRef: MutableRefObject<LaserController | null>;
   portRef: MutableRefObject<WebSerialPort | MockSerialPort | WebSocketSerialPort | null>;
 }
 
@@ -20,6 +20,12 @@ export function useMachineService(args: UseMachineServiceArgs) {
 
   const [messages, setMessages] = useState<string[]>([]);
   const [isSimulator, setIsSimulator] = useState(false);
+  const [burnState, setBurnState] = useState<BurnState>(() => service.getBurnState());
+
+  useEffect(() => {
+    setBurnState(service.getBurnState());
+    return service.onBurnStateChange(setBurnState);
+  }, [service]);
 
   const appendMessage = (message: string) => {
     service.appendMessage(message);
@@ -63,5 +69,8 @@ export function useMachineService(args: UseMachineServiceArgs) {
     appendConsoleLine,
     isSimulator,
     setSimulator,
+    burnState,
   };
 }
+
+export type MachineUiHook = ReturnType<typeof useMachineService>;

@@ -133,6 +133,10 @@ function planOperation(
 
     // ─── DISPATCH BY GEOMETRY TYPE ─────────────────────────────
     if (operation.geometry.type === 'raster') {
+      moves.push({
+        type: 'marker',
+        sourceObjectIds: [operation.geometry.bitmap.sourceObjectId],
+      });
       // RASTER: Convert bitmap pixels to scanline moves
       const rasterMoves = planRasterOperation(
         operation.geometry.bitmap,
@@ -143,6 +147,10 @@ function planOperation(
         moves.push(rasterMoves[i]);
       }
     } else if (operation.type === 'engrave' && operation.geometry.type === 'fill') {
+      const fillIds = Array.from(new Set(operation.geometry.paths.map(p => p.id)));
+      if (fillIds.length > 0) {
+        moves.push({ type: 'marker', sourceObjectIds: fillIds });
+      }
       // FILL: engrave only — never infer from fillInterval on cut/score jobs
       const fillMoves = planFillOperation(
         operation.geometry.paths,
@@ -158,6 +166,7 @@ function planOperation(
       if (paths.length > 0) {
         const ordered = orderPathsForCutting(paths, pos, settings.insideFirst);
         for (const { path, reversed } of ordered) {
+          moves.push({ type: 'marker', sourceObjectIds: [path.id] });
           const pathMoves = planPath(path, reversed, settings);
           for (let i = 0; i < pathMoves.length; i++) {
             moves.push(pathMoves[i]);

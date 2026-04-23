@@ -34,7 +34,8 @@ export type Move =
   | LaserOffMove
   | DwellMove
   | AirAssistMove
-  | ZMove;
+  | ZMove
+  | MarkerMove;
 
 export interface RapidMove {
   type: 'rapid';
@@ -81,6 +82,27 @@ export interface AirAssistMove {
 export interface ZMove {
   type: 'setZ';
   z: number;        // mm (absolute Z position)
+}
+
+/**
+ * Synthetic non-machine move. Emitted by the planner between FlatPaths
+ * (vector) and before each raster/fill operation to mark which source
+ * SceneObject(s) the following real moves belong to.
+ *
+ * Emitted by the output strategy as a gcode comment (; OBJ ids=...)
+ * so the file stays human-readable. Parsed by GrblController during
+ * sendJob to build a per-line source-object index for live UI state.
+ *
+ * Does NOT produce any real machine motion.
+ */
+export interface MarkerMove {
+  type: 'marker';
+  /**
+   * SceneObject.id(s) whose burn starts here. Usually one element
+   * (vector case); multiple for fill operations that interleave
+   * scanlines across several objects.
+   */
+  sourceObjectIds: readonly string[];
 }
 
 // ─── PLANNED OPERATION ───────────────────────────────────────────
@@ -185,7 +207,9 @@ export function calculatePlanStats(
           totalTime += move.ms / 1000;
           break;
         }
-        // setAir, setZ, laserOn, laserOff don't contribute to distance or time
+        case 'marker':
+          break;
+        // setAir, setZ, laserOn, laserOff, marker don't contribute to distance or time
       }
     }
   }

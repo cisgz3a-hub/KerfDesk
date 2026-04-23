@@ -6,6 +6,7 @@ G90 ; absolute positioning
 M5 S0
 
 ; --- Engrave (pass 1) ---
+; OBJ ids=mobj0omv-4-llx57k
 M4 S0
 G0 X0.000 Y29.900
 G1 X1.250 Y29.900 F3000 S0

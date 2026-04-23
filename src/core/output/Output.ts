@@ -258,6 +258,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       case 'dwell':    return this.encodeDwell(move.ms);
       case 'setAir':   return this.encodeAirAssist(move.on);
       case 'setZ':     return this.encodeZMove(move.z);
+      case 'marker':
+        return `; OBJ ids=${move.sourceObjectIds.join(',')}`;
     }
   }
 }

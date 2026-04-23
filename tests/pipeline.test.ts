@@ -443,6 +443,7 @@ const testBitmap: ProcessedBitmap = {
   width: bitmapWidth,
   height: bitmapHeight,
   dpi: 254,  // 0.1mm per pixel
+  sourceObjectId: 'raster-test-obj',
   mode: '1bit',
   data: bitmapData,
   physicalWidth: bitmapWidth * (25.4 / 254),   // ~1mm
@@ -534,7 +535,7 @@ console.log('\n=== Test: Raster grayscale variable power ===');
 // Create a 5×1 bitmap with gradient: [0, 64, 128, 192, 255] — each luminance maps to distinct S
 const gradientData = new Uint8Array([0, 64, 128, 192, 255]);
 const gradientBitmap: ProcessedBitmap = {
-  width: 5, height: 1, dpi: 254, mode: 'grayscale',
+  width: 5, height: 1, dpi: 254, sourceObjectId: 'gradient-obj', mode: 'grayscale',
   data: gradientData,
   physicalWidth: 5 * pixelSize,
   physicalHeight: 1 * pixelSize,

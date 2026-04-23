@@ -25,6 +25,20 @@ import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 
+export interface BurnState {
+  readonly activeIds: ReadonlySet<string>;
+  readonly burnedIds: ReadonlySet<string>;
+}
+
+export type BurnStateListener = (state: BurnState) => void;
+
+function emptyBurnState(): BurnState {
+  return {
+    activeIds: new Set<string>(),
+    burnedIds: new Set<string>(),
+  };
+}
+
 export interface MachineServiceState {
   isSimulator: boolean;
   messages: string[];
@@ -40,6 +54,9 @@ export class MachineService {
     isSimulator: false,
     messages: [],
   };
+
+  private burnState: BurnState = emptyBurnState();
+  private burnStateListeners = new Set<BurnStateListener>();
 
   private activeReplay: JobReplay | null = null;
   private currentJobLog: JobLog | null = null;
@@ -76,6 +93,19 @@ export class MachineService {
   clearJobSession(): void {
     this.activeReplay = null;
     this.currentJobLog = null;
+  }
+
+  getBurnState(): BurnState {
+    return this.burnState;
+  }
+
+  onBurnStateChange(cb: BurnStateListener): () => void {
+    this.burnStateListeners.add(cb);
+    return () => this.burnStateListeners.delete(cb);
+  }
+
+  private emitBurnState(): void {
+    for (const cb of this.burnStateListeners) cb(this.burnState);
   }
 
   /**
@@ -123,10 +153,24 @@ export class MachineService {
       }
     });
 
+    const unsubLifecycle =
+      controller.onObjectLifecycle?.((activeObjectIds) => {
+        const nextBurned = new Set(this.burnState.burnedIds);
+        for (const id of this.burnState.activeIds) {
+          if (!activeObjectIds.includes(id)) nextBurned.add(id);
+        }
+        this.burnState = {
+          activeIds: new Set(activeObjectIds),
+          burnedIds: nextBurned,
+        };
+        this.emitBurnState();
+      }) ?? (() => {});
+
     const cleanup = () => {
       unsubProgress();
       unsubError();
       unsubRaw();
+      unsubLifecycle();
       this.detachRecording = null;
     };
     this.detachRecording = cleanup;
@@ -176,6 +220,9 @@ export class MachineService {
     notifySimulatorTx: (line: string) => void;
   }): void {
     const { lines, scene, machineState, gcodeText, notifySimulatorTx } = args;
+
+    this.burnState = emptyBurnState();
+    this.emitBurnState();
 
     const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
 

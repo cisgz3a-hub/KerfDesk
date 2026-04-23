@@ -65,6 +65,17 @@ export type RawLineCallback = (
   direction: 'tx' | 'rx',
   kind?: 'user' | 'system',
 ) => void;
+/**
+ * Fired when the currently-active source object(s) change during
+ * a running job. An empty array means no object is currently being
+ * burned (between operations or at job end).
+ *
+ * Derived from ; OBJ ids=... markers embedded in the gcode by the
+ * planner, parsed and stripped from the machine stream during sendJob.
+ */
+export type ObjectLifecycleCallback = (
+  activeObjectIds: readonly string[],
+) => void;
 export type Unsubscribe = () => void;
 
 export interface LaserController {
@@ -96,4 +107,9 @@ export interface LaserController {
   onProgress(callback: ProgressCallback): Unsubscribe;
   onError(callback: ErrorCallback): Unsubscribe;
   onRawLine(callback: RawLineCallback): Unsubscribe;
+  /**
+   * Subscribe to source-object activation changes during a job.
+   * See ObjectLifecycleCallback. Optional for non-GRBL controllers / tests.
+   */
+  onObjectLifecycle?(callback: ObjectLifecycleCallback): Unsubscribe;
 }

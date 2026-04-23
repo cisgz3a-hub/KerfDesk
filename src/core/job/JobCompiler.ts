@@ -481,6 +481,7 @@ function compileGeometry(
         width: bitmapWidth,
         height: bitmapHeight,
         dpi,
+        sourceObjectId: obj.id,
         mode,
         data,
         physicalWidth,

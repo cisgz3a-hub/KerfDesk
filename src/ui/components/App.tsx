@@ -44,6 +44,7 @@ import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
+import { useMachineService } from '../hooks/useMachineService';
 import { GrblController } from '../../controllers/grbl/GrblController';
 import { CanvasViewport, type ViewportActions } from './CanvasViewport';
 import { ModeTabsOverlay } from './canvas/ModeTabsOverlay';
@@ -221,6 +222,10 @@ export function App() {
   } | null>(null);
   const [activeJobTransform, setActiveJobTransform] = useState<MachineTransformResult | null>(null);
   const grbl = useControllerConnection('grbl');
+  const machineUi = useMachineService({
+    controllerRef: grbl.controllerRef,
+    portRef: grbl.portRef,
+  });
   const wasJobRunningRef = useRef(false);
 
   const machinePositionForStartWizard = useMemo(() => {
@@ -1604,6 +1609,7 @@ export function App() {
           onViewportLayout: handleViewportLayout,
           interactableLayerIds,
           onActivateLayer: handleActivateLayer,
+          burnState: machineUi.burnState,
         }),
           React.createElement(ModeTabsOverlay, {
             viewportX: bedTabLayout.bedScreenX,
@@ -1656,6 +1662,7 @@ export function App() {
         onUpdateLayerFillInterval: handleConnectionUpdateLayerFillInterval,
         onUpdateLayerFillBidirectional: handleConnectionUpdateLayerFillBidirectional,
         onUpdateLayerSetting: handleConnectionUpdateLayerSetting,
+        machineUi,
       }),
       !connectionSidebarOpen && React.createElement('div', {
         style: {

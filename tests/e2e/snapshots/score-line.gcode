@@ -6,6 +6,7 @@ G90 ; absolute positioning
 M5 S0
 
 ; --- Score (pass 1) ---
+; OBJ ids=mobj0ovy-4-cirigz
 G0 X0.000 Y0.000
 M4 S150
 G1 X160.000 Y0.000 F2200 S150

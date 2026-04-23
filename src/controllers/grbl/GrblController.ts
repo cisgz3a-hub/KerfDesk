@@ -13,6 +13,7 @@ import {
   type ProgressCallback,
   type ErrorCallback,
   type RawLineCallback,
+  type ObjectLifecycleCallback,
   type Unsubscribe,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
@@ -84,6 +85,15 @@ export class GrblController implements LaserController {
   private _isJobRunning = false;
 
   private _jobLines: string[] = [];
+  /**
+   * Per-jobLine source-object ids that activate when this line is sent.
+   * Non-null means `; OBJ ids=...` appeared in the gcode before this line.
+   * Length matches _jobLines.
+   */
+  private _lineMarkers: (readonly string[] | null)[] = [];
+  /** Dedupe key for the last onObjectLifecycle emission (sorted ids joined). */
+  private _lastLifecycleKey: string | null = null;
+  private _objectLifecycleListeners = new Set<ObjectLifecycleCallback>();
   private _queueIndex = 0;
   private _pending: PendingLine[] = [];
   private _bufferAvailable = GRBL_BUFFER_SIZE;
@@ -354,7 +364,29 @@ export class GrblController implements LaserController {
       );
     }
 
-    this._jobLines = lines.filter(l => l.trim().length > 0 && !l.trim().startsWith(';'));
+    {
+      const jobLines: string[] = [];
+      const lineMarkers: (readonly string[] | null)[] = [];
+      let pending: readonly string[] | null = null;
+      for (const raw of lines) {
+        const line = raw.trim();
+        if (line.length === 0) continue;
+        if (line.startsWith(';')) {
+          const m = line.match(/^;\s*OBJ\s+ids=(.+)$/i);
+          if (m) {
+            const parsed = m[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
+            pending = parsed;
+          }
+          continue;
+        }
+        jobLines.push(line);
+        lineMarkers.push(pending);
+        pending = null;
+      }
+      this._jobLines = jobLines;
+      this._lineMarkers = lineMarkers;
+    }
+
     this._queueIndex = 0;
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
@@ -365,8 +397,12 @@ export class GrblController implements LaserController {
     this._ackTimestamps = [];
     this._sendTimestamps = [];
 
+    this._lastLifecycleKey = null;
+    this._emitObjectLifecycle([]);
+
     // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
     if (this._jobLines.length === 0) {
+      this._lineMarkers = [];
       this._emitProgress();
       return;
     }
@@ -568,6 +604,20 @@ export class GrblController implements LaserController {
   onRawLine(callback: RawLineCallback): Unsubscribe {
     this._rawLineListeners.add(callback);
     return () => this._rawLineListeners.delete(callback);
+  }
+
+  onObjectLifecycle(cb: ObjectLifecycleCallback): Unsubscribe {
+    this._objectLifecycleListeners.add(cb);
+    return () => this._objectLifecycleListeners.delete(cb);
+  }
+
+  private _emitObjectLifecycle(activeObjectIds: readonly string[]): void {
+    const key = activeObjectIds.length === 0 ? '' : [...activeObjectIds].sort().join('\0');
+    if (this._lastLifecycleKey !== null && key === this._lastLifecycleKey) return;
+    this._lastLifecycleKey = key;
+    for (const listener of this._objectLifecycleListeners) {
+      listener(activeObjectIds);
+    }
   }
 
   // ─── LINE HANDLER ───────────────────────────────────────────
@@ -778,6 +828,11 @@ export class GrblController implements LaserController {
 
       if (byteCount > this._bufferAvailable) break;
 
+      const marker = this._lineMarkers[this._queueIndex];
+      if (marker != null) {
+        this._emitObjectLifecycle(marker);
+      }
+
       this._writeLine(line);
       this._pending.push({ text: line, byteCount });
       this._bufferAvailable -= byteCount;
@@ -792,11 +847,14 @@ export class GrblController implements LaserController {
     this._isJobRunning = false;
     this._updateStatus('idle');
     this._emitProgress();
+    this._lastLifecycleKey = null;
+    this._emitObjectLifecycle([]);
   }
 
   private _abortJob(): void {
     this._isJobRunning = false;
     this._jobLines = [];
+    this._lineMarkers = [];
     this._queueIndex = 0;
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
@@ -804,6 +862,8 @@ export class GrblController implements LaserController {
     this._resumeRequested = false;
     this._ackTimestamps = [];
     this._sendTimestamps = [];
+    this._lastLifecycleKey = null;
+    this._emitObjectLifecycle([]);
   }
 
   // ─── INTERNALS ──────────────────────────────────────────────

@@ -46,6 +46,7 @@ import { geometryToPoints } from '../../core/job/JobCompiler';
 import { type JobProgress } from '../../controllers/ControllerInterface';
 import { type Move } from '../../core/plan/Plan';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { type BurnState } from '../../app/MachineService';
 import { QuickActions } from './QuickActions';
 
 function defaultCursorForTool(activeTool: ToolType): string {
@@ -70,6 +71,7 @@ function penAfterMoveIndex(moves: readonly Move[], lastMoveIndex: number): { x: 
   const lim = Math.min(lastMoveIndex, moves.length - 1);
   for (let i = 0; i <= lim; i++) {
     const m = moves[i];
+    if (m.type === 'marker') continue;
     if (m.type === 'rapid' || m.type === 'linear') {
       x = m.to.x;
       y = m.to.y;
@@ -104,6 +106,7 @@ function drawJobToolpathRange(
   let hasPen = fromIdx > 0;
   for (let i = Math.max(0, fromIdx); i < toIdxExclusive && i < moves.length; i++) {
     const m = moves[i];
+    if (m.type === 'marker') continue;
     if (m.type === 'rapid') {
       x = m.to.x;
       y = m.to.y;
@@ -145,6 +148,7 @@ function drawPlannedToolpathPreview(
   let px = 0;
   let py = 0;
   for (const m of moves) {
+    if (m.type === 'marker') continue;
     if (m.type === 'rapid') {
       ctx.moveTo(px, py);
       ctx.lineTo(m.to.x, m.to.y);
@@ -380,6 +384,8 @@ interface CanvasViewportProps {
   interactableLayerIds?: ReadonlySet<string> | null;
   /** Called when a hit-test lands on an object whose layer is not currently interactable. The parent should activate that layer. */
   onActivateLayer?: (layerId: string) => void;
+  /** Live burn progress: which objects are actively lasering vs done (GRBL job stream). */
+  burnState?: BurnState | null;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -416,6 +422,7 @@ export function CanvasViewport({
   onViewportLayout,
   interactableLayerIds = null,
   onActivateLayer,
+  burnState = null,
 }: CanvasViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
@@ -563,6 +570,7 @@ export function CanvasViewport({
         previewMode,
         machineWorkAreaMm,
         { startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner },
+        burnState,
       );
       ctx.restore();
       drawRulers(ctx, transform, width, height);
@@ -601,16 +609,16 @@ export function CanvasViewport({
           ctx.globalAlpha = 0.15;
           renderSceneObjects(ctx, dimScene, transform, width, height, new Set(), previewMode, {
             skipTrailingContextRestore: true,
-          });
+          }, burnState);
           ctx.restore();
 
           const activeScene = {
             ...scene,
             objects: scene.objects.filter(o => interactableLayerIds.has(o.layerId)),
           };
-          renderSceneObjects(ctx, activeScene, transform, width, height, selectedIds, previewMode);
+          renderSceneObjects(ctx, activeScene, transform, width, height, selectedIds, previewMode, undefined, burnState);
         } else {
-          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode);
+          renderSceneObjects(ctx, scene, transform, width, height, selectedIds, previewMode, undefined, burnState);
         }
       }
       ctx.restore();
@@ -936,7 +944,7 @@ export function CanvasViewport({
 
     // 7. Screen-space overlay
     renderOverlay(ctx, width, height, mouseWorldRef.current, scene.objects.length, selectedIds.size);
-  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, interactableLayerIds]);
+  }, [scene, simulation, viewport, width, height, playbackTime, selectedIds, activeTool, previewMode, isJobRunning, livePosition, jobProgress, activeJobMoves, showToolpathPreview, toolpathMoves, machineWorkAreaMm, startMode, savedOrigin, bedWidthMm, bedHeightMm, originCorner, interactableLayerIds, burnState]);
 
   useEffect(() => {
     if (activeTool !== 'node') {

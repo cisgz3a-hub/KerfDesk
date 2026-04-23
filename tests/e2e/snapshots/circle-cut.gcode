@@ -7,6 +7,7 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
+; OBJ ids=mobj0pys-3-xk7nfa
 G0 X79.969 Y31.178
 M4 S800
 G1 X79.877 Y32.354 F150 S800

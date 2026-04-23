@@ -164,6 +164,8 @@ export function simulatePlan(
           ));
           break;
         }
+        case 'marker':
+          break;
       }
     }
   }

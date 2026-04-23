@@ -55,6 +55,11 @@ export interface ProcessedBitmap {
   width: number;                 // pixels
   height: number;                // pixels
   dpi: number;
+  /**
+   * SceneObject.id of the image this bitmap was compiled from.
+   * Used by the planner to emit an object-marker before raster moves.
+   */
+  sourceObjectId: string;
   /** 1-bit mask, or 8-bit luminance (0=dark, 255=light) for variable-S raster. */
   mode: '1bit' | 'grayscale';
   data: Uint8Array;

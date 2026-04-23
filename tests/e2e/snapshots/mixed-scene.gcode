@@ -6,6 +6,7 @@ G90 ; absolute positioning
 M5 S0
 
 ; --- Engrave (pass 1) ---
+; OBJ ids=mobj0p5f-6-jol6xj
 M4 S0
 G0 X76.749 Y79.950
 G1 X77.999 Y79.950 F3000 S0
@@ -2410,6 +2411,7 @@ G1 X76.749 Y40.050 S0
 M5 S0
 
 ; --- Score (pass 1) ---
+; OBJ ids=mobj0p5f-7-fp7f70
 G0 X0.000 Y0.000
 M4 S150
 G1 X160.000 Y0.000 F2200 S150
@@ -2417,6 +2419,7 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
+; OBJ ids=mobj0p5f-8-ii2xb6
 G0 X28.259 Y19.087
 M4 S800
 G1 X26.677 Y19.087 F150 S800
@@ -2447,6 +2450,7 @@ G1 X30.186 Y21.855 S800
 G1 X28.259 Y19.087 S800
 G1 X28.259 Y19.087 S800
 M5 S0
+; OBJ ids=mobj0p5f-8-ii2xb6
 G0 X23.550 Y30.000
 M4 S800
 G1 X24.941 Y30.000 S800
@@ -2455,6 +2459,7 @@ G1 X23.550 Y19.087 S800
 G1 X23.550 Y30.000 S800
 G1 X23.550 Y30.000 S800
 M5 S0
+; OBJ ids=mobj0p5f-8-ii2xb6
 G0 X11.326 Y19.087
 M4 S800
 G1 X10.000 Y19.087 S800
@@ -2494,6 +2499,7 @@ M9 ; air assist OFF
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
+; OBJ ids=mobj0p5f-5-y00ysy
 G0 X0.000 Y90.000
 M4 S800
 G1 X40.000 Y90.000 S800

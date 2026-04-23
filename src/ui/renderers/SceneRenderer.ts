@@ -26,6 +26,7 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { type BurnState } from '../../app/MachineService';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
 const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
@@ -408,6 +409,7 @@ export function renderSceneObjects(
   selectedIds?: ReadonlySet<string>,
   previewMode: boolean = false,
   options?: RenderSceneObjectsOptions,
+  burnState?: BurnState | null,
 ): void {
   const visibleBounds = transform.getVisibleWorldBounds(canvasWidth, canvasHeight);
 
@@ -591,7 +593,7 @@ export function renderSceneObjects(
     }
 
     try {
-      renderObject(ctx, obj, layer, transform);
+      renderObject(ctx, obj, layer, transform, burnState);
     } catch (err) {
       console.error('[Canvas] Failed to render object:', obj.id, err);
     }
@@ -671,9 +673,10 @@ export function renderScene(
   previewMode: boolean = false,
   machineWorkAreaMm: { width: number; height: number } | null = null,
   machineOverlay: SceneMachineOverlayOptions = {},
+  burnState?: BurnState | null,
 ): void {
   renderSceneBackground(ctx, scene, transform, canvasWidth, canvasHeight, machineWorkAreaMm, machineOverlay);
-  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode);
+  renderSceneObjects(ctx, scene, transform, canvasWidth, canvasHeight, selectedIds, previewMode, undefined, burnState);
 }
 
 // ─── BED ─────────────────────────────────────────────────────────
@@ -760,13 +763,18 @@ function renderObject(
   ctx: CanvasRenderingContext2D,
   obj: SceneObject,
   layer: Layer,
-  transform: Transform
+  transform: Transform,
+  burnState?: BurnState | null,
 ): void {
   const t = obj.transform;
   if (!isSafeObjectMatrix(t)) {
     console.error('[Canvas] Skipping object with non-finite transform matrix:', obj.id);
     return;
   }
+
+  const isActive = burnState?.activeIds.has(obj.id) === true;
+  const isBurned = burnState?.burnedIds.has(obj.id) === true;
+  const worldBounds = computeObjectBounds(obj);
 
   ctx.save();
   try {
@@ -777,23 +785,53 @@ function renderObject(
     }
 
     const modeColor = previewStrokeForMode(layer.settings.mode);
-    ctx.strokeStyle = modeColor;
+    if (isBurned) {
+      ctx.strokeStyle = '#6a8a6a';
+      ctx.globalAlpha = 0.35;
+    } else {
+      ctx.strokeStyle = modeColor;
+      ctx.globalAlpha = 1;
+    }
     ctx.lineWidth = transform.screenPx(1.2);
 
     const isFill = layer.settings.mode === 'engrave' || layer.settings.mode === 'image';
     if (isFill) {
-      ctx.fillStyle = `${modeColor}22`;
+      ctx.fillStyle = isBurned ? 'rgba(106,138,106,0.12)' : `${modeColor}22`;
     }
 
     drawGeometry(ctx, obj.geometry, transform, isFill, obj, layer);
 
     if (layer.settings.mode === 'engrave' && layer.settings.fill.enabled) {
-      drawFillPreview(ctx, obj, layer, transform, modeColor);
+      drawFillPreview(ctx, obj, layer, transform, isBurned ? '#6a8a6a' : modeColor);
     }
   } catch (err) {
     console.error('[Canvas] renderObject error:', obj.id, err);
   } finally {
     ctx.restore();
+  }
+
+  if (burnState && isRenderableAabb(worldBounds)) {
+    if (isActive) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(0, 212, 255, 0.9)';
+      ctx.lineWidth = transform.screenPx(3);
+      ctx.strokeRect(
+        worldBounds.minX,
+        worldBounds.minY,
+        worldBounds.maxX - worldBounds.minX,
+        worldBounds.maxY - worldBounds.minY,
+      );
+      ctx.restore();
+    }
+    if (isBurned) {
+      ctx.save();
+      ctx.font = `${transform.screenPx(10)}px system-ui, sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
+      ctx.fillText('✓', worldBounds.maxX, worldBounds.minY);
+      ctx.restore();
+    }
   }
 }
 

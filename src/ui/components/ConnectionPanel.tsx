@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { type JobReplay } from '../../core/replay/JobReplay';
 import {
   ConnectionPanelMain,
   type ConnectionPanelMainProps,
 } from './ConnectionPanelMain';
 import { JobOutcomeDialog } from './JobOutcomeDialog';
-import { useMachineService } from '../hooks/useMachineService';
+import { type MachineUiHook } from '../hooks/useMachineService';
 import {
   getActiveProfile,
   setActiveProfileId,
@@ -23,7 +23,9 @@ export type ConnectionPanelProps = Omit<
   | 'clearMessages'
   | 'isSimulator'
   | 'setSimulator'
->;
+> & {
+  machineUi: MachineUiHook;
+};
 
 const FONT = "'DM Sans', system-ui, sans-serif";
 
@@ -110,10 +112,8 @@ export function ConnectionPanel(props: ConnectionPanelProps) {
 }
 
 function ConnectionPanelLegacy(props: ConnectionPanelProps) {
-  const { controller, portRef, machineState, jobProgress } = props;
-  const controllerRef = useRef(controller);
-  controllerRef.current = controller;
-
+  const { machineUi, ...mainProps } = props;
+  const { controller, portRef, machineState, jobProgress } = mainProps;
   const {
     service: machineService,
     messages,
@@ -123,7 +123,7 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
     appendConsoleLine,
     isSimulator,
     setSimulator,
-  } = useMachineService({ controllerRef, portRef });
+  } = machineUi;
 
   const [currentReplay, setCurrentReplay] = useState<JobReplay | null>(null);
   const [showOutcome, setShowOutcome] = useState(false);
@@ -139,7 +139,7 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
   }, [controller, machineService, appendConsoleLine]);
 
   useEffect(() => {
-    const running = controllerRef.current?.isJobRunning ?? false;
+    const running = controller.isJobRunning ?? false;
     machineService.tryFinalizeJobLog(machineState, jobProgress, running, appendMessage);
   }, [
     machineState?.status,
@@ -166,7 +166,7 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
       : null;
 
   return React.createElement(ConnectionPanelMain, {
-    ...props,
+    ...mainProps,
     machineService,
     outcomeReplaySection,
     messages,
