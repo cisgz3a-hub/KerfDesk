@@ -142,6 +142,21 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         }
       }
 
+      // Template footer path does not call encodeRapid for RETURN_X/Y — it emits
+      // literal G0 X0 Y0 when returnPosition is (0,0), which is a no-op in G91.
+      // Inject the true relative return here so the head returns to the pre-Job
+      // position before the template block runs. Non-template footers already
+      // append this inside encodeFooter(); skip when no template to avoid duplicating.
+      if (this._relative && options?.gcodeFooterTemplate?.trim()) {
+        const backX = -this._prevPos.x;
+        const backY = -this._prevPos.y;
+        const eps = BaseGCodeStrategy._posEps;
+        if (Math.abs(backX) > eps || Math.abs(backY) > eps) {
+          lines.push(`G0 X${backX.toFixed(3)} Y${backY.toFixed(3)} ; return to start`);
+          this._prevPos = { x: 0, y: 0 };
+        }
+      }
+
       lines.push('');
       const previewFooter = this.encodeFooter(job, options, lines.length + 1);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
