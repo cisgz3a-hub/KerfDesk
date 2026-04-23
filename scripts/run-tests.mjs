@@ -177,6 +177,7 @@ const files = [
   'gcode-relative-return-template.test.ts',
   'origin-mode-wcs-zero.test.ts',
   'bed-height-resolver-parity.test.ts',
+  'start-mode-wcs-reset.test.ts',
   'fonts.test.ts',
   'frame-gcode-pure.test.ts',
   'frame-gcode-crosshair.test.ts',

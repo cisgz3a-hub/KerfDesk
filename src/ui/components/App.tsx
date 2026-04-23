@@ -48,6 +48,7 @@ import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { useMachineService } from '../hooks/useMachineService';
 import { GrblController } from '../../controllers/grbl/GrblController';
+import { sendResetWcsCommand } from '../../app/sendResetWcsCommand';
 import { CanvasViewport, type ViewportActions } from './CanvasViewport';
 import { ModeTabsOverlay } from './canvas/ModeTabsOverlay';
 import { LayerPanel } from './LayerPanel';
@@ -1064,7 +1065,15 @@ export function App() {
       ...scene,
       startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
     }, 'start-position');
-  }, [scene, handleSceneCommit]);
+    // When leaving Origin mode, clear any WCS offset that Set Origin
+    // applied. Bed mode assumes WCS == machine coords; Head mode is
+    // G91-relative and doesn't depend on WCS but users expect the X:Y
+    // readout to reflect machine coords after switching. Only 'savedOrigin'
+    // mode wants the WCS offset to persist (user will Set Origin manually).
+    if (mode !== 'savedOrigin') {
+      sendResetWcsCommand(grbl.controller);
+    }
+  }, [scene, handleSceneCommit, grbl.controller]);
 
   const handleExit = useCallback(async () => {
     const ctrl = grbl.controllerRef.current;
