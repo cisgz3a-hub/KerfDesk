@@ -72,6 +72,8 @@ export class WebSerialPort implements SerialPortLike {
     this._readLoopActive = false;
     this._isOpen = false;
 
+    const port = this._port;
+
     try {
       if (this._reader) {
         this._reader.cancel().catch(() => {});
@@ -82,8 +84,31 @@ export class WebSerialPort implements SerialPortLike {
         this._writer.releaseLock();
         this._writer = null;
       }
-      if (this._port) {
-        this._port.close().catch(() => {});
+      if (port) {
+        // Chain: close the handle, THEN revoke the permission grant.
+        // forget() is best-effort — browsers may reject it if the
+        // permission was granted by administrator policy, which we
+        // ignore. Not all browsers support forget() (Chrome 103+),
+        // so feature-detect. Electron ships Chromium new enough to
+        // have it, but guard for safety.
+        port
+          .close()
+          .then(() => {
+            if (typeof (port as any).forget === 'function') {
+              return (port as any).forget().catch(() => {
+                /* forget failed — e.g. policy-granted permission */
+              });
+            }
+          })
+          .catch(() => {
+            // close() failed — port likely already closed from the
+            // other side. Still try forget() to release the grant.
+            if (typeof (port as any).forget === 'function') {
+              (port as any).forget().catch(() => {
+                /* ignore */
+              });
+            }
+          });
         this._port = null;
       }
     } catch {
