@@ -103,6 +103,7 @@ import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
 import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
 import { entitlementService, tierDisplayName } from '../../entitlements';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { resolveBedHeightMm, resolveBedWidthMm } from '../../app/PipelineService';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -288,6 +289,16 @@ export function App() {
     void profileRevision;
     return getActiveProfileId();
   }, [profileRevision]);
+
+  const resolvedMachineBedWidthMm = useMemo(
+    () => resolveBedWidthMm(getActiveProfile(), machineBedFromGrbl),
+    [profileRevision, machineBedFromGrbl],
+  );
+  const resolvedMachineBedHeightMm = useMemo(
+    () => resolveBedHeightMm(getActiveProfile(), machineBedFromGrbl),
+    [profileRevision, machineBedFromGrbl],
+  );
+
   const allProfiles = useMemo(() => {
     void profileRevision;
     return getDeviceProfiles();
@@ -1466,8 +1477,8 @@ export function App() {
       onTogglePreview: handleTogglePreview,
       showToolpathPreview,
       machineMaxSpindle: grbl.controller?.maxSpindle ?? 1000,
-      machineBedWidth: machineBedFromGrbl?.width ?? scene.canvas.width,
-      machineBedHeight: machineBedFromGrbl?.height ?? scene.canvas.height,
+      machineBedWidth: resolvedMachineBedWidthMm,
+      machineBedHeight: resolvedMachineBedHeightMm,
       onOpenSettings: (tab?: SettingsTab) => {
         setSettingsInitialTab(tab ?? 'machine');
         setSettingsOpen(true);
@@ -1605,8 +1616,8 @@ export function App() {
           machineWorkAreaMm: machineBedFromGrbl,
           startMode,
           savedOrigin,
-          bedWidthMm: scene.canvas.width,
-          bedHeightMm: scene.canvas.height,
+          bedWidthMm: resolvedMachineBedWidthMm,
+          bedHeightMm: resolvedMachineBedHeightMm,
           originCorner: activeProfile?.originCorner ?? 'front-left',
           onViewportLayout: handleViewportLayout,
           interactableLayerIds,
@@ -1619,8 +1630,8 @@ export function App() {
             viewportZoom: bedTabLayout.zoom,
             activeMode: activeLayerMode,
             onSelectMode: handleModeTabSelect,
-            bedWidth: scene.canvas.width,
-            bedHeight: scene.canvas.height,
+            bedWidth: resolvedMachineBedWidthMm,
+            bedHeight: resolvedMachineBedHeightMm,
           }),
         ),
       ),
@@ -1639,8 +1650,8 @@ export function App() {
         setSettingsInitialTab(tab ?? 'machine');
         setSettingsOpen(true);
       },
-        bedWidth: scene.canvas.width,
-        bedHeight: scene.canvas.height,
+        bedWidth: resolvedMachineBedWidthMm,
+        bedHeight: resolvedMachineBedHeightMm,
         machinePlanBounds: activeJobTransform?.plan.bounds ?? null,
         boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
         boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
@@ -1755,14 +1766,14 @@ export function App() {
 
     gcodePreview && React.createElement(GcodePreview, {
       gcode: gcodePreview,
-      bedWidth: scene.canvas.width,
-      bedHeight: scene.canvas.height,
+      bedWidth: resolvedMachineBedWidthMm,
+      bedHeight: resolvedMachineBedHeightMm,
       onClose: () => setGcodePreview(null),
     }),
 
     dialogs.showMaterial && React.createElement(MaterialDialog, {
-      bedWidth: scene.canvas.width,
-      bedHeight: scene.canvas.height,
+      bedWidth: resolvedMachineBedWidthMm,
+      bedHeight: resolvedMachineBedHeightMm,
       current: scene.material ? { type: scene.material.type, name: scene.material.name, width: scene.material.width, height: scene.material.height, thickness: scene.material.thickness } : null,
       onConfirm: handleMaterialConfirm,
       onClear: handleMaterialClear,

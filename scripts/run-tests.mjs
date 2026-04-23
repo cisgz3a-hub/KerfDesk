@@ -54,6 +54,7 @@ const files = [
   'gcode-relative-mode.test.ts',
   'gcode-relative-return-template.test.ts',
   'origin-mode-wcs-zero.test.ts',
+  'bed-height-resolver-parity.test.ts',
   'fonts.test.ts',
 
   // E2E snapshot tests

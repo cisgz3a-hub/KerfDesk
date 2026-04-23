@@ -27,7 +27,20 @@ import {
 
 const DEFAULT_MACHINE_BED_MM = 300;
 
-function resolveBedHeightMm(
+/** Prefer controller $130/$131, then profile, then default — same priority as compile path. */
+export function resolveBedWidthMm(
+  profile: ReturnType<typeof getActiveProfile>,
+  machineBedFromController: { width: number; height: number } | null | undefined,
+): number {
+  const wCtrl = machineBedFromController?.width;
+  if (typeof wCtrl === 'number' && Number.isFinite(wCtrl) && wCtrl > 0) return wCtrl;
+  const wProf = profile?.bedWidth;
+  if (typeof wProf === 'number' && Number.isFinite(wProf) && wProf > 0) return wProf;
+  return DEFAULT_MACHINE_BED_MM;
+}
+
+/** Prefer controller $130/$131, then profile, then default — same priority as compile path. */
+export function resolveBedHeightMm(
   profile: ReturnType<typeof getActiveProfile>,
   machineBedFromController: { width: number; height: number } | null | undefined,
 ): number {
