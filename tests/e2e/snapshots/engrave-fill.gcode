@@ -4,10 +4,9 @@
 G21 ; mm mode
 G90 ; absolute positioning
 M5 S0
-G10 L20 P1 X0 Y0 ; zero WCS at head position (Head mode)
 
 ; --- Engrave (pass 1) ---
-; OBJ ids=mobl5kyr-4-qi1wrf
+; OBJ ids=mobm0szu-4-s0h9h2
 M4 S0
 G0 X0.000 Y29.900
 G1 X1.250 Y29.900 F3000 S0

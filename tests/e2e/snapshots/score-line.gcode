@@ -4,10 +4,9 @@
 G21 ; mm mode
 G90 ; absolute positioning
 M5 S0
-G10 L20 P1 X0 Y0 ; zero WCS at head position (Head mode)
 
 ; --- Score (pass 1) ---
-; OBJ ids=mobl5l89-4-iaula5
+; OBJ ids=mobm0tab-4-w01ytv
 G0 X0.000 Y0.000
 M4 S150
 G1 X160.000 Y0.000 F2200 S150

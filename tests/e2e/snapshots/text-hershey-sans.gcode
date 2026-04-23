@@ -4,41 +4,40 @@
 G21 ; mm mode
 G90 ; absolute positioning
 M5 S0
-G10 L20 P1 X0 Y0 ; zero WCS at head position (Head mode)
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X0.000 Y20.000
 M4 S800
 G1 X0.000 Y0.000 F150 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X0.000 Y10.476
 M4 S800
 G1 X13.333 Y10.476 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X10.476 Y10.476
 M4 S800
 G1 X18.095 Y10.476 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X19.048 Y20.000
 M4 S800
 G1 X19.048 Y0.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X19.048 Y0.000
 M4 S800
 G1 X30.476 Y0.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X25.714 Y0.000
 M4 S800
 G1 X37.143 Y0.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X37.143 Y20.000
 M4 S800
 G1 X35.238 Y19.048 S800
@@ -62,27 +61,27 @@ G1 X42.857 Y19.048 S800
 G1 X40.952 Y20.000 S800
 G1 X37.143 Y20.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X10.476 Y20.000
 M4 S800
 G1 X10.476 Y0.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X10.476 Y0.000
 M4 S800
 G1 X22.857 Y0.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X13.333 Y0.000
 M4 S800
 G1 X13.333 Y20.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X10.476 Y20.000
 M4 S800
 G1 X22.857 Y20.000 S800
 M5 S0
-; OBJ ids=mobl5kp7-3-d60d8s
+; OBJ ids=mobm0spw-3-7glleh
 G0 X25.714 Y20.000
 M4 S800
 G1 X25.714 Y0.000 S800

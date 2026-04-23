@@ -7,7 +7,7 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobl5m2t-3-ax1r8f
+; OBJ ids=mobm0u6w-3-1uj5rx
 G0 X100.000 Y95.000
 M4 S800
 G1 X140.000 Y95.000 F150 S800

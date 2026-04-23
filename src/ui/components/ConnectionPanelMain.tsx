@@ -667,15 +667,10 @@ export function ConnectionPanelMain({
       `Framing (safe): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    // Head mode frames at (0,0)–(designW,designH) in WCS space, which only
-    // lands at the jogged position if WCS is zeroed here first. Matches the
-    // G10 L20 injection in the gcode header for Head-mode jobs.
-    const zeroWcs = startMode === 'current' ? ['G10 L20 P1 X0 Y0'] : [];
     const lines: string[] = [
       'G90',
       'G21',
       'M5 S0',
-      ...zeroWcs,
       ...corners.map(c => `G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`),
       'M5 S0',
     ];
@@ -739,12 +734,8 @@ export function ConnectionPanelMain({
     const maxSpindle = activeProfile?.maxSpindle ?? 1000;
     const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
 
-    // See handleFrameSafe: Head-mode corners are in WCS space offset from
-    // (0,0); we must zero WCS at the head's physical position first.
-    const zeroWcs = startMode === 'current' ? ['G10 L20 P1 X0 Y0'] : [];
     const lines: string[] = [
       'G90', 'G21',
-      ...zeroWcs,
       // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
       `M4 S${frameDotS}`,
       ...corners.map(c => `G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`),

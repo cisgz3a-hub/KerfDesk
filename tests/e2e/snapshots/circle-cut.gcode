@@ -4,11 +4,10 @@
 G21 ; mm mode
 G90 ; absolute positioning
 M5 S0
-G10 L20 P1 X0 Y0 ; zero WCS at head position (Head mode)
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobl5mc6-3-xtjnv6
+; OBJ ids=mobm0ugi-3-ux44rv
 G0 X79.969 Y31.178
 M4 S800
 G1 X79.877 Y32.354 F150 S800
