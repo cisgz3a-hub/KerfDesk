@@ -50,6 +50,47 @@ export interface CompileJobOptions {
   machineAccelMmPerS2?: number | null;
 }
 
+/** Min/max plausible acceleration (mm/s²) for controller-reported and profile-sourced values. */
+const MIN_PLAUSIBLE_ACCEL_MM_PER_S2 = 100;
+const MAX_PLAUSIBLE_ACCEL_MM_PER_S2 = 20000;
+const DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2 = 1000;
+
+function isPlausibleMachineAccel(value: number | null | undefined): boolean {
+  return (
+    value != null
+    && Number.isFinite(value)
+    && value >= MIN_PLAUSIBLE_ACCEL_MM_PER_S2
+    && value <= MAX_PLAUSIBLE_ACCEL_MM_PER_S2
+  );
+}
+
+/**
+ * Picks an acceleration (mm/s²) for acceleration-aware raster power. Controller value wins if
+ * sensible; else profile; else 1000. A warning is emitted when the controller reported a value
+ * that was ignored and the profile was not a usable fallback (both bad / missing as appropriate).
+ * Exported for unit tests.
+ */
+export function resolveMaxAccelMmPerS2(
+  machineAccel: number | null | undefined,
+  profileAccel: number | null | undefined,
+): { value: number; warnImplausibleController: boolean; ignoredDetected?: number } {
+  if (isPlausibleMachineAccel(machineAccel)) {
+    return { value: machineAccel as number, warnImplausibleController: false };
+  }
+  if (isPlausibleMachineAccel(profileAccel)) {
+    return { value: profileAccel as number, warnImplausibleController: false };
+  }
+  const warn =
+    machineAccel != null
+    && !isPlausibleMachineAccel(machineAccel)
+    && !isPlausibleMachineAccel(profileAccel);
+  return {
+    value: DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2,
+    warnImplausibleController: warn,
+    ignoredDetected: warn ? Number(machineAccel) : undefined,
+  };
+}
+
 function vectorOpToOrderableShape(
   op: Operation,
   layerPhase: number,
@@ -277,12 +318,17 @@ function resolveSettings(
     }
   }
 
-  const detectedAccel = jobOpts?.machineAccelMmPerS2;
-  const accelFromProfile = profile?.maxAccelMmPerS2 ?? 1000;
-  const maxAccelMmPerS2 =
-    detectedAccel != null && Number.isFinite(detectedAccel) && detectedAccel > 0
-      ? detectedAccel
-      : accelFromProfile;
+  const { value: maxAccelMmPerS2, warnImplausibleController, ignoredDetected } = resolveMaxAccelMmPerS2(
+    jobOpts?.machineAccelMmPerS2,
+    profile?.maxAccelMmPerS2,
+  );
+  if (warnImplausibleController) {
+    console.warn(
+      `[JobCompiler] Controller reported implausible acceleration ${ignoredDetected} mm/s²; ` +
+        `expected range [${MIN_PLAUSIBLE_ACCEL_MM_PER_S2}, ${MAX_PLAUSIBLE_ACCEL_MM_PER_S2}]. ` +
+        `No usable profile fallback. Using default ${maxAccelMmPerS2} mm/s².`,
+    );
+  }
   const accelAwarePower =
     s.accelAwarePower ?? profile?.accelAwarePower ?? true;
   const minPowerRatioAccel =
