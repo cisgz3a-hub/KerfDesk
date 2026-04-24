@@ -17,8 +17,11 @@ import { type OutputFormat } from '../core/output/Output';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
+import '../core/output/GrblStrategy';
 import { getActiveProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
+import { generateTicketId, hashObject, hashString } from '../core/job/ticketHashing';
+import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
   DEFAULT_FOOTER_TEMPLATE_NAME,
@@ -66,6 +69,8 @@ export interface CompileGcodeResult {
   canvasMoves: Move[];
   canvasPlanBounds: AABB;
   failedTextObjects: string[];
+  /** Execution-contract ticket (phase 1: built here; consumed by later phases). */
+  ticket: ValidatedJobTicket;
 }
 
 export interface CompileToolpathResult {
@@ -167,13 +172,31 @@ export async function compileGcode(
   });
   if (!output.text) return null;
 
+  const gcode = output.text;
+  const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const ticket: ValidatedJobTicket = {
+    ticketId: generateTicketId(),
+    sceneHash: hashObject(sceneForJob),
+    profileHash: profile ? hashObject(profile) : hashString('no-profile'),
+    gcodeHash: hashString(gcode),
+    gcodeLines,
+    gcodeText: gcode,
+    machinePlanBounds: { ...machineTransform.plan.bounds },
+    machineTransform,
+    controllerType: 'grbl',
+    startMode,
+    savedOrigin,
+    createdAt: Date.now(),
+  };
+
   return {
-    gcode: output.text,
+    gcode,
     machineTransform,
     machinePlanBounds: { ...machineTransform.plan.bounds },
     canvasMoves,
     canvasPlanBounds,
     failedTextObjects,
+    ticket,
   };
 }
 

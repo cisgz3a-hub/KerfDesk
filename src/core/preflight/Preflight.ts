@@ -11,6 +11,7 @@ function negativeCoordPreflightSeverity(profile: DeviceProfile | null | undefine
 }
 import type { Scene } from '../scene/Scene';
 import { getOutputLayers } from '../scene/Scene';
+import type { ValidatedJobTicket } from '../job/ValidatedJobTicket';
 import {
   buildPreflightTemplateContext,
   resolveFooterTemplateForValidation,
@@ -185,6 +186,8 @@ export interface PreflightSummary {
   blockers: number;
   warnings: number;
   canStart: boolean;
+  /** When set, the compile-time job ticket merged in by the UI (phase 1+). */
+  validatedTicket?: ValidatedJobTicket;
 }
 
 function categorizeCode(code: string): 'machine' | 'design' | 'settings' | 'output' {

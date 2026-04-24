@@ -147,12 +147,12 @@ async function runAsyncTests(): Promise<void> {
     assert(!summary.canStart, 'summary has blockers');
     let alertCount = 0;
     let confirmCount = 0;
-    const ok = await confirmPreflightForJobStart(
+    const { confirmed } = await confirmPreflightForJobStart(
       summary,
       async () => { alertCount++; },
       async () => { confirmCount++; return true; },
     );
-    assert(!ok, 'returns false when blockers');
+    assert(!confirmed, 'returns false when blockers');
     assert(alertCount === 1, 'showAlert once');
     assert(confirmCount === 0, 'no confirm when blocked');
   }
@@ -169,13 +169,13 @@ async function runAsyncTests(): Promise<void> {
     assert(fullSummary.canStart, 'warning-only canStart');
     assert(fullSummary.warnings > 0, 'has warnings');
     let confirmCount = 0;
-    const ok = await confirmPreflightForJobStart(
+    const { confirmed } = await confirmPreflightForJobStart(
       fullSummary,
       async () => {},
       async () => { confirmCount++; return true; },
     );
     assert(confirmCount === 1, 'showConfirm for warnings');
-    assert(ok === true, 'user confirms');
+    assert(confirmed === true, 'user confirms');
   }
 }
 

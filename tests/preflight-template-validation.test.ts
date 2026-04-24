@@ -123,8 +123,8 @@ void (async () => {
   };
   const showConfirm = async () => true;
 
-  const ok = await confirmPreflightForJobStart(preflight, showAlert, showConfirm);
-  assert(ok === false, 'confirmPreflightForJobStart returns false when blockers present');
+  const { confirmed } = await confirmPreflightForJobStart(preflight, showAlert, showConfirm);
+  assert(confirmed === false, 'confirmPreflightForJobStart returns false when blockers present');
   assert(alertTitle === 'Cannot start job', 'confirmPreflightForJobStart shows cannot-start alert');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

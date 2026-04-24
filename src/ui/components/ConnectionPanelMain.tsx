@@ -12,7 +12,10 @@ import { textGeometryToPath } from '../../geometry/TextToPath';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflightSummary, type PreflightSummary, type PreflightIssue } from '../../core/preflight/Preflight';
-import { confirmPreflightForJobStart } from '../../core/preflight/confirmPreflightForJobStart';
+import {
+  confirmPreflightForJobStart,
+} from '../../core/preflight/confirmPreflightForJobStart';
+import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
 import { MAX_LASER_SPEED } from '../../core/types';
@@ -121,6 +124,8 @@ export interface ConnectionPanelMainProps {
   bedHeight: number;
   /** Machine-space plan bounds for preflight validation (from applyMachineTransform). */
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
+  /** Latest compile ticket (phase 1: threaded for confirm only; job path unchanged). */
+  compiledJobTicket?: ValidatedJobTicket | null;
   boundsMinX?: number;
   boundsMinY?: number;
   boundsMaxX?: number;
@@ -174,6 +179,7 @@ export function ConnectionPanelMain({
   bedWidth,
   bedHeight,
   machinePlanBounds = null,
+  compiledJobTicket = null,
   boundsMinX,
   boundsMinY,
   boundsMaxX,
@@ -325,8 +331,21 @@ export function ConnectionPanelMain({
       machinePlanBounds,
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
     );
-    setPreflight(result);
-  }, [gcode, machineState, scene, bedWidth, bedHeight, machinePlanBounds, activeProfile?.gcodeHeaderTemplate]);
+    setPreflight(
+      compiledJobTicket != null
+        ? { ...result, validatedTicket: compiledJobTicket }
+        : result,
+    );
+  }, [
+    gcode,
+    machineState,
+    scene,
+    bedWidth,
+    bedHeight,
+    machinePlanBounds,
+    activeProfile?.gcodeHeaderTemplate,
+    compiledJobTicket,
+  ]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;
@@ -586,8 +605,13 @@ export function ConnectionPanelMain({
     setIsPaused(false);
     setJobCompleted(false);
 
-    const okPreflight = await confirmPreflightForJobStart(preflight, showAlert, showConfirm);
-    if (!okPreflight) return;
+    const { confirmed } = await confirmPreflightForJobStart(
+      preflight,
+      showAlert,
+      showConfirm,
+      compiledJobTicket ?? undefined,
+    );
+    if (!confirmed) return;
 
     stopTestFire();
 

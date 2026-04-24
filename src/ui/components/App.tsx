@@ -448,6 +448,7 @@ export function App() {
     gcodeStale,
     setGcodeStale,
     sceneCompileTick,
+    lastResult,
   } = useCompileManager({
     scene,
     startMode,
@@ -1699,6 +1700,7 @@ export function App() {
         sidebarWidth: connectionSidebarWidth,
         productionMode,
         gcode: currentGcode,
+        compiledJobTicket: lastResult?.ticket ?? null,
         onClose: () => dialogs.setShowConnection(false),
         onDisconnect: () => dialogs.setShowConnection(false),
       onOpenSettings: (tab?: SettingsTab) => {

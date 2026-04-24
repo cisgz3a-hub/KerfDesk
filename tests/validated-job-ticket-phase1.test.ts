@@ -1,0 +1,147 @@
+/**
+ * ValidatedJobTicket phase 1 — hashing, compile ticket, confirmPreflight return shape.
+ * Run: npx tsx tests/validated-job-ticket-phase1.test.ts
+ */
+import { compileGcode } from '../src/app/PipelineService';
+import {
+  createBlankProfile,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
+import { confirmPreflightForJobStart } from '../src/core/preflight/confirmPreflightForJobStart';
+import { runPreflightSummary } from '../src/core/preflight/Preflight';
+import { generateTicketId, hashObject, hashString } from '../src/core/job/ticketHashing';
+import { createScene } from '../src/core/scene/Scene';
+import { addObject } from '../src/ui/history/SceneCommands';
+import { createRect } from '../src/core/scene/SceneObject';
+import { type MachineState } from '../src/controllers/ControllerInterface';
+
+let passed = 0;
+let failed = 0;
+
+function assert(cond: boolean, message: string): void {
+  if (cond) {
+    passed++;
+    console.log(`  ✓ ${message}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${message}`);
+  }
+}
+
+const memoryStore: Record<string, string> = {};
+
+function installMockLocalStorage(): void {
+  (globalThis as unknown as { localStorage: Storage }).localStorage = {
+    get length() {
+      return Object.keys(memoryStore).length;
+    },
+    clear(): void {
+      for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+    },
+    getItem(key: string): string | null {
+      return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+    },
+    key(index: number): string | null {
+      const keys = Object.keys(memoryStore);
+      return keys[index] ?? null;
+    },
+    removeItem(key: string): void {
+      delete memoryStore[key];
+    },
+    setItem(key: string, value: string): void {
+      memoryStore[key] = value;
+    },
+  } as Storage;
+}
+
+const idle: MachineState = {
+  status: 'idle',
+  position: { x: 0, y: 0, z: 0 },
+  feedRate: 0,
+  spindleSpeed: 0,
+  alarmCode: null,
+  errorCode: null,
+};
+
+console.log('\n=== validated-job-ticket phase 1 ===\n');
+
+{
+  assert(hashString('abc') === hashString('abc'), 'hashString deterministic');
+  assert(hashString('abc') !== hashString('abd'), 'hashString different inputs');
+}
+
+{
+  assert(
+    hashObject({ a: 1, b: 2 }) === hashObject({ b: 2, a: 1 }),
+    'hashObject key order independent',
+  );
+  assert(hashObject([1, 2]) !== hashObject([2, 1]), 'hashObject array order matters');
+}
+
+{
+  const a = generateTicketId();
+  const b = generateTicketId();
+  assert(a !== b, 'generateTicketId unique across calls');
+}
+
+void (async () => {
+  installMockLocalStorage();
+  for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  const p = createBlankProfile('TicketCompile');
+  p.bedWidth = 400;
+  p.bedHeight = 300;
+  saveDeviceProfile(p);
+  setActiveProfileId(p.id);
+
+  const s0 = createScene(400, 300, 'T');
+  const scene = addObject(s0, createRect(s0.layers[0].id, 20, 20, 40, 30));
+  const result = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null);
+  assert(result != null && result.ticket != null, 'compileGcode returns ticket');
+  if (result) {
+    assert(result.ticket.ticketId.length > 0, 'ticketId non-empty');
+    assert(/^[0-9a-f]{8}$/.test(result.ticket.sceneHash), 'sceneHash is 8 hex chars');
+    assert(result.ticket.gcodeHash === hashString(result.gcode), 'gcodeHash matches hashString(gcode)');
+    const lines = result.gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    assert(result.ticket.gcodeLines.length === lines.length, 'gcodeLines count matches trimmed gcode');
+    assert(result.ticket.startMode === 'absolute', 'ticket.startMode matches compile startMode');
+  }
+
+  const s2 = createScene(400, 300, 'T2');
+  const scene2 = addObject(s2, createRect(s2.layers[0].id, 5, 5, 20, 20));
+  const r2 = await compileGcode(scene2, 'current', { x: 1, y: 2 }, null, 'grbl', null, null);
+  assert(r2?.ticket.startMode === 'current', 'ticket.startMode current');
+  assert(r2?.ticket.savedOrigin?.x === 1 && r2.ticket.savedOrigin?.y === 2, 'ticket.savedOrigin');
+
+  const preflight = runPreflightSummary(scene2, r2?.gcode ?? null, idle, 400, 300, r2?.machinePlanBounds ?? null);
+  assert(preflight.canStart, 'preflight can start for compile scene');
+
+  const ticket = r2!.ticket;
+  const okWithTicket = await confirmPreflightForJobStart(
+    preflight,
+    async () => {},
+    async () => true,
+    ticket,
+  );
+  assert(
+    okWithTicket.confirmed && okWithTicket.ticket != null && okWithTicket.ticket.ticket === ticket,
+    'confirm with ticket returns ConfirmedJobTicket',
+  );
+
+  const okNoTicket = await confirmPreflightForJobStart(preflight, async () => {}, async () => true);
+  assert(okNoTicket.confirmed && okNoTicket.ticket === null, 'confirm without ticket returns ticket null');
+
+  const blocked = await confirmPreflightForJobStart(
+    { ...preflight, canStart: false, blockers: 1 },
+    async () => {},
+    async () => true,
+    ticket,
+  );
+  assert(!blocked.confirmed && blocked.ticket === null, 'blockers → confirmed false, ticket null');
+
+  console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
+  process.exit(failed > 0 ? 1 : 0);
+})().catch((e: unknown) => {
+  console.error(e);
+  process.exit(1);
+});
