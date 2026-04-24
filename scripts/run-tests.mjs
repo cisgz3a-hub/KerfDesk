@@ -40,6 +40,7 @@ const files = [
   'preflight-template-validation.test.ts',
   'storage-adapter-contract.test.ts',
   'storage-filesystem-unit.test.ts',
+  'storage-singleton.test.ts',
   'validated-job-ticket-phase1.test.ts',
   'validated-job-ticket-mismatch.test.ts',
   'preflight.test.ts',

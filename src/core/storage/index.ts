@@ -4,3 +4,4 @@ export { IndexedDbStorageAdapter } from './IndexedDbStorageAdapter';
 export { FilesystemStorageAdapter } from './FilesystemStorageAdapter';
 export type { StorageIpc } from './FilesystemStorageAdapter';
 export { createDefaultStorage } from './bootstrap';
+export { storage, getStorage, setStorageForTest } from './storage';
