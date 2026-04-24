@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
+import { storageGet, storageSet, storageRemove, storageList, storageClear } from './storage';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -173,6 +174,43 @@ ipcMain.handle('dialog:open', async () => {
   const filePath = result.filePaths[0];
   const content = fs.readFileSync(filePath, 'utf-8');
   return { filePath, content, ext: path.extname(filePath).toLowerCase() };
+});
+
+function assertNonEmptyString(value: unknown, label: string): asserts value is string {
+  if (typeof value !== 'string' || value.length === 0) {
+    throw new Error(`Invalid ${label}`);
+  }
+}
+
+function assertOptionalString(value: unknown, label: string): asserts value is string | undefined {
+  if (value != null && typeof value !== 'string') {
+    throw new Error(`Invalid ${label}`);
+  }
+}
+
+ipcMain.handle('storage:get', (_event, key: unknown) => {
+  assertNonEmptyString(key, 'storage key');
+  return storageGet(key);
+});
+
+ipcMain.handle('storage:set', (_event, key: unknown, value: unknown) => {
+  assertNonEmptyString(key, 'storage key');
+  if (typeof value !== 'string') throw new Error('Invalid storage value');
+  storageSet(key, value);
+});
+
+ipcMain.handle('storage:remove', (_event, key: unknown) => {
+  assertNonEmptyString(key, 'storage key');
+  storageRemove(key);
+});
+
+ipcMain.handle('storage:list', (_event, prefix: unknown) => {
+  assertOptionalString(prefix, 'storage prefix');
+  return storageList(prefix);
+});
+
+ipcMain.handle('storage:clear', () => {
+  storageClear();
 });
 
 // ─── SERIAL / GRBL ───────────────────────────────────────────────

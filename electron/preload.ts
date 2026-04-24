@@ -14,6 +14,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   disconnectPort: () => ipcRenderer.invoke('serial:disconnect') as Promise<void>,
   sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,
   quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
+  storageGet: (key: string) => ipcRenderer.invoke('storage:get', key) as Promise<string | null>,
+  storageSet: (key: string, value: string) =>
+    ipcRenderer.invoke('storage:set', key, value) as Promise<void>,
+  storageRemove: (key: string) => ipcRenderer.invoke('storage:remove', key) as Promise<void>,
+  storageList: (prefix?: string) => ipcRenderer.invoke('storage:list', prefix) as Promise<string[]>,
+  storageClear: () => ipcRenderer.invoke('storage:clear') as Promise<void>,
 
   // ─── Falcon WiFi (Phase 1: read-only status monitoring) ─────────
   falconWifi: {

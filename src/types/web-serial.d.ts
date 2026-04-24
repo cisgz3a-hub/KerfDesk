@@ -13,6 +13,11 @@ declare global {
     disconnectPort?: () => Promise<void>;
     sendGcode?: (cmd: string) => Promise<void>;
     quit?: () => Promise<void>;
+    storageGet?: (key: string) => Promise<string | null>;
+    storageSet?: (key: string, value: string) => Promise<void>;
+    storageRemove?: (key: string) => Promise<void>;
+    storageList?: (prefix?: string) => Promise<string[]>;
+    storageClear?: () => Promise<void>;
   }
 
   interface Window {

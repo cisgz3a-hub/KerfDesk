@@ -38,6 +38,8 @@ const files = [
   'preflight-negative-coords.test.ts',
   'gcode-template-validator.test.ts',
   'preflight-template-validation.test.ts',
+  'storage-adapter-contract.test.ts',
+  'storage-filesystem-unit.test.ts',
   'validated-job-ticket-phase1.test.ts',
   'validated-job-ticket-mismatch.test.ts',
   'preflight.test.ts',
