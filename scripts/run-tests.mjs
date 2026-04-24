@@ -86,6 +86,7 @@ const files = [
   'velocity-profile.test.ts',
   'plan-accel-sanity.test.ts',
   'scene-canvas-machine-coord-check.test.ts',
+  'no-localstorage-in-core.test.ts',
   'burn-moves-2d.test.ts',
   'scanning-offset.test.ts',
   'smart-overscan.test.ts',
