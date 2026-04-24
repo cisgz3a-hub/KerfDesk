@@ -23,6 +23,14 @@ type ModalInternal =
       defaultValue?: string;
       placeholder?: string;
       resolve: (value: string | null) => void;
+    }
+  | {
+      variant: 'confirmWithCheckbox';
+      title: string;
+      message: string;
+      details?: string;
+      checkboxLabel: string;
+      resolve: (result: { ok: boolean; checkboxChecked: boolean }) => void;
     };
 
 export function useModal() {
@@ -52,6 +60,24 @@ export function useModal() {
     });
   }, []);
 
+  const showConfirmWithCheckbox = useCallback((
+    title: string,
+    message: string,
+    checkboxLabel: string,
+    details?: string,
+  ): Promise<{ ok: boolean; checkboxChecked: boolean }> => {
+    return new Promise(resolve => {
+      setModal({
+        variant: 'confirmWithCheckbox',
+        title,
+        message,
+        details,
+        checkboxLabel,
+        resolve,
+      });
+    });
+  }, []);
+
   const showPrompt = useCallback((
     title: string,
     message: string,
@@ -75,7 +101,8 @@ export function useModal() {
   const dismissModal = useCallback(() => {
     setModal(m => {
       if (!m) return null;
-      if (m.variant === 'confirm') m.resolve(false);
+      if (m.variant === 'confirmWithCheckbox') m.resolve({ ok: false, checkboxChecked: false });
+      else if (m.variant === 'confirm') m.resolve(false);
       else if (m.variant === 'prompt') m.resolve(null);
       else m.resolve();
       return null;
@@ -106,14 +133,27 @@ export function useModal() {
     });
   }, []);
 
+  const finishConfirmWithCheckbox = useCallback(
+    (result: { ok: boolean; checkboxChecked: boolean }) => {
+      setModal(m => {
+        if (!m || m.variant !== 'confirmWithCheckbox') return null;
+        m.resolve(result);
+        return null;
+      });
+    },
+    [],
+  );
+
   return {
     modal,
     showAlert,
     showConfirm,
+    showConfirmWithCheckbox,
     showPrompt,
     dismissModal,
     finishAlert,
     finishConfirm,
+    finishConfirmWithCheckbox,
     finishPrompt,
   };
 }

@@ -136,6 +136,30 @@ export class MockSerialPort implements SerialPortLike {
     if (line === '') return ['ok'];
     if (line.startsWith(';')) return [];
 
+    if (line === '$$') {
+      return [
+        '$10=0',
+        '$22=0',
+        '$23=0',
+        '$32=0',
+        '$30=1000.000',
+        '$110=10000.000',
+        '$111=10000.000',
+        '$120=10.000',
+        '$121=10.000',
+        '$130=200.000',
+        '$131=200.000',
+        'ok',
+      ];
+    }
+    if (line === '$#') {
+      return [
+        '[G54:0.000,0.000,0.000]',
+        '[G55:0.000,0.000,0.000]',
+        'ok',
+      ];
+    }
+
     if (line.startsWith('$J=')) {
       const upper = line.toUpperCase();
       const xMatch = line.match(/[Xx]([0-9.-]+)/);

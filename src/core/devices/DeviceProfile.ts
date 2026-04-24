@@ -136,6 +136,13 @@ export interface DeviceProfile {
   autoFocusTimeoutMs?: number;
 
   /**
+   * When true, skip the WCS-mutation consent dialog on connect for this profile
+   * and always apply the LaserForge GRBL baseline (G54=0, $10=0). Set from the
+   * connect-time “don’t ask again” checkbox, or the Machine settings tab.
+   */
+  suppressWcsConsent?: boolean;
+
+  /**
    * Optional connection metadata. When omitted, the profile is treated as
    * serial/GRBL (the historical shape). Present for Falcon A1 Pro WiFi
    * profiles so the UI can pick the correct connection & status widgets.

@@ -78,6 +78,12 @@ export type ObjectLifecycleCallback = (
 ) => void;
 export type Unsubscribe = () => void;
 
+/** Snapshot of work coordinate system and status report mask before LaserForge WCS baseline is applied. */
+export interface WcsConsentSnapshot {
+  g54: { x: number; y: number; z: number };
+  statusMask: number;
+}
+
 export interface LaserController {
   readonly protocolName: string;
   readonly state: MachineState;
@@ -105,6 +111,27 @@ export interface LaserController {
    * GRBL: $22 homing cycle. `true` = enabled, `false` = disabled, `undefined` if not read yet.
    */
   getFirmwareHomingCycleEnabled?(): boolean | undefined;
+  /**
+   * GRBL: G54 (from the last $#) and $10 (from the last $$). Nulls until a successful dump
+   * during the current connect handshake.
+   */
+  getCurrentWcsState?(): { g54: { x: number; y: number; z: number } | null; statusMask: number | null };
+  /**
+   * GRBL: Fired when connect-time normalization would change G54 and/or $10. Call
+   * `applyWcsNormalization` to apply the baseline, or `skipWcsNormalization` to leave
+   * firmware as-is. Not all controllers implement this.
+   */
+  onWcsConsentNeeded?(callback: (state: WcsConsentSnapshot) => void): Unsubscribe;
+  /**
+   * GRBL: Apply G10 L2 (G54=0) and $10=0. Only call after the user has agreed in response
+   * to `onWcsConsentNeeded` (or when the controller auto-applied because the machine was
+   * already in the baseline state).
+   */
+  applyWcsNormalization?(): void;
+  /**
+   * GRBL: Mark settings handshake done without writing G10 / $10 (user declined or error).
+   */
+  skipWcsNormalization?(): void;
   requestStatusReport(): void;
 
   onStateChange(callback: StateChangeCallback): Unsubscribe;

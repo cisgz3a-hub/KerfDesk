@@ -161,6 +161,8 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
         'Default for new image layers. Per-layer override available.'),
       checkboxField('Smart overscan sizing (default)', 'smartOverscanEnabled',
         'Compute overscan from speed + acceleration. Per-layer override.'),
+      checkboxField('Skip WCS normalization prompt on connect', 'suppressWcsConsent',
+        'If checked, LaserForge will silently set G54 to (0,0,0) and $10=0 on each connect for this machine, without asking.'),
     ),
   );
 }

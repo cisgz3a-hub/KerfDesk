@@ -37,6 +37,8 @@ const files = [
   'controller-stop-safety.test.ts',
   'autofocus.test.ts',
   'machine-service-pause-resume.test.ts',
+  'wcs-mutation-consent.test.ts',
+  'modal-confirm-with-checkbox.test.tsx',
   'falcon-serial-profile.test.ts',
   'falcon-autofocus-heal.test.ts',
   'material-preset-schema.test.ts',

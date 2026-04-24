@@ -15,6 +15,7 @@ import {
   type RawLineCallback,
   type ObjectLifecycleCallback,
   type Unsubscribe,
+  type WcsConsentSnapshot,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { computeStreamingHealth } from './streamingHealth';
@@ -27,6 +28,7 @@ const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
 
 const GRBL_SETTING_LINE = /^\$(\d+)=(.+)$/;
+const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 
 interface PendingLine {
   text: string;
@@ -128,6 +130,10 @@ export class GrblController implements LaserController {
   private _maxAccelY = 0;
   /** Waiting for trailing `ok` after a `$$` settings dump. */
   private _awaitingSettingsOk = false;
+  /** Waiting for `ok` after a `$#` WCS / parameter report. */
+  private _awaitingWcsQueryOk = false;
+  private _currentG54: { x: number; y: number; z: number } | null = null;
+  private _wcsConsentListeners = new Set<(state: WcsConsentSnapshot) => void>();
 
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -348,6 +354,8 @@ export class GrblController implements LaserController {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
+    this._awaitingWcsQueryOk = false;
+    this._currentG54 = null;
     this._grblSettings.clear();
     this._resetMachineSettingsCache();
     this._updateStatus('disconnected');
@@ -611,6 +619,122 @@ export class GrblController implements LaserController {
     return () => this._objectLifecycleListeners.delete(cb);
   }
 
+  onWcsConsentNeeded(callback: (state: WcsConsentSnapshot) => void): Unsubscribe {
+    this._wcsConsentListeners.add(callback);
+    return () => this._wcsConsentListeners.delete(callback);
+  }
+
+  getCurrentWcsState(): { g54: { x: number; y: number; z: number } | null; statusMask: number | null } {
+    const mask = this._grblSettings.get(10);
+    const m = mask != null ? parseInt(mask, 10) : NaN;
+    return {
+      g54: this._currentG54,
+      statusMask: Number.isFinite(m) ? m : null,
+    };
+  }
+
+  /**
+   * Apply the LaserForge-standard WCS and status-report mask. Call after user consent
+   * (or when the machine was already in the baseline state and no prompt was needed).
+   */
+  applyWcsNormalization(): void {
+    if (!this._port?.isOpen) return;
+    this._writeSystemLine('G10 L2 P1 X0 Y0 Z0');
+    this._writeSystemLine('$10=0');
+    this._settingsQueried = true;
+    console.log(
+      '[GRBL] Machine: ' +
+        this._bedWidth +
+        'x' +
+        this._bedHeight +
+        'mm, $23=' +
+        this._homingDir +
+        ', laser=' +
+        this._laserMode
+    );
+    for (const cb of this._stateListeners) {
+      cb({ ...this._state });
+    }
+  }
+
+  /** Mark the post-connect settings handshake done without writing G10 / $10. */
+  skipWcsNormalization(): void {
+    this._settingsQueried = true;
+    for (const cb of this._stateListeners) {
+      cb({ ...this._state });
+    }
+  }
+
+  private _tryParseG54WcsLine(line: string): void {
+    const m = line.match(GRBL_G54_WCS_LINE);
+    if (!m) return;
+    const x = parseFloat(m[1]);
+    const y = parseFloat(m[2]);
+    const z = parseFloat(m[3]);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+      this._currentG54 = { x, y, z };
+    }
+  }
+
+  private _onSettingsDollarOk(): void {
+    if (!this._awaitingSettingsOk) return;
+    this._awaitingSettingsOk = false;
+    if (!this._port?.isOpen) return;
+    this._queryWcsOffsets();
+  }
+
+  private _queryWcsOffsets(): void {
+    if (!this._port?.isOpen) return;
+    this._currentG54 = null;
+    this._awaitingWcsQueryOk = true;
+    this._writeSystemLine('$#');
+  }
+
+  private _onWcsQueryOk(): void {
+    this._awaitingWcsQueryOk = false;
+    this._emitWcsConsentNeeded();
+  }
+
+  private _emitWcsConsentNeeded(): void {
+    const g54 = this._currentG54;
+    const maskRaw = this._grblSettings.get(10);
+    const parsed = maskRaw != null ? parseInt(maskRaw, 10) : 0;
+    const mask = Number.isFinite(parsed) ? parsed : 0;
+
+    const g54IsZero = g54
+      ? Math.abs(g54.x) < 0.0005 && Math.abs(g54.y) < 0.0005 && Math.abs(g54.z) < 0.0005
+      : true;
+    const maskIsZero = mask === 0;
+
+    if (g54IsZero && maskIsZero) {
+      this.applyWcsNormalization();
+      return;
+    }
+
+    this._emitWcsPayload(g54, mask);
+  }
+
+  private _emitWcsPayload(
+    g54: { x: number; y: number; z: number } | null,
+    mask: number,
+  ): void {
+    if (this._wcsConsentListeners.size === 0) {
+      console.warn(
+        '[GrblController] onWcsConsentNeeded would fire with no listeners — applying WCS normalization without user prompt. '
+        + 'This is expected in headless tests; if a UI is expected, subscribe before connect or there is a race.',
+      );
+      this.applyWcsNormalization();
+      return;
+    }
+    const payload: WcsConsentSnapshot = {
+      g54: g54 ?? { x: 0, y: 0, z: 0 },
+      statusMask: mask,
+    };
+    for (const cb of this._wcsConsentListeners) {
+      cb(payload);
+    }
+  }
+
   private _emitObjectLifecycle(activeObjectIds: readonly string[]): void {
     const key = activeObjectIds.length === 0 ? '' : [...activeObjectIds].sort().join('\0');
     if (this._lastLifecycleKey !== null && key === this._lastLifecycleKey) return;
@@ -623,9 +747,24 @@ export class GrblController implements LaserController {
   // ─── LINE HANDLER ───────────────────────────────────────────
 
   private _handleLine(line: string): void {
+    if (this._awaitingWcsQueryOk) {
+      if (line === 'ok') {
+        this._onWcsQueryOk();
+        return;
+      }
+      if (line.startsWith('error:')) {
+        this._awaitingWcsQueryOk = false;
+        this._currentG54 = null;
+        this.skipWcsNormalization();
+        return;
+      }
+      this._tryParseG54WcsLine(line);
+      return;
+    }
+
     if (this._awaitingSettingsOk) {
       if (line === 'ok') {
-        this._finalizeMachineSettingsQuery();
+        this._onSettingsDollarOk();
         return;
       }
       if (line.startsWith('error:')) {
@@ -1050,31 +1189,6 @@ export class GrblController implements LaserController {
         break;
     }
     return true;
-  }
-
-  private _finalizeMachineSettingsQuery(): void {
-    if (!this._awaitingSettingsOk) return;
-    this._awaitingSettingsOk = false;
-    if (!this._port?.isOpen) return;
-
-    this._settingsQueried = true;
-    // LaserForge G-code assumes a predictable WCS + status mask. Without this, stale
-    // G54 offsets or $10 masks from other software cause jobs in the wrong place / wrong parser behavior.
-    this._writeSystemLine('G10 L2 P1 X0 Y0 Z0');
-    this._writeSystemLine('$10=0');
-    console.log(
-      '[GRBL] Machine: ' +
-        this._bedWidth +
-        'x' +
-        this._bedHeight +
-        'mm, $23=' +
-        this._homingDir +
-        ', laser=' +
-        this._laserMode
-    );
-    for (const cb of this._stateListeners) {
-      cb({ ...this._state });
-    }
   }
 
   /**

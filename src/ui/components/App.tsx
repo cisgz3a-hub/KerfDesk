@@ -115,10 +115,12 @@ export function App() {
     modal,
     showAlert,
     showConfirm,
+    showConfirmWithCheckbox,
     showPrompt,
     dismissModal,
     finishAlert,
     finishConfirm,
+    finishConfirmWithCheckbox,
     finishPrompt,
   } = useModal();
   const dialogs = useDialogs();
@@ -318,6 +320,49 @@ export function App() {
     saveDeviceProfile(updated);
     refreshProfiles();
   }, [refreshProfiles]);
+
+  useEffect(() => {
+    const ctrl = grbl.controller;
+    if (!ctrl || typeof ctrl.onWcsConsentNeeded !== 'function') return;
+
+    return ctrl.onWcsConsentNeeded(async ({ g54, statusMask }) => {
+      const profile = getActiveProfile();
+      if (profile?.suppressWcsConsent === true) {
+        ctrl.applyWcsNormalization?.();
+        return;
+      }
+
+      const g54Line = `G54 offset: X=${g54.x.toFixed(3)} Y=${g54.y.toFixed(3)} Z=${g54.z.toFixed(3)}`;
+      const maskLine = `$10 status mask: ${statusMask}`;
+
+      const result = await showConfirmWithCheckbox(
+        'Normalize machine settings?',
+        'LaserForge requires G54 = (0,0,0) and $10 = 0 for reliable job placement.\n\n'
+          + 'Your machine currently has:\n'
+          + g54Line + '\n'
+          + maskLine
+          + '\n\n'
+          + 'Normalize now? (Decline to leave settings unchanged — job placement is your responsibility.)',
+        "Don't ask again for this profile",
+      );
+
+      if (result.checkboxChecked) {
+        const p = getActiveProfile();
+        if (p) {
+          const updated: DeviceProfile = { ...p, suppressWcsConsent: true };
+          saveDeviceProfile(updated);
+          refreshProfiles();
+        }
+      }
+
+      if (result.ok) {
+        ctrl.applyWcsNormalization?.();
+      } else {
+        ctrl.skipWcsNormalization?.();
+      }
+    });
+  }, [grbl.controller, showConfirmWithCheckbox, refreshProfiles]);
+
   const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
     target.scanningOffsets = previous.scanningOffsets;
     target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
@@ -334,6 +379,7 @@ export function App() {
     target.maxRateY = previous.maxRateY;
     target.maxAccelX = previous.maxAccelX;
     target.maxAccelY = previous.maxAccelY;
+    if (previous.suppressWcsConsent) target.suppressWcsConsent = true;
   }, []);
   const setActiveProfileAndApply = useCallback((id: string | null) => {
     setActiveProfileId(id);
@@ -1934,6 +1980,7 @@ export function App() {
     }),
 
     modal && React.createElement(AppModal, {
+      key: `${modal.variant}-${modal.title}`,
       title: modal.title,
       message: modal.message,
       details: modal.details,
@@ -1942,6 +1989,9 @@ export function App() {
         ? { defaultValue: modal.defaultValue, placeholder: modal.placeholder }
         : undefined,
       onPromptSubmit: modal.variant === 'prompt' ? (v: string) => finishPrompt(v) : undefined,
+      confirmWithCheckbox: modal.variant === 'confirmWithCheckbox'
+        ? { label: modal.checkboxLabel, onResult: finishConfirmWithCheckbox }
+        : undefined,
       buttons: modal.variant === 'alert'
         ? [{ label: 'OK', action: finishAlert, primary: true }]
         : modal.variant === 'confirm'
@@ -1949,10 +1999,12 @@ export function App() {
               { label: 'Cancel', action: () => finishConfirm(false) },
               { label: 'OK', action: () => finishConfirm(true), primary: true },
             ]
-          : [
-              { label: 'Cancel', action: () => finishPrompt(null) },
-              { label: 'OK', action: () => {}, primary: true },
-            ],
+          : modal.variant === 'confirmWithCheckbox'
+            ? []
+            : [
+                { label: 'Cancel', action: () => finishPrompt(null) },
+                { label: 'OK', action: () => {}, primary: true },
+              ],
     }),
   );
 }

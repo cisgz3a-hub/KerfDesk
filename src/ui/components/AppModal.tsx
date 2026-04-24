@@ -11,6 +11,7 @@ interface AppModalProps {
   title: string;
   message: string;
   details?: string;
+  /** Standard footer buttons. Ignored when `confirmWithCheckbox` is set. */
   buttons: ModalButton[];
   onClose: () => void;
   /** When set, shows a text field (prompt mode). */
@@ -19,11 +20,19 @@ interface AppModalProps {
     placeholder?: string;
   };
   onPromptSubmit?: (value: string) => void;
+  /** Optional checkbox + OK/Cancel; uses `onResult` instead of `buttons`. */
+  confirmWithCheckbox?: {
+    label: string;
+    onResult: (result: { ok: boolean; checkboxChecked: boolean }) => void;
+  };
 }
 
-export function AppModal({ title, message, details, buttons, onClose, prompt, onPromptSubmit }: AppModalProps) {
+export function AppModal({
+  title, message, details, buttons, onClose, prompt, onPromptSubmit, confirmWithCheckbox,
+}: AppModalProps) {
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
   const [inputValue, setInputValue] = useState(prompt?.defaultValue ?? '');
+  const [checkboxChecked, setCheckboxChecked] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -71,6 +80,21 @@ export function AppModal({ title, message, details, buttons, onClose, prompt, on
             fontFamily: "'JetBrains Mono', monospace",
           },
         }, details),
+        confirmWithCheckbox && React.createElement('label', {
+          style: {
+            display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 16,
+            cursor: 'pointer', userSelect: 'none' as const, fontSize: 12, color: '#a8a8c0',
+            lineHeight: 1.45,
+          },
+        },
+          React.createElement('input', {
+            type: 'checkbox',
+            checked: checkboxChecked,
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => setCheckboxChecked(e.target.checked),
+            style: { marginTop: 2, width: 14, height: 14, flexShrink: 0, cursor: 'pointer' },
+          }),
+          confirmWithCheckbox.label,
+        ),
         prompt && React.createElement('input', {
           ref: inputRef,
           type: 'text',
@@ -97,25 +121,48 @@ export function AppModal({ title, message, details, buttons, onClose, prompt, on
       React.createElement('div', {
         style: { padding: '12px 20px', borderTop: '1px solid #1a1a2e', display: 'flex', justifyContent: 'flex-end', gap: 8 },
       },
-        ...buttons.map((btn, i) =>
-          React.createElement('button', {
-            key: i,
-            type: 'button',
-            onClick: () => {
-              if (prompt && btn.primary && onPromptSubmit) {
-                onPromptSubmit(inputValue);
-              } else {
-                btn.action();
-              }
-            },
-            style: {
-              padding: '7px 18px', fontSize: 12, fontWeight: btn.primary ? 600 : 400,
-              cursor: 'pointer', fontFamily: font, borderRadius: 6,
-              background: btn.primary ? `rgba(${rgb(btn.color)}, 0.1)` : 'transparent',
-              border: btn.primary ? `1px solid rgba(${rgb(btn.color)}, 0.4)` : '1px solid #252540',
-              color: btn.primary ? `rgb(${rgb(btn.color)})` : '#8888aa',
-            },
-          }, btn.label),
+        ...(confirmWithCheckbox
+          ? [
+            React.createElement('button', {
+              key: 'c',
+              type: 'button',
+              onClick: () => { confirmWithCheckbox.onResult({ ok: false, checkboxChecked: false }); },
+              style: {
+                padding: '7px 18px', fontSize: 12, fontWeight: 400, cursor: 'pointer', fontFamily: font, borderRadius: 6,
+                background: 'transparent', border: '1px solid #252540', color: '#8888aa',
+              },
+            }, 'Cancel'),
+            React.createElement('button', {
+              key: 'o',
+              type: 'button',
+              onClick: () => { confirmWithCheckbox.onResult({ ok: true, checkboxChecked }); },
+              style: {
+                padding: '7px 18px', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: font, borderRadius: 6,
+                background: `rgba(${rgb()}, 0.1)`, border: `1px solid rgba(${rgb()}, 0.4)`,
+                color: `rgb(${rgb()})`,
+              },
+            }, 'OK'),
+          ]
+          : buttons.map((btn, i) =>
+            React.createElement('button', {
+              key: i,
+              type: 'button',
+              onClick: () => {
+                if (prompt && btn.primary && onPromptSubmit) {
+                  onPromptSubmit(inputValue);
+                } else {
+                  btn.action();
+                }
+              },
+              style: {
+                padding: '7px 18px', fontSize: 12, fontWeight: btn.primary ? 600 : 400,
+                cursor: 'pointer', fontFamily: font, borderRadius: 6,
+                background: btn.primary ? `rgba(${rgb(btn.color)}, 0.1)` : 'transparent',
+                border: btn.primary ? `1px solid rgba(${rgb(btn.color)}, 0.4)` : '1px solid #252540',
+                color: btn.primary ? `rgb(${rgb(btn.color)})` : '#8888aa',
+              },
+            }, btn.label),
+          )
         ),
       ),
     ),
