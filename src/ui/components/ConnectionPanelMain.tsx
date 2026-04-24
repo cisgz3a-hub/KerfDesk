@@ -11,7 +11,7 @@ import { type PathGeometry, type TextGeometry } from '../../core/scene/SceneObje
 import { textGeometryToPath } from '../../geometry/TextToPath';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
-import { runPreflightSummary, type PreflightSummary, type PreflightIssue } from '../../core/preflight/Preflight';
+import { runPreflightSummary, type PreflightSummary } from '../../core/preflight/Preflight';
 import {
   confirmPreflightForJobStart,
 } from '../../core/preflight/confirmPreflightForJobStart';
@@ -95,6 +95,36 @@ function playCompletionBeep(): void {
   } catch {
     /* Audio not available */
   }
+}
+
+function samePreflightSummary(a: PreflightSummary, b: PreflightSummary): boolean {
+  if (
+    a.score !== b.score ||
+    a.canStart !== b.canStart ||
+    a.blockers !== b.blockers ||
+    a.warnings !== b.warnings
+  ) {
+    return false;
+  }
+  if (a.validatedTicket?.ticketId !== b.validatedTicket?.ticketId) return false;
+  const ia = a.issues;
+  const ib = b.issues;
+  if (ia.length !== ib.length) return false;
+  for (let i = 0; i < ia.length; i++) {
+    const x = ia[i];
+    const y = ib[i];
+    if (
+      x.id !== y.id ||
+      x.severity !== y.severity ||
+      x.category !== y.category ||
+      x.title !== y.title ||
+      x.detail !== y.detail ||
+      x.fix !== y.fix
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 export interface ConnectionPanelMainProps {
@@ -321,6 +351,15 @@ export function ConnectionPanelMain({
     if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
   }, [messages]);
 
+  const preflightMachinePresent = machineState != null;
+  const preflightMachineStatus = machineState?.status ?? null;
+  const preflightMachineAlarm = machineState?.alarmCode ?? null;
+  const preflightPlanMinX = machinePlanBounds?.minX ?? null;
+  const preflightPlanMinY = machinePlanBounds?.minY ?? null;
+  const preflightPlanMaxX = machinePlanBounds?.maxX ?? null;
+  const preflightPlanMaxY = machinePlanBounds?.maxY ?? null;
+  const preflightGcodeHeaderTemplate = activeProfile?.gcodeHeaderTemplate ?? null;
+
   useEffect(() => {
     const result = runPreflightSummary(
       scene,
@@ -331,19 +370,25 @@ export function ConnectionPanelMain({
       machinePlanBounds,
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
     );
-    setPreflight(
-      compiledJobTicket != null
-        ? { ...result, validatedTicket: compiledJobTicket }
-        : result,
-    );
+    setPreflight(prev => {
+      const next: PreflightSummary =
+        compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
+      if (prev != null && samePreflightSummary(prev, next)) return prev;
+      return next;
+    });
   }, [
-    gcode,
-    machineState,
     scene,
+    gcode,
+    preflightMachinePresent,
+    preflightMachineStatus,
+    preflightMachineAlarm,
     bedWidth,
     bedHeight,
-    machinePlanBounds,
-    activeProfile?.gcodeHeaderTemplate,
+    preflightPlanMinX,
+    preflightPlanMinY,
+    preflightPlanMaxX,
+    preflightPlanMaxY,
+    preflightGcodeHeaderTemplate,
     compiledJobTicket,
   ]);
 
