@@ -14,6 +14,8 @@ import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { getJobLogs } from '../src/core/job/JobLog';
+import { hashObject, hashString } from '../src/core/job/ticketHashing';
+import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 
 let passed = 0;
 let failed = 0;
@@ -66,7 +68,7 @@ function installMockLocalStorage(): void {
   } as Storage;
 }
 
-function makeTestTicket(overrides?: Partial<ValidatedJobTicket>): ValidatedJobTicket {
+function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Partial<ValidatedJobTicket>): ValidatedJobTicket {
   const plan = createEmptyPlan('phase2-test');
   const machineTransform = {
     plan,
@@ -78,11 +80,12 @@ function makeTestTicket(overrides?: Partial<ValidatedJobTicket>): ValidatedJobTi
   };
   const gcodeLines = ['G0 X1', 'M5'] as const;
   const gcodeText = 'G0 X1\nM5';
-  return {
+  const profile = getActiveProfile();
+  const baseTicket: ValidatedJobTicket = {
     ticketId: 'tkt_phase2_test',
-    sceneHash: 'scene-h',
-    profileHash: 'profile-h',
-    gcodeHash: 'gcode-h',
+    sceneHash: hashObject(scene),
+    profileHash: profile ? hashObject(profile) : hashString('no-profile'),
+    gcodeHash: hashString(gcodeText),
     gcodeLines: [...gcodeLines],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -91,8 +94,12 @@ function makeTestTicket(overrides?: Partial<ValidatedJobTicket>): ValidatedJobTi
     startMode: 'current',
     savedOrigin: null,
     createdAt: Date.now(),
-    ...overrides,
   };
+  const merged = { ...baseTicket, ...overrides };
+  if (!overrides?.gcodeHash) {
+    merged.gcodeHash = hashString(merged.gcodeText);
+  }
+  return merged;
 }
 
 const idle: MachineState = {
@@ -130,7 +137,7 @@ async function run(): Promise<void> {
   console.log('\n=== machine-service startValidatedJob ===\n');
 
   const scene = createScene(120, 100, 'ticket svc test');
-  const ticket = makeTestTicket();
+  const ticket = makeTestTicket(scene);
 
   {
     const sentBatches: string[][] = [];
@@ -219,7 +226,7 @@ async function run(): Promise<void> {
     const portRef = { current: port as SerialPortLike };
     const svc = new MachineService(controllerRef, portRef);
 
-    const t = makeTestTicket({
+    const t = makeTestTicket(scene, {
       gcodeLines: ['G0 X1 Y1', 'M5'],
       gcodeText: 'G0 X1 Y1\nM5',
     });

@@ -39,6 +39,7 @@ const files = [
   'gcode-template-validator.test.ts',
   'preflight-template-validation.test.ts',
   'validated-job-ticket-phase1.test.ts',
+  'validated-job-ticket-mismatch.test.ts',
   'preflight.test.ts',
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',

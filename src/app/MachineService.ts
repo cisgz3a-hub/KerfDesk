@@ -24,6 +24,8 @@ import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
+import { hashObject, hashString } from '../core/job/ticketHashing';
+import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
   classifyUserCommand as classifyUserGrbl,
   type CommandClassification,
@@ -242,6 +244,54 @@ export class MachineService {
   /** Start a job from a validated ticket. The ticket carries the
    *  gcode lines and metadata; we stash it for later phases that
    *  will verify scene/profile hashes before streaming. */
+  private validateTicket(
+    ticket: ValidatedJobTicket,
+    scene: Scene,
+  ): { ok: true } | { ok: false; reason: string } {
+    const currentSceneHash = hashObject(scene);
+    if (currentSceneHash !== ticket.sceneHash) {
+      return {
+        ok: false,
+        reason:
+          'Scene has changed since this job was compiled. Recompile to continue. '
+          + `(ticket scene hash ${ticket.sceneHash}, current ${currentSceneHash})`,
+      };
+    }
+
+    const currentProfile = getActiveProfile();
+    const currentProfileHash = currentProfile
+      ? hashObject(currentProfile)
+      : hashString('no-profile');
+    if (currentProfileHash !== ticket.profileHash) {
+      return {
+        ok: false,
+        reason:
+          'Device profile has changed since this job was compiled. Recompile to continue. '
+          + `(ticket profile hash ${ticket.profileHash}, current ${currentProfileHash})`,
+      };
+    }
+
+    const currentControllerType: ControllerId = 'grbl';
+    if (currentControllerType !== ticket.controllerType) {
+      return {
+        ok: false,
+        reason:
+          'Controller type has changed since this job was compiled. '
+          + `(ticket ${ticket.controllerType}, current ${currentControllerType})`,
+      };
+    }
+
+    const recomputedGcodeHash = hashString(ticket.gcodeText);
+    if (recomputedGcodeHash !== ticket.gcodeHash) {
+      return {
+        ok: false,
+        reason: 'Ticket is corrupted (gcode hash mismatch). Recompile to continue.',
+      };
+    }
+
+    return { ok: true };
+  }
+
   async startValidatedJob(args: {
     ticket: ValidatedJobTicket;
     scene: Scene;
@@ -249,6 +299,11 @@ export class MachineService {
     notifySimulatorTx: (line: string) => void;
   }): Promise<void> {
     const { ticket, scene, machineState, notifySimulatorTx } = args;
+
+    const validation = this.validateTicket(ticket, scene);
+    if (!validation.ok) {
+      throw new Error(validation.reason);
+    }
 
     this.activeTicket = ticket;
 
