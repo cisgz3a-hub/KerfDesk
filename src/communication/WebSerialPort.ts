@@ -20,6 +20,7 @@ export class WebSerialPort implements SerialPortLike {
   get isOpen(): boolean { return this._isOpen; }
 
   static isSupported(): boolean {
+    if (typeof navigator === 'undefined') return false;
     return 'serial' in navigator;
   }
 
