@@ -363,12 +363,14 @@ export class MachineService {
     }, 100);
   }
 
-  pauseResume(paused: boolean): void {
-    if (paused) {
-      this.controllerRef.current.resume();
-    } else {
-      this.controllerRef.current.pause();
-    }
+  /** Pause the currently running job (feed-hold). */
+  pause(): void {
+    this.controllerRef.current.pause();
+  }
+
+  /** Resume a paused job. */
+  resume(): void {
+    this.controllerRef.current.resume();
   }
 
   async stopAndEnsureLaserOff(sendTx?: (line: string) => void): Promise<void> {

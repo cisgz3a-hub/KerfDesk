@@ -834,7 +834,11 @@ export function ConnectionPanelMain({
   const handlePauseResume = useCallback(async () => {
     const held = isPaused || machineState?.status === 'hold';
     try {
-      machineService.pauseResume(held);
+      if (held) {
+        machineService.resume();
+      } else {
+        machineService.pause();
+      }
       setIsPaused(!held);
     } catch (err: unknown) {
       console.warn('[Pause/Resume]', err instanceof Error ? err.message : err);
