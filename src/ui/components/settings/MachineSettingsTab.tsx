@@ -36,6 +36,7 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     borderRadius: 4, color: '#e0e0ec', fontSize: 12, outline: 'none', width: '100%',
   };
   const hintStyle: React.CSSProperties = { fontSize: 10, color: '#666' };
+  const stopOnErrorChecked = activeProfile.stopOnError !== false;
 
   const rerunSection = onReRunSetup && React.createElement('div', {
     style: {
@@ -165,6 +166,24 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
         'If checked, LaserForge will silently set G54 to (0,0,0) and $10=0 on each connect for this machine, without asking.'),
       checkboxField('Allow negative workspace coordinates', 'allowsNegativeWorkspace',
         'Most diode lasers have the origin at a front corner and treat negative coords as limit hits. Enable only if your machine is configured for work offsets that produce negative coordinates.'),
+    ),
+
+    React.createElement('div', { style: sectionStyle },
+      React.createElement('div', { style: sectionTitleStyle }, 'Advanced'),
+      React.createElement('div', { style: fieldRowStyle },
+        React.createElement('label', { style: labelStyle }, 'Stop job on GRBL errors'),
+        React.createElement('input', {
+          type: 'checkbox',
+          checked: stopOnErrorChecked,
+          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+            onUpdateProfile({ stopOnError: e.target.checked } as unknown as Partial<DeviceProfile>);
+          },
+          style: { justifySelf: 'start' },
+        }),
+        React.createElement('div', { style: hintStyle },
+          'When checked, any error:N response from the machine aborts the running job. Uncheck only if your firmware emits benign error codes that are safe to ignore. Uncheck at your own risk — real errors (bad G-code, limit hits) will also be ignored until you turn this back on.',
+        ),
+      ),
     ),
   );
 }

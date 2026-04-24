@@ -363,6 +363,14 @@ export function App() {
     });
   }, [grbl.controller, showConfirmWithCheckbox, refreshProfiles]);
 
+  useEffect(() => {
+    const ctrl = grbl.controller;
+    if (!ctrl || typeof ctrl.setStopOnError !== 'function') return;
+    const profile = getActiveProfile();
+    const value = profile?.stopOnError !== false;
+    ctrl.setStopOnError(value);
+  }, [grbl.controller, profileRevision]);
+
   const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
     target.scanningOffsets = previous.scanningOffsets;
     target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
@@ -380,6 +388,7 @@ export function App() {
     target.maxAccelX = previous.maxAccelX;
     target.maxAccelY = previous.maxAccelY;
     if (previous.suppressWcsConsent) target.suppressWcsConsent = true;
+    if (previous.stopOnError === false) target.stopOnError = false;
   }, []);
   const setActiveProfileAndApply = useCallback((id: string | null) => {
     setActiveProfileId(id);

@@ -132,6 +132,11 @@ export interface LaserController {
    * GRBL: Mark settings handshake done without writing G10 / $10 (user declined or error).
    */
   skipWcsNormalization?(): void;
+  /**
+   * Configure whether a running job is aborted on GRBL `error:` responses.
+   * Optional; defaults to true when not implemented.
+   */
+  setStopOnError?(value: boolean): void;
   requestStatusReport(): void;
 
   onStateChange(callback: StateChangeCallback): Unsubscribe;

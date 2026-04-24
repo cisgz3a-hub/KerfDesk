@@ -157,6 +157,11 @@ export class GrblController implements LaserController {
   get isJobRunning(): boolean { return this._isJobRunning; }
   get maxSpindle(): number | null { return this._maxSpindle; }
 
+  /** When false, GRBL `error:` during a job is logged but streaming may continue. Default true. */
+  setStopOnError(value: boolean): void {
+    this._stopOnError = value;
+  }
+
   /** Bed size, feeds, homing mask, and laser mode from the last $$ dump. */
   getMachineInfo(): GrblMachineInfo {
     return {

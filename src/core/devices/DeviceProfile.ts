@@ -152,6 +152,14 @@ export interface DeviceProfile {
   allowsNegativeWorkspace?: boolean;
 
   /**
+   * When true (default), any GRBL `error:N` during a job aborts the job. When
+   * false, errors are surfaced but the stream attempts to continue. Set false
+   * only if your firmware emits benign error codes in normal operation and you
+   * accept the risk of continuing past real failures.
+   */
+  stopOnError?: boolean;
+
+  /**
    * Optional connection metadata. When omitted, the profile is treated as
    * serial/GRBL (the historical shape). Present for Falcon A1 Pro WiFi
    * profiles so the UI can pick the correct connection & status widgets.

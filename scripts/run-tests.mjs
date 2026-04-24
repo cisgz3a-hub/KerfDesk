@@ -36,6 +36,8 @@ const files = [
   'preflight.test.ts',
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',
+  'stop-on-error-override.test.ts',
+  'machine-settings-stop-on-error-toggle.test.ts',
   'autofocus.test.ts',
   'machine-service-pause-resume.test.ts',
   'wcs-mutation-consent.test.ts',
