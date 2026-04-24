@@ -11,6 +11,11 @@ function negativeCoordPreflightSeverity(profile: DeviceProfile | null | undefine
 }
 import type { Scene } from '../scene/Scene';
 import { getOutputLayers } from '../scene/Scene';
+import {
+  buildPreflightTemplateContext,
+  resolveFooterTemplateForValidation,
+  validateGcodeTemplates,
+} from './GcodeTemplateValidator';
 import type { MachineState, MachineStatus } from '../../controllers/ControllerInterface';
 import type { SceneObject } from '../scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -138,6 +143,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runLayerChecks(ctx, results);
   runMachineChecks(ctx, results);
   runTemplateChecks(ctx, results);
+  runGcodeTemplateSemanticValidation(ctx, results);
   runRasterChecks(ctx, results);
   runOptimizationChecks(ctx, results);
   ensureNoCompiledOutputIssue(ctx, results);
@@ -198,6 +204,9 @@ function categorizeCode(code: string): 'machine' | 'design' | 'settings' | 'outp
     return 'settings';
   }
   if (code === PREFLIGHT_CODES.HOMING_REQUESTED_BUT_DISABLED) {
+    return 'settings';
+  }
+  if (code.startsWith('TEMPLATE_') || code === 'FOOTER_MISSING_M5') {
     return 'settings';
   }
   return 'output';
@@ -924,6 +933,44 @@ function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]): void {
         message: 'Acceleration-aware power is enabled but no max acceleration is set.',
       });
     }
+  }
+}
+
+function runGcodeTemplateSemanticValidation(ctx: PreflightContext, out: PreflightResult[]): void {
+  const profile = ctx.profile;
+  if (!profile) return;
+
+  const templateContext = buildPreflightTemplateContext(
+    ctx.scene,
+    ctx.preflightBedWidthMm,
+    ctx.preflightBedHeightMm,
+  );
+  const maxSpindle =
+    profile.maxSpindle != null && profile.maxSpindle > 0 ? profile.maxSpindle : 1000;
+
+  const findings = validateGcodeTemplates({
+    customStart: profile.startGcode,
+    customEnd: profile.endGcode,
+    headerTemplate: profile.gcodeHeaderTemplate,
+    footerTemplate: resolveFooterTemplateForValidation(profile),
+    templateContext,
+    bedWidthMm: ctx.preflightBedWidthMm,
+    bedHeightMm: ctx.preflightBedHeightMm,
+    maxSpindle,
+  });
+
+  for (const f of findings) {
+    const where =
+      f.lineNumber > 0
+        ? `[${f.source} — line ${f.lineNumber}]`
+        : `[${f.source}]`;
+    const message =
+      f.line.trim().length > 0 ? `${where}\n${f.line.trim()}\n\n${f.message}` : `${where} ${f.message}`;
+    out.push({
+      severity: f.severity,
+      code: f.code,
+      message,
+    });
   }
 }
 

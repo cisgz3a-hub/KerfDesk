@@ -36,6 +36,8 @@ const files = [
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
   'preflight-negative-coords.test.ts',
+  'gcode-template-validator.test.ts',
+  'preflight-template-validation.test.ts',
   'preflight.test.ts',
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',
