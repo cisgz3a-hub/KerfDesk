@@ -1,5 +1,5 @@
 /**
- * Guardrails: autosave strips image pixel buffers, remains loadable, and stays much smaller than full save.
+ * Guardrails: autosave preserves image data (Storage-backed), remains loadable; compact JSON vs pretty file save.
  * Run: npx tsx tests/autosave-serialization.test.ts
  */
 
@@ -75,10 +75,10 @@ const autoJson = serializeForAutosave(withImage);
 assert(JSON.parse(autoJson).format === 'laserforge', 'autosave: valid envelope format');
 assert(JSON.parse(autoJson).scene?.objects?.length === 2, 'autosave: two objects preserved');
 
-assert(!autoJson.includes('grayscaleData'), 'autosave: no raw grayscaleData key in JSON');
-assert(!autoJson.includes('adjustedData'), 'autosave: no raw adjustedData key in JSON');
-assert(!autoJson.includes('_grayscaleDataB64'), 'autosave: strips image buffers (no grayscale b64)');
-assert(!autoJson.includes('_adjustedDataB64'), 'autosave: strips image buffers (no adjusted b64)');
+assert(!autoJson.includes('"grayscaleData":{'), 'autosave: no raw grayscaleData object blob in JSON');
+assert(!autoJson.includes('"adjustedData":{'), 'autosave: no raw adjustedData object blob in JSON');
+assert(autoJson.includes('_grayscaleDataB64'), 'autosave: encodes grayscale as b64');
+assert(autoJson.includes('_adjustedDataB64'), 'autosave: encodes adjusted as b64');
 
 assert(
   fullJson.includes('_grayscaleDataB64') || fullJson.includes('grayscaleData'),
@@ -86,8 +86,8 @@ assert(
 );
 
 const ratio = autoJson.length / fullJson.length;
-assert(ratio < 0.5, `autosave size < 50% of full save (got ${(ratio * 100).toFixed(1)}%)`);
-assert(autoJson.length < fullJson.length, 'autosave byte length strictly less than full save');
+assert(ratio < 1, `autosave compact not larger than pretty full save (ratio ${(ratio * 100).toFixed(1)}%)`);
+assert(autoJson.length < fullJson.length, 'autosave byte length strictly less than pretty-printed full save');
 
 let loaded: ReturnType<typeof deserializeScene> | null = null;
 try {
@@ -107,6 +107,14 @@ if (loaded) {
     }),
     'roundtrip: image src preserved',
   );
+  assert(
+    loaded.objects.every(o => {
+      const g = o.geometry as ImageGeometry;
+      return g.grayscaleData instanceof Uint8Array && g.grayscaleData.length > 0
+        && g.adjustedData instanceof Uint8Array && g.adjustedData.length > 0;
+    }),
+    'roundtrip: pixel buffers restored from autosave',
+  );
 }
 
 const rectOnly = addObject(base, createRect(lid, 12, 12, 30, 20));
@@ -123,7 +131,7 @@ assert(
 const huge = addObject(base, makeImageObject(lid, 200 * 200));
 const autoH = serializeForAutosave(huge);
 const fullH = serializeScene(huge);
-assert(autoH.length / fullH.length < 0.2, 'large image: autosave far smaller than full save');
+assert(autoH.length < fullH.length, 'large image: compact autosave smaller than pretty full save');
 
 // Compile-equivalence guardrail (vectors survive autosave unchanged)
 const vectorScene = createScene(300, 200, 'Vector Eq');

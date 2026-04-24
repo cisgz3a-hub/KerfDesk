@@ -34,6 +34,8 @@ const files = [
   'scene-io.test.ts',
   'ui-integration.test.ts',
   'autosave-serialization.test.ts',
+  'autosave-storage.test.ts',
+  'autosave-preserves-images.test.ts',
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',

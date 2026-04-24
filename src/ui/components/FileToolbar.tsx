@@ -19,6 +19,7 @@ import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene } from '../../io/SceneSerializer';
+import { clearAutosave } from '../../app/autosavePersistence';
 import { TestGridDialog } from './TestGridDialog';
 // ─── PROPS ───────────────────────────────────────────────────────
 
@@ -125,7 +126,7 @@ export function FileToolbar({
       const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
       if (!ok) return;
     }
-    try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
+    clearAutosave();
     const newScene = createScene(
       scene.canvas.width,
       scene.canvas.height,

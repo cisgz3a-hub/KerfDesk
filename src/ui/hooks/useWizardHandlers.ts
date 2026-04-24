@@ -1,6 +1,7 @@
 import { useCallback, type RefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { deserializeScene } from '../../io/SceneSerializer';
+import { readAutosave } from '../../app/autosavePersistence';
 import {
   createBlankProfile,
   createFalconSerialProfile,
@@ -47,13 +48,14 @@ export interface UseWizardHandlersParams {
   handleNewProject: (scene: Scene) => void;
   setShowSetup: (show: boolean) => void;
   setShowRecover: (show: boolean) => void;
+  setRecoverAutosaveTimeLabel?: (label: string | null) => void;
   viewportActionsRef: RefObject<ViewportActions | null>;
   /** Bump so `getActiveProfile()` / device list re-read after wizard creates a profile. */
   refreshProfiles: () => void;
 }
 
 export interface WizardHandlers {
-  handleRecover: () => void;
+  handleRecover: () => void | Promise<void>;
   handleWizardComplete: (result: WizardResult) => void;
   handleWizardSkip: () => void;
 }
@@ -65,22 +67,24 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     handleNewProject,
     setShowSetup,
     setShowRecover,
+    setRecoverAutosaveTimeLabel,
     viewportActionsRef,
     refreshProfiles,
   } = params;
 
-  const handleRecover = useCallback(() => {
+  const handleRecover = useCallback(async () => {
     try {
-      const saved = localStorage.getItem('laserforge_autosave');
-      if (saved) {
-        const recovered = deserializeScene(saved);
+      const payload = await readAutosave();
+      if (payload?.json) {
+        const recovered = deserializeScene(payload.json);
         handleNewProject(recovered);
       }
     } catch (e) {
       console.error('Recovery failed:', e);
     }
     setShowRecover(false);
-  }, [handleNewProject]);
+    setRecoverAutosaveTimeLabel?.(null);
+  }, [handleNewProject, setShowRecover, setRecoverAutosaveTimeLabel]);
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
     setShowSetup(false);

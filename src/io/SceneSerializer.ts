@@ -18,7 +18,7 @@
  */
 
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject, type Geometry, type ImageGeometry } from '../core/scene/SceneObject';
+import { type SceneObject, type Geometry } from '../core/scene/SceneObject';
 import { type Layer } from '../core/scene/Layer';
 import { defaultLaserSettings, type LaserSettings, type LayerMode } from '../core/scene/Layer';
 
@@ -86,8 +86,9 @@ export function serializeScene(scene: Scene): string {
 }
 
 /**
- * Serialize for localStorage auto-save only: strips heavy image pixel buffers so
- * quota is not exhausted. Full `serializeScene` is still used for file export.
+ * Serialize for auto-save (Storage adapter: Electron filesystem or IndexedDB).
+ * Same payload shape as file save, compact JSON (no pretty-print). Image pixel
+ * data is preserved — unlike historical localStorage autosave, there is no 5MB quota.
  */
 export function serializeForAutosave(scene: Scene): string {
   const cleaned: SerializedScene = {
@@ -95,9 +96,7 @@ export function serializeForAutosave(scene: Scene): string {
     version: scene.version,
     canvas: scene.canvas,
     layers: scene.layers,
-    objects: scene.objects.map((o) =>
-      encodeImageBuffers(stripObjectCache(stripImageBuffersForAutosave(o))),
-    ),
+    objects: scene.objects.map((o) => encodeImageBuffers(stripObjectCache(o))),
     material: scene.material,
     startPosition: scene.startPosition,
     machine: scene.machine,
@@ -423,23 +422,6 @@ function restoreObjectDefaults(o: any): SceneObject {
 function stripObjectCache(obj: SceneObject): any {
   const { _bounds, _worldTransform, ...clean } = obj;
   return clean;
-}
-
-function stripImageBuffersForAutosave(obj: SceneObject): SceneObject {
-  if (obj.geometry?.type !== 'image') return obj;
-  const g = obj.geometry as unknown as Record<string, unknown>;
-  const {
-    grayscaleData: _gd,
-    adjustedData: _ad,
-    _grayscaleDataB64: _g64,
-    _adjustedDataB64: _a64,
-    _grayscaleDataLength: _gl,
-    _adjustedDataLength: _al,
-    _grayscaleB64: _gleg,
-    _adjustedB64: _aleg,
-    ...rest
-  } = g;
-  return { ...obj, geometry: rest as unknown as ImageGeometry };
 }
 
 // ─── BASE64 HELPERS FOR TYPED ARRAYS ────────────────────────────

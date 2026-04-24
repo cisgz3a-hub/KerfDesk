@@ -2,6 +2,7 @@ import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction 
 import { createScene, type Scene } from '../../core/scene/Scene';
 import { deserializeScene, serializeForAutosave } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
+import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 
 export interface UseFileHandlersParams {
   scene: Scene;
@@ -36,8 +37,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
     sceneIsDirtyRef.current = false;
     try {
       const json = serializeForAutosave(scene);
-      localStorage.setItem('laserforge_autosave', json);
-      localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+      writeAutosave(json);
       lastSavedSceneRef.current = json;
     } catch { /* ignore */ }
   }, [scene]);
@@ -74,7 +74,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
       if (!ok) return;
     }
-    try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
+    clearAutosave();
     handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'));
   }, [scene.canvas.width, scene.canvas.height, scene.objects.length, handleNewProject, showConfirm]);
 

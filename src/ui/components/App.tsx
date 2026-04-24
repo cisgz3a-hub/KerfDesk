@@ -58,6 +58,7 @@ import { GcodePreview } from './GcodePreview';
 import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
+import { readAutosave, writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -610,18 +611,33 @@ export function App() {
       } catch { /* ignore */ }
     }
   }, [productionMode]);
-  const [showRecover, setShowRecover] = useState(() => {
-    try {
-      const saved = localStorage.getItem('laserforge_autosave');
-      const time = localStorage.getItem('laserforge_autosave_time');
-      if (saved && time) {
-        const parsed = JSON.parse(saved) as { scene?: { objects?: unknown[] } };
+  const [showRecover, setShowRecover] = useState(false);
+  const [recoverAutosaveTimeLabel, setRecoverAutosaveTimeLabel] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void readAutosave().then(payload => {
+      if (cancelled || !payload) return;
+      try {
+        const parsed = JSON.parse(payload.json) as { scene?: { objects?: unknown[] } };
         const objs = parsed.scene?.objects;
-        if (Array.isArray(objs) && objs.length > 0) return true;
-      }
-    } catch { /* ignore */ }
-    return false;
-  });
+        if (Array.isArray(objs) && objs.length > 0) {
+          setShowRecover(true);
+          try {
+            const d = new Date(payload.timestamp);
+            setRecoverAutosaveTimeLabel(
+              d.toLocaleDateString() + ' ' + d.toLocaleTimeString(),
+            );
+          } catch {
+            setRecoverAutosaveTimeLabel(null);
+          }
+        }
+      } catch { /* ignore */ }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
@@ -1082,6 +1098,7 @@ export function App() {
     handleNewProject,
     setShowSetup: dialogs.setShowSetup,
     setShowRecover,
+    setRecoverAutosaveTimeLabel,
     viewportActionsRef,
     refreshProfiles,
   });
@@ -1098,8 +1115,7 @@ export function App() {
           return;
         }
 
-        localStorage.setItem('laserforge_autosave', json);
-        localStorage.setItem('laserforge_autosave_time', new Date().toISOString());
+        writeAutosave(json);
         lastSavedSceneRef.current = json;
         sceneIsDirtyRef.current = false;
       } catch (e) {
@@ -1575,16 +1591,7 @@ export function App() {
       },
     },
       React.createElement('span', { style: { color: '#8888aa' } },
-        `Unsaved work found from ${(() => {
-          try {
-            const t = localStorage.getItem('laserforge_autosave_time');
-            if (t) {
-              const d = new Date(t);
-              return d.toLocaleDateString() + ' ' + d.toLocaleTimeString();
-            }
-          } catch { /* ignore */ }
-          return 'previous session';
-        })()}`,
+        `Unsaved work found from ${recoverAutosaveTimeLabel ?? 'previous session'}`,
       ),
       React.createElement('button', {
         onClick: handleRecover,
@@ -1598,7 +1605,8 @@ export function App() {
       React.createElement('button', {
         onClick: () => {
           setShowRecover(false);
-          try { localStorage.removeItem('laserforge_autosave'); } catch { /* ignore */ }
+          setRecoverAutosaveTimeLabel(null);
+          clearAutosave();
         },
         style: {
           padding: '3px 12px', background: 'transparent',
