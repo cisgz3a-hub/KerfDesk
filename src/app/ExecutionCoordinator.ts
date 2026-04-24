@@ -182,10 +182,19 @@ export class ExecutionCoordinator {
   }
 
   /**
-   * End test-fire: laser off. Safe to call even without an active fire — sends M5 S0 which is a
-   * no-op when the laser is already off. Swallows 'Not connected' errors.
+   * Immediate laser off (M5 S0). Notifies simulator. Idempotent-safe.
+   * Swallows disconnect races ('Not connected').
    */
+  async emergencyLaserOff(): Promise<void> {
+    this.laserM5OffSync('[LaserOff] blocked:');
+  }
+
+  /** End test-fire: reuse emergency laser-off path. */
   async endTestFire(): Promise<void> {
+    await this.emergencyLaserOff();
+  }
+
+  private laserM5OffSync(warnPrefix: string): void {
     const ctrl = this.deps.controllerRef.current;
     const cmd = 'M5 S0';
     this.notifySimulator(cmd);
@@ -195,8 +204,37 @@ export class ExecutionCoordinator {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (!msg.includes('Not connected')) {
-        console.warn('[TestFire] stop blocked:', msg);
+        console.warn(warnPrefix, msg);
       }
+    }
+  }
+
+  /**
+   * Stop (if requested), laser off, then {@link MachineService.disconnect} (wake-lock release +
+   * controller disconnect + port clear). No-op if already disconnected.
+   *
+   * @param options.skipStop — omit controller {@link LaserController.stop} (e.g. toolbar
+   *   disconnect while idle). GRBL `stop()` is a soft reset; skipping avoids alarm/rehome.
+   */
+  async safeDisconnect(options?: { skipStop?: boolean }): Promise<void> {
+    const ctrl = this.deps.controllerRef.current;
+    if (!ctrl) return;
+
+    const status = ctrl.state.status;
+    if (status === 'disconnected' || status === 'connecting') return;
+
+    if (!options?.skipStop) {
+      try {
+        ctrl.stop();
+      } catch {
+        /* port may already be gone */
+      }
+    }
+    await this.emergencyLaserOff();
+    try {
+      await this.deps.machineService.disconnect();
+    } catch (err) {
+      console.warn('[Disconnect] failed:', err instanceof Error ? err.message : err);
     }
   }
 

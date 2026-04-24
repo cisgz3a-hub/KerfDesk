@@ -1,6 +1,6 @@
 /**
- * ExecutionCoordinator test fire + set origin (T2-4 phase 5).
- * Run: npx tsx tests/execution-coordinator-testfire-setorigin.test.ts
+ * ExecutionCoordinator emergencyLaserOff + safeDisconnect (T2-4 phase 7).
+ * Run: npx tsx tests/execution-coordinator-disconnect.test.ts
  */
 import { MachineService } from '../src/app/MachineService';
 import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
@@ -20,7 +20,7 @@ function assert(c: boolean, m: string): void {
   }
 }
 
-const idle: MachineState = {
+const baseState: MachineState = {
   status: 'idle',
   position: { x: 0, y: 0, z: 0 },
   feedRate: 0,
@@ -30,108 +30,13 @@ const idle: MachineState = {
 };
 
 void (async () => {
-  console.log('\n=== execution-coordinator testfire + setorigin ===\n');
+  console.log('\n=== execution-coordinator disconnect cleanup ===\n');
 
   {
     const sent: string[] = [];
     const mock = {
       protocolName: 'mock',
-      state: idle,
-      isJobRunning: false,
-      maxSpindle: null,
-      connect: async () => {},
-      disconnect: async () => {},
-      sendJob: async () => {},
-      pause: () => {},
-      resume: () => {},
-      stop: () => {},
-      emergencyStop: () => {},
-      sendCommand: (cmd: string, _s?: string) => {
-        sent.push(cmd);
-      },
-      requestStatusReport: () => {},
-      onStateChange: () => () => {},
-      onProgress: () => () => {},
-      onError: () => () => {},
-      onRawLine: () => () => {},
-    } as LaserController;
-    const controllerRef = { current: mock };
-    const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
-    const sim: string[] = [];
-    const notifyRef = { current: (line: string) => { sim.push(line); } };
-    const coord = new ExecutionCoordinator({
-      machineService: svc,
-      controllerRef,
-      notifySimulatorRef: notifyRef,
-    });
-
-    assert((await coord.beginTestFire({ maxSpindle: 1000 })) === true, 'beginTestFire 1000 returns true');
-    assert(sent.includes('M3 S20') && sim.includes('M3 S20'), 'beginTestFire 1000 sends M3 S20');
-
-    sent.length = 0;
-    sim.length = 0;
-    await coord.beginTestFire({ maxSpindle: 500 });
-    assert(sent.includes('M3 S10'), 'beginTestFire 500 → M3 S10');
-
-    sent.length = 0;
-    sim.length = 0;
-    await coord.beginTestFire({ maxSpindle: 0 });
-    assert(sent.includes('M3 S0'), 'beginTestFire 0 → M3 S0');
-  }
-
-  {
-    const portRef = { current: null } as { current: SerialPortLike | null };
-    const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
-    const sim: string[] = [];
-    const coord = new ExecutionCoordinator({
-      machineService: svc,
-      controllerRef,
-      notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
-    });
-    assert((await coord.beginTestFire({ maxSpindle: 1000 })) === false, 'no controller → beginTestFire false');
-    assert(sim.length === 0, 'no controller → no simulator notify for begin');
-  }
-
-  {
-    const mock = {
-      protocolName: 'mock',
-      state: idle,
-      isJobRunning: false,
-      maxSpindle: null,
-      connect: async () => {},
-      disconnect: async () => {},
-      sendJob: async () => {},
-      pause: () => {},
-      resume: () => {},
-      stop: () => {},
-      emergencyStop: () => {},
-      sendCommand: () => {
-        throw new Error('blocked');
-      },
-      requestStatusReport: () => {},
-      onStateChange: () => () => {},
-      onProgress: () => () => {},
-      onError: () => () => {},
-      onRawLine: () => () => {},
-    } as LaserController;
-    const controllerRef = { current: mock };
-    const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
-    const coord = new ExecutionCoordinator({
-      machineService: svc,
-      controllerRef,
-      notifySimulatorRef: { current: () => {} },
-    });
-    assert((await coord.beginTestFire({ maxSpindle: 1000 })) === false, 'sendCommand throws → false');
-  }
-
-  {
-    const sent: string[] = [];
-    const mock = {
-      protocolName: 'mock',
-      state: idle,
+      state: { ...baseState },
       isJobRunning: false,
       maxSpindle: null,
       connect: async () => {},
@@ -159,8 +64,8 @@ void (async () => {
       controllerRef,
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
-    await coord.endTestFire();
-    assert(sent.includes('M5 S0') && sim.includes('M5 S0'), 'endTestFire with controller sends M5 S0');
+    await coord.emergencyLaserOff();
+    assert(sent.includes('M5 S0') && sim.includes('M5 S0'), 'emergencyLaserOff with controller sends M5 S0');
   }
 
   {
@@ -173,14 +78,14 @@ void (async () => {
       controllerRef,
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
-    await coord.endTestFire();
+    await coord.emergencyLaserOff();
     assert(sim.length === 1 && sim[0] === 'M5 S0', 'no controller → simulator only M5');
   }
 
   {
     const mock = {
       protocolName: 'mock',
-      state: idle,
+      state: { ...baseState },
       isJobRunning: false,
       maxSpindle: null,
       connect: async () => {},
@@ -213,17 +118,17 @@ void (async () => {
       warns.push(args.map(a => String(a)).join(' '));
     };
     try {
-      await coord.endTestFire();
+      await coord.emergencyLaserOff();
     } finally {
       console.warn = orig;
     }
-    assert(!warns.some(w => w.includes('[LaserOff] blocked:')), 'Not connected → no LaserOff warn');
+    assert(!warns.some(w => w.includes('[LaserOff]')), 'Not connected → no LaserOff warn');
   }
 
   {
     const mock = {
       protocolName: 'mock',
-      state: idle,
+      state: { ...baseState },
       isJobRunning: false,
       maxSpindle: null,
       connect: async () => {},
@@ -256,7 +161,7 @@ void (async () => {
       warns.push(args.map(a => String(a)).join(' '));
     };
     try {
-      await coord.endTestFire();
+      await coord.emergencyLaserOff();
     } finally {
       console.warn = orig;
     }
@@ -264,10 +169,36 @@ void (async () => {
   }
 
   {
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const controllerRef = { current: null } as { current: LaserController | null };
+    const svc = new MachineService(controllerRef, portRef);
+    let disconnectCalls = 0;
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    let threw = false;
+    try {
+      await coord.safeDisconnect();
+    } catch (e) {
+      threw = true;
+    }
+    assert(!threw && disconnectCalls === 0, 'no controller → safeDisconnect no-op, no throw');
+  }
+
+  {
     const sent: string[] = [];
+    let stopCalls = 0;
+    let disconnectCalls = 0;
     const mock = {
       protocolName: 'mock',
-      state: idle,
+      state: { ...baseState, status: 'idle' as const },
       isJobRunning: false,
       maxSpindle: null,
       connect: async () => {},
@@ -275,7 +206,9 @@ void (async () => {
       sendJob: async () => {},
       pause: () => {},
       resume: () => {},
-      stop: () => {},
+      stop: () => {
+        stopCalls++;
+      },
       emergencyStop: () => {},
       sendCommand: (cmd: string, _s?: string) => {
         sent.push(cmd);
@@ -289,32 +222,184 @@ void (async () => {
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
     const svc = new MachineService(controllerRef, portRef);
-    const sim: string[] = [];
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
-      notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
+      notifySimulatorRef: { current: () => {} },
     });
-    await coord.setOriginAtCurrentPosition();
-    assert(
-      sent.length === 1 && sent[0] === 'G10 L20 P1 X0 Y0',
-      'setOriginAtCurrentPosition sends G10 L20 P1 X0 Y0',
-    );
-    assert(sim.length === 1 && sim[0] === 'G10 L20 P1 X0 Y0', 'setOrigin notifies simulator');
+    await coord.safeDisconnect();
+    assert(stopCalls === 1, 'safeDisconnect calls stop');
+    assert(sent.includes('M5 S0'), 'safeDisconnect sends M5 S0');
+    assert(disconnectCalls === 1, 'safeDisconnect calls machineService.disconnect');
   }
 
   {
+    let stopCalls = 0;
+    let disconnectCalls = 0;
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState, status: 'idle' as const },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {
+        stopCalls++;
+        throw new Error('stop failed');
+      },
+      emergencyStop: () => {},
+      sendCommand: (cmd: string, _s?: string) => {
+        void cmd;
+      },
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+    } as LaserController;
+    const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const controllerRef = { current: null } as { current: LaserController | null };
     const svc = new MachineService(controllerRef, portRef);
-    const sim: string[] = [];
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
-      notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
+      notifySimulatorRef: { current: () => {} },
     });
-    await coord.setOriginAtCurrentPosition();
-    assert(sim.length === 0, 'no controller → setOrigin no simulator G10 (early return)');
+    await coord.safeDisconnect();
+    assert(stopCalls === 1 && disconnectCalls === 1, 'stop throws → still disconnects');
+  }
+
+  {
+    const sent: string[] = [];
+    let disconnectCalls = 0;
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState, status: 'idle' as const },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {},
+      emergencyStop: () => {},
+      sendCommand: (cmd: string, _s?: string) => {
+        if (cmd === 'M5 S0') throw new Error('M5 blocked');
+        sent.push(cmd);
+      },
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+    } as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect();
+    assert(disconnectCalls === 1, 'M5 S0 throws → still reaches disconnect');
+  }
+
+  {
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState, status: 'disconnected' as const },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {},
+      emergencyStop: () => {},
+      sendCommand: () => {},
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+    } as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    let disconnectCalls = 0;
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect();
+    assert(disconnectCalls === 0, 'already disconnected status → no machineService.disconnect');
+  }
+
+  {
+    const sent: string[] = [];
+    let stopCalls = 0;
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState, status: 'idle' as const },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {
+        stopCalls++;
+      },
+      emergencyStop: () => {},
+      sendCommand: (cmd: string, _s?: string) => {
+        sent.push(cmd);
+      },
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+    } as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => inner();
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect({ skipStop: true });
+    assert(stopCalls === 0 && sent.includes('M5 S0'), 'skipStop: no stop, still M5');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

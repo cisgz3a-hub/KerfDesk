@@ -537,7 +537,7 @@ export function App() {
     }
   }, [grbl.machineState?.status]);
 
-  // Safety: clean stop on page unload — feed hold + laser off, not soft reset (avoids ALARM:3 / forced rehome).
+  // Safety: clean stop on page unload — soft reset path + laser off; no disconnect (port dies with the page).
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => {
       const ctrl = grbl.controllerRef.current;
@@ -548,10 +548,10 @@ export function App() {
       const jobWasRunning = ctrl.isJobRunning;
       try {
         ctrl.stop();
-        ctrl.sendCommand('M5 S0', 'internal');
       } catch {
         /* port may already be gone */
       }
+      void machineUi.executionCoordinator.emergencyLaserOff();
 
       if (jobWasRunning) {
         e.preventDefault();
@@ -561,7 +561,7 @@ export function App() {
 
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
-  }, []);
+  }, [machineUi.executionCoordinator]);
 
   const handleSaveOrigin = useCallback(() => {
     const pos = grbl.machineState?.position;
@@ -958,18 +958,7 @@ export function App() {
         );
         if (!ok) return;
       }
-      try {
-        // Clean stop (feed hold + queued laser off) — not soft reset, to avoid ALARM:3 / forced rehome.
-        ctrl.stop();
-      } catch {
-        /* ignore */
-      }
-      try {
-        ctrl.sendCommand('M5 S0', 'internal');
-      } catch {
-        /* ignore */
-      }
-      await ctrl.disconnect();
+      await machineUi.executionCoordinator.safeDisconnect();
     }
 
     if (sceneIsDirtyRef.current) {
@@ -983,7 +972,7 @@ export function App() {
     }
 
     window.location.href = '/landing.html';
-  }, [grbl.machineState?.status]);
+  }, [grbl.machineState?.status, machineUi.executionCoordinator]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
     if (selectedIds.size === 0) {
@@ -1279,11 +1268,10 @@ export function App() {
 
   const handleToolbarDisconnect = useCallback(async () => {
     try {
-      try { grbl.controller?.sendCommand('M5 S0', 'internal'); } catch { /* ignore */ }
-      await grbl.disconnect();
+      await machineUi.executionCoordinator.safeDisconnect({ skipStop: true });
     } catch { /* best effort */ }
     dialogs.setShowConnection(false);
-  }, [grbl, dialogs]);
+  }, [machineUi.executionCoordinator, dialogs]);
 
   const handleGridArray = useCallback(() => {
     if (selectedIds.size === 0) return;
