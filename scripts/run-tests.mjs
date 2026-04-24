@@ -59,6 +59,7 @@ const files = [
   'smart-overscan.test.ts',
   'gcode-templates.test.ts',
   'gcode-relative-mode.test.ts',
+  'ui-start-job-preserves-markers.test.ts',
   'gcode-relative-return-template.test.ts',
   'origin-mode-wcs-zero.test.ts',
   'bed-height-resolver-parity.test.ts',

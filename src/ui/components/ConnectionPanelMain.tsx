@@ -575,7 +575,11 @@ export function ConnectionPanelMain({
 
     stopTestFire();
 
-    const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
+    // Preserve comment lines (in particular `; OBJ ids=...`) so the
+    // controller can parse object-lifecycle markers and drive the
+    // canvas burn-progress highlighting. The controller strips comments
+    // from the machine stream itself — see GrblController.startJob.
+    const lines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     setMessages(prev => [...prev, `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%)`]);
     try {
       machineService.beginJobRun({
