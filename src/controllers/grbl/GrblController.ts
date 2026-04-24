@@ -614,7 +614,11 @@ export class GrblController implements LaserController {
 
   // ─── MANUAL CONTROL ─────────────────────────────────────────
 
-  sendCommand(command: string): void {
+  /**
+   * `source` is reserved (audit / future enforcement); the controller only
+   * enforces line shape and job-stream rules.
+   */
+  sendCommand(command: string, _source: 'internal' | 'user' = 'internal'): void {
     if (!this._port?.isOpen) throw new Error('Not connected');
 
     // Allow realtime commands during jobs (status query, feed hold, resume, soft reset)

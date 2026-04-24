@@ -23,6 +23,10 @@ import {
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
+import {
+  classifyUserCommand as classifyUserGrbl,
+  type CommandClassification,
+} from '../controllers/grbl/CommandClassifier';
 
 export interface BurnState {
   readonly activeIds: ReadonlySet<string>;
@@ -314,8 +318,24 @@ export class MachineService {
     this.portRef.current = null;
   }
 
-  sendCommand(command: string): void {
-    this.controllerRef.current.sendCommand(command);
+  /**
+   * Classify user-typed console input only. Caller shows confirm dialogs and
+   * only sends after the user approves; this method does not prompt.
+   */
+  classifyUserCommand(command: string): CommandClassification {
+    return classifyUserGrbl(command);
+  }
+
+  /**
+   * Forward a line to GRBL. Gating of user-typed content is the UI’s job; `user`
+   * is passed through to the controller for call-site documentation / future
+   * audit, not to block in the service layer.
+   */
+  async sendCommand(
+    command: string,
+    source: 'internal' | 'user' = 'internal',
+  ): Promise<void> {
+    this.controllerRef.current.sendCommand(command, source);
   }
 
   async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -351,7 +371,7 @@ export class MachineService {
 
   jog(axis: 'X' | 'Y', distance: number, feedRate: number): void {
     const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
-    this.sendCommand(cmd);
+    this.controllerRef.current.sendCommand(cmd, 'internal');
     setTimeout(() => {
       try {
         this.controllerRef.current.requestStatusReport();

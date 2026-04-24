@@ -530,7 +530,7 @@ export function App() {
       const jobWasRunning = ctrl.isJobRunning;
       try {
         ctrl.stop();
-        ctrl.sendCommand('M5 S0');
+        ctrl.sendCommand('M5 S0', 'internal');
       } catch {
         /* port may already be gone */
       }
@@ -932,7 +932,7 @@ export function App() {
         /* ignore */
       }
       try {
-        ctrl.sendCommand('M5 S0');
+        ctrl.sendCommand('M5 S0', 'internal');
       } catch {
         /* ignore */
       }
@@ -1240,7 +1240,7 @@ export function App() {
 
   const handleToolbarDisconnect = useCallback(async () => {
     try {
-      try { grbl.controller?.sendCommand('M5 S0'); } catch { /* ignore */ }
+      try { grbl.controller?.sendCommand('M5 S0', 'internal'); } catch { /* ignore */ }
       await grbl.disconnect();
     } catch { /* best effort */ }
     dialogs.setShowConnection(false);

@@ -296,7 +296,7 @@ export function ConnectionPanelMain({
     }
     notifySimulatorTx('M5 S0');
     try {
-      controllerRef.current?.sendCommand('M5 S0');
+      controllerRef.current?.sendCommand('M5 S0', 'internal');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       // Disconnect races test-fire release — laser should already be off via port close / feed hold.
@@ -507,7 +507,7 @@ export function ConnectionPanelMain({
 
       notifySimulatorTx('M5 S0');
       try {
-        ctrl?.sendCommand('M5 S0');
+        ctrl?.sendCommand('M5 S0', 'internal');
       } catch {
         /* may already be disconnected */
       }
@@ -529,14 +529,39 @@ export function ConnectionPanelMain({
 
   // ─── Machine control ────────────────────────────────────
 
-  const sendCmd = (cmd: string) => {
-    notifySimulatorTx(cmd);
-    try {
-      machineService.sendCommand(cmd);
-    } catch (err: unknown) {
-      console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-    }
-  };
+  const sendCmd = useCallback(
+    async (cmd: string) => {
+      if (!cmd.trim()) return;
+      const classification = machineService.classifyUserCommand(cmd);
+      if (classification.severity === 'dangerous') {
+        const ok = await showConfirm(
+          'Dangerous command',
+          `${classification.reason}\n\nSend "${classification.command}" anyway?`,
+        );
+        if (!ok) {
+          appendMessage(`Blocked: ${classification.command}`);
+          return;
+        }
+      } else if (classification.severity === 'warn') {
+        const ok = await showConfirm(
+          'Machine state change',
+          `${classification.reason}\n\nSend "${classification.command}"?`,
+        );
+        if (!ok) {
+          appendMessage(`Cancelled: ${classification.command}`);
+          return;
+        }
+      }
+      notifySimulatorTx(cmd);
+      try {
+        await machineService.sendCommand(cmd, 'user');
+      } catch (err: unknown) {
+        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+        appendMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    },
+    [appendMessage, machineService, notifySimulatorTx, showConfirm],
+  );
 
   const handleJog = useCallback(
     (axis: 'X' | 'Y', distance: number) => {
@@ -626,7 +651,7 @@ export function ConnectionPanelMain({
     async (ctrl: LaserController, line: string) => {
       notifySimulatorTx(line);
       try {
-        ctrl.sendCommand(line);
+        ctrl.sendCommand(line, 'internal');
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
@@ -792,8 +817,8 @@ export function ConnectionPanelMain({
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
-    if (ok) sendCmd('$H');
-  }, [showConfirm]);
+    if (ok) void sendCmd('$H');
+  }, [showConfirm, sendCmd]);
 
   const handleAutoFocus = useCallback(async () => {
     if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
@@ -813,8 +838,8 @@ export function ConnectionPanelMain({
   }, [canAutoFocus, machineService, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
 
   const handleUnlock = useCallback(() => {
-    sendCmd('$X');
-  }, []);
+    void sendCmd('$X');
+  }, [sendCmd]);
 
   const handlePauseResume = useCallback(async () => {
     const held = isPaused || machineState?.status === 'hold';
@@ -882,7 +907,7 @@ export function ConnectionPanelMain({
 
       try {
         notifySimulatorTx(cmd);
-        ctrl.sendCommand(cmd);
+        ctrl.sendCommand(cmd, 'internal');
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
         try {
@@ -1658,10 +1683,10 @@ export function ConnectionPanelMain({
         React.createElement('input', {
           type: 'text', value: manualCmd, placeholder: 'G-code…',
           onChange: (e: React.ChangeEvent<HTMLInputElement>) => setManualCmd(e.target.value),
-          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') { sendCmd(manualCmd); setManualCmd(''); } },
+          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === 'Enter') { void sendCmd(manualCmd); setManualCmd(''); } },
           style: { flex: 1, padding: '6px 8px', background: '#0a0a14', border: '1px solid #252540', borderRadius: 6, color: '#e0e0ec', fontSize: 10, fontFamily: mono, outline: 'none' },
         }),
-        React.createElement('button', { type: 'button', onClick: () => { sendCmd(manualCmd); setManualCmd(''); }, style: btnStyle('0,212,255') }, 'Send'),
+        React.createElement('button', { type: 'button', onClick: () => { void sendCmd(manualCmd); setManualCmd(''); }, style: btnStyle('0,212,255') }, 'Send'),
       ),
       React.createElement('div', {
         style: { fontSize: 9, color: '#444460', paddingTop: 4 },
@@ -1773,7 +1798,7 @@ export function ConnectionPanelMain({
             portRef.current = null;
             try {
               notifySimulatorTx('M5 S0');
-              controllerRef.current?.sendCommand('M5 S0');
+              controllerRef.current?.sendCommand('M5 S0', 'internal');
             } catch (err: unknown) {
               console.warn('[Command blocked]', err instanceof Error ? err.message : err);
             }

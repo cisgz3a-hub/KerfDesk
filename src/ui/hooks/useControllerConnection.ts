@@ -30,7 +30,7 @@ export function useControllerConnection(controllerId: ControllerId = 'grbl') {
         if (controller.isJobRunning) {
           controller.stop();
         }
-        controller.sendCommand('M5 S0');
+        controller.sendCommand('M5 S0', 'internal');
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }

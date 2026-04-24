@@ -50,6 +50,8 @@ const files = [
   'material-preset-schema.test.ts',
   'streaming-health.test.ts',
   'grbl-system-line-tagging.test.ts',
+  'command-classifier.test.ts',
+  'machine-service-user-sendcommand.test.ts',
   'plan-marker-emission.test.ts',
   'output-marker-encoding.test.ts',
   'grbl-marker-lifecycle.test.ts',

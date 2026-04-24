@@ -105,7 +105,11 @@ export interface LaserController {
   /** Soft reset — use only for true emergency (position may be lost). */
   emergencyStop(): void;
 
-  sendCommand(command: string): void;
+  /**
+   * Manual line to GRBL. `internal` = LaserForge-generated (known sequences);
+   * `user` = console / operator-typed (semantic gating is the UI’s responsibility).
+   */
+  sendCommand(command: string, source?: 'internal' | 'user'): void;
   /**
    * Optional controller-native autofocus trigger.
    * Serial GRBL controllers can implement this; other controllers may omit it.
