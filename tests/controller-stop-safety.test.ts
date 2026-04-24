@@ -1,7 +1,8 @@
 /**
  * GrblController.stop() must send soft reset (0x18) so the planner
  * buffer is purged; M5 is not a realtime command and must not be relied
- * on to stop an in-flight job. emergencyStop() also uses 0x18.
+ * on to stop an in-flight job. emergencyStop() also uses 0x18, then
+ * disconnects to sever the command path.
  * Run: npx tsx tests/controller-stop-safety.test.ts
  */
 
@@ -52,6 +53,7 @@ async function main(): Promise<void> {
       'stop() while idle: soft reset (0x18), not feed hold (0x21)',
     );
     assert(!hasM5S0InReceived(port.received), 'stop() while idle: no M5 in g-code stream');
+    assert(port.isOpen, 'stop() leaves port open');
     await ctrl.disconnect();
   }
 
@@ -86,6 +88,7 @@ async function main(): Promise<void> {
     );
     assert(!hasM5S0InReceived(port.received), 'stop() during job: no M5 in g-code stream');
     assert(progressFires > before, 'stop() notifies progress listener');
+    assert(port.isOpen, 'stop() during job still leaves port open');
     await ctrl.disconnect();
   }
 
@@ -122,15 +125,25 @@ async function main(): Promise<void> {
     port.open();
     await ctrl.connect(port);
     await flush();
+    assert(ctrl.isJobRunning === false, 'sanity: idle before emergencyStop');
     port.realtimeBytes.length = 0;
     ctrl.emergencyStop();
-    await flush();
-    assert(
-      port.realtimeBytes.includes(0x18),
-      'emergencyStop() sends soft reset (0x18)',
-    );
+    await new Promise(r => setTimeout(r, 250));
+    assert(port.realtimeBytes.includes(0x18), 'emergencyStop() sends soft reset (0x18)');
+    assert(!ctrl.isJobRunning, 'emergencyStop() aborts job state');
+    assert(!port.isOpen, 'emergencyStop() closes port (severs command path)');
     assert(!hasUnlock(port.received), 'emergencyStop(): no $X in port.received');
-    await ctrl.disconnect();
+    let sendThrew = false;
+    try {
+      ctrl.sendCommand('G0 X0');
+    } catch (e) {
+      sendThrew = true;
+      assert(
+        (e as Error).message.includes('Not connected'),
+        'sendCommand after emergencyStop throws Not connected',
+      );
+    }
+    assert(sendThrew, 'sendCommand is blocked after emergencyStop');
   }
 
   console.log(`\nController stop safety: ${passed} passed, ${failed} failed`);

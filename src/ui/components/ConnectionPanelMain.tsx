@@ -1763,6 +1763,12 @@ export function ConnectionPanelMain({
             jobStoppedByUserRef.current = true;
             stopTestFire();
             controllerRef.current?.emergencyStop();
+            void showAlert(
+              'Emergency stop',
+              'The machine was reset and the connection was closed. Reconnect when it is safe to continue.',
+            );
+            void machineService.disconnect().catch(() => { /* idempotent with controller.disconnect */ });
+            portRef.current = null;
             try {
               notifySimulatorTx('M5 S0');
               controllerRef.current?.sendCommand('M5 S0');
@@ -1770,7 +1776,7 @@ export function ConnectionPanelMain({
               console.warn('[Command blocked]', err instanceof Error ? err.message : err);
             }
             setIsPaused(false);
-            setMessages(prev => [...prev, '⚠ EMERGENCY STOP']);
+            setMessages(prev => [...prev, '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.']);
           },
           style: {
             width: '100%', padding: '10px',

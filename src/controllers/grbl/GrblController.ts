@@ -479,16 +479,27 @@ export class GrblController implements LaserController {
   }
 
   /**
-   * EMERGENCY stop only. Sends soft reset. Position may be lost (e.g. ALARM:3).
-   * Machine must be unlocked + rehomed before the next job.
-   * Use only for physical danger — fire, crash, runaway.
+   * Emergency stop: soft reset + disconnect. Severs the command path so no further
+   * commands can reach the machine without explicit reconnect.
+   *
+   * Use only for physical danger — fire, crash, runaway, user injury. For ordinary
+   * "stop this job" use stop() instead.
    */
   emergencyStop(): void {
     if (!this._port?.isOpen) return;
-    console.warn('[GrblController] EMERGENCY STOP — soft reset, position may be lost, rehome may be required');
+    console.warn(
+      '[GrblController] EMERGENCY STOP — soft reset, position may be lost, rehome may be required. Disconnecting.',
+    );
     this._sendRealtime(REALTIME_RESET);
     this._abortJob();
     this._emitProgress();
+    // Sever the command path. User must reconnect to send anything further.
+    void this.disconnect().catch((err: unknown) => {
+      console.warn(
+        '[GrblController] Emergency disconnect failed (port may already be closed):',
+        err,
+      );
+    });
   }
 
   // ─── MANUAL CONTROL ─────────────────────────────────────────
