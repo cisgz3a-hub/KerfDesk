@@ -46,6 +46,7 @@ const files = [
   'machine-settings-stop-on-error-toggle.test.ts',
   'autofocus.test.ts',
   'machine-service-pause-resume.test.ts',
+  'machine-service-start-validated-job.test.ts',
   'wcs-mutation-consent.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
   'falcon-serial-profile.test.ts',

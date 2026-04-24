@@ -23,6 +23,7 @@ import {
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
+import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   classifyUserCommand as classifyUserGrbl,
   type CommandClassification,
@@ -63,6 +64,13 @@ export class MachineService {
 
   private activeReplay: JobReplay | null = null;
   private currentJobLog: JobLog | null = null;
+
+  /** Ticket currently driving the running job, if any. Set by
+   *  startValidatedJob; cleared by tryFinalizeJobLog when the job
+   *  ends. Used by phase 5 to enforce scene/profile hash matching
+   *  at send time. */
+  private activeTicket: ValidatedJobTicket | null = null;
+
   private detachRecording: (() => void) | null = null;
 
   constructor(
@@ -96,6 +104,13 @@ export class MachineService {
   clearJobSession(): void {
     this.activeReplay = null;
     this.currentJobLog = null;
+    this.activeTicket = null;
+  }
+
+  /** Read-only accessor — tests and future phases need to inspect
+   *  which ticket is running. */
+  getActiveTicket(): ValidatedJobTicket | null {
+    return this.activeTicket;
   }
 
   getBurnState(): BurnState {
@@ -221,6 +236,7 @@ export class MachineService {
       appendMessage(`\u26A0 ${saveResult.message ?? 'Job log not saved'}`);
     }
     this.currentJobLog = null;
+    this.activeTicket = null;
   }
 
   async beginJobRun(args: {
@@ -252,6 +268,73 @@ export class MachineService {
       { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
     );
     addLogEntry(jobLog, 'milestone', `Job started: ${lines.length} commands`);
+    this.currentJobLog = jobLog;
+
+    if (hasPro()) {
+      const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
+        name: l.name,
+        mode: l.settings.mode,
+        power: l.settings.power.max,
+        speed: l.settings.speed,
+        passes: l.settings.passes,
+      }));
+      this.activeReplay = createReplay(
+        scene.metadata?.name || 'Untitled',
+        lines.length,
+        {
+          layers: layerSettings,
+          material: scene.material?.name || null,
+          machineType: scene.machine?.type || null,
+        },
+        estimate ? estimate.totalSeconds * 1000 : null,
+      );
+    } else {
+      this.activeReplay = null;
+    }
+
+    for (const line of lines) notifySimulatorTx(line);
+    await this.controllerRef.current.sendJob(lines);
+  }
+
+  /** Start a job from a validated ticket. The ticket carries the
+   *  gcode lines and metadata; we stash it for later phases that
+   *  will verify scene/profile hashes before streaming. This phase
+   *  is a parallel entry point — same side effects as beginJobRun,
+   *  just ticket-shaped inputs. */
+  async startValidatedJob(args: {
+    ticket: ValidatedJobTicket;
+    scene: Scene;
+    machineState: MachineState | null;
+    notifySimulatorTx: (line: string) => void;
+  }): Promise<void> {
+    const { ticket, scene, machineState, notifySimulatorTx } = args;
+
+    this.activeTicket = ticket;
+
+    this.burnState = emptyBurnState();
+    this.emitBurnState();
+
+    const lines = [...ticket.gcodeLines];
+    const gcodeText = ticket.gcodeText;
+
+    const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
+
+    const jobLog = createJobLog(
+      scene.metadata?.name || 'Untitled',
+      lines.length,
+      estimate ? estimate.formatted : '?',
+      scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
+        name: l.name,
+        mode: l.settings.mode,
+        power: l.settings.power.max,
+        speed: l.settings.speed,
+        passes: l.settings.passes,
+      })),
+      machineState?.status || 'unknown',
+      { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
+    );
+    addLogEntry(jobLog, 'milestone',
+      `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
     this.currentJobLog = jobLog;
 
     if (hasPro()) {
