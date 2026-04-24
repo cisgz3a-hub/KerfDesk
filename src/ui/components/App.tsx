@@ -1724,6 +1724,7 @@ export function App() {
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {
         controller: grbl.controller!,
+        machineControllerRef: grbl.controllerRef,
         portRef: grbl.portRef,
         machineState: grbl.machineState,
         jobProgress: grbl.jobProgress,

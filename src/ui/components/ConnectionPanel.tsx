@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { type JobReplay } from '../../core/replay/JobReplay';
 import {
   ConnectionPanelMain,
   type ConnectionPanelMainProps,
 } from './ConnectionPanelMain';
-import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { JobOutcomeDialog } from './JobOutcomeDialog';
 import { type MachineUiHook } from '../hooks/useMachineService';
 import {
@@ -17,7 +16,6 @@ import { FalconWiFiStatusPanel, FalconAlarmToastStack } from './falcon-wifi';
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
   | 'machineService'
-  | 'executionCoordinator'
   | 'outcomeReplaySection'
   | 'messages'
   | 'appendMessage'
@@ -167,19 +165,9 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
         })
       : null;
 
-  const executionCoordinator = useMemo(
-    () =>
-      new ExecutionCoordinator({
-        machineService,
-        getController: () => controller,
-      }),
-    [machineService, controller],
-  );
-
   return React.createElement(ConnectionPanelMain, {
     ...mainProps,
     machineService,
-    executionCoordinator,
     outcomeReplaySection,
     messages,
     appendMessage,

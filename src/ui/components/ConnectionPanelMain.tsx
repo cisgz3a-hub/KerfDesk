@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { MockSerialPort, type SerialPortLike } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
@@ -18,10 +18,10 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
-import { type ExecutionCoordinator } from '../../app/ExecutionCoordinator';
+import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
+import { buildFrameCorners } from '../../app/frameGcode';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
-import { transformPointToMachine } from '../../core/plan/MachineTransform';
 import { SimulatorView } from './SimulatorView';
 import { ConnectionControls } from './ConnectionControls';
 import { MoveControls } from './MoveControls';
@@ -61,27 +61,10 @@ function jobModeLabel(scene: Scene): string {
 
 type StartMode = GcodeStartMode;
 
-const FRAME_IDLE_POLL_MS = 200;
-const FRAME_IDLE_TIMEOUT_MS = 15_000;
 /** Backup stop if pointer-up is missed (deadman test fire). */
 const TEST_FIRE_MAX_MS = 5000;
 /** Keep streaming-health banner visible briefly after status recovers (reduces flicker). */
 const STREAMING_WARNING_HOLD_MS = 3000;
-
-/** Poll until GRBL reports idle (e.g. after framing moves). */
-async function waitForGrblIdle(ctrl: LaserController): Promise<boolean> {
-  const deadline = Date.now() + FRAME_IDLE_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    try {
-      ctrl.requestStatusReport();
-    } catch {
-      /* disconnected */
-    }
-    if (ctrl.state.status === 'idle') return true;
-    await new Promise<void>(r => setTimeout(r, FRAME_IDLE_POLL_MS));
-  }
-  return false;
-}
 
 function formatJobTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
@@ -161,6 +144,8 @@ export interface ConnectionPanelMainProps {
   /** Panel width in px (host computes min(500, 45% window)). */
   sidebarWidth?: number;
   machineService: MachineService;
+  /** Same ref as {@link MachineService} / `useMachineService` (GRBL controller). */
+  machineControllerRef: MutableRefObject<LaserController | null>;
   outcomeReplaySection: React.ReactNode;
   messages: string[];
   appendMessage: (message: string) => void;
@@ -168,8 +153,6 @@ export interface ConnectionPanelMainProps {
   clearMessages: () => void;
   isSimulator: boolean;
   setSimulator: (v: boolean) => void;
-  /** T2-4: machine authority facade (phase 1: jog + validated job start). */
-  executionCoordinator: ExecutionCoordinator;
 }
 
 export function ConnectionPanelMain({
@@ -211,7 +194,7 @@ export function ConnectionPanelMain({
   onOpenSettings,
   sidebarWidth = 500,
   machineService,
-  executionCoordinator,
+  machineControllerRef,
   outcomeReplaySection,
   messages,
   appendMessage,
@@ -270,6 +253,19 @@ export function ConnectionPanelMain({
       }
     }
   }, []);
+
+  const notifySimulatorTxRef = useRef(notifySimulatorTx);
+  notifySimulatorTxRef.current = notifySimulatorTx;
+
+  const executionCoordinator = useMemo(
+    () =>
+      new ExecutionCoordinator({
+        machineService,
+        controllerRef: machineControllerRef,
+        notifySimulatorRef: notifySimulatorTxRef,
+      }),
+    [machineService, machineControllerRef],
+  );
 
   const onSimulatorSubscribe = useCallback((cb: (line: string) => void) => {
     simulatorListenersRef.current.add(cb);
@@ -591,12 +587,12 @@ export function ConnectionPanelMain({
       hasJogged.current = true;
       setWorkflowVersion(v => v + 1);
       try {
-        executionCoordinator.jog(axis, distance, 3000, notifySimulatorTx);
+        executionCoordinator.jog(axis, distance, 3000);
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
     },
-    [notifySimulatorTx, executionCoordinator],
+    [executionCoordinator],
   );
 
   const handleStartJob = async () => {
@@ -674,22 +670,8 @@ export function ConnectionPanelMain({
     return true;
   }, [workFrame, bedWidth, bedHeight, showConfirm]);
 
-  const sendFrameLine = useCallback(
-    async (ctrl: LaserController, line: string) => {
-      notifySimulatorTx(line);
-      try {
-        ctrl.sendCommand(line, 'internal');
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-      }
-      await new Promise(r => setTimeout(r, 50));
-    },
-    [notifySimulatorTx],
-  );
-
   const handleFrameSafe = useCallback(async () => {
-    const ctrl = controllerRef.current;
-    if (!ctrl || !canFrame) return;
+    if (!canFrame) return;
 
     if (!(await confirmFrameBounds())) return;
 
@@ -700,66 +682,32 @@ export function ConnectionPanelMain({
       bedHeightMm: bedHeight,
     };
 
-    const corners = [
-      { x: sceneBounds.minX, y: sceneBounds.minY },
-      { x: sceneBounds.maxX, y: sceneBounds.minY },
-      { x: sceneBounds.maxX, y: sceneBounds.maxY },
-      { x: sceneBounds.minX, y: sceneBounds.maxY },
-      { x: sceneBounds.minX, y: sceneBounds.minY },
-    ].map(p => transformPointToMachine(p, sceneBounds, transformOpts));
+    const corners = buildFrameCorners(sceneBounds, transformOpts);
 
     const ys = corners.map(c => c.y);
     const yLo = Math.min(...ys);
     const yHi = Math.max(...ys);
 
     setMessages(prev => [...prev,
-      `Framing (safe): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
+      `Framing (safe): machine X${corners[0]!.x.toFixed(0)}-${corners[1]!.x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    const eps = 0.0005;
-    const lines: string[] =
-      startMode === 'current'
-        ? (() => {
-          const out: string[] = ['G91', 'G21', 'M5 S0'];
-          let prev = corners[0];
-          for (let i = 1; i < corners.length; i++) {
-            const dx = corners[i].x - prev.x;
-            const dy = corners[i].y - prev.y;
-            if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
-              out.push(`G0 X${dx.toFixed(3)} Y${dy.toFixed(3)}`);
-            }
-            prev = corners[i];
-          }
-          out.push('M5 S0');
-          out.push('G90');
-          return out;
-        })()
-        : [
-          'G90',
-          'G21',
-          'M5 S0',
-          ...corners.map(c => `G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`),
-          'M5 S0',
-        ];
+    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts });
 
-    for (const line of lines) {
-      await sendFrameLine(ctrl, line);
-    }
-
-    const idleOk = await waitForGrblIdle(ctrl);
-    if (!idleOk) {
-      setMessages(prev => [...prev, '⚠ Frame (Safe): machine did not reach idle within 15s — check machine state']);
+    if (!result.ok) {
+      if (result.reason === 'idle-timeout') {
+        setMessages(prev => [...prev, '⚠ Frame (Safe): machine did not reach idle within 15s — check machine state']);
+      }
       return;
     }
 
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
+  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator]);
 
   const handleFrameDot = useCallback(async () => {
-    const ctrl = controllerRef.current;
-    if (!ctrl || !canFrame) return;
+    if (!canFrame) return;
 
     if (!(await confirmFrameBounds())) return;
 
@@ -782,70 +730,40 @@ export function ConnectionPanelMain({
       bedHeightMm: bedHeight,
     };
 
-    const corners = [
-      { x: sceneBounds.minX, y: sceneBounds.minY },
-      { x: sceneBounds.maxX, y: sceneBounds.minY },
-      { x: sceneBounds.maxX, y: sceneBounds.maxY },
-      { x: sceneBounds.minX, y: sceneBounds.maxY },
-      { x: sceneBounds.minX, y: sceneBounds.minY },
-    ].map(p => transformPointToMachine(p, sceneBounds, transformOpts));
+    const corners = buildFrameCorners(sceneBounds, transformOpts);
 
     const ys = corners.map(c => c.y);
     const yLo = Math.min(...ys);
     const yHi = Math.max(...ys);
 
     setMessages(prev => [...prev,
-      `Framing (laser dot): machine X${corners[0].x.toFixed(0)}-${corners[1].x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
+      `Framing (laser dot): machine X${corners[0]!.x.toFixed(0)}-${corners[1]!.x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
     const maxSpindle = activeProfile?.maxSpindle ?? 1000;
-    const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
 
-    const eps = 0.0005;
-    const lines: string[] =
-      startMode === 'current'
-        ? (() => {
-          const out: string[] = ['G91', 'G21', `M4 S${frameDotS}`];
-          let prev = corners[0];
-          for (let i = 1; i < corners.length; i++) {
-            const dx = corners[i].x - prev.x;
-            const dy = corners[i].y - prev.y;
-            if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
-              out.push(`G1 X${dx.toFixed(3)} Y${dy.toFixed(3)} F3000`);
-            }
-            prev = corners[i];
-          }
-          out.push('M5 S0');
-          out.push('G90');
-          return out;
-        })()
-        : [
-          'G90', 'G21',
-          // M4 = dynamic laser mode — fires during G1/G2/G3 only; correct while machine moves along frame
-          `M4 S${frameDotS}`,
-          ...corners.map(c => `G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`),
-          'M5 S0',
-        ];
+    const result = await executionCoordinator.frameDot({
+      sceneBounds,
+      transformOpts,
+      maxSpindle,
+    });
 
-    for (const line of lines) {
-      await sendFrameLine(ctrl, line);
-    }
-
-    const idleOk = await waitForGrblIdle(ctrl);
-    if (!idleOk) {
-      setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle within 15s — check machine state']);
+    if (!result.ok) {
+      if (result.reason === 'idle-timeout') {
+        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle within 15s — check machine state']);
+      }
       return;
     }
 
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, sendFrameLine]);
+  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
-    if (ok) void sendCmd('$H');
-  }, [showConfirm, sendCmd]);
+    if (ok) await executionCoordinator.home();
+  }, [showConfirm, executionCoordinator]);
 
   const handleAutoFocus = useCallback(async () => {
     if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
@@ -864,9 +782,18 @@ export function ConnectionPanelMain({
     }
   }, [canAutoFocus, machineService, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
 
-  const handleUnlock = useCallback(() => {
-    void sendCmd('$X');
-  }, [sendCmd]);
+  const handleUnlock = useCallback(async () => {
+    const classification = machineService.classifyUserCommand('$X');
+    const ok = await showConfirm(
+      'Dangerous command',
+      `${classification.reason}\n\nSend "${classification.command}" anyway?`,
+    );
+    if (!ok) {
+      appendMessage(`Blocked: ${classification.command}`);
+      return;
+    }
+    await executionCoordinator.unlock();
+  }, [appendMessage, machineService, showConfirm, executionCoordinator]);
 
   const handlePauseResume = useCallback(async () => {
     const held = isPaused || machineState?.status === 'hold';

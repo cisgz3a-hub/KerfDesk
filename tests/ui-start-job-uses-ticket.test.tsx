@@ -6,11 +6,10 @@
 import './e2e/helpers/e2eDeterministicIds';
 
 import { JSDOM } from 'jsdom';
-import React, { act, useMemo, useState, type MutableRefObject } from 'react';
+import React, { act, useState, type MutableRefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { compileGcode } from '../src/app/PipelineService';
 import { MachineService } from '../src/app/MachineService';
-import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import {
   createBlankProfile,
   getActiveProfile,
@@ -130,6 +129,7 @@ function PanelHarness(props: {
   machineService: MachineService;
   controller: LaserController;
   portRef: MutableRefObject<SerialPortLike | null>;
+  machineControllerRef: MutableRefObject<LaserController | null>;
 }): React.ReactElement {
   const {
     scene,
@@ -139,21 +139,15 @@ function PanelHarness(props: {
     machineService,
     controller,
     portRef,
+    machineControllerRef,
   } = props;
   const [messages, setMessages] = useState<string[]>([]);
   const activeProfile = getActiveProfile();
-  const executionCoordinator = useMemo(
-    () =>
-      new ExecutionCoordinator({
-        machineService,
-        getController: () => controller,
-      }),
-    [machineService, controller],
-  );
 
   return React.createElement(ConnectionPanelMain, {
     controller,
     portRef,
+    machineControllerRef,
     machineState: idle,
     jobProgress: null as JobProgress | null,
     scene,
@@ -177,7 +171,6 @@ function PanelHarness(props: {
     onSaveOrigin: () => {},
     gcodeStale: false,
     machineService,
-    executionCoordinator,
     outcomeReplaySection: null,
     messages,
     appendMessage: (m: string) => {
@@ -245,6 +238,7 @@ async function run(): Promise<void> {
         machineService,
         controller,
         portRef,
+        machineControllerRef: controllerRef,
       }),
     );
     await flush(50);

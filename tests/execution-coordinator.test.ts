@@ -1,5 +1,5 @@
 /**
- * ExecutionCoordinator (T2-4 phase 1). Run: npx tsx tests/execution-coordinator.test.ts
+ * ExecutionCoordinator jog (T2-4). Run: npx tsx tests/execution-coordinator.test.ts
  */
 import { MachineService } from '../src/app/MachineService';
 import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
@@ -56,7 +56,7 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
 }
 
 void (async () => {
-  console.log('\n=== execution-coordinator (phase 1) ===\n');
+  console.log('\n=== execution-coordinator (jog) ===\n');
 
   let jogCalls: Array<{ axis: 'X' | 'Y'; d: number; f: number }> = [];
   const mock = makeController((axis, d, f) => {
@@ -65,28 +65,30 @@ void (async () => {
   const controllerRef = { current: mock } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };
   const svc = new MachineService(controllerRef, portRef);
+  const simLines: string[] = [];
+  const notifyRef = { current: (line: string) => { simLines.push(line); } };
   const coord = new ExecutionCoordinator({
     machineService: svc,
-    getController: () => controllerRef.current,
+    controllerRef,
+    notifySimulatorRef: notifyRef,
   });
 
   assert(coord.service === svc, 'service exposes MachineService');
 
-  const simLines: string[] = [];
-  coord.jog('X', 1.5, 2400, line => {
-    simLines.push(line);
-  });
+  coord.jog('X', 1.5, 2400);
 
   assert(simLines.length === 1 && simLines[0]?.includes('$J=') && simLines[0]?.includes('X1.5'), 'simulator sees $J line');
   assert(jogCalls.length === 1 && jogCalls[0]?.axis === 'X' && jogCalls[0]?.d === 1.5 && jogCalls[0]?.f === 2400, 'controller receives jog');
 
   jogCalls = [];
   const sim2: string[] = [];
+  const nr2 = { current: (line: string) => { sim2.push(line); } };
   const coordNoCtrl = new ExecutionCoordinator({
     machineService: svc,
-    getController: () => null,
+    controllerRef: { current: null },
+    notifySimulatorRef: nr2,
   });
-  coordNoCtrl.jog('Y', 10, 3000, line => sim2.push(line));
+  coordNoCtrl.jog('Y', 10, 3000);
   assert(jogCalls.length === 0 && sim2.length === 0, 'no controller → jog is a no-op');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

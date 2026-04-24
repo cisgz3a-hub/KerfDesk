@@ -48,6 +48,7 @@ const files = [
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'execution-coordinator.test.ts',
+  'execution-coordinator-unlock-home-frame.test.ts',
   'device-profile-storage-migration.test.ts',
   'device-profile-basic-api.test.ts',
   'validated-job-ticket-phase1.test.ts',
@@ -100,6 +101,7 @@ const files = [
   'origin-mode-wcs-zero.test.ts',
   'bed-height-resolver-parity.test.ts',
   'fonts.test.ts',
+  'frame-gcode-pure.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',
