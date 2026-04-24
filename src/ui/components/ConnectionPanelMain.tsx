@@ -18,6 +18,7 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type MachineService } from '../../app/MachineService';
+import { type ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { transformPointToMachine } from '../../core/plan/MachineTransform';
@@ -167,6 +168,8 @@ export interface ConnectionPanelMainProps {
   clearMessages: () => void;
   isSimulator: boolean;
   setSimulator: (v: boolean) => void;
+  /** T2-4: machine authority facade (phase 1: jog + validated job start). */
+  executionCoordinator: ExecutionCoordinator;
 }
 
 export function ConnectionPanelMain({
@@ -208,6 +211,7 @@ export function ConnectionPanelMain({
   onOpenSettings,
   sidebarWidth = 500,
   machineService,
+  executionCoordinator,
   outcomeReplaySection,
   messages,
   appendMessage,
@@ -586,18 +590,13 @@ export function ConnectionPanelMain({
     (axis: 'X' | 'Y', distance: number) => {
       hasJogged.current = true;
       setWorkflowVersion(v => v + 1);
-      const c = controllerRef.current;
-      if (!c) return;
-      const feedRate = 3000;
-      const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
-      notifySimulatorTx(cmd);
       try {
-        machineService.jog(axis, distance, feedRate);
+        executionCoordinator.jog(axis, distance, 3000, notifySimulatorTx);
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
     },
-    [notifySimulatorTx, machineService],
+    [notifySimulatorTx, executionCoordinator],
   );
 
   const handleStartJob = async () => {
@@ -627,7 +626,7 @@ export function ConnectionPanelMain({
       `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
     ]);
     try {
-      await machineService.startValidatedJob({
+      await executionCoordinator.startValidatedJob({
         ticket,
         scene,
         machineState,
@@ -640,7 +639,7 @@ export function ConnectionPanelMain({
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
     } catch (e: unknown) {
-      machineService.clearJobSession();
+      executionCoordinator.clearJobSession();
       jobStartTimeRef.current = null;
       setJobStartTime(null);
       setElapsedSeconds(0);

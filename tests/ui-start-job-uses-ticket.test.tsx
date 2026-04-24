@@ -6,10 +6,11 @@
 import './e2e/helpers/e2eDeterministicIds';
 
 import { JSDOM } from 'jsdom';
-import React, { act, useState, type MutableRefObject } from 'react';
+import React, { act, useMemo, useState, type MutableRefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { compileGcode } from '../src/app/PipelineService';
 import { MachineService } from '../src/app/MachineService';
+import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import {
   createBlankProfile,
   getActiveProfile,
@@ -141,6 +142,14 @@ function PanelHarness(props: {
   } = props;
   const [messages, setMessages] = useState<string[]>([]);
   const activeProfile = getActiveProfile();
+  const executionCoordinator = useMemo(
+    () =>
+      new ExecutionCoordinator({
+        machineService,
+        getController: () => controller,
+      }),
+    [machineService, controller],
+  );
 
   return React.createElement(ConnectionPanelMain, {
     controller,
@@ -168,6 +177,7 @@ function PanelHarness(props: {
     onSaveOrigin: () => {},
     gcodeStale: false,
     machineService,
+    executionCoordinator,
     outcomeReplaySection: null,
     messages,
     appendMessage: (m: string) => {

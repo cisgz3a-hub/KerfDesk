@@ -47,6 +47,7 @@ const files = [
   'storage-filesystem-unit.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
+  'execution-coordinator.test.ts',
   'device-profile-storage-migration.test.ts',
   'device-profile-basic-api.test.ts',
   'validated-job-ticket-phase1.test.ts',
