@@ -20,7 +20,7 @@ import { getOutputStrategy } from '../core/output/Output';
 import '../core/output/GrblStrategy';
 import { getActiveProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
-import { generateTicketId, hashObject, hashString } from '../core/job/ticketHashing';
+import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -176,7 +176,7 @@ export async function compileGcode(
   const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const ticket: ValidatedJobTicket = {
     ticketId: generateTicketId(),
-    sceneHash: hashObject(sceneForJob),
+    sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcode),
     gcodeLines,

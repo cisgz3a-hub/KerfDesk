@@ -11,7 +11,7 @@ import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
-import { hashObject, hashString } from '../src/core/job/ticketHashing';
+import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 
 let passed = 0;
@@ -89,7 +89,7 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
   const profile = getActiveProfile();
   const baseTicket: ValidatedJobTicket = {
     ticketId: 'tkt_wake_lock',
-    sceneHash: hashObject(scene),
+    sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
     gcodeLines: [...gcodeLines],

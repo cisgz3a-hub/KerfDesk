@@ -10,7 +10,7 @@ import {
 } from '../src/core/devices/DeviceProfile';
 import { confirmPreflightForJobStart } from '../src/core/preflight/confirmPreflightForJobStart';
 import { runPreflightSummary } from '../src/core/preflight/Preflight';
-import { generateTicketId, hashObject, hashString } from '../src/core/job/ticketHashing';
+import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { createScene } from '../src/core/scene/Scene';
 import { addObject } from '../src/ui/history/SceneCommands';
 import { createRect } from '../src/core/scene/SceneObject';
@@ -101,6 +101,10 @@ void (async () => {
   if (result) {
     assert(result.ticket.ticketId.length > 0, 'ticketId non-empty');
     assert(/^[0-9a-f]{8}$/.test(result.ticket.sceneHash), 'sceneHash is 8 hex chars');
+    assert(
+      result.ticket.sceneHash === hashSceneForTicket(scene),
+      'ticket.sceneHash matches hashSceneForTicket(live scene)',
+    );
     assert(result.ticket.gcodeHash === hashString(result.gcode), 'gcodeHash matches hashString(gcode)');
     const lines = result.gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     assert(result.ticket.gcodeLines.length === lines.length, 'gcodeLines count matches trimmed gcode');
@@ -138,6 +142,26 @@ void (async () => {
     ticket,
   );
   assert(!blocked.confirmed && blocked.ticket === null, 'blockers → confirmed false, ticket null');
+
+  {
+    const s3 = createScene(400, 300, 'bounds-cache');
+    const scene3 = addObject(s3, createRect(s3.layers[0].id, 2, 2, 8, 8));
+    const h0 = hashSceneForTicket(scene3);
+    const r = scene3.objects[0];
+    const scene3dirty = {
+      ...scene3,
+      objects: scene3.objects.map(o =>
+        o.id === r.id
+          ? {
+              ...o,
+              _bounds: { minX: 0, minY: 0, maxX: 8, maxY: 8 },
+              _worldTransform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 },
+            }
+          : o,
+      ),
+    };
+    assert(hashSceneForTicket(scene3dirty) === h0, 'hashSceneForTicket ignores bounds/worldTransform caches');
+  }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);

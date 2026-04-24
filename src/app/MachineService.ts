@@ -24,7 +24,7 @@ import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
-import { hashObject, hashString } from '../core/job/ticketHashing';
+import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
   classifyUserCommand as classifyUserGrbl,
@@ -279,8 +279,13 @@ export class MachineService {
     ticket: ValidatedJobTicket,
     scene: Scene,
   ): { ok: true } | { ok: false; reason: string } {
-    const currentSceneHash = hashObject(scene);
+    const currentSceneHash = hashSceneForTicket(scene);
     if (currentSceneHash !== ticket.sceneHash) {
+      console.warn('[ticket] scene hash mismatch', {
+        ticketHash: ticket.sceneHash,
+        currentHash: currentSceneHash,
+        ticketScenePreview: JSON.stringify(ticket).slice(0, 500),
+      });
       return {
         ok: false,
         reason:
