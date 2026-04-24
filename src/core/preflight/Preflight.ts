@@ -2,6 +2,13 @@
  * @copyright (c) 2025 LaserForge. All rights reserved.
  */
 import { createBlankProfile, getActiveProfile, type DeviceProfile } from '../devices/DeviceProfile';
+
+const NEGATIVE_COORD_SETTINGS_HINT =
+  " If your machine legitimately supports negative workspace, enable 'Allow negative workspace coordinates' in Machine settings.";
+
+function negativeCoordPreflightSeverity(profile: DeviceProfile | null | undefined): 'error' | 'warning' {
+  return profile?.allowsNegativeWorkspace === true ? 'warning' : 'error';
+}
 import type { Scene } from '../scene/Scene';
 import { getOutputLayers } from '../scene/Scene';
 import type { MachineState, MachineStatus } from '../../controllers/ControllerInterface';
@@ -612,17 +619,25 @@ function runOutputBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): v
   const bedH = ctx.liveMachineInfo?.bedHeightMm ?? ctx.profile?.bedHeight;
 
   if (bounds.minX < -1) {
+    const sev = negativeCoordPreflightSeverity(ctx.profile);
     out.push({
-      severity: 'warning',
+      severity: sev,
       code: PREFLIGHT_CODES.OUTPUT_NEGATIVE_X,
-      message: `Output has negative X (${bounds.minX.toFixed(1)}mm). Verify work zero and soft limits.`,
+      message:
+        sev === 'error'
+          ? `Job produces negative X (${bounds.minX.toFixed(1)}mm). On front-origin machines this usually means limit-switch hits.${NEGATIVE_COORD_SETTINGS_HINT}`
+          : `Output has negative X (${bounds.minX.toFixed(1)}mm). Verify work zero and soft limits.`,
     });
   }
   if (bounds.minY < -1) {
+    const sev = negativeCoordPreflightSeverity(ctx.profile);
     out.push({
-      severity: 'warning',
+      severity: sev,
       code: PREFLIGHT_CODES.OUTPUT_NEGATIVE_Y,
-      message: `Output has negative Y (${bounds.minY.toFixed(1)}mm). Verify work zero and machine limits.`,
+      message:
+        sev === 'error'
+          ? `Job produces negative Y (${bounds.minY.toFixed(1)}mm). On front-origin machines this usually means limit-switch hits.${NEGATIVE_COORD_SETTINGS_HINT}`
+          : `Output has negative Y (${bounds.minY.toFixed(1)}mm). Verify work zero and machine limits.`,
     });
   }
   if (bedW != null && bedW > 0 && bounds.maxX > bedW + 1) {
@@ -669,19 +684,25 @@ function runGcodeTravelBoundsChecks(ctx: PreflightContext, out: PreflightResult[
   const bedH = ctx.liveMachineInfo?.bedHeightMm ?? ctx.profile?.bedHeight ?? 0;
 
   if (minX < -1) {
+    const sev = negativeCoordPreflightSeverity(ctx.profile);
     out.push({
-      severity: 'warning',
+      severity: sev,
       code: PREFLIGHT_CODES.GCODE_TRAVEL_NEGATIVE_X,
       message:
-        `G-code has negative X (${minX.toFixed(1)}mm). Many setups use negative work coordinates after zeroing; verify work zero and soft limits.`,
+        sev === 'error'
+          ? `Job produces negative X (${minX.toFixed(1)}mm) in G-code travel. On front-origin machines this usually means limit-switch hits.${NEGATIVE_COORD_SETTINGS_HINT}`
+          : `G-code has negative X (${minX.toFixed(1)}mm). Many setups use negative work coordinates after zeroing; verify work zero and soft limits.`,
     });
   }
   if (minY < -1) {
+    const sev = negativeCoordPreflightSeverity(ctx.profile);
     out.push({
-      severity: 'warning',
+      severity: sev,
       code: PREFLIGHT_CODES.GCODE_TRAVEL_NEGATIVE_Y,
       message:
-        `G-code has negative Y (${minY.toFixed(1)}mm). Top-left homing often uses negative Y; verify work zero and machine limits.`,
+        sev === 'error'
+          ? `Job produces negative Y (${minY.toFixed(1)}mm) in G-code travel. On front-origin machines this usually means limit-switch hits.${NEGATIVE_COORD_SETTINGS_HINT}`
+          : `G-code has negative Y (${minY.toFixed(1)}mm). Top-left homing often uses negative Y; verify work zero and machine limits.`,
     });
   }
   if (bedW > 0 && maxX > bedW + 1) {

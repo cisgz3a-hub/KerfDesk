@@ -84,6 +84,7 @@ function testFactoryDefaults(): void {
   assertEq(p.maxSpindle, 1000, 'maxSpindle = 1000');
   assertEq(p.name, 'Creality Falcon A1 Pro', 'default name = Creality Falcon A1 Pro');
   assertEq(p.connection, undefined, 'no connection field (serial/USB discovered at connect time)');
+  assertEq(p.allowsNegativeWorkspace, false, 'allowsNegativeWorkspace = false (front-origin default)');
 }
 
 function testFactoryCustomName(): void {

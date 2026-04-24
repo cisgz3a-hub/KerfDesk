@@ -1,6 +1,7 @@
 /**
- * Guardrails: preflight output bounds — negative coords are warnings, bed exceed is blocker,
- * machinePlanBounds takes precedence over G-code parsing.
+ * Guardrails: preflight output bounds — negative coords are blockers by default
+ * (profile.allowsNegativeWorkspace), bed exceed is blocker, machinePlanBounds
+ * takes precedence over G-code parsing.
  * Run: npx tsx tests/preflight-bounds.test.ts
  */
 
@@ -43,21 +44,21 @@ console.log('\n=== Preflight bounds guardrails ===');
   const s = sceneWithRect();
   const r = runPreflightSummary(s, null, idle, 400, 300, { minX: -5, maxX: 50, minY: 0, maxY: 50 });
   const neg = r.issues.filter(i => i.id === 'output-negative-x');
-  assert(neg.length === 1 && neg[0].severity === 'warning', 'negative X → warning');
-  assert(r.canStart, 'negative X alone does not block start');
+  assert(neg.length === 1 && neg[0].severity === 'blocker', 'negative X → blocker (default profile)');
+  assert(!r.canStart, 'negative X alone blocks start');
 }
 
 {
   const s = sceneWithRect();
   const r = runPreflightSummary(s, null, idle, 400, 300, { minX: 0, maxX: 50, minY: -3, maxY: 50 });
-  assert(r.issues.some(i => i.id === 'output-negative-y' && i.severity === 'warning'), 'negative Y → warning');
-  assert(r.canStart, 'negative Y alone does not block start');
+  assert(r.issues.some(i => i.id === 'output-negative-y' && i.severity === 'blocker'), 'negative Y → blocker');
+  assert(!r.canStart, 'negative Y alone blocks start');
 }
 
 {
   const s = sceneWithRect();
   const r = runPreflightSummary(s, null, idle, 400, 300, { minX: -2, maxX: 10, minY: -4, maxY: 10 });
-  assert(r.issues.filter(i => i.id === 'output-negative-x' || i.id === 'output-negative-y').length === 2, 'both axes negative → two warnings');
+  assert(r.issues.filter(i => i.id === 'output-negative-x' || i.id === 'output-negative-y').length === 2, 'both axes negative → two blockers');
 }
 
 {
@@ -97,7 +98,7 @@ console.log('\n=== Preflight bounds guardrails ===');
   const gcode = 'G0 X10 Y10';
   const r = runPreflightSummary(s, gcode, idle, 400, 300, { minX: -8, maxX: 5, minY: 0, maxY: 5 });
   const x = r.issues.find(i => i.id === 'output-negative-x');
-  assert(x != null && x.title.includes('Output has negative'), 'machinePlanBounds wins over gcode (title mentions Output)');
+  assert(x != null && x.title.includes('Job produces'), 'machinePlanBounds wins over gcode (output-bounds path)');
 }
 
 {
@@ -109,7 +110,7 @@ console.log('\n=== Preflight bounds guardrails ===');
 {
   const s = sceneWithRect();
   const r = runPreflightSummary(s, null, idle, 400, 300, { minX: -1.01, maxX: 50, minY: 0, maxY: 50 });
-  assert(r.issues.some(i => i.id === 'output-negative-x'), 'minX below -1 → negative-X warning');
+  assert(r.issues.some(i => i.id === 'output-negative-x' && i.severity === 'blocker'), 'minX below -1 → negative-X blocker');
 }
 
 {

@@ -32,6 +32,7 @@ const files = [
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
+  'preflight-negative-coords.test.ts',
   'preflight.test.ts',
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',

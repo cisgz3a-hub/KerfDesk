@@ -143,6 +143,15 @@ export interface DeviceProfile {
   suppressWcsConsent?: boolean;
 
   /**
+   * When true, the machine workspace legitimately includes negative X/Y machine
+   * or G-code coordinates (e.g. rear origin with G92/G10 offsets). When false
+   * (default for new profiles and when omitted on load), negative output/travel
+   * coordinates are preflight **errors** that block job start — typical for
+   * front-origin diode lasers where negative means a limit risk.
+   */
+  allowsNegativeWorkspace?: boolean;
+
+  /**
    * Optional connection metadata. When omitted, the profile is treated as
    * serial/GRBL (the historical shape). Present for Falcon A1 Pro WiFi
    * profiles so the UI can pick the correct connection & status widgets.
@@ -369,6 +378,7 @@ export function createFalconWiFiProfile(name: string, ip: string): DeviceProfile
       kind: 'falcon-wifi',
       ip,
     },
+    allowsNegativeWorkspace: false,
   };
 }
 
@@ -403,6 +413,7 @@ export function createFalconSerialProfile(name: string = 'Creality Falcon A1 Pro
     autoFocusSupported: true,
     autoFocusCommand: '$HZ1',
     autoFocusTimeoutMs: 15_000,
+    allowsNegativeWorkspace: false,
   };
 }
 
