@@ -92,6 +92,7 @@ import {
   getActiveProfile,
   getActiveProfileId,
   getDeviceProfiles,
+  initializeDeviceProfiles,
   profileFromScene,
   saveDeviceProfile,
   setActiveProfileId,
@@ -308,6 +309,15 @@ export function App() {
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
 
   const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
+  useEffect(() => {
+    void initializeDeviceProfiles()
+      .then(() => {
+        refreshProfiles();
+      })
+      .catch(() => {
+        refreshProfiles();
+      });
+  }, [refreshProfiles]);
   useEffect(() => {
     const onExternalProfileChange = () => refreshProfiles();
     window.addEventListener('laserforge:active-profile-changed', onExternalProfileChange);

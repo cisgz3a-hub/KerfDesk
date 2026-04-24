@@ -6,6 +6,8 @@ import {
   backfillGcodeTemplateNames,
   createBlankProfile,
   getDeviceProfiles,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
   type DeviceProfile,
 } from '../src/core/devices/DeviceProfile';
 import {
@@ -171,9 +173,12 @@ function makeSceneForPreflight(): ReturnType<typeof createScene> {
 
   installMockLocalStorage();
   for (const k of Object.keys(memoryStore)) delete memoryStore[k];
-  memoryStore.laserforge_device_profiles = JSON.stringify([
-    { ...createBlankProfile('x'), id: 'x', gcodeFooterTemplate: LEGACY_FOOTER_BODY__PARK_AT_MAX_BED },
-  ]);
+  resetDeviceProfilesForTest();
+  saveDeviceProfile({
+    ...createBlankProfile('x'),
+    id: 'x',
+    gcodeFooterTemplate: LEGACY_FOOTER_BODY__PARK_AT_MAX_BED,
+  });
   const [loaded] = getDeviceProfiles();
   assert(loaded != null, '6c. profile loaded');
   assert(

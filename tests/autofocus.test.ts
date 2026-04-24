@@ -7,7 +7,15 @@ import { MachineService } from '../src/app/MachineService';
 import { GrblController } from '../src/controllers/grbl/GrblController';
 import { MockSerialPort, type SerialPortLike } from '../src/communication/SerialPort';
 import type { LaserController } from '../src/controllers/ControllerInterface';
-import type { DeviceProfile } from '../src/core/devices/DeviceProfile';
+import {
+  initializeDeviceProfiles,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
+  setActiveProfileId,
+  type DeviceProfile,
+} from '../src/core/devices/DeviceProfile';
+import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
+import { setStorageForTest } from '../src/core/storage/storage';
 
 let passed = 0;
 let failed = 0;
@@ -53,15 +61,17 @@ function installMockLocalStorage(): void {
 }
 
 function setActiveProfile(profile: DeviceProfile): void {
-  const all = [profile];
-  memoryStore.laserforge_device_profiles = JSON.stringify(all);
-  memoryStore.laserforge_active_profile = profile.id;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
 }
 
 async function testMachineServiceAutoFocus(): Promise<void> {
   console.log('\n=== MachineService.autoFocus() ===');
   installMockLocalStorage();
   for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  setStorageForTest(new InMemoryStorageAdapter());
+  resetDeviceProfilesForTest();
+  await initializeDeviceProfiles();
 
   const calls: Array<{ command: string; timeoutMs: number }> = [];
   const controller = {
@@ -275,11 +285,15 @@ async function testGrblRunAutoFocus(): Promise<void> {
 async function runAll(): Promise<void> {
   await testMachineServiceAutoFocus();
   await testGrblRunAutoFocus();
+  setStorageForTest(null);
+  resetDeviceProfilesForTest();
   console.log(`\nAutofocus tests: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
 runAll().catch(e => {
+  setStorageForTest(null);
+  resetDeviceProfilesForTest();
   console.error(e);
   process.exit(1);
 });

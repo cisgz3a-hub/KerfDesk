@@ -15,8 +15,12 @@ import {
   backfillFalconAutofocus,
   createFalconSerialProfile,
   getDeviceProfiles,
+  initializeDeviceProfiles,
+  resetDeviceProfilesForTest,
   type DeviceProfile,
 } from '../src/core/devices/DeviceProfile';
+import { setStorageForTest } from '../src/core/storage/storage';
+import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 
 let passed = 0;
 let failed = 0;
@@ -158,13 +162,17 @@ function testBackfillHelperPure(): void {
   assertEq(variant.autoFocusSupported, true, "model 'Falcon A1 Pro (USB)' still matches");
 }
 
-function testBackfillViaGetDeviceProfiles(): void {
+async function testBackfillViaGetDeviceProfiles(): Promise<void> {
   console.log('\n=== getDeviceProfiles() migration on read ===');
   installMockLocalStorage();
   clearMockStorage();
+  setStorageForTest(new InMemoryStorageAdapter());
+  resetDeviceProfilesForTest();
 
   const stored = [legacyFalconProfile()];
   memoryStore.laserforge_device_profiles = JSON.stringify(stored);
+  memoryStore.laserforge_active_profile = stored[0].id;
+  await initializeDeviceProfiles();
 
   const [migrated] = getDeviceProfiles();
   assertEq(
@@ -185,9 +193,12 @@ function testBackfillViaGetDeviceProfiles(): void {
 
   // Stale false (e.g. older build in localStorage) is healed on read.
   clearMockStorage();
+  setStorageForTest(new InMemoryStorageAdapter());
+  resetDeviceProfilesForTest();
   memoryStore.laserforge_device_profiles = JSON.stringify([
     legacyFalconProfile({ autoFocusSupported: false }),
   ]);
+  await initializeDeviceProfiles();
   const [healed] = getDeviceProfiles();
   assertEq(
     healed.autoFocusSupported,
@@ -197,9 +208,12 @@ function testBackfillViaGetDeviceProfiles(): void {
 
   // Non-Falcon profile untouched.
   clearMockStorage();
+  setStorageForTest(new InMemoryStorageAdapter());
+  resetDeviceProfilesForTest();
   memoryStore.laserforge_device_profiles = JSON.stringify([
     legacyFalconProfile({ brand: 'Generic', model: 'Medium Diode' }),
   ]);
+  await initializeDeviceProfiles();
   const [generic] = getDeviceProfiles();
   assertEq(
     generic.autoFocusSupported,
@@ -213,13 +227,18 @@ function testBackfillViaGetDeviceProfiles(): void {
   );
 }
 
-function runAll(): void {
+async function runAll(): Promise<void> {
   testFactoryDefaults();
   testFactoryCustomName();
   testBackfillHelperPure();
-  testBackfillViaGetDeviceProfiles();
+  await testBackfillViaGetDeviceProfiles();
+  setStorageForTest(null);
   console.log(`\nFalcon serial profile tests: ${passed} passed, ${failed} failed`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
-runAll();
+void runAll().catch((e: unknown) => {
+  setStorageForTest(null);
+  console.error(e);
+  process.exit(1);
+});

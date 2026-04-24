@@ -14,6 +14,7 @@ import {
   LEGACY_FOOTER_BODY__PARK_AT_MAX_BED,
   LEGACY_FOOTER_BODY__WITH_BEEP,
 } from '../plan/GcodeTemplates';
+import { getStorage } from '../storage/storage';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
@@ -176,102 +177,148 @@ export interface DeviceProfile {
 const STORAGE_KEY = 'laserforge_device_profiles';
 const ACTIVE_PROFILE_KEY = 'laserforge_active_profile';
 
-/** Browser `localStorage`; absent in Node (tsx tests) and some embed contexts. */
-function getBrowserLocalStorage(): Storage | null {
-  if (typeof globalThis === 'undefined') return null;
-  try {
-    const ls = (globalThis as unknown as { localStorage?: unknown }).localStorage;
-    if (
-      ls != null &&
-      typeof (ls as Storage).getItem === 'function' &&
-      typeof (ls as Storage).setItem === 'function'
-    ) {
-      return ls as Storage;
+let cachedProfiles: DeviceProfile[] = [];
+let cachedActiveId: string | null = null;
+let initPromise: Promise<void> | null = null;
+
+function applyProfileBackfills(p: DeviceProfile): DeviceProfile {
+  const profile: DeviceProfile = {
+    ...p,
+    returnToOrigin: p.returnToOrigin ?? true,
+    originCorner:
+      (p as DeviceProfile).originCorner
+      ?? (p.invertY === false ? 'rear-left' : 'front-left'),
+  };
+  return backfillGcodeTemplateNames(backfillFalconAutofocus(profile));
+}
+
+async function migrateDeviceProfilesFromLocalStorage(): Promise<void> {
+  if (typeof localStorage === 'undefined') return;
+  const storage = getStorage();
+  const keys = [STORAGE_KEY, ACTIVE_PROFILE_KEY];
+
+  for (const key of keys) {
+    try {
+      const legacy = localStorage.getItem(key);
+      if (legacy === null) continue;
+      const existing = await storage.get(key);
+      if (existing !== null) continue;
+      await storage.set(key, legacy);
+      localStorage.removeItem(key);
+    } catch {
+      /* ignore */
     }
-    return null;
-  } catch {
-    return null;
   }
+}
+
+async function persistProfiles(): Promise<void> {
+  try {
+    await getStorage().set(STORAGE_KEY, JSON.stringify(cachedProfiles));
+  } catch {
+    /* ignore */
+  }
+}
+
+async function runInitializeDeviceProfiles(): Promise<void> {
+  await migrateDeviceProfilesFromLocalStorage();
+  const storage = getStorage();
+
+  try {
+    const raw = await storage.get(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as DeviceProfile[];
+      if (Array.isArray(parsed)) {
+        cachedProfiles = parsed.map(applyProfileBackfills);
+      } else {
+        cachedProfiles = [];
+      }
+    } else {
+      cachedProfiles = [];
+    }
+  } catch {
+    cachedProfiles = [];
+  }
+
+  try {
+    cachedActiveId = await storage.get(ACTIVE_PROFILE_KEY);
+  } catch {
+    cachedActiveId = null;
+  }
+}
+
+/** Load profiles from storage into the in-memory cache. Idempotent. */
+export async function initializeDeviceProfiles(): Promise<void> {
+  if (initPromise) return initPromise;
+  initPromise = runInitializeDeviceProfiles();
+  return initPromise;
+}
+
+/** Test-only cache reset for isolated profile-storage tests. */
+export function resetDeviceProfilesForTest(): void {
+  cachedProfiles = [];
+  cachedActiveId = null;
+  initPromise = null;
 }
 
 /** Get all saved profiles */
 export function getDeviceProfiles(): DeviceProfile[] {
-  const ls = getBrowserLocalStorage();
-  if (!ls) return [];
-  try {
-    const raw = ls.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as DeviceProfile[];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map(p => {
-      const profile: DeviceProfile = {
-        ...p,
-        returnToOrigin: p.returnToOrigin ?? true,
-        originCorner:
-          (p as DeviceProfile).originCorner
-          ?? (p.invertY === false ? 'rear-left' : 'front-left'),
-      };
-      return backfillGcodeTemplateNames(backfillFalconAutofocus(profile));
-    });
-  } catch {
-    return [];
-  }
+  return [...cachedProfiles];
 }
 
 /** Save a profile (create or update) */
 export function saveDeviceProfile(profile: DeviceProfile): void {
-  const ls = getBrowserLocalStorage();
-  if (!ls) return;
-  const profiles = getDeviceProfiles();
-  const existingIdx = profiles.findIndex(p => p.id === profile.id);
-  profile.updatedAt = new Date().toISOString();
+  const existingIdx = cachedProfiles.findIndex(p => p.id === profile.id);
+  const nextProfile = applyProfileBackfills({
+    ...profile,
+    updatedAt: new Date().toISOString(),
+  });
 
   if (existingIdx >= 0) {
-    profiles[existingIdx] = profile;
+    cachedProfiles[existingIdx] = nextProfile;
   } else {
-    profile.createdAt = new Date().toISOString();
-    profiles.push(profile);
+    nextProfile.createdAt = new Date().toISOString();
+    cachedProfiles.push(nextProfile);
   }
-
-  ls.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  void persistProfiles();
 }
 
 /** Delete a profile by ID */
 export function deleteDeviceProfile(id: string): void {
-  const ls = getBrowserLocalStorage();
-  if (!ls) return;
-  const profiles = getDeviceProfiles().filter(p => p.id !== id);
-  ls.setItem(STORAGE_KEY, JSON.stringify(profiles));
+  cachedProfiles = cachedProfiles.filter(p => p.id !== id);
+  void persistProfiles();
 
   // Clear active if it was deleted
   if (getActiveProfileId() === id) {
-    ls.removeItem(ACTIVE_PROFILE_KEY);
+    cachedActiveId = null;
+    void getStorage().remove(ACTIVE_PROFILE_KEY).catch(() => {
+      /* ignore */
+    });
   }
 }
 
 /** Get the active profile ID */
 export function getActiveProfileId(): string | null {
-  const ls = getBrowserLocalStorage();
-  if (!ls) return null;
-  return ls.getItem(ACTIVE_PROFILE_KEY);
+  return cachedActiveId;
 }
 
 /** Set the active profile */
 export function setActiveProfileId(id: string | null): void {
-  const ls = getBrowserLocalStorage();
-  if (!ls) return;
+  cachedActiveId = id;
   if (id) {
-    ls.setItem(ACTIVE_PROFILE_KEY, id);
+    void getStorage().set(ACTIVE_PROFILE_KEY, id).catch(() => {
+      /* ignore */
+    });
   } else {
-    ls.removeItem(ACTIVE_PROFILE_KEY);
+    void getStorage().remove(ACTIVE_PROFILE_KEY).catch(() => {
+      /* ignore */
+    });
   }
 }
 
 /** Get the active profile */
 export function getActiveProfile(): DeviceProfile | null {
-  const id = getActiveProfileId();
-  if (!id) return null;
-  return getDeviceProfiles().find(p => p.id === id) ?? null;
+  if (!cachedActiveId) return null;
+  return cachedProfiles.find(p => p.id === cachedActiveId) ?? null;
 }
 
 /** Create a new blank profile */
