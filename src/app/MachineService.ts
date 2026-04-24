@@ -239,68 +239,9 @@ export class MachineService {
     this.activeTicket = null;
   }
 
-  async beginJobRun(args: {
-    lines: string[];
-    scene: Scene;
-    machineState: MachineState | null;
-    gcodeText: string;
-    notifySimulatorTx: (line: string) => void;
-  }): Promise<void> {
-    const { lines, scene, machineState, gcodeText, notifySimulatorTx } = args;
-
-    this.burnState = emptyBurnState();
-    this.emitBurnState();
-
-    const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
-
-    const jobLog = createJobLog(
-      scene.metadata?.name || 'Untitled',
-      lines.length,
-      estimate ? estimate.formatted : '?',
-      scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
-        name: l.name,
-        mode: l.settings.mode,
-        power: l.settings.power.max,
-        speed: l.settings.speed,
-        passes: l.settings.passes,
-      })),
-      machineState?.status || 'unknown',
-      { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
-    );
-    addLogEntry(jobLog, 'milestone', `Job started: ${lines.length} commands`);
-    this.currentJobLog = jobLog;
-
-    if (hasPro()) {
-      const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
-        name: l.name,
-        mode: l.settings.mode,
-        power: l.settings.power.max,
-        speed: l.settings.speed,
-        passes: l.settings.passes,
-      }));
-      this.activeReplay = createReplay(
-        scene.metadata?.name || 'Untitled',
-        lines.length,
-        {
-          layers: layerSettings,
-          material: scene.material?.name || null,
-          machineType: scene.machine?.type || null,
-        },
-        estimate ? estimate.totalSeconds * 1000 : null,
-      );
-    } else {
-      this.activeReplay = null;
-    }
-
-    for (const line of lines) notifySimulatorTx(line);
-    await this.controllerRef.current.sendJob(lines);
-  }
-
   /** Start a job from a validated ticket. The ticket carries the
    *  gcode lines and metadata; we stash it for later phases that
-   *  will verify scene/profile hashes before streaming. This phase
-   *  is a parallel entry point — same side effects as beginJobRun,
-   *  just ticket-shaped inputs. */
+   *  will verify scene/profile hashes before streaming. */
   async startValidatedJob(args: {
     ticket: ValidatedJobTicket;
     scene: Scene;

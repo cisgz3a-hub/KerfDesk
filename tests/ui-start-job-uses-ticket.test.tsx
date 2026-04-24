@@ -1,6 +1,6 @@
 /**
  * ConnectionPanelMain.handleStartJob calls startValidatedJob with the compile
- * ticket, not beginJobRun (phase 3).
+ * ticket.
  * Run: npx tsx tests/ui-start-job-uses-ticket.test.tsx
  */
 import './e2e/helpers/e2eDeterministicIds';
@@ -120,7 +120,6 @@ function makeController(): LaserController {
 }
 
 type StartArgs = Parameters<MachineService['startValidatedJob']>[0];
-type BeginArgs = Parameters<MachineService['beginJobRun']>[0];
 
 function PanelHarness(props: {
   scene: Scene;
@@ -215,18 +214,11 @@ async function run(): Promise<void> {
   const machineService = new MachineService(controllerRef, portRef);
 
   const startCalls: StartArgs[] = [];
-  const beginCalls: BeginArgs[] = [];
   const realStart = machineService.startValidatedJob.bind(machineService);
-  const realBegin = machineService.beginJobRun.bind(machineService);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (machineService as any).startValidatedJob = async (args: StartArgs) => {
     startCalls.push(args);
     return realStart(args);
-  };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (machineService as any).beginJobRun = async (args: BeginArgs) => {
-    beginCalls.push(args);
-    return realBegin(args);
   };
 
   const container = win.document.getElementById('root')!;
@@ -258,7 +250,6 @@ async function run(): Promise<void> {
   });
 
   assert(startCalls.length === 1, 'startValidatedJob called once');
-  assert(beginCalls.length === 0, 'beginJobRun not called');
   const arg0 = startCalls[0];
   assert(arg0?.ticket === ticket, 'same ticket reference as compile');
   assert(

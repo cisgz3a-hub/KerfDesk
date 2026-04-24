@@ -1,5 +1,5 @@
 /**
- * MachineService.startValidatedJob — ticket entry point parallel to beginJobRun.
+ * MachineService.startValidatedJob — ticket entry point.
  * Run: npx tsx tests/machine-service-start-validated-job.test.ts
  */
 import { MachineService } from '../src/app/MachineService';
@@ -206,29 +206,6 @@ async function run(): Promise<void> {
       Boolean(startMilestone?.message.includes(ticket.ticketId)),
       'start milestone includes ticketId',
     );
-  }
-
-  {
-    const sent: string[][] = [];
-    const mock = makeMockController(async lines => {
-      sent.push([...lines]);
-    });
-    const controllerRef = { current: mock } as { current: LaserController };
-    const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
-
-    const lines = ['G0 X0', 'M3 S1'];
-    const gcodeText = lines.join('\n');
-    await svc.beginJobRun({
-      lines,
-      scene,
-      machineState: idle,
-      gcodeText,
-      notifySimulatorTx: () => {},
-    });
-
-    assert(sent.length === 1 && sent[0]?.join('\n') === lines.join('\n'), 'beginJobRun still sends lines');
-    assert(svc.getActiveTicket() === null, 'beginJobRun does not set activeTicket');
   }
 
   {
