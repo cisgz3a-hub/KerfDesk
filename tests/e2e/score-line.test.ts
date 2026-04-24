@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: score line — open path, score feed defaults.
  */

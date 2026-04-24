@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: engrave fill — raster scanline G-code.
  */

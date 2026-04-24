@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: rectangle with savedOrigin start mode.
  */

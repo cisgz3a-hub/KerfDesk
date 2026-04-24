@@ -45,11 +45,42 @@ export const IDENTITY_MATRIX: Readonly<Matrix3x2> = {
 
 // ─── ID GENERATION ───────────────────────────────────────────────
 
-let _counter = 0;
+let _randCounter = 0;
+let _detCounter = 0;
+
+/**
+ * When true, {@link generateId} returns `det-000001`, `det-000002`, ... so
+ * tests (E2E gcode snapshots, etc.) are stable. Re-evaluated each call so
+ * unit tests can toggle the env or global per case.
+ */
+function isDeterministic(): boolean {
+  if (
+    typeof process !== 'undefined' &&
+    process.env?.LASERFORGE_DETERMINISTIC_IDS === '1'
+  ) {
+    return true;
+  }
+  if (typeof globalThis !== 'undefined') {
+    return (globalThis as { __LF_DETERMINISTIC_IDS__?: boolean })
+      .__LF_DETERMINISTIC_IDS__ === true;
+  }
+  return false;
+}
+
+/** Reset the sequence used when {@link isDeterministic} is true (e.g. start of each e2e test). */
+export function resetDeterministicCounter(): void {
+  _detCounter = 0;
+}
 
 export function generateId(): string {
-  _counter++;
-  return `${Date.now().toString(36)}-${_counter.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  if (isDeterministic()) {
+    _detCounter += 1;
+    return `det-${String(_detCounter).padStart(6, '0')}`;
+  }
+  _randCounter++;
+  return `${Date.now().toString(36)}-${_randCounter.toString(36)}-${Math.random()
+    .toString(36)
+    .slice(2, 8)}`;
 }
 
 // ─── AABB UTILITIES ──────────────────────────────────────────────

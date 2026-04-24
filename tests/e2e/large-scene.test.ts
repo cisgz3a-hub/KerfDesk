@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: large scene — compile-time budget (no snapshot).
  */

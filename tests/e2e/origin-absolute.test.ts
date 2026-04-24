@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: rectangle with startMode absolute — scene coords vs work offset.
  */

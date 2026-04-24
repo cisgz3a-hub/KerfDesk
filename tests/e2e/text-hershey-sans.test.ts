@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: Hershey Sans text → stable G-code (single-line stroke path).
  */

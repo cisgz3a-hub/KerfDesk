@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: bundled Inter text → stable G-code (opentype outline path).
  */

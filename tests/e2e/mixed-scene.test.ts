@@ -1,3 +1,5 @@
+import './helpers/e2eDeterministicIds';
+
 /**
  * E2E: mixed cut / engrave / score / text — operation ordering.
  */

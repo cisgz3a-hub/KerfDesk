@@ -7,7 +7,7 @@ M5 S0
 
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 X55.400 Y1.719
 M4 S800
 G1 F150 S800
@@ -64,7 +64,7 @@ G1 X0.607 Y-0.125 S800
 G1 X0.638 Y-0.042 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 Y-1.719
 M4 S800
 G1 S800
@@ -121,7 +121,7 @@ G1 X-0.856 Y-0.169 S800
 G1 X-0.907 Y-0.056 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 X-8.613 Y0.195
 M4 S800
 G1 X-8.594 S800
@@ -132,7 +132,7 @@ G1 X6.738 S800
 G1 Y-1.641 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 X-11.309
 M4 S800
 G1 X-8.594 S800
@@ -143,7 +143,7 @@ G1 X6.738 S800
 G1 Y-1.641 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 X-11.660
 M4 S800
 G1 X-8.955 S800
@@ -160,7 +160,7 @@ G1 X7.100 S800
 G1 Y-1.641 S800
 G1 S800
 M5 S0
-; OBJ ids=mobm7dfm-3-k6k8jv
+; OBJ ids=det-000003
 G0 X-21.963
 M4 S800
 G1 X-1.855 S800

@@ -10,7 +10,13 @@ const root = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(root, '..');
 const tsxCli = join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
+const testEnv = {
+  ...process.env,
+  LASERFORGE_DETERMINISTIC_IDS: '1',
+};
+
 const files = [
+  'deterministic-ids.test.ts',
   'pipeline.test.ts',
   'plan-optimizer-large-raster.test.ts',
   'controller.test.ts',
@@ -76,6 +82,7 @@ for (const f of files) {
   console.error(`\n▶ ${f}\n`);
   const r = spawnSync(process.execPath, [tsxCli, join(projectRoot, 'tests', f)], {
     cwd: projectRoot,
+    env: testEnv,
     stdio: 'inherit',
     windowsHide: true,
   });
