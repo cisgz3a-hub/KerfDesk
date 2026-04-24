@@ -1076,4 +1076,15 @@ export class GrblController implements LaserController {
       cb({ ...this._state });
     }
   }
+
+  /**
+   * GRBL $22: homing cycle enable. `true` if $22=1, `false` if $22=0, `undefined` if not in $$ cache.
+   */
+  getFirmwareHomingCycleEnabled(): boolean | undefined {
+    if (!this._grblSettings.has(22)) return undefined;
+    const v = this._grblSettings.get(22)!.trim();
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return undefined;
+    return n !== 0;
+  }
 }

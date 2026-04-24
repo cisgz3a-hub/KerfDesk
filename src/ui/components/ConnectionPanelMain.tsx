@@ -327,9 +327,17 @@ export function ConnectionPanelMain({
   }, [messages]);
 
   useEffect(() => {
-    const result = runPreflightSummary(scene, gcode, machineState, bedWidth, bedHeight, machinePlanBounds);
+    const result = runPreflightSummary(
+      scene,
+      gcode,
+      machineState,
+      bedWidth,
+      bedHeight,
+      machinePlanBounds,
+      controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
+    );
     setPreflight(result);
-  }, [gcode, machineState, scene, bedWidth, bedHeight, machinePlanBounds]);
+  }, [gcode, machineState, scene, bedWidth, bedHeight, machinePlanBounds, activeProfile?.gcodeHeaderTemplate]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
   const isRunning = controllerRef.current?.isJobRunning || false;

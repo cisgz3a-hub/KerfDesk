@@ -101,6 +101,10 @@ export interface LaserController {
    * Serial GRBL controllers can implement this; other controllers may omit it.
    */
   runAutoFocus?(command: string, timeoutMs?: number): Promise<void>;
+  /**
+   * GRBL: $22 homing cycle. `true` = enabled, `false` = disabled, `undefined` if not read yet.
+   */
+  getFirmwareHomingCycleEnabled?(): boolean | undefined;
   requestStatusReport(): void;
 
   onStateChange(callback: StateChangeCallback): Unsubscribe;

@@ -62,7 +62,7 @@ export function emptyTemplateContext(): GcodeTemplateContext {
  */
 export function renderTemplate(template: string, context: GcodeTemplateContext): string {
   if (!template) return '';
-  return template.replace(/\{([A-Z_]+)\}/g, (match, key) => {
+  return template.replace(/\{([A-Z0-9_]+)\}/g, (match, key) => {
     switch (key) {
       case 'JOB_NAME': return context.jobName;
       case 'DATE': return context.date;
@@ -76,6 +76,10 @@ export function renderTemplate(template: string, context: GcodeTemplateContext):
       case 'MATERIAL_THICKNESS': return context.materialThicknessMm.toFixed(2);
       case 'RETURN_X': return context.returnX.toFixed(3);
       case 'RETURN_Y': return context.returnY.toFixed(3);
+      case 'BED_WIDTH_MINUS_5':
+        return Math.max(0, context.bedWidthMm - 5).toFixed(3);
+      case 'BED_HEIGHT_MINUS_5':
+        return Math.max(0, context.bedHeightMm - 5).toFixed(3);
       default: return match;
     }
   });
@@ -131,9 +135,9 @@ export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
     '; Estimated time: {ESTIMATED_TIME}',
   ].join('\n'),
 
-  'Park at max bed': [
+  'Park near far corner': [
     'M5 ; laser off',
-    'G0 X{BED_WIDTH} Y{BED_HEIGHT} ; park at far corner',
+    'G0 X{BED_WIDTH_MINUS_5} Y{BED_HEIGHT_MINUS_5} ; park 5mm from far corner',
     '; Total lines: {TOTAL_LINES}',
   ].join('\n'),
 
@@ -143,10 +147,10 @@ export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
     '; Total lines: {TOTAL_LINES}',
   ].join('\n'),
 
-  'With beep on completion': [
+  'With completion marker': [
     'M5 ; laser off',
     'G0 X{RETURN_X} Y{RETURN_Y} ; return to origin',
-    'M300 P500 S1000 ; 500ms beep at 1kHz (Marlin)',
+    '; ===== JOB COMPLETE =====',
     '; Total lines: {TOTAL_LINES}',
   ].join('\n'),
 
@@ -162,3 +166,20 @@ export const BUILT_IN_FOOTER_TEMPLATES: Record<string, string> = {
  */
 export const DEFAULT_HEADER_TEMPLATE_NAME = 'GRBL (generic)';
 export const DEFAULT_FOOTER_TEMPLATE_NAME = 'Park at origin';
+
+/**
+ * Pre–T0-2 built-in footer bodies, for migrating stored profiles.
+ * (Profiles store the full template string, not the preset name.)
+ */
+export const LEGACY_FOOTER_BODY__PARK_AT_MAX_BED = [
+  'M5 ; laser off',
+  'G0 X{BED_WIDTH} Y{BED_HEIGHT} ; park at far corner',
+  '; Total lines: {TOTAL_LINES}',
+].join('\n');
+
+export const LEGACY_FOOTER_BODY__WITH_BEEP = [
+  'M5 ; laser off',
+  'G0 X{RETURN_X} Y{RETURN_Y} ; return to origin',
+  'M300 P500 S1000 ; 500ms beep at 1kHz (Marlin)',
+  '; Total lines: {TOTAL_LINES}',
+].join('\n');

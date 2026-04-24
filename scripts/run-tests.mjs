@@ -58,6 +58,7 @@ const files = [
   'scanning-offset.test.ts',
   'smart-overscan.test.ts',
   'gcode-templates.test.ts',
+  'gcode-templates-safety.test.ts',
   'gcode-relative-mode.test.ts',
   'ui-start-job-preserves-markers.test.ts',
   'gcode-relative-return-template.test.ts',

@@ -80,6 +80,8 @@ export const PREFLIGHT_CODES = {
   IMAGE_ROTATED_SKEWED: 'IMAGE_ROTATED_SKEWED',
   SETTINGS_CUT_OVERBURN: 'SETTINGS_CUT_OVERBURN',
   LAYER_OUTPUT_SUMMARIES: 'LAYER_OUTPUT_SUMMARIES',
+  /** Header template has `$H` but live GRBL reports $22=0 (homing cycle disabled). */
+  HOMING_REQUESTED_BUT_DISABLED: 'HOMING_REQUESTED_BUT_DISABLED',
 } as const;
 
 export interface PreflightContext {
@@ -182,6 +184,9 @@ function categorizeCode(code: string): 'machine' | 'design' | 'settings' | 'outp
   if (code.includes('LAYER') || code.includes('POWER') || code.includes('SPEED') || code.includes('SETTINGS_')) {
     return 'settings';
   }
+  if (code === PREFLIGHT_CODES.HOMING_REQUESTED_BUT_DISABLED) {
+    return 'settings';
+  }
   return 'output';
 }
 
@@ -264,6 +269,8 @@ export function runPreflightSummary(
   bedWidth: number,
   bedHeight: number,
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null,
+  /** When set, GRBL $22 from the connected controller (homing cycle enabled in firmware). */
+  firmwareHomingFromMachine?: boolean,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   const profile =
@@ -284,9 +291,11 @@ export function runPreflightSummary(
     hasGcode: gcode != null && gcode.length > 0,
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
+    gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {
       bedWidthMm: bedWidth > 0 ? bedWidth : undefined,
       bedHeightMm: bedHeight > 0 ? bedHeight : undefined,
+      ...(typeof firmwareHomingFromMachine === 'boolean' ? { homingEnabled: firmwareHomingFromMachine } : {}),
     },
   };
 
@@ -894,6 +903,23 @@ function runTemplateChecks(ctx: PreflightContext, out: PreflightResult[]): void 
       code: PREFLIGHT_CODES.HOMING_ENABLED_NO_H,
       message: 'Homing is enabled in profile but $H is missing from header template.',
       fix: { label: 'Enable homing in template', action: { type: 'enableHoming' } },
+    });
+  }
+
+  const homingHPattern = /(^|\s|;)\$H(\s|$|;)/m;
+  const headerWantsHoming = homingHPattern.test(ctx.gcodeHeaderPreview);
+  const live = ctx.liveMachineInfo;
+  if (
+    headerWantsHoming &&
+    live != null &&
+    typeof live.homingEnabled === 'boolean' &&
+    live.homingEnabled === false
+  ) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.HOMING_REQUESTED_BUT_DISABLED,
+      message:
+        "Template '$H' requires machine homing to be enabled. Machine reports $22=0. Enable homing in firmware or choose a template without '$H'.",
     });
   }
 }

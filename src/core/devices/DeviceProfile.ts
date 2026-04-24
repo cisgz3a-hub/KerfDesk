@@ -11,6 +11,8 @@ import {
   BUILT_IN_HEADER_TEMPLATES,
   DEFAULT_FOOTER_TEMPLATE_NAME,
   DEFAULT_HEADER_TEMPLATE_NAME,
+  LEGACY_FOOTER_BODY__PARK_AT_MAX_BED,
+  LEGACY_FOOTER_BODY__WITH_BEEP,
 } from '../plan/GcodeTemplates';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
@@ -185,7 +187,7 @@ export function getDeviceProfiles(): DeviceProfile[] {
           (p as DeviceProfile).originCorner
           ?? (p.invertY === false ? 'rear-left' : 'front-left'),
       };
-      return backfillFalconAutofocus(profile);
+      return backfillGcodeTemplateNames(backfillFalconAutofocus(profile));
     });
   } catch {
     return [];
@@ -317,6 +319,18 @@ export function backfillFalconAutofocus(profile: DeviceProfile): DeviceProfile {
     autoFocusCommand: '$HZ1',
     autoFocusTimeoutMs: 15_000,
   };
+}
+
+/** On load, rewrite pre–T0-2 built-in footer body strings to current built-ins. */
+export function backfillGcodeTemplateNames(profile: DeviceProfile): DeviceProfile {
+  const t = profile.gcodeFooterTemplate;
+  if (t === LEGACY_FOOTER_BODY__PARK_AT_MAX_BED) {
+    return { ...profile, gcodeFooterTemplate: BUILT_IN_FOOTER_TEMPLATES['Park near far corner'] };
+  }
+  if (t === LEGACY_FOOTER_BODY__WITH_BEEP) {
+    return { ...profile, gcodeFooterTemplate: BUILT_IN_FOOTER_TEMPLATES['With completion marker'] };
+  }
+  return profile;
 }
 
 /**
