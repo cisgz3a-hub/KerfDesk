@@ -6,7 +6,7 @@
  */
 
 import { computeGcodeOffset } from '../src/core/output/GcodeOrigin';
-import { sendSetOriginWcsCommand } from '../src/ui/origin/sendSetOriginWcsCommand';
+import { sendSetOriginWcsCommand } from '../src/app/sendSetOriginWcsCommand';
 import { makeRectangleCutScene } from './e2e/fixtures/rectangleCut';
 import { compileSceneToGcode } from './e2e/helpers/compileToGcode';
 

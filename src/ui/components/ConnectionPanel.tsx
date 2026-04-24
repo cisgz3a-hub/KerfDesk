@@ -168,6 +168,8 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
   return React.createElement(ConnectionPanelMain, {
     ...mainProps,
     machineService,
+    executionCoordinator: machineUi.executionCoordinator,
+    coordinatorSimulatorNotifyRef: machineUi.coordinatorSimulatorNotifyRef,
     outcomeReplaySection,
     messages,
     appendMessage,

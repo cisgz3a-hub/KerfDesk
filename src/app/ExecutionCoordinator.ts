@@ -8,6 +8,7 @@ import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners, buildFrameGcode } from './frameGcode';
 import { waitForGrblIdle } from './grblIdlePoll';
+import { sendSetOriginWcsCommand } from './sendSetOriginWcsCommand';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
 
@@ -145,5 +146,57 @@ export class ExecutionCoordinator {
     if (!idleOk) return { ok: false, reason: 'idle-timeout' };
 
     return { ok: true };
+  }
+
+  /**
+   * Start test-fire: laser on at low power. Caller must have secured user consent (UI dialog)
+   * and must set up a deadman timer — this method does NOT auto-stop. Pair with {@link endTestFire}
+   * on pointer release or timeout.
+   *
+   * Returns false if no controller (caller should not set isTestFiring UI state in that case).
+   */
+  async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
+    const ctrl = this.deps.controllerRef.current;
+    if (!ctrl) return false;
+    const sVal = Math.max(0, Math.round((2 / 100) * args.maxSpindle));
+    const cmd = `M3 S${sVal}`;
+    this.notifySimulator(cmd);
+    try {
+      ctrl.sendCommand(cmd, 'internal');
+      return true;
+    } catch (err) {
+      console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
+      return false;
+    }
+  }
+
+  /**
+   * End test-fire: laser off. Safe to call even without an active fire — sends M5 S0 which is a
+   * no-op when the laser is already off. Swallows 'Not connected' errors.
+   */
+  async endTestFire(): Promise<void> {
+    const ctrl = this.deps.controllerRef.current;
+    const cmd = 'M5 S0';
+    this.notifySimulator(cmd);
+    if (!ctrl) return;
+    try {
+      ctrl.sendCommand(cmd, 'internal');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (!msg.includes('Not connected')) {
+        console.warn('[TestFire] stop blocked:', msg);
+      }
+    }
+  }
+
+  /**
+   * Set machine origin: zero the G54 work coordinate at the current physical head position.
+   * Caller must have verified the head is at the intended position.
+   */
+  async setOriginAtCurrentPosition(): Promise<void> {
+    const ctrl = this.deps.controllerRef.current;
+    if (!ctrl) return;
+    this.notifySimulator('G10 L20 P1 X0 Y0');
+    sendSetOriginWcsCommand(ctrl);
   }
 }

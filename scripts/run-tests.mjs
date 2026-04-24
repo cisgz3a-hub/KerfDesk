@@ -49,6 +49,7 @@ const files = [
   'entitlement-storage-migration.test.ts',
   'execution-coordinator.test.ts',
   'execution-coordinator-unlock-home-frame.test.ts',
+  'execution-coordinator-testfire-setorigin.test.ts',
   'device-profile-storage-migration.test.ts',
   'device-profile-basic-api.test.ts',
   'validated-job-ticket-phase1.test.ts',

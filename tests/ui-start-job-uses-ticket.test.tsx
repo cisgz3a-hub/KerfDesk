@@ -6,7 +6,7 @@
 import './e2e/helpers/e2eDeterministicIds';
 
 import { JSDOM } from 'jsdom';
-import React, { act, useState, type MutableRefObject } from 'react';
+import React, { act, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { compileGcode } from '../src/app/PipelineService';
 import { MachineService } from '../src/app/MachineService';
@@ -19,6 +19,7 @@ import {
 import { createScene } from '../src/core/scene/Scene';
 import { addObject } from '../src/ui/history/SceneCommands';
 import { createRect } from '../src/core/scene/SceneObject';
+import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import { ConnectionPanelMain } from '../src/ui/components/ConnectionPanelMain';
 import {
   type JobProgress,
@@ -129,7 +130,7 @@ function PanelHarness(props: {
   machineService: MachineService;
   controller: LaserController;
   portRef: MutableRefObject<SerialPortLike | null>;
-  machineControllerRef: MutableRefObject<LaserController | null>;
+  controllerRef: MutableRefObject<LaserController | null>;
 }): React.ReactElement {
   const {
     scene,
@@ -139,15 +140,26 @@ function PanelHarness(props: {
     machineService,
     controller,
     portRef,
-    machineControllerRef,
+    controllerRef,
   } = props;
   const [messages, setMessages] = useState<string[]>([]);
   const activeProfile = getActiveProfile();
+  const coordinatorSimulatorNotifyRef = useRef<(line: string) => void>(() => {});
+  const executionCoordinator = useMemo(
+    () =>
+      new ExecutionCoordinator({
+        machineService,
+        controllerRef,
+        notifySimulatorRef: coordinatorSimulatorNotifyRef,
+      }),
+    [machineService, controllerRef],
+  );
 
   return React.createElement(ConnectionPanelMain, {
     controller,
     portRef,
-    machineControllerRef,
+    executionCoordinator,
+    coordinatorSimulatorNotifyRef,
     machineState: idle,
     jobProgress: null as JobProgress | null,
     scene,
@@ -238,7 +250,7 @@ async function run(): Promise<void> {
         machineService,
         controller,
         portRef,
-        machineControllerRef: controllerRef,
+        controllerRef,
       }),
     );
     await flush(50);

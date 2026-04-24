@@ -46,7 +46,6 @@ import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { useMachineService } from '../hooks/useMachineService';
 import { GrblController } from '../../controllers/grbl/GrblController';
-import { sendSetOriginWcsCommand } from '../origin/sendSetOriginWcsCommand';
 import { CanvasViewport, type ViewportActions } from './CanvasViewport';
 import { ModeTabsOverlay } from './canvas/ModeTabsOverlay';
 import { LayerPanel } from './LayerPanel';
@@ -572,8 +571,8 @@ export function App() {
     try {
       localStorage.setItem('laserforge_saved_origin', JSON.stringify(origin));
     } catch { /* ignore */ }
-    sendSetOriginWcsCommand(grbl.controller);
-  }, [grbl.machineState, grbl.controller]);
+    void machineUi.executionCoordinator.setOriginAtCurrentPosition();
+  }, [grbl.machineState, machineUi.executionCoordinator]);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
   const [productionMode, setProductionMode] = useState<boolean>(() => {
@@ -1724,7 +1723,6 @@ export function App() {
       ),
       connectionSidebarOpen && React.createElement(ConnectionPanel, {
         controller: grbl.controller!,
-        machineControllerRef: grbl.controllerRef,
         portRef: grbl.portRef,
         machineState: grbl.machineState,
         jobProgress: grbl.jobProgress,

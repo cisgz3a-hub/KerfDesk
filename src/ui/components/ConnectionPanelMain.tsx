@@ -174,8 +174,9 @@ export interface ConnectionPanelMainProps {
   /** Panel width in px (host computes min(500, 45% window)). */
   sidebarWidth?: number;
   machineService: MachineService;
-  /** Same ref as {@link MachineService} / `useMachineService` (GRBL controller). */
-  machineControllerRef: MutableRefObject<LaserController | null>;
+  /** Shared with App (save origin, etc.); simulator notify ref is wired in an effect. */
+  executionCoordinator: ExecutionCoordinator;
+  coordinatorSimulatorNotifyRef: MutableRefObject<(line: string) => void>;
   outcomeReplaySection: React.ReactNode;
   messages: string[];
   appendMessage: (message: string) => void;
@@ -224,7 +225,8 @@ export function ConnectionPanelMain({
   onOpenSettings,
   sidebarWidth = 500,
   machineService,
-  machineControllerRef,
+  executionCoordinator,
+  coordinatorSimulatorNotifyRef,
   outcomeReplaySection,
   messages,
   appendMessage,
@@ -284,18 +286,9 @@ export function ConnectionPanelMain({
     }
   }, []);
 
-  const notifySimulatorTxRef = useRef(notifySimulatorTx);
-  notifySimulatorTxRef.current = notifySimulatorTx;
-
-  const executionCoordinator = useMemo(
-    () =>
-      new ExecutionCoordinator({
-        machineService,
-        controllerRef: machineControllerRef,
-        notifySimulatorRef: notifySimulatorTxRef,
-      }),
-    [machineService, machineControllerRef],
-  );
+  useEffect(() => {
+    coordinatorSimulatorNotifyRef.current = notifySimulatorTx;
+  }, [notifySimulatorTx, coordinatorSimulatorNotifyRef]);
 
   const onSimulatorSubscribe = useCallback((cb: (line: string) => void) => {
     simulatorListenersRef.current.add(cb);
@@ -330,18 +323,9 @@ export function ConnectionPanelMain({
       clearTimeout(testFireTimeoutRef.current);
       testFireTimeoutRef.current = null;
     }
-    notifySimulatorTx('M5 S0');
-    try {
-      controllerRef.current?.sendCommand('M5 S0', 'internal');
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      // Disconnect races test-fire release — laser should already be off via port close / feed hold.
-      if (!msg.includes('Not connected')) {
-        console.warn('[Command blocked]', msg);
-      }
-    }
+    void executionCoordinator.endTestFire();
     setIsTestFiring(false);
-  }, [notifySimulatorTx]);
+  }, [executionCoordinator]);
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -568,13 +552,6 @@ export function ConnectionPanelMain({
       }
 
       stopTestFire();
-
-      notifySimulatorTx('M5 S0');
-      try {
-        ctrl?.sendCommand('M5 S0', 'internal');
-      } catch {
-        /* may already be disconnected */
-      }
 
       try {
         await machineService.disconnect();
@@ -890,8 +867,6 @@ export function ConnectionPanelMain({
       }
 
       const maxSpindle = activeProfile?.maxSpindle ?? 1000;
-      const sVal = Math.max(0, Math.round((2 / 100) * maxSpindle));
-      const cmd = `M3 S${sVal}`;
 
       if (testFireTimeoutRef.current) {
         clearTimeout(testFireTimeoutRef.current);
@@ -904,27 +879,24 @@ export function ConnectionPanelMain({
         /* ignore */
       }
 
-      try {
-        notifySimulatorTx(cmd);
-        ctrl.sendCommand(cmd, 'internal');
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-        try {
-          e.currentTarget.releasePointerCapture(e.pointerId);
-        } catch {
-          /* ignore */
+      void executionCoordinator.beginTestFire({ maxSpindle }).then(ok => {
+        if (!ok) {
+          try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          return;
         }
-        return;
-      }
-
-      testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
-      setIsTestFiring(true);
-      testFireTimeoutRef.current = setTimeout(() => {
-        testFireTimeoutRef.current = null;
-        stopTestFire();
-      }, TEST_FIRE_MAX_MS);
+        testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
+        setIsTestFiring(true);
+        testFireTimeoutRef.current = setTimeout(() => {
+          testFireTimeoutRef.current = null;
+          stopTestFire();
+        }, TEST_FIRE_MAX_MS);
+      });
     },
-    [activeProfile, machineState?.status, notifySimulatorTx, stopTestFire],
+    [activeProfile, machineState?.status, executionCoordinator, stopTestFire],
   );
 
   const endTestFire = useCallback(() => {
@@ -1795,12 +1767,6 @@ export function ConnectionPanelMain({
             );
             void machineService.disconnect().catch(() => { /* idempotent with controller.disconnect */ });
             portRef.current = null;
-            try {
-              notifySimulatorTx('M5 S0');
-              controllerRef.current?.sendCommand('M5 S0', 'internal');
-            } catch (err: unknown) {
-              console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-            }
             setIsPaused(false);
             setMessages(prev => [...prev, '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.']);
           },

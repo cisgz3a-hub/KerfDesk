@@ -1,9 +1,10 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { type MockSerialPort } from '../../communication/SerialPort';
 import { type WebSerialPort } from '../../communication/WebSerialPort';
 import { MachineService, type BurnState } from '../../app/MachineService';
+import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 
 interface UseMachineServiceArgs {
   controllerRef: MutableRefObject<LaserController | null>;
@@ -15,6 +16,17 @@ export function useMachineService(args: UseMachineServiceArgs) {
   const service = useMemo(
     () => new MachineService(controllerRef, portRef),
     [controllerRef, portRef],
+  );
+
+  const coordinatorSimulatorNotifyRef = useRef<(line: string) => void>(() => {});
+  const executionCoordinator = useMemo(
+    () =>
+      new ExecutionCoordinator({
+        machineService: service,
+        controllerRef,
+        notifySimulatorRef: coordinatorSimulatorNotifyRef,
+      }),
+    [service, controllerRef],
   );
 
   const [messages, setMessages] = useState<string[]>([]);
@@ -61,6 +73,8 @@ export function useMachineService(args: UseMachineServiceArgs) {
 
   return {
     service,
+    executionCoordinator,
+    coordinatorSimulatorNotifyRef,
     messages,
     appendMessage,
     replaceMessages,
