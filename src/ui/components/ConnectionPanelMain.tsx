@@ -792,7 +792,7 @@ export function ConnectionPanelMain({
     setIsAutoFocusing(true);
     setMessages(prev => [...prev, 'Focusing...']);
     try {
-      const result = await machineService.autoFocus();
+      const result = await executionCoordinator.autoFocus();
       if (result.ok) {
         setMessages(prev => [...prev, '✓ Focus complete']);
         return;
@@ -802,7 +802,7 @@ export function ConnectionPanelMain({
     } finally {
       setIsAutoFocusing(false);
     }
-  }, [canAutoFocus, machineService, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
+  }, [canAutoFocus, executionCoordinator, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
 
   const handleUnlock = useCallback(async () => {
     const classification = machineService.classifyUserCommand('$X');

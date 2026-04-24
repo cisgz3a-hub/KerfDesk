@@ -67,6 +67,17 @@ export class ExecutionCoordinator {
     this.deps.machineService.clearJobSession();
   }
 
+  /**
+   * Auto-focus sequence. Delegates to {@link MachineService.autoFocus} which checks profile
+   * support, controller capability, and timeout before invoking {@link LaserController.runAutoFocus}.
+   *
+   * UI should still gate on `activeProfile.autoFocusSupported` and machine idle state before
+   * calling — the coordinator executes only; it does not enforce pre-conditions.
+   */
+  async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
+    return this.deps.machineService.autoFocus();
+  }
+
   /** Unlock GRBL ($X). Caller must run danger confirmation when appropriate. */
   async unlock(): Promise<void> {
     if (!this.deps.controllerRef.current) return;
