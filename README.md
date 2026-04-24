@@ -117,6 +117,10 @@ npm test
 }
 ```
 
+## Roadmap / tracking
+
+- **T1-12** — Connection panel preflight used to refire on every GRBL status tick (new `machineState` identity each report), which could trigger **maximum update depth** when combined with `setPreflight`. **Shipped:** narrow `useEffect` deps + `samePreflightSummary` short-circuit (`fix/preflight-update-loop`). **Follow-up:** add firmware homing-enabled (`getFirmwareHomingCycleEnabled` or equivalent) to the effect dependency list so preflight refreshes when homing flips and no other listed input changes.
+
 ## License
 
 ISC
