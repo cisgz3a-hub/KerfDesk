@@ -80,6 +80,35 @@ export class MachineService {
     private readonly portRef: MutableRefObject<SerialPortLike | null>,
   ) {}
 
+  /** Acquire an OS wake lock for the duration of an active job.
+   *  Prevents Windows USB Selective Suspend and Chromium renderer
+   *  throttling, either of which can stall streaming mid-cut.
+   *  Best-effort: silently no-ops outside Electron. */
+  private async acquireWakeLock(): Promise<void> {
+    const api = (globalThis as {
+      electronAPI?: { acquireJobWakeLock?: () => Promise<number> };
+    }).electronAPI;
+    if (!api?.acquireJobWakeLock) return;
+    try {
+      await api.acquireJobWakeLock();
+    } catch (err) {
+      console.warn('[MachineService] Failed to acquire wake lock:', err);
+    }
+  }
+
+  /** Release the wake lock. Idempotent. Best-effort. */
+  private async releaseWakeLock(): Promise<void> {
+    const api = (globalThis as {
+      electronAPI?: { releaseJobWakeLock?: () => Promise<void> };
+    }).electronAPI;
+    if (!api?.releaseJobWakeLock) return;
+    try {
+      await api.releaseJobWakeLock();
+    } catch {
+      /* best-effort — don't fail the job-end path on this */
+    }
+  }
+
   getState(): MachineServiceState {
     return {
       isSimulator: this.state.isSimulator,
@@ -104,6 +133,7 @@ export class MachineService {
   }
 
   clearJobSession(): void {
+    void this.releaseWakeLock();
     this.activeReplay = null;
     this.currentJobLog = null;
     this.activeTicket = null;
@@ -205,7 +235,7 @@ export class MachineService {
     jobProgress: JobProgress | null,
     isJobRunning: boolean,
     appendMessage: (msg: string) => void,
-  ): void {
+  ): Promise<void> {
     const log = this.currentJobLog;
     if (!log || log.status !== 'running') return;
 
@@ -237,6 +267,7 @@ export class MachineService {
     } else {
       appendMessage(`\u26A0 ${saveResult.message ?? 'Job log not saved'}`);
     }
+    void this.releaseWakeLock();
     this.currentJobLog = null;
     this.activeTicket = null;
   }
@@ -305,58 +336,64 @@ export class MachineService {
       throw new Error(validation.reason);
     }
 
-    this.activeTicket = ticket;
+    await this.acquireWakeLock();
+    try {
+      this.activeTicket = ticket;
 
-    this.burnState = emptyBurnState();
-    this.emitBurnState();
+      this.burnState = emptyBurnState();
+      this.emitBurnState();
 
-    const lines = [...ticket.gcodeLines];
-    const gcodeText = ticket.gcodeText;
+      const lines = [...ticket.gcodeLines];
+      const gcodeText = ticket.gcodeText;
 
-    const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
+      const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
 
-    const jobLog = createJobLog(
-      scene.metadata?.name || 'Untitled',
-      lines.length,
-      estimate ? estimate.formatted : '?',
-      scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
-        name: l.name,
-        mode: l.settings.mode,
-        power: l.settings.power.max,
-        speed: l.settings.speed,
-        passes: l.settings.passes,
-      })),
-      machineState?.status || 'unknown',
-      { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
-    );
-    addLogEntry(jobLog, 'milestone',
-      `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
-    this.currentJobLog = jobLog;
-
-    if (hasPro()) {
-      const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
-        name: l.name,
-        mode: l.settings.mode,
-        power: l.settings.power.max,
-        speed: l.settings.speed,
-        passes: l.settings.passes,
-      }));
-      this.activeReplay = createReplay(
+      const jobLog = createJobLog(
         scene.metadata?.name || 'Untitled',
         lines.length,
-        {
-          layers: layerSettings,
-          material: scene.material?.name || null,
-          machineType: scene.machine?.type || null,
-        },
-        estimate ? estimate.totalSeconds * 1000 : null,
+        estimate ? estimate.formatted : '?',
+        scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
+          name: l.name,
+          mode: l.settings.mode,
+          power: l.settings.power.max,
+          speed: l.settings.speed,
+          passes: l.settings.passes,
+        })),
+        machineState?.status || 'unknown',
+        { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
       );
-    } else {
-      this.activeReplay = null;
-    }
+      addLogEntry(jobLog, 'milestone',
+        `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
+      this.currentJobLog = jobLog;
 
-    for (const line of lines) notifySimulatorTx(line);
-    await this.controllerRef.current.sendJob(lines);
+      if (hasPro()) {
+        const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
+          name: l.name,
+          mode: l.settings.mode,
+          power: l.settings.power.max,
+          speed: l.settings.speed,
+          passes: l.settings.passes,
+        }));
+        this.activeReplay = createReplay(
+          scene.metadata?.name || 'Untitled',
+          lines.length,
+          {
+            layers: layerSettings,
+            material: scene.material?.name || null,
+            machineType: scene.machine?.type || null,
+          },
+          estimate ? estimate.totalSeconds * 1000 : null,
+        );
+      } else {
+        this.activeReplay = null;
+      }
+
+      for (const line of lines) notifySimulatorTx(line);
+      await this.controllerRef.current.sendJob(lines);
+    } catch (err) {
+      void this.releaseWakeLock();
+      throw err;
+    }
   }
 
   applyReplayOutcome(
@@ -393,6 +430,7 @@ export class MachineService {
   }
 
   async disconnect(): Promise<void> {
+    void this.releaseWakeLock();
     await this.controllerRef.current.disconnect();
     this.portRef.current = null;
   }

@@ -24,6 +24,7 @@ const files = [
   'controller-bounds-recheck.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
+  'wake-lock.test.ts',
   'svg-import.test.ts',
   'svg-import-placement.test.ts',
   'placement.test.ts',

@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   storageRemove: (key: string) => ipcRenderer.invoke('storage:remove', key) as Promise<void>,
   storageList: (prefix?: string) => ipcRenderer.invoke('storage:list', prefix) as Promise<string[]>,
   storageClear: () => ipcRenderer.invoke('storage:clear') as Promise<void>,
+  acquireJobWakeLock: () =>
+    ipcRenderer.invoke('power:acquireJobWakeLock') as Promise<number>,
+  releaseJobWakeLock: () =>
+    ipcRenderer.invoke('power:releaseJobWakeLock') as Promise<void>,
 
   // ─── Falcon WiFi (Phase 1: read-only status monitoring) ─────────
   falconWifi: {

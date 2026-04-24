@@ -18,6 +18,8 @@ declare global {
     storageRemove?: (key: string) => Promise<void>;
     storageList?: (prefix?: string) => Promise<string[]>;
     storageClear?: () => Promise<void>;
+    acquireJobWakeLock?: () => Promise<number>;
+    releaseJobWakeLock?: () => Promise<void>;
   }
 
   interface Window {

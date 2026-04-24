@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
@@ -119,10 +119,17 @@ app.on('activate', () => {
 
 let safeShutdownDone = false;
 
+/** OS wake lock id while a job is active (see power:acquireJobWakeLock). */
+let jobWakeLockId: number | null = null;
+
 app.on('before-quit', (e) => {
   if (safeShutdownDone) return;
   e.preventDefault();
   safeShutdownDone = true;
+  if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
+    powerSaveBlocker.stop(jobWakeLockId);
+    jobWakeLockId = null;
+  }
   shutdownFalconWiFi();
   safeCloseSerial()
     .catch(err => console.error('[before-quit] safe close failed:', err))
@@ -211,6 +218,26 @@ ipcMain.handle('storage:list', (_event, prefix: unknown) => {
 
 ipcMain.handle('storage:clear', () => {
   storageClear();
+});
+
+// ─── WAKE LOCK ───────────────────────────────────────────────────
+// Held during active jobs so Windows doesn't suspend USB,
+// Chromium doesn't throttle our renderer, and the OS doesn't
+// sleep. Released on all job-end paths.
+
+ipcMain.handle('power:acquireJobWakeLock', () => {
+  if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
+    return jobWakeLockId;
+  }
+  jobWakeLockId = powerSaveBlocker.start('prevent-app-suspension');
+  return jobWakeLockId;
+});
+
+ipcMain.handle('power:releaseJobWakeLock', () => {
+  if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
+    powerSaveBlocker.stop(jobWakeLockId);
+  }
+  jobWakeLockId = null;
 });
 
 // ─── SERIAL / GRBL ───────────────────────────────────────────────
