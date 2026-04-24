@@ -1,6 +1,7 @@
 import type { EntitlementState, EntitlementTier, ProFeature, StoredLicenseCacheEntry } from './types';
 import { PRO_FEATURES } from './types';
 import { parseTesterCode, verifyTesterCode } from './testerKey';
+import { getStorage } from '../core/storage/storage';
 
 const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
@@ -10,26 +11,8 @@ const LICENSE_OFFLINE_GRACE = 30 * 24 * 60 * 60 * 1000;
 
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
-function getCachedLicense(code: string): StoredLicenseCacheEntry | null {
-  try {
-    const raw = localStorage.getItem(LICENSE_CACHE_KEY);
-    if (!raw) return null;
-    const entry = JSON.parse(raw) as StoredLicenseCacheEntry;
-    if (entry.code !== code.toUpperCase().trim()) return null;
-    return entry;
-  } catch {
-    return null;
-  }
-}
-
-function setCachedLicense(code: string, name: string, valid: boolean): void {
-  const entry: StoredLicenseCacheEntry = {
-    code: code.toUpperCase().trim(),
-    name,
-    validatedAt: Date.now(),
-    valid,
-  };
-  localStorage.setItem(LICENSE_CACHE_KEY, JSON.stringify(entry));
+function isDevBuild(): boolean {
+  return (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
 }
 
 export interface ActivateResult {
@@ -73,15 +56,12 @@ export class EntitlementService {
 
   private setState(next: EntitlementState): void {
     this.state = next;
-    try {
-      if (next.hasPro) {
-        localStorage.setItem(PRO_FLAG_KEY, 'true');
-      } else {
-        localStorage.removeItem(PRO_FLAG_KEY);
-      }
-    } catch {
+    const write = next.hasPro
+      ? getStorage().set(PRO_FLAG_KEY, 'true')
+      : getStorage().remove(PRO_FLAG_KEY);
+    write.catch(() => {
       /* ignore */
-    }
+    });
     this.emit();
   }
 
@@ -92,7 +72,9 @@ export class EntitlementService {
   }
 
   private async runInitialize(): Promise<void> {
-    if (import.meta.env.DEV) {
+    await this.migrateFromLocalStorage();
+
+    if (isDevBuild()) {
       this.setState({
         tier: 'developer',
         hasPro: true,
@@ -101,7 +83,7 @@ export class EntitlementService {
       return;
     }
 
-    const saved = localStorage.getItem(STORAGE_KEY);
+    const saved = await getStorage().get(STORAGE_KEY);
     if (!saved) {
       this.setState({ tier: 'free', hasPro: false });
       return;
@@ -109,25 +91,44 @@ export class EntitlementService {
 
     const applied = await this.validateAndApplyStoredCode(saved);
     if (!applied) {
-      localStorage.removeItem(STORAGE_KEY);
+      await getStorage().remove(STORAGE_KEY);
       this.setState({ tier: 'free', hasPro: false });
+    }
+  }
+
+  private async migrateFromLocalStorage(): Promise<void> {
+    if (typeof localStorage === 'undefined') return;
+    const storage = getStorage();
+    const migrationKeys = [STORAGE_KEY, PRO_FLAG_KEY, LICENSE_CACHE_KEY];
+
+    for (const key of migrationKeys) {
+      try {
+        const legacy = localStorage.getItem(key);
+        if (legacy === null) continue;
+        const existing = await storage.get(key);
+        if (existing !== null) continue;
+        await storage.set(key, legacy);
+        localStorage.removeItem(key);
+      } catch {
+        /* ignore */
+      }
     }
   }
 
   /** Session-only free tier (no license in storage); matches legacy TrialGuard behavior. */
   skipToFreeSession(): void {
-    if (import.meta.env.DEV) return;
+    if (isDevBuild()) return;
     this.setState({ tier: 'free', hasPro: false, label: 'Free User' });
   }
 
   deactivate(): void {
-    try {
-      localStorage.removeItem(STORAGE_KEY);
-      localStorage.removeItem(PRO_FLAG_KEY);
-    } catch {
+    Promise.all([
+      getStorage().remove(STORAGE_KEY),
+      getStorage().remove(PRO_FLAG_KEY),
+    ]).catch(() => {
       /* ignore */
-    }
-    if (import.meta.env.DEV) {
+    });
+    if (isDevBuild()) {
       this.setState({
         tier: 'developer',
         hasPro: true,
@@ -144,7 +145,7 @@ export class EntitlementService {
       return { ok: false, error: 'Enter a license or tester key' };
     }
 
-    if (import.meta.env.DEV) {
+    if (isDevBuild()) {
       return {
         ok: true,
         state: this.getState(),
@@ -157,7 +158,7 @@ export class EntitlementService {
       const ok = await verifyTesterCode(trimmed);
       if (ok) {
         const slug = parseTesterCode(trimmed)!.slug;
-        localStorage.setItem(STORAGE_KEY, upper);
+        await getStorage().set(STORAGE_KEY, upper);
         const next: EntitlementState = {
           tier: 'tester_permanent',
           hasPro: true,
@@ -179,7 +180,7 @@ export class EntitlementService {
       return { ok: false, error: 'Invalid code or license key' };
     }
 
-    localStorage.setItem(STORAGE_KEY, upper);
+    await getStorage().set(STORAGE_KEY, upper);
     const next: EntitlementState = {
       tier: 'paid',
       hasPro: true,
@@ -222,8 +223,34 @@ export class EntitlementService {
     return false;
   }
 
+  private async getCachedLicense(code: string): Promise<StoredLicenseCacheEntry | null> {
+    try {
+      const raw = await getStorage().get(LICENSE_CACHE_KEY);
+      if (!raw) return null;
+      const entry = JSON.parse(raw) as StoredLicenseCacheEntry;
+      if (entry.code !== code.toUpperCase().trim()) return null;
+      return entry;
+    } catch {
+      return null;
+    }
+  }
+
+  private async setCachedLicense(code: string, name: string, valid: boolean): Promise<void> {
+    const entry: StoredLicenseCacheEntry = {
+      code: code.toUpperCase().trim(),
+      name,
+      validatedAt: Date.now(),
+      valid,
+    };
+    try {
+      await getStorage().set(LICENSE_CACHE_KEY, JSON.stringify(entry));
+    } catch {
+      /* ignore */
+    }
+  }
+
   private async verifyGumroad(upper: string): Promise<{ name: string } | null> {
-    const cached = getCachedLicense(upper);
+    const cached = await this.getCachedLicense(upper);
     if (cached && cached.valid) {
       const age = Date.now() - cached.validatedAt;
       if (age < LICENSE_CACHE_MAX_AGE) {
@@ -243,7 +270,7 @@ export class EntitlementService {
       });
 
       if (!response.ok) {
-        setCachedLicense(upper, '', false);
+        await this.setCachedLicense(upper, '', false);
         return null;
       }
 
@@ -258,17 +285,17 @@ export class EntitlementService {
       };
 
       if (!data.success || !data.purchase) {
-        setCachedLicense(upper, '', false);
+        await this.setCachedLicense(upper, '', false);
         return null;
       }
 
       if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
-        setCachedLicense(upper, '', false);
+        await this.setCachedLicense(upper, '', false);
         return null;
       }
 
       const name = data.purchase.email || 'PRO User';
-      setCachedLicense(upper, name, true);
+      await this.setCachedLicense(upper, name, true);
       return { name };
     } catch (err) {
       console.warn('[EntitlementService] Network error during license check:', err);

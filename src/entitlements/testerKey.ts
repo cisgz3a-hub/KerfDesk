@@ -5,7 +5,8 @@ export const DEFAULT_TESTER_HMAC_SECRET =
   'bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1';
 
 export function getTesterHmacSecret(): string {
-  return import.meta.env.VITE_TESTER_HMAC_SECRET ?? DEFAULT_TESTER_HMAC_SECRET;
+  const env = (import.meta as ImportMeta & { env?: { VITE_TESTER_HMAC_SECRET?: string } }).env;
+  return env?.VITE_TESTER_HMAC_SECRET ?? DEFAULT_TESTER_HMAC_SECRET;
 }
 
 /** TF-SLUG-HEX8 (hex is first 8 chars of HMAC-SHA256 hex digest). */

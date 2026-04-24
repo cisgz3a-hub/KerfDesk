@@ -41,6 +41,7 @@ const files = [
   'storage-adapter-contract.test.ts',
   'storage-filesystem-unit.test.ts',
   'storage-singleton.test.ts',
+  'entitlement-storage-migration.test.ts',
   'validated-job-ticket-phase1.test.ts',
   'validated-job-ticket-mismatch.test.ts',
   'preflight.test.ts',
