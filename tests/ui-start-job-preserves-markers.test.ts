@@ -1,8 +1,9 @@
 /**
- * Mirrors ConnectionPanelMain.handleStartJob gcode line filter, then
- * GrblController.sendJob — ensures `; OBJ ids=...` markers survive the
- * UI path and drive onObjectLifecycle (burn-progress), while comments
- * never hit the serial port.
+ * Mirrors the compile/ticket line split (`ticket.gcodeLines` uses the same
+ * trim + non-empty filter as the former handleStartJob string split), then
+ * GrblController.sendJob — ensures `; OBJ ids=...` markers survive that path
+ * and drive onObjectLifecycle (burn-progress), while comments never hit the
+ * serial port.
  *
  * Run: npx tsx tests/ui-start-job-preserves-markers.test.ts
  */

@@ -49,6 +49,7 @@ const files = [
   'machine-service-start-validated-job.test.ts',
   'wcs-mutation-consent.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
+  'ui-start-job-uses-ticket.test.tsx',
   'falcon-serial-profile.test.ts',
   'falcon-autofocus-heal.test.ts',
   'material-preset-schema.test.ts',

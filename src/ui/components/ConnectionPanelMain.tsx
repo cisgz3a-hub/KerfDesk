@@ -601,32 +601,36 @@ export function ConnectionPanelMain({
   );
 
   const handleStartJob = async () => {
-    if (!gcode || !controllerRef.current) return;
+    if (!controllerRef.current) return;
+    if (!compiledJobTicket) {
+      setMessages(prev => [...prev, 'No compiled job — compile gcode first.']);
+      return;
+    }
+
     setIsPaused(false);
     setJobCompleted(false);
 
-    const { confirmed } = await confirmPreflightForJobStart(
+    const preflightResult = await confirmPreflightForJobStart(
       preflight,
       showAlert,
       showConfirm,
-      compiledJobTicket ?? undefined,
+      compiledJobTicket,
     );
-    if (!confirmed) return;
+    if (!preflightResult.confirmed) return;
 
     stopTestFire();
 
-    // Preserve comment lines (in particular `; OBJ ids=...`) so the
-    // controller can parse object-lifecycle markers and drive the
-    // canvas burn-progress highlighting. The controller strips comments
-    // from the machine stream itself — see GrblController.startJob.
-    const lines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    setMessages(prev => [...prev, `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%)`]);
+    const ticket = preflightResult.ticket?.ticket ?? compiledJobTicket;
+    const lines = ticket.gcodeLines;
+    setMessages(prev => [
+      ...prev,
+      `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
+    ]);
     try {
-      await machineService.beginJobRun({
-        lines,
+      await machineService.startValidatedJob({
+        ticket,
         scene,
         machineState,
-        gcodeText: gcode,
         notifySimulatorTx,
       });
       jobStoppedByUserRef.current = false;
@@ -636,14 +640,14 @@ export function ConnectionPanelMain({
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : String(e);
-      await showAlert('Cannot start job', msg);
       machineService.clearJobSession();
       jobStartTimeRef.current = null;
       setJobStartTime(null);
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
+      const msg = e instanceof Error ? e.message : String(e);
       setMessages(prev => [...prev, `Failed to start: ${msg}`]);
+      await showAlert('Cannot start job', msg);
     }
   };
 

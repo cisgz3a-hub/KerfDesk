@@ -55,6 +55,7 @@ export function Controls({
         }, '⬚ Frame'),
         React.createElement('button', {
           type: 'button',
+          'data-testid': 'connection-start-job',
           onClick: () => { onStartJob(); },
           disabled: !canStartJob,
           style: {
