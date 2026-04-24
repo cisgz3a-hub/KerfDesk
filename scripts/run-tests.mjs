@@ -28,6 +28,7 @@ const files = [
   'svg-import-placement.test.ts',
   'placement.test.ts',
   'history.test.ts',
+  'job-log-quota.test.ts',
   'scene-io.test.ts',
   'ui-integration.test.ts',
   'autosave-serialization.test.ts',

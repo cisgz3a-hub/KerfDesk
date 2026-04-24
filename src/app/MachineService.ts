@@ -206,8 +206,16 @@ export class MachineService {
           ? `Job failed with ${log.errors} error(s)`
           : 'Job stopped by user',
     );
-    saveJobLog(log);
-    appendMessage(`\u2713 Job log saved (${status})`);
+    const saveResult = saveJobLog(log);
+    if (saveResult.ok) {
+      if (saveResult.message) {
+        appendMessage(`\u26A0 ${saveResult.message}`);
+      } else {
+        appendMessage(`\u2713 Job log saved (${status})`);
+      }
+    } else {
+      appendMessage(`\u26A0 ${saveResult.message ?? 'Job log not saved'}`);
+    }
     this.currentJobLog = null;
   }
 

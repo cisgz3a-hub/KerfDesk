@@ -46,6 +46,28 @@ export interface JobLog {
   actualDuration: number;     // ms
 }
 
+export interface SaveJobLogResult {
+  ok: boolean;
+  error?: 'quota' | 'serialize' | 'other';
+  message?: string;
+}
+
+/** Compact large entry lists for storage (cap raw tx/rx, keep all milestones and warnings). */
+function compactJobLogForStorage(log: JobLog): JobLog {
+  const compacted: JobLog = { ...log, entries: [...log.entries] };
+  if (compacted.entries.length > 200) {
+    const nonRaw = compacted.entries.filter(
+      e => e.type === 'milestone' || e.type === 'error' || e.type === 'warning',
+    );
+    const rawEntries = log.entries.filter(e => e.type === 'sent' || e.type === 'received');
+    const keptRaw = [...rawEntries.slice(0, 25), ...rawEntries.slice(-25)];
+    compacted.entries = [...nonRaw, ...keptRaw].sort((a, b) => a.timestamp - b.timestamp);
+  }
+  return compacted;
+}
+
+export { compactJobLogForStorage };
+
 /** Create a new empty job log */
 export function createJobLog(
   projectName: string,
@@ -118,31 +140,72 @@ export function finalizeLog(
   log.actualDuration = Date.now() - new Date(log.startedAt).getTime();
 }
 
-/** Save log to localStorage */
-export function saveJobLog(log: JobLog): void {
-  try {
-    const compactedLog = { ...log, entries: [...log.entries] };
-    if (compactedLog.entries.length > 200) {
-      compactedLog.entries = compactedLog.entries.filter(e =>
-        e.type === 'milestone' || e.type === 'error' || e.type === 'warning',
-      );
-      const rawEntries = log.entries.filter(e => e.type === 'sent' || e.type === 'received');
-      const keptRaw = [
-        ...rawEntries.slice(0, 25),
-        ...rawEntries.slice(-25),
-      ];
-      compactedLog.entries = [
-        ...compactedLog.entries,
-        ...keptRaw,
-      ].sort((a, b) => a.timestamp - b.timestamp);
-    }
+function isStorageQuotaError(err: unknown): boolean {
+  return (
+    err instanceof Error
+    && (err.name === 'QuotaExceededError'
+      || (err as { name?: string }).name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      || /quota/i.test(err.message))
+  );
+}
 
+/** Save log to localStorage */
+export function saveJobLog(log: JobLog): SaveJobLogResult {
+  try {
+    const compactedLog = compactJobLogForStorage(log);
     const logs = getJobLogs();
     logs.unshift(compactedLog);
-    const trimmed = logs.slice(0, 20);
-    localStorage.setItem('laserforge_job_logs', JSON.stringify(trimmed));
-  } catch {
-    // Storage full — silently skip
+    const trimmed = logs.slice(0, 5);
+
+    const nowMs = Date.now();
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const agedTrimmed = trimmed.map((l, idx) => {
+      if (idx === 0) return l;
+      const logStartMs = new Date(l.startedAt).getTime();
+      if (Number.isNaN(logStartMs) || nowMs - logStartMs < ONE_HOUR_MS) return l;
+      return {
+        ...l,
+        entries: l.entries.filter(
+          e => e.type === 'milestone' || e.type === 'error' || e.type === 'warning',
+        ),
+      };
+    });
+
+    localStorage.setItem('laserforge_job_logs', JSON.stringify(agedTrimmed));
+    return { ok: true };
+  } catch (err) {
+    if (isStorageQuotaError(err)) {
+      try {
+        const emergencyCompacted = {
+          ...log,
+          entries: log.entries.filter(
+            e => e.type === 'milestone' || e.type === 'error',
+          ),
+        };
+        localStorage.setItem(
+          'laserforge_job_logs',
+          JSON.stringify([emergencyCompacted]),
+        );
+        return {
+          ok: true,
+          error: 'quota',
+          message:
+            'Browser storage full. Saved only the current job; previous logs were purged.',
+        };
+      } catch {
+        return {
+          ok: false,
+          error: 'quota',
+          message: 'Browser storage full. Job log could not be saved. Clear old logs or free storage.',
+        };
+      }
+    }
+
+    return {
+      ok: false,
+      error: err instanceof Error ? 'serialize' : 'other',
+      message: err instanceof Error ? err.message : 'Unknown error saving job log',
+    };
   }
 }
 
