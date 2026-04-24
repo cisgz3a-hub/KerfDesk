@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { getJobLogs, clearJobLogs } from '../../core/job/JobLog';
+import React, { useEffect, useState } from 'react';
+import { type JobLog, getJobLogs, clearJobLogs } from '../../core/job/JobLog';
 
 interface JobLogViewerProps {
   onLoadLog: (entries: string[]) => void;
@@ -8,8 +8,33 @@ interface JobLogViewerProps {
 
 export function JobLogViewer({ onLoadLog, showConfirm }: JobLogViewerProps) {
   const [showHistory, setShowHistory] = useState(false);
-  const logs = getJobLogs();
+  const [logs, setLogs] = useState<JobLog[]>([]);
+  const [loading, setLoading] = useState(true);
   const font = "'DM Sans', system-ui, sans-serif";
+
+  useEffect(() => {
+    let cancelled = false;
+    void getJobLogs()
+      .then((result) => {
+        if (cancelled) return;
+        setLogs(result);
+        setLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setLogs([]);
+        setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return React.createElement('div', {
+      style: { padding: '6px 18px', fontSize: 10, color: '#555570', fontFamily: font },
+    }, 'Loading logs...');
+  }
 
   return React.createElement('div', null,
     React.createElement('div', { style: { padding: '4px 18px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
@@ -21,7 +46,8 @@ export function JobLogViewer({ onLoadLog, showConfirm }: JobLogViewerProps) {
         onClick: async () => {
           const ok = await showConfirm('Clear logs', 'Clear all job logs?');
           if (!ok) return;
-          clearJobLogs();
+          await clearJobLogs();
+          setLogs([]);
           setShowHistory(false);
         },
         style: { background: 'none', border: 'none', color: '#333355', fontSize: 9, cursor: 'pointer', fontFamily: font },

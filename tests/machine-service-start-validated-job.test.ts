@@ -201,11 +201,11 @@ async function run(): Promise<void> {
       expectedAckRateHz: null,
     } as JobProgress;
 
-    svc.tryFinalizeJobLog(idle, progress, false, () => {});
+    await svc.tryFinalizeJobLog(idle, progress, false, () => {});
 
     assert(svc.getActiveTicket() === null, 'getActiveTicket null after tryFinalizeJobLog');
 
-    const logs = getJobLogs();
+    const logs = await getJobLogs();
     assert(logs.length >= 1, 'job log persisted');
     const milestones = logs[0]?.entries.filter(e => e.type === 'milestone') ?? [];
     const startMilestone = milestones.find(m => m.message.includes('Job started:'));
@@ -260,7 +260,7 @@ async function run(): Promise<void> {
     installMockLocalStorage();
     for (const k of Object.keys(memoryStore)) delete memoryStore[k];
 
-    svc.tryFinalizeJobLog(ctrl.state, progress, ctrl.isJobRunning, () => {});
+    await svc.tryFinalizeJobLog(ctrl.state, progress, ctrl.isJobRunning, () => {});
     assert(svc.getActiveTicket() === null, 'finalize clears ticket (Grbl path)');
 
     await ctrl.disconnect();

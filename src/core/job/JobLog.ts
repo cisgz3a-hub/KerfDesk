@@ -2,6 +2,7 @@
  * Job execution log — persists GRBL messages, errors, settings, and timeline
  * for post-job review and "why did this fail?" debugging.
  */
+import { getStorage } from '../storage/storage';
 
 export interface JobLogEntry {
   timestamp: number;    // Date.now()
@@ -51,6 +52,11 @@ export interface SaveJobLogResult {
   error?: 'quota' | 'serialize' | 'other';
   message?: string;
 }
+
+const JOB_LOGS_KEY = 'laserforge_job_logs';
+const MAX_RETAINED_LOGS = 5;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+let migrationAttempted = false;
 
 /** Compact large entry lists for storage (cap raw tx/rx, keep all milestones and warnings). */
 function compactJobLogForStorage(log: JobLog): JobLog {
@@ -150,15 +156,15 @@ function isStorageQuotaError(err: unknown): boolean {
 }
 
 /** Save log to localStorage */
-export function saveJobLog(log: JobLog): SaveJobLogResult {
+export async function saveJobLog(log: JobLog): Promise<SaveJobLogResult> {
+  await migrateJobLogsFromLocalStorage();
   try {
     const compactedLog = compactJobLogForStorage(log);
-    const logs = getJobLogs();
+    const logs = await getJobLogs();
     logs.unshift(compactedLog);
-    const trimmed = logs.slice(0, 5);
+    const trimmed = logs.slice(0, MAX_RETAINED_LOGS);
 
     const nowMs = Date.now();
-    const ONE_HOUR_MS = 60 * 60 * 1000;
     const agedTrimmed = trimmed.map((l, idx) => {
       if (idx === 0) return l;
       const logStartMs = new Date(l.startedAt).getTime();
@@ -171,7 +177,7 @@ export function saveJobLog(log: JobLog): SaveJobLogResult {
       };
     });
 
-    localStorage.setItem('laserforge_job_logs', JSON.stringify(agedTrimmed));
+    await getStorage().set(JOB_LOGS_KEY, JSON.stringify(agedTrimmed));
     return { ok: true };
   } catch (err) {
     if (isStorageQuotaError(err)) {
@@ -182,10 +188,7 @@ export function saveJobLog(log: JobLog): SaveJobLogResult {
             e => e.type === 'milestone' || e.type === 'error',
           ),
         };
-        localStorage.setItem(
-          'laserforge_job_logs',
-          JSON.stringify([emergencyCompacted]),
-        );
+        await getStorage().set(JOB_LOGS_KEY, JSON.stringify([emergencyCompacted]));
         return {
           ok: true,
           error: 'quota',
@@ -210,22 +213,52 @@ export function saveJobLog(log: JobLog): SaveJobLogResult {
 }
 
 /** Get all saved logs */
-export function getJobLogs(): JobLog[] {
+export async function getJobLogs(): Promise<JobLog[]> {
+  await migrateJobLogsFromLocalStorage();
   try {
-    const raw = localStorage.getItem('laserforge_job_logs');
+    const raw = await getStorage().get(JOB_LOGS_KEY);
     if (!raw) return [];
-    return JSON.parse(raw) as JobLog[];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed as JobLog[] : [];
   } catch {
     return [];
   }
 }
 
 /** Get a single log by ID */
-export function getJobLogById(id: string): JobLog | null {
-  return getJobLogs().find(l => l.id === id) ?? null;
+export async function getJobLogById(id: string): Promise<JobLog | null> {
+  const logs = await getJobLogs();
+  return logs.find(l => l.id === id) ?? null;
 }
 
 /** Clear all logs */
-export function clearJobLogs(): void {
-  localStorage.removeItem('laserforge_job_logs');
+export async function clearJobLogs(): Promise<void> {
+  try {
+    await getStorage().remove(JOB_LOGS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+async function migrateJobLogsFromLocalStorage(): Promise<void> {
+  if (migrationAttempted) return;
+  migrationAttempted = true;
+  if (typeof localStorage === 'undefined') return;
+
+  try {
+    const legacy = localStorage.getItem(JOB_LOGS_KEY);
+    if (legacy === null) return;
+    const storage = getStorage();
+    const existing = await storage.get(JOB_LOGS_KEY);
+    if (existing !== null) return;
+    await storage.set(JOB_LOGS_KEY, legacy);
+    localStorage.removeItem(JOB_LOGS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Test-only migration reset hook. */
+export function resetJobLogsForTest(): void {
+  migrationAttempted = false;
 }

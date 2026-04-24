@@ -200,7 +200,7 @@ export class MachineService {
   /**
    * When the machine returns idle after a running job, persist the job log.
    */
-  tryFinalizeJobLog(
+  async tryFinalizeJobLog(
     machineState: MachineState | null,
     jobProgress: JobProgress | null,
     isJobRunning: boolean,
@@ -227,7 +227,7 @@ export class MachineService {
           ? `Job failed with ${log.errors} error(s)`
           : 'Job stopped by user',
     );
-    const saveResult = saveJobLog(log);
+    const saveResult = await saveJobLog(log);
     if (saveResult.ok) {
       if (saveResult.message) {
         appendMessage(`\u26A0 ${saveResult.message}`);

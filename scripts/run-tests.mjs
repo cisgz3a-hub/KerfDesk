@@ -29,6 +29,7 @@ const files = [
   'placement.test.ts',
   'history.test.ts',
   'job-log-quota.test.ts',
+  'joblog-storage-migration.test.ts',
   'scene-io.test.ts',
   'ui-integration.test.ts',
   'autosave-serialization.test.ts',

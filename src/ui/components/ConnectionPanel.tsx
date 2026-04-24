@@ -140,7 +140,7 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
 
   useEffect(() => {
     const running = controller.isJobRunning ?? false;
-    machineService.tryFinalizeJobLog(machineState, jobProgress, running, appendMessage);
+    void machineService.tryFinalizeJobLog(machineState, jobProgress, running, appendMessage);
   }, [
     machineState?.status,
     jobProgress?.linesAcknowledged,
