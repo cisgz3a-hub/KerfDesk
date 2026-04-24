@@ -115,6 +115,8 @@ function makeSceneForPreflight(): ReturnType<typeof createScene> {
     profile: { ...baseProfile, gcodeHeaderTemplate: headerH },
     optimizeOrderEnabled: true,
     gcodeHeaderPreview: headerH,
+    preflightBedWidthMm: 400,
+    preflightBedHeightMm: 300,
     liveMachineInfo: { bedWidthMm: 400, bedHeightMm: 300, homingEnabled: false },
   };
   const f3 = runPreflight(c3);

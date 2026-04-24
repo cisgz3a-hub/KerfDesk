@@ -117,6 +117,7 @@ export async function compileGcode(
   const canvasPlanBounds = { ...plan.bounds };
 
   const originCorner = resolveOriginCorner(profile);
+  const bedWidthMm = resolveBedWidthMm(profile, machineBedFromController);
   const bedHeightMm = resolveBedHeightMm(profile, machineBedFromController);
 
   const maxSpindle =
@@ -153,8 +154,8 @@ export async function compileGcode(
     gcodeTemplateContext: {
       ...emptyTemplateContext(),
       jobName: scene.metadata?.name || job.name || 'untitled',
-      bedWidthMm: profile?.bedWidth ?? scene.canvas.width ?? 300,
-      bedHeightMm: profile?.bedHeight ?? scene.canvas.height ?? 300,
+      bedWidthMm,
+      bedHeightMm,
       maxSpeedMmPerMin: Math.max(0, ...job.operations.map(op => op.settings.speed)),
       materialName: scene.material?.name ?? '',
       materialThicknessMm: scene.material?.thickness ?? 0,

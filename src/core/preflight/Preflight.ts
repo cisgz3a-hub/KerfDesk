@@ -119,6 +119,12 @@ export interface PreflightContext {
   connectedToMachine?: boolean;
   /** When `machinePlanBounds` is absent, optional G-code text for travel XY bounds scan only. */
   gcodeTravelScan?: string | null;
+  /**
+   * Design vs machine bed (mm) for "outside bed" design checks. Same source as
+   * `resolveBedWidthMm` / `resolveBedHeightMm` at the `runPreflightSummary` call site.
+   */
+  preflightBedWidthMm: number;
+  preflightBedHeightMm: number;
 }
 
 export function runPreflight(ctx: PreflightContext): PreflightResult[] {
@@ -280,17 +286,21 @@ export function runPreflightSummary(
   firmwareHomingFromMachine?: boolean,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
+  const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
+  const preflightBedHeightMm = bedHeight > 0 ? bedHeight : 300;
   const profile =
     activeProfile ??
     {
       ...createBlankProfile('Bed (scene)'),
-      bedWidth: scene.canvas.width,
-      bedHeight: scene.canvas.height,
+      bedWidth: preflightBedWidthMm,
+      bedHeight: preflightBedHeightMm,
     };
 
   const ctx: PreflightContext = {
     scene,
     profile,
+    preflightBedWidthMm,
+    preflightBedHeightMm,
     optimizeOrderEnabled: scene.compileOptions?.optimizeOrder !== false,
     connectedToMachine: machineState != null,
     machineStatus: machineState?.status ?? null,
@@ -447,15 +457,15 @@ function isObjectOutsideMaterial(
 
 function isObjectOutsideBed(
   obj: SceneObject,
-  canvas: { width: number; height: number },
+  bed: { width: number; height: number },
 ): boolean {
   const bounds = computeObjectBounds(obj);
   if (!hasUsableObjectBounds(bounds)) return false;
   return (
     bounds.minX < 0 ||
     bounds.minY < 0 ||
-    bounds.maxX > canvas.width ||
-    bounds.maxY > canvas.height
+    bounds.maxX > bed.width ||
+    bounds.maxY > bed.height
   );
 }
 
@@ -499,11 +509,12 @@ function runDesignOutputLayerChecks(ctx: PreflightContext, out: PreflightResult[
   }
 
   for (const obj of outputObjects) {
-    if (isObjectOutsideBed(obj, scene.canvas)) {
+    const bed = { width: ctx.preflightBedWidthMm, height: ctx.preflightBedHeightMm };
+    if (isObjectOutsideBed(obj, bed)) {
       out.push({
         severity: 'error',
         code: PREFLIGHT_CODES.DESIGN_OUTSIDE_BED,
-        message: `Object "${obj.name || obj.id}" is outside the laser bed travel area (${scene.canvas.width}×${scene.canvas.height}mm).`,
+        message: `Object "${obj.name || obj.id}" is outside the laser bed travel area (${bed.width}×${bed.height}mm).`,
         objectId: obj.id,
       });
     }

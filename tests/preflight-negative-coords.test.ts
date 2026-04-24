@@ -47,6 +47,8 @@ function makeCtx(overrides: Partial<PreflightContext> = {}): PreflightContext {
     scene: makeScene(),
     profile: makeProfile(),
     optimizeOrderEnabled: true,
+    preflightBedWidthMm: 300,
+    preflightBedHeightMm: 300,
     ...overrides,
   };
 }
