@@ -82,8 +82,14 @@ import { LearnedToast } from './LearnedToast';
 import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
 import { type ResponseCurve } from '../../core/materials/ResponseCurve';
-import { getPresets, savePreset, migrateDeviceProfileResponseCurves } from '../../core/materials/MaterialLibrary';
+import {
+  getPresets,
+  savePreset,
+  migrateDeviceProfileResponseCurves,
+  initializeMaterialLibrary,
+} from '../../core/materials/MaterialLibrary';
 import type { MaterialPreset } from '../../core/materials/MaterialPreset';
+import { initializeMaterialPresets } from '../../core/materials/MaterialPresets';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
@@ -133,12 +139,6 @@ export function App() {
   // resolves families like "Inter" instead of falling back to a default serif.
   useEffect(() => {
     void injectBundledFontFaces();
-  }, []);
-
-  // One-time migration: move D.13 response curves stored on DeviceProfile
-  // onto matching MaterialPresets. Idempotent and cheap — safe on every mount.
-  useEffect(() => {
-    migrateDeviceProfileResponseCurves();
   }, []);
 
   const [scene, setScene] = useState<Scene>(() => {
@@ -310,11 +310,18 @@ export function App() {
 
   const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
   useEffect(() => {
-    void initializeDeviceProfiles()
+    void Promise.all([
+      initializeDeviceProfiles(),
+      initializeMaterialLibrary(),
+      initializeMaterialPresets(),
+      entitlementService.initialize(),
+    ])
       .then(() => {
+        migrateDeviceProfileResponseCurves();
         refreshProfiles();
       })
       .catch(() => {
+        migrateDeviceProfileResponseCurves();
         refreshProfiles();
       });
   }, [refreshProfiles]);
@@ -1103,6 +1110,7 @@ export function App() {
     return () => clearInterval(interval);
   }, [scene]);
 
+  const activeLayerModeForSuggestion = scene.layers.find(l => l.id === scene.activeLayerId)?.settings.mode;
   useEffect(() => {
     const materialName = scene.material?.name;
     const machineType = scene.machine?.type || 'diode';
@@ -1113,14 +1121,19 @@ export function App() {
       return;
     }
 
-    const suggestion = getSuggestion(materialName, machineType, activeLayer.settings.mode);
-
-    if (suggestion && suggestion.sampleCount > 0) {
-      setToastSuggestion({ suggestion, materialName });
-    } else {
-      setToastSuggestion(null);
-    }
-  }, [scene.material?.name, scene.activeLayerId]); // eslint-disable-line react-hooks/exhaustive-deps -- material/layer identity only
+    let cancelled = false;
+    void getSuggestion(materialName, machineType, activeLayer.settings.mode).then(suggestion => {
+      if (cancelled) return;
+      if (suggestion && suggestion.sampleCount > 0) {
+        setToastSuggestion({ suggestion, materialName });
+      } else {
+        setToastSuggestion(null);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [scene.material?.name, scene.machine?.type, scene.activeLayerId, activeLayerModeForSuggestion]);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 

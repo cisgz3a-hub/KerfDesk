@@ -13,6 +13,8 @@
  * user-library preset type consumed by MaterialLibrary / applyMaterialPresetToLayer).
  */
 
+import { getStorage } from '../storage/storage';
+
 export interface StarterPreset {
   name: string;
   category: string;
@@ -37,6 +39,61 @@ export interface UserStarterMaterial extends StarterPreset {
 }
 
 const USER_MATERIALS_KEY = 'laserforge_user_materials';
+
+let _cachedUserMaterials: UserStarterMaterial[] = [];
+let _userMaterialsInitPromise: Promise<void> | null = null;
+
+export async function initializeMaterialPresets(): Promise<void> {
+  if (_userMaterialsInitPromise) return _userMaterialsInitPromise;
+  _userMaterialsInitPromise = runInitializeMaterialPresets();
+  return _userMaterialsInitPromise;
+}
+
+async function runInitializeMaterialPresets(): Promise<void> {
+  await migrateMaterialPresetsFromLocalStorage();
+  const storage = getStorage();
+  try {
+    const raw = await storage.get(USER_MATERIALS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        _cachedUserMaterials = parsed.filter((m): m is UserStarterMaterial =>
+          m != null && typeof m === 'object' && 'id' in m && 'name' in m && 'settings' in m,
+        );
+      }
+    }
+  } catch {
+    _cachedUserMaterials = [];
+  }
+}
+
+async function persistUserMaterials(): Promise<void> {
+  try {
+    await getStorage().set(USER_MATERIALS_KEY, JSON.stringify(_cachedUserMaterials));
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function migrateMaterialPresetsFromLocalStorage(): Promise<void> {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const legacy = localStorage.getItem(USER_MATERIALS_KEY);
+    if (legacy === null) return;
+    const storage = getStorage();
+    const existing = await storage.get(USER_MATERIALS_KEY);
+    if (existing !== null) return;
+    await storage.set(USER_MATERIALS_KEY, legacy);
+    localStorage.removeItem(USER_MATERIALS_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function resetMaterialPresetsForTest(): void {
+  _cachedUserMaterials = [];
+  _userMaterialsInitPromise = null;
+}
 
 interface LaserOp {
   power: number;
@@ -425,39 +482,28 @@ export function getMachineSettingsKey(machineType: string, watts: string): strin
   return 'diode_5w';
 }
 
-/** Get all user-created materials from localStorage */
+/** Get all user-created materials from the in-memory cache (filled by initializeMaterialPresets). */
 export function getUserMaterials(): UserStarterMaterial[] {
-  try {
-    const raw = localStorage.getItem(USER_MATERIALS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((m): m is UserStarterMaterial =>
-      m != null && typeof m === 'object' && 'id' in m && 'name' in m && 'settings' in m,
-    );
-  } catch {
-    return [];
-  }
+  return [..._cachedUserMaterials];
 }
 
 /** Save a user material (create or update) */
 export function saveUserMaterial(material: UserStarterMaterial): void {
-  const all = getUserMaterials();
-  const idx = all.findIndex(m => m.id === material.id);
+  const idx = _cachedUserMaterials.findIndex(m => m.id === material.id);
   material.updatedAt = new Date().toISOString();
   if (idx >= 0) {
-    all[idx] = material;
+    _cachedUserMaterials = _cachedUserMaterials.map((m, i) => (i === idx ? material : m));
   } else {
     material.createdAt = material.createdAt || new Date().toISOString();
-    all.push(material);
+    _cachedUserMaterials = [..._cachedUserMaterials, material];
   }
-  localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(all));
+  void persistUserMaterials();
 }
 
 /** Delete a user material by ID */
 export function deleteUserMaterial(id: string): void {
-  const all = getUserMaterials().filter(m => m.id !== id);
-  localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(all));
+  _cachedUserMaterials = _cachedUserMaterials.filter(m => m.id !== id);
+  void persistUserMaterials();
 }
 
 /** Create a new user material from current layer settings */
@@ -587,7 +633,8 @@ export function importUserMaterials(jsonString: string): number {
       imported++;
     }
 
-    localStorage.setItem(USER_MATERIALS_KEY, JSON.stringify(existing));
+    _cachedUserMaterials = existing;
+    void persistUserMaterials();
     return imported;
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

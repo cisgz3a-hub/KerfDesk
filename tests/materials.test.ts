@@ -9,9 +9,13 @@ import {
   exportPresets,
   getPresets,
   importPresets,
+  initializeMaterialLibrary,
+  resetMaterialLibraryForTest,
   savePreset,
 } from '../src/core/materials/MaterialLibrary';
 import type { MaterialPreset } from '../src/core/materials/MaterialPreset';
+import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
+import { setStorageForTest } from '../src/core/storage/storage';
 
 let passed = 0;
 let failed = 0;
@@ -52,64 +56,86 @@ function installMockLocalStorage(): void {
   } as Storage;
 }
 
-installMockLocalStorage();
-
-console.log('\n=== Material presets: defaults ===');
-
-const defaults = getDefaultMaterialPresets();
-assert(defaults.length === 10, 'defaultPresets returns 10 presets');
-
-for (const p of defaults) {
-  const ops = p.operations;
-  const has =
-    ops.cut != null || ops.engrave != null || ops.score != null;
-  assert(has, `preset "${p.id}" has at least one operation`);
+async function bootstrapMaterials(): Promise<void> {
+  for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  memoryStore['laserforge-material-presets'] = '[]';
+  resetMaterialLibraryForTest();
+  setStorageForTest(new InMemoryStorageAdapter());
+  await initializeMaterialLibrary();
 }
 
-console.log('\n=== Material presets: savePreset / getPresets ===');
+installMockLocalStorage();
 
-memoryStore['laserforge-material-presets'] = '[]';
-const beforeUser = getPresets().filter(p => !isDefaultMaterialPresetId(p.id));
-assert(beforeUser.length === 0, 'clean storage has no user presets');
+async function run(): Promise<void> {
+  console.log('\n=== Material presets: defaults ===');
 
-const userPreset: MaterialPreset = {
-  id: 'preset-user-test-one',
-  name: 'Test Preset',
-  material: 'TestMat',
-  thickness: '1mm',
-  laserWattage: '10W',
-  operations: { cut: { power: 12, speed: 300, passes: 1 } },
-};
+  const defaults = getDefaultMaterialPresets();
+  assert(defaults.length === 10, 'defaultPresets returns 10 presets');
 
-savePreset(userPreset);
-const merged = getPresets();
-assert(merged.length === 11, 'getPresets merges user preset with defaults');
-const round = merged.find(p => p.id === 'preset-user-test-one');
-assert(round?.operations.cut?.power === 12, 'savePreset/getPresets round-trips power');
-assert(round?.operations.cut?.speed === 300, 'savePreset/getPresets round-trips speed');
+  for (const p of defaults) {
+    const ops = p.operations;
+    const has =
+      ops.cut != null || ops.engrave != null || ops.score != null;
+    assert(has, `preset "${p.id}" has at least one operation`);
+  }
 
-console.log('\n=== Material presets: exportPresets / importPresets ===');
+  console.log('\n=== Material presets: savePreset / getPresets ===');
 
-const exported = exportPresets();
-const parsed = JSON.parse(exported) as unknown;
-assert(Array.isArray(parsed) && parsed.length === 1, 'exportPresets returns JSON array of user presets');
+  await bootstrapMaterials();
+  const beforeUser = getPresets().filter(p => !isDefaultMaterialPresetId(p.id));
+  assert(beforeUser.length === 0, 'clean storage has no user presets');
 
-memoryStore['laserforge-material-presets'] = '[]';
-const imported = importPresets(exported);
-assert(imported.length === 1, 'importPresets returns imported presets');
-const afterImport = getPresets().find(p => p.id === 'preset-user-test-one');
-assert(afterImport != null, 'importPresets persists user preset');
+  const userPreset: MaterialPreset = {
+    id: 'preset-user-test-one',
+    name: 'Test Preset',
+    material: 'TestMat',
+    thickness: '1mm',
+    laserWattage: '10W',
+    operations: { cut: { power: 12, speed: 300, passes: 1 } },
+  };
 
-console.log('\n=== Material presets: deletePreset ===');
+  savePreset(userPreset);
+  await Promise.resolve();
+  const merged = getPresets();
+  assert(merged.length === 11, 'getPresets merges user preset with defaults');
+  const round = merged.find(p => p.id === 'preset-user-test-one');
+  assert(round?.operations.cut?.power === 12, 'savePreset/getPresets round-trips power');
+  assert(round?.operations.cut?.speed === 300, 'savePreset/getPresets round-trips speed');
 
-deletePreset('preset-user-test-one');
-assert(getPresets().every(p => p.id !== 'preset-user-test-one'), 'deletePreset removes user preset');
+  console.log('\n=== Material presets: exportPresets / importPresets ===');
 
-const defaultCount = getDefaultMaterialPresets().length;
-deletePreset('preset-birch-3mm');
-assert(getPresets().length === defaultCount, 'deletePreset does not remove defaults');
+  const exported = exportPresets();
+  const parsed = JSON.parse(exported) as unknown;
+  assert(Array.isArray(parsed) && parsed.length === 1, 'exportPresets returns JSON array of user presets');
 
-console.log('\n=== Summary ===');
-console.log(`Passed: ${passed}, Failed: ${failed}`);
-if (failed > 0) throw new Error(`materials.test.ts: ${failed} assertion(s) failed`);
-process.exit(0);
+  await bootstrapMaterials();
+  const imported = importPresets(exported);
+  assert(imported.length === 1, 'importPresets returns imported presets');
+  await Promise.resolve();
+  const afterImport = getPresets().find(p => p.id === 'preset-user-test-one');
+  assert(afterImport != null, 'importPresets persists user preset');
+
+  console.log('\n=== Material presets: deletePreset ===');
+
+  deletePreset('preset-user-test-one');
+  await Promise.resolve();
+  assert(getPresets().every(p => p.id !== 'preset-user-test-one'), 'deletePreset removes user preset');
+
+  const defaultCount = getDefaultMaterialPresets().length;
+  deletePreset('preset-birch-3mm');
+  assert(getPresets().length === defaultCount, 'deletePreset does not remove defaults');
+
+  console.log('\n=== Summary ===');
+  console.log(`Passed: ${passed}, Failed: ${failed}`);
+  setStorageForTest(null);
+  resetMaterialLibraryForTest();
+  if (failed > 0) throw new Error(`materials.test.ts: ${failed} assertion(s) failed`);
+  process.exit(0);
+}
+
+void run().catch((err: unknown) => {
+  setStorageForTest(null);
+  resetMaterialLibraryForTest();
+  console.error(err);
+  process.exit(1);
+});

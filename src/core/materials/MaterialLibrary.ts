@@ -4,19 +4,32 @@ import { type Layer, type LaserSettings, type LayerMode } from '../scene/Layer';
 import { MAX_LASER_SPEED } from '../types';
 import { getDeviceProfiles, saveDeviceProfile, type DeviceProfile } from '../devices/DeviceProfile';
 import type { ResponseCurve } from './ResponseCurve';
+import { getStorage } from '../storage/storage';
 
 const STORAGE_KEY = 'laserforge-material-presets';
 
-function readUserPresets(): MaterialPreset[] {
-  if (typeof localStorage === 'undefined') return [];
+let _cachedUserPresets: MaterialPreset[] = [];
+let _initPromise: Promise<void> | null = null;
+
+export async function initializeMaterialLibrary(): Promise<void> {
+  if (_initPromise) return _initPromise;
+  _initPromise = runInitializeMaterialLibrary();
+  return _initPromise;
+}
+
+async function runInitializeMaterialLibrary(): Promise<void> {
+  await migrateMaterialLibraryFromLocalStorage();
+  const storage = getStorage();
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(isRoughlyValidPreset) as MaterialPreset[];
+    const raw = await storage.get(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw) as unknown;
+      if (Array.isArray(parsed)) {
+        _cachedUserPresets = parsed.filter(isRoughlyValidPreset);
+      }
+    }
   } catch {
-    return [];
+    _cachedUserPresets = [];
   }
 }
 
@@ -34,12 +47,44 @@ function isRoughlyValidPreset(x: unknown): x is MaterialPreset {
   );
 }
 
-function writeUserPresets(presets: MaterialPreset[]): void {
-  if (typeof localStorage === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+function readUserPresets(): MaterialPreset[] {
+  return [..._cachedUserPresets];
 }
 
-/** Defaults plus user presets from localStorage (user entries with same id as a default are ignored). */
+function writeUserPresets(presets: MaterialPreset[]): void {
+  _cachedUserPresets = [...presets];
+  void persistUserPresets();
+}
+
+async function persistUserPresets(): Promise<void> {
+  try {
+    await getStorage().set(STORAGE_KEY, JSON.stringify(_cachedUserPresets));
+  } catch {
+    /* best-effort */
+  }
+}
+
+async function migrateMaterialLibraryFromLocalStorage(): Promise<void> {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (legacy === null) return;
+    const storage = getStorage();
+    const existing = await storage.get(STORAGE_KEY);
+    if (existing !== null) return;
+    await storage.set(STORAGE_KEY, legacy);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function resetMaterialLibraryForTest(): void {
+  _cachedUserPresets = [];
+  _initPromise = null;
+}
+
+/** Defaults plus user presets from storage (user entries with same id as a default are ignored). */
 export function getPresets(): MaterialPreset[] {
   const defaults = getDefaultMaterialPresets();
   const defaultIds = new Set(defaults.map(p => p.id));

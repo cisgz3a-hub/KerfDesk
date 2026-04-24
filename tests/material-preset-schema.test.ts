@@ -35,6 +35,13 @@ import {
 } from '../src/core/devices/DeviceProfile';
 import { createLayer, type Layer } from '../src/core/scene/Layer';
 import type { ResponseCurve } from '../src/core/materials/ResponseCurve';
+import {
+  initializeMaterialLibrary,
+  resetMaterialLibraryForTest,
+} from '../src/core/materials/MaterialLibrary';
+import { initializeDeviceProfiles, resetDeviceProfilesForTest } from '../src/core/devices/DeviceProfile';
+import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
+import { setStorageForTest } from '../src/core/storage/storage';
 
 let passed = 0;
 let failed = 0;
@@ -113,15 +120,25 @@ function makeCurve(materialName: string): ResponseCurve {
 // Writes raw JSON (no schema check) into the user-preset bucket so we can
 // simulate a pre-refactor stored blob.
 const USER_PRESETS_KEY = 'laserforge-material-presets';
-function writeRawUserPresets(rows: unknown[]): void {
-  memoryStore[USER_PRESETS_KEY] = JSON.stringify(rows);
+
+async function bootstrapPresetsTest(opts?: { legacyRows?: unknown[] }): Promise<void> {
+  resetStorage();
+  resetMaterialLibraryForTest();
+  resetDeviceProfilesForTest();
+  setStorageForTest(new InMemoryStorageAdapter());
+  if (opts?.legacyRows) {
+    memoryStore[USER_PRESETS_KEY] = JSON.stringify(opts.legacyRows);
+  }
+  await initializeDeviceProfiles();
+  await initializeMaterialLibrary();
 }
 
 // ─── Tests ──────────────────────────────────────────────────────────
 
+async function runAll(): Promise<void> {
+
 console.log('[material-preset-schema] Test 1: legacy preset loads without new fields');
 {
-  resetStorage();
   const legacy = {
     id: 'preset-legacy-1',
     name: 'Legacy 3mm Plywood',
@@ -133,7 +150,7 @@ console.log('[material-preset-schema] Test 1: legacy preset loads without new fi
     },
     // no kerf, leadIn, zOffset, tabs, responseCurve
   };
-  writeRawUserPresets([legacy]);
+  await bootstrapPresetsTest({ legacyRows: [legacy] });
 
   const loaded = getPresetById('preset-legacy-1');
   assert(loaded !== undefined, 'legacy preset survives load');
@@ -145,7 +162,7 @@ console.log('[material-preset-schema] Test 1: legacy preset loads without new fi
 
 console.log('\n[material-preset-schema] Test 2: new fields round-trip through save/load');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   const curve = makeCurve('Walnut');
   const rich: MaterialPreset = {
     id: 'preset-rich-1',
@@ -180,7 +197,7 @@ console.log('\n[material-preset-schema] Test 2: new fields round-trip through sa
 
 console.log('\n[material-preset-schema] Test 3: applyMaterialPresetToLayer applies new fields');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   const preset: MaterialPreset = {
     id: 'preset-apply-1',
     name: 'Apply Test',
@@ -235,7 +252,7 @@ console.log('\n[material-preset-schema] Test 3: applyMaterialPresetToLayer appli
 
 console.log('\n[material-preset-schema] Test 4: applyMaterialPresetToLayer returns null for missing op');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   const preset: MaterialPreset = {
     id: 'preset-null-op',
     name: 'Null Op',
@@ -251,7 +268,7 @@ console.log('\n[material-preset-schema] Test 4: applyMaterialPresetToLayer retur
 
 console.log('\n[material-preset-schema] Test 5: migrateDeviceProfileResponseCurves moves matching curves');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
 
   // Preset: material = 'Plywood', no curve yet.
   const preset: MaterialPreset = {
@@ -288,7 +305,7 @@ console.log('\n[material-preset-schema] Test 5: migrateDeviceProfileResponseCurv
 
 console.log('\n[material-preset-schema] Test 6: migration is idempotent');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   const preset: MaterialPreset = {
     id: 'preset-idem-1',
     name: 'Idempotent Mat',
@@ -324,7 +341,7 @@ console.log('\n[material-preset-schema] Test 6: migration is idempotent');
 
 console.log('\n[material-preset-schema] Test 7: unmatched curves stay on device profile');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   // No preset with material matching "NonexistentMat".
   const curve = makeCurve('NonexistentMat');
   const profile: DeviceProfile = {
@@ -341,7 +358,7 @@ console.log('\n[material-preset-schema] Test 7: unmatched curves stay on device 
 
 console.log('\n[material-preset-schema] Test 8: unmatched-because-already-calibrated stays on profile');
 {
-  resetStorage();
+  await bootstrapPresetsTest();
   // Preset exists AND already has a calibrated curve → migration should skip
   // (prevents clobbering newer data with older data from the device profile).
   const existingCurve = makeCurve('Leather-existing');
@@ -376,7 +393,19 @@ console.log('\n[material-preset-schema] Test 8: unmatched-because-already-calibr
 console.log(`\n──────────────────────────────────────`);
 console.log(`  ${passed} passed, ${failed} failed`);
 console.log(`──────────────────────────────────────\n`);
-
-if (failed > 0) {
-  process.exit(1);
 }
+
+void runAll()
+  .then(() => {
+    setStorageForTest(null);
+    resetMaterialLibraryForTest();
+    resetDeviceProfilesForTest();
+    process.exit(failed > 0 ? 1 : 0);
+  })
+  .catch((err: unknown) => {
+    setStorageForTest(null);
+    resetMaterialLibraryForTest();
+    resetDeviceProfilesForTest();
+    console.error(err);
+    process.exit(1);
+  });

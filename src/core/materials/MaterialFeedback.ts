@@ -4,6 +4,8 @@
  * Over time, builds confidence in which settings work for which materials.
  */
 
+import { getStorage } from '../storage/storage';
+
 export interface MaterialRecord {
   material: string;          // e.g. "3mm Birch Plywood"
   machineType: string;       // 'diode' | 'co2' | 'fiber'
@@ -26,30 +28,67 @@ export interface MaterialSuggestion {
 
 const STORAGE_KEY = 'laserforge_material_feedback';
 
+let _migrationAttempted = false;
+
+async function migrateMaterialFeedbackFromLocalStorage(): Promise<void> {
+  if (_migrationAttempted) return;
+  _migrationAttempted = true;
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const legacy = localStorage.getItem(STORAGE_KEY);
+    if (legacy === null) return;
+    const storage = getStorage();
+    const existing = await storage.get(STORAGE_KEY);
+    if (existing !== null) return;
+    await storage.set(STORAGE_KEY, legacy);
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function resetMaterialFeedbackForTest(): void {
+  _migrationAttempted = false;
+}
+
 /**
  * Record a job outcome for learning
  */
 export function recordMaterialOutcome(record: MaterialRecord): void {
-  try {
-    const records = loadRecords();
-    records.push(record);
-    // Keep last 200 records
-    while (records.length > 200) records.shift();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
-  } catch {
+  void persistOutcome(record).catch(() => {
     console.warn('Failed to save material feedback');
+  });
+}
+
+async function persistOutcome(record: MaterialRecord): Promise<void> {
+  await migrateMaterialFeedbackFromLocalStorage();
+  const records = await loadRecordsAsync();
+  records.push(record);
+  while (records.length > 200) records.shift();
+  await getStorage().set(STORAGE_KEY, JSON.stringify(records));
+}
+
+async function loadRecordsAsync(): Promise<MaterialRecord[]> {
+  try {
+    const raw = await getStorage().get(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    return Array.isArray(parsed) ? parsed as MaterialRecord[] : [];
+  } catch {
+    return [];
   }
 }
 
 /**
  * Get a suggestion for a material+machine+mode based on past outcomes
  */
-export function getSuggestion(
+export async function getSuggestion(
   material: string,
   machineType: string,
   mode: string,
-): MaterialSuggestion | null {
-  const records = loadRecords();
+): Promise<MaterialSuggestion | null> {
+  await migrateMaterialFeedbackFromLocalStorage();
+  const records = await loadRecordsAsync();
 
   // Find matching records
   const matches = records.filter(r =>
@@ -103,20 +142,13 @@ export function getSuggestion(
 /**
  * Get history summary for a material
  */
-export function getMaterialHistory(
+export async function getMaterialHistory(
   material: string,
   machineType: string,
-): MaterialRecord[] {
-  return loadRecords().filter(r =>
+): Promise<MaterialRecord[]> {
+  await migrateMaterialFeedbackFromLocalStorage();
+  const records = await loadRecordsAsync();
+  return records.filter(r =>
     r.material === material && r.machineType === machineType
   );
-}
-
-function loadRecords(): MaterialRecord[] {
-  try {
-    const data = localStorage.getItem(STORAGE_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
-  }
 }
