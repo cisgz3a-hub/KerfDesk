@@ -61,7 +61,7 @@ Implemented from published academic papers:
 - Sierra, F. (1989-1990). Various kernel publications.
 - Bayer, B.E. (1973). "An optimum method for two-level rendition of continuous-tone pictures." (Patent US3971065, expired 1986.)
 
-### GRBL streaming protocol (`scripts/wainlux-bridge.mjs`)
+### GRBL streaming protocol (`src/controllers/grbl/GrblController.ts`)
 
 Based on public specification:
 

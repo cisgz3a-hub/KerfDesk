@@ -20,7 +20,7 @@ export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | '
 
 /**
  * Connection metadata for a DeviceProfile. When absent, profiles are treated as
- * the historical `serial` flavour (GRBL over USB or WiFi bridge). Falcon A1 Pro
+ * the historical `serial` flavour (GRBL over USB). Falcon A1 Pro
  * WiFi profiles use the `falcon-wifi` variant and talk to the device directly
  * via the Creality HTTP + WebSocket API (see electron/falcon-wifi/).
  */

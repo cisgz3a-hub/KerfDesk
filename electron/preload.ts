@@ -14,10 +14,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   disconnectPort: () => ipcRenderer.invoke('serial:disconnect') as Promise<void>,
   sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,
   quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
-  startBridge: (laserIp: string, wsPort: number) =>
-    ipcRenderer.invoke('bridge:start', laserIp, wsPort) as Promise<{ ok: boolean; error?: string }>,
-  stopBridge: () =>
-    ipcRenderer.invoke('bridge:stop') as Promise<void>,
 
   // ─── Falcon WiFi (Phase 1: read-only status monitoring) ─────────
   falconWifi: {

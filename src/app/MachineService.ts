@@ -2,7 +2,6 @@ import { type MutableRefObject } from 'react';
 import { type LaserController } from '../controllers/ControllerInterface';
 import { type SerialPortLike } from '../communication/SerialPort';
 import { WebSerialPort } from '../communication/WebSerialPort';
-import { WebSocketSerialPort } from '../communication/WebSocketSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
@@ -298,15 +297,6 @@ export class MachineService {
     const ws = createSerialPort('web') as WebSerialPort;
     this.portRef.current = ws;
     await ws.requestAndOpen(baudRate);
-    await this.controllerRef.current.connect(ws);
-    this.state.isSimulator = false;
-  }
-
-  async connectWifiLaser(host: string, bridgePort: number = 8765): Promise<void> {
-    const ws = createSerialPort('websocket') as WebSocketSerialPort;
-    const url = `ws://${host}:${bridgePort}`;
-    this.portRef.current = ws;
-    await ws.connect(url);
     await this.controllerRef.current.connect(ws);
     this.state.isSimulator = false;
   }

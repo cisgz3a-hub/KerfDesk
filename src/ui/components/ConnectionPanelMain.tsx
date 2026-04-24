@@ -274,17 +274,6 @@ export function ConnectionPanelMain({
   }, []);
 
   useEffect(() => {
-    return () => {
-      try {
-        const api = (window as { electronAPI?: { stopBridge?: () => Promise<void> } }).electronAPI;
-        void api?.stopBridge?.();
-      } catch {
-        /* ignore */
-      }
-    };
-  }, []);
-
-  useEffect(() => {
     isTestFiringRef.current = isTestFiring;
   }, [isTestFiring]);
 
@@ -533,12 +522,6 @@ export function ConnectionPanelMain({
     }
 
     portRef.current = null;
-    try {
-      const api = (window as { electronAPI?: { stopBridge?: () => Promise<void> } }).electronAPI;
-      await api?.stopBridge?.();
-    } catch {
-      /* ignore */
-    }
     setShowSimulator(false);
     clearMessages();
     onDisconnect?.();

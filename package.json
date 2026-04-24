@@ -10,7 +10,6 @@
     "electron:dev": "npm run electron:compile && concurrently -k -n vite,electron -c green,cyan \"npm run dev\" \"wait-on http://localhost:3000 && electron dist-electron/main.js\"",
     "electron:compile": "tsc -p electron/tsconfig.json",
     "icons:ico": "node scripts/generate-ico.mjs",
-    "wainlux-bridge": "node scripts/wainlux-bridge.mjs",
     "electron:build": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --win",
     "electron:build:mac": "npm run build && npm run electron:compile && npm run icons:ico && electron-builder --mac",
     "license-check": "node scripts/license-check.mjs",

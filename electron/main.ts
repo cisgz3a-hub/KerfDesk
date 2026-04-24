@@ -1,5 +1,4 @@
 import { app, BrowserWindow, ipcMain, dialog } from 'electron';
-import { spawn, type ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
@@ -123,63 +122,10 @@ app.on('before-quit', (e) => {
   if (safeShutdownDone) return;
   e.preventDefault();
   safeShutdownDone = true;
-  killBridge();
   shutdownFalconWiFi();
   safeCloseSerial()
     .catch(err => console.error('[before-quit] safe close failed:', err))
     .finally(() => app.quit());
-});
-
-// ─── WAINLUX BRIDGE AUTO-SPAWN ──────────────────────────────────
-
-let bridgeProcess: ChildProcess | null = null;
-
-function killBridge() {
-  if (bridgeProcess) {
-    console.log('[bridge] Stopping bridge process');
-    bridgeProcess.kill();
-    bridgeProcess = null;
-  }
-}
-
-ipcMain.handle('bridge:start', async (_event, laserIp: string, wsPort: number) => {
-  killBridge();
-
-  const scriptPath = path.join(app.getAppPath(), 'scripts', 'wainlux-bridge.mjs');
-  if (!fs.existsSync(scriptPath)) {
-    console.error('[bridge] Script not found:', scriptPath);
-    return { ok: false as const, error: 'Bridge script not found' };
-  }
-
-  console.log(`[bridge] Spawning: node ${scriptPath} ${laserIp} --ws-port ${wsPort}`);
-  bridgeProcess = spawn('node', [scriptPath, laserIp, '--ws-port', String(wsPort)], {
-    stdio: ['ignore', 'pipe', 'pipe'],
-    detached: false,
-  });
-
-  bridgeProcess.stdout?.on('data', (data: Buffer) => {
-    const line = data.toString().trim();
-    if (line) console.log('[bridge]', line);
-  });
-
-  bridgeProcess.stderr?.on('data', (data: Buffer) => {
-    const line = data.toString().trim();
-    if (line) console.error('[bridge]', line);
-  });
-
-  bridgeProcess.on('exit', (code) => {
-    console.log(`[bridge] Process exited with code ${code}`);
-    bridgeProcess = null;
-  });
-
-  await new Promise<void>(resolve => {
-    setTimeout(resolve, 600);
-  });
-  return { ok: true as const };
-});
-
-ipcMain.handle('bridge:stop', async () => {
-  killBridge();
 });
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────

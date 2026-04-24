@@ -3,12 +3,11 @@ import { type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { type MockSerialPort } from '../../communication/SerialPort';
 import { type WebSerialPort } from '../../communication/WebSerialPort';
-import { type WebSocketSerialPort } from '../../communication/WebSocketSerialPort';
 import { MachineService, type BurnState } from '../../app/MachineService';
 
 interface UseMachineServiceArgs {
   controllerRef: MutableRefObject<LaserController | null>;
-  portRef: MutableRefObject<WebSerialPort | MockSerialPort | WebSocketSerialPort | null>;
+  portRef: MutableRefObject<WebSerialPort | MockSerialPort | null>;
 }
 
 export function useMachineService(args: UseMachineServiceArgs) {
