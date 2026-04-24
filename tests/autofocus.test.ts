@@ -153,15 +153,17 @@ async function testMachineServiceAutoFocus(): Promise<void> {
   result = await svc.autoFocus();
   assert(!result.ok && result.error.includes('not supported'), 'returns not-supported when command is missing');
 
+  // Non–Falcon A1 Pro: custom timeout is preserved. (Creality Falcon profiles
+  // are healed to 15s on load; see backfillFalconAutofocus + falcon-autofocus-heal tests.)
   setActiveProfile({
     id: 'p3',
-    name: 'Falcon',
+    name: 'With AF and custom timeout',
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     machineType: 'diode',
     watts: 20,
-    brand: 'Creality',
-    model: 'Falcon A1 Pro',
+    brand: 'Acme',
+    model: 'Test Laser 9000',
     bedWidth: 400,
     bedHeight: 400,
     originCorner: 'front-left',

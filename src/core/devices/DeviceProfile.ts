@@ -286,13 +286,17 @@ function isMachineType(v: string): v is DeviceProfile['machineType'] {
 }
 
 /**
- * Backfill autofocus config for Falcon A1 Pro profiles that predate the
- * autofocus feature. Detection: brand === 'Creality' AND model contains
- * 'Falcon A1 Pro'. Only fills fields that are currently undefined — never
- * overwrites a user's explicit value, even if it's `false`. This means a
- * user who deliberately disabled autofocus stays disabled.
+ * Heal autofocus config for Falcon A1 Pro profiles. These fields are
+ * firmware capability, not user preference, so they're restored to
+ * correct values on every profile load regardless of prior state.
+ * Older builds may have persisted autoFocusSupported=false or stale
+ * commands in localStorage; this migration corrects that.
  *
- * Exported so the migration can be unit-tested without touching localStorage.
+ * Detection: brand === 'Creality' AND model contains 'Falcon A1 Pro'.
+ * Non-Falcon profiles are returned unchanged.
+ *
+ * Exported so the migration can be unit-tested without touching
+ * localStorage.
  */
 export function backfillFalconAutofocus(profile: DeviceProfile): DeviceProfile {
   const isFalconA1Pro =
@@ -301,17 +305,18 @@ export function backfillFalconAutofocus(profile: DeviceProfile): DeviceProfile {
     profile.model.includes('Falcon A1 Pro');
   if (!isFalconA1Pro) return profile;
 
-  const next: DeviceProfile = { ...profile };
-  if (next.autoFocusSupported === undefined) {
-    next.autoFocusSupported = true;
-  }
-  if (next.autoFocusCommand === undefined) {
-    next.autoFocusCommand = '$HZ1';
-  }
-  if (next.autoFocusTimeoutMs === undefined) {
-    next.autoFocusTimeoutMs = 15_000;
-  }
-  return next;
+  // Heal autofocus fields unconditionally for Falcon A1 Pro.
+  // These values are firmware-dictated, not user preferences:
+  //   - autoFocusSupported: true (Falcon A1 Pro always supports $HZ1 since fw 1.0.38)
+  //   - autoFocusCommand:   '$HZ1' (the correct GRBL-LPC command for this hardware)
+  //   - autoFocusTimeoutMs: 15_000 (empirically validated timeout)
+  // Older builds may have written stale values; we overwrite them on every load.
+  return {
+    ...profile,
+    autoFocusSupported: true,
+    autoFocusCommand: '$HZ1',
+    autoFocusTimeoutMs: 15_000,
+  };
 }
 
 /**

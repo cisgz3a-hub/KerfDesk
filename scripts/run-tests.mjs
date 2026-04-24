@@ -37,6 +37,7 @@ const files = [
   'controller-stop-safety.test.ts',
   'autofocus.test.ts',
   'falcon-serial-profile.test.ts',
+  'falcon-autofocus-heal.test.ts',
   'material-preset-schema.test.ts',
   'streaming-health.test.ts',
   'grbl-system-line-tagging.test.ts',

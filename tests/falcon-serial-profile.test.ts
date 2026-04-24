@@ -3,9 +3,10 @@
  * Covers:
  *   1. createFalconSerialProfile() populates all autofocus + Falcon defaults.
  *   2. createFalconSerialProfile() honors a custom display name.
- *   3. getDeviceProfiles() backfills autofocus fields on a legacy Falcon
+ *   3. getDeviceProfiles() backfills (heals) autofocus fields on a legacy Falcon
  *      profile (brand='Creality', model contains 'Falcon A1 Pro', no AF fields).
- *   4. getDeviceProfiles() does NOT overwrite an explicit autoFocusSupported=false.
+ *   4. getDeviceProfiles() also heals an explicit autoFocusSupported=false
+ *      (stale; Falcon AF fields are firmware-dictated, not user toggles).
  *
  * Run: npx tsx tests/falcon-serial-profile.test.ts
  */
@@ -129,22 +130,19 @@ function testBackfillHelperPure(): void {
   assertEq(migrated.autoFocusCommand, '$HZ1', "legacy Falcon → autoFocusCommand backfilled '$HZ1'");
   assertEq(migrated.autoFocusTimeoutMs, 15_000, 'legacy Falcon → autoFocusTimeoutMs backfilled 15000');
 
-  // Explicit `false` is the real safety property — the UI gates the Focus
-  // button on `autoFocusSupported`, so this is what protects a user who
-  // deliberately disabled autofocus. (Command/timeout backfill independently.)
-  const untouched = backfillFalconAutofocus(
+  // Stale `false` from an older build is healed — there is no UI to disable
+  // autofocus; the Focus button is firmware-gated, not a preference.
+  const healedFalse = backfillFalconAutofocus(
     legacyFalconProfile({ autoFocusSupported: false }),
   );
-  assertEq(untouched.autoFocusSupported, false, 'explicit autoFocusSupported=false is preserved');
-
-  const explicitCmd = backfillFalconAutofocus(
-    legacyFalconProfile({ autoFocusCommand: '$MYCUSTOM' }),
-  );
   assertEq(
-    explicitCmd.autoFocusCommand,
-    '$MYCUSTOM',
-    'explicit autoFocusCommand is preserved',
+    healedFalse.autoFocusSupported,
+    true,
+    'stale autoFocusSupported=false is healed to true for Falcon A1 Pro',
   );
+
+  const wrongCmd = backfillFalconAutofocus(legacyFalconProfile({ autoFocusCommand: '$MYCUSTOM' }));
+  assertEq(wrongCmd.autoFocusCommand, '$HZ1', 'stale or wrong autoFocusCommand is healed to $HZ1');
 
   const nonFalcon = backfillFalconAutofocus(
     legacyFalconProfile({ brand: 'Other', model: 'Whatever' }),
@@ -184,16 +182,16 @@ function testBackfillViaGetDeviceProfiles(): void {
     'getDeviceProfiles() backfills autoFocusTimeoutMs = 15000',
   );
 
-  // Explicit false is preserved.
+  // Stale false (e.g. older build in localStorage) is healed on read.
   clearMockStorage();
   memoryStore.laserforge_device_profiles = JSON.stringify([
     legacyFalconProfile({ autoFocusSupported: false }),
   ]);
-  const [preserved] = getDeviceProfiles();
+  const [healed] = getDeviceProfiles();
   assertEq(
-    preserved.autoFocusSupported,
-    false,
-    'getDeviceProfiles() does NOT overwrite explicit autoFocusSupported=false',
+    healed.autoFocusSupported,
+    true,
+    'getDeviceProfiles() heals autoFocusSupported=false to true for Falcon A1 Pro',
   );
 
   // Non-Falcon profile untouched.
