@@ -44,7 +44,7 @@ console.log('\n=== grbl-marker-lifecycle ===');
     '; OBJ ids=obj-2',
     'G1 X20 Y20 F1000',
   ];
-  ctrl.sendJob(lines);
+  await ctrl.sendJob(lines);
   await flush();
   await flush();
   await flush();

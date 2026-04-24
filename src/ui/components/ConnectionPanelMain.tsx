@@ -573,7 +573,7 @@ export function ConnectionPanelMain({
     const lines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
     setMessages(prev => [...prev, `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%)`]);
     try {
-      machineService.beginJobRun({
+      await machineService.beginJobRun({
         lines,
         scene,
         machineState,
@@ -587,12 +587,14 @@ export function ConnectionPanelMain({
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
     } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      await showAlert('Cannot start job', msg);
       machineService.clearJobSession();
       jobStartTimeRef.current = null;
       setJobStartTime(null);
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
-      setMessages(prev => [...prev, `Failed to start: ${e instanceof Error ? e.message : String(e)}`]);
+      setMessages(prev => [...prev, `Failed to start: ${msg}`]);
     }
   };
 

@@ -20,6 +20,8 @@ const files = [
   'pipeline.test.ts',
   'plan-optimizer-large-raster.test.ts',
   'controller.test.ts',
+  'controller-fresh-status-recheck.test.ts',
+  'controller-bounds-recheck.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'svg-import.test.ts',

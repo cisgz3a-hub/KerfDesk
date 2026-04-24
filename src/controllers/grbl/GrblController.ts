@@ -368,37 +368,26 @@ export class GrblController implements LaserController {
 
   // ─── JOB EXECUTION ──────────────────────────────────────────
 
-  sendJob(lines: string[]): void {
+  async sendJob(lines: string[]): Promise<void> {
     if (!this._port?.isOpen) throw new Error('Not connected');
     if (this._isJobRunning) throw new Error('Job already running');
-    if (this._state.status !== 'idle') {
+
+    const freshStatus = await this._queryFreshStatus();
+    if (freshStatus !== 'idle') {
       throw new Error(
-        `Cannot start job — machine is "${this._state.status}" (stop or reset on the controller until idle, then try again)`,
+        `Cannot start job — machine is "${freshStatus}" (wait for idle, then try again)`,
       );
     }
 
-    {
-      const jobLines: string[] = [];
-      const lineMarkers: (readonly string[] | null)[] = [];
-      let pending: readonly string[] | null = null;
-      for (const raw of lines) {
-        const line = raw.trim();
-        if (line.length === 0) continue;
-        if (line.startsWith(';')) {
-          const m = line.match(/^;\s*OBJ\s+ids=(.+)$/i);
-          if (m) {
-            const parsed = m[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
-            pending = parsed;
-          }
-          continue;
-        }
-        jobLines.push(line);
-        lineMarkers.push(pending);
-        pending = null;
-      }
-      this._jobLines = jobLines;
-      this._lineMarkers = lineMarkers;
+    const { jobLines, lineMarkers } = this._parseJobLines(lines);
+
+    const boundsError = this._checkJobBounds(jobLines);
+    if (boundsError) {
+      throw new Error(boundsError);
     }
+
+    this._jobLines = jobLines;
+    this._lineMarkers = lineMarkers;
 
     this._queueIndex = 0;
     this._pending = [];
@@ -424,6 +413,122 @@ export class GrblController implements LaserController {
     this._updateStatus('run');
     this._emitProgress();
     this._drainQueue();
+  }
+
+  private _parseJobLines(lines: string[]): {
+    jobLines: string[];
+    lineMarkers: (readonly string[] | null)[];
+  } {
+    const jobLines: string[] = [];
+    const lineMarkers: (readonly string[] | null)[] = [];
+    let pending: readonly string[] | null = null;
+    for (const raw of lines) {
+      const line = raw.trim();
+      if (line.length === 0) continue;
+      if (line.startsWith(';')) {
+        const m = line.match(/^;\s*OBJ\s+ids=(.+)$/i);
+        if (m) {
+          pending = m[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
+        }
+        continue;
+      }
+      jobLines.push(line);
+      lineMarkers.push(pending);
+      pending = null;
+    }
+    return { jobLines, lineMarkers };
+  }
+
+  /**
+   * Scan job lines for absolute-mode G0/G1 X/Y moves that exceed the controller's
+   * known bed extents. Returns null on pass, error string on fail. Skips when
+   * relative mode (G91) is active and no G90 has been seen yet for re-enabling
+   * absolute checks — only the first 500 **lines** are considered (O(n) cap).
+   */
+  private _checkJobBounds(lines: string[]): string | null {
+    const bedW = this._bedWidth;
+    const bedH = this._bedHeight;
+    if (!(bedW > 0) || !(bedH > 0)) {
+      return null;
+    }
+
+    const EPS = 0.01;
+    let relative = false;
+    const MAX_LINES = 500;
+
+    for (let i = 0; i < lines.length && i < MAX_LINES; i++) {
+      const line = lines[i];
+      if (/^G91\b/i.test(line)) {
+        relative = true;
+        continue;
+      }
+      if (/^G90\b/i.test(line)) {
+        relative = false;
+        continue;
+      }
+      if (relative) continue;
+
+      if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
+
+      const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
+      const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
+      if (!xMatch && !yMatch) continue;
+
+      if (xMatch) {
+        const x = parseFloat(xMatch[1]);
+        if (Number.isFinite(x) && (x < -EPS || x > bedW + EPS)) {
+          return (
+            `Job out of bounds: line contains X=${x.toFixed(3)} but machine bed is ` +
+            `${bedW.toFixed(0)}mm wide. Recompile against the current profile.`
+          );
+        }
+      }
+      if (yMatch) {
+        const y = parseFloat(yMatch[1]);
+        if (Number.isFinite(y) && (y < -EPS || y > bedH + EPS)) {
+          return (
+            `Job out of bounds: line contains Y=${y.toFixed(3)} but machine bed is ` +
+            `${bedH.toFixed(0)}mm tall. Recompile against the current profile.`
+          );
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Send `?` and await the next status report. Returns the fresh `state.status`
+   * (after the report is parsed). Resolves to `'unknown'` on timeout.
+   */
+  private async _queryFreshStatus(): Promise<MachineStatus | 'unknown' | 'disconnected'> {
+    if (!this._port?.isOpen) return 'disconnected';
+    return await new Promise<MachineStatus | 'unknown' | 'disconnected'>((resolve) => {
+      let settled = false;
+      let unsub: () => void = () => {};
+
+      const done = (s: MachineStatus | 'unknown' | 'disconnected') => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        unsub();
+        resolve(s);
+      };
+
+      const timer = setTimeout(() => done('unknown'), 500);
+
+      unsub = this.onRawLine((line, direction) => {
+        if (direction !== 'rx' || !line.startsWith('<') || !line.endsWith('>')) return;
+        queueMicrotask(() => {
+          if (settled) return;
+          done(this._state.status);
+        });
+      });
+      try {
+        this._sendRealtime(REALTIME_STATUS);
+      } catch {
+        done('disconnected');
+      }
+    });
   }
 
   /**

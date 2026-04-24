@@ -49,7 +49,7 @@ async function main(): Promise<void> {
     await flush();
     ctrl.setStopOnError(true);
     const job = ['G21', 'G0 X0', 'G0 X1', 'G0 X2', 'M2'];
-    ctrl.sendJob(job);
+    await ctrl.sendJob(job);
     await waitUntil(() => !ctrl.isJobRunning, 3000);
     assert(!ctrl.isJobRunning, 'job no longer running after error (aborted)');
     await ctrl.disconnect();
@@ -66,7 +66,7 @@ async function main(): Promise<void> {
     let errCount = 0;
     ctrl.onError((code) => { errCount++; if (code !== 20) console.error('expected 20, got', code); });
     const job = ['G21', 'G0 X0', 'G0 X1', 'G0 X2', 'M2'];
-    ctrl.sendJob(job);
+    await ctrl.sendJob(job);
     await waitUntil(() => !ctrl.isJobRunning, 5000);
     assert(errCount >= 1, 'error listener still fired (logged, job continued)');
     assert(!ctrl.isJobRunning, 'job completed after continuing past error');
@@ -83,7 +83,7 @@ async function main(): Promise<void> {
     ctrl.setStopOnError(false);
     ctrl.setStopOnError(true);
     const job = ['G21', 'G0 X0', 'G0 X1', 'G0 X2', 'M2'];
-    ctrl.sendJob(job);
+    await ctrl.sendJob(job);
     await waitUntil(() => !ctrl.isJobRunning, 3000);
     assert(!ctrl.isJobRunning, 're-enabled stopOnError aborts again');
     await ctrl.disconnect();

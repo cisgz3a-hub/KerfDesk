@@ -94,7 +94,11 @@ export interface LaserController {
   connect(port: SerialPortLike): Promise<void>;
   disconnect(): Promise<void>;
 
-  sendJob(lines: string[]): void;
+  /**
+   * Stream a G-code job. Resolves when acceptance checks pass; streaming then
+   * runs asynchronously. Sends a realtime `?` first to avoid stale read of `state.status`.
+   */
+  sendJob(lines: string[]): Promise<void>;
   pause(): void;
   resume(): void;
   stop(): void;

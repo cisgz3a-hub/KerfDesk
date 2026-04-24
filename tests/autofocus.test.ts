@@ -78,7 +78,7 @@ async function testMachineServiceAutoFocus(): Promise<void> {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    sendJob: () => {},
+    sendJob: () => Promise.resolve(),
     pause: () => {},
     resume: () => {},
     stop: () => {},

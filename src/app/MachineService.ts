@@ -211,13 +211,13 @@ export class MachineService {
     this.currentJobLog = null;
   }
 
-  beginJobRun(args: {
+  async beginJobRun(args: {
     lines: string[];
     scene: Scene;
     machineState: MachineState | null;
     gcodeText: string;
     notifySimulatorTx: (line: string) => void;
-  }): void {
+  }): Promise<void> {
     const { lines, scene, machineState, gcodeText, notifySimulatorTx } = args;
 
     this.burnState = emptyBurnState();
@@ -265,7 +265,7 @@ export class MachineService {
     }
 
     for (const line of lines) notifySimulatorTx(line);
-    this.controllerRef.current.sendJob(lines);
+    await this.controllerRef.current.sendJob(lines);
   }
 
   applyReplayOutcome(

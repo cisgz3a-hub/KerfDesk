@@ -69,7 +69,7 @@ async function main(): Promise<void> {
     await ctrl.connect(port);
     await flush();
     const lines = ['G21', 'G90', 'G0 X1 Y1', 'M2'].join('\n').split('\n');
-    ctrl.sendJob(lines);
+    await ctrl.sendJob(lines);
     await flush();
     port.received.length = 0;
     port.realtimeBytes.length = 0;

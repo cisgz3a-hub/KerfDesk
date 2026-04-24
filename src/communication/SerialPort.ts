@@ -76,11 +76,25 @@ export class MockSerialPort implements SerialPortLike {
     }
   }
 
+  /**
+   * When set, a realtime `?` (0x3F) injects this line instead of the default
+   * `<Idle|...>` (used by tests to simulate alarm/run/hold status reports).
+   */
+  nextStatusQueryResponse: string | null = null;
+  /**
+   * When true, a `?` is recorded in `realtimeBytes` but no status line is
+   * injected (timeout path in fresh-status preflight tests).
+   */
+  blockStatusQueryResponse = false;
+
   writeByte(byte: number): void {
     if (!this._isOpen) throw new Error('Port is not open');
     this.realtimeBytes.push(byte);
     if (byte === 0x3F) {
-      if (this._responseGenerator) {
+      if (this.blockStatusQueryResponse) return;
+      if (this.nextStatusQueryResponse != null) {
+        this.injectResponse(this.nextStatusQueryResponse);
+      } else if (this._responseGenerator) {
         this.injectResponse('<Idle|MPos:0.000,0.000,0.000|FS:0,0>');
       } else {
         const wx = this._simPosX - this._workOffsetX;

@@ -85,7 +85,7 @@ async function run(): Promise<void> {
     }
   });
 
-  ctrl.sendJob(lines);
+  await ctrl.sendJob(lines);
   await waitForJobEnd(ctrl);
   await flush(50);
 

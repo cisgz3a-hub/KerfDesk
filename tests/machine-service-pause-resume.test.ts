@@ -36,7 +36,7 @@ const mockController: LaserController = {
   maxSpindle: null,
   connect: async () => {},
   disconnect: async () => {},
-  sendJob: () => {},
+    sendJob: () => Promise.resolve(),
   pause: () => {
     pauseCalls.push('pause');
   },
