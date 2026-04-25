@@ -20,6 +20,7 @@ import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService } from '../../app/MachineService';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
+import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
@@ -141,6 +142,8 @@ export interface ConnectionPanelMainProps {
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
   /** Latest compile ticket (phase 1: threaded for confirm only; job path unchanged). */
   compiledJobTicket?: ValidatedJobTicket | null;
+  /** Last successful `compileGcode` result (same run as the ticket) — used for T1-11 canvas snapshot. */
+  lastGcodeCompileResult?: CompileGcodeResult | null;
   boundsMinX?: number;
   boundsMinY?: number;
   boundsMaxX?: number;
@@ -198,6 +201,7 @@ export function ConnectionPanelMain({
   bedHeight,
   machinePlanBounds = null,
   compiledJobTicket = null,
+  lastGcodeCompileResult = null,
   boundsMinX,
   boundsMinY,
   boundsMaxX,
@@ -640,16 +644,38 @@ export function ConnectionPanelMain({
 
     const ticket = preflightResult.ticket?.ticket ?? compiledJobTicket;
     const lines = ticket.gcodeLines;
+    if (!lastGcodeCompileResult) {
+      setMessages(prev => [
+        ...prev,
+        'Cannot start: no compile result. Run Compile first.',
+      ]);
+      await showAlert('Cannot start job', 'G-code compile result is missing. Compile before starting.');
+      return;
+    }
+    if (lastGcodeCompileResult.ticket.ticketId !== ticket.ticketId) {
+      setMessages(prev => [
+        ...prev,
+        'Cannot start: compile result does not match the selected job ticket. Recompile.',
+      ]);
+      await showAlert('Cannot start job', 'The compile output is out of date for this ticket. Recompile, then start.');
+      return;
+    }
     setMessages(prev => [
       ...prev,
       `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
     ]);
     try {
+      const canvasContext = {
+        canvasMoves: lastGcodeCompileResult.canvasMoves,
+        canvasPlanBounds: lastGcodeCompileResult.canvasPlanBounds,
+        machineTransform: lastGcodeCompileResult.machineTransform,
+      };
       await executionCoordinator.startValidatedJob({
         ticket,
         scene,
         machineState,
         notifySimulatorTx,
+        canvasContext,
       });
       jobStoppedByUserRef.current = false;
       const t0 = Date.now();

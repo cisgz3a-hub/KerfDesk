@@ -4,6 +4,7 @@ import { type LaserController } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
 import { type MachineState } from '../controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
+import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners, buildFrameGcode } from './frameGcode';
@@ -52,6 +53,7 @@ export class ExecutionCoordinator {
     scene: Scene;
     machineState: MachineState | null;
     notifySimulatorTx: (line: string) => void;
+    canvasContext: ActiveJobCanvasContext;
   }): Promise<void> {
     return this.deps.machineService.startValidatedJob(args);
   }

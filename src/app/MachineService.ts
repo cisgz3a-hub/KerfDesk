@@ -24,6 +24,7 @@ import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
+import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
@@ -72,6 +73,13 @@ export class MachineService {
    *  ends. Used by phase 5 to enforce scene/profile hash matching
    *  at send time. */
   private activeTicket: ValidatedJobTicket | null = null;
+
+  /**
+   * Canvas/head display snapshot (same compile as the ticket), cleared
+   * whenever `activeTicket` is cleared. Reference-stable for the life of
+   * the run — T1-11; not on ValidatedJobTicket to avoid React identity churn.
+   */
+  private activeJobCanvasContext: ActiveJobCanvasContext | null = null;
 
   private detachRecording: (() => void) | null = null;
 
@@ -137,12 +145,18 @@ export class MachineService {
     this.activeReplay = null;
     this.currentJobLog = null;
     this.activeTicket = null;
+    this.activeJobCanvasContext = null;
   }
 
   /** Read-only accessor — tests and future phases need to inspect
    *  which ticket is running. */
   getActiveTicket(): ValidatedJobTicket | null {
     return this.activeTicket;
+  }
+
+  /** Canvas-space toolpath + transform for the running job (T1-11), or null. */
+  getActiveJobCanvasContext(): ActiveJobCanvasContext | null {
+    return this.activeJobCanvasContext;
   }
 
   getBurnState(): BurnState {
@@ -270,6 +284,7 @@ export class MachineService {
     void this.releaseWakeLock();
     this.currentJobLog = null;
     this.activeTicket = null;
+    this.activeJobCanvasContext = null;
   }
 
   /** Start a job from a validated ticket. The ticket carries the
@@ -333,8 +348,9 @@ export class MachineService {
     scene: Scene;
     machineState: MachineState | null;
     notifySimulatorTx: (line: string) => void;
+    canvasContext: ActiveJobCanvasContext;
   }): Promise<void> {
-    const { ticket, scene, machineState, notifySimulatorTx } = args;
+    const { ticket, scene, machineState, notifySimulatorTx, canvasContext } = args;
 
     const validation = this.validateTicket(ticket, scene);
     if (!validation.ok) {
@@ -344,6 +360,7 @@ export class MachineService {
     await this.acquireWakeLock();
     try {
       this.activeTicket = ticket;
+      this.activeJobCanvasContext = canvasContext;
 
       this.burnState = emptyBurnState();
       this.emitBurnState();
@@ -396,6 +413,8 @@ export class MachineService {
       for (const line of lines) notifySimulatorTx(line);
       await this.controllerRef.current.sendJob(lines);
     } catch (err) {
+      this.activeTicket = null;
+      this.activeJobCanvasContext = null;
       void this.releaseWakeLock();
       throw err;
     }

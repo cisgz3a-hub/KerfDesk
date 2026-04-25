@@ -4,6 +4,8 @@
  */
 import './e2e/helpers/e2eDeterministicIds';
 
+import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
+import { type CompileGcodeResult } from '../src/app/PipelineService';
 import { MachineService } from '../src/app/MachineService';
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
@@ -16,6 +18,14 @@ import {
   saveDeviceProfile,
   setActiveProfileId,
 } from '../src/core/devices/DeviceProfile';
+
+function activeJobContextFromCompile(c: CompileGcodeResult): ActiveJobCanvasContext {
+  return {
+    canvasMoves: c.canvasMoves,
+    canvasPlanBounds: c.canvasPlanBounds,
+    machineTransform: c.machineTransform,
+  };
+}
 
 let passed = 0;
 let failed = 0;
@@ -123,6 +133,7 @@ async function run(): Promise<void> {
         scene: sceneB,
         machineState: idle,
         notifySimulatorTx: () => {},
+        canvasContext: activeJobContextFromCompile(compiledA),
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);
@@ -153,6 +164,7 @@ async function run(): Promise<void> {
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
+        canvasContext: activeJobContextFromCompile(compiled),
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);
@@ -180,6 +192,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: activeJobContextFromCompile(compiled),
     });
 
     assert(sendCalls.length === 1, 'clean path: sendJob called once');
@@ -211,6 +224,7 @@ async function run(): Promise<void> {
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
+        canvasContext: activeJobContextFromCompile(compiled),
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);

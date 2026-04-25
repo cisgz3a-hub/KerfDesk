@@ -8,7 +8,8 @@ import './e2e/helpers/e2eDeterministicIds';
 import { JSDOM } from 'jsdom';
 import React, { act, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { compileGcode } from '../src/app/PipelineService';
+import { compileGcode, type CompileGcodeResult } from '../src/app/PipelineService';
+import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { MachineService } from '../src/app/MachineService';
 import {
   createBlankProfile,
@@ -122,10 +123,19 @@ function makeController(): LaserController {
 
 type StartArgs = Parameters<MachineService['startValidatedJob']>[0];
 
+function panelCanvasContext(c: CompileGcodeResult): ActiveJobCanvasContext {
+  return {
+    canvasMoves: c.canvasMoves,
+    canvasPlanBounds: c.canvasPlanBounds,
+    machineTransform: c.machineTransform,
+  };
+}
+
 function PanelHarness(props: {
   scene: Scene;
   gcode: string | null;
   compiledJobTicket: ValidatedJobTicket | null;
+  lastGcodeCompileResult: CompileGcodeResult | null;
   machinePlanBounds: AABB | null;
   machineService: MachineService;
   controller: LaserController;
@@ -136,6 +146,7 @@ function PanelHarness(props: {
     scene,
     gcode,
     compiledJobTicket,
+    lastGcodeCompileResult,
     machinePlanBounds,
     machineService,
     controller,
@@ -168,6 +179,7 @@ function PanelHarness(props: {
     bedHeight: 300,
     machinePlanBounds,
     compiledJobTicket,
+    lastGcodeCompileResult,
     onClose: () => {},
     activeProfile,
     productionMode: false,
@@ -246,6 +258,7 @@ async function run(): Promise<void> {
         scene,
         gcode: gcodeProp,
         compiledJobTicket: ticket,
+        lastGcodeCompileResult: compiled,
         machinePlanBounds: compiled.machinePlanBounds,
         machineService,
         controller,
@@ -268,6 +281,12 @@ async function run(): Promise<void> {
   assert(startCalls.length === 1, 'startValidatedJob called once');
   const arg0 = startCalls[0];
   assert(arg0?.ticket === ticket, 'same ticket reference as compile');
+  const expectedCtx = panelCanvasContext(compiled);
+  assert(
+    arg0?.canvasContext.canvasMoves === expectedCtx.canvasMoves
+    && arg0?.canvasContext.machineTransform === expectedCtx.machineTransform,
+    'startValidatedJob receives same canvas snapshot refs as compile (T1-11 v2)',
+  );
   assert(
     !arg0?.ticket.gcodeLines.some(l => l.includes('INJECTED_UI_PROP_ONLY')),
     'streamed lines come from ticket, not gcode prop split',

@@ -461,7 +461,6 @@ export function App() {
     setCurrentGcode,
     compileGcode,
     compileToolpath,
-    compileToResult,
     gcodeStale,
     setGcodeStale,
     sceneCompileTick,
@@ -479,41 +478,27 @@ export function App() {
   });
 
   useEffect(() => {
-    let cancelled = false;
-
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
-      void (async () => {
-        try {
-          const result = await compileToResult(scene);
-          if (cancelled) return;
-          if (!result) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          } else {
-            setActiveJobMoves(result.canvasMoves);
-            setActiveJobPlanBounds(result.canvasPlanBounds);
-            setActiveJobTransform(result.machineTransform);
-          }
-        } catch {
-          if (!cancelled) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          }
-        }
-      })();
+      const ctx = machineUi.service.getActiveJobCanvasContext();
+      if (ctx) {
+        setActiveJobMoves(ctx.canvasMoves);
+        setActiveJobPlanBounds(ctx.canvasPlanBounds);
+        setActiveJobTransform(ctx.machineTransform);
+      } else {
+        console.warn(
+          '[App] Job running but no active job canvas context — clearing active job canvas state',
+        );
+        setActiveJobMoves(null);
+        setActiveJobPlanBounds(null);
+        setActiveJobTransform(null);
+      }
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
       setActiveJobMoves(null);
       setActiveJobPlanBounds(null);
       setActiveJobTransform(null);
     }
     wasJobRunningRef.current = grbl.isJobRunning;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [grbl.isJobRunning, scene, compileToResult]);
+  }, [grbl.isJobRunning, machineUi.service]);
 
   const connectionSidebarWidth = connectionSidebarOpen
     ? Math.min(500, Math.floor(canvasSize.width * 0.45))
@@ -1719,6 +1704,7 @@ export function App() {
         productionMode,
         gcode: currentGcode,
         compiledJobTicket: lastResult?.ticket ?? null,
+        lastGcodeCompileResult: lastResult,
         onClose: () => dialogs.setShowConnection(false),
         onDisconnect: () => dialogs.setShowConnection(false),
       onOpenSettings: (tab?: SettingsTab) => {

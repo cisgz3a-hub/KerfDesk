@@ -1,6 +1,7 @@
 /**
  * MachineService wake lock (T1-10). Run: npx tsx tests/wake-lock.test.ts
  */
+import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { MachineService } from '../src/app/MachineService';
 import {
   type JobProgress,
@@ -108,6 +109,14 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
   return merged;
 }
 
+function canvasContextForTicket(t: ValidatedJobTicket): ActiveJobCanvasContext {
+  return {
+    canvasMoves: [],
+    canvasPlanBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    machineTransform: t.machineTransform,
+  };
+}
+
 const idle: MachineState = {
   status: 'idle',
   position: { x: 0, y: 0, z: 0 },
@@ -159,6 +168,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     assert(acquireCallCount === 1, 'acquireJobWakeLock invoked exactly once for successful start');
@@ -180,6 +190,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     const progress = {
@@ -212,6 +223,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     svc.clearJobSession();
@@ -232,6 +244,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     await svc.disconnect();
@@ -255,6 +268,7 @@ async function run(): Promise<void> {
         scene: otherScene,
         machineState: idle,
         notifySimulatorTx: () => {},
+        canvasContext: canvasContextForTicket(ticket),
       });
     } catch {
       threw = true;
@@ -282,6 +296,7 @@ async function run(): Promise<void> {
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
+        canvasContext: canvasContextForTicket(ticket),
       });
     } catch {
       threw = true;

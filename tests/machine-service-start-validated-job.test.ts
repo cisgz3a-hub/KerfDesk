@@ -2,6 +2,7 @@
  * MachineService.startValidatedJob — ticket entry point.
  * Run: npx tsx tests/machine-service-start-validated-job.test.ts
  */
+import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { MachineService } from '../src/app/MachineService';
 import { GrblController } from '../src/controllers/grbl/GrblController';
 import { MockSerialPort, type SerialPortLike } from '../src/communication/SerialPort';
@@ -102,6 +103,14 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
   return merged;
 }
 
+function canvasContextForTicket(t: ValidatedJobTicket): ActiveJobCanvasContext {
+  return {
+    canvasMoves: [],
+    canvasPlanBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    machineTransform: t.machineTransform,
+  };
+}
+
 const idle: MachineState = {
   status: 'idle',
   position: { x: 0, y: 0, z: 0 },
@@ -156,6 +165,7 @@ async function run(): Promise<void> {
       notifySimulatorTx: line => {
         simLines.push(line);
       },
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     assert(sentBatches.length === 1, 'sendJob invoked once');
@@ -170,6 +180,13 @@ async function run(): Promise<void> {
     assert(
       svc.getActiveTicket()?.ticketId === ticket.ticketId,
       'getActiveTicket returns the ticket after startValidatedJob',
+    );
+    const ctx0 = svc.getActiveJobCanvasContext();
+    assert(
+      ctx0 != null
+      && ctx0.machineTransform === ticket.machineTransform
+      && ctx0.canvasMoves.length === 0,
+      'getActiveJobCanvasContext holds same machineTransform ref and snapshot',
     );
   }
 
@@ -187,6 +204,7 @@ async function run(): Promise<void> {
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
     });
 
     const progress = {
@@ -204,6 +222,7 @@ async function run(): Promise<void> {
     await svc.tryFinalizeJobLog(idle, progress, false, () => {});
 
     assert(svc.getActiveTicket() === null, 'getActiveTicket null after tryFinalizeJobLog');
+    assert(svc.getActiveJobCanvasContext() === null, 'getActiveJobCanvasContext null after tryFinalizeJobLog');
 
     const logs = await getJobLogs();
     assert(logs.length >= 1, 'job log persisted');
@@ -236,6 +255,7 @@ async function run(): Promise<void> {
       scene,
       machineState: ctrl.state,
       notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(t),
     });
 
     await waitUntil(() => !ctrl.isJobRunning, 8000);
