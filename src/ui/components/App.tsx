@@ -461,7 +461,6 @@ export function App() {
     setCurrentGcode,
     compileGcode,
     compileToolpath,
-    compileToResult,
     gcodeStale,
     setGcodeStale,
     sceneCompileTick,
@@ -479,41 +478,27 @@ export function App() {
   });
 
   useEffect(() => {
-    let cancelled = false;
-
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
-      void (async () => {
-        try {
-          const result = await compileToResult(scene);
-          if (cancelled) return;
-          if (!result) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          } else {
-            setActiveJobMoves(result.canvasMoves);
-            setActiveJobPlanBounds(result.canvasPlanBounds);
-            setActiveJobTransform(result.machineTransform);
-          }
-        } catch {
-          if (!cancelled) {
-            setActiveJobMoves(null);
-            setActiveJobPlanBounds(null);
-            setActiveJobTransform(null);
-          }
-        }
-      })();
+      const ticket = machineUi.service.getActiveTicket();
+      if (ticket) {
+        setActiveJobMoves(ticket.canvasMoves);
+        setActiveJobPlanBounds(ticket.canvasPlanBounds);
+        setActiveJobTransform(ticket.machineTransform);
+      } else {
+        console.warn(
+          '[App] Job running but no active ticket — clearing active job canvas state',
+        );
+        setActiveJobMoves(null);
+        setActiveJobPlanBounds(null);
+        setActiveJobTransform(null);
+      }
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
       setActiveJobMoves(null);
       setActiveJobPlanBounds(null);
       setActiveJobTransform(null);
     }
     wasJobRunningRef.current = grbl.isJobRunning;
-
-    return () => {
-      cancelled = true;
-    };
-  }, [grbl.isJobRunning, scene, compileToResult]);
+  }, [grbl.isJobRunning, machineUi.service]);
 
   const connectionSidebarWidth = connectionSidebarOpen
     ? Math.min(500, Math.floor(canvasSize.width * 0.45))

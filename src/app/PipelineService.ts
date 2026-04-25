@@ -183,6 +183,8 @@ export async function compileGcode(
     gcodeText: gcode,
     machinePlanBounds: { ...machineTransform.plan.bounds },
     machineTransform,
+    canvasMoves: [...canvasMoves],
+    canvasPlanBounds: { ...canvasPlanBounds },
     controllerType: 'grbl',
     startMode,
     savedOrigin,

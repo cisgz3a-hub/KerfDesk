@@ -4,6 +4,7 @@
  */
 
 import type { MachineTransformResult } from '../plan/MachineTransform';
+import type { Move } from '../plan/Plan';
 import type { AABB } from '../types';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { ControllerId } from '../../controllers/ControllerRegistry';
@@ -22,6 +23,14 @@ export interface ValidatedJobTicket {
   readonly gcodeText: string;
   readonly machinePlanBounds: AABB;
   readonly machineTransform: MachineTransformResult;
+  /**
+   * Canvas-space moves and bounds from the same plan compile as the gcode (before
+   * `applyMachineTransform`). Pinned to this ticket for on-canvas active-job
+   * preview. Derived view data — not used in `sceneHash` or other integrity
+   * fingerprints.
+   */
+  readonly canvasMoves: readonly Move[];
+  readonly canvasPlanBounds: AABB;
   readonly controllerType: ControllerId;
   readonly startMode: GcodeStartMode;
   readonly savedOrigin: { readonly x: number; readonly y: number } | null;

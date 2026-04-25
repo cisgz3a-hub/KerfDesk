@@ -90,6 +90,8 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
     machineTransform,
+    canvasMoves: [],
+    canvasPlanBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
     controllerType: 'grbl',
     startMode: 'current',
     savedOrigin: null,
