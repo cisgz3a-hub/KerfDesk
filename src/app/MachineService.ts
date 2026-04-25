@@ -85,6 +85,8 @@ export class MachineService {
    *  tryFinalizeJobLog from treating a brand-new `currentJobLog` as
    *  "already finished" when a stale React closure still has idle+!running. */
   private jobObservedRunning = false;
+  private nextJobSessionId = 1;
+  private activeJobSessionId: number | null = null;
 
   private detachRecording: (() => void) | null = null;
 
@@ -152,6 +154,7 @@ export class MachineService {
     this.activeTicket = null;
     this.activeJobCanvasContext = null;
     this.jobObservedRunning = false;
+    this.activeJobSessionId = null;
   }
 
   /** Read-only accessor — tests and future phases need to inspect
@@ -258,6 +261,8 @@ export class MachineService {
   ): Promise<void> {
     const log = this.currentJobLog;
     if (!log || log.status !== 'running') return;
+    const sessionId = this.activeJobSessionId;
+    const replay = this.activeReplay;
 
     if (isJobRunning) {
       this.jobObservedRunning = true;
@@ -292,11 +297,18 @@ export class MachineService {
     } else {
       appendMessage(`\u26A0 ${saveResult.message ?? 'Job log not saved'}`);
     }
+    if (this.currentJobLog !== log || this.activeJobSessionId !== sessionId) return;
+    if (replay && replay.status === 'running' && this.activeReplay === replay) {
+      finalizeReplay(replay, status, linesCompleted);
+      saveReplay(replay);
+      this.activeReplay = null;
+    }
     void this.releaseWakeLock();
     this.currentJobLog = null;
     this.activeTicket = null;
     this.activeJobCanvasContext = null;
     this.jobObservedRunning = false;
+    this.activeJobSessionId = null;
   }
 
   /** Start a job from a validated ticket. The ticket carries the
@@ -364,21 +376,39 @@ export class MachineService {
   }): Promise<void> {
     const { ticket, scene, machineState, notifySimulatorTx, canvasContext } = args;
 
+    if (
+      this.activeTicket
+      || this.activeJobCanvasContext
+      || this.currentJobLog?.status === 'running'
+      || this.activeReplay?.status === 'running'
+    ) {
+      throw new Error('A job is already active. Wait for it to finish or clear the job session.');
+    }
+
     const validation = this.validateTicket(ticket, scene);
     if (!validation.ok) {
       throw new Error(validation.reason);
     }
 
+    const lines = [...ticket.gcodeLines];
+    const streamableLines = lines
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && !line.startsWith(';'));
+    if (streamableLines.length === 0) {
+      throw new Error('Job contains no streamable G-code lines.');
+    }
+
     await this.acquireWakeLock();
+    const sessionId = this.nextJobSessionId++;
     try {
       this.jobObservedRunning = false;
+      this.activeJobSessionId = sessionId;
       this.activeTicket = ticket;
       this.activeJobCanvasContext = canvasContext;
 
       this.burnState = emptyBurnState();
       this.emitBurnState();
 
-      const lines = [...ticket.gcodeLines];
       const gcodeText = ticket.gcodeText;
 
       const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
@@ -426,10 +456,15 @@ export class MachineService {
       for (const line of lines) notifySimulatorTx(line);
       await this.controllerRef.current.sendJob(lines);
     } catch (err) {
-      this.activeTicket = null;
-      this.activeJobCanvasContext = null;
-      this.jobObservedRunning = false;
-      void this.releaseWakeLock();
+      if (this.activeJobSessionId === sessionId) {
+        this.activeReplay = null;
+        this.currentJobLog = null;
+        this.activeTicket = null;
+        this.activeJobCanvasContext = null;
+        this.jobObservedRunning = false;
+        this.activeJobSessionId = null;
+        void this.releaseWakeLock();
+      }
       throw err;
     }
   }
@@ -468,17 +503,20 @@ export class MachineService {
   }
 
   async disconnect(): Promise<void> {
-    void this.releaseWakeLock();
     const ctrl = this.controllerRef.current;
-    if (ctrl) {
-      try {
-        ctrl.sendCommand('M5 S0', 'internal');
-      } catch {
-        /* not connected, buffer full, or port already gone */
+    try {
+      if (ctrl) {
+        try {
+          ctrl.sendCommand('M5 S0', 'internal');
+        } catch {
+          /* not connected, buffer full, or port already gone */
+        }
+        await ctrl.disconnect();
       }
-      await ctrl.disconnect();
+    } finally {
+      this.portRef.current = null;
+      this.clearJobSession();
     }
-    this.portRef.current = null;
   }
 
   /**
