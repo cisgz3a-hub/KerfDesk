@@ -80,6 +80,8 @@ const files = [
   'wcs-mutation-consent.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
   'ui-start-job-uses-ticket.test.tsx',
+  'connection-panel-preflight-no-loop.test.tsx',
+  'usecompilemanager-stale-no-loop.test.tsx',
   'numberinput-no-loop-on-rapid-prop-change.test.tsx',
   'numberinput-tolerance-still-works.test.tsx',
   'numberinput-focused-not-overridden.test.tsx',

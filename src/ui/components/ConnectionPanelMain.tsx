@@ -129,6 +129,15 @@ function samePreflightSummary(a: PreflightSummary, b: PreflightSummary): boolean
   return true;
 }
 
+function sameMessages(a: readonly string[], b: readonly string[]): boolean {
+  if (a === b) return true;
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
+}
+
 export interface ConnectionPanelMainProps {
   controller: LaserController;
   portRef: React.MutableRefObject<SerialPortLike | null>;
@@ -241,6 +250,7 @@ export function ConnectionPanelMain({
   setSimulator,
 }: ConnectionPanelMainProps) {
   const [preflight, setPreflight] = useState<PreflightSummary | null>(null);
+  const preflightRef = useRef<PreflightSummary | null>(null);
   const [showSimulator, setShowSimulator] = useState(false);
   const [jogStep, setJogStep] = useState(10);
   const [showMore, setShowMore] = useState(false);
@@ -262,13 +272,12 @@ export function ConnectionPanelMain({
   controllerRef.current = controller;
   const setMessages = useCallback(
     (next: string[] | ((prev: string[]) => string[])) => {
-      if (typeof next === 'function') {
-        replaceMessages(next(messages));
-      } else {
-        replaceMessages(next);
-      }
+      replaceMessages(prev => {
+        const resolved = typeof next === 'function' ? next(prev) : next;
+        return sameMessages(prev, resolved) ? prev : resolved;
+      });
     },
-    [messages, replaceMessages],
+    [replaceMessages],
   );
   const logRef = useRef<HTMLDivElement>(null);
   const simulatorListenersRef = useRef(new Set<(line: string) => void>());
@@ -359,12 +368,13 @@ export function ConnectionPanelMain({
       machinePlanBounds,
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
     );
-    setPreflight(prev => {
-      const next: PreflightSummary =
-        compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
-      if (prev != null && samePreflightSummary(prev, next)) return prev;
-      return next;
-    });
+    const next: PreflightSummary =
+      compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
+    if (preflightRef.current != null && samePreflightSummary(preflightRef.current, next)) {
+      return;
+    }
+    preflightRef.current = next;
+    setPreflight(next);
   }, [
     scene,
     gcode,

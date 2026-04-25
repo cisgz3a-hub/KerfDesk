@@ -75,7 +75,15 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   sceneCompileTickRef.current = sceneCompileTick;
 
   const lastCompiledRevisionRef = useRef<number | null>(null);
-  const [gcodeStale, setGcodeStale] = useState(false);
+  const [gcodeStale, setGcodeStaleState] = useState(false);
+  const gcodeStaleRef = useRef(false);
+  const setGcodeStale = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((next) => {
+    setGcodeStaleState(prev => {
+      const resolved = typeof next === 'function' ? next(prev) : next;
+      gcodeStaleRef.current = resolved;
+      return prev === resolved ? prev : resolved;
+    });
+  }, []);
 
   const savedOriginX = savedOrigin?.x ?? null;
   const savedOriginY = savedOrigin?.y ?? null;
@@ -102,7 +110,8 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     if (!connectionSidebarOpen) return;
     if (
       lastCompiledRevisionRef.current !== null &&
-      lastCompiledRevisionRef.current !== sceneCompileTick
+      lastCompiledRevisionRef.current !== sceneCompileTick &&
+      !gcodeStaleRef.current
     ) {
       setGcodeStale(true);
     }
