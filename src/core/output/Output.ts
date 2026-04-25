@@ -53,6 +53,13 @@ export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 export interface OutputStrategy {
   readonly formatId: OutputFormat;
   readonly formatName: string;
+  /**
+   * Whether the target firmware already compensates laser power during
+   * accel/decel (for example GRBL M4 dynamic mode). When true, software-side
+   * acceleration-aware power splitting must be disabled to avoid double
+   * attenuation.
+   */
+  readonly supportsDynamicLaserPower: boolean;
 
   // Generate full output from a plan
   generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output;
@@ -93,6 +100,7 @@ export function listOutputFormats(): OutputFormat[] {
 export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract readonly formatId: OutputFormat;
   abstract readonly formatName: string;
+  abstract readonly supportsDynamicLaserPower: boolean;
 
   // Subclasses override these for protocol differences
   abstract encodeLaserOn(power: number): string;

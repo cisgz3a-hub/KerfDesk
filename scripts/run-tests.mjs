@@ -57,6 +57,7 @@ const files = [
   'validated-job-ticket-phase1.test.ts',
   'validated-job-ticket-mismatch.test.ts',
   'preflight.test.ts',
+  'raster-m4-no-software-splitting.test.ts',
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',
   'stop-on-error-override.test.ts',

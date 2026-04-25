@@ -16,9 +16,10 @@
  *
  * This is the minimum distance to accelerate from 0 to v at acceleration a.
  *
- * If acceleration-aware power modulation (Phase 2.6) is enabled, we can
- * technically use zero overscan because power scales with velocity. However
- * we still add a small safety margin because:
+ * If acceleration-aware burn compensation is active (either software-side
+ * splitting or firmware-side dynamic mode such as GRBL M4), we can technically
+ * use zero overscan because power scales with velocity. However we still add
+ * a small safety margin because:
  *   - motion planner may undershoot commanded acceleration
  *   - mechanical lag (belt stretch, backlash) isn't captured in pure kinematics
  *   - real machines benefit from ~0.5-1mm margin
@@ -30,9 +31,9 @@ export interface SmartOverscanInput {
   /** Machine maximum acceleration in mm/s². */
   maxAccelMmPerS2: number;
   /**
-   * Whether acceleration-aware power modulation (Phase 2.6) is enabled.
-   * When true, we can use much less overscan because partial-speed zones
-   * still get proportional power.
+   * Whether acceleration-aware burn compensation is enabled.
+   * When true, partial-speed zones still get proportional power (software
+   * split or firmware dynamic mode), so we can use much less overscan.
    */
   accelAwarePowerEnabled: boolean;
   /**
@@ -70,8 +71,8 @@ export function computeSmartOverscan(input: SmartOverscanInput): SmartOverscanRe
   // Theoretical minimum: s = v² / (2·a)
   const theoreticalMinMm = (v * v) / (2 * a);
 
-  // If accel-aware power is enabled, we could use zero, but a small buffer
-  // still improves real-world results. Use a reduced safety factor in that case.
+  // If accel-aware compensation is enabled, we could use zero, but a small
+  // buffer still improves real-world results. Use a reduced safety factor.
   const effectiveSafetyFactor = input.accelAwarePowerEnabled
     ? Math.max(1.0, safetyFactor * 0.3) // 30% of full safety, min 1.0
     : safetyFactor;

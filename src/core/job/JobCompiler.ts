@@ -48,6 +48,11 @@ export interface CompileJobOptions {
   optimizeOrder?: boolean;
   /** From GRBL $120/$121 (min of X,Y) when connected; overrides profile for raster kinematics. */
   machineAccelMmPerS2?: number | null;
+  /**
+   * Whether active output firmware already applies dynamic laser scaling (for
+   * example GRBL M4). When true, software accel-aware splitting is disabled.
+   */
+  strategySupportsDynamicLaserPower?: boolean;
 }
 
 /** Min/max plausible acceleration (mm/s²) for controller-reported and profile-sourced values. */
@@ -329,8 +334,13 @@ function resolveSettings(
         `No usable profile fallback. Using default ${maxAccelMmPerS2} mm/s².`,
     );
   }
-  const accelAwarePower =
+  const userRequestedAccelAwarePower =
     s.accelAwarePower ?? profile?.accelAwarePower ?? true;
+  // Firmware dynamic power (GRBL M4) and software splitting must not stack.
+  const accelAwarePower =
+    jobOpts?.strategySupportsDynamicLaserPower
+      ? false
+      : userRequestedAccelAwarePower;
   const minPowerRatioAccel =
     s.minPowerRatioAccel ?? profile?.minPowerRatioAccel ?? 0.1;
 

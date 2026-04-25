@@ -99,6 +99,8 @@ export async function compileGcode(
   controllerAccelMmPerS2: number | null = null,
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
+  const strategy = getOutputStrategy(outputFormat);
+  if (!strategy) return null;
 
   if (failedTextObjects.length > 0) {
     console.warn(
@@ -108,6 +110,7 @@ export async function compileGcode(
 
   const job = compileJob(sceneForJob, {
     machineAccelMmPerS2: controllerAccelMmPerS2,
+    strategySupportsDynamicLaserPower: strategy.supportsDynamicLaserPower ?? false,
   });
   if (job.operations.length === 0) return null;
 
@@ -137,9 +140,6 @@ export async function compileGcode(
     originCorner,
     bedHeightMm,
   });
-
-  const strategy = getOutputStrategy(outputFormat);
-  if (!strategy) return null;
 
   const output = strategy.generate(machineTransform.plan, job, {
     startMode,
@@ -211,6 +211,7 @@ export async function compileToolpath(
   controllerAccelMmPerS2: number | null = null,
 ): Promise<CompileToolpathResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
+  const strategy = getOutputStrategy('grbl');
 
   if (failedTextObjects.length > 0) {
     console.warn(
@@ -220,6 +221,7 @@ export async function compileToolpath(
 
   const job = compileJob(sceneForJob, {
     machineAccelMmPerS2: controllerAccelMmPerS2,
+    strategySupportsDynamicLaserPower: strategy?.supportsDynamicLaserPower ?? false,
   });
   if (job.operations.length === 0) return null;
 

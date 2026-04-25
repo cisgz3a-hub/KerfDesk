@@ -15,11 +15,12 @@ import { BaseGCodeStrategy, type OutputFormat, registerOutputStrategy } from './
 export class GrblOutputStrategy extends BaseGCodeStrategy {
   readonly formatId: OutputFormat = 'grbl';
   readonly formatName = 'GRBL 1.1 (G-code)';
+  readonly supportsDynamicLaserPower = true;
 
   /**
    * GRBL uses M4 for dynamic laser mode.
-   * M4 = laser power scales with speed during acceleration.
-   * This prevents burning during acceleration/deceleration.
+   * M4 = firmware scales laser power by current_velocity / programmed_feedrate.
+   * Software-side accel-aware splitting must be disabled in this mode.
    */
   encodeLaserOn(power: number): string {
     return `M4 ${this.encodePowerValue(power)}`;
