@@ -1023,17 +1023,20 @@ export function App() {
     setShowToolpathPreview(p => !p);
   }, []);
 
+  // Clear preview state only when preview mode is actually off or suppressed by a job.
+  useEffect(() => {
+    if (!showToolpathPreview || grbl.isJobRunning) {
+      setToolpathPreviewMoves(null);
+    }
+  }, [showToolpathPreview, grbl.isJobRunning]);
+
   // Toolpath overlay follows the same `scene` as the canvas (fingerprint includes geometry, layers, transforms).
   useEffect(() => {
     // Never recompile during a running job — main-thread stalls starve the
     // WiFi bridge and cause GRBL's planner buffer to drain, silently stopping
     // the machine mid-job. The auto-recompile effect has this same guard.
-    if (grbl.isJobRunning) return;
+    if (grbl.isJobRunning || !showToolpathPreview) return;
 
-    if (!showToolpathPreview) {
-      setToolpathPreviewMoves(null);
-      return;
-    }
     let cancelled = false;
     void compileToolpath(scene).then(m => {
       if (cancelled) return;
