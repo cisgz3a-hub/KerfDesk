@@ -6,6 +6,7 @@ import { type Template } from '../../templates/TemplateLibrary';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { generateId } from '../../core/types';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
+import { requireFeature } from '../../entitlements';
 
 export interface UseGeneratorHandlersParams {
   scene: Scene;
@@ -111,7 +112,12 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
   }, [scene, handleSceneCommit]);
 
   const handleBoxGenerate = commitGeneratedObjects;
-  const handleVariableTextGenerate = commitGeneratedObjects;
+  const handleVariableTextGenerate = useCallback((objects: SceneObject[]) => {
+    if (!requireFeature('variable_text')) {
+      throw new Error('Variable text requires a Pro license');
+    }
+    commitGeneratedObjects(objects);
+  }, [commitGeneratedObjects]);
 
   const handleTemplateSelect = useCallback(async (template: Template) => {
     setShowTemplates(false);

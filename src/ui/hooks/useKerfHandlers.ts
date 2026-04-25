@@ -3,6 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { IDENTITY_MATRIX } from '../../core/types';
 import { offsetObject } from '../../geometry/OffsetPath';
+import { requireFeature } from '../../entitlements';
 
 export interface UseKerfHandlersParams {
   scene: Scene;
@@ -20,6 +21,9 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   const { scene, handleSceneCommit, showAlert } = params;
 
   const handleKerfGenerateTest = useCallback((objects: SceneObject[]) => {
+    if (!requireFeature('kerf_wizard')) {
+      throw new Error('Kerf wizard requires a Pro license');
+    }
     handleSceneCommit({
       ...scene,
       objects: [...scene.objects, ...objects],
@@ -27,6 +31,9 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   }, [scene, handleSceneCommit]);
 
   const handleKerfApply = useCallback(async (offsetMm: number, objectIds: string[]) => {
+    if (!requireFeature('kerf_wizard')) {
+      throw new Error('Kerf wizard requires a Pro license');
+    }
     const idsSet = new Set(objectIds);
     const next: SceneObject[] = [];
     let changed = 0;
@@ -63,6 +70,9 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   }, [scene, handleSceneCommit, showAlert]);
 
   const handleKerfSaveToPreset = useCallback((kerfMm: number) => {
+    if (!requireFeature('kerf_wizard')) {
+      throw new Error('Kerf wizard requires a Pro license');
+    }
     try {
       localStorage.setItem('laserforge_kerf', String(kerfMm));
     } catch { /* ignore */ }

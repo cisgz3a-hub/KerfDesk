@@ -43,6 +43,7 @@ import { getActiveProfile } from '../devices/DeviceProfile';
 import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { computeSmartOverscan } from '../plan/SmartOverscan';
 import { getPresetById } from '../materials/MaterialLibrary';
+import { requireFeature } from '../../entitlements';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -59,6 +60,32 @@ export interface CompileJobOptions {
 const MIN_PLAUSIBLE_ACCEL_MM_PER_S2 = 100;
 const MAX_PLAUSIBLE_ACCEL_MM_PER_S2 = 20000;
 const DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2 = 1000;
+
+interface EntitlementPolicy {
+  allowTabs: boolean;
+  allowOvercut: boolean;
+  allowLeadIn: boolean;
+  allowCrossHatch: boolean;
+  allowPowerScale: boolean;
+  allowCutStartPoint: boolean;
+  droppedFeatures: Set<string>;
+}
+
+function createEntitlementPolicy(): EntitlementPolicy {
+  return {
+    allowTabs: requireFeature('tabs'),
+    allowOvercut: requireFeature('overcut'),
+    allowLeadIn: requireFeature('lead_in'),
+    allowCrossHatch: requireFeature('cross_hatch'),
+    allowPowerScale: requireFeature('power_scale'),
+    allowCutStartPoint: requireFeature('cut_start_point'),
+    droppedFeatures: new Set<string>(),
+  };
+}
+
+function recordDropped(policy: EntitlementPolicy, feature: string, active: boolean): void {
+  if (active) policy.droppedFeatures.add(feature);
+}
 
 function isPlausibleMachineAccel(value: number | null | undefined): boolean {
   return (
@@ -133,6 +160,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   const optimizeOrder = options?.optimizeOrder ?? scene.compileOptions?.optimizeOrder !== false;
   const compileOpts = options;
   const sceneMaterialName = scene.material?.name ?? null;
+  const entitlementPolicy = createEntitlementPolicy();
 
   let totalObjects = 0;
 
@@ -144,7 +172,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of objects) {
           if (!obj.visible || obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
+          const imgOp = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
           if (imgOp) {
             job.operations.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -154,7 +182,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
         continue;
       }
 
-      const operation = compileOperation(layer, objects, sceneMaterialName, compileOpts);
+      const operation = compileOperation(layer, objects, sceneMaterialName, entitlementPolicy, compileOpts);
       if (operation) {
         job.operations.push(operation);
         job.bounds = mergeAABB(job.bounds, operation.bounds);
@@ -177,7 +205,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       if (layer.settings.mode === 'image') {
         for (const obj of orderedObjs) {
           if (obj.geometry.type !== 'image') continue;
-          const imgOp = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
+          const imgOp = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
           if (imgOp) {
             rasterOps.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
@@ -191,7 +219,7 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       const sceneIndexById = new Map(scene.objects.map((o, i) => [o.id, i]));
 
       for (const obj of orderedObjs) {
-        const op = compileOperation(layer, [obj], sceneMaterialName, compileOpts);
+        const op = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
         if (!op) continue;
         if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') continue;
         const shape = vectorOpToOrderableShape(op, phase, sceneIndexById.get(obj.id) ?? 0);
@@ -233,6 +261,12 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   job.metadata.startPositionX = spX;
   job.metadata.startPositionY = spY;
 
+  if (entitlementPolicy.droppedFeatures.size > 0) {
+    console.warn(
+      `[entitlement] Pro features dropped during compile (no Pro license): ${[...entitlementPolicy.droppedFeatures].join(', ')}.`,
+    );
+  }
+
   return job;
 }
 
@@ -242,11 +276,12 @@ function compileOperation(
   layer: Layer,
   objects: SceneObject[],
   sceneMaterialName: string | null,
+  entitlementPolicy: EntitlementPolicy,
   jobOpts?: CompileJobOptions,
 ): Operation | null {
   const type = mapModeToType(layer.settings.mode);
-  const settings = resolveSettings(layer, sceneMaterialName, jobOpts);
-  const geometry = compileGeometry(type, layer, objects);
+  const settings = resolveSettings(layer, sceneMaterialName, entitlementPolicy, jobOpts);
+  const geometry = compileGeometry(type, layer, objects, entitlementPolicy);
 
   if (!geometry) return null;
 
@@ -298,6 +333,7 @@ function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType 
 function resolveSettings(
   layer: Layer,
   sceneMaterialName: string | null,
+  entitlementPolicy: EntitlementPolicy,
   jobOpts?: CompileJobOptions,
 ): ResolvedLaserSettings {
   const s = layer.settings;
@@ -384,6 +420,33 @@ function resolveSettings(
     );
   }
 
+  const tabsActive =
+    s.tabs?.enabled === true
+      ? (Number(s.tabs?.count) || 0) > 0 && (Number(s.tabs?.width) || 0) > 0
+      : s.cut.tabCount > 0 && s.cut.tabWidth > 0;
+  const crossHatchActive = s.fill.mode === 'cross-hatch';
+  recordDropped(entitlementPolicy, 'tabs', !entitlementPolicy.allowTabs && tabsActive);
+  recordDropped(entitlementPolicy, 'overcut', !entitlementPolicy.allowOvercut && s.cut.overcut > 0);
+  recordDropped(entitlementPolicy, 'lead_in', !entitlementPolicy.allowLeadIn && s.cut.leadIn > 0);
+  recordDropped(entitlementPolicy, 'cross_hatch', !entitlementPolicy.allowCrossHatch && crossHatchActive);
+
+  const fillMode =
+    crossHatchActive && !entitlementPolicy.allowCrossHatch
+      ? 'line'
+      : s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line';
+  const tabCount =
+    entitlementPolicy.allowTabs
+      ? s.tabs?.enabled === true
+        ? Math.max(0, Math.floor(Number(s.tabs?.count) || 0))
+        : Math.max(0, Math.floor(s.cut.tabCount))
+      : 0;
+  const tabWidth =
+    entitlementPolicy.allowTabs
+      ? s.tabs?.enabled === true
+        ? Math.max(0, Number(s.tabs?.width) || 0)
+        : Math.max(0, s.cut.tabWidth)
+      : 0;
+
   return {
     powerMin: Math.max(0, Math.min(100, s.power.min)),
     powerMax: Math.max(0, Math.min(100, s.power.max)),
@@ -393,18 +456,14 @@ function resolveSettings(
 
     fillInterval: engraveFillInterval,
     fillAngle: s.fill.angle % 360,
-    fillMode: s.fill.mode === 'offset' || s.fill.mode === 'cross-hatch' ? s.fill.mode : 'line',
+    fillMode,
     fillBiDirectional: s.fill.biDirectional !== false,
     overscanning,
 
-    overcut: Math.max(0, s.cut.overcut),
-    leadIn: Math.max(0, s.cut.leadIn),
-    tabCount: s.tabs?.enabled === true
-      ? Math.max(0, Math.floor(Number(s.tabs?.count) || 0))
-      : Math.max(0, Math.floor(s.cut.tabCount)),
-    tabWidth: s.tabs?.enabled === true
-      ? Math.max(0, Number(s.tabs?.width) || 0)
-      : Math.max(0, s.cut.tabWidth),
+    overcut: entitlementPolicy.allowOvercut ? Math.max(0, s.cut.overcut) : 0,
+    leadIn: entitlementPolicy.allowLeadIn ? Math.max(0, s.cut.leadIn) : 0,
+    tabCount,
+    tabWidth,
     insideFirst: s.cut.insideFirst,
 
     airAssist: s.airAssist,
@@ -452,7 +511,8 @@ function mirrorRasterData(
 function compileGeometry(
   type: OperationType,
   layer: Layer,
-  objects: SceneObject[]
+  objects: SceneObject[],
+  entitlementPolicy: EntitlementPolicy,
 ): OperationGeometry | null {
   if (type === 'raster') {
     const img = layer.settings.image;
@@ -566,7 +626,7 @@ function compileGeometry(
 
   for (const obj of objects) {
     if (!obj.visible) continue;
-    const flatPaths = flattenObject(obj);
+    const flatPaths = flattenObject(obj, entitlementPolicy);
     for (let i = 0; i < flatPaths.length; i++) {
       paths.push(flatPaths[i]);
     }
@@ -585,7 +645,7 @@ function compileGeometry(
  * Converts a SceneObject (with transform) into FlatPath(s)
  * in world coordinates. Strips away all scene graph overhead.
  */
-function flattenObject(obj: SceneObject): FlatPath[] {
+function flattenObject(obj: SceneObject, entitlementPolicy: EntitlementPolicy): FlatPath[] {
   const points = geometryToPoints(obj.geometry);
   if (points.length === 0) return [];
 
@@ -598,12 +658,29 @@ function flattenObject(obj: SceneObject): FlatPath[] {
   return transformed.map(group => {
     let pts = group.points;
     if (group.closed && pts.length > 1) {
-      const idx = (obj.cutStartIndex ?? 0) % pts.length;
+      const hasCutStartPoint = (obj.cutStartIndex ?? 0) !== 0;
+      recordDropped(
+        entitlementPolicy,
+        'cut_start_point',
+        !entitlementPolicy.allowCutStartPoint && hasCutStartPoint,
+      );
+      const idx = entitlementPolicy.allowCutStartPoint ? (obj.cutStartIndex ?? 0) % pts.length : 0;
       if (idx !== 0) {
         pts = [...pts.slice(idx), ...pts.slice(0, idx)];
       }
     }
-    return flatPathFromPoints(pts, group.closed, obj.id, obj.powerScale ?? 1.0);
+    const rawPowerScale = obj.powerScale ?? 1.0;
+    recordDropped(
+      entitlementPolicy,
+      'power_scale',
+      !entitlementPolicy.allowPowerScale && rawPowerScale !== 1.0,
+    );
+    return flatPathFromPoints(
+      pts,
+      group.closed,
+      obj.id,
+      entitlementPolicy.allowPowerScale ? rawPowerScale : 1.0,
+    );
   });
 }
 

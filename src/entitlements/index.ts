@@ -17,3 +17,7 @@ export function hasPro(): boolean {
 export function canUse(feature: ProFeature): boolean {
   return entitlementService.canUse(feature);
 }
+
+export function requireFeature(feature: ProFeature): boolean {
+  return entitlementService.canUse(feature);
+}

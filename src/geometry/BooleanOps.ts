@@ -7,6 +7,7 @@ import polygonClipping from 'polygon-clipping';
 import type { MultiPolygon } from 'polygon-clipping';
 import type { SceneObject } from '../core/scene/SceneObject';
 import type { PathGeometry } from '../core/scene/SceneObject';
+import { requireFeature } from '../entitlements';
 
 type Coord = [number, number];
 type Ring = Coord[];
@@ -189,6 +190,9 @@ export function polygonToPathGeometry(multiPolygon: MultiPolygon): PathGeometry 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
 export function booleanOperation(objA: SceneObject, objB: SceneObject, op: BooleanOp): PathGeometry | null {
+  if (!requireFeature('boolean_ops')) {
+    throw new Error('Boolean operations require a Pro license');
+  }
   const polyA = objectToPolygon(objA);
   const polyB = objectToPolygon(objB);
 

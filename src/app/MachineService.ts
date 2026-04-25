@@ -5,7 +5,7 @@ import { WebSerialPort } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
-import { hasPro } from '../entitlements';
+import { requireFeature } from '../entitlements';
 import {
   createReplay,
   addReplayEntry,
@@ -401,7 +401,7 @@ export class MachineService {
         `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
       this.currentJobLog = jobLog;
 
-      if (hasPro()) {
+      if (requireFeature('job_replay')) {
         const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
           name: l.name,
           mode: l.settings.mode,

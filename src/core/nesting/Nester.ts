@@ -9,6 +9,7 @@
 
 import { type SceneObject } from '../scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
+import { requireFeature } from '../../entitlements';
 
 export interface NestingOptions {
   binWidth: number; // Material width in mm
@@ -61,6 +62,9 @@ export function nestShapes(
   objects: SceneObject[],
   options: NestingOptions,
 ): NestingResult {
+  if (!requireFeature('nesting')) {
+    throw new Error('Nesting requires a Pro license');
+  }
   const {
     binWidth,
     binHeight,
@@ -268,6 +272,9 @@ export function applyNesting(
   objects: SceneObject[],
   result: NestingResult,
 ): SceneObject[] {
+  if (!requireFeature('nesting')) {
+    throw new Error('Nesting requires a Pro license');
+  }
   const updates = new Map<string, NestedItem>();
   for (const item of result.items) {
     updates.set(item.objectId, item);
