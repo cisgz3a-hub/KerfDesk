@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 
 /**
  * Number input that lets you fully clear the field while typing.
@@ -37,22 +37,27 @@ export function NumberInput({
 }: NumberInputProps) {
   const [localValue, setLocalValue] = useState(String(value));
   const [isFocused, setIsFocused] = useState(false);
+  const [lastSyncedValue, setLastSyncedValue] = useState(value);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isFocused) return;
-    const nextStr = Number.isFinite(value)
-      ? (integer ? String(Math.round(value)) : String(value))
-      : String(value);
-    setLocalValue(prev => {
-      const prevNum = parseFloat(prev);
-      if (Number.isFinite(prevNum) && Number.isFinite(value)) {
-        const tolerance = integer ? 0.5 : 1e-4;
-        if (Math.abs(prevNum - value) < tolerance) return prev;
+  // Keep local string state in sync with prop updates when not focused.
+  // React recommends this render-phase adjustment over effect-based syncing.
+  if (!isFocused && value !== lastSyncedValue) {
+    setLastSyncedValue(value);
+    const prevNum = parseFloat(localValue);
+    const isNumericallyEqual =
+      Number.isFinite(prevNum)
+      && Number.isFinite(value)
+      && Math.abs(prevNum - value) < (integer ? 0.5 : 1e-4);
+    if (!isNumericallyEqual) {
+      const nextStr = Number.isFinite(value)
+        ? (integer ? String(Math.round(value)) : String(value))
+        : String(value);
+      if (localValue !== nextStr) {
+        setLocalValue(nextStr);
       }
-      return prev === nextStr ? prev : nextStr;
-    });
-  }, [value, isFocused, integer]);
+    }
+  }
 
   const clamp = (v: number): number => {
     let clamped = v;
