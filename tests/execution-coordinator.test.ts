@@ -73,8 +73,6 @@ void (async () => {
     notifySimulatorRef: notifyRef,
   });
 
-  assert(coord.service === svc, 'service exposes MachineService');
-
   coord.jog('X', 1.5, 2400);
 
   assert(simLines.length === 1 && simLines[0]?.includes('$J=') && simLines[0]?.includes('X1.5'), 'simulator sees $J line');

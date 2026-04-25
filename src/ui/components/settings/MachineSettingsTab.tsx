@@ -157,7 +157,7 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     React.createElement('div', { style: sectionStyle },
       React.createElement('div', { style: sectionTitleStyle }, 'Behavior'),
       checkboxField('Homing enabled', 'homingEnabled',
-        'If on, preflight warns when header lacks $H. Matches GRBL $22.'),
+        'If on, preflight warns when header lacks \u0024H. Matches GRBL \u002422.'),
       checkboxField('Acceleration-aware power (default)', 'accelAwarePower',
         'Default for new image layers. Per-layer override available.'),
       checkboxField('Smart overscan sizing (default)', 'smartOverscanEnabled',

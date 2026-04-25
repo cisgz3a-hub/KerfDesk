@@ -17,6 +17,7 @@ import {
 } from '../../core/preflight/confirmPreflightForJobStart';
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService } from '../../app/MachineService';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { buildFrameCorners } from '../../app/frameGcode';
@@ -805,7 +806,7 @@ export function ConnectionPanelMain({
   }, [canAutoFocus, executionCoordinator, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
 
   const handleUnlock = useCallback(async () => {
-    const classification = machineService.classifyUserCommand('$X');
+    const classification = machineService.classifyUserCommand(GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY);
     const ok = await showConfirm(
       'Dangerous command',
       `${classification.reason}\n\nSend "${classification.command}" anyway?`,

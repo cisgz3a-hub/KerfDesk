@@ -34,6 +34,42 @@ void (async () => {
 
   {
     const sent: string[] = [];
+    let portDisconnectCalls = 0;
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {
+        portDisconnectCalls++;
+      },
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {},
+      emergencyStop: () => {},
+      sendCommand: (cmd: string, _s?: string) => {
+        sent.push(cmd);
+      },
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+    } as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    await svc.disconnect();
+    assert(
+      portDisconnectCalls === 1 && sent[0] === 'M5 S0' && sent.length === 1,
+      'machineService.disconnect: M5 S0 then controller.disconnect (single M5)',
+    );
+  }
+
+  {
+    const sent: string[] = [];
     const mock = {
       protocolName: 'mock',
       state: { ...baseState },
@@ -234,7 +270,8 @@ void (async () => {
     });
     await coord.safeDisconnect();
     assert(stopCalls === 1, 'safeDisconnect calls stop');
-    assert(sent.includes('M5 S0'), 'safeDisconnect sends M5 S0');
+    const m5FromSend = sent.filter(s => s === 'M5 S0').length;
+    assert(m5FromSend === 1, 'safeDisconnect: exactly one M5 (from machineService.disconnect only)');
     assert(disconnectCalls === 1, 'safeDisconnect calls machineService.disconnect');
   }
 
@@ -399,7 +436,10 @@ void (async () => {
       notifySimulatorRef: { current: () => {} },
     });
     await coord.safeDisconnect({ skipStop: true });
-    assert(stopCalls === 0 && sent.includes('M5 S0'), 'skipStop: no stop, still M5');
+    assert(
+      stopCalls === 0 && sent.filter(s => s === 'M5 S0').length === 1,
+      'skipStop: no stop, still one M5 from service.disconnect',
+    );
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

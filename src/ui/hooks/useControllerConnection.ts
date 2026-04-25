@@ -33,6 +33,7 @@ export function useControllerConnection(controllerId: ControllerId = 'grbl') {
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
+      // App-level disconnects use MachineService.disconnect() (laser off + wake lock).
       void controller.disconnect();
     };
   }, [controllerId]);

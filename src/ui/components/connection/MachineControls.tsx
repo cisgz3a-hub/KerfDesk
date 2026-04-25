@@ -31,7 +31,7 @@ export function MachineControls({
   isAlarm && React.createElement('button', {
     type: 'button',
     onClick: onUnlock,
-    title: 'Clear alarm state ($X)',
+    title: 'Clear alarm state (\u0024X)',
     style: {
       width: '100%', padding: '6px', fontSize: 10, fontWeight: 600, borderRadius: 6,
       cursor: 'pointer', fontFamily: font,

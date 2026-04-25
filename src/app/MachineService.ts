@@ -436,7 +436,15 @@ export class MachineService {
 
   async disconnect(): Promise<void> {
     void this.releaseWakeLock();
-    await this.controllerRef.current.disconnect();
+    const ctrl = this.controllerRef.current;
+    if (ctrl) {
+      try {
+        ctrl.sendCommand('M5 S0', 'internal');
+      } catch {
+        /* not connected, buffer full, or port already gone */
+      }
+      await ctrl.disconnect();
+    }
     this.portRef.current = null;
   }
 

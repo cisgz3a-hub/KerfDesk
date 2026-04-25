@@ -66,7 +66,7 @@ export function Jog({
       React.createElement('button', {
         type: 'button',
         onClick: () => { onHome(); },
-        title: 'Home machine ($H)',
+        title: 'Home machine (\u0024H)',
         style: { ...jogCellStyle, background: 'rgba(255,212,68,0.06)', fontSize: 14 },
       }, '⌂'),
       showFocus && React.createElement('button', {

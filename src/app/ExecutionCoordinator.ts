@@ -29,19 +29,12 @@ export interface FrameResult {
 /**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
  *
- * T2-4 migration: methods are moved here from ConnectionPanelMain in phases;
- * prefer calling named methods over {@link service}.
+ * T2-4 migration: machine authority lives here; UI should call these methods
+ * (or go through {@link MachineService} where appropriate) instead of emitting gcode
+ * in components.
  */
 export class ExecutionCoordinator {
   constructor(private readonly deps: ExecutionCoordinatorDeps) {}
-
-  /**
-   * @deprecated Remove by end of T2-4 — use specific coordinator methods. New call
-   * sites should not depend on the full {@link MachineService} surface.
-   */
-  get service(): MachineService {
-    return this.deps.machineService;
-  }
 
   private notifySimulator(line: string): void {
     this.deps.notifySimulatorRef.current(line);
@@ -230,7 +223,6 @@ export class ExecutionCoordinator {
         /* port may already be gone */
       }
     }
-    await this.emergencyLaserOff();
     try {
       await this.deps.machineService.disconnect();
     } catch (err) {
