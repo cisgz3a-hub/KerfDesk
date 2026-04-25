@@ -173,6 +173,18 @@ void (async () => {
       ackRateHz: null,
       expectedAckRateHz: null,
     };
+    const zeroProgress: JobProgress = {
+      linesSent: 0,
+      linesAcknowledged: 0,
+      totalLines: 0,
+      percentComplete: 0,
+      elapsedMs: 0,
+      bufferFill: 0,
+      healthStatus: 'healthy',
+      ackRateHz: null,
+      expectedAckRateHz: null,
+    };
+    await svc.tryFinalizeJobLog(idle, zeroProgress, true, () => {});
     await svc.tryFinalizeJobLog(idle, progress, false, () => {});
 
     assert(

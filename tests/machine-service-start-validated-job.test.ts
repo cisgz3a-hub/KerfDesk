@@ -218,7 +218,18 @@ async function run(): Promise<void> {
       ackRateHz: null,
       expectedAckRateHz: null,
     } as JobProgress;
-
+    const zeroProgress = {
+      linesSent: 0,
+      linesAcknowledged: 0,
+      totalLines: 0,
+      percentComplete: 0,
+      elapsedMs: 0,
+      bufferFill: 0,
+      healthStatus: 'healthy' as const,
+      ackRateHz: null,
+      expectedAckRateHz: null,
+    } as JobProgress;
+    await svc.tryFinalizeJobLog(idle, zeroProgress, true, () => {});
     await svc.tryFinalizeJobLog(idle, progress, false, () => {});
 
     assert(svc.getActiveTicket() === null, 'getActiveTicket null after tryFinalizeJobLog');
@@ -276,11 +287,22 @@ async function run(): Promise<void> {
       ackRateHz: null,
       expectedAckRateHz: null,
     } as JobProgress;
-
+    const zeroProgress = {
+      linesSent: 0,
+      linesAcknowledged: 0,
+      totalLines: 0,
+      percentComplete: 0,
+      elapsedMs: 0,
+      bufferFill: 0,
+      healthStatus: 'healthy' as const,
+      ackRateHz: null,
+      expectedAckRateHz: null,
+    } as JobProgress;
     installMockLocalStorage();
     for (const k of Object.keys(memoryStore)) delete memoryStore[k];
 
-    await svc.tryFinalizeJobLog(ctrl.state, progress, ctrl.isJobRunning, () => {});
+    await svc.tryFinalizeJobLog(idle, zeroProgress, true, () => {});
+    await svc.tryFinalizeJobLog(ctrl.state, progress, false, () => {});
     assert(svc.getActiveTicket() === null, 'finalize clears ticket (Grbl path)');
 
     await ctrl.disconnect();

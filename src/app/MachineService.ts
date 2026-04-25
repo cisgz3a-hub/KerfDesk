@@ -81,6 +81,11 @@ export class MachineService {
    */
   private activeJobCanvasContext: ActiveJobCanvasContext | null = null;
 
+  /** True after we've observed the controller report a running job. Prevents
+   *  tryFinalizeJobLog from treating a brand-new `currentJobLog` as
+   *  "already finished" when a stale React closure still has idle+!running. */
+  private jobObservedRunning = false;
+
   private detachRecording: (() => void) | null = null;
 
   constructor(
@@ -146,6 +151,7 @@ export class MachineService {
     this.currentJobLog = null;
     this.activeTicket = null;
     this.activeJobCanvasContext = null;
+    this.jobObservedRunning = false;
   }
 
   /** Read-only accessor — tests and future phases need to inspect
@@ -253,6 +259,11 @@ export class MachineService {
     const log = this.currentJobLog;
     if (!log || log.status !== 'running') return;
 
+    if (isJobRunning) {
+      this.jobObservedRunning = true;
+    }
+    if (!this.jobObservedRunning) return;
+
     const idle = machineState?.status === 'idle';
     const notRunning = !isJobRunning;
     if (!idle || !notRunning) return;
@@ -285,6 +296,7 @@ export class MachineService {
     this.currentJobLog = null;
     this.activeTicket = null;
     this.activeJobCanvasContext = null;
+    this.jobObservedRunning = false;
   }
 
   /** Start a job from a validated ticket. The ticket carries the
@@ -359,6 +371,7 @@ export class MachineService {
 
     await this.acquireWakeLock();
     try {
+      this.jobObservedRunning = false;
       this.activeTicket = ticket;
       this.activeJobCanvasContext = canvasContext;
 
@@ -415,6 +428,7 @@ export class MachineService {
     } catch (err) {
       this.activeTicket = null;
       this.activeJobCanvasContext = null;
+      this.jobObservedRunning = false;
       void this.releaseWakeLock();
       throw err;
     }

@@ -204,7 +204,18 @@ async function run(): Promise<void> {
       ackRateHz: null,
       expectedAckRateHz: null,
     } as JobProgress;
-
+    const zeroProgress = {
+      linesSent: 0,
+      linesAcknowledged: 0,
+      totalLines: 0,
+      percentComplete: 0,
+      elapsedMs: 0,
+      bufferFill: 0,
+      healthStatus: 'healthy' as const,
+      ackRateHz: null,
+      expectedAckRateHz: null,
+    } as JobProgress;
+    await svc.tryFinalizeJobLog(idle, zeroProgress, true, () => {});
     await svc.tryFinalizeJobLog(idle, progress, false, () => {});
 
     assert(releaseCallCount === 1, 'tryFinalizeJobLog invokes releaseJobWakeLock once');
