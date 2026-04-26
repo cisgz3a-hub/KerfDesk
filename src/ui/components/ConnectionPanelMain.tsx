@@ -971,12 +971,18 @@ export function ConnectionPanelMain({
     machineStatus !== 'idle' &&
     machineStatus !== 'disconnected' &&
     machineStatus !== 'connecting';
+  // T1-59 frame-before-start gate. When T2-64 (advanced-mode setting) lands,
+  // this becomes `const requireFrame = !advancedMode`. Until then, beginner
+  // default = require frame. Prevents wrong-position-burn on confused
+  // origin/saved-origin/mirror configurations.
+  const requireFrame = true;
   const canStartJob =
     !!gcode &&
     !isRunning &&
     !!preflight?.canStart &&
     !gcodeStale &&
-    !machineBlocksJobStart;
+    !machineBlocksJobStart &&
+    (!requireFrame || hasFramed.current);
   /** Human-readable reason the Start button is disabled, or null if ready. */
   const startDisabledReason: string | null = (() => {
     if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
@@ -985,6 +991,9 @@ export function ConnectionPanelMain({
     if (!preflight?.canStart) return 'Fix the issues listed below first';
     if (machineBlocksJobStart) {
       return `Machine is "${machineStatus}" — wait for idle (stop or reset on the controller if needed)`;
+    }
+    if (requireFrame && !hasFramed.current) {
+      return 'Frame the job first (use Frame button) — this confirms where the laser will burn';
     }
     return null; // ready to start
   })();

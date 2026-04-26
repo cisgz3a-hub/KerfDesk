@@ -43,6 +43,7 @@ export function Controls({
       },
         React.createElement('button', {
           type: 'button',
+          'data-testid': 'connection-frame',
           onClick: () => { onFrame(); },
           disabled: !canFrame,
           style: {

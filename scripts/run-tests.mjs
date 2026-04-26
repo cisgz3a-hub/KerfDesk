@@ -126,6 +126,7 @@ const files = [
   'bed-height-resolver-parity.test.ts',
   'fonts.test.ts',
   'frame-gcode-pure.test.ts',
+  'frame-required-before-start.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',

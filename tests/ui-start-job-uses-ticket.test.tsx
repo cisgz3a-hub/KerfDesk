@@ -269,9 +269,22 @@ async function run(): Promise<void> {
     await flush(50);
   });
 
+  // T1-59: Start now requires Frame first. Click the Frame button and let the
+  // simulator-driven frameSafe complete before asserting the Start button enables.
+  // frameSafe streams frame-corner gcode lines with a 50ms gap between each plus
+  // a 200ms idle-poll at the end, so wait long enough for the worst case.
+  const frameBtn = container.querySelector(
+    '[data-testid="connection-frame"]',
+  ) as HTMLButtonElement | null;
+  assert(frameBtn != null, 'frame button present');
+  await act(async () => {
+    frameBtn!.click();
+    await flush(900);
+  });
+
   const btn = container.querySelector('[data-testid="connection-start-job"]') as HTMLButtonElement | null;
   assert(btn != null, 'start button present');
-  assert(btn.disabled === false, 'start enabled (simulator + idle + preflight ok)');
+  assert(btn.disabled === false, 'start enabled (simulator + idle + preflight ok + framed)');
 
   await act(async () => {
     btn.click();
