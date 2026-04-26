@@ -20,12 +20,27 @@ export interface ExecutionCoordinatorDeps {
    */
   readonly controllerRef: MutableRefObject<LaserController | null>;
   readonly notifySimulatorRef: MutableRefObject<(line: string) => void>;
+  /**
+   * Override the test-fire deadman duration. Production should leave this undefined
+   * (defaults to {@link TEST_FIRE_DEADMAN_MS}). Tests may inject a smaller value to
+   * exercise the auto-stop without waiting 5 real seconds.
+   */
+  readonly testFireDeadmanMs?: number;
 }
 
 export interface FrameResult {
   ok: boolean;
   reason?: 'no-controller' | 'idle-timeout';
 }
+
+/**
+ * Hardware-off deadman duration for test-fire. After this many milliseconds the
+ * coordinator forces {@link ExecutionCoordinator.emergencyLaserOff} regardless of
+ * whether the UI requested a stop. T1-18: this guarantee lives in the service so
+ * a hung renderer / lost pointer-capture / unmounted component cannot strand the
+ * laser on. The UI's pointer-up handler is a UX convenience, not a safety guarantee.
+ */
+export const TEST_FIRE_DEADMAN_MS = 5000;
 
 /**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
@@ -35,6 +50,13 @@ export interface FrameResult {
  * in components.
  */
 export class ExecutionCoordinator {
+  /**
+   * Service-owned test-fire deadman timer handle. Non-null while a test-fire is
+   * armed; cleared synchronously before any laser-off path so a re-entrant
+   * stop cannot race with the timer's own laser-off. T1-18.
+   */
+  private _testFireTimerHandle: ReturnType<typeof setTimeout> | null = null;
+
   constructor(private readonly deps: ExecutionCoordinatorDeps) {}
 
   private notifySimulator(line: string): void {
@@ -155,9 +177,11 @@ export class ExecutionCoordinator {
   }
 
   /**
-   * Start test-fire: laser on at low power. Caller must have secured user consent (UI dialog)
-   * and must set up a deadman timer — this method does NOT auto-stop. Pair with {@link endTestFire}
-   * on pointer release or timeout.
+   * Start test-fire: laser on at low power. T1-18: this method owns the deadman.
+   * On successful start, a service-owned timer is armed for {@link TEST_FIRE_DEADMAN_MS}
+   * (or the test-injected override) and will force a laser-off if {@link endTestFire}
+   * is not called first. UI pointer-up / pointer-cancel / unmount handlers should still
+   * call {@link endTestFire} for responsive UX, but they are no longer the safety guarantee.
    *
    * Returns false if no controller (caller should not set isTestFiring UI state in that case).
    */
@@ -169,11 +193,26 @@ export class ExecutionCoordinator {
     this.notifySimulator(cmd);
     try {
       ctrl.sendCommand(cmd, 'internal');
-      return true;
     } catch (err) {
       console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
       return false;
     }
+    // Arm the deadman synchronously after the M3 succeeds so there is no window
+    // in which the laser is on but the auto-stop is unscheduled. Re-entry: clear
+    // any prior handle first (a second beginTestFire resets the timer).
+    if (this._testFireTimerHandle !== null) {
+      clearTimeout(this._testFireTimerHandle);
+      this._testFireTimerHandle = null;
+    }
+    const deadmanMs = this.deps.testFireDeadmanMs ?? TEST_FIRE_DEADMAN_MS;
+    this._testFireTimerHandle = setTimeout(() => {
+      // Clear handle *before* firing the laser-off so a re-entrant endTestFire
+      // during the M5 write does not see a stale handle. T1-18.
+      this._testFireTimerHandle = null;
+      console.warn('[TestFire] deadman expired — forcing laser off');
+      void this.emergencyLaserOff();
+    }, deadmanMs);
+    return true;
   }
 
   /**
@@ -184,8 +223,16 @@ export class ExecutionCoordinator {
     this.laserM5OffSync('[LaserOff] blocked:');
   }
 
-  /** End test-fire: reuse emergency laser-off path. */
+  /**
+   * End test-fire: disarm the deadman, then issue M5. Order matters — disarm
+   * before laser-off so a slow {@link emergencyLaserOff} cannot race with the
+   * timer firing again. Idempotent: safe to call without an active fire. T1-18.
+   */
   async endTestFire(): Promise<void> {
+    if (this._testFireTimerHandle !== null) {
+      clearTimeout(this._testFireTimerHandle);
+      this._testFireTimerHandle = null;
+    }
     await this.emergencyLaserOff();
   }
 

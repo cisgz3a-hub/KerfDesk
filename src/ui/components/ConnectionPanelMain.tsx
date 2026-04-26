@@ -63,8 +63,6 @@ function jobModeLabel(scene: Scene): string {
 
 type StartMode = GcodeStartMode;
 
-/** Backup stop if pointer-up is missed (deadman test fire). */
-const TEST_FIRE_MAX_MS = 5000;
 /** Keep streaming-health banner visible briefly after status recovers (reduces flicker). */
 const STREAMING_WARNING_HOLD_MS = 3000;
 
@@ -258,7 +256,6 @@ export function ConnectionPanelMain({
   const [manualCmd, setManualCmd] = useState('');
   const [isTestFiring, setIsTestFiring] = useState(false);
   const isTestFiringRef = useRef(false);
-  const testFireTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const testFirePointerCaptureRef = useRef<{ pointerId: number; el: HTMLButtonElement } | null>(null);
   const [jobStartTime, setJobStartTime] = useState<number | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -333,10 +330,7 @@ export function ConnectionPanelMain({
     }
     testFirePointerCaptureRef.current = null;
 
-    if (testFireTimeoutRef.current) {
-      clearTimeout(testFireTimeoutRef.current);
-      testFireTimeoutRef.current = null;
-    }
+    // T1-18: deadman timer is owned by ExecutionCoordinator. UI just requests stop.
     void executionCoordinator.endTestFire();
     setIsTestFiring(false);
   }, [executionCoordinator]);
@@ -905,11 +899,6 @@ export function ConnectionPanelMain({
 
       const maxSpindle = activeProfile?.maxSpindle ?? 1000;
 
-      if (testFireTimeoutRef.current) {
-        clearTimeout(testFireTimeoutRef.current);
-        testFireTimeoutRef.current = null;
-      }
-
       try {
         e.currentTarget.setPointerCapture(e.pointerId);
       } catch {
@@ -927,13 +916,13 @@ export function ConnectionPanelMain({
         }
         testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
         setIsTestFiring(true);
-        testFireTimeoutRef.current = setTimeout(() => {
-          testFireTimeoutRef.current = null;
-          stopTestFire();
-        }, TEST_FIRE_MAX_MS);
+        // T1-18: ExecutionCoordinator.beginTestFire arms its own deadman timer.
+        // UI no longer schedules an auto-stop — pointer-up / pointer-cancel /
+        // unmount paths still call stopTestFire for responsive UX, but they are
+        // no longer the safety guarantee.
       });
     },
-    [activeProfile, machineState?.status, executionCoordinator, stopTestFire],
+    [activeProfile, machineState?.status, executionCoordinator],
   );
 
   const endTestFire = useCallback(() => {
