@@ -57,7 +57,7 @@ import { GcodePreview } from './GcodePreview';
 import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
-import { readAutosave, writeAutosave, clearAutosave } from '../../app/autosavePersistence';
+import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -1083,20 +1083,35 @@ export function App() {
     const interval = setInterval(() => {
       if (!sceneIsDirtyRef.current) return;
 
+      let json: string;
       try {
-        const json = serializeForAutosave(scene);
-
-        if (json === lastSavedSceneRef.current) {
-          sceneIsDirtyRef.current = false;
-          return;
-        }
-
-        writeAutosave(json);
-        lastSavedSceneRef.current = json;
-        sceneIsDirtyRef.current = false;
+        json = serializeForAutosave(scene);
       } catch (e) {
-        console.warn('[LaserForge] Autosave failed:', e);
+        console.warn('[LaserForge] Autosave failed (serialize):', e);
+        // Leave sceneIsDirtyRef.current = true so the next tick retries.
+        return;
       }
+
+      if (json === lastSavedSceneRef.current) {
+        sceneIsDirtyRef.current = false;
+        return;
+      }
+
+      // Only clear the dirty flag and advance lastSavedSceneRef AFTER the
+      // underlying storage write resolves. A failed write (quota, fs error,
+      // IPC failure) must leave the project marked dirty so the next tick
+      // retries — otherwise unsaved data is silently lost.
+      void writeAutosaveAsync(json).then(
+        () => {
+          lastSavedSceneRef.current = json;
+          sceneIsDirtyRef.current = false;
+        },
+        (err: unknown) => {
+          console.warn('[LaserForge] Autosave failed:', err);
+          // Intentionally do NOT clear sceneIsDirtyRef and do NOT advance
+          // lastSavedSceneRef — the project remains dirty for retry.
+        },
+      );
     }, 30000);
 
     return () => clearInterval(interval);

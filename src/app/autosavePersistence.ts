@@ -37,6 +37,15 @@ export function writeAutosave(json: string): void {
   });
 }
 
+/**
+ * Write autosave. Awaitable. Rejects if the underlying storage rejects.
+ * Use this when the caller needs to gate post-save state changes (e.g.
+ * clearing a dirty flag) on the write actually succeeding.
+ */
+export async function writeAutosaveAsync(json: string): Promise<void> {
+  await persistAutosave(json);
+}
+
 async function persistAutosave(json: string): Promise<void> {
   await migrateAutosaveFromLocalStorage();
   const storage = getStorage();
