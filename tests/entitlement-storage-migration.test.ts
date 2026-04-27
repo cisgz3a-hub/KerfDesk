@@ -6,7 +6,7 @@ import {
   EntitlementService,
 } from '../src/entitlements/EntitlementService';
 import {
-  DEFAULT_TESTER_HMAC_SECRET,
+  __setTesterHmacSecretForTest,
   TESTER_KEY_MESSAGE_PREFIX,
 } from '../src/entitlements/testerKey';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
@@ -15,6 +15,12 @@ import { setStorageForTest } from '../src/core/storage/storage';
 const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 const LICENSE_CACHE_KEY = 'laserforge_license_cache';
+
+// T1-77: tester HMAC secret is no longer source-controlled. Tests that need
+// to synthesize a valid tester code install a known secret via the test-only
+// injection. Production builds use VITE_TESTER_HMAC_SECRET at build time and
+// builds without it refuse all tester codes.
+const TEST_HMAC_SECRET = 'test-only-secret-for-storage-migration';
 
 let passed = 0;
 let failed = 0;
@@ -60,7 +66,7 @@ async function makeTesterCode(slug: string): Promise<string> {
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
-    enc.encode(DEFAULT_TESTER_HMAC_SECRET),
+    enc.encode(TEST_HMAC_SECRET),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['sign'],
@@ -77,6 +83,10 @@ async function makeTesterCode(slug: string): Promise<string> {
 async function run(): Promise<void> {
   console.log('\n=== entitlement storage migration ===\n');
   installMockLocalStorage();
+  // T1-77: install the test secret so verifyTesterCode accepts our synthesized
+  // tester codes. Production code never calls __setTesterHmacSecretForTest;
+  // this is the test-only path.
+  __setTesterHmacSecretForTest(TEST_HMAC_SECRET);
 
   {
     for (const k of Object.keys(memoryStore)) delete memoryStore[k];
@@ -136,12 +146,14 @@ async function run(): Promise<void> {
   }
 
   setStorageForTest(null);
+  __setTesterHmacSecretForTest(null); // T1-77: clear injection for next test
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 }
 
 void run().catch((err: unknown) => {
   setStorageForTest(null);
+  __setTesterHmacSecretForTest(null);
   console.error(err);
   process.exit(1);
 });

@@ -1,12 +1,33 @@
-/** Must match scripts/generate-tester-key.mjs (message + default secret). */
+/** Must match scripts/generate-tester-key.mjs (message). */
 export const TESTER_KEY_MESSAGE_PREFIX = 'LaserForge|tester|v1|';
 
-export const DEFAULT_TESTER_HMAC_SECRET =
-  'bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1';
+// T1-77: the previous `DEFAULT_TESTER_HMAC_SECRET` export was removed because
+// any string literal in the client bundle is trivially extractable via DevTools
+// or source maps, allowing unlimited valid tester keys to be minted offline.
+// The secret is now strictly env-required (VITE_TESTER_HMAC_SECRET, set at
+// build time) with no source-controlled fallback. Builds that don't set the
+// env var simply refuse all tester codes — correct, because tester program is
+// not a feature for end users.
 
-export function getTesterHmacSecret(): string {
-  const env = (import.meta as ImportMeta & { env?: { VITE_TESTER_HMAC_SECRET?: string } }).env;
-  return env?.VITE_TESTER_HMAC_SECRET ?? DEFAULT_TESTER_HMAC_SECRET;
+let _testHmacSecretOverride: string | null = null;
+
+/**
+ * Test-only injection point. Production code paths never call this; tests
+ * (e.g. tests/entitlement-storage-migration.test.ts) call it to install a
+ * known secret so they can synthesize a valid tester code via the same HMAC
+ * recipe `verifyTesterCode` uses. Calling with `null` clears the override and
+ * restores production resolution (env var only). T1-77.
+ */
+export function __setTesterHmacSecretForTest(secret: string | null): void {
+  _testHmacSecretOverride = secret;
+}
+
+function resolveTesterHmacSecret(): string | null {
+  if (_testHmacSecretOverride !== null) return _testHmacSecretOverride;
+  const env = (import.meta as ImportMeta & {
+    env?: { VITE_TESTER_HMAC_SECRET?: string };
+  }).env;
+  return env?.VITE_TESTER_HMAC_SECRET ?? null;
 }
 
 /** TF-SLUG-HEX8 (hex is first 8 chars of HMAC-SHA256 hex digest). */
@@ -37,10 +58,19 @@ async function hmacSha256Hex(secret: string, message: string): Promise<string> {
 
 export async function verifyTesterCode(code: string): Promise<boolean> {
   if (!crypto.subtle) return false;
+  const secret = resolveTesterHmacSecret();
+  if (!secret) {
+    // T1-77: no tester HMAC secret configured. All tester keys reject.
+    // Production builds that don't set VITE_TESTER_HMAC_SECRET don't ship a
+    // hardcoded fallback (which would be commercial-critically extractable).
+    // Tester program isn't a feature for end users — internal/QA builds set
+    // the env var; production end-user builds don't.
+    return false;
+  }
   const parsed = parseTesterCode(code);
   if (!parsed) return false;
   const message = `${TESTER_KEY_MESSAGE_PREFIX}${parsed.slug}`;
-  const hex = await hmacSha256Hex(getTesterHmacSecret(), message);
+  const hex = await hmacSha256Hex(secret, message);
   const expected = hex.slice(0, 8).toUpperCase();
   return expected === parsed.sig;
 }
