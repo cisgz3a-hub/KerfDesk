@@ -55,6 +55,7 @@ const files = [
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',
+  'packaged-app-no-dev-arg.test.ts',
   'production-bundle-smoke.test.ts',
   'source-maps-not-shipped.test.ts',
   'execution-coordinator.test.ts',

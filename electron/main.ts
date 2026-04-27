@@ -7,8 +7,26 @@ import { storageGet, storageSet, storageRemove, storageList, storageClear } from
 
 let mainWindow: BrowserWindow | null = null;
 
-/** Dev: unpackaged app, or explicit --dev (Vite on localhost:3000) */
-const isDev = !app.isPackaged || process.argv.includes('--dev');
+/**
+ * Renderer source: Vite dev server (unpackaged) vs bundled dist/ (packaged).
+ * T1-85: the previous --dev arg escape hatch was removed. A packaged build
+ * always loads the bundled renderer from dist/. There is no command-line
+ * flag that flips a packaged build into dev mode — that was an attack
+ * surface (any user could run `LaserForge.exe --dev`) for no legitimate
+ * end-user benefit.
+ */
+const isDev = !app.isPackaged;
+
+/**
+ * DevTools control: open automatically for unpackaged dev runs, or when a
+ * support engineer explicitly sets ELECTRON_ENABLE_DEVTOOLS=1 to diagnose a
+ * customer's installed copy. The env var path is intentionally less
+ * discoverable than a command-line flag — it requires deliberate setup,
+ * unlike `LaserForge.exe --dev` which any user could try casually.
+ * Strict equality with '1' only (not any truthy string) so the variable
+ * has to be set deliberately.
+ */
+const shouldOpenDevTools = isDev || process.env.ELECTRON_ENABLE_DEVTOOLS === '1';
 
 // Enable Web Serial API in Electron
 app.commandLine.appendSwitch('enable-features', 'ElectronSerialChooser,WebSerial');
@@ -95,9 +113,15 @@ function createWindow() {
 
   if (isDev) {
     mainWindow.loadURL('http://localhost:3000');
-    mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
     mainWindow.loadFile(path.join(__dirname, '..', 'dist', 'index.html'));
+  }
+
+  // T1-85: DevTools is now its own gate — for a packaged build, only opens
+  // when ELECTRON_ENABLE_DEVTOOLS=1 is explicitly set in the environment.
+  // No more `--dev` arg path.
+  if (shouldOpenDevTools) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
   mainWindow.on('closed', () => {
