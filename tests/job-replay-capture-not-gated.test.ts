@@ -214,10 +214,13 @@ void (async () => {
     `replay.totalLines === ${ticket.gcodeLines.length} (got ${replay.totalLines})`,
   );
 
-  // 5. T1-87 finalized this on the failure path: status='failed', 0 lines.
+  // 5. T1-87 finalized this on the failure path; T2-67 widened the
+  // status union and switched the failed-start path to use the distinct
+  // 'failed_to_start' value (vs reusing 'failed' which is for mid-run
+  // failures). The assertion below pins the post-T2-67 contract.
   assert(
-    replay.status === 'failed',
-    `replay.status === "failed" (T1-87 finalize ran on the throw)`,
+    replay.status === 'failed_to_start',
+    `replay.status === "failed_to_start" (T1-87 finalize + T2-67 enum widening; got "${replay.status}")`,
   );
   assert(
     replay.linesCompleted === 0,
