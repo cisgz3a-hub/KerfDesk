@@ -175,6 +175,13 @@ export interface ConnectionPanelMainProps {
   onSelectMode: (mode: StartMode) => void;
   onSaveOrigin: () => void;
   gcodeStale?: boolean;
+  /**
+   * T1-75: increments when App.tsx applies an undo/redo. The panel watches
+   * this counter via an effect that resets `hasFramed` (the burn bounds may
+   * have changed, so the previous frame action no longer reflects the
+   * current scene). Initial value 0 from App.tsx.
+   */
+  historyVersion?: number;
   onRecompile?: () => void;
   onUpdateLayerMode?: (layerId: string, mode: LayerMode) => void;
   onUpdateLayerFillMode?: (layerId: string, fillMode: FillMode) => void;
@@ -228,6 +235,7 @@ export function ConnectionPanelMain({
   onSelectMode,
   onSaveOrigin,
   gcodeStale = false,
+  historyVersion = 0,
   onRecompile,
   onUpdateLayerMode,
   onUpdateLayerFillMode,
@@ -399,6 +407,17 @@ export function ConnectionPanelMain({
       setWorkflowVersion(v => v + 1);
     }
   }, [isConnected]);
+
+  // T1-75: undo/redo applied by App.tsx. Burn bounds may have changed; the
+  // previous frame action no longer reflects reality. Reset hasFramed so
+  // the T1-59 frame-before-start gate refuses Start until the user re-frames.
+  // workflowVersion bumped so canStartJob re-evaluates the same render.
+  // Mount-time fire (historyVersion === 0) is a no-op since hasFramed is
+  // already false.
+  useEffect(() => {
+    hasFramed.current = false;
+    setWorkflowVersion(v => v + 1);
+  }, [historyVersion]);
 
   jobProgressRef.current = jobProgress;
 

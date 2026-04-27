@@ -560,6 +560,10 @@ export function App() {
   }, [grbl.machineState, machineUi.executionCoordinator]);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
+  // T1-75: bridge counter for ConnectionPanelMain so it can reset hasFramed
+  // (which is encapsulated in the panel) when an undo/redo applied here
+  // changes the scene. Increments on every applyHistoryScene call.
+  const [historyVersion, setHistoryVersion] = useState(0);
   const [productionMode, setProductionMode] = useState<boolean>(() => {
     try {
       return localStorage.getItem('laserforge_production_mode') === 'true';
@@ -1144,15 +1148,36 @@ export function App() {
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 
+  // T1-75: shared application of a history-recovered scene. Undo/redo are
+  // scene mutations from the perspective of "needs save" and they invalidate
+  // any compiled G-code or frame action that was based on the previous scene.
+  // The conservative behavior here (always-mark-dirty) is the audit's
+  // Priority 4; the longer-term content-hash model (audit Priority 3) is
+  // deferred to T2-tier work.
+  const applyHistoryScene = useCallback((nextScene: Scene) => {
+    setScene(nextScene);
+    setSelectedIds(new Set());
+    sceneIsDirtyRef.current = true;
+    // Direct invalidation — the useCompileManager scene-changes-mark-stale
+    // effect early-returns when the connection sidebar is closed, so undoing
+    // while the sidebar is closed would otherwise leave currentGcode stale
+    // in code but fresh in the UI's eyes. Invalidate here unconditionally.
+    setGcodeStale(true);
+    // Bridge to ConnectionPanelMain — it watches this counter and resets
+    // hasFramed.current = false. The previous frame action no longer
+    // reflects the now-recovered scene's burn bounds.
+    setHistoryVersion(v => v + 1);
+  }, [setGcodeStale]);
+
   const handleUndo = useCallback(() => {
     const prev = historyRef.current.undo();
-    if (prev) { setScene(prev); setSelectedIds(new Set()); }
-  }, []);
+    if (prev) applyHistoryScene(prev);
+  }, [applyHistoryScene]);
 
   const handleRedo = useCallback(() => {
     const next = historyRef.current.redo();
-    if (next) { setScene(next); setSelectedIds(new Set()); }
-  }, []);
+    if (next) applyHistoryScene(next);
+  }, [applyHistoryScene]);
 
   const handleSelectAll = useCallback(() => {
     const allIds = new Set(scene.objects.filter(o => o.visible && !o.locked).map(o => o.id));
@@ -1751,6 +1776,7 @@ export function App() {
         onSelectMode: (mode) => handleSelectStartMode(mode, machinePositionForStartWizard ?? scene.startPosition),
         onSaveOrigin: handleSaveOrigin,
         gcodeStale,
+        historyVersion,
         onRecompile: handleConnectionRecompile,
         onUpdateLayerMode: handleConnectionUpdateLayerMode,
         onUpdateLayerFillMode: handleConnectionUpdateLayerFillMode,
