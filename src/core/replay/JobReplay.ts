@@ -15,7 +15,7 @@ export interface JobReplay {
   id: string;
   startedAt: string;         // ISO date
   completedAt: string | null;
-  status: 'running' | 'completed' | 'failed' | 'stopped';
+  status: 'running' | 'completed' | 'failed' | 'failed_to_start' | 'stopped';
 
   // What was sent
   jobName: string;
@@ -96,7 +96,7 @@ export function addReplayEntry(
  */
 export function finalizeReplay(
   replay: JobReplay,
-  status: 'completed' | 'failed' | 'stopped',
+  status: 'completed' | 'failed' | 'failed_to_start' | 'stopped',
   linesCompleted: number,
 ): void {
   replay.completedAt = new Date().toISOString();

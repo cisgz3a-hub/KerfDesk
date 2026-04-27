@@ -63,13 +63,13 @@ export function JobLogViewer({ onLoadLog, showConfirm }: JobLogViewerProps) {
           style: {
             padding: '8px 10px', marginBottom: 4,
             background: '#0a0a14', borderRadius: 6,
-            border: `1px solid ${log.status === 'completed' ? '#1a2e1a' : log.status === 'failed' ? '#2e1a1a' : '#1a1a2e'}`,
+            border: `1px solid ${log.status === 'completed' ? '#1a2e1a' : (log.status === 'failed' || log.status === 'failed_to_start') ? '#2e1a1a' : '#1a1a2e'}`,
             fontSize: 10, cursor: 'pointer',
           },
           onClick: () => {
             onLoadLog([
               `═══ JOB REPLAY: ${log.projectName} ═══`,
-              `Status: ${log.status.toUpperCase()}`,
+              `Status: ${log.status.replace(/_/g, ' ').toUpperCase()}`,
               `Started: ${new Date(log.startedAt).toLocaleString()}`,
               `Duration: ${(log.actualDuration / 1000).toFixed(0)}s`,
               `Lines: ${log.linesCompleted}/${log.gcodeLines}`,
@@ -86,8 +86,8 @@ export function JobLogViewer({ onLoadLog, showConfirm }: JobLogViewerProps) {
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 2 } },
             React.createElement('span', { style: { color: '#e0e0ec', fontWeight: 500 } }, log.projectName),
             React.createElement('span', {
-              style: { color: log.status === 'completed' ? '#2dd4a0' : log.status === 'failed' ? '#ff4466' : '#ffd444', fontWeight: 600 },
-            }, log.status.toUpperCase()),
+              style: { color: log.status === 'completed' ? '#2dd4a0' : (log.status === 'failed' || log.status === 'failed_to_start') ? '#ff4466' : '#ffd444', fontWeight: 600 },
+            }, log.status.replace(/_/g, ' ').toUpperCase()),
           ),
           React.createElement('div', { style: { color: '#555570', display: 'flex', gap: 8 } },
             React.createElement('span', null, new Date(log.startedAt).toLocaleDateString()),

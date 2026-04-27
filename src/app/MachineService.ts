@@ -500,8 +500,11 @@ export class MachineService {
         // construction (matches the convention at the success-finalize
         // path elsewhere in this file).
         //
-        // Status 'failed' is reused here as a stopgap. T2-67 (job outcome
-        // enum) will introduce a distinct 'failed_to_start' value.
+        // T2-67 closed T1-87's stopgap: failed-start jobs are finalized
+        // with the distinct 'failed_to_start' status (added to JobLog and
+        // JobReplay status unions) instead of reusing 'failed'. This lets
+        // the log viewer and support tooling distinguish jobs that never
+        // started from jobs that ran-and-then-failed mid-stream.
         //
         // Order: addLogEntry BEFORE finalizeLog. finalizeLog doesn't read
         // log.errors today, but if it ever does, having the error entry
@@ -513,7 +516,7 @@ export class MachineService {
             'error',
             `Job failed to start: ${err instanceof Error ? err.message : String(err)}`,
           );
-          finalizeLog(log, 'failed', 0);
+          finalizeLog(log, 'failed_to_start', 0);
           void saveJobLog(log).catch(saveErr => {
             console.warn('[MachineService] T1-87: failed to save failed-start log:', saveErr);
           });
@@ -521,7 +524,7 @@ export class MachineService {
 
         const replay = this.activeReplay;
         if (replay) {
-          finalizeReplay(replay, 'failed', 0);
+          finalizeReplay(replay, 'failed_to_start', 0);
           saveReplay(replay);
         }
 

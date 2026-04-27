@@ -9,13 +9,16 @@
  * jobs, because they expose mismatches between app state and machine
  * state).
  *
- * Fix: before nullifying, finalize the partial log with status='failed' +
- * linesCompleted=0, add an 'error' entry with the throw message, and
- * fire-and-forget save it to storage. Same for the replay. Save failures
- * are caught and warned, never block cleanup or the rethrow.
+ * Fix: before nullifying, finalize the partial log with status =
+ * 'failed_to_start' + linesCompleted=0, add an 'error' entry with the
+ * throw message, and fire-and-forget save it to storage. Same for the
+ * replay. Save failures are caught and warned, never block cleanup or
+ * the rethrow.
  *
- * Status 'failed' is reused (vs a distinct 'failed_to_start') as a stopgap
- * until T2-67 (job outcome enum) widens the union.
+ * T2-67 closed the original T1-87 stopgap: failed-start jobs are
+ * finalized with the distinct 'failed_to_start' status (added to the
+ * JobLog and JobReplay status unions) instead of reusing 'failed'.
+ * This test asserts the new value.
  *
  * Run: npx tsx tests/failed-start-persists-log.test.ts
  */
@@ -199,8 +202,11 @@ void (async () => {
     assert(logs.length === 1, `exactly one job log persisted (got ${logs.length})`);
     const log = logs[0]!;
 
-    // 4. Status reflects failure.
-    assert(log.status === 'failed', `log.status === "failed" (got "${log.status}")`);
+    // 4. Status reflects failure-to-start (distinct from mid-run 'failed').
+    assert(
+      log.status === 'failed_to_start',
+      `log.status === "failed_to_start" (got "${log.status}")`,
+    );
 
     // 5. linesCompleted is zero — by definition the job didn't start.
     assert(
@@ -255,7 +261,10 @@ void (async () => {
       `replay persisted on failed start (got ${replays.length})`,
     );
     const replay = replays[0]!;
-    assert(replay.status === 'failed', `replay.status === "failed" (got "${replay.status}")`);
+    assert(
+      replay.status === 'failed_to_start',
+      `replay.status === "failed_to_start" (got "${replay.status}")`,
+    );
     assert(
       replay.linesCompleted === 0,
       `replay.linesCompleted === 0 (got ${replay.linesCompleted})`,

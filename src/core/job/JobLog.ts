@@ -14,7 +14,7 @@ export interface JobLog {
   id: string;
   startedAt: string;          // ISO 8601
   completedAt: string | null;
-  status: 'running' | 'completed' | 'failed' | 'stopped';
+  status: 'running' | 'completed' | 'failed' | 'failed_to_start' | 'stopped';
 
   // Job context
   projectName: string;
@@ -137,7 +137,7 @@ export function addLogEntry(
 /** Finalize the log */
 export function finalizeLog(
   log: JobLog,
-  status: 'completed' | 'failed' | 'stopped',
+  status: 'completed' | 'failed' | 'failed_to_start' | 'stopped',
   linesCompleted: number,
 ): void {
   log.completedAt = new Date().toISOString();
