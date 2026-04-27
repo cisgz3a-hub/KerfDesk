@@ -105,6 +105,7 @@ const files = [
   'numberinput-focused-not-overridden.test.tsx',
   'falcon-serial-profile.test.ts',
   'falcon-autofocus-heal.test.ts',
+  'falcon-ws-frame-cap.test.ts',
   'material-preset-schema.test.ts',
   'material-library-storage.test.ts',
   'material-presets-storage.test.ts',

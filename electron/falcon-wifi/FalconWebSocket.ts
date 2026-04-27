@@ -33,6 +33,18 @@ const RECONNECT_BACKOFF_MS = 5_000;
 const MAX_RECONNECT_ATTEMPTS = 5;
 const HANDSHAKE_TIMEOUT_MS = 10_000;
 
+// T1-94: practical caps for incoming WebSocket data. The Falcon protocol
+// uses small JSON messages (typically a few hundred bytes). 256 KB per
+// frame is generous; 1 MB buffer accommodates handshake responses,
+// pipelined frames, and slow consumers. A peer that violates either cap
+// is treated as hostile or broken — the connection is closed and a
+// reconnect is scheduled. Persistent attackers continue to disconnect by
+// design; they cannot accumulate memory in our process. Replaces the
+// previous 9-petabyte (MAX_SAFE_INTEGER) cap that allowed unbounded
+// buffer growth from a malicious local-network actor.
+const MAX_WS_FRAME_BYTES = 256 * 1024;
+const MAX_WS_BUFFER_BYTES = 1024 * 1024;
+
 /** Public handle returned to callers so they can gracefully close. */
 export interface FalconWsHandle {
   readonly ip: string;
@@ -184,11 +196,21 @@ export function connectFalconWebSocket(
         if (state.buffer.length < 4) return;
         len = state.buffer.readUInt16BE(2);
         hlen = 4;
+        // T1-94: cap the 16-bit length path. Range is up to 65535, well
+        // under MAX_WS_FRAME_BYTES today, but the check belongs here for
+        // defense-in-depth in case the cap ever drops below 64 KB.
+        if (len > MAX_WS_FRAME_BYTES) {
+          destroySocket();
+          scheduleReconnect('oversized frame');
+          return;
+        }
       } else if (len === 127) {
         if (state.buffer.length < 10) return;
         const big = state.buffer.readBigUInt64BE(2);
-        if (big > BigInt(Number.MAX_SAFE_INTEGER)) {
-          // Absurd frame size; reset and let reconnect handle it.
+        // T1-94: replaces the previous MAX_SAFE_INTEGER (~9 PB) check —
+        // a 1 GB-claimed frame previously passed and let state.buffer
+        // grow unbounded as the parser waited for more data.
+        if (big > BigInt(MAX_WS_FRAME_BYTES)) {
           destroySocket();
           scheduleReconnect('oversized frame');
           return;
@@ -282,6 +304,16 @@ export function connectFalconWebSocket(
     }, HANDSHAKE_TIMEOUT_MS);
 
     socket.on('data', (chunk: Buffer) => {
+      // T1-94: enforce buffer cap before concat. Without this, a peer
+      // that drips bytes without ever forming a complete frame would
+      // grow state.buffer unbounded, OOMing the renderer. Hits both
+      // pre-handshake (HTTP response accumulation) and post-handshake
+      // (frame accumulation) attack shapes with one check.
+      if (state.buffer.length + chunk.length > MAX_WS_BUFFER_BYTES) {
+        destroySocket();
+        scheduleReconnect('buffer overflow');
+        return;
+      }
       state.buffer = Buffer.concat([state.buffer, chunk]);
       if (!state.handshakeComplete) {
         const end = state.buffer.indexOf('\r\n\r\n');
