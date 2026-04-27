@@ -5,7 +5,8 @@ import { WebSerialPort } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
-import { requireFeature } from '../entitlements';
+// T1-88: requireFeature import removed — the only consumer was the
+// job_replay capture gate, which is now always-on.
 import {
   createReplay,
   addReplayEntry,
@@ -459,27 +460,29 @@ export class MachineService {
         `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
       this.currentJobLog = jobLog;
 
-      if (requireFeature('job_replay')) {
-        const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
-          name: l.name,
-          mode: l.settings.mode,
-          power: l.settings.power.max,
-          speed: l.settings.speed,
-          passes: l.settings.passes,
-        }));
-        this.activeReplay = createReplay(
-          scene.metadata?.name || 'Untitled',
-          lines.length,
-          {
-            layers: layerSettings,
-            material: scene.material?.name || null,
-            machineType: scene.machine?.type || null,
-          },
-          estimate ? estimate.totalSeconds * 1000 : null,
-        );
-      } else {
-        this.activeReplay = null;
-      }
+      // T1-88: replay capture is no longer Pro-gated. Capture is a
+      // diagnostic tool for support; gating it behind Pro means free users
+      // get worse support, which is both unfair and bad for conversion.
+      // Visualization (the actual product) can be Pro-gated at the consumer
+      // side when a JobReplayViewer component is built. The replay payload
+      // is bounded by the existing MAX_RETAINED_REPLAYS=20 cap.
+      const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
+        name: l.name,
+        mode: l.settings.mode,
+        power: l.settings.power.max,
+        speed: l.settings.speed,
+        passes: l.settings.passes,
+      }));
+      this.activeReplay = createReplay(
+        scene.metadata?.name || 'Untitled',
+        lines.length,
+        {
+          layers: layerSettings,
+          material: scene.material?.name || null,
+          machineType: scene.machine?.type || null,
+        },
+        estimate ? estimate.totalSeconds * 1000 : null,
+      );
 
       for (const line of lines) notifySimulatorTx(line);
       await this.controllerRef.current.sendJob(lines);

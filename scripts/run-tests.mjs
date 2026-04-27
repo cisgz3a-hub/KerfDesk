@@ -87,6 +87,7 @@ const files = [
   'machine-service-start-validated-job.test.ts',
   'machine-service-job-lifecycle-safety.test.ts',
   'failed-start-persists-log.test.ts',
+  'job-replay-capture-not-gated.test.ts',
   'start-validated-job-passes-context.test.ts',
   'active-job-canvas-context-pinned.test.ts',
   'active-job-canvas-context-cleared.test.ts',

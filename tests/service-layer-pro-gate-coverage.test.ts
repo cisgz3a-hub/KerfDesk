@@ -50,11 +50,10 @@ const REQUIRED_GATES: Array<{
     feature: 'material_test',
     patterns: [/requireFeature\('material_test'\)/],
   },
-  {
-    file: 'src/app/MachineService.ts',
-    feature: 'job_replay',
-    patterns: [/requireFeature\('job_replay'\)/],
-  },
+  // T1-88: the MachineService.ts / job_replay gate was removed. Replay
+  // capture is now always-on (a diagnostic tool, not a Pro feature).
+  // When a viewer/export UI is added, its own Pro gate (e.g.
+  // job_replay_viewer) can be re-listed here.
 ];
 
 const ALLOWLISTED_EXCEPTIONS = [

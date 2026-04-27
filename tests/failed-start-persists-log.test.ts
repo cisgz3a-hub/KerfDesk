@@ -243,15 +243,22 @@ void (async () => {
       `at least one entry mentions ticket ID ${ticket.ticketId} (got ${ticketMentions.length})`,
     );
 
-    // 10. Replay is Pro-gated (createReplay only fires if requireFeature
-    // 'job_replay'). In this test environment there's no entitlement, so
-    // activeReplay stays null and the new catch's `if (replay)` guard
-    // correctly skips saveReplay. Verify no replay was attempted (proving
-    // we don't accidentally save a non-existent replay).
+    // 10. Replay was created and persisted. T1-88 made replay capture
+    // always-on (no longer Pro-gated), so even in this test environment
+    // with no entitlement, the activeReplay is created during
+    // startValidatedJob and the new T1-87 catch block finalizes + saves it
+    // when sendJob throws. Pre-T1-88 this assertion was the inverse
+    // (replays.length === 0 because the gate prevented creation).
     const replays = await loadReplays();
     assert(
-      replays.length === 0,
-      `no replay persisted when feature gate not satisfied (got ${replays.length})`,
+      replays.length === 1,
+      `replay persisted on failed start (got ${replays.length})`,
+    );
+    const replay = replays[0]!;
+    assert(replay.status === 'failed', `replay.status === "failed" (got "${replay.status}")`);
+    assert(
+      replay.linesCompleted === 0,
+      `replay.linesCompleted === 0 (got ${replay.linesCompleted})`,
     );
 
     setStorageForTest(null);
