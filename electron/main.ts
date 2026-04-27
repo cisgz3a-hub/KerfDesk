@@ -242,7 +242,15 @@ ipcMain.handle('dialog:open', async () => {
   }
 
   const content = fs.readFileSync(filePath, 'utf-8');
-  return { filePath, content, ext };
+  // T1-93: return basename only, not the absolute filePath. The full path
+  // leaks the username and folder structure across the IPC boundary —
+  // every renderer caller, every future log line, every future support
+  // bundle (T2-108) would carry "C:\\Users\\johanns\\..." or
+  // "/Users/jane/Desktop/secret_design.svg". The renderer doesn't need
+  // the full path for any current feature; if a future feature truly
+  // needs it (recent-files with "open from same folder"), expose it via
+  // a separate explicit IPC with user opt-in.
+  return { fileName: path.basename(filePath), content, ext };
 });
 
 function assertNonEmptyString(value: unknown, label: string): asserts value is string {

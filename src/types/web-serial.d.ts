@@ -6,7 +6,7 @@ declare global {
   interface ElectronAPI {
     saveFile?: (defaultName: string, content: string) => Promise<boolean>;
     saveGcode?: (defaultName: string, content: string) => Promise<boolean>;
-    openFile?: () => Promise<{ filePath: string; content: string; ext: string } | null>;
+    openFile?: () => Promise<{ fileName: string; content: string; ext: string } | null>;
     isElectron?: boolean;
     listPorts?: () => Promise<{ path: string; manufacturer?: string }[]>;
     connectPort?: (portPath: string, baudRate: number) => Promise<boolean>;
