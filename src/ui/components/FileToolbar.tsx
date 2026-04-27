@@ -232,11 +232,26 @@ export function FileToolbar({
   const handleSave = useCallback(async () => {
     try {
       await saveSceneToFile(scene);
-      onAfterSuccessfulFileSave?.();
     } catch (e) {
       await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
+      return;
     }
-  }, [scene, showAlert, onAfterSuccessfulFileSave]);
+    // T1-69: saveSceneToFile resolves on a.click() dispatch — not on actual
+    // disk write. Browser-side download blockers, cancelled Save As dialogs,
+    // disk-full and permission errors are all invisible to us. Until we have
+    // a confirmed-write path (File System Access API / Electron fs), we ask
+    // the user to verify before clearing the dirty flag.
+    const ok = await showConfirm(
+      'File saved?',
+      'Make sure your browser saved the file. The app cannot confirm browser '
+      + 'downloads.\n\nClick Yes if the file saved successfully. Click No if '
+      + 'the download did not complete and you want to try again.',
+    );
+    if (ok) {
+      onAfterSuccessfulFileSave?.();
+    }
+    // On No: dirty stays true; user can retry via Save again.
+  }, [scene, showAlert, showConfirm, onAfterSuccessfulFileSave]);
 
   const handleOpenClick = useCallback(() => {
     openInputRef.current?.click();

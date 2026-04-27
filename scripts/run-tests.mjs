@@ -38,6 +38,7 @@ const files = [
   'autosave-storage.test.ts',
   'autosave-preserves-images.test.ts',
   'autosave-dirty-flag-on-failure.test.ts',
+  'manual-save-needs-acknowledgement.test.ts',
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
