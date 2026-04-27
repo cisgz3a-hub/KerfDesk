@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker } from 'electron';
+import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
@@ -89,6 +89,30 @@ app.on('web-contents-created', (_, contents) => {
   contents.session.setDevicePermissionHandler((details) => {
     return details.deviceType === 'serial';
   });
+
+  // T1-90: belt-and-suspenders navigation hardening for ANY WebContents
+  // (main window, future child windows, future webview tags should we
+  // ever enable them). The main window also has these handlers
+  // installed in createWindow() — registering twice is idempotent for
+  // setWindowOpenHandler (last call wins) and additive but harmless for
+  // will-navigate (both fire; both event.preventDefault calls are no-
+  // ops if any earlier handler already prevented). The duplication is
+  // intentional: if a future code path creates a WebContents WITHOUT
+  // going through createWindow(), this catches it.
+  contents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  contents.on('will-navigate', (event, url) => {
+    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isAppFile = !isDev && url.startsWith('file://');
+    if (!isDevServer && !isAppFile) {
+      event.preventDefault();
+    }
+  });
 });
 
 function createWindow() {
@@ -110,6 +134,35 @@ function createWindow() {
 
   mainWindow.setMenuBarVisibility(false);
   mainWindow.removeMenu();
+
+  // T1-90: navigation hardening on the main window. Without these, the
+  // renderer can: window.open('https://attacker.com') opens a new window
+  // with full Chromium chrome and no preload bridge restrictions; a
+  // target=_blank link opens externally with no guard; location.href =
+  // 'javascript:...' or other navigation escape may load attacker
+  // content into our trusted origin. For a packaged Electron app, every
+  // navigation attempt should be blocked or routed through the OS
+  // browser explicitly.
+  //
+  // Belt-and-suspenders for any child WebContents (printers, future
+  // dialogs, etc.) lives in the existing app.on('web-contents-created')
+  // handler above.
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // http(s) URLs open in the user's OS browser; everything else
+    // (file://, javascript:, chrome:, mailto:, custom schemes) denied.
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isAppFile = !isDev && url.startsWith('file://');
+    if (!isDevServer && !isAppFile) {
+      event.preventDefault();
+    }
+  });
 
   // Content Security Policy — reduces XSS impact in the renderer
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {

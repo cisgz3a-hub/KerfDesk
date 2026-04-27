@@ -53,6 +53,7 @@ const files = [
   'storage-ipc-no-broad-clear.test.ts',
   'dialog-open-file-size-limit.test.ts',
   'dialog-open-no-full-path.test.ts',
+  'electron-navigation-blocked.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'tester-verification-no-secret.test.ts',
