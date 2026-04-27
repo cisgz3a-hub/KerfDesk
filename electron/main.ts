@@ -28,6 +28,29 @@ const isDev = !app.isPackaged;
  */
 const shouldOpenDevTools = isDev || process.env.ELECTRON_ENABLE_DEVTOOLS === '1';
 
+// T1-92: per-extension size caps applied before fs.readFileSync. Without
+// this, a 5 GB SVG selected from the dialog blocks the main process for
+// many seconds, allocates a 5 GB string, and ships it over IPC. Even a
+// well-meaning user with a misconfigured CAD exporter could freeze or
+// crash the app. Each cap is sized for legitimate content of that type:
+// SVG/DXF rarely exceed a few MB; G-code can be tens of MB for fine work
+// on a big bed; project JSON tracks scene + history at modest size.
+//
+// Note on .laserforge.json: path.extname("project.laserforge.json")
+// returns ".json", so a separate ".laserforge.json" entry would never
+// match. The ".json" cap covers project files identically.
+const MAX_FILE_BYTES_BY_EXTENSION: Record<string, number> = {
+  '.json':  50 * 1024 * 1024,
+  '.svg':   25 * 1024 * 1024,
+  '.dxf':   25 * 1024 * 1024,
+  '.gcode': 100 * 1024 * 1024,
+  '.nc':    100 * 1024 * 1024,
+  '.png':   100 * 1024 * 1024,
+  '.jpg':   100 * 1024 * 1024,
+  '.jpeg':  100 * 1024 * 1024,
+};
+const DEFAULT_MAX_FILE_BYTES = 50 * 1024 * 1024;
+
 // Enable Web Serial API in Electron
 app.commandLine.appendSwitch('enable-features', 'ElectronSerialChooser,WebSerial');
 
@@ -203,8 +226,23 @@ ipcMain.handle('dialog:open', async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return null;
   const filePath = result.filePaths[0];
+  const ext = path.extname(filePath).toLowerCase();
+
+  // T1-92: cap file size before reading. The check fires after the dialog
+  // resolves so the user has already deliberately selected the file —
+  // they get a useful error message naming the size, limit, and ext.
+  const stat = fs.statSync(filePath);
+  const limit = MAX_FILE_BYTES_BY_EXTENSION[ext] ?? DEFAULT_MAX_FILE_BYTES;
+  if (stat.size > limit) {
+    const sizeMB = (stat.size / (1024 * 1024)).toFixed(1);
+    const limitMB = (limit / (1024 * 1024)).toFixed(0);
+    throw new Error(
+      `File too large: ${sizeMB} MB. Maximum for ${ext || 'this file type'} is ${limitMB} MB.`,
+    );
+  }
+
   const content = fs.readFileSync(filePath, 'utf-8');
-  return { filePath, content, ext: path.extname(filePath).toLowerCase() };
+  return { filePath, content, ext };
 });
 
 function assertNonEmptyString(value: unknown, label: string): asserts value is string {

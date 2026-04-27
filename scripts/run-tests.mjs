@@ -51,6 +51,7 @@ const files = [
   'storage-adapter-contract.test.ts',
   'storage-filesystem-unit.test.ts',
   'storage-ipc-no-broad-clear.test.ts',
+  'dialog-open-file-size-limit.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'tester-verification-no-secret.test.ts',
