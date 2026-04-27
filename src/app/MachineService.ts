@@ -485,6 +485,43 @@ export class MachineService {
       await this.controllerRef.current.sendJob(lines);
     } catch (err) {
       if (this.activeJobSessionId === sessionId) {
+        // T1-87: persist the partial log/replay before clearing refs so
+        // support can investigate failed starts. Without this, a thrown
+        // sendJob silently nullified currentJobLog/activeReplay — losing
+        // the lines that did go out before the throw, the machine state
+        // captured at job start, and the throw error itself.
+        //
+        // Best-effort save: a save failure must NOT block cleanup or the
+        // rethrow. saveJobLog returns a promise; we attach .catch and
+        // discard the rest with `void`. saveReplay is fire-and-forget by
+        // construction (matches the convention at the success-finalize
+        // path elsewhere in this file).
+        //
+        // Status 'failed' is reused here as a stopgap. T2-67 (job outcome
+        // enum) will introduce a distinct 'failed_to_start' value.
+        //
+        // Order: addLogEntry BEFORE finalizeLog. finalizeLog doesn't read
+        // log.errors today, but if it ever does, having the error entry
+        // already counted is the forward-compatible choice.
+        const log = this.currentJobLog;
+        if (log) {
+          addLogEntry(
+            log,
+            'error',
+            `Job failed to start: ${err instanceof Error ? err.message : String(err)}`,
+          );
+          finalizeLog(log, 'failed', 0);
+          void saveJobLog(log).catch(saveErr => {
+            console.warn('[MachineService] T1-87: failed to save failed-start log:', saveErr);
+          });
+        }
+
+        const replay = this.activeReplay;
+        if (replay) {
+          finalizeReplay(replay, 'failed', 0);
+          saveReplay(replay);
+        }
+
         this.activeReplay = null;
         this.currentJobLog = null;
         this.activeTicket = null;
