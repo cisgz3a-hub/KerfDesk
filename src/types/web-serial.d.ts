@@ -17,7 +17,7 @@ declare global {
     storageSet?: (key: string, value: string) => Promise<void>;
     storageRemove?: (key: string) => Promise<void>;
     storageList?: (prefix?: string) => Promise<string[]>;
-    storageClear?: () => Promise<void>;
+    // T1-84: storageClear was removed from the IPC.
     acquireJobWakeLock?: () => Promise<number>;
     releaseJobWakeLock?: () => Promise<void>;
   }

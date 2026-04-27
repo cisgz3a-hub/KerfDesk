@@ -19,7 +19,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('storage:set', key, value) as Promise<void>,
   storageRemove: (key: string) => ipcRenderer.invoke('storage:remove', key) as Promise<void>,
   storageList: (prefix?: string) => ipcRenderer.invoke('storage:list', prefix) as Promise<string[]>,
-  storageClear: () => ipcRenderer.invoke('storage:clear') as Promise<void>,
+  // T1-84: storageClear removed. See electron/main.ts for the explanation.
   acquireJobWakeLock: () =>
     ipcRenderer.invoke('power:acquireJobWakeLock') as Promise<number>,
   releaseJobWakeLock: () =>

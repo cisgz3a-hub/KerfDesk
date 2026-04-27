@@ -8,15 +8,15 @@ function isStorageIpc(api: unknown): api is {
   storageSet: (key: string, value: string) => Promise<void>;
   storageRemove: (key: string) => Promise<void>;
   storageList: (prefix?: string) => Promise<string[]>;
-  storageClear: () => Promise<void>;
+  // T1-84: storageClear no longer required (or accepted) on the IPC
+  // contract. The guard accepts shapes that don't expose bulk clear.
 } {
   if (!api || typeof api !== 'object') return false;
   const typed = api as Record<string, unknown>;
   return typeof typed.storageGet === 'function'
     && typeof typed.storageSet === 'function'
     && typeof typed.storageRemove === 'function'
-    && typeof typed.storageList === 'function'
-    && typeof typed.storageClear === 'function';
+    && typeof typed.storageList === 'function';
 }
 
 /** Picks the right storage adapter for the current runtime. */

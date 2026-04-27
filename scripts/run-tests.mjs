@@ -50,6 +50,7 @@ const files = [
   'preflight-template-validation.test.ts',
   'storage-adapter-contract.test.ts',
   'storage-filesystem-unit.test.ts',
+  'storage-ipc-no-broad-clear.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'tester-verification-no-secret.test.ts',

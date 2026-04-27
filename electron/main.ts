@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
-import { storageGet, storageSet, storageRemove, storageList, storageClear } from './storage';
+import { storageGet, storageSet, storageRemove, storageList } from './storage';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -240,9 +240,14 @@ ipcMain.handle('storage:list', (_event, prefix: unknown) => {
   return storageList(prefix);
 });
 
-ipcMain.handle('storage:clear', () => {
-  storageClear();
-});
+// T1-84: storage:clear IPC was removed. The previous handler wiped every
+// .json file in the storage directory in one call — license, profiles,
+// presets, autosave, all jobs — exposing a single point of catastrophic
+// data loss to any renderer code path. Audit confirmed no renderer code
+// uses bulk clear, so the IPC was dead capability. If a future feature
+// needs targeted clearing (e.g. "clear job log history"), add a scoped
+// IPC handler per the T1-84 roadmap (storage:clearScope with explicit
+// allow-list of key prefixes per scope).
 
 // ─── WAKE LOCK ───────────────────────────────────────────────────
 // Held during active jobs so Windows doesn't suspend USB,
