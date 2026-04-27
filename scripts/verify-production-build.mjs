@@ -45,7 +45,7 @@ const REJECT_PATTERNS = [
   },
 ];
 
-const SCAN_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.html', '.css']);
+const SCAN_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.html', '.css', '.map']);
 
 /** @param {string} dir @param {string[]} out */
 function walk(dir, out) {
@@ -77,7 +77,23 @@ walk(DIST, files);
 console.log(`Scanning ${files.length} file(s) in ${DIST}/ for forbidden patterns...`);
 
 let failed = false;
+// T1-83: source-map files must not appear in the renderer dist/. The Electron
+// main-process maps live in dist-electron/ and are excluded at the packaging
+// step via package.json:build.files negation globs (dist-electron glob with
+// a later !*.map exclusion). This check covers the renderer side: if Vite
+// ever starts emitting maps (config drift, version regression, opt-in for
+// crash reporting that wasn't switched to 'hidden'), the build is rejected
+// before we ship it.
+const mapFiles = files.filter(f => f.endsWith('.map'));
+for (const file of mapFiles) {
+  console.error(
+    `\n✗ ${file}\n    source map file present in renderer bundle\n    Set vite.config.ts build.sourcemap to false (or 'hidden' for crash-reporter use).`,
+  );
+  failed = true;
+}
+
 for (const file of files) {
+  if (file.endsWith('.map')) continue; // already reported above
   const content = readFileSync(file, 'utf8');
   for (const { name, detail, pattern } of REJECT_PATTERNS) {
     if (pattern.test(content)) {

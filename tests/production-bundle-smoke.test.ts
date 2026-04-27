@@ -211,6 +211,54 @@ void (() => {
     );
   }
 
+  // ── 7. T1-83: dist containing a .map file → exit 1 ────────────────────
+  // The renderer should never ship source maps. If Vite is misconfigured
+  // and emits one, the verifier rejects.
+  {
+    const fake = makeFakeDist({
+      'assets/index-abc123.js': 'console.log("hello");',
+      'assets/index-abc123.js.map': '{"version":3,"sources":["../src/main.ts"]}',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T1-83: .map file in dist/ → exit 1');
+      assert(
+        /source map/i.test(r.stderr),
+        '  stderr names "source map" in the rejection message',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 8. T1-83: top-level .map file detected too ────────────────────────
+  {
+    const fake = makeFakeDist({
+      'index.js': 'console.log("ok");',
+      'index.js.map': '{"version":3}',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'top-level .map detected too');
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 9. T1-83: .map.bak is NOT a source map (suffix is .bak, not .map) ──
+  {
+    const fake = makeFakeDist({
+      'assets/index.js': 'console.log("ok");',
+      'assets/index.js.map.bak': '{"version":3}', // backup file, not a map
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 0, '.map.bak passes (last extension is .bak)');
+    } finally {
+      fake.cleanup();
+    }
+  }
+
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 })();
