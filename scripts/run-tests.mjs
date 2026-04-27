@@ -54,6 +54,8 @@ const files = [
   'entitlement-storage-migration.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
+  'dev-build-self-check.test.ts',
+  'production-bundle-smoke.test.ts',
   'execution-coordinator.test.ts',
   'execution-coordinator-unlock-home-frame.test.ts',
   'execution-coordinator-testfire-setorigin.test.ts',

@@ -12,7 +12,26 @@ const LICENSE_OFFLINE_GRACE = 30 * 24 * 60 * 60 * 1000;
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
 function isDevBuild(): boolean {
-  return (import.meta as ImportMeta & { env?: { DEV?: boolean } }).env?.DEV === true;
+  const env = (import.meta as ImportMeta & {
+    env?: { DEV?: boolean; PROD?: boolean };
+  }).env;
+  const isDev = env?.DEV === true;
+  const isProd = env?.PROD === true;
+  // T1-81: defense-in-depth Layer 3. If both DEV and PROD are true, the build
+  // is misconfigured. Fail safely toward production behavior — a free user
+  // who shouldn't have Pro is preferable to every shipped build silently
+  // auto-unlocking Pro for everyone. The console.error makes the
+  // misconfiguration visible during testing. Layers 1 (build-time grep in
+  // scripts/verify-production-build.mjs) and 2 (CI runs npm run build) are
+  // the primary defenses; this is the runtime safety net.
+  if (isDev && isProd) {
+    console.error(
+      '[EntitlementService] T1-81: Build misconfigured — both DEV and PROD '
+      + 'are true. Treating as production for safety. Auto-Pro unlock disabled.',
+    );
+    return false;
+  }
+  return isDev;
 }
 
 export interface ActivateResult {

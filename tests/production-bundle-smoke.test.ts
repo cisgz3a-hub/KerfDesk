@@ -1,0 +1,216 @@
+/**
+ * T1-81 regression test: scripts/verify-production-build.mjs correctly
+ * detects forbidden patterns in synthetic dist/ content.
+ *
+ * Bug class: a misconfigured production build that ships dev-mode auto-Pro
+ * unlock (`tier: 'developer'`) or the legacy tester HMAC secret
+ * (`bf5c9e2a-...`, removed in T1-77). Layer 1 of T1-81 is a build-time grep
+ * over dist/ that rejects any bundle containing these patterns.
+ *
+ * This test exercises the verifier script's logic against synthetic dist
+ * directories — it doesn't actually run `vite build`. The reasoning: CI
+ * already runs `npm run build` against the real source on every PR, so
+ * production-bundle coverage comes for free. This test's job is to prove
+ * the script's logic is right (catches forbidden patterns when present,
+ * lets clean output through).
+ *
+ * Four cases:
+ *   1. Empty dist/ → exit 0
+ *   2. Clean dist with safe code → exit 0
+ *   3. dist with `tier: 'developer'` → exit 1
+ *   4. dist with the legacy tester secret literal → exit 1
+ *
+ * Run: npx tsx tests/production-bundle-smoke.test.ts
+ */
+export {};
+
+import { spawnSync } from 'node:child_process';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(__dirname, '..');
+const VERIFY_SCRIPT = join(REPO_ROOT, 'scripts', 'verify-production-build.mjs');
+
+let passed = 0;
+let failed = 0;
+
+function assert(cond: boolean, message: string): void {
+  if (cond) {
+    passed++;
+    console.log(`  ✓ ${message}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${message}`);
+  }
+}
+
+interface RunResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+function runVerifier(distDir: string): RunResult {
+  const result = spawnSync('node', [VERIFY_SCRIPT, distDir], {
+    encoding: 'utf8',
+    timeout: 10_000,
+  });
+  return {
+    exitCode: result.status ?? -1,
+    stdout: result.stdout ?? '',
+    stderr: result.stderr ?? '',
+  };
+}
+
+interface FakeDist {
+  dir: string;
+  cleanup: () => void;
+}
+
+function makeFakeDist(files: Record<string, string>): FakeDist {
+  const dir = mkdtempSync(join(tmpdir(), 'lf-verify-'));
+  const distDir = join(dir, 'dist');
+  mkdirSync(distDir, { recursive: true });
+  for (const [name, content] of Object.entries(files)) {
+    const full = join(distDir, name);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, content);
+  }
+  return {
+    dir: distDir,
+    cleanup: () => { rmSync(dir, { recursive: true, force: true }); },
+  };
+}
+
+void (() => {
+  console.log('\n=== verify-production-build.mjs smoke (T1-81) ===\n');
+
+  // ── 1. Empty dist/ → exit 0 ────────────────────────────────────────────
+  {
+    const fake = makeFakeDist({});
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 0, 'empty dist/ → exit 0');
+      assert(
+        /verification passed/i.test(r.stdout),
+        '  stdout reports verification passed',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 2. Clean dist with safe code → exit 0 ──────────────────────────────
+  {
+    const fake = makeFakeDist({
+      'index.html': '<!doctype html><html><body><div id="root"></div></body></html>',
+      'assets/index-abc123.js': `
+        console.log("hello");
+        const tier = "free";
+        function isDevBuild() { return false; }
+        // case 'developer': in source still appears in consumer code paths
+        // but this regex doesn't match it (no tier: prefix).
+        switch (tier) {
+          case 'developer': break;
+          case 'free': break;
+        }
+      `,
+      'assets/style.css': '.foo { color: red; }',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 0, 'clean dist → exit 0');
+      assert(
+        /verification passed/i.test(r.stdout),
+        '  stdout reports verification passed',
+      );
+      assert(
+        !/forbidden/i.test(r.stderr),
+        '  no forbidden-pattern messages in stderr',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 3. dist containing the auto-Pro unlock literal → exit 1 ───────────
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js': `
+        function init() {
+          setState({ tier: 'developer', hasPro: true });
+        }
+      `,
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'auto-Pro unlock literal in dist → exit 1');
+      assert(
+        /forbidden pattern/i.test(r.stderr),
+        '  stderr reports the forbidden pattern',
+      );
+      assert(
+        /auto-Pro unlock/i.test(r.stderr),
+        '  stderr names the specific pattern (auto-Pro unlock)',
+      );
+      assert(
+        /verification FAILED/i.test(r.stderr),
+        '  stderr ends with FAILED message',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 4. dist containing the legacy tester secret literal → exit 1 ──────
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        'const SECRET = "bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1";',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'legacy tester secret in dist → exit 1');
+      assert(
+        /forbidden pattern/i.test(r.stderr),
+        '  stderr reports the forbidden pattern',
+      );
+      assert(
+        /tester HMAC secret/i.test(r.stderr),
+        '  stderr names the specific pattern (tester HMAC secret)',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 5. Different quote styles around 'developer' both detected ────────
+  // The regex /tier:\s*['"]developer['"]/ matches both ' and ". Verify both.
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js': "var s = { tier:\"developer\", hasPro:true };",
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'double-quote variant also detected');
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 6. Missing dist directory → exit 2 ────────────────────────────────
+  {
+    const r = runVerifier('/tmp/__nonexistent-laserforge-dist__');
+    assert(r.exitCode === 2, 'missing dist → exit 2');
+    assert(
+      /not found/i.test(r.stderr),
+      '  stderr explains the dist is missing',
+    );
+  }
+
+  console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
+  process.exit(failed > 0 ? 1 : 0);
+})();
