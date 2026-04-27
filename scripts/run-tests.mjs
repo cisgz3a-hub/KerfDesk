@@ -54,6 +54,7 @@ const files = [
   'dialog-open-file-size-limit.test.ts',
   'dialog-open-no-full-path.test.ts',
   'electron-navigation-blocked.test.ts',
+  'electron-renderer-sandbox.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'tester-verification-no-secret.test.ts',

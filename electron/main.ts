@@ -128,6 +128,21 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
+      // T1-89: enable Chromium's OS-level renderer sandbox. Without this,
+      // a renderer compromised by XSS or by malicious imported content
+      // (a doctored SVG, project file, or DXF) has access to the full
+      // preload bridge AND to non-sandboxed Chromium APIs that exist
+      // outside contextIsolation's strict contextBridge boundary.
+      // The preload (electron/preload.ts) is already sandbox-compatible:
+      // it only imports from 'electron' (contextBridge, ipcRenderer,
+      // IpcRendererEvent — all whitelisted under sandbox) and exposes
+      // the bridge purely via ipcRenderer.invoke / on, no fs/path/etc.
+      // The renderer (src/) uses typeof-process guards on the few Node
+      // touchpoints (loadFont's bundled-font fallback, ticket hashing's
+      // deterministic-IDs env check), so Node globals being unavailable
+      // under sandbox is not a regression — those guards already short-
+      // circuit when process is undefined or stubbed.
+      sandbox: true,
       webviewTag: false,
     },
   });
