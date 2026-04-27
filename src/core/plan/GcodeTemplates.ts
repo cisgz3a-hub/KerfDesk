@@ -56,6 +56,40 @@ export function emptyTemplateContext(): GcodeTemplateContext {
 }
 
 /**
+ * T1-91: sanitize a string for safe insertion into G-code comment context.
+ * Strips line terminators (closes G-code injection — without this, a
+ * project name like "Innocent Job\nM3 S1000\nG4 P5\nM5" rendered through
+ * a header template's "; LaserForge job: {JOB_NAME}" would produce four
+ * lines, three of which the controller interprets as G-code), replaces
+ * non-printable or non-ASCII characters with '?' (G-code comments are
+ * conservatively ASCII because older controller firmware misbehaves on
+ * UTF-8: some interpret high-bit bytes as commands, others truncate,
+ * others crash), and caps length at 120 chars.
+ *
+ * Applied only to user-controlled string variables (JOB_NAME,
+ * MATERIAL_NAME) and to ESTIMATED_TIME for defense-in-depth (it is
+ * currently app-controlled by the time formatter, but if a future
+ * formatter ever interpolates user data, this catches it).
+ *
+ * Numeric variables already flow through .toFixed() / .toString() and
+ * are safe without explicit sanitization. DATE/TIME come from
+ * Date.toISOString() and are ASCII-safe by definition.
+ *
+ * The "non-ASCII becomes ?" rule is a deliberate trade-off: a user
+ * named "Müller" sees "M?ller" in the G-code header. The alternative
+ * (allowing UTF-8) breaks comment parsing on some controllers. Safety
+ * wins. If a future controller-aware policy wants to allow Unicode for
+ * known-safe firmware, that's a separate ticket.
+ */
+function gcodeCommentSafe(value: string | undefined | null): string {
+  if (!value) return '';
+  return value
+    .replace(/[\r\n]+/g, ' ')          // newlines → space (closes injection)
+    .replace(/[^\x20-\x7E]/g, '?')      // non-printable / non-ASCII → '?'
+    .slice(0, 120);                     // length cap
+}
+
+/**
  * Substitute {VAR} placeholders in a template string with values from context.
  * Unknown variables are left as-is (user will see the literal {FOO} in output,
  * which is the clearest signal that they typoed).
@@ -64,15 +98,15 @@ export function renderTemplate(template: string, context: GcodeTemplateContext):
   if (!template) return '';
   return template.replace(/\{([A-Z0-9_]+)\}/g, (match, key) => {
     switch (key) {
-      case 'JOB_NAME': return context.jobName;
+      case 'JOB_NAME': return gcodeCommentSafe(context.jobName);
       case 'DATE': return context.date;
       case 'TIME': return context.time;
       case 'BED_WIDTH': return context.bedWidthMm.toFixed(0);
       case 'BED_HEIGHT': return context.bedHeightMm.toFixed(0);
       case 'MAX_SPEED': return context.maxSpeedMmPerMin.toFixed(0);
       case 'TOTAL_LINES': return context.totalLines.toString();
-      case 'ESTIMATED_TIME': return context.estimatedTime || 'unknown';
-      case 'MATERIAL_NAME': return context.materialName || 'none';
+      case 'ESTIMATED_TIME': return gcodeCommentSafe(context.estimatedTime) || 'unknown';
+      case 'MATERIAL_NAME': return gcodeCommentSafe(context.materialName) || 'none';
       case 'MATERIAL_THICKNESS': return context.materialThicknessMm.toFixed(2);
       case 'RETURN_X': return context.returnX.toFixed(3);
       case 'RETURN_Y': return context.returnY.toFixed(3);
