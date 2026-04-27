@@ -2,7 +2,12 @@
  * Audit-cluster regression test: keep the security-relevant runtime deps
  * pinned to versions that have the published advisories patched.
  *
- * BACKGROUND — npm audit triage performed at this commit:
+ * BACKGROUND — npm audit triage performed across four commits:
+ *
+ * Initial state (pre-93b305b): 15 advisories (2 low, 2 moderate, 11 high).
+ * After Tier-A xmldom + dompurify upgrades (93b305b): 14 advisories.
+ * After Tier-C electron-builder upgrade (6fe39ac):    2 advisories.
+ * After Tier-A postcss override (this commit):        1 advisory.
  *
  * `npm audit` reported 15 advisories across 2 direct deps, 12 transitive
  * deps, and electron itself. Triage by reachability (does the advisory
@@ -30,6 +35,24 @@
  * │                             │ sanitizer with hostile input. Bypass  │
  * │                             │ unreachable in practice but upgrade   │
  * │                             │ is a clean minor bump.                │
+ * │                             │                                       │
+ * │ postcss 8.5.8 → 8.5.12 via  │ One CSS-stringify XSS advisory        │
+ * │ npm overrides               │ (postcss < 8.5.10). Reachability null │
+ * │                             │ in our usage — postcss is consumed by │
+ * │                             │ vite to bundle our own CSS, not user- │
+ * │                             │ supplied CSS. Bumped via npm          │
+ * │                             │ overrides rather than a vite minor    │
+ * │                             │ bump because vite 8.0.10 has an       │
+ * │                             │ unresolved production-build           │
+ * │                             │ regression ("Class extends value      │
+ * │                             │ undefined"). Override pins postcss    │
+ * │                             │ directly, leaving vite at 8.0.5.      │
+ * │                             │                                       │
+ * │                             │ REMOVE THE OVERRIDE when vite is      │
+ * │                             │ upgraded to a version that declares   │
+ * │                             │ postcss >= 8.5.10 and does not have   │
+ * │                             │ the 8.0.10 production-build           │
+ * │                             │ regression.                           │
  * └─────────────────────────────┴───────────────────────────────────────┘
  *
  * ┌─────────────────────────────┬───────────────────────────────────────┐
@@ -69,24 +92,23 @@
  * │                             │ so the build host does not drift back │
  * │                             │ into the known-vulnerable cluster.    │
  * │                             │                                       │
- * │ postcss                     │ Still appears after the builder bump, │
- * │                             │ but now only via vite. That is a      │
- * │                             │ separate Vite cleanup ticket, not     │
- * │                             │ part of the electron-builder cluster. │
  * └─────────────────────────────┴───────────────────────────────────────┘
+ *
+ * (TIER C is now empty — the postcss-via-vite holdover moved to Tier A
+ *  via the npm override above.)
  *
  * WHAT THIS TEST ENFORCES:
  *   1. The two Tier A upgrades stay in place — package.json declarations
  *      and resolved package-lock.json versions both at-or-above the
- *      patched lines.
+ *      patched lines for @xmldom/xmldom, dompurify, and postcss
+ *      (postcss via the npm overrides field).
  *   2. The test FAILS if a future regression downgrades either dep into
  *      the vulnerable range.
  *   3. The electron-builder cluster stays on the patched 26.x line and
  *      the old vulnerable transitive packages stay absent.
  *   4. The test does NOT enforce zero `npm audit` output — that would
  *      conflate fixed Tier A/C work with Tier B (electron major upgrade)
- *      and the remaining Vite/postcss cleanup. Conflation here would
- *      either block all merges or train people to ignore the test.
+ *      and either block all merges or train people to ignore the test.
  *
  * Run: npx tsx tests/security-deps-pinned.test.ts
  */
@@ -115,6 +137,7 @@ function assert(cond: boolean, message: string): void {
 interface PkgJson {
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  overrides?: Record<string, string>;
 }
 
 interface LockfileEntry {
@@ -275,6 +298,48 @@ function lockVersion(packagePath: string): string {
       `${packagePath} is absent from package-lock.json (old builder cluster removed)`,
     );
   }
+}
+
+// ── postcss (Tier A, via npm overrides) ────────────────────────────
+// postcss < 8.5.10 has a CSS-stringify XSS advisory. We do not bump vite
+// to clear it because vite 8.0.10 has an unresolved production-build
+// regression; instead npm's overrides field forces postcss directly to the
+// patched line while vite stays at 8.0.5.
+//
+// Remove this override once vite is upgraded to a version that declares
+// postcss >= 8.5.10 and does not have the 8.0.10 production-build regression.
+{
+  const overridePin = pkg.overrides?.postcss ?? '';
+  assert(
+    overridePin.length > 0,
+    'package.json declares an overrides.postcss pin',
+  );
+  const overrideMin = overridePin.replace(/^[\^~]/, '');
+  assert(
+    semverCmp(overrideMin, '8.5.10') >= 0,
+    `overrides.postcss declared at >= 8.5.10 (patched line); got "${overridePin}"`,
+  );
+
+  const resolved = lockVersion('node_modules/postcss');
+  assert(
+    resolved.length > 0,
+    'postcss is resolved in package-lock.json',
+  );
+  assert(
+    semverCmp(resolved, '8.5.10') >= 0,
+    `postcss resolved at >= 8.5.10 in lockfile (override applied); got "${resolved}"`,
+  );
+
+  let postcssInstallCount = 0;
+  for (const packagePath of Object.keys(lock.packages ?? {})) {
+    if (/(?:^|\/)node_modules\/postcss$/.test(packagePath)) {
+      postcssInstallCount++;
+    }
+  }
+  assert(
+    postcssInstallCount === 1,
+    `exactly one postcss installation in the tree (got ${postcssInstallCount}). Multiple installations may indicate the override did not fully propagate.`,
+  );
 }
 
 // ── Reachability invariants (defense-in-depth against future code drift) ──
