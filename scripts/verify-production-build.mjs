@@ -19,6 +19,13 @@
  *     Removed in T1-77; this is belt-and-suspenders. If anyone reintroduces
  *     the literal in any source file, this catches it before shipping.
  *
+ *   sourceMappingURL=  — runtime source map reference
+ *     T2-105 uses Vite's `sourcemap: 'hidden'` mode so renderer .map files
+ *     can exist in dist/ for symbolication, but runtime JS/CSS/HTML bundles
+ *     must not contain a sourceMappingURL reference that lets end users load
+ *     those maps. The .map files themselves are excluded from installers by
+ *     package.json:build.files negation globs.
+ *
  * The script is intentionally pure-Node (no deps); same constraint as the
  * other utility scripts in this folder.
  *
@@ -44,6 +51,8 @@ const REJECT_PATTERNS = [
     pattern: /bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1/,
   },
 ];
+
+const SOURCE_MAPPING_URL_PATTERN = /sourceMappingURL\s*=/;
 
 const SCAN_EXTENSIONS = new Set(['.js', '.mjs', '.cjs', '.html', '.css', '.map']);
 
@@ -77,24 +86,20 @@ walk(DIST, files);
 console.log(`Scanning ${files.length} file(s) in ${DIST}/ for forbidden patterns...`);
 
 let failed = false;
-// T1-83: source-map files must not appear in the renderer dist/. The Electron
-// main-process maps live in dist-electron/ and are excluded at the packaging
-// step via package.json:build.files negation globs (dist-electron glob with
-// a later !*.map exclusion). This check covers the renderer side: if Vite
-// ever starts emitting maps (config drift, version regression, opt-in for
-// crash reporting that wasn't switched to 'hidden'), the build is rejected
-// before we ship it.
-const mapFiles = files.filter(f => f.endsWith('.map'));
-for (const file of mapFiles) {
-  console.error(
-    `\n✗ ${file}\n    source map file present in renderer bundle\n    Set vite.config.ts build.sourcemap to false (or 'hidden' for crash-reporter use).`,
-  );
-  failed = true;
-}
-
 for (const file of files) {
-  if (file.endsWith('.map')) continue; // already reported above
+  // T2-105: hidden sourcemaps deliberately generate .map files in dist/.
+  // They are for local/archive tooling only and are excluded from packaged
+  // installers. The runtime security property is that non-map files do not
+  // reference them via sourceMappingURL (including inline data URI maps).
+  if (file.endsWith('.map')) continue;
   const content = readFileSync(file, 'utf8');
+  if (SOURCE_MAPPING_URL_PATTERN.test(content)) {
+    const match = content.match(SOURCE_MAPPING_URL_PATTERN);
+    console.error(
+      `\n✗ ${file}\n    contains forbidden source map reference\n    matched: ${match?.[0] ?? '(no preview)'}\n    Set vite.config.ts build.sourcemap to 'hidden' or false; never true or inline for shipped runtime bundles.`,
+    );
+    failed = true;
+  }
   for (const { name, detail, pattern } of REJECT_PATTERNS) {
     if (pattern.test(content)) {
       const match = content.match(pattern);

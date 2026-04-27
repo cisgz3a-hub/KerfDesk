@@ -1,6 +1,6 @@
 /**
- * T1-83 regression test: configuration files declare the no-source-maps-in-
- * shipped-installers policy.
+ * T1-83/T2-105 regression test: configuration files declare the no-source-
+ * maps-in-shipped-installers policy.
  *
  * Bug: source maps in the Electron main-process and renderer outputs leak
  * the original variable names, file structure, and (depending on emit mode)
@@ -8,11 +8,13 @@
  * and any logic relying on T1-77's stopgap secret-removal. A reverse
  * engineer with the installer can read the source nearly verbatim.
  *
- * Fix: three configuration changes.
+ * Fix: three configuration changes, refined by T2-105.
  *  1. package.json build.files adds negation globs for *.map files in dist
  *     and dist-electron — Electron Builder skips maps when packaging.
- *  2. vite.config.ts explicitly sets build.sourcemap to false — guards
- *     against future config drift.
+ *  2. vite.config.ts explicitly sets build.sourcemap to 'hidden' — renderer
+ *     maps are generated for symbolication, but bundles contain no
+ *     sourceMappingURL reference and package.json excludes maps from
+ *     installers. `false` is also accepted here as an equally safe fallback.
  *  3. electron/tsconfig.json:compilerOptions.sourceMap stays true (per the
  *     roadmap's preferred Option B): local devs keep maps for debugging,
  *     but the package-level negation prevents shipping them.

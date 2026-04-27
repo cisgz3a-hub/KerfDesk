@@ -14,11 +14,13 @@
  * the script's logic is right (catches forbidden patterns when present,
  * lets clean output through).
  *
- * Four cases:
+ * Core cases:
  *   1. Empty dist/ → exit 0
  *   2. Clean dist with safe code → exit 0
  *   3. dist with `tier: 'developer'` → exit 1
  *   4. dist with the legacy tester secret literal → exit 1
+ *   5. T2-105 hidden sourcemaps: .map files may exist, but runtime files
+ *      must not contain sourceMappingURL references.
  *
  * Run: npx tsx tests/production-bundle-smoke.test.ts
  */
@@ -211,9 +213,10 @@ void (() => {
     );
   }
 
-  // ── 7. T1-83: dist containing a .map file → exit 1 ────────────────────
-  // The renderer should never ship source maps. If Vite is misconfigured
-  // and emits one, the verifier rejects.
+  // ── 7. T2-105: hidden .map file with no runtime URL reference passes ───
+  // Hidden sourcemaps are generated for symbolication/archive tooling, then
+  // excluded from packaged installers. The runtime bundle must not point at
+  // them with sourceMappingURL.
   {
     const fake = makeFakeDist({
       'assets/index-abc123.js': 'console.log("hello");',
@@ -221,31 +224,54 @@ void (() => {
     });
     try {
       const r = runVerifier(fake.dir);
-      assert(r.exitCode === 1, 'T1-83: .map file in dist/ → exit 1');
+      assert(r.exitCode === 0, 'T2-105: hidden .map file in dist/ with no URL reference → exit 0');
       assert(
-        /source map/i.test(r.stderr),
-        '  stderr names "source map" in the rejection message',
+        /verification passed/i.test(r.stdout),
+        '  stdout reports verification passed',
       );
     } finally {
       fake.cleanup();
     }
   }
 
-  // ── 8. T1-83: top-level .map file detected too ────────────────────────
+  // ── 8. T2-105: external sourceMappingURL reference is rejected ─────────
   {
     const fake = makeFakeDist({
-      'index.js': 'console.log("ok");',
+      'index.js': 'console.log("ok");\n//# sourceMappingURL=index.js.map',
       'index.js.map': '{"version":3}',
     });
     try {
       const r = runVerifier(fake.dir);
-      assert(r.exitCode === 1, 'top-level .map detected too');
+      assert(r.exitCode === 1, 'external sourceMappingURL reference in runtime JS → exit 1');
+      assert(
+        /source map reference/i.test(r.stderr),
+        '  stderr names source map reference in the rejection message',
+      );
     } finally {
       fake.cleanup();
     }
   }
 
-  // ── 9. T1-83: .map.bak is NOT a source map (suffix is .bak, not .map) ──
+  // ── 9. T2-105: inline sourceMappingURL data URI is rejected ────────────
+  // The old ".map file exists" heuristic missed inline maps because they
+  // don't create a separate .map file. The new verifier catches the real leak.
+  {
+    const fake = makeFakeDist({
+      'assets/index.js': 'console.log("ok");\n//# sourceMappingURL=data:application/json;base64,eyJ2ZXJzaW9uIjozfQ==',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'inline sourceMappingURL data URI in runtime JS → exit 1');
+      assert(
+        /source map reference/i.test(r.stderr),
+        '  stderr names source map reference for inline maps',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 10. T2-105: .map.bak is inert if not referenced ───────────────────
   {
     const fake = makeFakeDist({
       'assets/index.js': 'console.log("ok");',

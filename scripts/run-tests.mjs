@@ -64,6 +64,7 @@ const files = [
   'packaged-app-no-dev-arg.test.ts',
   'production-bundle-smoke.test.ts',
   'source-maps-not-shipped.test.ts',
+  'source-maps-hidden-mode.test.ts',
   'native-deps-prebuild-check.test.ts',
   'execution-coordinator.test.ts',
   'execution-coordinator-unlock-home-frame.test.ts',

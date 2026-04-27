@@ -5,14 +5,11 @@ export default defineConfig({
   base: './',
   plugins: [react()],
   build: {
-    // T1-83: explicit no-source-maps for the renderer bundle. Default is
-    // false today, but making it explicit prevents a future Vite version
-    // change or accidental config addition from leaking renderer source
-    // structure into end-user installers. If crash-reporter integration
-    // (T2-105) ever needs maps, switch to 'hidden' (maps generated but the
-    // bundle has no //# sourceMappingURL=... reference, so end users still
-    // can't see the original source — only the crash uploader can).
-    sourcemap: false,
+    // T2-105: hidden renderer maps support crash symbolication while keeping
+    // the runtime bundle free of //# sourceMappingURL references. The maps
+    // are generated in dist/ for post-build tooling, then excluded from
+    // packaged installers by package.json:build.files negation globs.
+    sourcemap: 'hidden',
   },
   server: {
     port: 3000,
