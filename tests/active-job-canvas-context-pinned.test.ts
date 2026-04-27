@@ -67,6 +67,7 @@ function makeCtrl(sendJob: (lines: string[]) => Promise<void> = async () => {}):
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
 }
 

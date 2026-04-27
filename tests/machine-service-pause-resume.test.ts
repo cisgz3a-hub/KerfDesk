@@ -51,6 +51,7 @@ const mockController: LaserController = {
   onProgress: () => () => {},
   onError: () => () => {},
   onRawLine: () => () => {},
+  safetyOff: async () => ({ stage: 'm5' as const }),
 } as LaserController;
 
 const controllerRef = { current: mockController } as { current: LaserController };

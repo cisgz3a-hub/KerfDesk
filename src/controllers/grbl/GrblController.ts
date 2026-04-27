@@ -612,6 +612,60 @@ export class GrblController implements LaserController {
     });
   }
 
+  /**
+   * Two-stage hardware-off path. T1-22.
+   *
+   * Stage 1: try `M5 S0` via the port's awaitable critical-write path. If
+   * transport accepts it, return `{ stage: 'm5' }`. The caller can trust the
+   * laser-off intent reached firmware.
+   *
+   * Stage 2 (only if Stage 1 rejects): fall back to soft reset (`0x18`) via
+   * the awaitable critical-byte path. Soft reset is GRBL's actual realtime
+   * emergency stop; it disables laser output at firmware level but is
+   * destructive (loses position, may require re-home depending on `$22`).
+   * On success returns `{ stage: 'soft-reset', error: <m5_error> }`. The
+   * controller's internal job state is also aborted.
+   *
+   * If both fail (or port is closed), returns `{ stage: 'failed', error }`.
+   * Never throws — the caller (`ExecutionCoordinator.emergencyLaserOff`) is on
+   * the safety hot path and must always get a structured outcome it can act on.
+   */
+  async safetyOff(): Promise<{
+    stage: 'm5' | 'soft-reset' | 'failed';
+    error?: Error;
+  }> {
+    if (!this._port?.isOpen) {
+      return { stage: 'failed', error: new Error('Not connected') };
+    }
+    let m5Error: Error | undefined;
+    try {
+      await this._port.writeCritical('M5 S0\n');
+      this._emitRawLine('M5 S0', 'tx', 'system');
+      return { stage: 'm5' };
+    } catch (err) {
+      m5Error = err instanceof Error ? err : new Error(String(err));
+    }
+    // Stage 2: soft reset. Tighter guarantee but destructive.
+    try {
+      if (!this._port?.isOpen) {
+        return { stage: 'failed', error: m5Error };
+      }
+      await this._port.writeByteCritical(REALTIME_RESET);
+      // Mirror the bookkeeping of stop()/emergencyStop() so internal state is
+      // consistent after a forced reset.
+      this._abortJob();
+      this._emitProgress();
+      return { stage: 'soft-reset', error: m5Error };
+    } catch (resetErr) {
+      const resetError = resetErr instanceof Error ? resetErr : new Error(String(resetErr));
+      // Combine both error messages so support bundles capture the full picture.
+      const combined = new Error(
+        `M5 failed (${m5Error?.message ?? 'unknown'}); soft reset also failed (${resetError.message})`,
+      );
+      return { stage: 'failed', error: combined };
+    }
+  }
+
   // ─── MANUAL CONTROL ─────────────────────────────────────────
 
   /**

@@ -106,6 +106,20 @@ export interface LaserController {
   emergencyStop(): void;
 
   /**
+   * Two-stage hardware laser-off (T1-22). Awaitable; never throws — returns a
+   * structured outcome the caller can act on. Stage 1 attempts `M5 S0` via the
+   * port's critical-write path. On failure, stage 2 falls back to soft reset
+   * (`0x18`), GRBL's actual realtime emergency stop. The caller (typically
+   * {@link ExecutionCoordinator.emergencyLaserOff}) uses the returned stage to
+   * notify {@link MachineService.notifyLaserSafetyOutcome} which gates job
+   * starts when laser state becomes uncertain.
+   */
+  safetyOff(): Promise<{
+    stage: 'm5' | 'soft-reset' | 'failed';
+    error?: Error;
+  }>;
+
+  /**
    * Manual line to GRBL. `internal` = LaserForge-generated (known sequences);
    * `user` = console / operator-typed (semantic gating is the UI’s responsibility).
    */

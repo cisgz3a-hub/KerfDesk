@@ -89,6 +89,23 @@ export class MachineService {
   private activeJobSessionId: number | null = null;
 
   private detachRecording: (() => void) | null = null;
+  /**
+   * Conservative tracking of laser output state for job-start gating. T1-22.
+   *
+   * Driven by:
+   * - {@link notifyTestFire} — UI/coordinator tells us when the laser-on
+   *   handheld path is engaged.
+   * - {@link notifyLaserSafetyOutcome} — coordinator reports the outcome of
+   *   {@link LaserController.safetyOff}: an `m5` outcome → `'off'`, anything
+   *   else → `'unknown'` (M5 path was indeterminate or both paths failed).
+   * - Connect → reset to `'off'` (fresh connection clears stale unknown state).
+   *
+   * `'unknown'` blocks {@link startValidatedJob} until cleared by reconnect
+   * or explicit user resolution via {@link clearLaserUnknownState}. Once T2-12
+   * (formal MachineSafetyState) lands this becomes a proper enum subscribed
+   * by the UI; for now this is a polled getter.
+   */
+  private _laserOutputState: 'off' | 'on' | 'unknown' = 'off';
 
   constructor(
     private readonly controllerRef: MutableRefObject<LaserController>,
@@ -385,6 +402,17 @@ export class MachineService {
       throw new Error('A job is already active. Wait for it to finish or clear the job session.');
     }
 
+    // T1-22: refuse to start a job while laser output state is uncertain.
+    // This typically means the previous emergency-laser-off path took the
+    // soft-reset fallback (M5 transport failed) or both stages failed. The
+    // user must reconnect or run an explicit safety-clear before continuing.
+    if (this._laserOutputState === 'unknown') {
+      throw new Error(
+        'Machine is in an unknown laser-safety state after a previous laser-off failure. '
+        + 'Reconnect or clear the safety state before starting a job.',
+      );
+    }
+
     const validation = this.validateTicket(ticket, scene);
     if (!validation.ok) {
       throw new Error(validation.reason);
@@ -491,6 +519,72 @@ export class MachineService {
     }
   }
 
+  // ─── T1-22 LASER SAFETY STATE ─────────────────────────────────────
+
+  /**
+   * Read the current laser-output safety state. T1-22.
+   *
+   * - `'off'`: Last known state is laser off. Default after connect.
+   * - `'on'`: A test-fire is currently active (laser intentionally on).
+   * - `'unknown'`: A previous {@link LaserController.safetyOff} returned
+   *   `soft-reset` or `failed` — the M5 path did not provide a clean confirmation.
+   *   {@link startValidatedJob} refuses while in this state.
+   */
+  getLaserOutputState(): 'off' | 'on' | 'unknown' {
+    return this._laserOutputState;
+  }
+
+  /**
+   * Coordinator notifies the service when test-fire transitions begin/end.
+   * Called from {@link ExecutionCoordinator.beginTestFire} after M3 succeeds and
+   * from the deadman/{@link ExecutionCoordinator.endTestFire} path.
+   *
+   * `'end'` does not overwrite an `'unknown'` state — that escalation must be
+   * resolved explicitly. T1-22.
+   */
+  notifyTestFire(phase: 'begin' | 'end'): void {
+    if (phase === 'begin') {
+      // Begin always wins: we explicitly turned the laser on.
+      this._laserOutputState = 'on';
+      return;
+    }
+    // 'end'
+    if (this._laserOutputState !== 'unknown') {
+      this._laserOutputState = 'off';
+    }
+  }
+
+  /**
+   * Coordinator reports the structured outcome of a {@link LaserController.safetyOff}
+   * call. M5 path success → laser is confirmed off. Soft-reset fallback or
+   * failure → laser-output state is no longer trustworthy and we mark
+   * `'unknown'` so {@link startValidatedJob} refuses until cleared. T1-22.
+   */
+  notifyLaserSafetyOutcome(stage: 'm5' | 'soft-reset' | 'failed'): void {
+    if (stage === 'm5') {
+      this._laserOutputState = 'off';
+    } else {
+      // soft-reset or failed — treat both as uncertain. Soft reset disables
+      // laser output at firmware level, but the M5-path indeterminacy means
+      // the planner state is unknown and a fresh connection check is the
+      // safest reset.
+      this._laserOutputState = 'unknown';
+    }
+  }
+
+  /**
+   * Explicitly clear an `'unknown'` laser-safety state (user-resolved).
+   * No-op if state is not currently `'unknown'` (avoids accidentally
+   * downgrading an active `'on'` state). T1-22.
+   */
+  clearLaserUnknownState(): void {
+    if (this._laserOutputState === 'unknown') {
+      this._laserOutputState = 'off';
+    }
+  }
+
+  // ─── CONNECTION ─────────────────────────────────────────
+
   async connectRealLaser(baudRate: number): Promise<void> {
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
@@ -500,6 +594,9 @@ export class MachineService {
     await ws.requestAndOpen(baudRate);
     await this.controllerRef.current.connect(ws);
     this.state.isSimulator = false;
+    // T1-22: fresh connection clears any stale unknown laser-safety state
+    // from a previous session.
+    this._laserOutputState = 'off';
   }
 
   async disconnect(): Promise<void> {

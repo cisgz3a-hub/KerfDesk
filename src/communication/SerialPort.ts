@@ -7,6 +7,20 @@
 export interface SerialPortLike {
   write(data: string): void;
   writeByte(byte: number): void;
+  /**
+   * Awaitable critical write. Resolves only after the underlying transport has
+   * accepted the bytes (or, for mocks, after the mock has processed the line).
+   * Rejects on transport failure (USB suspend, cable glitch, browser serial
+   * fault, OS-level error). Use for safety-critical paths (M5 laser-off, soft
+   * reset) where the caller must know whether the write actually landed.
+   * T1-22.
+   */
+  writeCritical(data: string): Promise<void>;
+  /**
+   * Awaitable critical realtime byte (e.g. soft reset 0x18, feed-hold 0x21).
+   * Same failure semantics as {@link writeCritical}. T1-22.
+   */
+  writeByteCritical(byte: number): Promise<void>;
   onData(callback: (line: string) => void): void;
   onError(callback: (error: Error) => void): void;
   onClose(callback: () => void): void;
@@ -104,6 +118,36 @@ export class MockSerialPort implements SerialPortLike {
         );
       }
     }
+  }
+
+  /**
+   * Test-only: when true, the next {@link writeCritical} or
+   * {@link writeByteCritical} call rejects with a simulated transport error,
+   * then the flag clears. Used by safety-write tests. T1-22.
+   */
+  failNextCriticalWrite = false;
+  /**
+   * Test-only: when set, all critical writes reject. Use when a test wants the
+   * fallback to also fail (e.g. "both M5 and soft-reset failed"). T1-22.
+   */
+  failAllCriticalWrites = false;
+
+  async writeCritical(data: string): Promise<void> {
+    if (this.failAllCriticalWrites || this.failNextCriticalWrite) {
+      this.failNextCriticalWrite = false;
+      throw new Error('Simulated transport failure (writeCritical)');
+    }
+    // Reuse the same line-handling path as `write` so simulated `ok` responses
+    // continue to fire and existing test infrastructure works unchanged.
+    this.write(data);
+  }
+
+  async writeByteCritical(byte: number): Promise<void> {
+    if (this.failAllCriticalWrites || this.failNextCriticalWrite) {
+      this.failNextCriticalWrite = false;
+      throw new Error('Simulated transport failure (writeByteCritical)');
+    }
+    this.writeByte(byte);
   }
 
   onData(callback: (line: string) => void): void { this._dataCallback = callback; }

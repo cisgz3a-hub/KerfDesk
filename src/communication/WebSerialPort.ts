@@ -57,6 +57,26 @@ export class WebSerialPort implements SerialPortLike {
     });
   }
 
+  /**
+   * Awaitable critical write. Awaits the underlying writer.write() and
+   * rethrows on failure (no swallowing). Use only for safety-critical paths
+   * where the caller needs to know whether the write actually landed. T1-22.
+   */
+  async writeCritical(data: string): Promise<void> {
+    if (!this._isOpen || !this._writer) throw new Error('Port is not open');
+    const encoder = new TextEncoder();
+    await this._writer.write(encoder.encode(data));
+  }
+
+  /**
+   * Awaitable critical realtime-byte write (e.g. soft reset 0x18). Awaits the
+   * underlying writer.write() and rethrows on failure. T1-22.
+   */
+  async writeByteCritical(byte: number): Promise<void> {
+    if (!this._isOpen || !this._writer) throw new Error('Port is not open');
+    await this._writer.write(new Uint8Array([byte]));
+  }
+
   onData(callback: (line: string) => void): void {
     this._dataCallback = callback;
   }

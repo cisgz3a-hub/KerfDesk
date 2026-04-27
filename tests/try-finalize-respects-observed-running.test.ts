@@ -103,6 +103,7 @@ void (async () => {
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
   const controllerRef = { current: mock } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };

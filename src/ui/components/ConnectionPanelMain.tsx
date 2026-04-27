@@ -976,13 +976,19 @@ export function ConnectionPanelMain({
   // default = require frame. Prevents wrong-position-burn on confused
   // origin/saved-origin/mirror configurations.
   const requireFrame = true;
+  // T1-22: read laser-output safety state for the start-job gate. Polled
+  // (re-evaluated on each render) — sufficient because both transitions
+  // (notifyTestFire / notifyLaserSafetyOutcome) happen inside coordinator
+  // calls that already trigger renders elsewhere. T2-12 will subscribe properly.
+  const laserOutputState = machineService.getLaserOutputState();
   const canStartJob =
     !!gcode &&
     !isRunning &&
     !!preflight?.canStart &&
     !gcodeStale &&
     !machineBlocksJobStart &&
-    (!requireFrame || hasFramed.current);
+    (!requireFrame || hasFramed.current) &&
+    laserOutputState !== 'unknown';
   /** Human-readable reason the Start button is disabled, or null if ready. */
   const startDisabledReason: string | null = (() => {
     if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
@@ -994,6 +1000,9 @@ export function ConnectionPanelMain({
     }
     if (requireFrame && !hasFramed.current) {
       return 'Frame the job first (use Frame button) — this confirms where the laser will burn';
+    }
+    if (laserOutputState === 'unknown') {
+      return 'Laser-safety state is unknown after a previous laser-off failure — reconnect to clear';
     }
     return null; // ready to start
   })();

@@ -56,6 +56,10 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      safetyOff: async () => {
+        sent.push('M5 S0');
+        return { stage: 'm5' as const };
+      },
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
@@ -129,6 +133,10 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      safetyOff: async () => {
+        sent.push('M5 S0');
+        return { stage: 'm5' as const };
+      },
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
@@ -185,6 +193,7 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      safetyOff: async () => ({ stage: 'm5' as const }),
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
@@ -235,6 +244,10 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      safetyOff: async () => {
+        sent.push('M5 S0');
+        return { stage: 'm5' as const };
+      },
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };

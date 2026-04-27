@@ -113,6 +113,7 @@ async function run(): Promise<void> {
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
   const controllerRef = { current: controller } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };

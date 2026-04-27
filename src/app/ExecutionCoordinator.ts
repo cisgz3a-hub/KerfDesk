@@ -197,6 +197,9 @@ export class ExecutionCoordinator {
       console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
       return false;
     }
+    // T1-22: notify the service that the laser is intentionally on so
+    // job-start gates and the laser-output-state surface stay accurate.
+    this.deps.machineService.notifyTestFire('begin');
     // Arm the deadman synchronously after the M3 succeeds so there is no window
     // in which the laser is on but the auto-stop is unscheduled. Re-entry: clear
     // any prior handle first (a second beginTestFire resets the timer).
@@ -210,17 +213,48 @@ export class ExecutionCoordinator {
       // during the M5 write does not see a stale handle. T1-18.
       this._testFireTimerHandle = null;
       console.warn('[TestFire] deadman expired — forcing laser off');
+      // T1-22: deadman path also notifies test-fire end so the service's
+      // laser-output-state transitions back to 'off' (or 'unknown' if the
+      // safetyOff path took the soft-reset fallback).
+      this.deps.machineService.notifyTestFire('end');
       void this.emergencyLaserOff();
     }, deadmanMs);
     return true;
   }
 
   /**
-   * Immediate laser off (M5 S0). Notifies simulator. Idempotent-safe.
-   * Swallows disconnect races ('Not connected').
+   * Two-stage hardware-off path. T1-22.
+   *
+   * Awaits {@link LaserController.safetyOff}, which tries `M5 S0` via the
+   * port's awaitable critical-write and, on transport failure, falls back to
+   * soft reset (`0x18`). Pipes the structured outcome to
+   * {@link MachineService.notifyLaserSafetyOutcome} so subsequent job starts
+   * are gated until laser-output state is trustworthy again.
+   *
+   * Warning text is preserved for back-compat with existing tests that assert
+   * on `[LaserOff] blocked:`. A new `[LaserOff] M5 transport failed; soft
+   * reset succeeded` warn marks the fallback path so support bundles can
+   * distinguish it.
    */
   async emergencyLaserOff(): Promise<void> {
-    this.laserM5OffSync('[LaserOff] blocked:');
+    const ctrl = this.deps.controllerRef.current;
+    this.notifySimulator('M5 S0');
+    if (!ctrl) return;
+    const result = await ctrl.safetyOff();
+    this.deps.machineService.notifyLaserSafetyOutcome(result.stage);
+    if (result.stage === 'm5') return;
+    if (result.stage === 'soft-reset') {
+      console.warn(
+        '[LaserOff] M5 transport failed; soft reset succeeded:',
+        result.error?.message ?? '',
+      );
+      return;
+    }
+    // stage === 'failed'
+    const msg = result.error?.message ?? 'unknown';
+    if (!msg.includes('Not connected')) {
+      console.warn('[LaserOff] blocked:', msg);
+    }
   }
 
   /**
@@ -233,22 +267,11 @@ export class ExecutionCoordinator {
       clearTimeout(this._testFireTimerHandle);
       this._testFireTimerHandle = null;
     }
+    // T1-22: notify the service that the user-driven laser-on phase is over.
+    // The subsequent emergencyLaserOff will further refine the state via
+    // notifyLaserSafetyOutcome (M5 → 'off', soft-reset/failed → 'unknown').
+    this.deps.machineService.notifyTestFire('end');
     await this.emergencyLaserOff();
-  }
-
-  private laserM5OffSync(warnPrefix: string): void {
-    const ctrl = this.deps.controllerRef.current;
-    const cmd = 'M5 S0';
-    this.notifySimulator(cmd);
-    if (!ctrl) return;
-    try {
-      ctrl.sendCommand(cmd, 'internal');
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      if (!msg.includes('Not connected')) {
-        console.warn(warnPrefix, msg);
-      }
-    }
   }
 
   /**

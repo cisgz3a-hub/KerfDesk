@@ -118,6 +118,7 @@ function makeController(): LaserController {
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
 }
 

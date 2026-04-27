@@ -126,6 +126,7 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
 }
 

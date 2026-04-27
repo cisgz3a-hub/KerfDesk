@@ -52,6 +52,7 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
 }
 

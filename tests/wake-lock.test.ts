@@ -145,6 +145,7 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
   } as LaserController;
 }
 

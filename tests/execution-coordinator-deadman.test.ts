@@ -65,6 +65,10 @@ function makeMockController(sent: string[], throwOnSend = false): LaserControlle
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => {
+        sent.push('M5 S0');
+        return { stage: 'm5' as const };
+      },
   } as LaserController;
 }
 

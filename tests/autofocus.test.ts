@@ -99,6 +99,7 @@ async function testMachineServiceAutoFocus(): Promise<void> {
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    safetyOff: async () => ({ stage: 'm5' as const }),
     onObjectLifecycle: () => () => {},
     runAutoFocus: async (command: string, timeoutMs: number = 15000) => {
       calls.push({ command, timeoutMs });

@@ -68,6 +68,8 @@ const files = [
   'job-compiler-curve-flatness.test.ts',
   'controller-stop-safety.test.ts',
   'stop-on-error-override.test.ts',
+  'safety-off-two-stage.test.ts',
+  'safety-write-failure-surfaces.test.ts',
   'machine-settings-stop-on-error-toggle.test.ts',
   'autofocus.test.ts',
   'machine-service-pause-resume.test.ts',
