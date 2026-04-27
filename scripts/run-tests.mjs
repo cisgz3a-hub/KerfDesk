@@ -40,6 +40,7 @@ const files = [
   'autosave-dirty-flag-on-failure.test.ts',
   'manual-save-needs-acknowledgement.test.ts',
   'delete-marks-dirty.test.ts',
+  'text-property-edits-undoable.test.ts',
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',

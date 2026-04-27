@@ -413,7 +413,15 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
           : o
       ),
     };
-    (onSceneChange ?? onSceneCommit)(newScene);
+    // T1-74: always commit (was `(onSceneChange ?? onSceneCommit)`). Every
+    // caller — bold/italic/alignment buttons, font/fontSize dropdowns, and
+    // letter/line/word spacing sliders — represents a meaningful user-actioned
+    // change that must mark dirty and create a history entry. Today this
+    // overshoots history for sliders (one entry per onChange tick during a
+    // drag) but is strictly better than the previous behavior of producing
+    // zero history entries for any text property edit. T2-80 will coalesce
+    // slider drags into a single history entry.
+    onSceneCommit(newScene);
     try {
       window.dispatchEvent(new Event('laserforge-canvas-repaint'));
     } catch { /* ignore */ }
