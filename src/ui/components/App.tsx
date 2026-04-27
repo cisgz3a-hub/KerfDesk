@@ -1162,10 +1162,13 @@ export function App() {
   const handleDelete = useCallback(() => {
     if (selectedIds.size === 0) return;
     const newScene = deleteObjects(scene, selectedIds);
-    historyRef.current.push(newScene);
-    setScene(newScene);
+    // T1-73: route through handleSceneCommit so the canonical mutation path
+    // marks dirty (was previously bypassed via direct historyRef.push +
+    // setScene, leaving the project clean and risking autosave skipping the
+    // deletion if the tab closed before the next dirty-marking edit).
+    handleSceneCommit(newScene);
     setSelectedIds(new Set());
-  }, [scene, selectedIds]);
+  }, [scene, selectedIds, handleSceneCommit]);
 
   const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
     scene,
