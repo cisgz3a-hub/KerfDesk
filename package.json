@@ -21,11 +21,11 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
+  "_npmRebuildRationale": "T1-86: serialport@13 / @serialport/bindings-cpp@13 use N-API (node-addon-api), so the bundled prebuilds (prebuilds/{platform}-{arch}/*.node) are forward-compatible across Electron versions. node-gyp-build resolves them at runtime; electron-builder unpacks .node files from asar by default. tests/native-deps-prebuild-check.test.ts asserts the prebuild chain structurally; T3-86 will add a packaged-binary runtime smoke test as defense against future serialport upgrades that drop prebuilds or platform coverage.",
   "build": {
     "appId": "com.laserforge.app",
     "productName": "LaserForge",
     "npmRebuild": false,
-    "_npmRebuildRationale": "T1-86: serialport@13 / @serialport/bindings-cpp@13 use N-API (node-addon-api), so the bundled prebuilds (prebuilds/{platform}-{arch}/*.node) are forward-compatible across Electron versions. node-gyp-build resolves them at runtime; electron-builder unpacks .node files from asar by default. tests/native-deps-prebuild-check.test.ts asserts the prebuild chain structurally; T3-86 will add a packaged-binary runtime smoke test as defense against future serialport upgrades that drop prebuilds or platform coverage.",
     "directories": {
       "output": "release"
     },
@@ -73,7 +73,7 @@
     "@vitejs/plugin-react": "^6.0.1",
     "concurrently": "^8.2.2",
     "electron": "^34.0.0",
-    "electron-builder": "^25.0.0",
+    "electron-builder": "^26.8.1",
     "eslint": "^10.2.0",
     "eslint-plugin-react-hooks": "^7.1.0",
     "husky": "^9.1.7",

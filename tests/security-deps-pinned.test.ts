@@ -53,30 +53,26 @@
  * └─────────────────────────────┴───────────────────────────────────────┘
  *
  * ┌─────────────────────────────┬───────────────────────────────────────┐
- * │ TIER C — build-only, no end-user runtime exposure                   │
+ * │ TIER C — build-only, fixed here                                     │
  * ├─────────────────────────────┼───────────────────────────────────────┤
- * │ electron-builder 25 → 26    │ Bundles 11 transitive advisories      │
- * │                             │ under one upgrade: @electron/rebuild, │
+ * │ electron-builder 25 → 26    │ Collapses the build-only advisory     │
+ * │                             │ cluster: @electron/rebuild,          │
  * │                             │ @tootallnate/once, app-builder-lib,   │
  * │                             │ cacache, dmg-builder,                 │
  * │                             │ electron-builder-squirrel-windows,    │
  * │                             │ http-proxy-agent, make-fetch-happen,  │
- * │                             │ node-gyp, postcss, tar. All run on    │
+ * │                             │ node-gyp, tar, and plist's nested     │
+ * │                             │ @xmldom/xmldom. These packages run on │
  * │                             │ the developer's build machine, not on │
- * │                             │ the end-user's installed app. Threat  │
- * │                             │ model is supply-chain attack on the   │
- * │                             │ build host. Deferred to its own       │
- * │                             │ ticket because semver-major bump can  │
- * │                             │ change packaging format, signing, or  │
- * │                             │ installer metadata — needs a full     │
- * │                             │ install/uninstall test on win32-x64,  │
- * │                             │ darwin, and linux.                    │
+ * │                             │ the end-user's installed app, but the │
+ * │                             │ patched builder line is still pinned  │
+ * │                             │ so the build host does not drift back │
+ * │                             │ into the known-vulnerable cluster.    │
  * │                             │                                       │
- * │ Includes: plist's transitive│ The plist package (a dep of           │
- * │ @xmldom/xmldom@0.8.12       │ dmg-builder) carries an old           │
- * │                             │ @xmldom/xmldom internally. macOS-     │
- * │                             │ build-only. Cleared by the            │
- * │                             │ electron-builder major bump.          │
+ * │ postcss                     │ Still appears after the builder bump, │
+ * │                             │ but now only via vite. That is a      │
+ * │                             │ separate Vite cleanup ticket, not     │
+ * │                             │ part of the electron-builder cluster. │
  * └─────────────────────────────┴───────────────────────────────────────┘
  *
  * WHAT THIS TEST ENFORCES:
@@ -85,10 +81,12 @@
  *      patched lines.
  *   2. The test FAILS if a future regression downgrades either dep into
  *      the vulnerable range.
- *   3. The test does NOT enforce zero `npm audit` output — that would
- *      conflate Tier A (we fixed it), Tier B (electron, deferred), and
- *      Tier C (electron-builder, deferred). Conflation here would either
- *      block all merges or train people to ignore the test.
+ *   3. The electron-builder cluster stays on the patched 26.x line and
+ *      the old vulnerable transitive packages stay absent.
+ *   4. The test does NOT enforce zero `npm audit` output — that would
+ *      conflate fixed Tier A/C work with Tier B (electron major upgrade)
+ *      and the remaining Vite/postcss cleanup. Conflation here would
+ *      either block all merges or train people to ignore the test.
  *
  * Run: npx tsx tests/security-deps-pinned.test.ts
  */
@@ -152,6 +150,10 @@ const lock = JSON.parse(
   readFileSync(join(REPO_ROOT, 'package-lock.json'), 'utf8'),
 ) as Lockfile;
 
+function lockVersion(packagePath: string): string {
+  return lock.packages?.[packagePath]?.version ?? '';
+}
+
 // ── @xmldom/xmldom (Tier A) ────────────────────────────────────────
 {
   const declared = pkg.dependencies?.['@xmldom/xmldom']
@@ -213,6 +215,66 @@ const lock = JSON.parse(
     semverCmp(resolved, '3.4.0') >= 0,
     `dompurify resolved at >= 3.4.0 in lockfile; got "${resolved}"`,
   );
+}
+
+// ── electron-builder cluster (Tier C, build-only) ──────────────────
+{
+  const declared = pkg.devDependencies?.['electron-builder'] ?? '';
+  const declaredMin = declared.replace(/^[\^~]/, '');
+  assert(
+    declared.length > 0,
+    'electron-builder is declared in devDependencies',
+  );
+  assert(
+    semverCmp(declaredMin, '26.8.1') >= 0,
+    `electron-builder declared at >= 26.8.1 (patched builder line); got "${declared}"`,
+  );
+
+  const builderVersion = lockVersion('node_modules/electron-builder');
+  assert(
+    builderVersion.length > 0,
+    'electron-builder is resolved in package-lock.json',
+  );
+  assert(
+    semverCmp(builderVersion, '26.8.1') >= 0,
+    `electron-builder resolved at >= 26.8.1 in lockfile; got "${builderVersion}"`,
+  );
+
+  const patchedBuilderPackages: Array<[string, string]> = [
+    ['node_modules/app-builder-lib', '26.8.1'],
+    ['node_modules/dmg-builder', '26.8.1'],
+    ['node_modules/electron-builder-squirrel-windows', '26.8.1'],
+    ['node_modules/@electron/rebuild', '4.0.3'],
+    ['node_modules/node-gyp', '12.2.0'],
+    ['node_modules/tar', '7.5.11'],
+    ['node_modules/http-proxy-agent', '7.0.0'],
+    ['node_modules/plist/node_modules/@xmldom/xmldom', '0.8.13'],
+  ];
+
+  for (const [packagePath, minVersion] of patchedBuilderPackages) {
+    const resolved = lockVersion(packagePath);
+    assert(
+      resolved.length > 0,
+      `${packagePath} is resolved in package-lock.json`,
+    );
+    assert(
+      semverCmp(resolved, minVersion) >= 0,
+      `${packagePath} resolved at >= ${minVersion}; got "${resolved}"`,
+    );
+  }
+
+  const removedPackages = [
+    'node_modules/@tootallnate/once',
+    'node_modules/cacache',
+    'node_modules/make-fetch-happen',
+  ];
+
+  for (const packagePath of removedPackages) {
+    assert(
+      lock.packages?.[packagePath] === undefined,
+      `${packagePath} is absent from package-lock.json (old builder cluster removed)`,
+    );
+  }
 }
 
 // ── Reachability invariants (defense-in-depth against future code drift) ──

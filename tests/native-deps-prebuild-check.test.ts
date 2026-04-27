@@ -59,6 +59,7 @@ interface BindingsCppPackage {
 }
 
 interface RootPackage {
+  _npmRebuildRationale?: string;
   build?: {
     npmRebuild?: boolean;
     _npmRebuildRationale?: string;
@@ -100,10 +101,14 @@ void (() => {
       rootPkg.build?.npmRebuild === false,
       'package.json:build.npmRebuild === false (current decision)',
     );
-    const rationale = rootPkg.build?._npmRebuildRationale ?? '';
+    assert(
+      rootPkg.build?._npmRebuildRationale === undefined,
+      'package.json:build has no custom _npmRebuildRationale key (electron-builder 26 validates build schema)',
+    );
+    const rationale = rootPkg._npmRebuildRationale ?? '';
     assert(
       typeof rationale === 'string' && rationale.length >= 100,
-      'package.json:build._npmRebuildRationale is a non-trivial doc string',
+      'package.json:_npmRebuildRationale is a non-trivial doc string',
     );
     assert(
       /T1-86/.test(rationale),
