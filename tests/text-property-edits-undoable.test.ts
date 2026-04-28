@@ -19,9 +19,11 @@
  * dirty=true, push history, setScene — exactly what production does. Uses
  * the real HistoryManager so undo/restore semantics are verified end-to-end.
  *
- * Slider behavior caveat (T2-80 deferred): until coalescing lands, sliders
- * produce one history entry per onChange tick. This is acknowledged as
- * sub-optimal but strictly better than zero entries.
+ * T2-80 closed the slider sub-case: letter/line/word spacing sliders now
+ * use a preview/commit split. onChange → previewTextGeometry (no history,
+ * no dirty flag, just live render). onPointerUp/onBlur →
+ * patchTextGeometry (one history entry, one dirty flip per drag). This
+ * test mirrors both functions and verifies the new contract.
  *
  * Run: npx tsx tests/text-property-edits-undoable.test.ts
  */
@@ -79,6 +81,38 @@ function runPatchTextGeometry(
   // Inline of `onSceneCommit(newScene)` (App.tsx:handleSceneCommit):
   deps.sceneIsDirtyRef.current = true;
   deps.historyRef.current.push(newScene);
+  deps.setScene(newScene);
+  return newScene;
+}
+
+/**
+ * T2-80: mirror of the post-T2-80 `previewTextGeometry` in
+ * PropertiesPanel.tsx. Same shape as runPatchTextGeometry but inlines
+ * the preview path (App.tsx:handleSceneChange = setScene only) instead
+ * of the commit path. Crucially: does NOT set dirty, does NOT push
+ * history. The matching commit at end-of-drag goes through
+ * runPatchTextGeometry.
+ */
+function runPreviewTextGeometry(
+  deps: PatchDeps,
+  updates: Partial<TextGeometry>,
+): Scene | null {
+  if (deps.obj.geometry.type !== 'text') return null;
+  const prev = deps.obj.geometry;
+  const newGeom: TextGeometry = { ...prev, ...updates, type: 'text' };
+  const newScene: Scene = {
+    ...deps.scene,
+    objects: deps.scene.objects.map(o =>
+      o.id === deps.obj.id
+        ? { ...o, geometry: newGeom, _bounds: null, _worldTransform: null }
+        : o,
+    ),
+  };
+  // Inline of `onSceneChange(newScene)` (App.tsx:handleSceneChange):
+  // setScene only — no dirty flip, no history push. Production has a
+  // fallback to onSceneCommit if onSceneChange isn't wired; the test
+  // assumes the modern host (always wired) which is the production
+  // configuration.
   deps.setScene(newScene);
   return newScene;
 }
@@ -232,7 +266,11 @@ void (() => {
     );
   }
 
-  // ── 4. Letter spacing slider tick: one entry per tick (T2-80 caveat) ──
+  // ── 4. Letter spacing slider drag: ONE history entry total (T2-80) ────
+  // Before T2-80, sliders called patchTextGeometry on every onChange tick
+  // (one history entry per tick during a drag). T2-80 split this into
+  // previewTextGeometry on onChange (no history) and patchTextGeometry on
+  // onPointerUp/onBlur (one history entry at end of drag).
   {
     const { scene, textId } = makeSceneWithText('Slide');
     const hist = new HistoryManager();
@@ -240,12 +278,13 @@ void (() => {
     const sceneIsDirtyRef: RefObj<boolean> = { current: false };
 
     let current: Scene = scene;
-    let entriesAdded = 0;
-    // Simulate three slider ticks at 5, 10, 15. Each is an onChange.
+    const startCursor = hist.cursor;
+
+    // Simulate three preview ticks (drag in progress: 5, 10, 15) followed
+    // by one commit (end of drag at 15).
     for (const v of [5, 10, 15]) {
       const obj = current.objects.find(o => o.id === textId)!;
-      const before = hist.cursor;
-      const after = runPatchTextGeometry(
+      const after = runPreviewTextGeometry(
         {
           scene: current, obj, sceneIsDirtyRef,
           historyRef: { current: hist },
@@ -254,24 +293,134 @@ void (() => {
         { letterSpacing: v },
       );
       current = after!;
-      if (hist.cursor === before + 1) entriesAdded++;
     }
+
     assert(
-      entriesAdded === 3,
-      'slider: one history entry per onChange tick (T2-80 will coalesce)',
+      hist.cursor === startCursor,
+      'preview ticks: zero history entries during drag (T2-80 coalescing)',
+    );
+    assert(
+      sceneIsDirtyRef.current === false,
+      'preview ticks: dirty NOT set (preview is non-mutating from autosave POV)',
+    );
+
+    // Now the commit path fires once at onPointerUp / onBlur.
+    const obj = current.objects.find(o => o.id === textId)!;
+    runPatchTextGeometry(
+      {
+        scene: current, obj, sceneIsDirtyRef,
+        historyRef: { current: hist },
+        setScene: (s) => { current = s; },
+      },
+      { letterSpacing: 15 },
+    );
+
+    assert(
+      hist.cursor === startCursor + 1,
+      'commit at end of drag: exactly ONE history entry (was 3 pre-T2-80)',
     );
     assert(
       sceneIsDirtyRef.current === true,
-      'slider drags → dirty=true',
-    );
-    const finalObj = current.objects.find(o => o.id === textId)!;
-    assert(
-      (finalObj.geometry as TextGeometry).letterSpacing === 15,
-      'final letterSpacing reflects the last tick',
+      'commit at end of drag: dirty=true',
     );
   }
 
-  // ── 5. Undo restores previous geometry exactly ────────────────────────
+  // ── 5. Preview-only path is non-destructive to history (T2-80) ────────
+  // Verifies that previewTextGeometry doesn't accidentally call
+  // historyRef.current.push or sceneIsDirtyRef mutation — the live-preview
+  // contract MUST be safe to fire continuously without polluting state.
+  {
+    const { scene, textId } = makeSceneWithText('Preview');
+    const hist = new HistoryManager();
+    hist.push(scene);
+    const sceneIsDirtyRef: RefObj<boolean> = { current: false };
+    const startCursor = hist.cursor;
+
+    let current: Scene = scene;
+    // Many preview ticks — simulate a long drag.
+    for (let i = 0; i < 20; i++) {
+      const obj = current.objects.find(o => o.id === textId)!;
+      const after = runPreviewTextGeometry(
+        {
+          scene: current, obj, sceneIsDirtyRef,
+          historyRef: { current: hist },
+          setScene: () => {},
+        },
+        { letterSpacing: i * 5 },
+      );
+      current = after!;
+    }
+
+    assert(
+      hist.cursor === startCursor,
+      `preview path: 20 ticks added zero history entries (got cursor delta ${hist.cursor - startCursor})`,
+    );
+    assert(
+      sceneIsDirtyRef.current === false,
+      'preview path: 20 ticks did not flip dirty',
+    );
+    // The scene state still reflects the last preview value (UI shows it).
+    const finalObj = current.objects.find(o => o.id === textId)!;
+    assert(
+      (finalObj.geometry as TextGeometry).letterSpacing === 95,
+      `preview path: scene reflects last tick value (got ${(finalObj.geometry as TextGeometry).letterSpacing})`,
+    );
+  }
+
+  // ── 6. Commit after preview takes the LAST preview value (T2-80) ──────
+  // Defense-in-depth for the most common drag pattern: user drags through
+  // many values then releases at the final one. The committed history
+  // entry should reflect the released value, not any intermediate.
+  {
+    const { scene, textId } = makeSceneWithText('Commit');
+    const hist = new HistoryManager();
+    hist.push(scene);
+    const sceneIsDirtyRef: RefObj<boolean> = { current: false };
+
+    let current: Scene = scene;
+
+    // Preview through 20 -> 40 -> 60 -> 80, then commit at 80.
+    for (const v of [20, 40, 60, 80]) {
+      const obj = current.objects.find(o => o.id === textId)!;
+      const after = runPreviewTextGeometry(
+        {
+          scene: current, obj, sceneIsDirtyRef,
+          historyRef: { current: hist },
+          setScene: () => {},
+        },
+        { letterSpacing: v },
+      );
+      current = after!;
+    }
+
+    const obj = current.objects.find(o => o.id === textId)!;
+    const committed = runPatchTextGeometry(
+      {
+        scene: current, obj, sceneIsDirtyRef,
+        historyRef: { current: hist },
+        setScene: () => {},
+      },
+      { letterSpacing: 80 },
+    );
+
+    const committedObj = committed!.objects.find(o => o.id === textId)!;
+    assert(
+      (committedObj.geometry as TextGeometry).letterSpacing === 80,
+      `commit value matches release value (got ${(committedObj.geometry as TextGeometry).letterSpacing})`,
+    );
+
+    // Undo from this state should restore to BEFORE the drag, not to one
+    // of the intermediate preview values. Verifies the coalescing
+    // contract from the user's POV.
+    const undone = hist.undo();
+    const undoneObj = undone!.objects.find(o => o.id === textId)!;
+    assert(
+      (undoneObj.geometry as TextGeometry).letterSpacing === undefined,
+      `undo after slider drag → pre-drag state (letterSpacing was unset; got ${(undoneObj.geometry as TextGeometry).letterSpacing})`,
+    );
+  }
+
+  // ── 7. Undo restores previous geometry exactly ────────────────────────
   {
     const { scene, textId } = makeSceneWithText('Undo me');
     const hist = new HistoryManager();
@@ -300,7 +449,7 @@ void (() => {
     );
   }
 
-  // ── 6. Non-text geometry: no-op (no history push, no dirty change) ────
+  // ── 8. Non-text geometry: no-op (no history push, no dirty change) ────
   {
     const { scene } = makeSceneWithText('whatever');
     // Build a non-text fake object

@@ -50,6 +50,13 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   const skipBlurBrightnessCommit = useRef(false);
   const skipBlurContrastCommit = useRef(false);
   const skipBlurImageThresholdCommit = useRef(false);
+  // T2-80: text-geometry slider commit guards — match the image-slider
+  // pattern (skip onBlur commit if onPointerUp already fired). Each slider
+  // has its own ref because the user can drag one slider, then keyboard-
+  // tab to another while their commit paths are still in flight.
+  const skipBlurLetterSpacingCommit = useRef(false);
+  const skipBlurLineSpacingCommit = useRef(false);
+  const skipBlurWordSpacingCommit = useRef(false);
 
   const selectedObjects = scene.objects.filter(o => selectedIds.has(o.id));
   const singleId = selectedObjects.length === 1 ? selectedObjects[0].id : null;
@@ -414,14 +421,49 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       ),
     };
     // T1-74: always commit (was `(onSceneChange ?? onSceneCommit)`). Every
-    // caller — bold/italic/alignment buttons, font/fontSize dropdowns, and
-    // letter/line/word spacing sliders — represents a meaningful user-actioned
-    // change that must mark dirty and create a history entry. Today this
-    // overshoots history for sliders (one entry per onChange tick during a
-    // drag) but is strictly better than the previous behavior of producing
-    // zero history entries for any text property edit. T2-80 will coalesce
-    // slider drags into a single history entry.
+    // discrete caller — bold/italic/alignment buttons, font/fontSize
+    // dropdowns, fontSize NumberInput — represents a meaningful user-
+    // actioned change that must mark dirty and create a history entry.
+    //
+    // T2-80 closed the slider sub-case: letter/line/word spacing sliders
+    // used to call patchTextGeometry on every onChange tick (one history
+    // entry per drag tick). They now use previewTextGeometry on onChange
+    // (preview only, no history) and patchTextGeometry on onPointerUp/
+    // onBlur (one history entry per drag).
     onSceneCommit(newScene);
+    try {
+      window.dispatchEvent(new Event('laserforge-canvas-repaint'));
+    } catch { /* ignore */ }
+  };
+
+  /**
+   * T2-80: preview-only sibling of patchTextGeometry. Mutates scene state
+   * for live preview during a slider drag without committing to history
+   * or marking the scene dirty. The matching commit must happen at the
+   * end of the drag (onPointerUp / onBlur) via patchTextGeometry.
+   *
+   * If onSceneChange isn't wired (older host), this falls back to
+   * onSceneCommit — the safe behavior is to commit each tick rather than
+   * lose user input. The fallback matches the pre-T1-74 default for
+   * non-slider edits.
+   */
+  const previewTextGeometry = (updates: Partial<TextGeometry>) => {
+    if (obj.geometry.type !== 'text') return;
+    const prev = obj.geometry as TextGeometry;
+    const newGeom: TextGeometry = { ...prev, ...updates, type: 'text' };
+    const newScene: Scene = {
+      ...scene,
+      objects: scene.objects.map(o =>
+        o.id === obj.id
+          ? { ...o, geometry: newGeom, _bounds: null, _worldTransform: null }
+          : o
+      ),
+    };
+    if (onSceneChange) {
+      onSceneChange(newScene);
+    } else {
+      onSceneCommit(newScene);
+    }
     try {
       window.dispatchEvent(new Event('laserforge-canvas-repaint'));
     } catch { /* ignore */ }
@@ -802,7 +844,23 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               max: 200,
               step: 5,
               value: tg.letterSpacing ?? 0,
+              // T2-80: onChange = preview only, onPointerUp/onBlur = commit
+              // (one history entry per drag instead of one per tick).
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = parseInt(e.target.value, 10);
+                previewTextGeometry({ letterSpacing: Number.isFinite(v) ? v : 0 });
+              },
+              onFocus: () => { skipBlurLetterSpacingCommit.current = false; },
+              onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+                skipBlurLetterSpacingCommit.current = true;
+                const v = parseInt(e.currentTarget.value, 10);
+                patchTextGeometry({ letterSpacing: Number.isFinite(v) ? v : 0 });
+              },
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                if (skipBlurLetterSpacingCommit.current) {
+                  skipBlurLetterSpacingCommit.current = false;
+                  return;
+                }
                 const v = parseInt(e.target.value, 10);
                 patchTextGeometry({ letterSpacing: Number.isFinite(v) ? v : 0 });
               },
@@ -841,7 +899,22 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               max: 300,
               step: 10,
               value: tg.lineSpacing ?? 120,
+              // T2-80: onChange = preview only, onPointerUp/onBlur = commit.
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = parseInt(e.target.value, 10);
+                previewTextGeometry({ lineSpacing: Number.isFinite(v) ? v : 120 });
+              },
+              onFocus: () => { skipBlurLineSpacingCommit.current = false; },
+              onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+                skipBlurLineSpacingCommit.current = true;
+                const v = parseInt(e.currentTarget.value, 10);
+                patchTextGeometry({ lineSpacing: Number.isFinite(v) ? v : 120 });
+              },
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                if (skipBlurLineSpacingCommit.current) {
+                  skipBlurLineSpacingCommit.current = false;
+                  return;
+                }
                 const v = parseInt(e.target.value, 10);
                 patchTextGeometry({ lineSpacing: Number.isFinite(v) ? v : 120 });
               },
@@ -880,7 +953,22 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               max: 300,
               step: 10,
               value: tg.wordSpacing ?? 100,
+              // T2-80: onChange = preview only, onPointerUp/onBlur = commit.
               onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+                const v = parseInt(e.target.value, 10);
+                previewTextGeometry({ wordSpacing: Number.isFinite(v) ? v : 100 });
+              },
+              onFocus: () => { skipBlurWordSpacingCommit.current = false; },
+              onPointerUp: (e: React.PointerEvent<HTMLInputElement>) => {
+                skipBlurWordSpacingCommit.current = true;
+                const v = parseInt(e.currentTarget.value, 10);
+                patchTextGeometry({ wordSpacing: Number.isFinite(v) ? v : 100 });
+              },
+              onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+                if (skipBlurWordSpacingCommit.current) {
+                  skipBlurWordSpacingCommit.current = false;
+                  return;
+                }
                 const v = parseInt(e.target.value, 10);
                 patchTextGeometry({ wordSpacing: Number.isFinite(v) ? v : 100 });
               },
