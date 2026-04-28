@@ -991,6 +991,13 @@ export class GrblController implements LaserController {
   private _handleError(line: string): void {
     const code = parseInt(line.split(':')[1], 10) || 0;
 
+    // T1-24: capture job-active state at entry. Used both for the
+    // safetyOff call (active jobs need the soft-reset stage; idle errors
+    // are protocol-level and a queued M5 is sufficient) and to decide
+    // the post-handler status (active-job errors must NOT transition to
+    // 'idle' — see audit 1E and the post-handler block below).
+    const wasJobRunning = this._isJobRunning;
+
     if (this._pending.length > 0) {
       const oldest = this._pending.shift()!;
       this._bufferAvailable += oldest.byteCount;
@@ -1005,10 +1012,55 @@ export class GrblController implements LaserController {
     this._state.errorCode = code;
     this._emitProgress();
 
+    // T1-24: actively command the laser off — but ONLY if a job was
+    // running. Without an active job, GRBL `error:N` is protocol-level
+    // (parsing, bad command, USB glitch) with no laser activity to
+    // worry about, and an extra M5 just adds noise on the connect
+    // handshake (the mock-port wake-up `\n` returns `error:20` in
+    // tests, a synthetic case that surfaced this distinction).
+    //
+    // When a job IS active, `error:N` does NOT necessarily disable the
+    // laser — modal M3/M4 state can persist through a parsing/protocol
+    // error while the beam keeps burning. safetyOff() is the awaitable
+    // two-stage M5 → soft-reset path installed by T1-22. Fire-and-
+    // forget because the data dispatch loop is sync; if we awaited
+    // here we'd back-pressure the entire stream including possible
+    // recovery lines.
+    //
+    // safetyOff is documented to never throw — it returns
+    // {stage: 'failed'} instead. Inspect the resolved value so a
+    // failed safety-off gets logged for support.
+    if (wasJobRunning) {
+      void this.safetyOff().then(result => {
+        if (result.stage === 'failed') {
+          console.warn(
+            '[GrblController] T1-24: safetyOff after error:%d returned failed:',
+            code, result.error,
+          );
+        }
+      }).catch((err: unknown) => {
+        // Defense-in-depth — safetyOff is documented to not throw.
+        console.warn('[GrblController] T1-24: safetyOff after error threw unexpectedly:', err);
+      });
+    }
+
     // Stop streaming on error by default — safer for real machines
     if (this._stopOnError) {
       this._abortJob();
-      this._updateStatus('idle');
+      // T1-24 + audit 1E: transition to 'alarm' (not 'idle') after an
+      // error during an active job. The UI reads 'idle' as "ready for
+      // next job" — a user who ignored the error and clicked Run would
+      // start a new job from a state where the previous error left the
+      // laser potentially still on, in unknown position. Forcing
+      // 'alarm' makes the UI gate the Run button until the user
+      // consciously clears, matching the existing alarm-state UX.
+      //
+      // For idle errors (e.g. user typed an invalid console command),
+      // the previous status was already 'idle' and there's no laser
+      // motion to lock down — preserve the existing 'idle' transition.
+      // T2-12 will introduce a proper FAULTED_REQUIRES_INSPECTION state
+      // and migrate the active-job branch to it.
+      this._updateStatus(wasJobRunning ? 'alarm' : 'idle');
       return;
     }
 
@@ -1020,6 +1072,24 @@ export class GrblController implements LaserController {
     this._state.alarmCode = code;
     this._updateStatus('alarm');
     this._abortJob();
+
+    // T1-24: actively command the laser off. The GRBL spec says ALARM
+    // disables spindle/laser at firmware level, but that's a
+    // firmware-side promise, not a software-side proof. If the alarm
+    // condition itself was caused by a firmware bug, USB glitch, or
+    // partial reset, the laser can be in an undefined state. safetyOff
+    // is a defense-in-depth confirmation. Fire-and-forget for the same
+    // reason as _handleError above.
+    void this.safetyOff().then(result => {
+      if (result.stage === 'failed') {
+        console.warn(
+          '[GrblController] T1-24: safetyOff after ALARM:%d returned failed:',
+          code, result.error,
+        );
+      }
+    }).catch((err: unknown) => {
+      console.warn('[GrblController] T1-24: safetyOff after alarm threw unexpectedly:', err);
+    });
 
     for (const cb of this._errorListeners) {
       cb(code, `ALARM:${code} — machine halted`);
