@@ -1092,13 +1092,30 @@ export function App() {
     showConfirm,
   });
 
-  /** New project: reset history entirely and start fresh. */
-  const handleNewProject = useCallback((newScene: Scene) => {
-    sceneIsDirtyRef.current = false;
-    setSelectedIds(new Set());
-    historyRef.current.reset(newScene);
-    setScene(newScene);
-  }, []);
+  /**
+   * Load a scene as the new project baseline. Resets history, marks
+   * clean, clears selection, invalidates compile and frame action.
+   *
+   * T2-76 step 6: routes through the unified mutation function with
+   * kind='load'. The `source` parameter discriminates new-from-blank,
+   * file-load, and autosave-recovery for the (currently no-op)
+   * transition log; T3-68 will wire the emitter.
+   *
+   * Behavioral note vs pre-step-6: loading a project now also calls
+   * invalidate.compile (was implicit-via-useCompileManager-effect
+   * which sidebar-gates, leaving a T1-75-shaped stale-gcode gap on
+   * loads) and invalidate.frame (was missing entirely, meaning the
+   * T1-59 frame-before-start gate could pass against an outdated
+   * frame action after a load). Both close real gaps.
+   */
+  const handleNewProject = useCallback(
+    (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
+      commitSceneTransaction(newScene, { kind: 'load', source }, {
+        selectionAfter: new Set(),
+      });
+    },
+    [commitSceneTransaction],
+  );
 
   const handleTogglePreview = useCallback(() => {
     setShowToolpathPreview(p => !p);

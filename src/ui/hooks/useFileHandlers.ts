@@ -7,7 +7,7 @@ import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 export interface UseFileHandlersParams {
   scene: Scene;
   setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
-  handleNewProject: (scene: Scene) => void;
+  handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   sceneIsDirtyRef: MutableRefObject<boolean>;
   lastSavedSceneRef: MutableRefObject<string>;
   showAlert: (title: string, message: string) => Promise<unknown>;
@@ -76,7 +76,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       try {
         const text = await file.text();
         const loadedScene = deserializeScene(text);
-        handleNewProject(loadedScene);
+        handleNewProject(loadedScene, 'file');
       } catch (err) {
         await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
       }
@@ -90,7 +90,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       if (!ok) return;
     }
     clearAutosave();
-    handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'));
+    handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'), 'new');
   }, [scene.canvas.width, scene.canvas.height, scene.objects.length, handleNewProject, showConfirm]);
 
   const handleClearSelection = useCallback(() => {

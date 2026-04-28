@@ -45,7 +45,7 @@ function mergePreservedProfileFields(target: DeviceProfile, previous: DeviceProf
 export interface UseWizardHandlersParams {
   scene: Scene;
   handleSceneCommit: (newScene: Scene) => void;
-  handleNewProject: (scene: Scene) => void;
+  handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setShowSetup: (show: boolean) => void;
   setShowRecover: (show: boolean) => void;
   setRecoverAutosaveTimeLabel?: (label: string | null) => void;
@@ -77,7 +77,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       const payload = await readAutosave();
       if (payload?.json) {
         const recovered = deserializeScene(payload.json);
-        handleNewProject(recovered);
+        handleNewProject(recovered, 'autosave');
       }
     } catch (e) {
       console.error('Recovery failed:', e);

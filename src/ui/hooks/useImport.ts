@@ -12,7 +12,7 @@ const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB — inline below, Indexed
 
 export interface UseImportDeps {
   handleSceneCommit: (scene: Scene) => void;
-  handleNewProject: (scene: Scene) => void;
+  handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setIsDragOver: (v: boolean) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
 }
@@ -228,7 +228,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       try {
         if (name.endsWith('.laserforge.json') || (name.endsWith('.json') && text)) {
           const loaded = deserializeScene(text!);
-          handleNewProject(loaded);
+          handleNewProject(loaded, 'file');
         } else if (name.endsWith('.svg') && text) {
           const layerId = scene.activeLayerId || scene.layers[0]?.id;
           if (!layerId) return;

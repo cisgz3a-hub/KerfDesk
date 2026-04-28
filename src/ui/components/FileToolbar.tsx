@@ -30,7 +30,7 @@ interface FileToolbarProps {
   onSceneChange: (scene: Scene) => void;
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
-  onNewProject: (scene: Scene) => void;
+  onNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   onConnect?: () => void;
@@ -132,7 +132,7 @@ export function FileToolbar({
       scene.canvas.height,
       'Untitled'
     );
-    onNewProject(newScene);
+    onNewProject(newScene, 'new');
   }, [scene.canvas.width, scene.canvas.height, scene.objects.length, onNewProject, showConfirm]);
 
   // ─── IMPORT SVG ──────────────────────────────────────────────
@@ -264,7 +264,7 @@ export function FileToolbar({
     try {
       const text = await file.text();
       const loaded = deserializeScene(text);
-      onNewProject(loaded);
+      onNewProject(loaded, 'file');
     } catch (e) {
       console.error('Failed to open file:', e);
       await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
