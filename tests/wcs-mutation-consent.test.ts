@@ -86,7 +86,7 @@ async function main(): Promise<void> {
     await ctrl.disconnect();
   }
 
-  console.log('\n=== WCS consent: G54 offset without listener → direct apply (no registered UI) ===');
+  console.log('\n=== WCS consent: G54 offset without listener → direct apply (headless flag) ===');
   {
   const port = new MockSerialPort((line: string) => {
     if (line === '$$') {
@@ -99,12 +99,20 @@ async function main(): Promise<void> {
     if (line.startsWith('$10=')) return ['ok'];
     return ['ok'];
   });
-  const ctrl = new GrblController();
-  // No onWcsConsentNeeded — controller should apply automatically (per no-listener rule)
+  // T1-20: pre-T1-20 a controller with no consent listener auto-applied
+  // normalization. After T1-20 that's only the case when the controller
+  // is constructed with allowHeadlessWcsAutoNormalize: true. Tests that
+  // rely on the headless auto-apply behavior pass the flag explicitly.
+  const ctrl = new GrblController({ allowHeadlessWcsAutoNormalize: true });
+  // No onWcsConsentNeeded — controller should apply automatically (per headless flag)
   port.open();
   await ctrl.connect(port);
   await waitUntil(() => port.received.includes('G10 L2 P1 X0 Y0 Z0'));
-  assert(port.received.includes('G10 L2 P1 X0 Y0 Z0'), 'Baseline applied with no app listener');
+  assert(port.received.includes('G10 L2 P1 X0 Y0 Z0'), 'Baseline applied with headless flag and no listener');
+  assert(
+    ctrl.getPlacementUncertain?.() === false,
+    'Headless-flag auto-apply: placement is NOT uncertain',
+  );
     await ctrl.disconnect();
   }
 

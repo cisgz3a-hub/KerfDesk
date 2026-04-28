@@ -1000,6 +1000,15 @@ export function ConnectionPanelMain({
   // (notifyTestFire / notifyLaserSafetyOutcome) happen inside coordinator
   // calls that already trigger renders elsewhere. T2-12 will subscribe properly.
   const laserOutputState = machineService.getLaserOutputState();
+  // T1-20: read placement-uncertain state for the start-job gate. Set
+  // by GrblController._emitWcsPayload when the WCS consent flow has no
+  // listeners and the controller wasn't constructed with the headless
+  // flag. Polled per-render — placement-uncertain transitions fire a
+  // state-change event so the UI re-renders and re-evaluates this gate.
+  // Optional method on the interface; default false (not uncertain) for
+  // controllers that don't implement it.
+  const placementUncertain =
+    controllerRef.current?.getPlacementUncertain?.() ?? false;
   const canStartJob =
     !!gcode &&
     !isRunning &&
@@ -1007,7 +1016,8 @@ export function ConnectionPanelMain({
     !gcodeStale &&
     !machineBlocksJobStart &&
     (!requireFrame || hasFramed.current) &&
-    laserOutputState !== 'unknown';
+    laserOutputState !== 'unknown' &&
+    !placementUncertain;
   /** Human-readable reason the Start button is disabled, or null if ready. */
   const startDisabledReason: string | null = (() => {
     if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
@@ -1022,6 +1032,9 @@ export function ConnectionPanelMain({
     }
     if (laserOutputState === 'unknown') {
       return 'Laser-safety state is unknown after a previous laser-off failure — reconnect to clear';
+    }
+    if (placementUncertain) {
+      return 'Machine work-coordinate state could not be confirmed (no consent prompt was shown). Disconnect and reconnect to retry.';
     }
     return null; // ready to start
   })();

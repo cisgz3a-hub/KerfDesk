@@ -35,6 +35,23 @@ interface PendingLine {
   byteCount: number;
 }
 
+/**
+ * T1-20: optional construction-time settings for GrblController.
+ *
+ * `allowHeadlessWcsAutoNormalize`: when true, the WCS consent flow's
+ * no-listener fallback path keeps the pre-T1-20 behavior of silently
+ * applying normalization. Default false: the no-listener path instead
+ * marks the controller placement-uncertain and the UI gates job start.
+ *
+ * Tests that need the pre-T1-20 auto-apply behavior pass `true`.
+ * Production code (App.tsx) leaves the option unset - the UI always
+ * registers a listener via onWcsConsentNeeded before connect, and the
+ * fallback is a no-go-to safety net.
+ */
+export interface GrblControllerOptions {
+  allowHeadlessWcsAutoNormalize?: boolean;
+}
+
 /** First field inside `<...|...>` GRBL realtime reports (e.g. `Hold:0`). */
 function parseGrblStatusReportStateToken(line: string): string | null {
   if (!line.startsWith('<') || !line.endsWith('>')) return null;
@@ -134,6 +151,27 @@ export class GrblController implements LaserController {
   private _awaitingWcsQueryOk = false;
   private _currentG54: { x: number; y: number; z: number } | null = null;
   private _wcsConsentListeners = new Set<(state: WcsConsentSnapshot) => void>();
+  /**
+   * T1-20: when the WCS consent flow finds zero registered listeners and
+   * the controller was NOT constructed with allowHeadlessWcsAutoNormalize,
+   * the controller marks itself placement-uncertain instead of silently
+   * auto-applying. The UI gates job start on this - placement-uncertain
+   * controllers should not be allowed to start jobs because the WCS state
+   * may be set to something the user wants to preserve, and we couldn't
+   * ask. Recovery is disconnect -> ensure listener subscribed -> reconnect.
+   *
+   * Invariant: false at construction (nothing to be uncertain about
+   * yet), false after applyWcsNormalization or skipWcsNormalization
+   * (user has resolved the question), false after disconnect (no
+   * machine state to be uncertain about).
+   */
+  private _placementUncertain = false;
+  /**
+   * T1-20: opt-in for tests / headless callers that need the pre-T1-20
+   * auto-apply behavior on no-listener fallback. Default false (production
+   * safety > test convenience). See `_emitWcsPayload`.
+   */
+  private readonly _allowHeadlessWcsAutoNormalize: boolean;
 
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
 
@@ -142,7 +180,8 @@ export class GrblController implements LaserController {
   private _errorListeners: Set<ErrorCallback> = new Set();
   private _rawLineListeners: Set<RawLineCallback> = new Set();
 
-  constructor() {
+  constructor(options?: GrblControllerOptions) {
+    this._allowHeadlessWcsAutoNormalize = options?.allowHeadlessWcsAutoNormalize === true;
     this._state = {
       status: 'disconnected',
       position: { x: 0, y: 0, z: 0 },
@@ -156,6 +195,17 @@ export class GrblController implements LaserController {
   get state(): MachineState { return { ...this._state }; }
   get isJobRunning(): boolean { return this._isJobRunning; }
   get maxSpindle(): number | null { return this._maxSpindle; }
+  /**
+   * T1-20: returns true if the controller's WCS consent flow encountered a
+   * no-listener fallback (without `allowHeadlessWcsAutoNormalize`). The UI
+   * gates job start on this - placement-uncertain controllers should not
+   * be allowed to start jobs because the WCS state may be set to something
+   * the user wants to preserve, and we couldn't ask. Recovery is
+   * disconnect -> ensure listener subscribed -> reconnect.
+   */
+  getPlacementUncertain(): boolean {
+    return this._placementUncertain;
+  }
 
   /** When false, GRBL `error:` during a job is logged but streaming may continue. Default true. */
   setStopOnError(value: boolean): void {
@@ -361,6 +411,8 @@ export class GrblController implements LaserController {
     this._awaitingSettingsOk = false;
     this._awaitingWcsQueryOk = false;
     this._currentG54 = null;
+    // T1-20: nothing to be uncertain about when not connected.
+    this._placementUncertain = false;
     this._grblSettings.clear();
     this._resetMachineSettingsCache();
     this._updateStatus('disconnected');
@@ -821,6 +873,12 @@ export class GrblController implements LaserController {
     this._writeSystemLine('G10 L2 P1 X0 Y0 Z0');
     this._writeSystemLine('$10=0');
     this._settingsQueried = true;
+    // T1-20: applying normalization brings the machine to the
+    // LaserForge-standard baseline. Whether we got here via consent,
+    // via the headless flag, or via the auto-apply-when-already-baseline
+    // path in _emitWcsConsentNeeded, the placement question is now
+    // resolved.
+    this._placementUncertain = false;
     console.log(
       '[GRBL] Machine: ' +
         this._bedWidth +
@@ -839,6 +897,10 @@ export class GrblController implements LaserController {
   /** Mark the post-connect settings handshake done without writing G10 / $10. */
   skipWcsNormalization(): void {
     this._settingsQueried = true;
+    // T1-20: user (or test) explicitly opted to leave the machine's
+    // existing WCS / mask state in place. They've made the decision -
+    // placement is no longer uncertain from the controller's POV.
+    this._placementUncertain = false;
     for (const cb of this._stateListeners) {
       cb({ ...this._state });
     }
@@ -898,11 +960,40 @@ export class GrblController implements LaserController {
     mask: number,
   ): void {
     if (this._wcsConsentListeners.size === 0) {
+      // T1-20: pre-T1-20 the no-listener fallback silently auto-applied
+      // normalization. That's a hidden mutation path: if the UI's
+      // consent listener registers AFTER connect (subscription race,
+      // unmounted component), G54 and $10 get rewritten without user
+      // consent. Default behavior now refuses to auto-apply and marks
+      // the controller placement-uncertain - the UI gates job start
+      // until the user disconnects, ensures the listener is attached,
+      // and reconnects (or the machine is in fact already at baseline,
+      // in which case _emitWcsConsentNeeded directly calls
+      // applyWcsNormalization without going through this path).
+      //
+      // Tests / headless callers that need the pre-T1-20 behavior pass
+      // `allowHeadlessWcsAutoNormalize: true` to the constructor.
+      if (this._allowHeadlessWcsAutoNormalize) {
+        console.warn(
+          '[GrblController] onWcsConsentNeeded would fire with no listeners - '
+          + 'applying WCS normalization without user prompt because '
+          + 'allowHeadlessWcsAutoNormalize was passed to the constructor.',
+        );
+        this.applyWcsNormalization();
+        return;
+      }
       console.warn(
-        '[GrblController] onWcsConsentNeeded would fire with no listeners — applying WCS normalization without user prompt. '
-        + 'This is expected in headless tests; if a UI is expected, subscribe before connect or there is a race.',
+        '[GrblController] T1-20: WCS consent listener not registered when '
+        + 'consent was needed. Refusing to auto-apply - controller marked '
+        + 'placement-uncertain. Job start will be blocked until the user '
+        + 'disconnects, attaches a listener, and reconnects.',
       );
-      this.applyWcsNormalization();
+      this._placementUncertain = true;
+      // Notify state listeners so the UI re-renders and reads the new
+      // gate value via getPlacementUncertain().
+      for (const cb of this._stateListeners) {
+        cb({ ...this._state });
+      }
       return;
     }
     const payload: WcsConsentSnapshot = {

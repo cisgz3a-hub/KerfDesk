@@ -155,6 +155,18 @@ export interface LaserController {
    */
   skipWcsNormalization?(): void;
   /**
+   * T1-20: GRBL: returns true if the WCS consent flow encountered a
+   * no-listener fallback without the `allowHeadlessWcsAutoNormalize`
+   * option. The UI must gate job start on this - placement-uncertain
+   * controllers should refuse to start jobs because the WCS state may
+   * be set to something the user wants to preserve, and we couldn't
+   * ask. Recovery is disconnect -> attach listener -> reconnect.
+   *
+   * Optional; non-GRBL controllers don't need to implement it. UI code
+   * defaults to false (not uncertain) when not implemented.
+   */
+  getPlacementUncertain?(): boolean;
+  /**
    * Configure whether a running job is aborted on GRBL `error:` responses.
    * Optional; defaults to true when not implemented.
    */
