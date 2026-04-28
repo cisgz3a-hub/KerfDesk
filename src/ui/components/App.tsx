@@ -23,6 +23,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { type Scene, createScene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
+import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { FileToolbar } from './FileToolbar';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
@@ -731,6 +732,62 @@ export function App() {
   useEffect(() => {
     historyRef.current.push(scene);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // T2-76 step 2 of 8: wire the unified scene-mutation function. Step 2
+  // only instantiates it against existing primitives; no caller is
+  // migrated yet, so this binding is intentionally unreferenced until
+  // step 3 starts routing handleSceneCommit through it.
+  //
+  // Captured-identity stability: React state setters
+  // (setScene/setSelectedIds/setGcodeStale/setHistoryVersion) are stable
+  // by React's contract. historyRef and sceneIsDirtyRef are refs -
+  // captured by reference, dereferenced inside the lambdas (T2-76 design
+  // risk 2 mitigation, see T2-76-design.md). setGcodeStale comes from
+  // useCompileManager's return object so its identity is not guaranteed
+  // stable across renders; including it in the dep array matches the
+  // applyHistoryScene precedent below.
+  //
+  // notifyDirty: writes the boolean directly into sceneIsDirtyRef. T2-88
+  // (hash-derived dirty) will swap this implementation for a no-op when
+  // dirty becomes a derived value.
+  //
+  // invalidate.frame: bumps setHistoryVersion. The sole reader is
+  // ConnectionPanelMain which resets hasFramed.current on bumps. Once
+  // step 3 routes handleSceneCommit through this function, edits will
+  // also reset hasFramed - semantically correct (frame action IS
+  // invalidated by edits) and matches the existing scene-change useEffect
+  // pattern. Comment update on the ConnectionPanelMain side is deferred
+  // to step 3.
+  //
+  // invalidate.preflight: no-op. preflightRef does not exist in this
+  // build; preflight recomputation is currently driven by a useEffect on
+  // `scene`. T2-76 design risk 4 documents this; centralization is a
+  // separate later cleanup.
+  //
+  // transitionLog: omitted. T3-68 will wire an emitter; until then the
+  // function uses its optional-chain fallback.
+  //
+  // Note: this binding is unreferenced through step 2 by design (steps
+  // 3-7 migrate callers). No active lint rule in this project flags
+  // unused locals, so no disable directive is needed.
+  const commitSceneTransaction: CommitSceneTransaction = useMemo(
+    () => makeCommitSceneTransaction({
+      setScene,
+      history: {
+        push: (s) => historyRef.current.push(s),
+        reset: (s) => historyRef.current.reset(s),
+      },
+      setSelectedIds: (ids) => setSelectedIds(ids),
+      notifyDirty: (dirty) => { sceneIsDirtyRef.current = dirty; },
+      invalidate: {
+        compile: () => setGcodeStale(true),
+        frame: () => setHistoryVersion(v => v + 1),
+        preflight: () => { /* no-op: see comment above */ },
+      },
+    }),
+    [setGcodeStale],
+  );
+  void commitSceneTransaction;
 
   // ─── SCENE HANDLERS ──────────────────────────────────────────
 
