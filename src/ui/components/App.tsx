@@ -1259,13 +1259,19 @@ export function App() {
   const handleDelete = useCallback(() => {
     if (selectedIds.size === 0) return;
     const newScene = deleteObjects(scene, selectedIds);
-    // T1-73: route through handleSceneCommit so the canonical mutation path
-    // marks dirty (was previously bypassed via direct historyRef.push +
-    // setScene, leaving the project clean and risking autosave skipping the
-    // deletion if the tab closed before the next dirty-marking edit).
-    handleSceneCommit(newScene);
-    setSelectedIds(new Set());
-  }, [scene, selectedIds, handleSceneCommit]);
+    // T1-73 (origin) + T2-76 step 4 (extension): route through the
+    // unified mutation function with the 'delete' action label and an
+    // explicit empty selection. selectionAfter is applied inside
+    // commitSceneTransaction so the selection-clear is part of the
+    // same transaction as the scene replacement (matches the
+    // function's documented contract; see SceneTransaction.ts step 5
+    // of dispatch). T1-73's original concern (autosave skipping the
+    // deletion if the project stayed clean) is still satisfied:
+    // commitSceneTransaction calls notifyDirty(true) for kind='edit'.
+    commitSceneTransaction(newScene, { kind: 'edit', action: 'delete' }, {
+      selectionAfter: new Set(),
+    });
+  }, [scene, selectedIds, commitSceneTransaction]);
 
   const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
     scene,
