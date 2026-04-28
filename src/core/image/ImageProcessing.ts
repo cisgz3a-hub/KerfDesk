@@ -1,14 +1,26 @@
 /**
  * Raster image preprocessing (brightness / contrast / invert).
  * All functions read input and return a new Uint8Array — originals are never mutated.
+ *
+ * TS 5.7+ models `Uint8Array` with a buffer kind parameter. `new Uint8Array(n)` and
+ * `new Uint8Array(copyFrom)` produce `Uint8Array<ArrayBuffer>`. Annotating returns as
+ * bare `Uint8Array` widens to `Uint8Array<ArrayBufferLike>`, which then fails assignment
+ * to variables inferred from `new Uint8Array(geom.grayscaleData)` in callers. Use an
+ * explicit `ArrayBuffer`-backed alias for all public inputs/outputs here.
  */
+
+/** Byte view backed by a concrete `ArrayBuffer` (matches `new Uint8Array(...)` results). */
+export type ImageBytes = Uint8Array<ArrayBuffer>;
+
+/** Any byte view acceptable as raster input (slices, copies, etc.). */
+export type ImageBytesSource = Uint8Array<ArrayBufferLike>;
 
 function clampByte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
 }
 
 /** brightness: -100 to +100. pixel = clamp(pixel + brightness * 2.55) */
-export function adjustBrightness(data: Uint8Array, brightness: number): Uint8Array {
+export function adjustBrightness(data: ImageBytesSource, brightness: number): ImageBytes {
   const out = new Uint8Array(data.length);
   const delta = brightness * 2.55;
   for (let i = 0; i < data.length; i++) {
@@ -18,7 +30,7 @@ export function adjustBrightness(data: Uint8Array, brightness: number): Uint8Arr
 }
 
 /** contrast: -100 to +100. pixel = clamp(((pixel - 128) * (1 + contrast/100)) + 128) */
-export function adjustContrast(data: Uint8Array, contrast: number): Uint8Array {
+export function adjustContrast(data: ImageBytesSource, contrast: number): ImageBytes {
   const out = new Uint8Array(data.length);
   const factor = 1 + contrast / 100;
   for (let i = 0; i < data.length; i++) {
@@ -27,7 +39,7 @@ export function adjustContrast(data: Uint8Array, contrast: number): Uint8Array {
   return out;
 }
 
-export function invertImage(data: Uint8Array): Uint8Array {
+export function invertImage(data: ImageBytesSource): ImageBytes {
   const out = new Uint8Array(data.length);
   for (let i = 0; i < data.length; i++) {
     out[i] = 255 - data[i];
@@ -36,7 +48,7 @@ export function invertImage(data: Uint8Array): Uint8Array {
 }
 
 /** Gamma curve on a copy; gamma typically 0.1–5, 1 = unchanged. */
-export function adjustGamma(data: Uint8Array, gamma: number): Uint8Array {
+export function adjustGamma(data: ImageBytesSource, gamma: number): ImageBytes {
   const g = Math.max(0.1, Math.min(5, gamma));
   if (g === 1) return new Uint8Array(data);
   const out = new Uint8Array(data.length);
@@ -50,11 +62,11 @@ export function adjustGamma(data: Uint8Array, gamma: number): Uint8Array {
 
 /** Simple 1-bit mask: pixel < threshold → burn (255), else off (0). */
 export function thresholdToOneBit(
-  data: Uint8Array,
+  data: ImageBytesSource,
   width: number,
   height: number,
   threshold: number,
-): Uint8Array {
+): ImageBytes {
   const t = Math.max(0, Math.min(255, threshold));
   const out = new Uint8Array(width * height);
   for (let i = 0; i < data.length; i++) {
