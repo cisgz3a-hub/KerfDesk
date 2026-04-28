@@ -98,11 +98,29 @@ export interface SceneTransactionMeta {
 export interface SceneTransactionDeps {
   setScene: (next: Scene) => void;
   history: {
-    push: (scene: Scene) => void;
-    reset: (scene: Scene) => void;
+    /**
+     * Push a new history entry. The optional `meta` argument carries
+     * action label and selection metadata (T2-78). Implementations may
+     * accept just `(scene)` for backward compatibility; the dispatcher
+     * always passes `meta` when called from a non-preview, non-history,
+     * non-load reason.
+     */
+    push: (scene: Scene, meta?: HistoryEntryMetaForward) => void;
+    /**
+     * Replace history with a single entry as the new baseline.
+     * Optional `meta` matches `push`. Used for `kind: 'load'` reasons.
+     */
+    reset: (scene: Scene, meta?: HistoryEntryMetaForward) => void;
   };
   setSelectedIds: (ids: Set<string>) => void;
   notifyDirty: (dirty: boolean) => void;
+  /**
+   * T2-78: read the current selection. Used by the dispatcher to
+   * record `selectionBefore` on history entries. App.tsx wires this
+   * to a ref so the read always reflects the latest selection state
+   * (state-by-value capture would be stale across renders).
+   */
+  getSelection: () => ReadonlySet<string>;
   invalidate: {
     compile: () => void;
     frame: () => void;
@@ -111,6 +129,23 @@ export interface SceneTransactionDeps {
   transitionLog?: {
     emit: (event: SceneTransactionLogEvent) => void;
   };
+}
+
+/**
+ * T2-78 metadata payload passed forward through `history.push` and
+ * `history.reset`. Forward-declared here as a structural type to keep
+ * SceneTransaction.ts independent of HistoryManager.ts (the actual
+ * `HistoryEntryMeta` interface is exported from HistoryManager).
+ *
+ * Keep the two shapes in sync. The forward shape uses optional fields
+ * so this module can construct a partial meta and let HistoryManager
+ * apply its own defaults for anything omitted.
+ */
+export interface HistoryEntryMetaForward {
+  action?: string;
+  timestamp?: number;
+  selectionBefore?: ReadonlySet<string>;
+  selectionAfter?: ReadonlySet<string>;
 }
 
 /**
@@ -177,10 +212,25 @@ export function makeCommitSceneTransaction(
     //    - preview: never touches history
     //    - history navigation: cursor already moved by historyRef.undo/redo
     //    - edit / async-result: push a new entry
-    if (isLoad) {
-      deps.history.reset(next);
-    } else if (!isPreview && !isHistory) {
-      deps.history.push(next);
+    //
+    // T2-78: when push or reset fires, capture metadata from the
+    // reason + meta + current selection so HistoryEntry can record the
+    // action label and selection-before/after for T2-79 consumers.
+    if (isLoad || (!isPreview && !isHistory)) {
+      const selectionBefore = deps.getSelection();
+      const selectionAfter = meta?.selectionAfter ?? selectionBefore;
+      const action = deriveActionLabel(reason);
+      const entryMeta: HistoryEntryMetaForward = {
+        action,
+        // timestamp omitted; HistoryManager defaults to Date.now() at push time
+        selectionBefore,
+        selectionAfter,
+      };
+      if (isLoad) {
+        deps.history.reset(next, entryMeta);
+      } else {
+        deps.history.push(next, entryMeta);
+      }
     }
 
     // 3. Dirty state.
@@ -225,4 +275,32 @@ export function makeCommitSceneTransaction(
       ts: Date.now(),
     });
   };
+}
+
+/**
+ * T2-78: derive a kebab-case action label from the dispatch reason.
+ * Used to tag history entries so T2-79 (selection restore), T2-80
+ * (history coalescing), and T3-68 (transition log) can consume a
+ * consistent label without re-deriving from the reason union.
+ *
+ * Only called for reasons that produce a history entry (load, edit,
+ * async-result). preview and history reasons skip the entry build
+ * entirely.
+ */
+function deriveActionLabel(reason: SceneTransactionReason): string {
+  switch (reason.kind) {
+    case 'edit':
+      return reason.action;
+    case 'load':
+      return `load:${reason.source}`;
+    case 'async-result':
+      return `async:${reason.operation}`;
+    case 'preview':
+    case 'history':
+      // Should never reach here - these reasons don't push or reset
+      // history. Returning a sentinel rather than throwing preserves
+      // robustness if a future reason is added without updating this
+      // switch.
+      return 'unknown';
+  }
 }

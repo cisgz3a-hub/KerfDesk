@@ -166,6 +166,13 @@ export function App() {
 
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // T2-78: ref-shadow of selectedIds so SceneTransaction's getSelection
+  // dep can read the freshest value without rebuilding the useMemo on
+  // every selection change. Synced via the useEffect below.
+  const selectedIdsRef = useRef<ReadonlySet<string>>(selectedIds);
+  useEffect(() => {
+    selectedIdsRef.current = selectedIds;
+  }, [selectedIds]);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
   const [isDragOver, setIsDragOver] = useState(false);
   const [showGridArray, setShowGridArray] = useState(false);
@@ -736,7 +743,9 @@ export function App() {
 
   // Push initial scene on mount
   useEffect(() => {
-    historyRef.current.push(scene);
+    // T2-78: tag the seed entry so it shows up in the history with a
+    // meaningful label rather than the generic 'edit' default.
+    historyRef.current.push(scene, { action: 'init' });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // T2-76 step 2 of 8: wire the unified scene-mutation function. Step 2
@@ -780,11 +789,17 @@ export function App() {
     () => makeCommitSceneTransaction({
       setScene,
       history: {
-        push: (s) => historyRef.current.push(s),
-        reset: (s) => historyRef.current.reset(s),
+        push: (s, m) => historyRef.current.push(s, m),
+        reset: (s, m) => historyRef.current.reset(s, m),
       },
       setSelectedIds: (ids) => setSelectedIds(ids),
       notifyDirty: (dirty) => { sceneIsDirtyRef.current = dirty; },
+      // T2-78: read-through-ref so SceneTransaction can record
+      // selectionBefore on history entries without rebuilding this
+      // useMemo every time the user clicks something. selectedIdsRef
+      // is kept in sync with the selectedIds state by a useEffect at
+      // declaration; this lambda always reads the freshest value.
+      getSelection: () => selectedIdsRef.current,
       invalidate: {
         compile: () => setGcodeStale(true),
         frame: () => setHistoryVersion(v => v + 1),

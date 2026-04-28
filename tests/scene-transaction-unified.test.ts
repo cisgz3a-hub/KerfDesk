@@ -14,6 +14,7 @@ import {
   makeCommitSceneTransaction,
   type SceneTransactionDeps,
   type SceneTransactionLogEvent,
+  type HistoryEntryMetaForward,
 } from '../src/ui/scene/SceneTransaction';
 import { createScene } from '../src/core/scene/Scene';
 import type { Scene } from '../src/core/scene/Scene';
@@ -46,14 +47,22 @@ function spy<TArgs extends unknown[]>(): CallSpy<TArgs> {
 
 interface SpyDeps {
   setScene: CallSpy<[Scene]>;
-  historyPush: CallSpy<[Scene]>;
-  historyReset: CallSpy<[Scene]>;
+  // T2-78: push/reset now receive an optional meta payload alongside
+  // the scene. Spy widens to capture both args; existing assertions
+  // that index calls[i][0] for the scene continue to work.
+  historyPush: CallSpy<[Scene, HistoryEntryMetaForward?]>;
+  historyReset: CallSpy<[Scene, HistoryEntryMetaForward?]>;
   setSelectedIds: CallSpy<[Set<string>]>;
   notifyDirty: CallSpy<[boolean]>;
   invalidateCompile: CallSpy<[]>;
   invalidateFrame: CallSpy<[]>;
   invalidatePreflight: CallSpy<[]>;
   logEmit: CallSpy<[SceneTransactionLogEvent]>;
+  /**
+   * T2-78: tracks every getSelection() read so tests can verify the
+   * dispatcher consults selection state when constructing history entries.
+   */
+  getSelectionReads: number;
   deps: SceneTransactionDeps;
   /** Pass deps WITHOUT the transition log (mimics pre-T3-68 wiring). */
   depsWithoutLog: SceneTransactionDeps;
@@ -61,8 +70,8 @@ interface SpyDeps {
 
 function makeSpyDeps(): SpyDeps {
   const setScene = spy<[Scene]>();
-  const historyPush = spy<[Scene]>();
-  const historyReset = spy<[Scene]>();
+  const historyPush = spy<[Scene, HistoryEntryMetaForward?]>();
+  const historyReset = spy<[Scene, HistoryEntryMetaForward?]>();
   const setSelectedIds = spy<[Set<string>]>();
   const notifyDirty = spy<[boolean]>();
   const invalidateCompile = spy<[]>();
@@ -70,11 +79,20 @@ function makeSpyDeps(): SpyDeps {
   const invalidatePreflight = spy<[]>();
   const logEmit = spy<[SceneTransactionLogEvent]>();
 
-  const baseDeps = {
+  // T2-78: tracker object so callers can mutate the read count from
+  // the getSelection lambda. Returned as a value-by-reference field.
+  const tracker = { getSelectionReads: 0 };
+  const getSelection = (): ReadonlySet<string> => {
+    tracker.getSelectionReads++;
+    return new Set();
+  };
+
+  const baseDeps: SceneTransactionDeps = {
     setScene: setScene.fn,
     history: { push: historyPush.fn, reset: historyReset.fn },
     setSelectedIds: setSelectedIds.fn,
     notifyDirty: notifyDirty.fn,
+    getSelection,
     invalidate: {
       compile: invalidateCompile.fn,
       frame: invalidateFrame.fn,
@@ -92,6 +110,7 @@ function makeSpyDeps(): SpyDeps {
     invalidateFrame,
     invalidatePreflight,
     logEmit,
+    get getSelectionReads() { return tracker.getSelectionReads; },
     deps: { ...baseDeps, transitionLog: { emit: logEmit.fn } },
     depsWithoutLog: baseDeps,
   };
@@ -333,6 +352,7 @@ void (async () => {
       history: { push: () => { callOrder.push('historyPush'); }, reset: () => {} },
       setSelectedIds: () => { callOrder.push('setSelectedIds'); },
       notifyDirty: () => { callOrder.push('notifyDirty'); },
+      getSelection: () => new Set(),
       invalidate: {
         compile: () => { callOrder.push('invalidateCompile'); },
         frame: () => { callOrder.push('invalidateFrame'); },

@@ -29,6 +29,7 @@ const files = [
   'svg-import-placement.test.ts',
   'placement.test.ts',
   'history.test.ts',
+  'history-entry-metadata.test.ts',
   'job-log-quota.test.ts',
   'joblog-storage-migration.test.ts',
   'jobreplay-storage-migration.test.ts',
