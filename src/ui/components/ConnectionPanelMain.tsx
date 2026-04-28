@@ -18,7 +18,7 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
-import { type MachineService } from '../../app/MachineService';
+import { type MachineService, type LaserOutputState } from '../../app/MachineService';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
@@ -999,11 +999,22 @@ export function ConnectionPanelMain({
   // default = require frame. Prevents wrong-position-burn on confused
   // origin/saved-origin/mirror configurations.
   const requireFrame = true;
-  // T1-22: read laser-output safety state for the start-job gate. Polled
-  // (re-evaluated on each render) — sufficient because both transitions
-  // (notifyTestFire / notifyLaserSafetyOutcome) happen inside coordinator
-  // calls that already trigger renders elsewhere. T2-12 will subscribe properly.
-  const laserOutputState = machineService.getLaserOutputState();
+  // T1-22: read laser-output safety state for the start-job gate.
+  // T2-12 part 1: subscribed instead of polled. The previous polled
+  // getter at this site relied on workflowVersion bumps to refresh on
+  // every transition; subscription is more direct and removes the need
+  // to keep this read inside the workflowVersion-touch envelope.
+  // Initial value via lazy useState so the very first render reflects
+  // current state (e.g. after a remount). Effect re-syncs on mount in
+  // case the value changed between render and effect-run, then
+  // subscribes for subsequent changes.
+  const [laserOutputState, setLaserOutputStateLocal] = useState<LaserOutputState>(
+    () => machineService.getLaserOutputState(),
+  );
+  useEffect(() => {
+    setLaserOutputStateLocal(machineService.getLaserOutputState());
+    return machineService.onLaserOutputStateChange(setLaserOutputStateLocal);
+  }, [machineService]);
   // T1-20: read placement-uncertain state for the start-job gate. Set
   // by GrblController._emitWcsPayload when the WCS consent flow has no
   // listeners and the controller wasn't constructed with the headless

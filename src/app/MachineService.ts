@@ -40,6 +40,14 @@ export interface BurnState {
 
 export type BurnStateListener = (state: BurnState) => void;
 
+/**
+ * T2-12 part 1: laser-output safety state union, exported for the
+ * subscription contract. T1-22 introduced the underlying state field;
+ * T2-12 promotes it to a subscribe-able value.
+ */
+export type LaserOutputState = 'off' | 'on' | 'unknown';
+export type LaserOutputStateListener = (state: LaserOutputState) => void;
+
 function emptyBurnState(): BurnState {
   return {
     activeIds: new Set<string>(),
@@ -102,11 +110,23 @@ export class MachineService {
    * - Connect → reset to `'off'` (fresh connection clears stale unknown state).
    *
    * `'unknown'` blocks {@link startValidatedJob} until cleared by reconnect
-   * or explicit user resolution via {@link clearLaserUnknownState}. Once T2-12
-   * (formal MachineSafetyState) lands this becomes a proper enum subscribed
-   * by the UI; for now this is a polled getter.
+   * or explicit user resolution via {@link clearLaserUnknownState}.
+   *
+   * T2-12 part 1 (subscription): UI consumers subscribe via
+   * {@link onLaserOutputStateChange}. Internal MachineService reads (e.g.
+   * the `'unknown'` gate inside {@link startValidatedJob}) continue to use
+   * the synchronous {@link getLaserOutputState} getter. T2-12 part 2 will
+   * promote the controller's status-on-error to a formal
+   * FAULTED_REQUIRES_INSPECTION state.
+   *
+   * IMPORTANT: do not assign `_laserOutputState` directly. All writers go
+   * through {@link _setLaserOutputState} so subscribers fire on transitions
+   * (and only on transitions - no-op writes are skipped).
    */
-  private _laserOutputState: 'off' | 'on' | 'unknown' = 'off';
+  private _laserOutputState: LaserOutputState = 'off';
+
+  /** T2-12 part 1: subscribers to laser-output-state transitions. */
+  private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
 
   constructor(
     private readonly controllerRef: MutableRefObject<LaserController>,
@@ -573,8 +593,37 @@ export class MachineService {
    *   `soft-reset` or `failed` — the M5 path did not provide a clean confirmation.
    *   {@link startValidatedJob} refuses while in this state.
    */
-  getLaserOutputState(): 'off' | 'on' | 'unknown' {
+  getLaserOutputState(): LaserOutputState {
     return this._laserOutputState;
+  }
+
+  /**
+   * T2-12 part 1: subscribe to laser-output-state transitions.
+   *
+   * Returns an unsubscribe function. The callback fires when the state
+   * actually changes; no-op writes (e.g. notifyTestFire('end') while
+   * already 'off') are skipped by {@link _setLaserOutputState}'s
+   * change-detection. Mirrors the HistoryManager.onChange and
+   * EntitlementService.onChange patterns elsewhere in the codebase.
+   *
+   * Synchronous reads still go through {@link getLaserOutputState}.
+   */
+  onLaserOutputStateChange(cb: LaserOutputStateListener): () => void {
+    this._laserOutputStateListeners.add(cb);
+    return () => this._laserOutputStateListeners.delete(cb);
+  }
+
+  /**
+   * T2-12 part 1: canonical writer for {@link _laserOutputState}.
+   * No-op writes (next === current) skip the notify so subscribers
+   * only see real transitions.
+   */
+  private _setLaserOutputState(next: LaserOutputState): void {
+    if (this._laserOutputState === next) return;
+    this._laserOutputState = next;
+    for (const cb of this._laserOutputStateListeners) {
+      cb(next);
+    }
   }
 
   /**
@@ -588,12 +637,12 @@ export class MachineService {
   notifyTestFire(phase: 'begin' | 'end'): void {
     if (phase === 'begin') {
       // Begin always wins: we explicitly turned the laser on.
-      this._laserOutputState = 'on';
+      this._setLaserOutputState('on');
       return;
     }
     // 'end'
     if (this._laserOutputState !== 'unknown') {
-      this._laserOutputState = 'off';
+      this._setLaserOutputState('off');
     }
   }
 
@@ -605,13 +654,13 @@ export class MachineService {
    */
   notifyLaserSafetyOutcome(stage: 'm5' | 'soft-reset' | 'failed'): void {
     if (stage === 'm5') {
-      this._laserOutputState = 'off';
+      this._setLaserOutputState('off');
     } else {
       // soft-reset or failed — treat both as uncertain. Soft reset disables
       // laser output at firmware level, but the M5-path indeterminacy means
       // the planner state is unknown and a fresh connection check is the
       // safest reset.
-      this._laserOutputState = 'unknown';
+      this._setLaserOutputState('unknown');
     }
   }
 
@@ -622,7 +671,7 @@ export class MachineService {
    */
   clearLaserUnknownState(): void {
     if (this._laserOutputState === 'unknown') {
-      this._laserOutputState = 'off';
+      this._setLaserOutputState('off');
     }
   }
 
@@ -639,7 +688,7 @@ export class MachineService {
     this.state.isSimulator = false;
     // T1-22: fresh connection clears any stale unknown laser-safety state
     // from a previous session.
-    this._laserOutputState = 'off';
+    this._setLaserOutputState('off');
   }
 
   async disconnect(): Promise<void> {
