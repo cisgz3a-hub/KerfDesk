@@ -24,6 +24,7 @@ import { type Scene, createScene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
@@ -806,22 +807,28 @@ export function App() {
   }, [commitSceneTransaction]);
 
   /** Commit: update UI AND create a history entry. */
-  const handleSceneCommit = useCallback((newScene: Scene) => {
-    // T2-76 step 3: dispatch through the unified mutation function.
-    // For 'edit' kind, commitSceneTransaction calls setScene,
-    // history.push, notifyDirty(true), and invalidate.compile/frame/
-    // preflight. The compile and frame invalidations are new on this
-    // path; see the useMemo block above and the T2-76 step 3 commit
-    // message for the behavioral diff (notably: edits now reset
-    // hasFramed via ConnectionPanelMain's historyVersion watcher,
-    // closing a T1-59 frame-before-start gap).
-    //
-    // 'unspecified' action label: handleSceneCommit is called from
-    // ~50 sites for every type of edit; the caller doesn't tell us
-    // which. Future cleanup can let specific callers pass a more
-    // informative label, or migrate directly to commitSceneTransaction.
-    commitSceneTransaction(newScene, { kind: 'edit', action: 'unspecified' });
-  }, [commitSceneTransaction]);
+  const handleSceneCommit = useCallback(
+    (newScene: Scene, action: SceneCommitAction = 'unspecified') => {
+      // T2-76 step 3: dispatch through the unified mutation function.
+      // T2-76 step 7: the action label is now caller-supplied. Five
+      // hook files (useClipboard, useConnectionHandlers,
+      // useGeneratorHandlers, useImport, useKerfHandlers) pass
+      // meaningful labels per SceneCommitAction. App.tsx's internal
+      // callers and other hooks continue to use the 'unspecified'
+      // default; future commits can migrate them incrementally.
+      //
+      // For 'edit' kind, commitSceneTransaction calls setScene,
+      // history.push, notifyDirty(true), and invalidate.compile/
+      // frame/preflight. The compile and frame invalidations are new
+      // on this path since step 3; see the useMemo block above and
+      // the T2-76 step 3 commit message for the behavioral diff
+      // (notably: edits now reset hasFramed via ConnectionPanelMain's
+      // historyVersion watcher, closing a T1-59 frame-before-start
+      // gap).
+      commitSceneTransaction(newScene, { kind: 'edit', action });
+    },
+    [commitSceneTransaction],
+  );
 
   const handleAddTextDialogSubmit = useCallback(() => {
     if (!dialogs.textInput.trim()) return;

@@ -108,6 +108,7 @@ const files = [
   'wcs-no-listener-headless-flag.test.ts',
   'scene-transaction-unified.test.ts',
   'scene-transaction-app-wired.test.ts',
+  'scene-commit-actions-wired.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
   'ui-start-job-uses-ticket.test.tsx',
   'connection-panel-preflight-no-loop.test.tsx',

@@ -4,10 +4,11 @@ import { type SceneObject } from '../../core/scene/SceneObject';
 import { IDENTITY_MATRIX } from '../../core/types';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { requireFeature } from '../../entitlements';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface UseKerfHandlersParams {
   scene: Scene;
-  handleSceneCommit: (newScene: Scene) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
   showAlert: (title: string, message: string) => Promise<unknown>;
 }
 
@@ -27,7 +28,7 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
     handleSceneCommit({
       ...scene,
       objects: [...scene.objects, ...objects],
-    });
+    }, 'layer-kerf');
   }, [scene, handleSceneCommit]);
 
   const handleKerfApply = useCallback(async (offsetMm: number, objectIds: string[]) => {
@@ -66,7 +67,7 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
       await showAlert('Kerf', 'Offset failed — select cut paths or shapes, or try a smaller kerf.');
       return;
     }
-    handleSceneCommit({ ...scene, objects: next });
+    handleSceneCommit({ ...scene, objects: next }, 'layer-kerf');
   }, [scene, handleSceneCommit, showAlert]);
 
   const handleKerfSaveToPreset = useCallback((kerfMm: number) => {

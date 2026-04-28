@@ -7,12 +7,13 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { generateId } from '../../core/types';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { requireFeature } from '../../entitlements';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface UseGeneratorHandlersParams {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
   setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
-  handleSceneCommit: (newScene: Scene) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
   setShowGridArray: (show: boolean) => void;
   setShowTemplates: (show: boolean) => void;
   showAlert: (title: string, message: string) => Promise<unknown>;
@@ -93,30 +94,36 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
     }
 
     const newScene = { ...scene, objects: [...scene.objects, ...allClones] };
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'array-clone');
   }, [scene, selectedIds, handleSceneCommit]);
 
   const handleNestingApply = useCallback((newObjects: SceneObject[]) => {
     const newScene = { ...scene, objects: newObjects };
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'nesting');
   }, [scene, handleSceneCommit]);
 
   /** Shared body for append generated objects + select them (was duplicated in App for box + variable text). */
-  const commitGeneratedObjects = useCallback((objects: SceneObject[]) => {
-    const newScene = {
-      ...scene,
-      objects: [...scene.objects, ...objects],
-    };
-    handleSceneCommit(newScene);
-    setSelectedIds(new Set(objects.map(o => o.id)));
-  }, [scene, handleSceneCommit]);
+  const commitGeneratedObjects = useCallback(
+    (objects: SceneObject[], action: SceneCommitAction) => {
+      const newScene = {
+        ...scene,
+        objects: [...scene.objects, ...objects],
+      };
+      handleSceneCommit(newScene, action);
+      setSelectedIds(new Set(objects.map(o => o.id)));
+    },
+    [scene, handleSceneCommit],
+  );
 
-  const handleBoxGenerate = commitGeneratedObjects;
+  const handleBoxGenerate = useCallback(
+    (objects: SceneObject[]) => commitGeneratedObjects(objects, 'box-generate'),
+    [commitGeneratedObjects],
+  );
   const handleVariableTextGenerate = useCallback((objects: SceneObject[]) => {
     if (!requireFeature('variable_text')) {
       throw new Error('Variable text requires a Pro license');
     }
-    commitGeneratedObjects(objects);
+    commitGeneratedObjects(objects, 'var-text-generate');
   }, [commitGeneratedObjects]);
 
   const handleTemplateSelect = useCallback(async (template: Template) => {
@@ -141,7 +148,7 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
             maxY: scene.canvas.height,
           },
       });
-      handleSceneCommit(newScene);
+      handleSceneCommit(newScene, 'template-import');
     } catch (e) {
       await showAlert('Template', 'Failed to load template: ' + (e as Error).message);
     }

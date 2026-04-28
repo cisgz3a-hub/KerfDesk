@@ -3,11 +3,12 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { duplicateObjects } from '../../core/scene/SceneOps';
 import { generateId } from '../../core/types';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export function useClipboard(
   scene: Scene,
   selectedIds: ReadonlySet<string>,
-  handleSceneCommit: (scene: Scene) => void,
+  handleSceneCommit: (scene: Scene, action?: SceneCommitAction) => void,
   setSelectedIds: (ids: Set<string>) => void,
 ) {
   const [clipboard, setClipboard] = useState<SceneObject[]>([]);
@@ -46,7 +47,7 @@ export function useClipboard(
       };
     });
     const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'paste');
     setSelectedIds(newIds);
     setClipboard(pasted);
   }, [clipboard, scene, handleSceneCommit, setSelectedIds]);
@@ -54,7 +55,7 @@ export function useClipboard(
   const handleDuplicate = useCallback(() => {
     if (selectedIds.size === 0) return;
     const newScene = duplicateObjects(scene, selectedIds, 10, 10);
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'duplicate');
     const existingIds = new Set(scene.objects.map(o => o.id));
     const duplicatedIds = new Set(
       newScene.objects.filter(o => !existingIds.has(o.id)).map(o => o.id),

@@ -3,6 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { MAX_LASER_SPEED, MIN_LASER_SPEED } from '../../core/types';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface ConnectionPanelGrbl {
   isJobRunning: boolean;
@@ -10,7 +11,7 @@ export interface ConnectionPanelGrbl {
 
 export interface UseConnectionHandlersParams {
   scene: Scene;
-  handleSceneCommit: (newScene: Scene) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
   compileGcode: (targetScene: Scene) => Promise<string | null>;
   setCurrentGcode: Dispatch<SetStateAction<string | null>>;
   connectionSidebarOpen: boolean;
@@ -92,7 +93,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
         ...scene,
         activeLayerId: layerId,
         layers: scene.layers.map(l => (l.id === layerId ? next : l)),
-      });
+      }, 'layer-mode');
       if (connectionSidebarOpen) setGcodeStale(true);
       bumpCanvasRepaint();
     },
@@ -117,7 +118,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
           const v = Math.max(1, Math.min(99, Math.round(Number.isFinite(value) ? value : 1)));
           return { ...l, settings: { ...l.settings, passes: v } };
         }),
-      });
+      }, 'layer-setting');
       if (connectionSidebarOpen) setGcodeStale(true);
       bumpCanvasRepaint();
     },
@@ -146,7 +147,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
             },
           };
         }),
-      });
+      }, 'layer-fill-setting');
       if (connectionSidebarOpen) setGcodeStale(true);
       bumpCanvasRepaint();
     },
@@ -174,7 +175,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
             },
           };
         }),
-      });
+      }, 'layer-fill-setting');
       if (connectionSidebarOpen) setGcodeStale(true);
       bumpCanvasRepaint();
     },
@@ -200,7 +201,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
             },
           };
         }),
-      });
+      }, 'layer-fill-setting');
       if (connectionSidebarOpen) setGcodeStale(true);
       bumpCanvasRepaint();
     },

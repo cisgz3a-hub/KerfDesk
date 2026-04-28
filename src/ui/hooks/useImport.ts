@@ -7,11 +7,12 @@ import { deserializeScene } from '../../io/SceneSerializer';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB — inline below, IndexedDB above
 
 export interface UseImportDeps {
-  handleSceneCommit: (scene: Scene) => void;
+  handleSceneCommit: (scene: Scene, action?: SceneCommitAction) => void;
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setIsDragOver: (v: boolean) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
@@ -196,7 +197,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       await showAlert('Import Failed', 'Could not import the image file.');
       return;
     }
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'image-import');
   }, [importImageUnified, handleSceneCommit, showAlert]);
 
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -249,14 +250,14 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
                   maxY: scene.canvas.height,
                 },
           });
-          handleSceneCommit(updated);
+          handleSceneCommit(updated, 'svg-import');
         } else if (name.endsWith('.dxf') && text) {
           const updated = importDxfIntoScene(text, scene);
-          handleSceneCommit(updated);
+          handleSceneCommit(updated, 'dxf-import');
         } else if (file.type.startsWith('image/')) {
           const newScene = await importImageUnified(file, file.name);
           if (newScene) {
-            handleSceneCommit(newScene);
+            handleSceneCommit(newScene, 'image-import');
           }
         }
       } catch (err) {
