@@ -9,10 +9,11 @@
  * Fix: the literal was removed from source. Tests synthesize tester codes via
  * `__setTesterHmacSecretForTest`, not via the legacy default.
  *
- * This test is a source-level version of the roadmap's bundle-search test.
- * The bundle search lives in CI (T3-82) and rebuilds the full Vite output;
- * here we walk `src/` directly. If the literal isn't in source, it can't be
- * in the bundle Vite produces.
+ * This test is a source-level version of the bundle-search test. The
+ * bundle search lives in scripts/verify-production-build.mjs (T1-81 +
+ * T3-82) and runs against the actual Vite build output during `npm run
+ * build`. Here we walk `src/` directly. If the literal isn't in source,
+ * it can't be in the bundle Vite produces.
  *
  * Note: scripts/ and tests/ are intentionally NOT scanned. Those directories
  * never ship in the client bundle. scripts/generate-tester-key.mjs also no

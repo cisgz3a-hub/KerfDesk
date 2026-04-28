@@ -1,5 +1,7 @@
 /**
  * T1-81 — Layer 1: production bundle verifier.
+ * T3-82 — broader pattern library: traps for future regressions that would
+ *         leak test-only or debug-only artifacts into the shipped bundle.
  *
  * Walks the dist/ output of `vite build` and rejects bundles that contain
  * forbidden patterns. Wired into `npm run build` so any production build
@@ -26,6 +28,34 @@
  *     those maps. The .map files themselves are excluded from installers by
  *     package.json:build.files negation globs.
  *
+ *   __setTesterHmacSecretForTest  — T1-77's test-only injection point
+ *     Defined in src/entitlements/testerKey.ts. Vite tree-shakes it out of
+ *     the production bundle today (verified at T3-82 commit time). If a
+ *     future change imports it from non-test code (or accidentally re-exports
+ *     it from a barrel file that production code touches), it would survive
+ *     tree-shaking — and an attacker with DevTools could overwrite the
+ *     tester HMAC secret. Rejecting the literal here catches that class of
+ *     leak before shipping.
+ *
+ *   __forceProUnlock, __entitlementService  — speculative debug APIs
+ *     Hypothetical names matching the kind of "expose-on-window for
+ *     debugging" pattern that's easy to add accidentally and forget about.
+ *     No code uses these names today; the verifier rejects them to make
+ *     "I'll just expose this on window for now" patterns visible at build
+ *     time. If a real ticket ever needs a debug API on window, it should
+ *     pick a name not on this list AND document why it's safe to ship.
+ *
+ *   mockEntitlement, createMockProfile  — speculative test-double leakage
+ *     Names that would suggest test-double helpers (an entitlement mock or
+ *     a fake user profile) leaking into a production bundle. No code uses
+ *     these names today; reject them as a trap for future regressions.
+ *
+ *   vitest  — test framework reference
+ *     We use tsx for tests today, not vitest. If a future ticket adds vitest
+ *     and a test-only import accidentally bleeds into a production code path,
+ *     the literal survives in the bundle. Rejecting it forces test-framework
+ *     code to stay out of the renderer.
+ *
  * The script is intentionally pure-Node (no deps); same constraint as the
  * other utility scripts in this folder.
  *
@@ -49,6 +79,44 @@ const REJECT_PATTERNS = [
     name: 'legacy tester HMAC secret',
     detail: 'Source: T1-77 removed this default. If it appears, someone re-added it.',
     pattern: /bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1/,
+  },
+  {
+    name: 'tester HMAC test-only injection point',
+    detail:
+      'Source: src/entitlements/testerKey.ts exports __setTesterHmacSecretForTest '
+      + 'for test injection. It must tree-shake out of production. If it survived, '
+      + 'an attacker could overwrite the runtime tester secret via DevTools.',
+    pattern: /__setTesterHmacSecretForTest/,
+  },
+  {
+    name: 'speculative debug API: __forceProUnlock',
+    detail:
+      'No code uses this name today. If it appears in dist/, someone added an '
+      + '"expose on window for debugging" hook. Either remove it or pick a name '
+      + 'that documents why shipping it is safe.',
+    pattern: /__forceProUnlock/,
+  },
+  {
+    name: 'speculative debug API: __entitlementService',
+    detail:
+      'No code uses this name today. If it appears in dist/, someone exposed the '
+      + 'entitlement service on a global for debugging. Same fix as __forceProUnlock.',
+    pattern: /__entitlementService/,
+  },
+  {
+    name: 'mock entitlement helper leakage',
+    detail:
+      'Names like mockEntitlement or createMockProfile suggest test doubles in a '
+      + 'production code path. Move them to tests/ or rename them to stay out of '
+      + 'the renderer bundle.',
+    pattern: /\b(?:mockEntitlement|createMockProfile)\b/,
+  },
+  {
+    name: 'test framework leakage (vitest)',
+    detail:
+      'We use tsx for tests, not vitest. If "vitest" appears in dist/, a test-only '
+      + 'import bled into a production code path. Move the import or guard it.',
+    pattern: /\bvitest\b/,
   },
 ];
 

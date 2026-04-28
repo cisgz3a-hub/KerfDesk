@@ -7,6 +7,12 @@
  * (`bf5c9e2a-...`, removed in T1-77). Layer 1 of T1-81 is a build-time grep
  * over dist/ that rejects any bundle containing these patterns.
  *
+ * T3-82 broadens the pattern list with traps for future regressions:
+ * tester-injection points (__setTesterHmacSecretForTest), speculative
+ * debug APIs (__forceProUnlock, __entitlementService), test-double helper
+ * names (mockEntitlement, createMockProfile), and test framework leakage
+ * (vitest).
+ *
  * This test exercises the verifier script's logic against synthetic dist
  * directories — it doesn't actually run `vite build`. The reasoning: CI
  * already runs `npm run build` against the real source on every PR, so
@@ -21,6 +27,8 @@
  *   4. dist with the legacy tester secret literal → exit 1
  *   5. T2-105 hidden sourcemaps: .map files may exist, but runtime files
  *      must not contain sourceMappingURL references.
+ *   6. T3-82 broader pattern library: tester injection point, debug-API
+ *      shapes, test-double names, vitest reference.
  *
  * Run: npx tsx tests/production-bundle-smoke.test.ts
  */
@@ -280,6 +288,181 @@ void (() => {
     try {
       const r = runVerifier(fake.dir);
       assert(r.exitCode === 0, '.map.bak passes (last extension is .bak)');
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 11. T3-82: tester injection point in dist → exit 1 ────────────────
+  // src/entitlements/testerKey.ts exports __setTesterHmacSecretForTest as a
+  // test injection point. Vite tree-shakes it out today; if it ever
+  // survives (e.g., a future ticket imports it from non-test code, or a
+  // barrel re-export pulls it into a production path), the verifier
+  // catches it at build time.
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        'export function __setTesterHmacSecretForTest(s) { CURRENT_SECRET = s; }',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(
+        r.exitCode === 1,
+        'T3-82: __setTesterHmacSecretForTest in dist → exit 1',
+      );
+      assert(
+        /tester HMAC test-only injection/i.test(r.stderr),
+        '  stderr names the tester injection-point pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 12. T3-82: speculative __forceProUnlock debug API → exit 1 ────────
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js': 'window.__forceProUnlock = () => state.tier = "pro";',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T3-82: __forceProUnlock in dist → exit 1');
+      assert(
+        /__forceProUnlock/.test(r.stderr),
+        '  stderr names the __forceProUnlock pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 13. T3-82: speculative __entitlementService debug exposure → exit 1
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js': 'window.__entitlementService = entitlementService;',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T3-82: __entitlementService in dist → exit 1');
+      assert(
+        /__entitlementService/.test(r.stderr),
+        '  stderr names the __entitlementService pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 14. T3-82: mock-entitlement helper leakage → exit 1 ───────────────
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        'function mockEntitlement(opts) { return { tier: opts.tier }; }',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T3-82: mockEntitlement in dist → exit 1');
+      assert(
+        /mock entitlement helper/i.test(r.stderr),
+        '  stderr names the mock-entitlement pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 15. T3-82: createMockProfile (alternate test-double name) → exit 1
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        'export function createMockProfile() { return { user: "test" }; }',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T3-82: createMockProfile in dist → exit 1');
+      assert(
+        /mock entitlement helper/i.test(r.stderr),
+        '  stderr names the mock-entitlement pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 16. T3-82: vitest reference → exit 1 ──────────────────────────────
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js': 'import { describe } from "vitest";',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(r.exitCode === 1, 'T3-82: vitest reference in dist → exit 1');
+      assert(
+        /test framework leakage \(vitest\)/i.test(r.stderr),
+        '  stderr names the vitest pattern',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 17. T3-82: word-boundary discipline ───────────────────────────────
+  // The vitest pattern uses \b to avoid matching it as a substring of an
+  // unrelated identifier. Confirm a bigger word containing "vitest" passes.
+  {
+    const fake = makeFakeDist({
+      'assets/clean.js': 'const InvitestProgress = 0;',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(
+        r.exitCode === 0,
+        'T3-82: "Invitest" substring (no word boundary) → exit 0',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 18. T3-82: a dist with multiple T3-82 leaks reports all of them ───
+  // A later test can fix multiple regressions at once, so the verifier
+  // should report each pattern that fires (not bail on the first).
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        'window.__forceProUnlock = 1; function mockEntitlement(){}',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(
+        r.exitCode === 1,
+        'T3-82: dist with multiple leaks → exit 1',
+      );
+      assert(
+        /__forceProUnlock/.test(r.stderr) && /mock entitlement/i.test(r.stderr),
+        '  stderr reports both patterns (not just the first)',
+      );
+    } finally {
+      fake.cleanup();
+    }
+  }
+
+  // ── 19. T3-82: a comment mentioning a forbidden literal still rejects ──
+  // The verifier doesn't try to be smart about what's "really" forbidden vs
+  // mentioned in a comment — comments in production source code are
+  // suspicious anyway (why would __forceProUnlock be discussed in shipped
+  // code?). Force callers to remove the literal, not annotate it away.
+  {
+    const fake = makeFakeDist({
+      'assets/leak.js':
+        '// historical: had __forceProUnlock here for debug, removed\nfunction main(){}',
+    });
+    try {
+      const r = runVerifier(fake.dir);
+      assert(
+        r.exitCode === 1,
+        'T3-82: forbidden literal in a comment also rejects (no comment carve-outs)',
+      );
     } finally {
       fake.cleanup();
     }
