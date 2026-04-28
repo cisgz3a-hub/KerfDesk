@@ -57,5 +57,10 @@ assert(
   'App.tsx imports the CommitSceneTransaction type for explicit binding type',
 );
 
+assert(
+  /\bcommitSceneTransaction\s*\(/.test(appTsx),
+  'App.tsx contains at least one commitSceneTransaction(...) call (caller migration in progress, T2-76 step 3+)',
+);
+
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

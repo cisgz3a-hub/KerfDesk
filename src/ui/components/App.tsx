@@ -793,15 +793,30 @@ export function App() {
 
   /** Preview: update UI without creating a history entry. */
   const handleSceneChange = useCallback((newScene: Scene) => {
-    setScene(newScene);
-  }, []);
+    // T2-76 step 3: dispatch through the unified mutation function.
+    // For 'preview' kind, commitSceneTransaction calls setScene only -
+    // no history, no dirty flag, no invalidation. Net behavior is
+    // identical to the previous direct setScene call.
+    commitSceneTransaction(newScene, { kind: 'preview' });
+  }, [commitSceneTransaction]);
 
   /** Commit: update UI AND create a history entry. */
   const handleSceneCommit = useCallback((newScene: Scene) => {
-    sceneIsDirtyRef.current = true;
-    historyRef.current.push(newScene);
-    setScene(newScene);
-  }, []);
+    // T2-76 step 3: dispatch through the unified mutation function.
+    // For 'edit' kind, commitSceneTransaction calls setScene,
+    // history.push, notifyDirty(true), and invalidate.compile/frame/
+    // preflight. The compile and frame invalidations are new on this
+    // path; see the useMemo block above and the T2-76 step 3 commit
+    // message for the behavioral diff (notably: edits now reset
+    // hasFramed via ConnectionPanelMain's historyVersion watcher,
+    // closing a T1-59 frame-before-start gap).
+    //
+    // 'unspecified' action label: handleSceneCommit is called from
+    // ~50 sites for every type of edit; the caller doesn't tell us
+    // which. Future cleanup can let specific callers pass a more
+    // informative label, or migrate directly to commitSceneTransaction.
+    commitSceneTransaction(newScene, { kind: 'edit', action: 'unspecified' });
+  }, [commitSceneTransaction]);
 
   const handleAddTextDialogSubmit = useCallback(() => {
     if (!dialogs.textInput.trim()) return;

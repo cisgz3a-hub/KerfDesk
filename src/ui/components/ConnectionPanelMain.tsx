@@ -408,12 +408,16 @@ export function ConnectionPanelMain({
     }
   }, [isConnected]);
 
-  // T1-75: undo/redo applied by App.tsx. Burn bounds may have changed; the
-  // previous frame action no longer reflects reality. Reset hasFramed so
-  // the T1-59 frame-before-start gate refuses Start until the user re-frames.
-  // workflowVersion bumped so canStartJob re-evaluates the same render.
-  // Mount-time fire (historyVersion === 0) is a no-op since hasFramed is
-  // already false.
+  // T1-75 (origin) + T2-76 step 3 (extension): historyVersion bumps on
+  // any scene mutation App.tsx commits — both undo/redo via
+  // applyHistoryScene and edits via the unified commitSceneTransaction
+  // (handleSceneCommit, etc.). Burn bounds may have changed; the
+  // previous frame action no longer reflects reality. Reset hasFramed
+  // so the T1-59 frame-before-start gate refuses Start until the user
+  // re-frames. workflowVersion bumped so canStartJob re-evaluates the
+  // same render.
+  // Mount-time fire (historyVersion === 0) is a no-op since hasFramed
+  // is already false.
   useEffect(() => {
     hasFramed.current = false;
     setWorkflowVersion(v => v + 1);
