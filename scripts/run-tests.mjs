@@ -106,6 +106,7 @@ const files = [
   'wcs-mutation-consent.test.ts',
   'wcs-no-listener-blocks-job.test.ts',
   'wcs-no-listener-headless-flag.test.ts',
+  'scene-transaction-unified.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
   'ui-start-job-uses-ticket.test.tsx',
   'connection-panel-preflight-no-loop.test.tsx',
