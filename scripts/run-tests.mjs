@@ -143,6 +143,7 @@ const files = [
   'image-processing.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
+  'box-geometry.test.ts',
   'velocity-profile.test.ts',
   'plan-accel-sanity.test.ts',
   'scene-canvas-machine-coord-check.test.ts',
