@@ -92,6 +92,7 @@ const files = [
   'safety-write-failure-surfaces.test.ts',
   'machine-service-laser-state-subscription.test.ts',
   'error-handler-sends-safety-off.test.ts',
+  'error-handler-faults-active-job.test.ts',
   'machine-settings-stop-on-error-toggle.test.ts',
   'autofocus.test.ts',
   'machine-service-pause-resume.test.ts',

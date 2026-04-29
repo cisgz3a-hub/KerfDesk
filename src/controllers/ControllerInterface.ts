@@ -14,7 +14,15 @@ export type MachineStatus =
   | 'hold'
   | 'alarm'
   | 'homing'
-  | 'check';
+  | 'check'
+  // T2-12 part 2: software-synthesized state when an error occurs
+  // during an active job. Distinct from 'alarm' (which is hardware-
+  // reported by GRBL and recoverable via $X). Faulted means the
+  // controller stopped a job mid-execution and the machine state is
+  // uncertain enough that the user should physically inspect before
+  // retrying. Recovery is via {@link LaserController.acknowledgeFault}
+  // rather than $X.
+  | 'faulted_requires_inspection';
 
 export interface MachinePosition {
   x: number;
@@ -118,6 +126,26 @@ export interface LaserController {
     stage: 'm5' | 'soft-reset' | 'failed';
     error?: Error;
   }>;
+
+  /**
+   * T2-12 part 2: clear a 'faulted_requires_inspection' state and
+   * return the controller to 'idle'. Should only be called after the
+   * user has physically inspected the machine and confirmed it is
+   * safe to proceed.
+   *
+   * Implementations should:
+   *  - Confirm motion has stopped.
+   *  - Call {@link safetyOff} as defense-in-depth (fire-and-forget;
+   *    the original fault path already invoked it once).
+   *  - Transition status to 'idle' if the controller is currently in
+   *    'faulted_requires_inspection'; otherwise no-op.
+   *
+   * No-op on controllers that don't surface the faulted state. Returns
+   * `{ ok: true }` on success or no-op; `{ ok: false, reason }` if the
+   * acknowledge couldn't be processed (e.g. disconnected, motion still
+   * running). Never throws.
+   */
+  acknowledgeFault?(): Promise<{ ok: boolean; reason?: string }>;
 
   /**
    * Manual line to GRBL. `internal` = LaserForge-generated (known sequences);

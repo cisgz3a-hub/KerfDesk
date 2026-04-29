@@ -28,6 +28,17 @@ export function runMachineStateChecks(ctx: PreflightContext, out: PreflightResul
       message: `Machine in ALARM state${ctx.machineAlarmCode != null ? ` (code ${ctx.machineAlarmCode})` : ''}. Unlock with $X before starting.`,
     });
   }
+  if (st === 'faulted_requires_inspection') {
+    // T2-12 part 2: software-synthesized state after a job-stopping
+    // error. Distinct from 'alarm' both in semantic (uncertainty about
+    // machine state, not a clean alarm condition) and in recovery
+    // path ("acknowledge fault" not "$X to clear").
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_FAULTED,
+      message: 'Machine fault detected. Inspect the workpiece and machine, then acknowledge before starting a new job.',
+    });
+  }
   if (st === 'hold') {
     out.push({
       severity: 'error',
@@ -52,6 +63,7 @@ export function runMachineStateChecks(ctx: PreflightContext, out: PreflightResul
   if (
     st !== 'idle' &&
     st !== 'alarm' &&
+    st !== 'faulted_requires_inspection' &&
     st !== 'hold' &&
     st !== 'run' &&
     st !== 'homing'

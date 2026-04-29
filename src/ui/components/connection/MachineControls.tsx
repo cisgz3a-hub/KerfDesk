@@ -2,10 +2,23 @@ import React from 'react';
 
 interface MachineControlsProps {
   isAlarm: boolean;
+  /**
+   * T2-12 part 2: machine is in 'faulted_requires_inspection'.
+   * Renders an "Acknowledge fault" button instead of "Unlock"; mutual
+   * exclusion with isAlarm is guaranteed by the controller's status
+   * field which holds exactly one value.
+   */
+  isFaulted: boolean;
   isRunning: boolean;
   canFrame: boolean;
   isTestFiring: boolean;
   onUnlock: () => void;
+  /**
+   * T2-12 part 2: handler for the "Acknowledge fault" button. Only
+   * called when {@link isFaulted} is true. Passing a no-op is fine
+   * for hosts that never surface the faulted state.
+   */
+  onAcknowledgeFault: () => void;
   onTestFireBegin: (e: React.PointerEvent<HTMLButtonElement>) => void;
   onTestFireEnd: () => void;
   onFrameDot: () => void;
@@ -15,15 +28,20 @@ const font = "'DM Sans', system-ui, sans-serif";
 
 export function MachineControls({
   isAlarm,
+  isFaulted,
   isRunning,
   canFrame,
   isTestFiring,
   onUnlock,
+  onAcknowledgeFault,
   onTestFireBegin,
   onTestFireEnd,
   onFrameDot,
 }: MachineControlsProps) {
-  const testFireDisabled = isAlarm || isRunning;
+  // T2-12 part 2: test-fire is gated by either halt-state. Both
+  // alarm and faulted indicate the laser path may be in a state we
+  // shouldn't fire from until cleared.
+  const testFireDisabled = isAlarm || isFaulted || isRunning;
 
   return React.createElement('div', {
     style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },
@@ -39,6 +57,17 @@ export function MachineControls({
       color: '#ffd444',
     },
   }, '🔓 Unlock'),
+  isFaulted && React.createElement('button', {
+    type: 'button',
+    onClick: onAcknowledgeFault,
+    title: 'Confirm machine is safe and return to idle',
+    style: {
+      width: '100%', padding: '6px', fontSize: 10, fontWeight: 600, borderRadius: 6,
+      cursor: 'pointer', fontFamily: font,
+      background: 'rgba(255,68,102,0.08)', border: '1px solid rgba(255,68,102,0.3)',
+      color: '#ff8ca0',
+    },
+  }, '⚠ Acknowledge fault'),
   React.createElement('button', {
     type: 'button',
     onPointerDown: (e: React.PointerEvent<HTMLButtonElement>) => {

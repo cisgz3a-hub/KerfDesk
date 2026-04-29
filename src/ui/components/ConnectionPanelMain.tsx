@@ -871,6 +871,36 @@ export function ConnectionPanelMain({
     await executionCoordinator.unlock();
   }, [appendMessage, machineService, showConfirm, executionCoordinator]);
 
+  /**
+   * T2-12 part 2: clear a 'faulted_requires_inspection' state after
+   * the user has confirmed they've inspected the machine. Asks once
+   * for explicit confirmation (the fault state exists precisely because
+   * we don't trust the machine to be in a clean state, so a one-click
+   * dismiss would defeat the gate's purpose).
+   */
+  const handleAcknowledgeFault = useCallback(async () => {
+    const ok = await showConfirm(
+      'Acknowledge fault',
+      'A job stopped due to an error. Confirm you have inspected the machine and workpiece, and that it is safe to return to idle.',
+    );
+    if (!ok) return;
+    const ctrl = controllerRef.current;
+    if (!ctrl?.acknowledgeFault) {
+      // Defensive — interface declares this method as optional. UI
+      // should only render the button when status is faulted, which
+      // implies a controller that produces the faulted state, which
+      // implies acknowledgeFault is implemented. But guard anyway.
+      appendMessage('Cannot acknowledge fault: controller does not support it.');
+      return;
+    }
+    const result = await ctrl.acknowledgeFault();
+    if (!result.ok) {
+      appendMessage(`Acknowledge fault failed: ${result.reason ?? 'unknown reason'}`);
+    } else {
+      appendMessage('Fault acknowledged. Machine returned to idle.');
+    }
+  }, [appendMessage, controllerRef, showConfirm]);
+
   const handlePauseResume = useCallback(async () => {
     const held = isPaused || machineState?.status === 'hold';
     try {
@@ -904,6 +934,8 @@ export function ConnectionPanelMain({
       const ctrl = controllerRef.current;
       if (!ctrl || isTestFiringRef.current) return;
       if (machineState?.status === 'alarm') return;
+      // T2-12 part 2: faulted is a halt-state too — don't fire from it.
+      if (machineState?.status === 'faulted_requires_inspection') return;
 
       const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
       if (!acknowledged) {
@@ -1107,6 +1139,55 @@ export function ConnectionPanelMain({
     }, '🔓 Unlock'),
   );
 
+  const faultedBanner = isConnected && machineState?.status === 'faulted_requires_inspection' && React.createElement('div', {
+    // T2-12 part 2: distinct from alarmBanner because the recovery
+    // affordance differs. Alarm = "clear with $X" (firmware alarm
+    // condition). Faulted = "we stopped your job mid-cut due to an
+    // error and need you to look at the machine before retrying."
+    // Same visual structure as alarmBanner so users don't have to
+    // learn two layouts; only the copy and button differ.
+    style: {
+      margin: '10px 16px 0',
+      padding: '12px 14px',
+      background: 'rgba(255,68,102,0.08)',
+      border: '1px solid rgba(255,68,102,0.4)',
+      borderRadius: 8,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 12,
+      flexShrink: 0,
+    },
+  },
+    React.createElement('div', { style: { fontSize: 20, flexShrink: 0 } }, '⚠'),
+    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
+      React.createElement('div', {
+        style: { fontSize: 12, fontWeight: 600, color: '#ff4466', marginBottom: 2 },
+      }, 'Machine fault — job stopped'),
+      React.createElement('div', {
+        style: { fontSize: 10, color: '#ff8ca0', lineHeight: 1.4 },
+      }, machineState?.errorCode != null
+        ? `Error ${machineState.errorCode}. Inspect the workpiece and machine, then acknowledge to return to idle.`
+        : 'Inspect the workpiece and machine, then acknowledge to return to idle.'),
+    ),
+    React.createElement('button', {
+      type: 'button',
+      onClick: () => { void handleAcknowledgeFault(); },
+      style: {
+        padding: '8px 18px',
+        fontSize: 12,
+        fontWeight: 700,
+        borderRadius: 6,
+        cursor: 'pointer',
+        fontFamily: font,
+        background: '#ff4466',
+        border: '1px solid #ff4466',
+        color: '#fff',
+        flexShrink: 0,
+        whiteSpace: 'nowrap' as const,
+      },
+    }, '⚠ Acknowledge fault'),
+  );
+
   const connectSection = React.createElement(ConnectWizard, {
     webSerialSupported: WebSerialPort.isSupported(),
     onConnectUsb: () => { void connectRealLaser(); },
@@ -1163,10 +1244,14 @@ export function ConnectionPanelMain({
     }, 'Focusing...'),
     React.createElement(MachineControls, {
       isAlarm: machineState?.status === 'alarm',
+      // T2-12 part 2: faulted is its own halt-state with its own
+      // recovery affordance (Acknowledge fault, not Unlock).
+      isFaulted: machineState?.status === 'faulted_requires_inspection',
       isRunning,
       canFrame,
       isTestFiring,
       onUnlock: handleUnlock,
+      onAcknowledgeFault: () => { void handleAcknowledgeFault(); },
       onTestFireBegin: beginTestFire,
       onTestFireEnd: endTestFire,
       onFrameDot: () => { void handleFrameDot(); },
@@ -1804,6 +1889,7 @@ export function ConnectionPanelMain({
         isConnected,
         statusSection,
         alarmBanner,
+        faultedBanner,
         connectSection,
       }),
       isConnected && React.createElement('div', {

@@ -1,6 +1,8 @@
 /**
- * T1-24 regression test: GRBL error/alarm handlers actively command the
- * laser off, and active-job errors transition to 'alarm' (not 'idle').
+ * T1-24 + T2-12 part 2 regression test: GRBL error/alarm handlers
+ * actively command the laser off; active-job errors transition to
+ * a halt-state (not 'idle'); hardware-reported alarm tokens still
+ * map to 'alarm' (T2-12 regression guard).
  *
  * Background — error path:
  *   GRBL `error:N` does NOT necessarily disable the laser. It's a parsing
@@ -19,32 +21,43 @@
  *   or partial reset, the laser can be in an undefined state. Pre-T1-24,
  *   _handleAlarm aborted the job without commanding the laser off.
  *
- * Fix:
+ * Fix (T1-24):
  *   1. _handleError: fire safetyOff() (T1-22's two-stage M5 → soft-reset
  *      path) when a job was active at handler entry. Skip safety-off if
  *      no job was running — protocol errors with no laser activity don't
  *      need it and the noise on the connect handshake (mock port returns
  *      error:20 to the wake-up '\n' line) would mask real issues.
- *   2. _handleError: when _stopOnError is true, transition to 'alarm'
- *      (instead of 'idle') if a job was active. UI gates Run on alarm
- *      state, forcing the user to consciously clear before another job.
+ *   2. _handleError: when _stopOnError is true, transition to a halt-
+ *      state (instead of 'idle') if a job was active. UI gates Run on
+ *      halt-states, forcing the user to consciously clear.
  *      For idle errors (e.g. user typed an invalid console command), the
  *      previous status was already 'idle' and there's no laser motion to
  *      lock down — preserve the existing 'idle' transition.
  *   3. _handleAlarm: fire safetyOff() unconditionally (defense-in-depth).
+ *
+ * Update (T2-12 part 2):
+ *   The active-job halt-state is now 'faulted_requires_inspection',
+ *   not 'alarm'. Hardware-reported ALARM tokens continue to map to
+ *   'alarm'. Two states with subtly different semantics — 'alarm' is
+ *   firmware-reported and cleared via $X; 'faulted_requires_inspection'
+ *   is software-synthesized and cleared via acknowledgeFault() after the
+ *   user inspects the machine.
  *
  * What this test enforces:
  *   1. Error during active job → safetyOff fires (soft reset 0x18 lands
  *      in port.realtimeBytes via the safetyOff fallback path, since M5
  *      via writeCritical may complete fast enough to short-circuit before
  *      we observe).
- *   2. Error during active job + _stopOnError → status becomes 'alarm',
- *      not 'idle'. errorCode preserved.
+ *   2. Error during active job + _stopOnError → status becomes
+ *      'faulted_requires_inspection', not 'idle' or 'alarm'. errorCode
+ *      preserved.
  *   3. Error while idle (no active job) → does NOT fire safetyOff.
  *      Verified by checking that the realtime bytes contain only the
  *      connect-handshake bytes (`?` for status poll, no 0x18).
- *   4. ALARM:N → fires safetyOff regardless of job state. Status
- *      transitions to 'alarm' (existing behavior, not new in T1-24).
+ *   4. ALARM:N (hardware-reported) → fires safetyOff regardless of job
+ *      state. Status transitions to 'alarm' — explicitly NOT to the
+ *      faulted state. This is the T2-12 part 2 regression guard for
+ *      the two-state distinction.
  *
  * Run: npx tsx tests/error-handler-sends-safety-off.test.ts
  */
@@ -107,7 +120,13 @@ void (async () => {
     );
   }
 
-  // ── 2. Error during active job → status='alarm', not 'idle' ───────────
+  // ── 2. Error during active job → status='faulted_requires_inspection' ──
+  // T1-24 originally moved this to 'alarm'; T2-12 part 2 promotes the
+  // active-job error transition to a software-distinct state so the UI
+  // can offer the right recovery action ("acknowledge fault" rather
+  // than "$X to clear alarm"). Block 4 below verifies that hardware-
+  // reported ALARM tokens still map to 'alarm' — the regression guard
+  // for the two-state distinction.
   {
     const port = new MockSerialPort();
     port.open();
@@ -124,8 +143,8 @@ void (async () => {
     await flush(50);
 
     assert(
-      ctrl.state.status === 'alarm',
-      `error during active job → status='alarm' (got "${ctrl.state.status}")`,
+      ctrl.state.status === 'faulted_requires_inspection',
+      `error during active job → status='faulted_requires_inspection' (got "${ctrl.state.status}")`,
     );
     assert(
       ctrl.state.errorCode === 9,

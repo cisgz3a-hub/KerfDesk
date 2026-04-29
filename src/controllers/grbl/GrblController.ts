@@ -718,6 +718,51 @@ export class GrblController implements LaserController {
     }
   }
 
+  /**
+   * T2-12 part 2: clear a 'faulted_requires_inspection' state and
+   * return the controller to 'idle'. Should only be called after the
+   * user has physically inspected the machine.
+   *
+   * Behavior:
+   *   - If the controller is in 'faulted_requires_inspection': fire
+   *     safetyOff() as defense-in-depth (laser-off invariant; the
+   *     original fault path already invoked it once but it's cheap
+   *     and idempotent), then transition status to 'idle'. Returns
+   *     { ok: true }.
+   *   - If the controller is in any other state: no-op. Returns
+   *     { ok: true }. Idempotent so the UI can call it without
+   *     reading status first.
+   *   - If not connected: returns { ok: false, reason: 'Not connected' }.
+   *
+   * Never throws.
+   */
+  async acknowledgeFault(): Promise<{ ok: boolean; reason?: string }> {
+    if (!this._port?.isOpen) {
+      return { ok: false, reason: 'Not connected' };
+    }
+    if (this._state.status !== 'faulted_requires_inspection') {
+      // Idempotent — nothing to clear.
+      return { ok: true };
+    }
+    // Defense-in-depth laser-off. Fire-and-forget; the error path that
+    // produced the fault already issued one safetyOff. A second one
+    // can't hurt and protects against the edge case where the prior
+    // safetyOff was racing with new RX that re-modal-set M3.
+    void this.safetyOff().then(result => {
+      if (result.stage === 'failed') {
+        console.warn(
+          '[GrblController] T2-12: safetyOff during acknowledgeFault returned failed:',
+          result.error,
+        );
+      }
+    }).catch((err: unknown) => {
+      console.warn('[GrblController] T2-12: safetyOff during acknowledgeFault threw:', err);
+    });
+    this._state.errorCode = null;
+    this._updateStatus('idle');
+    return { ok: true };
+  }
+
   // ─── MANUAL CONTROL ─────────────────────────────────────────
 
   /**
@@ -1138,20 +1183,28 @@ export class GrblController implements LaserController {
     // Stop streaming on error by default — safer for real machines
     if (this._stopOnError) {
       this._abortJob();
-      // T1-24 + audit 1E: transition to 'alarm' (not 'idle') after an
-      // error during an active job. The UI reads 'idle' as "ready for
-      // next job" — a user who ignored the error and clicked Run would
-      // start a new job from a state where the previous error left the
-      // laser potentially still on, in unknown position. Forcing
-      // 'alarm' makes the UI gate the Run button until the user
-      // consciously clears, matching the existing alarm-state UX.
+      // T1-24 + audit 1E: transition to a halt-state (not 'idle')
+      // after an error during an active job. The UI reads 'idle' as
+      // "ready for next job" — a user who ignored the error and clicked
+      // Run would start a new job from a state where the previous
+      // error left the laser potentially still on, in unknown position.
+      // Forcing a halt-state makes the UI gate the Run button until the
+      // user consciously clears.
+      //
+      // T2-12 part 2: active-job errors now transition to
+      // 'faulted_requires_inspection' rather than 'alarm'. The two
+      // states are semantically distinct:
+      //  - 'alarm' is hardware-reported by GRBL (cleared via $X) and
+      //    arrives through machineStatusFromGrblReportToken at the top
+      //    of the file; this writer never touches it.
+      //  - 'faulted_requires_inspection' is software-synthesized by us
+      //    when we stop a job mid-execution; recovery is via
+      //    acknowledgeFault() after the user inspects the machine.
       //
       // For idle errors (e.g. user typed an invalid console command),
       // the previous status was already 'idle' and there's no laser
       // motion to lock down — preserve the existing 'idle' transition.
-      // T2-12 will introduce a proper FAULTED_REQUIRES_INSPECTION state
-      // and migrate the active-job branch to it.
-      this._updateStatus(wasJobRunning ? 'alarm' : 'idle');
+      this._updateStatus(wasJobRunning ? 'faulted_requires_inspection' : 'idle');
       return;
     }
 
