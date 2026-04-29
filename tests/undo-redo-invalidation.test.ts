@@ -67,9 +67,13 @@ interface PanelState {
  * Mirror of the post-fix `applyHistoryScene` in App.tsx. Kept structurally
  * identical so a future divergence shows up here.
  */
-function runApplyHistoryScene(app: AppState, nextScene: Scene): void {
+function runApplyHistoryScene(
+  app: AppState,
+  nextScene: Scene,
+  selectionAfter: ReadonlySet<string>,
+): void {
   app.scene = nextScene;
-  app.selectedIds = new Set();
+  app.selectedIds = new Set(selectionAfter);
   app.sceneIsDirtyRef.current = true;
   app.gcodeStale = true;
   app.historyVersion += 1;
@@ -93,9 +97,9 @@ function runPanelHistoryEffect(panel: PanelState, app: AppState): void {
  * Mirror of `handleUndo` post-fix. Returns true if undo applied.
  */
 function runHandleUndo(app: AppState, hist: HistoryManager): boolean {
-  const prev = hist.undo();
-  if (prev) {
-    runApplyHistoryScene(app, prev);
+  const entry = hist.undoEntry();
+  if (entry) {
+    runApplyHistoryScene(app, entry.scene, entry.selectionAfter);
     return true;
   }
   return false;
@@ -105,9 +109,9 @@ function runHandleUndo(app: AppState, hist: HistoryManager): boolean {
  * Mirror of `handleRedo` post-fix. Returns true if redo applied.
  */
 function runHandleRedo(app: AppState, hist: HistoryManager): boolean {
-  const next = hist.redo();
-  if (next) {
-    runApplyHistoryScene(app, next);
+  const entry = hist.redoEntry();
+  if (entry) {
+    runApplyHistoryScene(app, entry.scene, entry.selectionAfter);
     return true;
   }
   return false;
@@ -184,7 +188,7 @@ void (() => {
     );
     assert(
       app.selectedIds.size === 0,
-      'undo → selectedIds cleared',
+      'undo → selection follows entry.selectionAfter (empty for entries pushed without metadata in this test)',
     );
   }
 

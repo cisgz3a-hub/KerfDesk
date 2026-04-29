@@ -11,7 +11,7 @@ export interface ConnectionPanelGrbl {
 
 export interface UseConnectionHandlersParams {
   scene: Scene;
-  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   compileGcode: (targetScene: Scene) => Promise<string | null>;
   setCurrentGcode: Dispatch<SetStateAction<string | null>>;
   connectionSidebarOpen: boolean;
@@ -56,14 +56,14 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
   }, [scene, compileGcode, setCurrentGcode]);
 
   // Auto-recompile G-code when the design changes (debounced).
-  // Replaces the manual "↻ Update" step in the connection panel.
+  // Replaces the manual "Update" step in the connection panel.
   useEffect(() => {
     if (!connectionSidebarOpen) return;
     if (grbl.isJobRunning) return;
     if (!gcodeStale) return;
 
     const timer = setTimeout(() => {
-      // Re-check at fire time — job may have started between scheduling and firing.
+      // Re-check at fire time - job may have started between scheduling and firing.
       // The effect-level guard only covers scheduling time.
       if (isJobRunningRef.current) return;
       handleConnectionRecompile();
@@ -78,13 +78,13 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
     } catch { /* ignore */ }
   }, []);
 
-  /** Connection sidebar edits arbitrary layers; LayerPanel’s mode UI is for `activeLayerId` only — align selection here. */
+  /** Connection sidebar edits arbitrary layers; LayerPanel mode UI is for `activeLayerId` only - align selection here. */
   const handleConnectionUpdateLayerMode = useCallback(
     (layerId: string, mode: LayerMode) => {
       const layer = scene.layers.find(l => l.id === layerId);
       if (!layer) return;
       let next = applyLayerModeChange(layer, mode);
-      // Auto-rename if the name matches the old mode (e.g. "Cut" → "Engrave")
+      // Auto-rename if the name matches the old mode (e.g. "Cut" -> "Engrave")
       const modeNames: Record<LayerMode, string> = { cut: 'Cut', engrave: 'Engrave', score: 'Score', image: 'Image' };
       if (layer.name.toLowerCase() === layer.settings.mode) {
         next = { ...next, name: modeNames[mode] };

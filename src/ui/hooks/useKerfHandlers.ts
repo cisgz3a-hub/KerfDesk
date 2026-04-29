@@ -8,7 +8,7 @@ import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface UseKerfHandlersParams {
   scene: Scene;
-  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   showAlert: (title: string, message: string) => Promise<unknown>;
 }
 
@@ -64,7 +64,7 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
       } as SceneObject);
     }
     if (changed === 0) {
-      await showAlert('Kerf', 'Offset failed — select cut paths or shapes, or try a smaller kerf.');
+      await showAlert('Kerf', 'Offset failed - select cut paths or shapes, or try a smaller kerf.');
       return;
     }
     handleSceneCommit({ ...scene, objects: next }, 'layer-kerf');

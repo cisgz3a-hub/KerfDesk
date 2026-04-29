@@ -119,6 +119,16 @@ import { gatedFeature, isProUnlocked } from '../utils/proGate';
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 
+function filterValidIds(ids: ReadonlySet<string>, scene: Scene): Set<string> {
+  if (ids.size === 0) return new Set();
+  const sceneIds = new Set(scene.objects.map(o => o.id));
+  const valid = new Set<string>();
+  for (const id of ids) {
+    if (sceneIds.has(id)) valid.add(id);
+  }
+  return valid;
+}
+
 export function App() {
   const {
     modal,
@@ -823,7 +833,11 @@ export function App() {
 
   /** Commit: update UI AND create a history entry. */
   const handleSceneCommit = useCallback(
-    (newScene: Scene, action: SceneCommitAction = 'unspecified') => {
+    (
+      newScene: Scene,
+      action: SceneCommitAction = 'unspecified',
+      selectionAfter?: ReadonlySet<string>,
+    ) => {
       // T2-76 step 3: dispatch through the unified mutation function.
       // T2-76 step 7: the action label is now caller-supplied. Five
       // hook files (useClipboard, useConnectionHandlers,
@@ -840,7 +854,11 @@ export function App() {
       // (notably: edits now reset hasFramed via ConnectionPanelMain's
       // historyVersion watcher, closing a T1-59 frame-before-start
       // gap).
-      commitSceneTransaction(newScene, { kind: 'edit', action });
+      commitSceneTransaction(
+        newScene,
+        { kind: 'edit', action },
+        selectionAfter ? { selectionAfter } : undefined,
+      );
     },
     [commitSceneTransaction],
   );
@@ -1175,7 +1193,6 @@ export function App() {
     scene,
     selectedIds,
     handleSceneCommit,
-    (ids) => setSelectedIds(ids),
   );
   const { handleDragOver, handleDragLeave, handleDrop, handleImageImport } = useImport(scene, {
     handleSceneCommit,
@@ -1281,20 +1298,28 @@ export function App() {
   // chain; T3-68 will wire a real emitter and the tag will become
   // visible in the log.
   const applyHistoryScene = useCallback(
-    (nextScene: Scene, direction: 'undo' | 'redo') => {
-      commitSceneTransaction(nextScene, { kind: 'history', direction });
+    (nextScene: Scene, direction: 'undo' | 'redo', selectionAfter?: ReadonlySet<string>) => {
+      commitSceneTransaction(
+        nextScene,
+        { kind: 'history', direction },
+        selectionAfter ? { selectionAfter } : undefined,
+      );
     },
     [commitSceneTransaction],
   );
 
   const handleUndo = useCallback(() => {
-    const prev = historyRef.current.undo();
-    if (prev) applyHistoryScene(prev, 'undo');
+    const entry = historyRef.current.undoEntry();
+    if (!entry) return;
+    const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
+    applyHistoryScene(entry.scene, 'undo', validSelection);
   }, [applyHistoryScene]);
 
   const handleRedo = useCallback(() => {
-    const next = historyRef.current.redo();
-    if (next) applyHistoryScene(next, 'redo');
+    const entry = historyRef.current.redoEntry();
+    if (!entry) return;
+    const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
+    applyHistoryScene(entry.scene, 'redo', validSelection);
   }, [applyHistoryScene]);
 
   const handleSelectAll = useCallback(() => {

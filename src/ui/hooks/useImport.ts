@@ -9,10 +9,10 @@ import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
-const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB — inline below, IndexedDB above
+const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB - inline below, IndexedDB above
 
 export interface UseImportDeps {
-  handleSceneCommit: (scene: Scene, action?: SceneCommitAction) => void;
+  handleSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setIsDragOver: (v: boolean) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;

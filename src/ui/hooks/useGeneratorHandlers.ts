@@ -13,7 +13,7 @@ export interface UseGeneratorHandlersParams {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
   setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
-  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction) => void;
+  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   setShowGridArray: (show: boolean) => void;
   setShowTemplates: (show: boolean) => void;
   showAlert: (title: string, message: string) => Promise<unknown>;

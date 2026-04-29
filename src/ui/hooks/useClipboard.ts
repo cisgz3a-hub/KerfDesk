@@ -8,8 +8,11 @@ import { type SceneCommitAction } from '../scene/SceneCommitActions';
 export function useClipboard(
   scene: Scene,
   selectedIds: ReadonlySet<string>,
-  handleSceneCommit: (scene: Scene, action?: SceneCommitAction) => void,
-  setSelectedIds: (ids: Set<string>) => void,
+  handleSceneCommit: (
+    scene: Scene,
+    action?: SceneCommitAction,
+    selectionAfter?: ReadonlySet<string>,
+  ) => void,
 ) {
   const [clipboard, setClipboard] = useState<SceneObject[]>([]);
 
@@ -47,21 +50,19 @@ export function useClipboard(
       };
     });
     const newScene = { ...scene, objects: [...scene.objects, ...pasted] };
-    handleSceneCommit(newScene, 'paste');
-    setSelectedIds(newIds);
+    handleSceneCommit(newScene, 'paste', newIds);
     setClipboard(pasted);
-  }, [clipboard, scene, handleSceneCommit, setSelectedIds]);
+  }, [clipboard, scene, handleSceneCommit]);
 
   const handleDuplicate = useCallback(() => {
     if (selectedIds.size === 0) return;
     const newScene = duplicateObjects(scene, selectedIds, 10, 10);
-    handleSceneCommit(newScene, 'duplicate');
     const existingIds = new Set(scene.objects.map(o => o.id));
     const duplicatedIds = new Set(
       newScene.objects.filter(o => !existingIds.has(o.id)).map(o => o.id),
     );
-    setSelectedIds(duplicatedIds);
-  }, [scene, selectedIds, handleSceneCommit, setSelectedIds]);
+    handleSceneCommit(newScene, 'duplicate', duplicatedIds);
+  }, [scene, selectedIds, handleSceneCommit]);
 
   return { clipboard, handleCopy, handlePaste, handleDuplicate };
 }

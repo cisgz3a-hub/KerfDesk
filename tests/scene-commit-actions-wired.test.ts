@@ -64,12 +64,11 @@ for (const f of migratedHooks) {
     /\bSceneCommitAction\b/.test(src),
     `${f} references SceneCommitAction`,
   );
-  // At least one handleSceneCommit(...) call passes a 2nd arg that is
-  // a kebab-case string literal. Excludes pure type-signature lines.
-  // The regex tolerates multi-line argument lists by allowing }, before
-  // the label literal.
+  // At least one handleSceneCommit(...) call passes a kebab-case
+  // string literal as its second argument. Excludes pure type-
+  // signature lines. Accepts both 2-arg and 3-arg forms.
   assert(
-    /handleSceneCommit\([\s\S]*?,\s*'[a-z][a-z0-9-]*'\s*\)/.test(src),
+    /handleSceneCommit\([\s\S]*?,\s*'[a-z][a-z0-9-]*'\s*[,)]/.test(src),
     `${f} contains at least one handleSceneCommit call with a label`,
   );
 }

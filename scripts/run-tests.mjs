@@ -43,6 +43,7 @@ const files = [
   'delete-marks-dirty.test.ts',
   'text-property-edits-undoable.test.ts',
   'undo-redo-invalidation.test.ts',
+  'selection-restore-on-history.test.ts',
   'text-outline-cache.test.ts',
   'source-text-migration.test.ts',
   'preflight-bounds.test.ts',
