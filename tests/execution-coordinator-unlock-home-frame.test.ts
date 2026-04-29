@@ -159,6 +159,7 @@ void (async () => {
       startMode: 'current',
       laserMode: 'off',
       maxSpindle: 1000,
+      crosshairAfterFrame: true,
     });
 
     status = 'run';
