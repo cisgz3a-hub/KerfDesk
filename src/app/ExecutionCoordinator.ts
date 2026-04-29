@@ -41,6 +41,7 @@ export interface FrameResult {
  * laser on. The UI's pointer-up handler is a UX convenience, not a safety guarantee.
  */
 export const TEST_FIRE_DEADMAN_MS = 5000;
+export const TEST_FIRE_POWER_PERCENT = 5;
 
 /**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
@@ -194,8 +195,8 @@ export class ExecutionCoordinator {
   async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
-    const sVal = Math.max(0, Math.round((2 / 100) * args.maxSpindle));
-    const cmd = `M3 S${sVal}`;
+    const sVal = Math.max(0, Math.round((TEST_FIRE_POWER_PERCENT / 100) * args.maxSpindle));
+    const cmd = `M4 S${sVal}`;
     this.notifySimulator(cmd);
     try {
       ctrl.sendCommand(cmd, 'internal');
@@ -206,7 +207,7 @@ export class ExecutionCoordinator {
     // T1-22: notify the service that the laser is intentionally on so
     // job-start gates and the laser-output-state surface stay accurate.
     this.deps.machineService.notifyTestFire('begin');
-    // Arm the deadman synchronously after the M3 succeeds so there is no window
+    // Arm the deadman synchronously after the laser-on command succeeds so there is no window
     // in which the laser is on but the auto-stop is unscheduled. Re-entry: clear
     // any prior handle first (a second beginTestFire resets the timer).
     if (this._testFireTimerHandle !== null) {

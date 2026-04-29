@@ -8,7 +8,7 @@
  * "Caller must ... set up a deadman timer — this method does NOT auto-stop."
  *
  * Fix: the deadman is now armed inside ExecutionCoordinator.beginTestFire
- * synchronously after the M3 succeeds, and disarmed in endTestFire before the
+ * synchronously after the laser-on command succeeds, and disarmed in endTestFire before the
  * M5 is issued. UI pointer-up / pointer-cancel / unmount paths still call
  * endTestFire for UX, but the safety guarantee no longer depends on the UI.
  *
@@ -106,7 +106,7 @@ void (async () => {
 
     const ok = await coord.beginTestFire({ maxSpindle: 1000 });
     assert(ok === true, 'beginTestFire returns true on success');
-    assert(log.sent.includes('M3 S20'), 'M3 S20 sent');
+    assert(log.sent.includes('M4 S50'), 'M4 S50 sent');
     assert(!log.sent.includes('M5 S0'), 'no M5 yet (timer pending)');
 
     // Wait past the 50ms deadman + a margin for setTimeout drift.
