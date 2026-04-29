@@ -51,4 +51,19 @@ export type SceneCommitAction =
   | 'calibration-grid'
   | 'nudge'
   | 'material-clear'
-  | 'learned-toast-apply';
+  | 'learned-toast-apply'
+  // Mixed-bag hooks migration commit 2. Atomic-pattern migrations
+  // pass selectionAfter as the 3rd arg to handleSceneCommit; the
+  // selection-preserving transforms just supply a label.
+  | 'move-to-layer'
+  | 'align'
+  | 'distribute'
+  | 'rotate'
+  | 'flip'
+  | 'move-to-corner'
+  | 'move-to-material-origin'
+  | 'toggle-lock'
+  | 'toggle-visibility'
+  | 'offset'
+  | 'boolean-op'
+  | 'text-to-path';

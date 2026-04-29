@@ -1133,7 +1133,6 @@ export function App() {
     scene,
     selectedIds,
     handleSceneCommit,
-    setSelectedIds: (ids) => setSelectedIds(ids),
     showAlert,
     showConfirm,
   });
@@ -1419,7 +1418,6 @@ export function App() {
   } = useQuickActionHandlers({
     scene,
     selectedIds,
-    setSelectedIds,
     handleSceneCommit,
     handleDelete,
     centerOnMaterial: sceneOps.centerOnMaterial,
@@ -1487,7 +1485,6 @@ export function App() {
   } = useGeneratorHandlers({
     scene,
     selectedIds,
-    setSelectedIds,
     handleSceneCommit,
     setShowGridArray,
     setShowTemplates: dialogs.setShowTemplates,

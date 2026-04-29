@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { gatedFeature } from '../utils/proGate';
 
 interface ContextMenuItem {
@@ -17,7 +18,7 @@ interface ContextMenuState {
 }
 
 export interface ContextMenuActions {
-  handleSceneCommit: (scene: Scene) => void;
+  handleSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   setSelectedIds: (ids: Set<string>) => void;
   setActiveTool: (tool: string) => void;
   handleCopy: () => void;
@@ -142,7 +143,7 @@ export function useContextMenu(
                   selectedIds.has(o.id) ? { ...o, layerId: layer.id } : o,
                 ),
               };
-              actions.handleSceneCommit(newScene);
+              actions.handleSceneCommit(newScene, 'move-to-layer');
             },
           });
         }
