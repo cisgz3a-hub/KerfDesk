@@ -1,12 +1,12 @@
-import { useCallback } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { generateId } from '../../core/types';
 
 export interface UseQuickActionHandlersParams {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
-  handleSceneCommit: (newScene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
+  setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
+  handleSceneCommit: (newScene: Scene) => void;
   handleDelete: () => void;
   centerOnMaterial: () => void;
 }
@@ -21,6 +21,7 @@ export function useQuickActionHandlers(params: UseQuickActionHandlersParams): Qu
   const {
     scene,
     selectedIds,
+    setSelectedIds,
     handleSceneCommit,
     handleDelete,
     centerOnMaterial,
@@ -53,7 +54,8 @@ export function useQuickActionHandlers(params: UseQuickActionHandlersParams): Qu
       });
     }
     const newScene = { ...scene, objects: [...scene.objects, ...clones] };
-    handleSceneCommit(newScene, 'duplicate', newIds);
+    handleSceneCommit(newScene);
+    setSelectedIds(newIds);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const handleQuickActionDelete = useCallback(() => {

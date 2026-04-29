@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, type Dispatch, type SetStateAction } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { type GridArrayConfig } from '../components/GridArrayDialog';
@@ -12,6 +12,7 @@ import { type SceneCommitAction } from '../scene/SceneCommitActions';
 export interface UseGeneratorHandlersParams {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
+  setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
   handleSceneCommit: (newScene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   setShowGridArray: (show: boolean) => void;
   setShowTemplates: (show: boolean) => void;
@@ -30,6 +31,7 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
   const {
     scene,
     selectedIds,
+    setSelectedIds,
     handleSceneCommit,
     setShowGridArray,
     setShowTemplates,
@@ -107,7 +109,8 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
         ...scene,
         objects: [...scene.objects, ...objects],
       };
-      handleSceneCommit(newScene, action, new Set(objects.map(o => o.id)));
+      handleSceneCommit(newScene, action);
+      setSelectedIds(new Set(objects.map(o => o.id)));
     },
     [scene, handleSceneCommit],
   );

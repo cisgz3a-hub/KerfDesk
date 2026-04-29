@@ -1,7 +1,6 @@
 import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
-import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { textGeometryToPath } from '../../geometry/TextToPath';
@@ -108,7 +107,8 @@ function translateSelection(scn: Scene, selIds: ReadonlySet<string>, dx: number,
 interface SceneOperationsActions {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
-  handleSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
+  handleSceneCommit: (scene: Scene) => void;
+  setSelectedIds: (ids: Set<string>) => void;
   showAlert: (title: string, message: string) => void | Promise<void>;
   showConfirm: (title: string, message: string) => Promise<boolean>;
 }
@@ -117,23 +117,24 @@ export function useSceneOperations({
   scene,
   selectedIds,
   handleSceneCommit,
+  setSelectedIds,
   showAlert,
   showConfirm,
 }: SceneOperationsActions) {
   const alignLeft = useCallback(() => {
-    handleSceneCommit(alignSelection(scene, selectedIds, 'left'), 'align');
+    handleSceneCommit(alignSelection(scene, selectedIds, 'left'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignRight = useCallback(() => {
-    handleSceneCommit(alignSelection(scene, selectedIds, 'right'), 'align');
+    handleSceneCommit(alignSelection(scene, selectedIds, 'right'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignTop = useCallback(() => {
-    handleSceneCommit(alignSelection(scene, selectedIds, 'top'), 'align');
+    handleSceneCommit(alignSelection(scene, selectedIds, 'top'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignBottom = useCallback(() => {
-    handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'), 'align');
+    handleSceneCommit(alignSelection(scene, selectedIds, 'bottom'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignCenterH = useCallback(() => {
@@ -143,7 +144,7 @@ export function useSceneOperations({
       ? scene.material.x + scene.material.width / 2
       : scene.canvas.width / 2;
     const cx = (b.wMinX + b.wMaxX) / 2;
-    handleSceneCommit(translateSelection(scene, selectedIds, targetCx - cx, 0), 'align');
+    handleSceneCommit(translateSelection(scene, selectedIds, targetCx - cx, 0));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignCenterV = useCallback(() => {
@@ -153,7 +154,7 @@ export function useSceneOperations({
       ? scene.material.y + scene.material.height / 2
       : scene.canvas.height / 2;
     const cy = (b.wMinY + b.wMaxY) / 2;
-    handleSceneCommit(translateSelection(scene, selectedIds, 0, targetCy - cy), 'align');
+    handleSceneCommit(translateSelection(scene, selectedIds, 0, targetCy - cy));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const centerOnCanvas = useCallback(() => {
@@ -165,12 +166,12 @@ export function useSceneOperations({
     const targetY = (scene.canvas.height - selHeight) / 2;
     const dx = targetX - b.wMinX;
     const dy = targetY - b.wMinY;
-    handleSceneCommit(translateSelection(scene, selectedIds, dx, dy), 'align');
+    handleSceneCommit(translateSelection(scene, selectedIds, dx, dy));
   }, [scene, selectedIds, handleSceneCommit]);
 
   /** Center selection on the material (or canvas if no material), same as legacy alignSelection(..., 'center'). */
   const centerOnMaterial = useCallback(() => {
-    handleSceneCommit(alignSelection(scene, selectedIds, 'center'), 'align');
+    handleSceneCommit(alignSelection(scene, selectedIds, 'center'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const performBoolean = useCallback(
@@ -213,9 +214,10 @@ export function useSceneOperations({
         objects: [...scene.objects.filter(o => !selectedIds.has(o.id)), newObj],
       };
 
-      handleSceneCommit(newScene, 'boolean-op', new Set([newId]));
+      handleSceneCommit(newScene);
+      setSelectedIds(new Set([newId]));
     },
-    [scene, selectedIds, handleSceneCommit, showAlert],
+    [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert],
   );
 
   const offsetShapes = useCallback(
@@ -254,7 +256,7 @@ export function useSceneOperations({
       handleSceneCommit({
         ...scene,
         objects: [...scene.objects, ...newObjects],
-      }, 'offset');
+      });
     },
     [scene, selectedIds, handleSceneCommit, showAlert],
   );
@@ -328,8 +330,9 @@ export function useSceneOperations({
       objects: [...scene.objects.filter(o => !removeIds.has(o.id)), ...newObjects],
     };
 
-    handleSceneCommit(newScene, 'text-to-path', new Set(newObjects.map(o => o.id)));
-  }, [scene, selectedIds, handleSceneCommit, showAlert, showConfirm]);
+    handleSceneCommit(newScene);
+    setSelectedIds(new Set(newObjects.map(o => o.id)));
+  }, [scene, selectedIds, handleSceneCommit, setSelectedIds, showAlert, showConfirm]);
 
   const distributeObjects = useCallback(
     (direction: 'horizontal' | 'vertical') => {
@@ -370,7 +373,7 @@ export function useSceneOperations({
           };
         }),
       };
-      handleSceneCommit(newScene, 'distribute');
+      handleSceneCommit(newScene);
     },
     [scene, selectedIds, handleSceneCommit],
   );
@@ -423,7 +426,7 @@ export function useSceneOperations({
         };
       }),
     };
-    handleSceneCommit(newScene, 'rotate');
+    handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const flipSelected = useCallback((axis: 'horizontal' | 'vertical') => {
@@ -484,7 +487,7 @@ export function useSceneOperations({
         };
       }),
     };
-    handleSceneCommit(newScene, 'flip');
+    handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const moveToCorner = useCallback(
@@ -529,7 +532,7 @@ export function useSceneOperations({
             : o,
         ),
       };
-      handleSceneCommit(newScene, 'move-to-corner');
+      handleSceneCommit(newScene);
     },
     [scene, selectedIds, handleSceneCommit],
   );
@@ -564,7 +567,7 @@ export function useSceneOperations({
           : o,
       ),
     };
-    handleSceneCommit(newScene, 'move-to-material-origin');
+    handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const toggleLock = useCallback(() => {
@@ -577,7 +580,7 @@ export function useSceneOperations({
         selectedIds.has(o.id) ? { ...o, locked: !allLocked } : o,
       ),
     };
-    handleSceneCommit(newScene, 'toggle-lock');
+    handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const toggleVisibility = useCallback(() => {
@@ -590,7 +593,7 @@ export function useSceneOperations({
         selectedIds.has(o.id) ? { ...o, visible: !allVisible } : o,
       ),
     };
-    handleSceneCommit(newScene, 'toggle-visibility');
+    handleSceneCommit(newScene);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignObjects = useCallback(
