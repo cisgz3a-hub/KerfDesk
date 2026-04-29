@@ -114,12 +114,14 @@ export class ExecutionCoordinator {
     sceneBounds: AABB;
     transformOpts: MachineTransformOptions;
     idleTimeoutMs?: number;
+    withCrosshair?: boolean;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
       transformOpts: args.transformOpts,
       laserMode: 'off',
       idleTimeoutMs: args.idleTimeoutMs,
+      withCrosshair: args.withCrosshair ?? true,
     });
   }
 
@@ -132,6 +134,7 @@ export class ExecutionCoordinator {
     transformOpts: MachineTransformOptions;
     maxSpindle: number;
     idleTimeoutMs?: number;
+    withCrosshair?: boolean;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
@@ -139,6 +142,7 @@ export class ExecutionCoordinator {
       laserMode: 'dot',
       maxSpindle: args.maxSpindle,
       idleTimeoutMs: args.idleTimeoutMs,
+      withCrosshair: args.withCrosshair ?? true,
     });
   }
 
@@ -148,16 +152,18 @@ export class ExecutionCoordinator {
     laserMode: 'off' | 'dot';
     maxSpindle?: number;
     idleTimeoutMs?: number;
+    withCrosshair?: boolean;
   }): Promise<FrameResult> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
 
-    const { sceneBounds, transformOpts, laserMode, maxSpindle = 1000 } = args;
+    const { sceneBounds, transformOpts, laserMode, maxSpindle = 1000, withCrosshair = false } = args;
     const corners = buildFrameCorners(sceneBounds, transformOpts);
     const lines = buildFrameGcode(corners, {
       startMode: transformOpts.startMode,
       laserMode,
       maxSpindle,
+      crosshairAfterFrame: withCrosshair,
     });
 
     for (const line of lines) {

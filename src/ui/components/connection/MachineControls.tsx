@@ -99,13 +99,13 @@ export function MachineControls({
     type: 'button',
     onClick: onFrameDot,
     disabled: !canFrame,
-    title: 'Trace outline with low-power laser dot',
+    title: 'Trace outline and mark center with low-power laser dot',
     style: {
       width: '100%', padding: '5px', fontSize: 9, borderRadius: 4,
       cursor: canFrame ? 'pointer' : 'default', fontFamily: font,
       background: 'transparent', border: '1px solid #1a1a2e', color: '#555570',
       opacity: canFrame ? 1 : 0.4,
     },
-  }, '◉ Frame with Laser Dot'),
+  }, '◉ Frame + Mark Center'),
   );
 }

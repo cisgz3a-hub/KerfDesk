@@ -787,16 +787,16 @@ export function ConnectionPanelMain({
 
     if (!(await confirmFrameBounds())) return;
 
-    const acknowledged = localStorage.getItem('laserforge_frame_dot_acknowledged');
+    const acknowledged = localStorage.getItem('laserforge_frame_dot_acknowledged_v2');
     if (!acknowledged) {
       const ok = confirm(
-        '⚠ Frame with Laser Dot enables the laser at low power during framing.\n\n' +
-        'On slow diode lasers, even low power can scorch wood.\n\n' +
+        '⚠ Frame + Mark Center enables the laser at low power to trace the outline and draw a small + at the geometric center.\n\n' +
+        'The center mark fires inside the design footprint. On slow diode lasers, even low power can scorch wood.\n\n' +
         'Use only with eye protection and material that can handle a brief mark.\n\n' +
         'Continue?',
       );
       if (!ok) return;
-      localStorage.setItem('laserforge_frame_dot_acknowledged', 'true');
+      localStorage.setItem('laserforge_frame_dot_acknowledged_v2', 'true');
     }
 
     const transformOpts = {
