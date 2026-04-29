@@ -37,4 +37,18 @@ export type SceneCommitAction =
   | 'array-clone'
   | 'image-import'
   | 'svg-import'
-  | 'dxf-import';
+  | 'dxf-import'
+  // App.tsx internal callers (added in the App.tsx-label-cleanup commit
+  // following T2-12 part 2). These cover the ~10 sites that previously
+  // defaulted to 'unspecified'. A handful are atomic-pattern migrations
+  // (text-add, mode-select) that pass selectionAfter as the third arg
+  // to handleSceneCommit; the rest just supply an honest action label.
+  | 'text-edit'
+  | 'text-add'
+  | 'mode-select'
+  | 'start-position'
+  | 'camera-position'
+  | 'calibration-grid'
+  | 'nudge'
+  | 'material-clear'
+  | 'learned-toast-apply';

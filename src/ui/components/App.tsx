@@ -889,7 +889,7 @@ export function App() {
             : o
         ),
       };
-      handleSceneCommit(newScene);
+      handleSceneCommit(newScene, 'text-edit');
     } else {
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
       if (!layerId) return;
@@ -923,8 +923,10 @@ export function App() {
         ...scene,
         objects: [...scene.objects, textObj],
       };
-      handleSceneCommit(newScene);
-      setSelectedIds(new Set([textObj.id]));
+      // T2-79+: atomic — selection of the new text object rides into
+      // the history entry's selectionAfter. Undo restores pre-add
+      // selection; redo restores the new text selected.
+      handleSceneCommit(newScene, 'text-add', new Set([textObj.id]));
       handleTextPlaced();
     }
 
@@ -1028,8 +1030,12 @@ export function App() {
       const objectsOnMode = next.objects.filter(
         o => o.visible && modeLayerIds.has(o.layerId),
       );
-      setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
-      handleSceneCommit(next);
+      const modeSelection = new Set(objectsOnMode.map(o => o.id));
+      // T2-79+: atomic — selecting all objects on the new mode-layer
+      // rides into the history entry's selectionAfter. Undo restores
+      // the pre-mode-select selection; redo re-selects the matched
+      // objects.
+      handleSceneCommit(next, 'mode-select', modeSelection);
     },
     [handleSceneCommit],
   );
@@ -1049,7 +1055,7 @@ export function App() {
     handleSceneCommit({
       ...scene,
       startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
-    });
+    }, 'start-position');
   }, [scene, handleSceneCommit]);
 
   const handleExit = useCallback(async () => {
@@ -1099,7 +1105,7 @@ export function App() {
           transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
         })),
       };
-      handleSceneCommit(newScene);
+      handleSceneCommit(newScene, 'camera-position');
       return;
     }
 
@@ -1120,7 +1126,7 @@ export function App() {
           : o
       ),
     };
-    handleSceneCommit(newScene);
+    handleSceneCommit(newScene, 'camera-position');
   }, [scene, selectedIds, handleSceneCommit]);
 
   const sceneOps = useSceneOperations({
@@ -1501,7 +1507,7 @@ export function App() {
       activeLayerId: result.layers[0]?.id ?? scene.activeLayerId,
     };
     setLastCalibrationGridResult(result);
-    handleSceneCommit(nextScene);
+    handleSceneCommit(nextScene, 'calibration-grid');
   }, [scene, handleSceneCommit]);
 
   const handleCalibrationCurveReady = useCallback((
@@ -1560,7 +1566,7 @@ export function App() {
   const handleNudge = useCallback((dx: number, dy: number, commit: boolean) => {
     if (commit) {
       if (isNudgingRef.current && nudgeSceneRef.current) {
-        handleSceneCommit(nudgeSceneRef.current);
+        handleSceneCommit(nudgeSceneRef.current, 'nudge');
         isNudgingRef.current = false;
         nudgeSceneRef.current = null;
       }
@@ -1802,7 +1808,7 @@ export function App() {
           onZoomIn: () => viewportActionsRef.current?.zoomIn(),
           onZoomOut: () => viewportActionsRef.current?.zoomOut(),
           onFitToBed: () => viewportActionsRef.current?.fitToBed(),
-          onClearMaterial: () => handleSceneCommit({ ...scene, material: null }),
+          onClearMaterial: () => handleSceneCommit({ ...scene, material: null }, 'material-clear'),
           onApplyPreset: handleMaterialPresetApply,
           onOpenMaterialLibrary: () => setShowMaterialLibrary(true),
         }),
@@ -2159,7 +2165,7 @@ export function App() {
               }
             : l
         );
-        handleSceneCommit({ ...scene, layers: newLayers });
+        handleSceneCommit({ ...scene, layers: newLayers }, 'learned-toast-apply');
       },
       onDismiss: () => setToastSuggestion(null),
     }),
