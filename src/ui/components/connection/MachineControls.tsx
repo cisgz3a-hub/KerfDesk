@@ -82,7 +82,7 @@ export function MachineControls({
     disabled: testFireDisabled,
     title: isTestFiring
       ? 'Release to stop laser (deadman)'
-      : 'Hold to fire at 2% of machine max S — release to stop',
+      : 'Hold to fire at 5% of machine max S — release to stop',
     style: {
       width: '100%', padding: '7px', fontSize: 11, fontWeight: 600, borderRadius: 6,
       cursor: testFireDisabled ? 'default' : 'pointer', fontFamily: font,

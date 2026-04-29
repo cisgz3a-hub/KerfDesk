@@ -940,7 +940,7 @@ export function ConnectionPanelMain({
       const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
       if (!acknowledged) {
         const ok = confirm(
-          '⚠ Test Fire enables the laser at low power (2% of your machine\'s max spindle / S range).\n\n' +
+          '⚠ Test Fire enables the laser at low power (5% of your machine\'s max spindle / S range).\n\n' +
           'Hold the button to fire — release to stop (5 second safety limit).\n\n' +
           'Make sure:\n' +
           '• Eye protection is on\n' +

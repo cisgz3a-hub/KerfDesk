@@ -44,6 +44,13 @@ export const TEST_FIRE_DEADMAN_MS = 5000;
 export const TEST_FIRE_POWER_PERCENT = 5;
 
 /**
+ * Test-fire is a stationary burn. GRBL dynamic mode (M4) may energize fans
+ * while suppressing beam output until motion starts, so use constant-power M3
+ * for the held focus/test pulse and always pair it with M5 on release/deadman.
+ */
+export const TEST_FIRE_LASER_ON_WORD = 'M3';
+
+/**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
  *
  * T2-4 migration: machine authority lives here; UI should call these methods
@@ -196,7 +203,7 @@ export class ExecutionCoordinator {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
     const sVal = Math.max(0, Math.round((TEST_FIRE_POWER_PERCENT / 100) * args.maxSpindle));
-    const cmd = `M4 S${sVal}`;
+    const cmd = `${TEST_FIRE_LASER_ON_WORD} S${sVal}`;
     this.notifySimulator(cmd);
     try {
       ctrl.sendCommand(cmd, 'internal');

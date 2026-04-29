@@ -71,17 +71,17 @@ void (async () => {
     });
 
     assert((await coord.beginTestFire({ maxSpindle: 1000 })) === true, 'beginTestFire 1000 returns true');
-    assert(sent.includes('M4 S50') && sim.includes('M4 S50'), 'beginTestFire 1000 sends M4 S50');
+    assert(sent.includes('M3 S50') && sim.includes('M3 S50'), 'beginTestFire 1000 sends M3 S50');
 
     sent.length = 0;
     sim.length = 0;
     await coord.beginTestFire({ maxSpindle: 500 });
-    assert(sent.includes('M4 S25'), 'beginTestFire 500 → M4 S25');
+    assert(sent.includes('M3 S25'), 'beginTestFire 500 → M3 S25');
 
     sent.length = 0;
     sim.length = 0;
     await coord.beginTestFire({ maxSpindle: 0 });
-    assert(sent.includes('M4 S0'), 'beginTestFire 0 → M4 S0');
+    assert(sent.includes('M3 S0'), 'beginTestFire 0 → M3 S0');
   }
 
   {

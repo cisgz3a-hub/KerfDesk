@@ -106,7 +106,7 @@ void (async () => {
 
     const ok = await coord.beginTestFire({ maxSpindle: 1000 });
     assert(ok === true, 'beginTestFire returns true on success');
-    assert(log.sent.includes('M4 S50'), 'M4 S50 sent');
+    assert(log.sent.includes('M3 S50'), 'M3 S50 sent');
     assert(!log.sent.includes('M5 S0'), 'no M5 yet (timer pending)');
 
     // Wait past the 50ms deadman + a margin for setTimeout drift.
