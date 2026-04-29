@@ -1717,9 +1717,7 @@ export function App() {
       onImportImageFile: handleImageImport,
       onTemplates: () => dialogs.setShowTemplates(true),
       onBoxGenerator: () => {
-        if (gatedFeature('box_generator')) {
-          dialogs.setShowBoxGenerator(true);
-        }
+        dialogs.setShowBoxGenerator(true);
       },
       onAutoNest: () => {
         if (gatedFeature('nesting')) {

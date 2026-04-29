@@ -1,5 +1,6 @@
 export const PRO_FEATURES = [
-  'box_generator',
+  // 'box_generator' moved to free: finger-joint box generation is
+  // beginner-friendly and belongs in easy mode without a pro gate.
   'nesting',
   'variable_text',
    'material_test',
