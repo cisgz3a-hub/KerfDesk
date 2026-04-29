@@ -85,6 +85,7 @@ function doRedo(env: ReturnType<typeof makeEnv>): boolean {
 
 console.log('\n=== T2-79 selection restore on undo/redo ===\n');
 
+console.log('-- 1. undo paste restores pre-paste selection --');
 {
   const env = makeEnv();
   const layerId = env.state.scene.layers[0]!.id;
@@ -110,6 +111,7 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
   assert(env.state.scene === sceneWith1, 'undo paste reverts scene');
 }
 
+console.log('-- 2. redo paste selects pasted IDs --');
 {
   const env = makeEnv();
   const layerId = env.state.scene.layers[0]!.id;
@@ -128,8 +130,10 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
   assert(setEq(env.state.selection, new Set([obj1.id])), 'mid: undo returns pre-paste selection');
   assert(doRedo(env), 'redo applied');
   assert(setEq(env.state.selection, new Set([newId])), 'redo paste selects pasted ID');
+  assert(env.state.scene === sceneWithPaste, 'redo paste -> scene is post-paste');
 }
 
+console.log('-- 3. undo delete restores pre-delete selection --');
 {
   const env = makeEnv();
   const layerId = env.state.scene.layers[0]!.id;
@@ -141,6 +145,7 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
   });
   const sceneAOnly: Scene = { ...sceneAB, objects: sceneAB.objects.filter(o => o.id !== b.id) };
   env.commit(sceneAOnly, { kind: 'edit', action: 'delete' }, { selectionAfter: new Set() });
+  assert(env.state.selection.size === 0, 'post-delete: selection is empty');
   doUndo(env);
   assert(
     setEq(env.state.selection, new Set([a.id, b.id])),
@@ -148,6 +153,7 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
   );
 }
 
+console.log('-- 4. two-deep undo lands on each entry in turn --');
 {
   const env = makeEnv();
   const layerId = env.state.scene.layers[0]!.id;
@@ -166,6 +172,7 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
   assert(setEq(env.state.selection, new Set([a.id])), 'second undo selects A');
 }
 
+console.log('-- 5. stale IDs in selectionAfter are filtered --');
 {
   const env = makeEnv();
   const layerId = env.state.scene.layers[0]!.id;
@@ -176,6 +183,7 @@ console.log('\n=== T2-79 selection restore on undo/redo ===\n');
     selectionAfter: new Set([a.id, 'stale-id-that-does-not-exist']),
   });
   doUndo(env);
+  assert(env.state.scene !== sceneA, 'pre-redo: cursor below the malformed entry');
   doRedo(env);
   assert(setEq(env.state.selection, new Set([a.id])), 'stale selection IDs are filtered out');
 }
