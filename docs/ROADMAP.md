@@ -5788,6 +5788,28 @@ A legitimate Falcon device never sends a frame > 256 KB. If the cap is hit, the 
 
 ---
 
+### T1-95 | `ui-start-job-uses-ticket.test.tsx` frame-wait flush insufficient post-T1-59
+
+**Code reference:** `tests/ui-start-job-uses-ticket.test.tsx` around line 283 (`await flush(1400);` after the Frame button click).
+
+**Problem:** When T1-59 (frame-before-start gate) shipped, the start-job ticket integration test was updated to click the Frame button before clicking Start. The simulator-driven `frameSafe` streams frame-corner gcode lines with a 50 ms gap between each, plus a 200 ms idle-poll at the end — so the test needs to wait long enough for the worst-case timing before asserting Start is enabled. The flush value initially landed too low and the test failed deterministically on this single frame-wait assertion. The rest of the suite was green; only this test halted `npm test`.
+
+This was the test that memory and the audit listed as "known pre-existing failure" through Fixes #1, #2, and #3.
+
+**Identified by:** Working through Fix #3 (T1-17 Pass 4a). The user pulled the trigger and bumped the flush long enough for the worst-case path to complete.
+
+**Fix:** `await flush(900);` → `await flush(1400);` — covers the longest plausible `frameSafe` corner-streaming + idle-poll sequence with margin. Documented inline in the test (the 4-line comment block above the call already explains the timing budget).
+
+**Tests:** The test itself is the test. Pre-fix: it failed. Post-fix: 1/1 passing, full `npm test` suite green.
+
+**Estimate:** ~5 min including the verify-and-commit. Already shipped.
+
+**Priority:** Tier 1 — blocked the regression bar. Trivial fix; documenting it after the fact for audit hygiene.
+
+**Status:** Shipped 2026-04-30 in `05ce7b86` — bundled in the same commit as T1-17 Pass 4a. Bundling violated workflow rule #4 ("one ticket per commit"); this T1-95 entry exists so the bisect history reflects the second change. Future bundling like this is forbidden — see `.cursor/rules/laserforge.md`. The user-flagged-and-explained-it-openly mitigates the rule violation but does not absolve it; the discipline is "if in doubt, split."
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

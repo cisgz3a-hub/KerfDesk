@@ -34,7 +34,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
-| 1 | 94 | ~34 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
+| 1 | 94 | ~35 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
@@ -142,6 +142,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-20 | WCS no-listener fallback hardening | `_placementUncertain` + `allowHeadlessWcsAutoNormalize` in `GrblController.ts:41,52`; `tests/wcs-no-listener-blocks-job.test.ts`, `tests/wcs-no-listener-headless-flag.test.ts`. Commit `b0375fa`. |
 | T1-21 | Frame-dot try/finally safety scope | `frameDot` at `src/app/ExecutionCoordinator.ts:140` |
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
+| T1-95 | `ui-start-job-uses-ticket.test.tsx` frame-wait insufficient post-T1-59 | `tests/ui-start-job-uses-ticket.test.tsx:283` `await flush(1400);` covers worst-case `frameSafe` corner-streaming + idle-poll budget. Was the "known pre-existing failure" carried as baseline through Fixes #1-#3. Shipped 2026-04-30 in `05ce7b86`, bundled with T1-17 Pass 4a (workflow rule #4 violation, retroactively documented here for bisect hygiene). |
 
 ### 鈼?Partial
 
