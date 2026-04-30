@@ -115,6 +115,7 @@ const files = [
   'scene-commit-actions-wired.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
   'console-input.test.tsx',
+  'laser-mode-banner.test.tsx',
   'ui-start-job-uses-ticket.test.tsx',
   'connection-panel-preflight-no-loop.test.tsx',
   'usecompilemanager-stale-no-loop.test.tsx',

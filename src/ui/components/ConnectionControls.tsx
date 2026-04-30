@@ -9,6 +9,12 @@ interface ConnectionControlsProps {
    * alarm / faulted_requires_inspection is true at a time.
    */
   faultedBanner?: React.ReactNode;
+  /**
+   * Laser-mode ($32=0) detection banner. Independent of alarm/
+   * faulted state — orthogonality of underlying conditions.
+   * LaserModeBanner returns null when not applicable.
+   */
+  laserModeBanner?: React.ReactNode;
   connectSection: React.ReactNode;
   isConnected: boolean;
 }
@@ -17,6 +23,7 @@ export function ConnectionControls({
   statusSection,
   alarmBanner,
   faultedBanner,
+  laserModeBanner,
   connectSection,
   isConnected,
 }: ConnectionControlsProps) {
@@ -26,6 +33,7 @@ export function ConnectionControls({
     statusSection,
     alarmBanner,
     faultedBanner,
+    laserModeBanner,
     !isConnected && connectSection,
   );
 }

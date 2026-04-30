@@ -29,6 +29,7 @@ import { ConnectionControls } from './ConnectionControls';
 import { MoveControls } from './MoveControls';
 import { JobControls } from './JobControls';
 import { ConsolePanel } from './ConsolePanel';
+import { LaserModeBanner } from './LaserModeBanner';
 import { StatusBar } from './connection/StatusBar';
 import { Jog } from './connection/Jog';
 import { Issues } from './connection/Issues';
@@ -1188,6 +1189,18 @@ export function ConnectionPanelMain({
     }, '⚠ Acknowledge fault'),
   );
 
+  const isOperational = isConnected && machineState?.status !== 'connecting';
+  const appendBannerMessage = useCallback(
+    (msg: string) => setMessages(prev => [...prev, msg]),
+    [setMessages],
+  );
+  const laserModeBanner = React.createElement(LaserModeBanner, {
+    controller: controllerRef.current,
+    isOperational,
+    showConfirm,
+    appendMessage: appendBannerMessage,
+  });
+
   const connectSection = React.createElement(ConnectWizard, {
     webSerialSupported: WebSerialPort.isSupported(),
     onConnectUsb: () => { void connectRealLaser(); },
@@ -1890,6 +1903,7 @@ export function ConnectionPanelMain({
         statusSection,
         alarmBanner,
         faultedBanner,
+        laserModeBanner,
         connectSection,
       }),
       isConnected && React.createElement('div', {
