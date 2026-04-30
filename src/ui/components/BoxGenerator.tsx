@@ -4,6 +4,7 @@ import { NumberInput } from './NumberInput';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { generateBoxFaces } from '../../core/box/boxGeometry';
+import { KERF_PRESETS, findPresetIdForKerf } from '../../core/box/kerfPresets';
 
 interface BoxGeneratorProps {
   scene: Scene;
@@ -137,7 +138,6 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
             { key: 'depth', label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
             { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20, step: 0.1 },
             { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50, step: 1 },
-            { key: 'kerf', label: 'Kerf (mm)', value: kerf, set: setKerf, min: 0, max: 1, step: 0.05 },
           ].map(f =>
             React.createElement('div', { key: f.key, style: { marginBottom: 10 } },
               React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
@@ -152,6 +152,38 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
                 onCommit: (v: number) => f.set(v),
               }),
             ),
+          ),
+          React.createElement('div', { key: 'kerf', style: { marginBottom: 10 } },
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, 'Kerf preset'),
+            React.createElement('select', {
+              value: findPresetIdForKerf(kerf),
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                const id = e.target.value;
+                if (id === 'custom') return;
+                const preset = KERF_PRESETS.find(p => p.id === id);
+                if (preset) setKerf(preset.kerf);
+              },
+              style: {
+                ...inputStyle,
+                marginBottom: 6,
+                cursor: 'pointer',
+              },
+            },
+              ...KERF_PRESETS.map(p =>
+                React.createElement('option', { key: p.id, value: p.id }, p.label),
+              ),
+            ),
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, 'Kerf (mm)'),
+            React.createElement(NumberInput, {
+              value: kerf,
+              min: 0,
+              max: 1,
+              step: 0.05,
+              defaultValue: kerf,
+              style: inputStyle,
+              onChange: (v: number) => setKerf(v),
+              onCommit: (v: number) => setKerf(v),
+            }),
           ),
           React.createElement('div', { style: { marginBottom: 12 } },
             React.createElement('button', {
