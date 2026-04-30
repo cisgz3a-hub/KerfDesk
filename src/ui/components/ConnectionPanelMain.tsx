@@ -286,6 +286,10 @@ export function ConnectionPanelMain({
     },
     [replaceMessages],
   );
+  const setMessagesRef = useRef(setMessages);
+  useEffect(() => {
+    setMessagesRef.current = setMessages;
+  }, [setMessages]);
   const logRef = useRef<HTMLDivElement>(null);
   const simulatorListenersRef = useRef(new Set<(line: string) => void>());
   const jobStartTimeRef = useRef<number | null>(null);
@@ -293,6 +297,22 @@ export function ConnectionPanelMain({
   const elapsedSecondsRef = useRef(0);
   const jobStoppedByUserRef = useRef(false);
   const hasFramed = useRef(false);
+
+  /**
+   * T1-97: production-mode-only frame-bypass override.
+   *
+   * Per-session only — never persisted. Resets on disconnect, scene
+   * change, production-mode exit, and browser reload. This is a
+   * localized safety relaxation for supervised production testing; the
+   * default T1-59 frame-before-start invariant remains unchanged.
+   */
+  const [frameBypass, setFrameBypassState] = useState<boolean>(false);
+  const frameBypassRef = useRef(false);
+  const setFrameBypass = useCallback((next: boolean) => {
+    frameBypassRef.current = next;
+    setFrameBypassState(next);
+  }, []);
+
   const hasJogged = useRef(false);
   const hasSetOrigin = useRef(false);
   const [workflowVersion, setWorkflowVersion] = useState(0);
@@ -321,7 +341,9 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessages([]);
     setShowSimulator(false);
-  }, [setMessages]);
+    // Mount-only reset for panel-local view state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     isTestFiringRef.current = isTestFiring;
@@ -404,13 +426,21 @@ export function ConnectionPanelMain({
   const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
 
   useEffect(() => {
+    // T1-97: connection cycle resets bypass — required, never sticky.
+    setFrameBypass(false);
     if (isConnected) {
       hasFramed.current = false;
       hasJogged.current = false;
       hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
     }
-  }, [isConnected]);
+  }, [isConnected, setFrameBypass]);
+
+  useEffect(() => {
+    if (!productionMode) {
+      setFrameBypass(false);
+    }
+  }, [productionMode, setFrameBypass]);
 
   // T1-75 (origin) + T2-76 step 3 (extension): historyVersion bumps on
   // any scene mutation App.tsx commits — both undo/redo via
@@ -424,8 +454,18 @@ export function ConnectionPanelMain({
   // is already false.
   useEffect(() => {
     hasFramed.current = false;
+    // T1-97: scene change re-arms the safety gate even when bypass was
+    // on. This is a one-shot override per connection/design state, not
+    // a global off-switch.
+    if (frameBypassRef.current) {
+      setFrameBypass(false);
+      setMessagesRef.current(prev => [
+        ...prev,
+        '⚠ Frame-bypass auto-disengaged: design changed since override was enabled.',
+      ]);
+    }
     setWorkflowVersion(v => v + 1);
-  }, [historyVersion]);
+  }, [historyVersion, setFrameBypass]);
 
   jobProgressRef.current = jobProgress;
 
@@ -1044,6 +1084,7 @@ export function ConnectionPanelMain({
   // default = require frame. Prevents wrong-position-burn on confused
   // origin/saved-origin/mirror configurations.
   const requireFrame = true;
+  const effectiveFrameBypass = productionMode === true && frameBypass;
   // T1-22: read laser-output safety state for the start-job gate.
   // T2-12 part 1: subscribed instead of polled. The previous polled
   // getter at this site relied on workflowVersion bumps to refresh on
@@ -1075,7 +1116,9 @@ export function ConnectionPanelMain({
     !!preflight?.canStart &&
     !gcodeStale &&
     !machineBlocksJobStart &&
-    (!requireFrame || hasFramed.current) &&
+    // T1-97: bypass is production-mode-only and per-session. T1-59
+    // remains the default for everyone else.
+    (!requireFrame || hasFramed.current || effectiveFrameBypass) &&
     laserOutputState !== 'unknown' &&
     !placementUncertain;
   /**
@@ -1144,8 +1187,8 @@ export function ConnectionPanelMain({
       },
       {
         id: 'framing',
-        label: 'Job framed',
-        status: !requireFrame
+        label: effectiveFrameBypass ? 'Job framed (bypass active)' : 'Job framed',
+        status: !requireFrame || effectiveFrameBypass
           ? 'ok'
           : (hasFramed.current ? 'ok' : 'fail'),
         failHeadline: 'Frame not done since last design change',
@@ -1312,24 +1355,42 @@ export function ConnectionPanelMain({
             : 'Prepare job';
   const estimatedTimeFormatted = gcode ? estimateJobTime(gcode).formatted : null;
 
-  const workflowSection = isConnected && React.createElement(Workflow, {
-    startMode,
-    onSelectMode,
-    startPositionStatus,
-    machinePositionKnown: !!machinePosition,
-    hasJogged: hasJogged.current,
-    hasSetOrigin: hasSetOrigin.current,
-    hasFramed: hasFramed.current,
-    canStartJob,
-    startJobDesc,
-    estimatedTimeFormatted,
-    isConnected,
-    onSaveOrigin: () => {
-      hasSetOrigin.current = true;
-      setWorkflowVersion(v => v + 1);
-      onSaveOrigin();
+  const frameBypassBanner = isConnected && effectiveFrameBypass && React.createElement('div', {
+    'data-testid': 'frame-bypass-active-banner',
+    style: {
+      margin: '10px 16px 0',
+      padding: '8px 10px',
+      background: 'rgba(255,68,102,0.08)',
+      border: '1px solid rgba(255,68,102,0.4)',
+      borderRadius: 6,
+      color: '#ff8ca0',
+      fontSize: 10,
+      lineHeight: 1.4,
+      flexShrink: 0,
     },
-  });
+  }, '⚠ Frame-before-start bypass is active. Verify origin and placement manually before Start.');
+
+  const workflowSection = isConnected && React.createElement(React.Fragment, null,
+    frameBypassBanner,
+    React.createElement(Workflow, {
+      startMode,
+      onSelectMode,
+      startPositionStatus,
+      machinePositionKnown: !!machinePosition,
+      hasJogged: hasJogged.current,
+      hasSetOrigin: hasSetOrigin.current,
+      hasFramed: hasFramed.current,
+      canStartJob,
+      startJobDesc,
+      estimatedTimeFormatted,
+      isConnected,
+      onSaveOrigin: () => {
+        hasSetOrigin.current = true;
+        setWorkflowVersion(v => v + 1);
+        onSaveOrigin();
+      },
+    }),
+  );
 
   const controlsSection = isConnected && React.createElement('div', {
     style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 16, flexShrink: 0 },
@@ -1856,6 +1917,78 @@ export function ConnectionPanelMain({
         showConfirm,
       }),
       productionMode && React.createElement('div', {
+        style: {
+          padding: '8px 10px',
+          background: effectiveFrameBypass ? 'rgba(255,68,102,0.08)' : 'rgba(45,212,160,0.04)',
+          border: `1px solid ${effectiveFrameBypass ? 'rgba(255,68,102,0.4)' : 'rgba(45,212,160,0.2)'}`,
+          borderRadius: 6,
+          display: 'flex',
+          flexDirection: 'column' as const,
+          gap: 4,
+        },
+        'data-testid': 'frame-bypass-control',
+      },
+        React.createElement('div', {
+          style: {
+            display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 600,
+            color: effectiveFrameBypass ? '#ff8ca0' : '#c0c0d0',
+          },
+        },
+          React.createElement('span', { style: { flex: 1 } },
+            effectiveFrameBypass ? '⚠ Frame-before-start: BYPASSED (production override)' : 'Frame-before-start: enforced',
+          ),
+          React.createElement('button', {
+            type: 'button',
+            'data-testid': 'frame-bypass-toggle',
+            onClick: () => {
+              if (effectiveFrameBypass) {
+                setFrameBypass(false);
+                setMessages(prev => [
+                  ...prev,
+                  'Frame-bypass disengaged.',
+                ]);
+                return;
+              }
+              const ack = confirm(
+                '⚠ DISABLE FRAME-BEFORE-START SAFETY CHECK?\n\n' +
+                'Frame-before-start exists to catch wrong-origin, mirror, and saved-origin mistakes BEFORE the laser fires. ' +
+                'Disabling it means the next Start will fire the laser at the configured origin without confirming the design footprint.\n\n' +
+                'This override:\n' +
+                '  • Is per-session only (resets on disconnect, scene change, or reload).\n' +
+                '  • Does not save your acknowledgement.\n' +
+                '  • Is logged in the GRBL console for diagnosis.\n' +
+                '  • Is not a substitute for verifying your origin and design placement.\n\n' +
+                'Continue?',
+              );
+              if (!ack) return;
+              setFrameBypass(true);
+              setMessages(prev => [
+                ...prev,
+                '⚠ T1-97 FRAME-BYPASS ENABLED. Wrong-origin burns will not be caught for this session. Resets on scene change or disconnect.',
+              ]);
+            },
+            style: {
+              padding: '4px 10px', fontSize: 10, fontWeight: 600,
+              borderRadius: 4, cursor: 'pointer', fontFamily: font,
+              background: effectiveFrameBypass ? 'rgba(255,68,102,0.15)' : 'transparent',
+              border: `1px solid ${effectiveFrameBypass ? 'rgba(255,68,102,0.5)' : '#444466'}`,
+              color: effectiveFrameBypass ? '#ff8ca0' : '#c0c0d0',
+            },
+          }, effectiveFrameBypass ? 'Disable' : 'Enable bypass'),
+        ),
+        effectiveFrameBypass && React.createElement('div', {
+          style: { fontSize: 9, color: '#ff8ca0', lineHeight: 1.4 },
+        },
+          'Active for this session only. Resets on disconnect, scene change, or reload. ',
+          'Verify the laser path manually before each burn.',
+        ),
+        !effectiveFrameBypass && React.createElement('div', {
+          style: { fontSize: 9, color: '#888899', lineHeight: 1.4 },
+        },
+          'Default Tier 1 safety. Use only if the frame gate is misbehaving and you have verified the origin manually.',
+        ),
+      ),
+      productionMode && React.createElement('div', {
         ref: logRef,
         style: {
           minHeight: 60, maxHeight: 100, padding: '6px 8px', background: '#08080f', borderRadius: 6,
@@ -2053,6 +2186,7 @@ export function ConnectionPanelMain({
             void machineService.disconnect().catch(() => { /* idempotent with controller.disconnect */ });
             portRef.current = null;
             setIsPaused(false);
+            setFrameBypass(false);
             setMessages(prev => [...prev, '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.']);
           },
           style: {

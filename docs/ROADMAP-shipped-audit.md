@@ -34,7 +34,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
-| 1 | 94 | ~36 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
+| 1 | 94 | ~37 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
@@ -144,6 +144,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
 | T1-95 | `ui-start-job-uses-ticket.test.tsx` frame-wait insufficient post-T1-59 | `tests/ui-start-job-uses-ticket.test.tsx:283` `await flush(1400);` covers worst-case `frameSafe` corner-streaming + idle-poll budget. Was the "known pre-existing failure" carried as baseline through Fixes #1-#3. Shipped 2026-04-30 in `05ce7b86`, bundled with T1-17 Pass 4a (workflow rule #4 violation, retroactively documented here for bisect hygiene). |
 | T1-96 | Start-button readiness diagnostics panel | New `src/ui/components/connection/StartReadinessPanel.tsx`; structured `StartReadiness` payload built in `ConnectionPanelMain.tsx` from existing gate state; replaces single-string `startDisabledReason`. 8 gates: controllerConnected, gcodeCompiled, gcodeFresh, preflight, machineState, framing, laserState, wcsState. Collapsed = first-failing-gate headline; expanded = full list with status glyphs, action hints, preflight detail items. Pinned by `tests/start-readiness-panel.test.tsx` (6/6). Preempted T1-17 Pass 4b/4c because the only physical-hardware tester was blocked from burning. Shipped 2026-04-30 in `5e8cff96d983d30cac721b8d6717c9fbfac9d6df`. |
+| T1-97 | Frame-before-start bypass override (production-only, per-session) | New `frameBypass` state in `ConnectionPanelMain.tsx`; canStartJob's frame conjunct now `(!requireFrame \|\| hasFramed.current \|\| frameBypass)`. Bypass requires (1) production mode (Pro-license-gated by App.tsx), (2) explicit confirm dialog, (3) auto-disengages on `[historyVersion]` bump or `[isConnected]` reset. Logged on engage/disengage. **Tier 1 safety relaxation, deliberately localized: tester-blocker bandage; underlying 6-vs-5 defect tracked under T1-98.** Pinned by `tests/frame-bypass-override.test.tsx` (6/6). Shipped 2026-04-30 in `<TBD>`. |
 
 ### 鈼?Partial
 
@@ -319,13 +320,11 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-T1-96 shipped — preempted Pass 4b for tester-unblocker reasons.
-
-1. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present (resumes after T1-96 unblocked the tester).
-2. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through the worker on slider drag (user-visible responsiveness win).
-3. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-4. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
-5. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`. Pattern test catching UI code that bypasses MachineService. Filed as T1-19 follow-up at the time of ship; not strictly needed for runtime safety but closes the architectural-bypass class.
+1. **T1-98 (NEW)** — Diagnose and fix the underlying 6-vs-5 phantom `commitSceneTransaction` post-frame in ConnectionPanelMain. (T1-97 is the bandage; this is the real fix.)
+2. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present.
+3. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through worker on slider drag.
+4. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`.
+5. **T1-23** — Pause must emit explicit M5 (or document firmware proof).
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 
