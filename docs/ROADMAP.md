@@ -5901,7 +5901,7 @@ The bypass is a *bandage*, not a *cure*. The ticket for the actual cure (T1-98) 
 
 **Priority:** Tier 1 — tester-blocker, with explicit safety-relaxation tradeoff documented.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `68bd79a0931754b69956ce242ed76ccfde5d002e`.
 
 ---
 
