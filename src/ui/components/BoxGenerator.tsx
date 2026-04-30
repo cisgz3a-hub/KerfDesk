@@ -17,6 +17,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   const [depth, setDepth] = useState(40);
   const [thickness, setThickness] = useState(3);
   const [fingerWidth, setFingerWidth] = useState(10);
+  const [kerf, setKerf] = useState(0);
   const [openTop, setOpenTop] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -43,7 +44,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
     ctx.fillStyle = '#08080f';
     ctx.fillRect(0, 0, cw, ch);
 
-    const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop });
+    const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop, kerf });
     if (faces.length === 0) return;
 
     let minX = Infinity;
@@ -87,7 +88,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       ctx.textBaseline = 'middle';
       ctx.fillText(face.name, cx * scale + ox, cy * scale + oy);
     }
-  }, [width, height, depth, thickness, fingerWidth, openTop]);
+  }, [width, height, depth, thickness, fingerWidth, openTop, kerf]);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -131,11 +132,12 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 } },
         React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
           ...[
-            { key: 'width', label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500 },
-            { key: 'height', label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500 },
-            { key: 'depth', label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500 },
-            { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20 },
-            { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50 },
+            { key: 'width', label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500, step: 1 },
+            { key: 'height', label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500, step: 1 },
+            { key: 'depth', label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
+            { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20, step: 0.1 },
+            { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50, step: 1 },
+            { key: 'kerf', label: 'Kerf (mm)', value: kerf, set: setKerf, min: 0, max: 1, step: 0.05 },
           ].map(f =>
             React.createElement('div', { key: f.key, style: { marginBottom: 10 } },
               React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
@@ -143,6 +145,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
                 value: f.value,
                 min: f.min,
                 max: f.max,
+                step: f.step,
                 defaultValue: f.value,
                 style: inputStyle,
                 onChange: (v: number) => f.set(v),
@@ -182,7 +185,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
           onClick: () => {
             const layerId = scene.activeLayerId || scene.layers[0]?.id;
             if (!layerId) return;
-            const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop });
+            const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop, kerf });
             const objects: SceneObject[] = faces.map(face => ({
               id: generateId(),
               type: 'polygon' as const,

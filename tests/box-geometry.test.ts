@@ -132,5 +132,132 @@ assert(ysAtX(generateRectWithFingers(20, 10, 2, 5, 'flat', 'flat', 'flat', 'slot
 assertEq(max(generateRectWithFingers(20, 10, 2, 5, 'flat', 'finger', 'flat', 'flat'), 'y'), 12, 'bottom finger protrudes outward');
 assert(xsAtY(generateRectWithFingers(20, 10, 2, 5, 'flat', 'slot', 'flat', 'flat'), 8).length > 0, 'bottom slot cuts inward');
 
+console.log('\n-- 10. kerf=0 produces identical output to no-kerf-arg call --');
+{
+  const noKerf = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger');
+  const explicitZeroKerf = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger', 0);
+  assert(
+    noKerf.length === explicitZeroKerf.length,
+    `kerf=0: same point count (${noKerf.length} vs ${explicitZeroKerf.length})`,
+  );
+  let allEqual = true;
+  for (let i = 0; i < noKerf.length; i++) {
+    if (Math.abs(noKerf[i]!.x - explicitZeroKerf[i]!.x) > 0.0001
+      || Math.abs(noKerf[i]!.y - explicitZeroKerf[i]!.y) > 0.0001) {
+      allEqual = false;
+      break;
+    }
+  }
+  assert(allEqual, 'kerf=0: byte-identical to default-kerf output');
+}
+
+console.log('\n-- 11. kerf > 0: finger tabs widen, slot openings narrow, bounds stable --');
+{
+  const k = 0.2;
+  const noKerf = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger');
+  const withKerf = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger', k);
+
+  const rightEdgePts = withKerf.filter(p => Math.abs(p.x - 80) < 0.01 && p.y >= 0 && p.y <= 50);
+  assert(rightEdgePts.length > 0, 'rectangle right boundary still at x=80');
+
+  const topEdgePts = withKerf.filter(p => Math.abs(p.y - 0) < 0.01 && p.x >= 0 && p.x <= 80);
+  const topRange = topEdgePts.length > 0
+    ? { min: Math.min(...topEdgePts.map(p => p.x)), max: Math.max(...topEdgePts.map(p => p.x)) }
+    : null;
+  assert(
+    topRange !== null && Math.abs(topRange.min) < 0.01 && Math.abs(topRange.max - 80) < 0.01,
+    `rectangle top boundary still spans [0, 80] (got [${topRange?.min}, ${topRange?.max}])`,
+  );
+
+  function middleFingerWidth(pts: Array<{ x: number; y: number }>, fingerX: number): number {
+    const tipPts = pts.filter(p => Math.abs(p.x - fingerX) < 0.01).map(p => p.y).sort((a, b) => a - b);
+    let bestPair: [number, number] | null = null;
+    let bestDist = Infinity;
+    for (let i = 0; i + 1 < tipPts.length; i += 2) {
+      const mid = (tipPts[i]! + tipPts[i + 1]!) / 2;
+      const d = Math.abs(mid - 25);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPair = [tipPts[i]!, tipPts[i + 1]!];
+      }
+    }
+    return bestPair ? bestPair[1] - bestPair[0] : 0;
+  }
+
+  const noKerfTabWidth = middleFingerWidth(noKerf, -3);
+  const withKerfTabWidth = middleFingerWidth(withKerf, -3);
+  assert(
+    Math.abs((withKerfTabWidth - noKerfTabWidth) - k) < 0.01,
+    `middle left-edge finger width grew by k=${k}: ${noKerfTabWidth} -> ${withKerfTabWidth}`,
+  );
+
+  function middleSlotWidth(pts: Array<{ x: number; y: number }>): number {
+    const slotPts = pts.filter(p => Math.abs(p.y - 3) < 0.01).map(p => p.x).sort((a, b) => a - b);
+    let bestPair: [number, number] | null = null;
+    let bestDist = Infinity;
+    for (let i = 0; i + 1 < slotPts.length; i += 2) {
+      const mid = (slotPts[i]! + slotPts[i + 1]!) / 2;
+      const d = Math.abs(mid - 40);
+      if (d < bestDist) {
+        bestDist = d;
+        bestPair = [slotPts[i]!, slotPts[i + 1]!];
+      }
+    }
+    return bestPair ? bestPair[1] - bestPair[0] : 0;
+  }
+
+  const noKerfSlotWidth = middleSlotWidth(noKerf);
+  const withKerfSlotWidth = middleSlotWidth(withKerf);
+  assert(
+    Math.abs((noKerfSlotWidth - withKerfSlotWidth) - k) < 0.01,
+    `middle top-edge slot width shrunk by k=${k}: ${noKerfSlotWidth} -> ${withKerfSlotWidth}`,
+  );
+}
+
+console.log('\n-- 12. kerf > 0: matched edges still interlock after laser cuts --');
+{
+  const k = 0.2;
+  const closedKerf = generateBoxFaces({ ...params, openTop: false, kerf: k });
+  const bottomK = face(closedKerf, 'Bottom');
+  const frontK = face(closedKerf, 'Front');
+
+  const bottomFingerTipXs = bottomK.points
+    .filter(p => Math.abs(p.y - (params.depth + params.thickness)) < 0.01)
+    .map(p => p.x)
+    .sort((a, b) => a - b);
+
+  const frontSlotBottomXs = frontK.points
+    .filter(p => Math.abs(p.y - (params.height - params.thickness)) < 0.01)
+    .map(p => p.x)
+    .sort((a, b) => a - b);
+
+  assert(
+    bottomFingerTipXs.length === frontSlotBottomXs.length,
+    `kerf-compensated: same number of finger tips and slot bottoms (${bottomFingerTipXs.length} vs ${frontSlotBottomXs.length})`,
+  );
+
+  let allOffsetsCorrect = true;
+  for (let i = 1; i < bottomFingerTipXs.length - 1; i++) {
+    const diff = bottomFingerTipXs[i]! - frontSlotBottomXs[i]!;
+    if (Math.abs(Math.abs(diff) - k) > 0.01) {
+      allOffsetsCorrect = false;
+      break;
+    }
+  }
+  assert(
+    allOffsetsCorrect,
+    `kerf-compensated internal boundaries: |finger - slot| = k=${k} (mate after laser kerf)`,
+  );
+
+  assert(
+    Math.abs(bottomFingerTipXs[0]! - frontSlotBottomXs[0]!) < 0.001,
+    'kerf-compensated: rectangle left end unshifted (boundary 0 stays at 0)',
+  );
+  assert(
+    Math.abs(bottomFingerTipXs[bottomFingerTipXs.length - 1]! - frontSlotBottomXs[frontSlotBottomXs.length - 1]!) < 0.001,
+    'kerf-compensated: rectangle right end unshifted (boundary count stays at w)',
+  );
+}
+
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
