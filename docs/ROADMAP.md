@@ -5851,7 +5851,7 @@ Status mapping:
 
 **Priority:** Tier 1 — real-tester unblocker.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `5e8cff96d983d30cac721b8d6717c9fbfac9d6df`.
 
 ---
 
