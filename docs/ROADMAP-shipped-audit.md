@@ -1,4 +1,4 @@
-# LaserForge Roadmap — Verified Shipped Audit
+﻿# LaserForge Roadmap 鈥?Verified Shipped Audit
 
 **Audit date:** 2026-04-30
 **Repo state at audit:** master at `7fb7b7f` (`feat(connection): auto-detect $32=0 with one-click remediation banner`)
@@ -23,7 +23,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 
 **Re-audit cadence:**
 
-- Full re-audit at every Gate transition (Gate 1 → Gate 2, Gate 2 → Gate 3).
+- Full re-audit at every Gate transition (Gate 1 鈫?Gate 2, Gate 2 鈫?Gate 3).
 - Spot re-audit any time a contributor isn't sure whether a ticket is shipped (cheaper to re-verify than to redo work).
 - The previous full re-audit was 2026-04-30; the one before was 2026-04-27 (Gate 1 cluster journal entry).
 
@@ -38,17 +38,17 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
-| **Total** | **323** | ~49 | 5 | ~210 confirmed-or-likely | — |
+| **Total** | **323** | ~49 | 5 | ~210 confirmed-or-likely | 鈥?|
 
-**Gate status (per `docs/ROADMAP.md` § Release Readiness):**
+**Gate status (per `docs/ROADMAP.md` 搂 Release Readiness):**
 
-- **Gate 1 — Private Technical Alpha: cleared.** Every Gate 1 cluster ticket (dirty-state, commercial credibility, diagnostic recovery, installer correctness, easy security wins, architectural safety) is shipped.
-- **Gate 2 — Public Beta: open.** Tier 2 architectural work is the path; ~115 tickets remaining of various sizes.
-- **Gate 3 — Paid Production Release: open.** Tier 2 commercial / release-engineering / supportability / security clusters all open.
+- **Gate 1 鈥?Private Technical Alpha: cleared.** Every Gate 1 cluster ticket (dirty-state, commercial credibility, diagnostic recovery, installer correctness, easy security wins, architectural safety) is shipped.
+- **Gate 2 鈥?Public Beta: open.** Tier 2 architectural work is the path; ~115 tickets remaining of various sizes.
+- **Gate 3 鈥?Paid Production Release: open.** Tier 2 commercial / release-engineering / supportability / security clusters all open.
 
 ---
 
-## Tier 0 — All 4 shipped
+## Tier 0 鈥?All 4 shipped
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -64,17 +64,17 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 
 ---
 
-## Tier 1 — Gate 1 cluster shipped, 5 confirmed open
+## Tier 1 鈥?Gate 1 cluster shipped, 5 confirmed open
 
-### ✅ Shipped (Gate 1 cluster + verified individually this session)
+### 鉁?Shipped (Gate 1 cluster + verified individually this session)
 
-The Gate 1 cluster — required for Private Technical Alpha — is fully closed. Per the roadmap's own definition this means LaserForge can be distributed to a small group of technically competent testers running supervised jobs on scrap material.
+The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed. Per the roadmap's own definition this means LaserForge can be distributed to a small group of technically competent testers running supervised jobs on scrap material.
 
 #### Dirty-state cluster (5/5 shipped)
 
 | Ticket | What | Evidence |
 |---|---|---|
-| T1-68 | Autosave awaits write before clearing dirty | `writeAutosaveAsync` in `src/app/autosavePersistence.ts`; `App.tsx:1247` uses `void writeAutosaveAsync(json).then(success → clear dirty, fail → leave dirty)`; `tests/autosave-dirty-flag-on-failure.test.ts` |
+| T1-68 | Autosave awaits write before clearing dirty | `writeAutosaveAsync` in `src/app/autosavePersistence.ts`; `App.tsx:1247` uses `void writeAutosaveAsync(json).then(success 鈫?clear dirty, fail 鈫?leave dirty)`; `tests/autosave-dirty-flag-on-failure.test.ts` |
 | T1-69 | Manual save needs acknowledgement | `src/ui/hooks/useFileHandlers.ts:57-66` shows "File saved?" confirm dialog; dirty stays true until ack; `tests/manual-save-needs-acknowledgement.test.ts` |
 | T1-73 | Delete marks dirty | `tests/delete-marks-dirty.test.ts`; `App.tsx:handleDelete` routed through canonical `handleSceneCommit` |
 | T1-74 | Text `patchTextGeometry` commits history | `tests/text-property-edits-undoable.test.ts`; `PropertiesPanel.tsx:patchTextGeometry` calls `onSceneCommit` directly |
@@ -85,7 +85,7 @@ The Gate 1 cluster — required for Private Technical Alpha — is fully closed.
 | Ticket | What | Evidence |
 |---|---|---|
 | T1-77 | `DEFAULT_TESTER_HMAC_SECRET` removed | `src/entitlements/testerKey.ts:4` comment ("the previous `DEFAULT_TESTER_HMAC_SECRET` export was removed") |
-| T1-81 | CI check — no dev auto-unlock in production | `scripts/verify-production-build.mjs` checks `tier:'developer'` literal, legacy tester HMAC, debug API leakage, mock-entitlement leakage, vitest leakage, source map references; wired into `npm run build`. Closed by **T3-82** (`de3fbc7`). |
+| T1-81 | CI check 鈥?no dev auto-unlock in production | `scripts/verify-production-build.mjs` checks `tier:'developer'` literal, legacy tester HMAC, debug API leakage, mock-entitlement leakage, vitest leakage, source map references; wired into `npm run build`. Closed by **T3-82** (`de3fbc7`). |
 | T1-83 | Strip Electron source maps | `vite.config.ts:12` `sourcemap: 'hidden'`. Closed by **T2-105** (`b6a56ed`). |
 | T1-85 | Remove `--dev` arg escape hatch | `electron/main.ts:12` "T1-85: the previous --dev arg escape hatch was removed"; line 213 "No more --dev arg path" |
 
@@ -127,12 +127,12 @@ The Gate 1 cluster — required for Private Technical Alpha — is fully closed.
 | Ticket | What | Evidence |
 |---|---|---|
 | T1-5 | `_stopOnError` per-profile configurable | `stopOnError?: boolean` field on `DeviceProfile` at line 161 |
-| T1-6 | Classify `sendCommand` and gate dangerous (service-layer) | `MachineService.sendCommand` rejects user-source warn/dangerous lines without matching `acknowledged` severity, throws `COMMAND_BLOCKED` error with structured `severity` / `reason` / `command` fields. UI at `ConnectionPanelMain.sendCmd` passes acknowledged severity through after confirm dialog. Internal callers bypass classification; `ExecutionCoordinator` sends already-confirmed unlock / home operations through the internal path. `tests/machine-service-user-sendcommand.test.ts` (29/29). Shipped 2026-04-30 in `<HASH>`. |
+| T1-6 | Classify `sendCommand` and gate dangerous (service-layer) | `MachineService.sendCommand` rejects user-source warn/dangerous lines without matching `acknowledged` severity, throws `COMMAND_BLOCKED` error with structured `severity` / `reason` / `command` fields. UI at `ConnectionPanelMain.sendCmd` passes acknowledged severity through after confirm dialog. Internal callers bypass classification; `ExecutionCoordinator` sends already-confirmed unlock / home operations through the internal path. `tests/machine-service-user-sendcommand.test.ts` (29/29). Shipped 2026-04-30 in `ef8ac92`. |
 | T1-7 | JobLog QuotaExceededError visibility | `tests/job-log-quota.test.ts` |
 | T1-8 | Acceleration-aware power sanity bounds | `tests/plan-accel-sanity.test.ts` |
 | T1-9 | Frame bed extents preflight | `tests/bed-height-resolver-parity.test.ts` |
 | T1-10 | Wake lock during active jobs | `tests/wake-lock.test.ts` |
-| T1-11 | Canvas ↔ machine coord mismatch | `tests/scene-canvas-machine-coord-check.test.ts` |
+| T1-11 | Canvas 鈫?machine coord mismatch | `tests/scene-canvas-machine-coord-check.test.ts` |
 | T1-12 | Preflight refired on every status tick | `samePreflightSummary` at `ConnectionPanelMain.tsx:101,376`; commit `4ad42d8`. **Note:** dep-coverage follow-up not shipped (firmware-homing read without listing in deps). |
 | T1-13 | Double power attenuation in M4 raster | `appendBurnMoves2D` at `src/core/plan/PlanOptimizer.ts:539,670,767` |
 | T1-14 | Max-update-depth crashes during fast resize | `lastSyncedValue` in `src/ui/components/NumberInput.tsx:40,45` |
@@ -142,13 +142,13 @@ The Gate 1 cluster — required for Private Technical Alpha — is fully closed.
 | T1-21 | Frame-dot try/finally safety scope | `frameDot` at `src/app/ExecutionCoordinator.ts:140` |
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
 
-### ◐ Partial
+### 鈼?Partial
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
 | T1-17 | Image import freezes the app | `src/import/trace/trace.worker.ts` exists for tracing | Image-import grayscale loop is still on the main thread. Pass 1 ~1 session; full ~3-5 sessions. |
 
-### ✗ Confirmed open
+### 鉁?Confirmed open
 
 | Ticket | What | Estimate |
 |---|---|---|
@@ -162,23 +162,23 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 
 ---
 
-## Tier 2 — 9 fully shipped, 3 partial, 115 open
+## Tier 2 鈥?9 fully shipped, 3 partial, 115 open
 
-### ✅ Shipped (9)
+### 鉁?Shipped (9)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
 | T2-7 | Real controller abstraction | `src/controllers/ControllerInterface.ts`, `src/controllers/ControllerRegistry.ts`, `src/controllers/grbl/` exist as a real abstraction | pre-session |
 | T2-8 | Split Preflight into rule modules | `src/core/preflight/rules/` has 8 separate rule modules: `LayerSettingsPreflight`, `MachinePreflight`, `MachineStatePreflight`, `OptimizationPreflight`, `OutputBoundsPreflight`, `RasterPreflight`, `ScenePreflight`, `TemplatePreflight`, plus `sharedHelpers` | pre-session |
-| T2-22 | Standardized test runner | `scripts/run-tests.mjs` runs each test file in its own Node process. **Note:** auto-discovery part may not be done — manual list still in file. Treating as shipped because the consistent-reporter requirement is met. | pre-session |
+| T2-22 | Standardized test runner | `scripts/run-tests.mjs` runs each test file in its own Node process. **Note:** auto-discovery part may not be done 鈥?manual list still in file. Treating as shipped because the consistent-reporter requirement is met. | pre-session |
 | T2-67 | `failed_to_start` outcome enum + 8-distinct-outcomes finalization | `src/ui/components/JobOutcomeDialog.tsx`; `failed_to_start` handled in `JobLogViewer.tsx:66,89` | `a1bb80f` |
 | T2-76 | `commitSceneTransaction` single mutation path | `src/ui/scene/SceneTransaction.ts` (306 lines); `tests/scene-transaction-unified.test.ts` (83/83); `tests/scene-transaction-app-wired.test.ts` | pre-session |
 | T2-78 | History entries with action metadata | `selectionBefore/After`, `invalidatesOutput` defined in `SceneTransaction.ts:147`, used in `HistoryManager.ts:64` | pre-session |
 | T2-79 | Selection restore on undo/redo | `HistoryEntry.selectionBefore/After`; `tests/selection-restore-on-history.test.ts` | pre-session |
-| T2-80 | History coalescing — slider preview/commit | Text-property sliders use preview/commit at `PropertiesPanel.tsx:847,902,956`; T2-80 markers at `PropertiesPanel.tsx:53,428,440` | `e6874af` |
+| T2-80 | History coalescing 鈥?slider preview/commit | Text-property sliders use preview/commit at `PropertiesPanel.tsx:847,902,956`; T2-80 markers at `PropertiesPanel.tsx:53,428,440` | `e6874af` |
 | T2-105 | Hidden source maps in production | `vite.config.ts:9-12` `sourcemap: 'hidden'` (closed T1-83 stopgap) | `b6a56ed` |
 
-### ◐ Partial (3)
+### 鈼?Partial (3)
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
@@ -186,13 +186,13 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 | T2-12 | Unified MachineSafetyState | Part 1: `laserOutputState` + subscriptions (6 markers). Part 2: `FAULTED_REQUIRES_INSPECTION` + Acknowledge button (15 markers, `tests/execution-coordinator-disconnect.test.ts` etc.) | Full canonical `MachineSafetyState` discriminated union (16 states: DISCONNECTED_UNKNOWN, RUNNING_TEMP_LASER, etc.) not done. Most consequential parts shipped; type-unification "bow on top" remains. |
 | T2-77 | Async revision guards | `capturedRevisionId` reserved in `SceneTransaction.ts:53` (scaffolding) | Mid-async cancellation logic not wired; needed for trace, image import |
 
-### ✗ Open (115)
+### 鉁?Open (115)
 
 Grouped by cluster. **Bold = highest leverage / blocks other work.**
 
 #### Reliability architecture (16 tickets)
 
-T2-1 (ValidatedJobTicket — type exists, contract not enforced), **T2-3** (paywall: `requireFeature` exists in scattered hooks; not service-layer-gated comprehensively), T2-5 (`GcodeTemplateValidator` exists at `src/core/preflight/GcodeTemplateValidator.ts` but not wired into compile pipeline), T2-6 (no Zustand stores), **T2-10** (no MachineCommandGateway), **T2-11** (no operation mutex), T2-13 (no FaultInjectingSerialPort), T2-14, T2-15 (no CompoundPath model), T2-16, T2-17 (no AbortSignal in compile), T2-18, T2-19, T2-20, T2-21 (no fast-check), T2-23, T2-24, T2-25 (no ControllerCapabilities), T2-26, T2-27, T2-28, T2-29.
+T2-1 (ValidatedJobTicket 鈥?type exists, contract not enforced), **T2-3** (paywall: `requireFeature` exists in scattered hooks; not service-layer-gated comprehensively), T2-5 (`GcodeTemplateValidator` exists at `src/core/preflight/GcodeTemplateValidator.ts` but not wired into compile pipeline), T2-6 (no Zustand stores), **T2-10** (no MachineCommandGateway), **T2-11** (no operation mutex), T2-13 (no FaultInjectingSerialPort), T2-14, T2-15 (no CompoundPath model), T2-16, T2-17 (no AbortSignal in compile), T2-18, T2-19, T2-20, T2-21 (no fast-check), T2-23, T2-24, T2-25 (no ControllerCapabilities), T2-26, T2-27, T2-28, T2-29.
 
 #### Connection lifecycle (7 tickets)
 
@@ -208,11 +208,11 @@ T2-47 (realistic GRBL simulator), T2-48, T2-49 (virtual time), T2-50 (injectFaul
 
 #### State machines / Job lifecycle (10 tickets)
 
-T2-51 (CompiledJobState atomic), T2-52 (useSyncExternalStore), T2-53 (JobPhase), T2-54 (unified disconnect), T2-55 (resetProjectRuntimeState), T2-56 (job log finalization), T2-57 (typed errors per domain — `machineAlarmCode` partial), T2-58 (Ready-to-Run panel), T2-59 (material-first workflow with confidence labels — UI exists, workflow doesn't), T2-60 (frame freshness invalidation).
+T2-51 (CompiledJobState atomic), T2-52 (useSyncExternalStore), T2-53 (JobPhase), T2-54 (unified disconnect), T2-55 (resetProjectRuntimeState), T2-56 (job log finalization), T2-57 (typed errors per domain 鈥?`machineAlarmCode` partial), T2-58 (Ready-to-Run panel), T2-59 (material-first workflow with confidence labels 鈥?UI exists, workflow doesn't), T2-60 (frame freshness invalidation).
 
 #### UX (7 tickets)
 
-T2-61 (design-editing controls out of conn panel), T2-62 (recovery cards: alarm/disconnect/frame-fail/E-stop), T2-63 (operation order preview), T2-64 (beginner/advanced toggle), **T2-65** (central error reporter — blocks lots of UX work), T2-66 (positionTrusted state), T2-77 (covered above).
+T2-61 (design-editing controls out of conn panel), T2-62 (recovery cards: alarm/disconnect/frame-fail/E-stop), T2-63 (operation order preview), T2-64 (beginner/advanced toggle), **T2-65** (central error reporter 鈥?blocks lots of UX work), T2-66 (positionTrusted state), T2-77 (covered above).
 
 #### Persistence (8 tickets)
 
@@ -220,7 +220,7 @@ T2-68 (critical error history preserved across clearMessages), T2-69 (atomic aut
 
 #### History (8 tickets)
 
-T2-81 (raster buffers outside history), T2-82 (memory budget), T2-83 (block undo while running), T2-84 (RuntimeState meta-container), T2-85 (JobFingerprint type), T2-86 (FrameState union), T2-87 (RecoveryState machine), T2-88 (hash-derived dirty — scaffolding referenced).
+T2-81 (raster buffers outside history), T2-82 (memory budget), T2-83 (block undo while running), T2-84 (RuntimeState meta-container), T2-85 (JobFingerprint type), T2-86 (FrameState union), T2-87 (RecoveryState machine), T2-88 (hash-derived dirty 鈥?scaffolding referenced).
 
 #### Entitlements (9 tickets)
 
@@ -228,11 +228,11 @@ T2-89 (server-signed entitlement), T2-90 (signed local token public-key verify),
 
 #### Release engineering (10 tickets)
 
-T2-98 (Win/macOS CI runners), T2-99 (Win code signing), T2-100 (macOS notarization), T2-101 (auto-update with electron-updater), T2-102 (rollback / failed-launch detection), T2-103 (SHA256 + SBOM + signed checksums), T2-104 (versioned user-data migration), T2-106 (CI dependency security scanning), T2-107 (CSP — currently has `unsafe-inline` and `unsafe-eval` per `electron/main.ts:190,191`).
+T2-98 (Win/macOS CI runners), T2-99 (Win code signing), T2-100 (macOS notarization), T2-101 (auto-update with electron-updater), T2-102 (rollback / failed-launch detection), T2-103 (SHA256 + SBOM + signed checksums), T2-104 (versioned user-data migration), T2-106 (CI dependency security scanning), T2-107 (CSP 鈥?currently has `unsafe-inline` and `unsafe-eval` per `electron/main.ts:190,191`).
 
 #### Diagnostics (10 tickets)
 
-**T2-108** (support bundle exporter), T2-109 (reconstruction-grade JobLog), T2-110 (controller settings snapshot before job), T2-111 (persist partial job log), T2-112 (event-window retention), T2-113 (structured RX/TX events), **T2-114** (React error boundary + window error/rejection persistence), T2-115 (privacy redaction), T2-116 (storage health/quota), T2-117 (correlation IDs), T2-118 (Help → Diagnostics panel).
+**T2-108** (support bundle exporter), T2-109 (reconstruction-grade JobLog), T2-110 (controller settings snapshot before job), T2-111 (persist partial job log), T2-112 (event-window retention), T2-113 (structured RX/TX events), **T2-114** (React error boundary + window error/rejection persistence), T2-115 (privacy redaction), T2-116 (storage health/quota), T2-117 (correlation IDs), T2-118 (Help 鈫?Diagnostics panel).
 
 #### Security (10 tickets)
 
@@ -240,33 +240,33 @@ T2-119 (assertTrustedSender on every IPC handler), T2-120 (typed namespaced stor
 
 ---
 
-## Tier 3 — 2 shipped, 87 open
+## Tier 3 鈥?2 shipped, 87 open
 
-### ✅ Shipped (2)
+### 鉁?Shipped (2)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
 | T3-1 | Autosave to IndexedDB / filesystem | `src/core/storage/{IndexedDb,Filesystem}StorageAdapter.ts` + `bootstrap.ts` picks per-runtime | pre-session |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### ✗ Open (87)
+### 鉁?Open (87)
 
-T3-2, T3-3, T3-4 (Win/macOS code signing), T3-5 (auto-update channel), T3-6 (crash reporting), T3-7 (backward-compat fixture corpus), T3-8 (Electron CSP hardening — duplicates T2-107), T3-9 (IPC attack surface), T3-10 (input file-format size limits), T3-11 (burn-progress visual bugs), **T3-12** (hardware-in-the-loop safety verification suite), T3-13 (active-edge-table fill scanline), T3-14 (sampled G-code preview), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-18 (output validator semantic scan), T3-19, T3-20, T3-21 (frame-dot F3000 hardcoded), T3-22, T3-23, T3-24, T3-25, T3-26, T3-27, T3-28, T3-29, T3-30, T3-31, T3-32, T3-33, T3-34, T3-35, T3-36, T3-37, T3-38, T3-39, T3-40, T3-41, T3-42, T3-43, T3-44, T3-45, T3-46, T3-47, T3-48, T3-49, T3-50 (device identity verification on connect), T3-51, T3-52, T3-53, T3-54, T3-55, T3-56, T3-57, T3-58, T3-59, T3-60, T3-61, T3-62, T3-63, T3-64, T3-65, T3-66, T3-67 (canonical bounds selectors), T3-68 (debug state graph + transition log; scaffolding ready in `SceneTransaction.ts:94,95,152-154,271,283`; emitter not wired), T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging — only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test — referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks).
+T3-2, T3-3, T3-4 (Win/macOS code signing), T3-5 (auto-update channel), T3-6 (crash reporting), T3-7 (backward-compat fixture corpus), T3-8 (Electron CSP hardening 鈥?duplicates T2-107), T3-9 (IPC attack surface), T3-10 (input file-format size limits), T3-11 (burn-progress visual bugs), **T3-12** (hardware-in-the-loop safety verification suite), T3-13 (active-edge-table fill scanline), T3-14 (sampled G-code preview), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-18 (output validator semantic scan), T3-19, T3-20, T3-21 (frame-dot F3000 hardcoded), T3-22, T3-23, T3-24, T3-25, T3-26, T3-27, T3-28, T3-29, T3-30, T3-31, T3-32, T3-33, T3-34, T3-35, T3-36, T3-37, T3-38, T3-39, T3-40, T3-41, T3-42, T3-43, T3-44, T3-45, T3-46, T3-47, T3-48, T3-49, T3-50 (device identity verification on connect), T3-51, T3-52, T3-53, T3-54, T3-55, T3-56, T3-57, T3-58, T3-59, T3-60, T3-61, T3-62, T3-63, T3-64, T3-65, T3-66, T3-67 (canonical bounds selectors), T3-68 (debug state graph + transition log; scaffolding ready in `SceneTransaction.ts:94,95,152-154,271,283`; emitter not wired), T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks).
 
 ---
 
-## Tier 4 — 2 shipped, 7 open
+## Tier 4 鈥?2 shipped, 7 open
 
-### ✅ Shipped (2)
+### 鉁?Shipped (2)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
 | T4-1 | Starter material preset library | `src/core/materials/defaultPresets.ts` has 10 presets: `preset-birch-3mm`, `preset-mdf-3mm`, `preset-acrylic-3mm`, `preset-cardboard`, `preset-leather-2mm`, `preset-anodized-aluminum`, `preset-slate-stone`, `preset-cork-3mm`, `preset-paper-cardstock`, `preset-fabric-cotton` | pre-session |
-| T4-8 | Import formats — DXF | `src/import/dxf/` with `importDxfIntoScene` wired into `src/ui/hooks/useImport.ts:255` and `src/ui/components/FileToolbar.tsx:19` | pre-session |
+| T4-8 | Import formats 鈥?DXF | `src/import/dxf/` with `importDxfIntoScene` wired into `src/ui/hooks/useImport.ts:255` and `src/ui/components/FileToolbar.tsx:19` | pre-session |
 
-### ✗ Open (7)
+### 鉁?Open (7)
 
-T4-2 (kerf planner UI — beyond the kerf compensation already shipped in box generator), T4-3 (inline coaching), T4-4 (Know-Why engine), T4-5 (Honest Mode), T4-6 (D.13 Phase 2 calibration), T4-7 (Marlin controller stub), T4-9 (material feedback portability).
+T4-2 (kerf planner UI 鈥?beyond the kerf compensation already shipped in box generator), T4-3 (inline coaching), T4-4 (Know-Why engine), T4-5 (Honest Mode), T4-6 (D.13 Phase 2 calibration), T4-7 (Marlin controller stub), T4-9 (material feedback portability).
 
 ---
 
@@ -274,8 +274,8 @@ T4-2 (kerf planner UI — beyond the kerf compensation already shipped in box ge
 
 Started at **15 advisories** (2 low, 2 moderate, 11 high) per prior session. After audit work:
 
-- **Cleared (14):** xmldom upgrade, dompurify upgrade, electron-builder cluster (multiple commits including major bump), postcss override (commits `93b305b` … `0046a04`)
-- **Remaining (1):** Electron 34→41 major bump — deferred (full-session smoke surface, would need re-running the entire app + IPC + dialog test set)
+- **Cleared (14):** xmldom upgrade, dompurify upgrade, electron-builder cluster (multiple commits including major bump), postcss override (commits `93b305b` 鈥?`0046a04`)
+- **Remaining (1):** Electron 34鈫?1 major bump 鈥?deferred (full-session smoke surface, would need re-running the entire app + IPC + dialog test set)
 
 ---
 
@@ -317,19 +317,19 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-17 pass 1** — Image import freeze: move grayscale loop to a Web Worker. ~1 session.
-2. **T1-19** — Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top — explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
-3. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-4. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
-5. **T1-17 full** — Finish image-import worker migration (passes 2-3).
+1. **T1-17 pass 1** 鈥?Image import freeze: move grayscale loop to a Web Worker. ~1 session.
+2. **T1-19** 鈥?Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top 鈥?explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
+3. **T1-23** 鈥?Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
+4. **T1-25** 鈥?Reconnect safe-state handshake. 1-2 sessions.
+5. **T1-17 full** 鈥?Finish image-import worker migration (passes 2-3).
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 
 - T2-3 (widen service-layer paywall gating)
-- T2-65 (central error reporter — unblocks T2-114 error boundary and lots of UX cleanup)
+- T2-65 (central error reporter 鈥?unblocks T2-114 error boundary and lots of UX cleanup)
 - T2-12 finish (close out canonical safety state union)
-- T2-10 (MachineCommandGateway choke point — unblocks consistent gating across Tier 2)
-- T2-11 (operation mutex — unblocks T2-12 full canonical type)
+- T2-10 (MachineCommandGateway choke point 鈥?unblocks consistent gating across Tier 2)
+- T2-11 (operation mutex 鈥?unblocks T2-12 full canonical type)
 
 ---
 

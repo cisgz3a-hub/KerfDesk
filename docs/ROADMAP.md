@@ -1,4 +1,4 @@
-> **Repo source-of-truth notice**
+﻿> **Repo source-of-truth notice**
 >
 > This file is the authoritative roadmap for LaserForge. It pairs with `docs/ROADMAP-shipped-audit.md`, which is the verified ledger of what has been shipped against this list.
 >
@@ -6,7 +6,7 @@
 >
 > 1. Tier 0 first, then Tier 1 in numeric order, then Tier 2 in numeric order, etc. No skipping ahead. The numbering encodes priority.
 > 2. Every commit that ships a ticket updates this file in the same commit: append `**Status:** Shipped in <commit-hash>` at the bottom of the ticket section (matching the existing T1-12 convention).
-> 3. The same commit also updates `docs/ROADMAP-shipped-audit.md` — move the row from "Open" or "Partial" into the "Shipped" section with the same hash.
+> 3. The same commit also updates `docs/ROADMAP-shipped-audit.md` 鈥?move the row from "Open" or "Partial" into the "Shipped" section with the same hash.
 > 4. Off-roadmap features are not shipped without explicit user approval. The phrase "We work on the roadmap from now on and strictly follow it" is the contract.
 > 5. The AI assistant rules at `.cursor/rules/laserforge.md` enforce this in every editing session.
 >
@@ -14,7 +14,7 @@
 
 ---
 
-# LaserForge — Consolidated Fix Roadmap
+# LaserForge 鈥?Consolidated Fix Roadmap
 
 **Date:** 2026-04-24
 **Source audits:** Round 1 (5.8/10), Round 2 supplement (5.5/10), plus in-session findings
@@ -26,20 +26,20 @@
 ## How to use this document
 
 Each item has:
-- **Code reference** — the exact file(s) and lines where the issue lives, verified against the current codebase.
-- **Problem** — what's broken and why it matters.
-- **Fix** — concrete implementation direction, not just "clean this up."
-- **Test** — what a regression test would look like.
-- **Estimate** — realistic solo-dev effort in short-chunk sessions (not continuous focus hours).
-- **Priority** — tier 0 through 4, described below.
+- **Code reference** 鈥?the exact file(s) and lines where the issue lives, verified against the current codebase.
+- **Problem** 鈥?what's broken and why it matters.
+- **Fix** 鈥?concrete implementation direction, not just "clean this up."
+- **Test** 鈥?what a regression test would look like.
+- **Estimate** 鈥?realistic solo-dev effort in short-chunk sessions (not continuous focus hours).
+- **Priority** 鈥?tier 0 through 4, described below.
 
 ### Priority tiers
 
-- **Tier 0 (Today)** — one-line fixes with real impact. Do before anything else.
-- **Tier 1 (This week)** — small, high-value safety and correctness fixes.
-- **Tier 2 (This month)** — architectural fixes that close bug classes or unblock future work.
-- **Tier 3 (This quarter)** — weeks-long refactors required for commercial readiness.
-- **Tier 4 (Later)** — product features, polish, strategic gaps.
+- **Tier 0 (Today)** 鈥?one-line fixes with real impact. Do before anything else.
+- **Tier 1 (This week)** 鈥?small, high-value safety and correctness fixes.
+- **Tier 2 (This month)** 鈥?architectural fixes that close bug classes or unblock future work.
+- **Tier 3 (This quarter)** 鈥?weeks-long refactors required for commercial readiness.
+- **Tier 4 (Later)** 鈥?product features, polish, strategic gaps.
 
 ### Reading order
 
@@ -47,15 +47,15 @@ Fix tier 0 first, then work tier 1 top-to-bottom. Don't skip ahead to features. 
 
 ---
 
-## Release Readiness — Audit 5E synthesis (2026-04-26)
+## Release Readiness 鈥?Audit 5E synthesis (2026-04-26)
 
-The final audit (5E) is a GO/NO-GO synthesis, not a new finding. It scores the categories that audits 1A–5D have already cross-checked, and asks the gate question: "Would I confidently allow real users to install this, connect a real laser, run real jobs, trust the output, and pay for the product?" The answer today is **no**.
+The final audit (5E) is a GO/NO-GO synthesis, not a new finding. It scores the categories that audits 1A鈥?D have already cross-checked, and asks the gate question: "Would I confidently allow real users to install this, connect a real laser, run real jobs, trust the output, and pay for the product?" The answer today is **no**.
 
 This section is the release plan: where we are, what gates separate us from each release stage, and which existing tickets close those gates.
 
 ### Current classification
 
-**Advanced Alpha — NO-GO for any release.**
+**Advanced Alpha 鈥?NO-GO for any release.**
 
 Final score: **4.5 / 10**
 
@@ -64,12 +64,12 @@ Final score: **4.5 / 10**
 | Safety (Phase 1) | 5.0 | Real safety pieces (M5 paths, command classifier, preflight) but T1-18 (deadman service-owned), T1-59 (frame-before-run), T1-22 (E-stop two-stage) unshipped |
 | Output correctness (Phase 2) | 5.0 | Real generation pipeline but T2-25 (CompiledJobState atomic), T2-44 (preflight bounds source), T2-86 (FrameState fingerprint) unshipped |
 | Controller (Phase 3) | 5.0 | Functional GRBL implementation but T2-25 (capabilities model), T2-44 (state machine refinement) unshipped |
-| System integrity (Phase 4) | 4.3 | T1-68 (autosave dirty-clear before write — the most consequential single defect) unshipped |
+| System integrity (Phase 4) | 4.3 | T1-68 (autosave dirty-clear before write 鈥?the most consequential single defect) unshipped |
 | Commercial readiness (Phase 5) | 4.0 | Tier 1 commercial-credibility cluster (T1-77, T1-81, T1-83, T1-85) and security cluster (T1-89 through T1-94) unshipped |
 
-Every safety, output, and persistence defect identified across 1A–5D is filed as a ticket. The roadmap below is the complete to-do list. The blockers below reference those tickets — no new ticket creation needed for 5E.
+Every safety, output, and persistence defect identified across 1A鈥?D is filed as a ticket. The roadmap below is the complete to-do list. The blockers below reference those tickets 鈥?no new ticket creation needed for 5E.
 
-### Gate 1 — Private Technical Alpha (~9.5 hours focused work)
+### Gate 1 鈥?Private Technical Alpha (~9.5 hours focused work)
 
 Acceptable scope: technical testers only, scrap material only, supervised, with explicit "experimental alpha" warning. NOT paid users, NOT beginners, NOT public.
 
@@ -83,7 +83,7 @@ Acceptable scope: technical testers only, scrap material only, supervised, with 
 
 Total: **~9.5 hours**.
 
-After this, the app can be safely distributed to a small group of technically competent testers running supervised jobs on scrap. The tester-key entitlement system already in place (the legitimate part — not the default secret T1-77 removes) handles license distribution to the alpha cohort.
+After this, the app can be safely distributed to a small group of technically competent testers running supervised jobs on scrap. The tester-key entitlement system already in place (the legitimate part 鈥?not the default secret T1-77 removes) handles license distribution to the alpha cohort.
 
 What's still missing at Gate 1 (acceptable for alpha):
 - Auto-update (testers manually install signed builds)
@@ -93,14 +93,14 @@ What's still missing at Gate 1 (acceptable for alpha):
 - Visual polish (testers tolerate rough edges)
 
 What's NOT acceptable to defer past Gate 1:
-- Test-fire deadman in service (T1-18 — this is a bigger architectural fix, but it's a hard safety gate)
+- Test-fire deadman in service (T1-18 鈥?this is a bigger architectural fix, but it's a hard safety gate)
 - Frame-before-run by default (T1-59)
 - E-stop two-stage M5 + soft-reset (T1-22)
 - Hardware test for T1-15 (already shipped, hardware verification still pending)
 
 The audit calls these "Required pre-release checklist for private alpha." T1-18, T1-59, T1-22 should be added to Gate 1. Adjusted estimate: **~12-13 hours** including these three architectural-safety items.
 
-### Gate 2 — Public Beta (~ Tier 2 architectural work, ~8-12 sessions)
+### Gate 2 鈥?Public Beta (~ Tier 2 architectural work, ~8-12 sessions)
 
 Acceptable scope: public users on a beta channel, free or low-cost, with clear "beta" labeling. Some output trust assumed.
 
@@ -113,30 +113,30 @@ Required additions on top of Gate 1:
 | Supportability foundation | T2-108 (support bundle), T2-114 (crash capture), T2-115 (redaction), T2-117 (correlation IDs) | ~6 sessions |
 | Security architecture | T2-119 (IPC sender verify), T2-120 (typed storage), T2-121 (main-process command class), T2-123 (SVG limits), T2-124 (image limits) | ~6 sessions |
 
-This is roughly **30-40 focused sessions** of work. At a sustainable solo-dev pace (1-2 sessions per week), that's 4-8 months. The alternative is to ship beta with a smaller subset and accept higher support burden — that decision is product-side, not engineering-blocked.
+This is roughly **30-40 focused sessions** of work. At a sustainable solo-dev pace (1-2 sessions per week), that's 4-8 months. The alternative is to ship beta with a smaller subset and accept higher support burden 鈥?that decision is product-side, not engineering-blocked.
 
-### Gate 3 — Paid Production Release
+### Gate 3 鈥?Paid Production Release
 
 Acceptable scope: paid users, full commercial credibility, production support standards.
 
 Required additions on top of Gate 2:
 
-- All Tier 2 commercial-credibility tickets shipped (T2-89 through T2-97 — server-signed entitlements, plan model, clock-tamper, etc.)
+- All Tier 2 commercial-credibility tickets shipped (T2-89 through T2-97 鈥?server-signed entitlements, plan model, clock-tamper, etc.)
 - All Tier 2 release-engineering tickets shipped (T2-102 rollback, T2-104 user-data migration, T2-105 safe mode, T2-106 dependency security, T2-107 CSP)
 - All Tier 2 supportability tickets shipped (T2-109 reconstruction-grade JobLog, T2-110 controller settings snapshot, T2-111 partial log persistence, T2-112 event-window retention, T2-113 structured RX/TX, T2-116 storage health, T2-118 troubleshooting panel)
 - All Tier 2 security tickets shipped (T2-122 typed serial IPC, T2-125 compiler enforcement, T2-126 WiFi untrusted telemetry, T2-127 storage size limits, T2-128 namespace authorization)
 - All Tier 1 tickets through T1-88 shipped (the longer Tier 1 list beyond the alpha cluster)
 - Hardware test matrix on the Falcon A1 Pro covering: cold boot, 8-hour burn, mid-job pause/resume, mid-job alarm recovery, mid-job E-stop recovery, full bed corner-to-corner traverse, large raster (>1M pixels), large vector (>10k segments)
 
-This is the "real commercial product" gate. Estimate cannot be given without scope decisions (Linux support? cloud nesting? plan model finalized?). The audit cycle 1A–5D has identified **every architectural defect known today** that blocks this gate; no further audit work is needed before execution.
+This is the "real commercial product" gate. Estimate cannot be given without scope decisions (Linux support? cloud nesting? plan model finalized?). The audit cycle 1A鈥?D has identified **every architectural defect known today** that blocks this gate; no further audit work is needed before execution.
 
 ### Pushback on 5E
 
-**Pushback 1 — "Advanced Alpha" is correct, but the alpha gate is in reach.** The audit emphasizes how far LaserForge is from production. That's right. But it understates how close it is to a defensible private alpha — ~12 hours of focused Tier 1 work. The narrative is "much to do" but the immediate next step is small.
+**Pushback 1 鈥?"Advanced Alpha" is correct, but the alpha gate is in reach.** The audit emphasizes how far LaserForge is from production. That's right. But it understates how close it is to a defensible private alpha 鈥?~12 hours of focused Tier 1 work. The narrative is "much to do" but the immediate next step is small.
 
-**Pushback 2 — The audit's checklist conflates alpha gates with production gates in some places.** It lists "server-signed licensing if paid features are exposed" under "Before public beta" — but if alpha doesn't expose paid features, this isn't blocking for alpha. Code signing (T2-99/T2-100) is correctly identified as needing to ship before any externally-distributed installer, not specifically a paid-release gate. The three-gate structure above clarifies these.
+**Pushback 2 鈥?The audit's checklist conflates alpha gates with production gates in some places.** It lists "server-signed licensing if paid features are exposed" under "Before public beta" 鈥?but if alpha doesn't expose paid features, this isn't blocking for alpha. Code signing (T2-99/T2-100) is correctly identified as needing to ship before any externally-distributed installer, not specifically a paid-release gate. The three-gate structure above clarifies these.
 
-**Pushback 3 — 4.3 for system integrity is slightly harsh.** The Phase 4 audits (4A–4F) averaged ~5.0. The 4.3 reflects that T1-68 (autosave dirty-clear) is the single most-consequential defect found and remains unshipped. The harsher score is essentially "with T1-68 unfixed, system integrity cannot honestly be rated higher than 4.3." Fair on its face, but worth noting that **T1-68 is a 30-minute fix** — the score would jump materially after one focused session.
+**Pushback 3 鈥?4.3 for system integrity is slightly harsh.** The Phase 4 audits (4A鈥?F) averaged ~5.0. The 4.3 reflects that T1-68 (autosave dirty-clear) is the single most-consequential defect found and remains unshipped. The harsher score is essentially "with T1-68 unfixed, system integrity cannot honestly be rated higher than 4.3." Fair on its face, but worth noting that **T1-68 is a 30-minute fix** 鈥?the score would jump materially after one focused session.
 
 ### Audit cycle complete
 
@@ -151,7 +151,7 @@ The next phase is execution: ship Tier 1 in priority order (starting with T1-68,
 ---
 
 
-## Tier 0 — Today
+## Tier 0 鈥?Today
 
 ### T0-1 | Delete comment-stripping in start-job path
 
@@ -161,7 +161,7 @@ The next phase is execution: ship Tier 1 in priority order (starting with T1-68,
 const lines = gcode.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith(';'));
 ```
 
-**Problem:** The UI filters `; OBJ ids=...` comments before sending to `GrblController.sendJob()`. The controller is built to parse those exact comments to drive `onObjectLifecycle` events, which feed the canvas burn-progress highlighting. As-is, every job strips the markers before the controller sees them. The burn-progress feature is dead on the primary path. The pipeline correctly emits markers, the controller correctly parses them, the React canvas correctly renders halos — but nothing reaches the parser.
+**Problem:** The UI filters `; OBJ ids=...` comments before sending to `GrblController.sendJob()`. The controller is built to parse those exact comments to drive `onObjectLifecycle` events, which feed the canvas burn-progress highlighting. As-is, every job strips the markers before the controller sees them. The burn-progress feature is dead on the primary path. The pipeline correctly emits markers, the controller correctly parses them, the React canvas correctly renders halos 鈥?but nothing reaches the parser.
 
 This has been broken for the entire duration of the burn-progress feature. Tests pass because they call `controller.sendJob()` directly, bypassing the UI filter.
 
@@ -205,7 +205,7 @@ Add `{BED_WIDTH_MINUS_5}` and `{BED_HEIGHT_MINUS_5}` substitution variables in `
   ...
 ]
 ```
-On machines with `$22=0` (homing disabled — common on entry-level diode lasers), `$H` returns `error:5`. Combined with hardcoded `_stopOnError=true`, the job aborts before it even starts with a cryptic error.
+On machines with `$22=0` (homing disabled 鈥?common on entry-level diode lasers), `$H` returns `error:5`. Combined with hardcoded `_stopOnError=true`, the job aborts before it even starts with a cryptic error.
 
 **Fix:** Add a preflight check `HOMING_REQUESTED_BUT_DISABLED` that cross-references `$H` presence in the resolved header template against the live `$22` setting reported by the controller. Block job start with a clear message.
 
@@ -240,7 +240,7 @@ pauseResume(paused: boolean): void {
 }
 ```
 
-**Problem:** The parameter means "is currently paused"; the action is "do the other thing." This is API-shape hazard — any caller who reads the signature without reading the body will pass the wrong argument, silently inverting pause/resume.
+**Problem:** The parameter means "is currently paused"; the action is "do the other thing." This is API-shape hazard 鈥?any caller who reads the signature without reading the body will pass the wrong argument, silently inverting pause/resume.
 
 **Fix:** Split into two methods:
 ```ts
@@ -249,7 +249,7 @@ resume(): void { this.controllerRef.current.resume(); }
 ```
 Update all callers to pick the right one based on their `currentlyPaused` state. Alternatively, rename to `togglePause(currentlyPaused: boolean)` to make the "toggle" shape explicit. Splitting is cleaner.
 
-**Test:** `tests/machine-service-pause-resume.test.ts` — verify `pause()` calls `controller.pause()`, `resume()` calls `controller.resume()`. Trivial mock.
+**Test:** `tests/machine-service-pause-resume.test.ts` 鈥?verify `pause()` calls `controller.pause()`, `resume()` calls `controller.resume()`. Trivial mock.
 
 **Estimate:** 30 minutes including caller updates.
 
@@ -278,7 +278,7 @@ Update all callers to pick the right one based on their `currentlyPaused` state.
 
 ---
 
-## Tier 1 — This week
+## Tier 1 鈥?This week
 
 ### T1-1 | Gate silent WCS + status-mask mutation behind consent
 
@@ -304,7 +304,7 @@ this._writeSystemLine('$10=0');
 
 Store the previous WCS/mask on the profile in a new `stashedWcsState` field. Offer a restore action on disconnect or manual trigger.
 
-**Test:** `tests/wcs-mutation-consent.test.ts` — mock controller with non-zero G54, verify consent is requested before the G10 L2 write. Mock controller with default G54, verify no prompt is shown (no-op).
+**Test:** `tests/wcs-mutation-consent.test.ts` 鈥?mock controller with non-zero G54, verify consent is requested before the G10 L2 write. Mock controller with default G54, verify no prompt is shown (no-op).
 
 **Estimate:** 1-2 sessions (UI prompt plus profile field plus restore logic).
 
@@ -316,13 +316,13 @@ Store the previous WCS/mask on the profile in a new `stashedWcsState` field. Off
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:359-420` (`startJob`)
 
-**Problem:** Preflight validates bounds at compile time. But `sendJob` accepts raw `lines: string[]` — if they're stale, hand-edited, or the user compiled for a 400×400 bed and then switched to a 300×300 profile without recompiling, the controller streams whatever it's given.
+**Problem:** Preflight validates bounds at compile time. But `sendJob` accepts raw `lines: string[]` 鈥?if they're stale, hand-edited, or the user compiled for a 400脳400 bed and then switched to a 300脳300 profile without recompiling, the controller streams whatever it's given.
 
-**Fix:** In `startJob`, before `_isJobRunning = true`, scan the first N (say 500) lines for absolute-mode `G0/G1 X... Y...` values. If any exceed the controller's reported machine extents (`_bedWidth`, `_bedHeight` from `$130`/`$131`), refuse to start and surface a structured error. Skip the scan in relative mode (G91) — deltas can't be validated without execution simulation.
+**Fix:** In `startJob`, before `_isJobRunning = true`, scan the first N (say 500) lines for absolute-mode `G0/G1 X... Y...` values. If any exceed the controller's reported machine extents (`_bedWidth`, `_bedHeight` from `$130`/`$131`), refuse to start and surface a structured error. Skip the scan in relative mode (G91) 鈥?deltas can't be validated without execution simulation.
 
 Also re-query status with `?` and await one fresh status frame before accepting the job. Refuse if the reported status is not `idle`.
 
-**Test:** `tests/controller-bounds-recheck.test.ts` — startJob with gcode containing `G0 X9999` on a machine with `_bedWidth=400`, assert the job is refused. `tests/controller-status-recheck.test.ts` — startJob during a `<Home>` status, assert refusal.
+**Test:** `tests/controller-bounds-recheck.test.ts` 鈥?startJob with gcode containing `G0 X9999` on a machine with `_bedWidth=400`, assert the job is refused. `tests/controller-status-recheck.test.ts` 鈥?startJob during a `<Home>` status, assert refusal.
 
 **Estimate:** 1 session.
 
@@ -342,7 +342,7 @@ severity: profile.allowsNegativeWorkspace ? 'warning' : 'error'
 ```
 In the Falcon factory profiles (serial and WiFi), set `allowsNegativeWorkspace: false` explicitly. Expose the field in device-settings UI with help text.
 
-**Test:** `tests/preflight-negative-coords.test.ts` — two cases, Falcon profile (error) and profile with `allowsNegativeWorkspace: true` (warning). Verify `confirmPreflightForJobStart` blocks in the error case.
+**Test:** `tests/preflight-negative-coords.test.ts` 鈥?two cases, Falcon profile (error) and profile with `allowsNegativeWorkspace: true` (warning). Verify `confirmPreflightForJobStart` blocks in the error case.
 
 **Estimate:** 30-60 minutes.
 
@@ -357,7 +357,7 @@ In the Falcon factory profiles (serial and WiFi), set `allowsNegativeWorkspace: 
 ```ts
 emergencyStop(): void {
   if (!this._port?.isOpen) return;
-  console.warn('[GrblController] EMERGENCY STOP — ...');
+  console.warn('[GrblController] EMERGENCY STOP 鈥?...');
   this._sendRealtime(REALTIME_RESET);
   this._abortJob();
   this._emitProgress();
@@ -368,7 +368,7 @@ emergencyStop(): void {
 
 **Fix:** After the reset and abort, call `this.disconnect()`. Update the UI button wiring so it handles the disconnect gracefully (toast + offer reconnect). Add comment documenting the intent.
 
-**Test:** `tests/controller-stop-safety.test.ts` already exists — extend with a case that calls `emergencyStop` and asserts the port closes after the reset.
+**Test:** `tests/controller-stop-safety.test.ts` already exists 鈥?extend with a case that calls `emergencyStop` and asserts the port closes after the reset.
 
 **Estimate:** 1 hour.
 
@@ -388,7 +388,7 @@ private _stopOnError = true;
 
 **Fix:** Add `stopOnError: boolean` to `DeviceProfile`, default `true`. Pass into `GrblController` constructor or via setter before job start. Expose in Advanced device settings.
 
-**Test:** `tests/controller-stop-on-error-override.test.ts` — mock a recoverable error during streaming, assert that with `stopOnError=false` the job continues.
+**Test:** `tests/controller-stop-on-error-override.test.ts` 鈥?mock a recoverable error during streaming, assert that with `stopOnError=false` the job continues.
 
 **Estimate:** 1 hour.
 
@@ -404,20 +404,20 @@ private _stopOnError = true;
 
 **Fix:** Classify:
 - **Safe:** `?`, `!`, `~`, `\x18`, `$$`, `$#`, `$G`, `$I`, `$N`, `$H` (if homing enabled).
-- **Motion:** `G0`, `G1`, `G2`, `G3`, `$J=` — allow if machine is idle, otherwise queue per existing logic.
-- **Laser-on:** `M3`, `M4` with non-zero `S` — require deadman context (test-fire timer active) OR explicit confirm.
-- **Config:** `$N=`, `$$`, `$10=`, `G10`, `G92` — require confirm with "this will change machine state" dialog.
-- **Dangerous:** `$X` (unlock alarm), `$RST=*` — require confirm with warning.
+- **Motion:** `G0`, `G1`, `G2`, `G3`, `$J=` 鈥?allow if machine is idle, otherwise queue per existing logic.
+- **Laser-on:** `M3`, `M4` with non-zero `S` 鈥?require deadman context (test-fire timer active) OR explicit confirm.
+- **Config:** `$N=`, `$$`, `$10=`, `G10`, `G92` 鈥?require confirm with "this will change machine state" dialog.
+- **Dangerous:** `$X` (unlock alarm), `$RST=*` 鈥?require confirm with warning.
 
 Add a `CommandClass` enum and a classifier function. UI console may allow class-based filtering ("Advanced mode").
 
-**Test:** `tests/sendcommand-classification.test.ts` — table of command strings to expected class, verify classifier. Separate test verifies the controller rejects dangerous classes in default mode.
+**Test:** `tests/sendcommand-classification.test.ts` 鈥?table of command strings to expected class, verify classifier. Separate test verifies the controller rejects dangerous classes in default mode.
 
 **Estimate:** 1 session.
 
 **Priority:** Tier 1 (safety plus UX).
 
-**Status:** Shipped in `<HASH>` — service-layer gate added at `MachineService.sendCommand`. User-source warn / dangerous lines now require a matching `acknowledged` severity in the options bag, otherwise rejected with `COMMAND_BLOCKED` error. Internal callers bypass classification (framework owns those gates elsewhere); `ExecutionCoordinator` now sends confirmed unlock / home operations through the internal path. UI confirm flow at `ConnectionPanelMain.sendCmd` updated to pass acknowledgement through. Test: `tests/machine-service-user-sendcommand.test.ts` 29/29 (pre-existing `command-classifier.test.ts` 38/38 covers the classifier itself).
+**Status:** Shipped in `ef8ac92` 鈥?service-layer gate added at `MachineService.sendCommand`. User-source warn / dangerous lines now require a matching `acknowledged` severity in the options bag, otherwise rejected with `COMMAND_BLOCKED` error. Internal callers bypass classification (framework owns those gates elsewhere); `ExecutionCoordinator` now sends confirmed unlock / home operations through the internal path. UI confirm flow at `ConnectionPanelMain.sendCmd` updated to pass acknowledgement through. Test: `tests/machine-service-user-sendcommand.test.ts` 29/29 (pre-existing `command-classifier.test.ts` 38/38 covers the classifier itself).
 
 ---
 
@@ -428,19 +428,19 @@ Add a `CommandClass` enum and a classifier function. UI console may allow class-
 ```ts
 try {
   localStorage.setItem('laserforge_job_logs', JSON.stringify(trimmed));
-} catch { /* Storage full — silently skip */ }
+} catch { /* Storage full 鈥?silently skip */ }
 ```
 
 **Problem:** JobLog is the diagnostic surface users consult after job failures. If localStorage is near quota, new failure logs are silently dropped. The more failures, the less data about them.
 
 **Fix (interim, before full storage refactor):**
 1. Surface save failures via a toast:
-   > Could not save job log — browser storage full.
+   > Could not save job log 鈥?browser storage full.
 2. Aggressively compact: keep only the last 5 jobs, drop TX/RX entries for jobs older than 1 hour, keep only error+milestone events for jobs older than 24 hours.
 
 **Fix (final):** Move JobLog to IndexedDB via the `Storage` interface in T2-2.
 
-**Test:** `tests/job-log-quota.test.ts` — mock `localStorage.setItem` to throw `QuotaExceededError`, verify a user-visible error path fires.
+**Test:** `tests/job-log-quota.test.ts` 鈥?mock `localStorage.setItem` to throw `QuotaExceededError`, verify a user-visible error path fires.
 
 **Estimate:** 30-60 minutes for interim, part of T2-2 for final.
 
@@ -456,7 +456,7 @@ try {
 
 **Fix:** In `PlanOptimizer` or `PipelineService`, clamp `maxAccelMmPerS2` to `[100, 20000]` for diode lasers. Outside that range, log a warning and fall back to profile default (typically 1500). Same bounds for fiber/CO2 should be a profile attribute.
 
-**Test:** `tests/plan-accel-sanity.test.ts` — pass `maxAccelMmPerS2: 5` and `200000`, assert both clamp to the valid range and produce reasonable power curves.
+**Test:** `tests/plan-accel-sanity.test.ts` 鈥?pass `maxAccelMmPerS2: 5` and `200000`, assert both clamp to the valid range and produce reasonable power curves.
 
 **Estimate:** 30 minutes.
 
@@ -468,11 +468,11 @@ try {
 
 **Code reference:** `src/core/preflight/Preflight.ts` (bounds check), verified interaction with `scene.canvas` vs `profile.bedWidth`
 
-**Problem:** Fixed during this session (commit `e427a0a`) — Frame path was using `scene.canvas.height` while Burn was using `resolveBedHeightMm`. Same divergence may exist in other consumers. Worth a sweep.
+**Problem:** Fixed during this session (commit `e427a0a`) 鈥?Frame path was using `scene.canvas.height` while Burn was using `resolveBedHeightMm`. Same divergence may exist in other consumers. Worth a sweep.
 
 **Fix:** Already landed. Verify no remaining `scene.canvas.*` references in machine-coord consumers. Document the rule: scene.canvas is for rendering; bed dims come from the resolver (controller > profile > default).
 
-**Test:** `tests/bed-height-resolver-parity.test.ts` exists. Add a test that greps the ts sources for `scene.canvas.width` and `scene.canvas.height` and fails if any non-rendering consumer (by file path) still references them — enforce via test.
+**Test:** `tests/bed-height-resolver-parity.test.ts` exists. Add a test that greps the ts sources for `scene.canvas.width` and `scene.canvas.height` and fails if any non-rendering consumer (by file path) still references them 鈥?enforce via test.
 
 **Estimate:** 1 hour for the grep-based test.
 
@@ -482,19 +482,19 @@ try {
 
 ### T1-10 | Wake lock: prevent OS suspend during active jobs
 
-**Code reference:** No existing file — new wiring in `electron/main.ts` and `src/app/MachineService.ts`.
+**Code reference:** No existing file 鈥?new wiring in `electron/main.ts` and `src/app/MachineService.ts`.
 
 **Problem:** Live hardware report (2026-04-24): user's engrave stopped mid-job when the laptop screen timed off. Three failure modes possible:
 
-1. **USB Selective Suspend** — Windows suspends "idle" USB devices after N minutes. Screen-off counts as idle; the CH340 bridge in the Falcon stops passing bytes; GRBL runs out of buffered lines and stalls.
-2. **Chromium renderer throttling** — Electron renderers that lose foreground are throttled aggressively. The ack-handling loop that streams the next line slows to ~1 Hz or worse. GRBL's 128-byte buffer drains, laser stops mid-cut.
-3. **System sleep / hybrid sleep** — if the power plan treats screen-off as sleep, the whole OS pauses.
+1. **USB Selective Suspend** 鈥?Windows suspends "idle" USB devices after N minutes. Screen-off counts as idle; the CH340 bridge in the Falcon stops passing bytes; GRBL runs out of buffered lines and stalls.
+2. **Chromium renderer throttling** 鈥?Electron renderers that lose foreground are throttled aggressively. The ack-handling loop that streams the next line slows to ~1 Hz or worse. GRBL's 128-byte buffer drains, laser stops mid-cut.
+3. **System sleep / hybrid sleep** 鈥?if the power plan treats screen-off as sleep, the whole OS pauses.
 
-All three are silent from LaserForge's perspective. The app doesn't know the user walked away; it doesn't know the OS decided to sleep; it doesn't prevent any of them. Professional CAM tools (LightBurn, Mach3, Carbide Motion) all hold a wake lock during active jobs — LaserForge does not.
+All three are silent from LaserForge's perspective. The app doesn't know the user walked away; it doesn't know the OS decided to sleep; it doesn't prevent any of them. Professional CAM tools (LightBurn, Mach3, Carbide Motion) all hold a wake lock during active jobs 鈥?LaserForge does not.
 
 Consequence: a user can start a 40-minute engrave, step away from the laptop, come back to a ruined workpiece and a partially-cut design. Material loss, time loss, trust loss.
 
-**Fix:** Acquire a wake lock when a job starts; release when the job ends (completed, aborted, stopped, errored — all paths). Electron provides `powerSaveBlocker` for this.
+**Fix:** Acquire a wake lock when a job starts; release when the job ends (completed, aborted, stopped, errored 鈥?all paths). Electron provides `powerSaveBlocker` for this.
 
 Implementation:
 
@@ -508,7 +508,7 @@ let jobWakeLockId: number | null = null;
 ipcMain.handle('power:acquireJobWakeLock', () => {
   if (jobWakeLockId !== null) return jobWakeLockId;
   // 'prevent-app-suspension' is enough for Windows USB + renderer.
-  // 'prevent-display-sleep' is stronger — keeps the screen on too.
+  // 'prevent-display-sleep' is stronger 鈥?keeps the screen on too.
   // Start with prevent-app-suspension; escalate if users report issues.
   jobWakeLockId = powerSaveBlocker.start('prevent-app-suspension');
   return jobWakeLockId;
@@ -532,7 +532,7 @@ app.on('before-quit', () => {
 
 2. **Preload** (`electron/preload.ts`): expose `acquireJobWakeLock` and `releaseJobWakeLock` on `electronAPI`.
 
-3. **MachineService** (`src/app/MachineService.ts`): acquire in `startValidatedJob` before streaming begins; release in `tryFinalizeJobLog` (covers all end paths: complete, failed, stopped) AND in `clearJobSession` as a belt-and-suspenders release on abort. Best-effort — if `electronAPI` is absent (browser runtime, tests), silently skip.
+3. **MachineService** (`src/app/MachineService.ts`): acquire in `startValidatedJob` before streaming begins; release in `tryFinalizeJobLog` (covers all end paths: complete, failed, stopped) AND in `clearJobSession` as a belt-and-suspenders release on abort. Best-effort 鈥?if `electronAPI` is absent (browser runtime, tests), silently skip.
 
 ```ts
 private async acquireWakeLock(): Promise<void> {
@@ -549,14 +549,14 @@ private async releaseWakeLock(): Promise<void> {
 }
 ```
 
-4. **Preflight warning (optional, later)**: if the power plan has aggressive settings that would defeat the wake lock (e.g., system hibernate timer ≤ 30 min), preflight warns before job start. Defer to Tier 3 or skip entirely — wake lock alone solves the common case.
+4. **Preflight warning (optional, later)**: if the power plan has aggressive settings that would defeat the wake lock (e.g., system hibernate timer 鈮?30 min), preflight warns before job start. Defer to Tier 3 or skip entirely 鈥?wake lock alone solves the common case.
 
 **Test:** `tests/wake-lock.test.ts`:
 - Mock `electronAPI.acquireJobWakeLock` and `releaseJobWakeLock`.
-- Call `startValidatedJob` → `acquireJobWakeLock` was called once.
-- Reach the job-end path (mock controller fires `onProgress` with 100%) → `releaseJobWakeLock` was called once.
+- Call `startValidatedJob` 鈫?`acquireJobWakeLock` was called once.
+- Reach the job-end path (mock controller fires `onProgress` with 100%) 鈫?`releaseJobWakeLock` was called once.
 - Test the abort path separately: start job, call abort, verify wake lock released.
-- Test environment without `electronAPI`: no crash, no error — silent skip.
+- Test environment without `electronAPI`: no crash, no error 鈥?silent skip.
 
 **Estimate:** 1 session. 30-40 lines of real code; the rest is test coverage and verifying all end paths release cleanly.
 
@@ -566,7 +566,7 @@ private async releaseWakeLock(): Promise<void> {
 
 ---
 
-### T1-11 | Canvas ↔ machine coordinate mismatch during active job
+### T1-11 | Canvas 鈫?machine coordinate mismatch during active job
 
 **Code reference:** `src/core/plan/MachineTransform.ts`, `src/app/PipelineService.ts` (machineTransform compile-time capture), `src/ui/renderers/SceneRenderer.ts` (machine head crosshair rendering).
 
@@ -578,9 +578,9 @@ Possible causes, ranked by likelihood:
 
 2. **invertY / originCorner drift.** Falcon A1 Pro has a specific origin corner. If `profile.originCorner` says one corner and the machine is zeroed at another, Y (or X) mirrors. Canvas shows front-left-origin (negative Y above 0); if the physical machine is rear-left-origin, the design is cut in a mirrored position.
 
-3. **Ticket `machineTransform` captured with stale bed dimensions.** If compileGcode ran before `machineBedFromController` resolved (pre-handshake), the compiled gcode uses wrong bed width/height. Execution runs against the real bed → visible offset. Related to the "4x compile on connect" problem — first compile(s) happened without bed data, some of them still produced tickets that got stored.
+3. **Ticket `machineTransform` captured with stale bed dimensions.** If compileGcode ran before `machineBedFromController` resolved (pre-handshake), the compiled gcode uses wrong bed width/height. Execution runs against the real bed 鈫?visible offset. Related to the "4x compile on connect" problem 鈥?first compile(s) happened without bed data, some of them still produced tickets that got stored.
 
-4. **Canvas crosshair rendering uses a different resolver than gcode compile.** Analogous to the Frame/Burn divergence we fixed in T1-9 — Frame used `scene.canvas.height` while Burn used `resolveBedHeightMm`. If the head-position crosshair is drawn using a legacy bed-dim path while gcode used the resolver, the two diverge.
+4. **Canvas crosshair rendering uses a different resolver than gcode compile.** Analogous to the Frame/Burn divergence we fixed in T1-9 鈥?Frame used `scene.canvas.height` while Burn used `resolveBedHeightMm`. If the head-position crosshair is drawn using a legacy bed-dim path while gcode used the resolver, the two diverge.
 
 **Which one is it:** unknown without diagnosis. Either the laser is physically cutting at the red-crosshair position (coordinate bug in gcode output), or the laser is cutting at the design position and only the canvas render is wrong (display bug). These require different fixes.
 
@@ -609,25 +609,25 @@ if (Math.abs(currentMachineInfo.bedWidthMm - ticket.machinePlanBounds.width) > 1
 
 Belt-and-suspenders alongside the scene/profile hash check.
 
-- Audit the crosshair render in SceneRenderer. If it uses `scene.canvas.*`, migrate to the resolver. Test with `tests/scene-canvas-machine-coord-check.test.ts` — if the render file isn't on the allowlist, it shouldn't use scene.canvas anyway.
+- Audit the crosshair render in SceneRenderer. If it uses `scene.canvas.*`, migrate to the resolver. Test with `tests/scene-canvas-machine-coord-check.test.ts` 鈥?if the render file isn't on the allowlist, it shouldn't use scene.canvas anyway.
 
 **Other possible fixes** (depending on diagnosis):
 
 - Surface start mode visually in a prominent way near the start button so the user can see whether "Current position" or "Absolute" is active before they commit. Current indication is buried in settings.
-- Preflight rule: warn if bed dimensions differ between profile and controller by more than a threshold — forces the user to reconcile before compiling.
+- Preflight rule: warn if bed dimensions differ between profile and controller by more than a threshold 鈥?forces the user to reconcile before compiling.
 
 **Test:**
 
-- `tests/machine-transform-stable-across-recompile.test.ts` — compile before bed-dim arrives, then after, assert tickets have different `machinePlanBounds` AND the later one is the one that reaches `startValidatedJob`.
-- `tests/ticket-bed-dim-mismatch-rejection.test.ts` — build a ticket with planBounds.width=400, attempt startValidatedJob against a controller reporting bed=300, assert refusal.
+- `tests/machine-transform-stable-across-recompile.test.ts` 鈥?compile before bed-dim arrives, then after, assert tickets have different `machinePlanBounds` AND the later one is the one that reaches `startValidatedJob`.
+- `tests/ticket-bed-dim-mismatch-rejection.test.ts` 鈥?build a ticket with planBounds.width=400, attempt startValidatedJob against a controller reporting bed=300, assert refusal.
 
 **Estimate:** 1-2 sessions for diagnosis, 1 session for the fix, depending on which root cause lands.
 
-**Priority:** Tier 1. Coordinate corruption is catastrophic — material ruined, safety risk if cut coordinates exceed bed extents (limit hits). The T1-2 controller-side bounds recheck should catch the worst case (out-of-bed refusal), but on-bed cuts at wrong positions are still wrong.
+**Priority:** Tier 1. Coordinate corruption is catastrophic 鈥?material ruined, safety risk if cut coordinates exceed bed extents (limit hits). The T1-2 controller-side bounds recheck should catch the worst case (out-of-bed refusal), but on-bed cuts at wrong positions are still wrong.
 
 **Severity of the bug today:** the user has hit it at least once. The job shown in the screenshot was at 46% progress with "Connection under pressure" warning. If the head was physically cutting at X:95.7 Y:188.1 while the design was meant to be at X:~500, the material is ruined. Needs investigation before next real job.
 
-**Status:** Shipped through three commits. (1) `e48765b` v1 attempt added `canvasMoves` directly to `ValidatedJobTicket` — caused identity churn during preview compiles, manifested as a `NumberInput` max-update-depth crash on fast vector resize. Reverted in `ecfd022`. (2) `a05b321` v2 took a different approach: separate `activeJobCanvasContext` snapshot on `MachineService`, set once at `startValidatedJob`, cleared on job end. Ticket stayed lean. Reference-stability tests passed. But hardware testing surfaced a third issue — `tryFinalizeJobLog` was racing job start, clearing the context before App.tsx could read it. (3) `c3c00a7` added a `jobObservedRunning` invariant to `MachineService` so `tryFinalize` only runs after the controller has actually been observed running. Hardware-verified 2026-04-25: live head crosshair tracks the design through the full engrave.
+**Status:** Shipped through three commits. (1) `e48765b` v1 attempt added `canvasMoves` directly to `ValidatedJobTicket` 鈥?caused identity churn during preview compiles, manifested as a `NumberInput` max-update-depth crash on fast vector resize. Reverted in `ecfd022`. (2) `a05b321` v2 took a different approach: separate `activeJobCanvasContext` snapshot on `MachineService`, set once at `startValidatedJob`, cleared on job end. Ticket stayed lean. Reference-stability tests passed. But hardware testing surfaced a third issue 鈥?`tryFinalizeJobLog` was racing job start, clearing the context before App.tsx could read it. (3) `c3c00a7` added a `jobObservedRunning` invariant to `MachineService` so `tryFinalize` only runs after the controller has actually been observed running. Hardware-verified 2026-04-25: live head crosshair tracks the design through the full engrave.
 
 ---
 
@@ -640,15 +640,15 @@ Belt-and-suspenders alongside the scene/profile hash check.
 **Fix shipped (`4ad42d8`):**
 
 1. Narrow the effect's dependency list to the specific fields of `machineState` that preflight actually reads: `preflightMachinePresent`, `preflightMachineStatus`, `preflightMachineAlarm`, resolved `bedWidth` / `bedHeight`, `preflightPlanMinX/MaxX/MinY/MaxY` from `machinePlanBounds`, and `preflightGcodeHeaderTemplate`. Everything else that shared object identity with `machineState` stops driving re-runs.
-2. Add `samePreflightSummary(a, b)` value-equality check — compares `score`, `canStart`, `blockers`, `warnings`, `validatedTicket.ticketId`, and each `PreflightIssue` index-by-index on `id`, `severity`, `category`, `title`, `detail`, `fix`. If equal, `setPreflight` is skipped. Belt-and-suspenders with the narrowed deps — even if a status field sneaks back in, the equality check prevents the loop.
+2. Add `samePreflightSummary(a, b)` value-equality check 鈥?compares `score`, `canStart`, `blockers`, `warnings`, `validatedTicket.ticketId`, and each `PreflightIssue` index-by-index on `id`, `severity`, `category`, `title`, `detail`, `fix`. If equal, `setPreflight` is skipped. Belt-and-suspenders with the narrowed deps 鈥?even if a status field sneaks back in, the equality check prevents the loop.
 
 **Not in scope of the shipped fix** (separate issue): the effect also reads `controllerRef.current?.getFirmwareHomingCycleEnabled?.()` but that value is NOT in the dependency list. If firmware-reported homing flips without any listed dep changing, preflight goes stale until the next unrelated dep change. In practice, homing-cycle state changes usually coincide with profile/scene changes that ARE listed, but it's a correctness gap.
 
-**Also out of scope:** profile-only edits (e.g. `originCorner`, non-template fields) can leave preflight stale because `activeProfile` as a whole isn't in the deps — only the gcode header template is. Pre-existing condition; not made worse by this fix, not fixed either.
+**Also out of scope:** profile-only edits (e.g. `originCorner`, non-template fields) can leave preflight stale because `activeProfile` as a whole isn't in the deps 鈥?only the gcode header template is. Pre-existing condition; not made worse by this fix, not fixed either.
 
 **Follow-up to ship:** Add a stable firmware-homing-enabled tracker (React state or ref updated on status parse) and include in preflight effect deps. Include full `activeProfile` or extract the fields preflight reads (originCorner, any else) and add those. Estimated 30 minutes. File as **T1-12 follow-up**.
 
-**Test:** the shipped fix was verified via `npm test` green and narrative trace on the repro scenario. A dedicated regression test — mount `ConnectionPanelMain` under jsdom, fire 100 synthetic `machineState` updates with identical preflight-relevant fields, assert `setPreflight` was called at most once — would protect against future re-broadening. 20 minutes to write. Stretch goal.
+**Test:** the shipped fix was verified via `npm test` green and narrative trace on the repro scenario. A dedicated regression test 鈥?mount `ConnectionPanelMain` under jsdom, fire 100 synthetic `machineState` updates with identical preflight-relevant fields, assert `setPreflight` was called at most once 鈥?would protect against future re-broadening. 20 minutes to write. Stretch goal.
 
 **Status:** shipped `4ad42d8`. Follow-up dep coverage NOT shipped.
 
@@ -662,25 +662,25 @@ Belt-and-suspenders alongside the scene/profile hash check.
 
 **Problem:** LaserForge currently double-attenuates laser power during raster acceleration/deceleration zones. Every raster engrave on every user's Falcon (and any GRBL 1.1+ machine with laser mode) has been running with this bug since `accelAwarePower` shipped.
 
-Root cause — two independent power-scaling mechanisms are active simultaneously:
+Root cause 鈥?two independent power-scaling mechanisms are active simultaneously:
 
 1. **GRBL's M4 dynamic laser mode** (hardware-side, in firmware). Authoritative sources: `gnea/grbl` docs, `bdring/Grbl_Esp32` wiki, LightBurn and LaserGRBL documentation. When M4 is active and laser mode is enabled (`$32=1`), GRBL automatically scales commanded S by `current_velocity / programmed_feedrate`. The S value the user sends is the target power; firmware handles the rest. This is the entire purpose of M4's existence.
 
-2. **LaserForge's software-side accel-aware power** (in `appendBurnMoves2D`). Splits each burn segment into 2-3 sub-moves at the boundaries of the kinematic accel/cruise/decel zones, then scales S on each sub-move using `scalePowerByVelocity(commandedPower, velocity, targetVel, floorRatio)`, which emits `round(commandedPower × velocity_fraction)`.
+2. **LaserForge's software-side accel-aware power** (in `appendBurnMoves2D`). Splits each burn segment into 2-3 sub-moves at the boundaries of the kinematic accel/cruise/decel zones, then scales S on each sub-move using `scalePowerByVelocity(commandedPower, velocity, targetVel, floorRatio)`, which emits `round(commandedPower 脳 velocity_fraction)`.
 
-Output strategy emits `M4 S<pre-scaled>`. Firmware receives the pre-scaled S and scales it AGAIN by actual velocity. Net effective power during accel zones is approximately `commanded × velocity_fraction²` — quadratic, not linear. At 30% into an accel zone, effective power ≈ 9% of commanded, not 30%.
+Output strategy emits `M4 S<pre-scaled>`. Firmware receives the pre-scaled S and scales it AGAIN by actual velocity. Net effective power during accel zones is approximately `commanded 脳 velocity_fraction虏` 鈥?quadratic, not linear. At 30% into an accel zone, effective power 鈮?9% of commanded, not 30%.
 
-**Visual evidence:** User-provided photographs (2026-04-24) of "ONS Houtkombuis / TimberCraft" logo engraved on black anodized aluminum card and on plywood. Both show the signature pattern of under-burning in accel/decel zones — scan line starts and ends lighter than scan line midpoints. Leatherette keyring ("Elba") did NOT show the pattern because leatherette has a forgiving thermal response that hides small power variations; raw wood and anodized coatings show it clearly.
+**Visual evidence:** User-provided photographs (2026-04-24) of "ONS Houtkombuis / TimberCraft" logo engraved on black anodized aluminum card and on plywood. Both show the signature pattern of under-burning in accel/decel zones 鈥?scan line starts and ends lighter than scan line midpoints. Leatherette keyring ("Elba") did NOT show the pattern because leatherette has a forgiving thermal response that hides small power variations; raw wood and anodized coatings show it clearly.
 
 **Evidence this is a LaserForge-unique bug:**
-- **LightBurn** emits constant S per burn segment in M4 mode. Forum example: `G1 Y47.992 S1000 F1020` — S holds at programmed power across the whole burn. Trusts firmware.
+- **LightBurn** emits constant S per burn segment in M4 mode. Forum example: `G1 Y47.992 S1000 F1020` 鈥?S holds at programmed power across the whole burn. Trusts firmware.
 - **LaserGRBL** (`arkypita/LaserGRBL`): documentation explicitly says M4 is hardware-implemented scaling; LaserGRBL issues user-commanded S, firmware modulates.
-- **bCNC / LaserWeb**: same pattern — constant S in M4 mode.
+- **bCNC / LaserWeb**: same pattern 鈥?constant S in M4 mode.
 - **LaserForge**: only tool doing software-side scaling on top of M4. Unique.
 
 A comment in `GrblStrategy.ts:20-22` correctly identifies what M4 does: "M4 = laser power scales with speed during acceleration. This prevents burning during acceleration/deceleration." The software-side scaling was added without realizing it duplicates firmware behavior.
 
-**Fix (Option A — aligns with every other GRBL laser tool):**
+**Fix (Option A 鈥?aligns with every other GRBL laser tool):**
 
 1. In `PlanOptimizer.ts` raster path (`appendBurnMoves2D` and its callers): when the active output strategy is M4-capable, **do not split burns into accel-zone sub-moves**. Emit a single `G1 X{end} Y{end} S{power} F{speed}` per burn segment. Trust firmware.
 
@@ -690,27 +690,27 @@ A comment in `GrblStrategy.ts:20-22` correctly identifies what M4 does: "M4 = la
 
 4. Keep `accelAwarePower` in the profile and settings, but re-purpose it: when `true` on an M4 strategy, it becomes a no-op (firmware handles it). When `true` on an M3 strategy, it enables the existing software-side splitting. When `false`, always disabled. Default stays `true`. Users don't need to change anything.
 
-5. Same treatment for `SmartOverscan`: the "reduced safety factor when accelAwarePower enabled" path in `computeSmartOverscan` currently assumes LaserForge is compensating via power scaling. With M4, the compensation IS happening, just in firmware. The current logic happens to still be correct — the overscan can be shorter because M4 handles accel. No change needed there; document that the rationale now reads "firmware compensates" instead of "software compensates."
+5. Same treatment for `SmartOverscan`: the "reduced safety factor when accelAwarePower enabled" path in `computeSmartOverscan` currently assumes LaserForge is compensating via power scaling. With M4, the compensation IS happening, just in firmware. The current logic happens to still be correct 鈥?the overscan can be shorter because M4 handles accel. No change needed there; document that the rationale now reads "firmware compensates" instead of "software compensates."
 
 **Don't touch:**
 - M4 emission itself. M4 is correct.
-- The kinematic model (`VelocityProfile.ts`) — still useful for overscan math.
-- Vector path handling — vectors don't run through `appendBurnMoves2D` in the same way; audit separately as part of the fix.
+- The kinematic model (`VelocityProfile.ts`) 鈥?still useful for overscan math.
+- Vector path handling 鈥?vectors don't run through `appendBurnMoves2D` in the same way; audit separately as part of the fix.
 - `accelAwarePower` setting semantics visible to users. Default stays `true`. The fix is transparent.
 
 **Test:**
 
-1. `tests/raster-m4-constant-power.test.ts` — compile a horizontal raster scanline, assert the emitted gcode contains exactly ONE `S<n>` change per burn segment (entry only), not 2-3. Golden values check S matches commanded power (within rounding), not velocity-scaled fraction.
+1. `tests/raster-m4-constant-power.test.ts` 鈥?compile a horizontal raster scanline, assert the emitted gcode contains exactly ONE `S<n>` change per burn segment (entry only), not 2-3. Golden values check S matches commanded power (within rounding), not velocity-scaled fraction.
 
-2. `tests/raster-m3-splits-preserved.test.ts` — if/when we have an M3-only strategy, compile same scanline, assert 2-3 S changes per burn (existing behavior preserved for M3 mode).
+2. `tests/raster-m3-splits-preserved.test.ts` 鈥?if/when we have an M3-only strategy, compile same scanline, assert 2-3 S changes per burn (existing behavior preserved for M3 mode).
 
-3. Hardware validation — run the ONS Houtkombuis logo on plywood before fix (control) and after (treatment). Compare uniformity. Document in the commit.
+3. Hardware validation 鈥?run the ONS Houtkombuis logo on plywood before fix (control) and after (treatment). Compare uniformity. Document in the commit.
 
 **Estimate:** 1 session for the fix (PlanOptimizer change + capability flag + tests). The fix is small because we're removing work, not adding it: just bypass `appendBurnMoves2D`'s splitting when the output strategy is M4-capable.
 
 **Before the code ships (interim mitigation):** User can disable `accelAwarePower` on their active profile via settings. This eliminates the software-side scaling; M4 handles everything. Known-good workaround matching LightBurn/LaserGRBL behavior.
 
-**Status:** SHIPPED `192a295` (2026-04-25). Hardware verified by user same day: re-enabled `accelAwarePower=true` on Falcon profile, ran the Houtkombuis logo on plywood, confirmed uniform burn matching the previous accelAwarePower=false result. Fix is transparent — user setting is preserved (default `true`), but for M4 strategies it's now a no-op because firmware handles it.
+**Status:** SHIPPED `192a295` (2026-04-25). Hardware verified by user same day: re-enabled `accelAwarePower=true` on Falcon profile, ran the Houtkombuis logo on plywood, confirmed uniform burn matching the previous accelAwarePower=false result. Fix is transparent 鈥?user setting is preserved (default `true`), but for M4 strategies it's now a no-op because firmware handles it.
 
 **Priority:** Tier 1. Active user-facing quality bug affecting every raster job on every GRBL 1.1+ machine. Visible on materials with linear thermal response. User has photographic evidence.
 
@@ -724,9 +724,9 @@ A comment in `GrblStrategy.ts:20-22` correctly identifies what M4 does: "M4 = la
 
 **Problem:** Resizing a vector quickly (drag handles at 60fps) crashed the UI with `Maximum update depth exceeded` from React. Two distinct effect-loops were involved.
 
-(a) `NumberInput.tsx` synced its `value` prop into local string state via a `useEffect`. Per React's official "You Might Not Need an Effect" guide, that's a documented anti-pattern: when the parent supplies rapidly changing values, the effect → setState → re-render → effect cycle exceeds React's max update depth. Fix: replace with the officially recommended "adjust state during render" pattern — track `lastSyncedValue` in state, compare in render body, update both states when the prop changes meaningfully. React aborts the in-progress render and restarts cleanly. No double render, no effect storm.
+(a) `NumberInput.tsx` synced its `value` prop into local string state via a `useEffect`. Per React's official "You Might Not Need an Effect" guide, that's a documented anti-pattern: when the parent supplies rapidly changing values, the effect 鈫?setState 鈫?re-render 鈫?effect cycle exceeds React's max update depth. Fix: replace with the officially recommended "adjust state during render" pattern 鈥?track `lastSyncedValue` in state, compare in render body, update both states when the prop changes meaningfully. React aborts the in-progress render and restarts cleanly. No double render, no effect storm.
 
-(b) `App.tsx` line 1027 effect was doing two jobs in one `useEffect`: clearing `toolpathPreviewMoves` to null when preview was off, AND running an async `compileToolpath` when preview was on. Both responsibilities shared deps `[showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning]`. When `compileToolpath` or `showAlert` identity churned (or `sceneCompileTick` ticked at 60Hz during drag), the effect re-fired even when preview was off. Each fire dispatched `setToolpathPreviewMoves(null)` — even though Object.is bailout would skip the re-render, React detected the dispatch frequency as nested-update-depth and crashed. Fix: split into two effects — one clear-only effect keyed solely on `showToolpathPreview` and `grbl.isJobRunning`, one compile effect with the original wider deps that only runs when preview is on.
+(b) `App.tsx` line 1027 effect was doing two jobs in one `useEffect`: clearing `toolpathPreviewMoves` to null when preview was off, AND running an async `compileToolpath` when preview was on. Both responsibilities shared deps `[showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning]`. When `compileToolpath` or `showAlert` identity churned (or `sceneCompileTick` ticked at 60Hz during drag), the effect re-fired even when preview was off. Each fire dispatched `setToolpathPreviewMoves(null)` 鈥?even though Object.is bailout would skip the re-render, React detected the dispatch frequency as nested-update-depth and crashed. Fix: split into two effects 鈥?one clear-only effect keyed solely on `showToolpathPreview` and `grbl.isJobRunning`, one compile effect with the original wider deps that only runs when preview is on.
 
 **Status:** Shipped `75b1749` (NumberInput fix) and `200a434` (App.tsx preview-effect split) on 2026-04-25. Hardware-verified: rapid vector resize no longer crashes.
 
@@ -736,27 +736,27 @@ A comment in `GrblStrategy.ts:20-22` correctly identifies what M4 does: "M4 = la
 
 ### T1-15 | MachineService job lifecycle hardening
 
-**Code reference:** `src/app/MachineService.ts` — `startValidatedJob`, `tryFinalizeJobLog`, `disconnect`, `clearJobSession`, plus new session-id field.
+**Code reference:** `src/app/MachineService.ts` 鈥?`startValidatedJob`, `tryFinalizeJobLog`, `disconnect`, `clearJobSession`, plus new session-id field.
 
 **Problem:** Audit (2026-04-25, post-T1-11 close) identified several latent race windows in MachineService's job lifecycle, beyond the `tryFinalizeJobLog`/`startValidatedJob` race that T1-11 race fix (`c3c00a7`) had addressed:
 
-(a) `tryFinalizeJobLog` `await saveJobLog(log)` is async. If a new job starts during that await (rare but possible — a fast user, an automated test), the post-await unconditional clear at lines 285-288 hits the wrong session — wipes the new job's `currentJobLog`/`activeTicket`/`activeJobCanvasContext` while the new job is actually running.
+(a) `tryFinalizeJobLog` `await saveJobLog(log)` is async. If a new job starts during that await (rare but possible 鈥?a fast user, an automated test), the post-await unconditional clear at lines 285-288 hits the wrong session 鈥?wipes the new job's `currentJobLog`/`activeTicket`/`activeJobCanvasContext` while the new job is actually running.
 
-(b) `startValidatedJob` catch path (line 415-420) cleared `activeTicket` and `activeJobCanvasContext` but NOT `currentJobLog` or `activeReplay` — service state inconsistent after a sendJob throw. UI-side catches in `handleStartJob` paper over via `clearJobSession`, but the service API alone leaves stale state.
+(b) `startValidatedJob` catch path (line 415-420) cleared `activeTicket` and `activeJobCanvasContext` but NOT `currentJobLog` or `activeReplay` 鈥?service state inconsistent after a sendJob throw. UI-side catches in `handleStartJob` paper over via `clearJobSession`, but the service API alone leaves stale state.
 
 (c) No service-level "already running" guard on `startValidatedJob`. A concurrent or programmatic double-start path could mutate `activeTicket`/`activeJobCanvasContext` while the first job was still running, then the second start could throw and the catch could clear context belonging to the first job.
 
 (d) `disconnect()` released the wake lock but left `activeTicket`, `activeJobCanvasContext`, `currentJobLog`, `jobObservedRunning`, and `activeReplay` non-null. Disconnecting mid-job left the service thinking a job was still active.
 
-(e) `tryFinalizeJobLog` did not finalize/clear `activeReplay` on stopped/failed paths. Replay completion was driven only by `percentComplete >= 100` — stopped jobs left replay stuck in 'running' state forever.
+(e) `tryFinalizeJobLog` did not finalize/clear `activeReplay` on stopped/failed paths. Replay completion was driven only by `percentComplete >= 100` 鈥?stopped jobs left replay stuck in 'running' state forever.
 
 (f) Empty/comment-only G-code: if controller's line parser yielded zero streamable lines, `sendJob` returned without ever setting `_isJobRunning=true`. `jobObservedRunning` stayed false. Normal finalize path would never run; the session lingered until next start.
 
 **Fix:** Audit-driven. None of these issues had been observed in the wild yet, but the patterns matched the class of race that T1-11 race fix had addressed for one specific case.
 
-(1) Added `jobSessionId: number` field on MachineService — incremented at start of every `startValidatedJob`. `tryFinalizeJobLog` captures the id at entry; before each cleanup mutation, checks `if (this.jobSessionId !== capturedId) return`. Same protective pattern as `jobObservedRunning` from T1-11 race fix, but token-keyed instead of state-machine-keyed — robust to interleaved async cleanups.
+(1) Added `jobSessionId: number` field on MachineService 鈥?incremented at start of every `startValidatedJob`. `tryFinalizeJobLog` captures the id at entry; before each cleanup mutation, checks `if (this.jobSessionId !== capturedId) return`. Same protective pattern as `jobObservedRunning` from T1-11 race fix, but token-keyed instead of state-machine-keyed 鈥?robust to interleaved async cleanups.
 
-(2) Added active-job guard before `startValidatedJob` mutates state — refuses double-start with explicit error before touching `activeTicket`/`activeJobCanvasContext`.
+(2) Added active-job guard before `startValidatedJob` mutates state 鈥?refuses double-start with explicit error before touching `activeTicket`/`activeJobCanvasContext`.
 
 (3) `startValidatedJob` failure cleanup made consistent: catches now clear `currentJobLog`, `activeReplay`, `activeTicket`, `activeJobCanvasContext`, `jobObservedRunning`, and release wake lock. Single helper extracted.
 
@@ -789,11 +789,11 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 (2) `ConnectionPanelMain.setMessages` wrapper rewritten to use functional updater throughout (`replaceMessages(prev => ...)`) and added `sameMessages` value-equality bailout. Removes `messages` from the useCallback deps, eliminating identity churn for any consumer using `setMessages` as a prop or in deps.
 
-(3) `useCompileManager.setGcodeStale` rewritten as an idempotent setter — bails inside the state updater when `prev === resolved`, and updates `gcodeStaleRef.current` synchronously. The stale-flag effect at line 107 now checks `!gcodeStaleRef.current` before calling `setGcodeStale(true)` — once stale, the effect skips the dispatch entirely.
+(3) `useCompileManager.setGcodeStale` rewritten as an idempotent setter 鈥?bails inside the state updater when `prev === resolved`, and updates `gcodeStaleRef.current` synchronously. The stale-flag effect at line 107 now checks `!gcodeStaleRef.current` before calling `setGcodeStale(true)` 鈥?once stale, the effect skips the dispatch entirely.
 
-**Status:** Shipped on 2026-04-25. Hardware-verified — load-another-job-after-complete scenario no longer crashes.
+**Status:** Shipped on 2026-04-25. Hardware-verified 鈥?load-another-job-after-complete scenario no longer crashes.
 
-**Lesson recorded:** React's max-update-depth detection counts dispatches, not commits. A `setX(prev => prev)` inside an effect mount is still a dispatch, even though it produces no commit. To suppress an effect's state write entirely, the gate must be in the effect body BEFORE `setState` is called, not inside the updater function. This is a stronger pattern than what T1-12 used — T1-12's `samePreflightSummary` bailout inside the updater wasn't sufficient; the value comparison has to short-circuit the effect itself.
+**Lesson recorded:** React's max-update-depth detection counts dispatches, not commits. A `setX(prev => prev)` inside an effect mount is still a dispatch, even though it produces no commit. To suppress an effect's state write entirely, the gate must be in the effect body BEFORE `setState` is called, not inside the updater function. This is a stronger pattern than what T1-12 used 鈥?T1-12's `samePreflightSummary` bailout inside the updater wasn't sufficient; the value comparison has to short-circuit the effect itself.
 
 ---
 
@@ -801,39 +801,39 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 **Code reference:** `src/ui/hooks/useImport.ts:27-191` (`importImageUnified`), `src/ui/renderers/SceneRenderer.ts:1125-1219` (image render branch), `src/core/job/JobCompiler.ts:30-35` (image processing imports), `src/core/image/ImageProcessing.ts` (brightness/contrast/threshold ops).
 
-**Problem:** Importing an image causes the whole app to freeze — visible UI lag, dropped frames, dragging the imported image is jerky, panel updates take 1-2 seconds. Current behavior makes the app feel broken on any reasonably-sized photo (≥1MP).
+**Problem:** Importing an image causes the whole app to freeze 鈥?visible UI lag, dropped frames, dragging the imported image is jerky, panel updates take 1-2 seconds. Current behavior makes the app feel broken on any reasonably-sized photo (鈮?MP).
 
 **Diagnosis (from code review, not yet hardware-verified):**
 
 (a) **Synchronous main-thread work in `importImageUnified`** (lines 86-104):
-- `document.createElement('canvas')` + `drawImage` + `getImageData` on main thread for any image — even ones already < 1000px.
-- `for (let i = 0; i < grayscaleData.length; i++)` luminance loop — runs on main thread, blocks UI.
-- For a 4000×3000 photo (typical phone shot), that's 12M pixels × 4 ops = 48M operations on main thread. Tens to hundreds of ms blocked.
+- `document.createElement('canvas')` + `drawImage` + `getImageData` on main thread for any image 鈥?even ones already < 1000px.
+- `for (let i = 0; i < grayscaleData.length; i++)` luminance loop 鈥?runs on main thread, blocks UI.
+- For a 4000脳3000 photo (typical phone shot), that's 12M pixels 脳 4 ops = 48M operations on main thread. Tens to hundreds of ms blocked.
 
 (b) **No worker offload.** The grayscale conversion and any subsequent dither/threshold operations all run on the main thread. Browser canvas APIs are available in OffscreenCanvas + Web Workers, but LaserForge currently doesn't use them.
 
-(c) **Per-render dither recomputation when settings change.** SceneRenderer.ts:1190-1219 has a dither cache, but the cache key at line 1191 includes `adjustedData.length`, not `adjustedData` content. **Different brightness/contrast settings produce identical-length adjustedData → same cache key → cache returns stale dither** while also missing legit cache opportunities. This is a separate latent bug from the freeze, but worth fixing in the same pass.
+(c) **Per-render dither recomputation when settings change.** SceneRenderer.ts:1190-1219 has a dither cache, but the cache key at line 1191 includes `adjustedData.length`, not `adjustedData` content. **Different brightness/contrast settings produce identical-length adjustedData 鈫?same cache key 鈫?cache returns stale dither** while also missing legit cache opportunities. This is a separate latent bug from the freeze, but worth fixing in the same pass.
 
 (d) **`importImageUnified` is in a `useCallback` with `[scene]` dep** (line 191). Every scene mutation creates a fresh `importImageUnified` reference. Anything depending on it via the import-handler chain re-renders. Not the freeze cause, but contributes to import-handler churn.
 
-(e) **JobCompiler runs image processing again at compile time** for raster gcode generation — `adjustBrightness`, `adjustContrast`, `adjustGamma`, `invertImage`, `thresholdToOneBit` (`ImageProcessing.ts`). These are also synchronous main-thread loops. If user adjusts brightness after import, the recompile re-runs all of these.
+(e) **JobCompiler runs image processing again at compile time** for raster gcode generation 鈥?`adjustBrightness`, `adjustContrast`, `adjustGamma`, `invertImage`, `thresholdToOneBit` (`ImageProcessing.ts`). These are also synchronous main-thread loops. If user adjusts brightness after import, the recompile re-runs all of these.
 
 **Fix (multi-pass, ranked by impact):**
 
-**Pass 1 — Move image preparation to a Web Worker** (~1 session). Create `src/workers/ImagePrepWorker.ts`. Move the FileReader + `Image.decode()` + canvas draw + grayscale loop off the main thread. `useImport` posts the file to the worker, receives `{ src, grayscaleData, gsWidth, gsHeight, originalWidth, originalHeight }` back. Main thread builds the SceneObject from the result. UI stays responsive during import. This is the biggest win.
+**Pass 1 鈥?Move image preparation to a Web Worker** (~1 session). Create `src/workers/ImagePrepWorker.ts`. Move the FileReader + `Image.decode()` + canvas draw + grayscale loop off the main thread. `useImport` posts the file to the worker, receives `{ src, grayscaleData, gsWidth, gsHeight, originalWidth, originalHeight }` back. Main thread builds the SceneObject from the result. UI stays responsive during import. This is the biggest win.
 
-**Pass 2 — Cache key bug** (~30 min). Replace `adjustedData.length` in the dither cache key with a content hash (FNV-1a or similar fast hash). Avoids the false-cache-hit class of bugs. Should also speed up subsequent renders when brightness/contrast settings change.
+**Pass 2 鈥?Cache key bug** (~30 min). Replace `adjustedData.length` in the dither cache key with a content hash (FNV-1a or similar fast hash). Avoids the false-cache-hit class of bugs. Should also speed up subsequent renders when brightness/contrast settings change.
 
-**Pass 3 — Stop adjustedData identity churn** (~1 hour). `importImageUnified`'s useCallback `[scene]` dep means the function rebuilds on every scene change. Replace with a sceneRef pattern (read from ref, not closure). Eliminates downstream re-renders of import-related components.
+**Pass 3 鈥?Stop adjustedData identity churn** (~1 hour). `importImageUnified`'s useCallback `[scene]` dep means the function rebuilds on every scene change. Replace with a sceneRef pattern (read from ref, not closure). Eliminates downstream re-renders of import-related components.
 
-**Pass 4 — Defer raster compile** (~1-2 sessions). JobCompiler's image processing pipeline runs synchronously at compile time. For preview-only renders this is fine (one shot). But during live editing of brightness/contrast, every change triggers a recompile that runs the whole pipeline. Move the image-side processing into the worker as well, so brightness/contrast adjustments don't lock the UI.
+**Pass 4 鈥?Defer raster compile** (~1-2 sessions). JobCompiler's image processing pipeline runs synchronously at compile time. For preview-only renders this is fine (one shot). But during live editing of brightness/contrast, every change triggers a recompile that runs the whole pipeline. Move the image-side processing into the worker as well, so brightness/contrast adjustments don't lock the UI.
 
 **Test:**
-- `tests/image-import-no-main-thread-block.test.ts` — import a 4000×3000 mock image, measure main-thread time blocked. Assert < 50ms.
-- `tests/dither-cache-key-content-hash.test.ts` — two adjustedData arrays with same length but different content produce different cache keys. Different content with same dither mode → different cached canvases.
+- `tests/image-import-no-main-thread-block.test.ts` 鈥?import a 4000脳3000 mock image, measure main-thread time blocked. Assert < 50ms.
+- `tests/dither-cache-key-content-hash.test.ts` 鈥?two adjustedData arrays with same length but different content produce different cache keys. Different content with same dither mode 鈫?different cached canvases.
 - Manual hardware verification: import a phone-camera photo (4-12MP), watch the UI. After Pass 1: UI should remain responsive throughout import (some loading state OK, but no frame drops/freezes).
 
-**Estimate:** Pass 1 alone unblocks the user pain (1 session). Passes 2-4 are polish — total 3-5 sessions for the full set.
+**Estimate:** Pass 1 alone unblocks the user pain (1 session). Passes 2-4 are polish 鈥?total 3-5 sessions for the full set.
 
 **Priority:** Tier 1. Active user-facing slowdown affecting every image-engrave workflow. The user explicitly reported this; not theoretical.
 
@@ -843,23 +843,23 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 **Code reference:** `src/app/ExecutionCoordinator.ts` (`beginTestFire`/`endTestFire`), `src/app/MachineService.ts`, UI test-fire pointer handlers (find via `grep -rn beginTestFire src/ui`).
 
-**Problem:** Test-fire safety currently depends on the React UI calling `endTestFire()` on pointer release. The service-side `ExecutionCoordinator.beginTestFire()` sends `M3 S<low>` and explicitly does NOT auto-stop — the comment in code says so. If a pointer event is lost, a UI state breaks, the renderer is throttled, or any future caller forgets the timeout, the laser stays on until something else triggers `M5`.
+**Problem:** Test-fire safety currently depends on the React UI calling `endTestFire()` on pointer release. The service-side `ExecutionCoordinator.beginTestFire()` sends `M3 S<low>` and explicitly does NOT auto-stop 鈥?the comment in code says so. If a pointer event is lost, a UI state breaks, the renderer is throttled, or any future caller forgets the timeout, the laser stays on until something else triggers `M5`.
 
 This is a laser-on operation. Safety must not depend solely on UI mechanisms working correctly.
 
-**Identified by:** External audit (2026-04-25). Real safety issue, not theoretical — ANY mechanism between user release and M5 emission that fails leaves the laser on.
+**Identified by:** External audit (2026-04-25). Real safety issue, not theoretical 鈥?ANY mechanism between user release and M5 emission that fails leaves the laser on.
 
 **Fix:** Move deadman timeout into `ExecutionCoordinator.beginTestFire` itself. Always schedule an internal `setTimeout` to send `M5 S0` after `maxDurationMs`. UI release stops it earlier, but the timeout is the bottom-layer guarantee:
 
 ```ts
 beginTestFire(opts: {
-  maxDurationMs: number;          // required — no default
+  maxDurationMs: number;          // required 鈥?no default
   maxPowerPercent?: number;       // default 2%
   approvalToken?: ApprovalToken;  // for T1-19 integration
 }): TestFireHandle {
   // ... validate state, send M3 S<low>
   const timeoutId = setTimeout(() => {
-    void this.endTestFire(); // safety net — caller forgot or UI broke
+    void this.endTestFire(); // safety net 鈥?caller forgot or UI broke
     console.warn('[TestFire] Deadman timeout fired');
   }, opts.maxDurationMs);
   return {
@@ -878,7 +878,7 @@ UI continues to call `handle.stop()` on pointer release. Timeout is the floor.
 
 **Estimate:** ~1 session. Single-file change in coordinator + tests + UI handler updates.
 
-**Priority:** Tier 1 — safety. Highest of the new safety items.
+**Priority:** Tier 1 鈥?safety. Highest of the new safety items.
 
 ---
 
@@ -925,19 +925,19 @@ sendCommand(command, source, approvalToken?: ApprovalToken): void {
 (3) UI updates: confirmation dialog returns the token; command-input handler passes it.
 
 **Tests:** `tests/sendcommand-requires-approval-for-dangerous.test.ts`:
-- `sendCommand('$X', 'user')` without token → throws.
-- `sendCommand('$X', 'user', token)` with valid token → succeeds.
-- `sendCommand('$X', 'user', tokenForDifferentCommand)` → throws.
-- Same token used twice → second throws.
-- Expired token → throws.
-- `sendCommand('?', 'user')` (safe command) → no token needed.
-- `sendCommand('M3 S0', 'system')` (system source) → no token needed.
+- `sendCommand('$X', 'user')` without token 鈫?throws.
+- `sendCommand('$X', 'user', token)` with valid token 鈫?succeeds.
+- `sendCommand('$X', 'user', tokenForDifferentCommand)` 鈫?throws.
+- Same token used twice 鈫?second throws.
+- Expired token 鈫?throws.
+- `sendCommand('?', 'user')` (safe command) 鈫?no token needed.
+- `sendCommand('M3 S0', 'system')` (system source) 鈫?no token needed.
 
-**Static guard:** Audit `tests/no-direct-controller-sendcommand-from-ui.test.ts` — UI must call `MachineService.sendCommand`, never `controllerRef.current.sendCommand` directly. Pattern mirrors `no-gcode-in-ui` (T2-4 phase 8).
+**Static guard:** Audit `tests/no-direct-controller-sendcommand-from-ui.test.ts` 鈥?UI must call `MachineService.sendCommand`, never `controllerRef.current.sendCommand` directly. Pattern mirrors `no-gcode-in-ui` (T2-4 phase 8).
 
 **Estimate:** ~1-2 sessions. Token type + service enforcement + UI integration + tests.
 
-**Priority:** Tier 1 — safety. Second most urgent after T1-18.
+**Priority:** Tier 1 鈥?safety. Second most urgent after T1-18.
 
 ---
 
@@ -963,13 +963,13 @@ new GrblController({ allowHeadlessWcsAutoNormalize: true })
 Tests that need the auto-apply behavior pass this flag explicitly.
 
 **Tests:**
-- `tests/wcs-no-listener-blocks-job.test.ts` — controller without listeners and without `allowHeadlessWcsAutoNormalize`. Attempt job start. Assert refused with `placement-uncertain` reason.
-- `tests/wcs-no-listener-headless-flag.test.ts` — controller without listeners but WITH `allowHeadlessWcsAutoNormalize: true`. Auto-apply works (preserves test convenience).
+- `tests/wcs-no-listener-blocks-job.test.ts` 鈥?controller without listeners and without `allowHeadlessWcsAutoNormalize`. Attempt job start. Assert refused with `placement-uncertain` reason.
+- `tests/wcs-no-listener-headless-flag.test.ts` 鈥?controller without listeners but WITH `allowHeadlessWcsAutoNormalize: true`. Auto-apply works (preserves test convenience).
 - Existing tests that depend on auto-apply: update to pass the flag explicitly.
 
 **Estimate:** ~30 min code change + test refactoring across existing wcs-*.test.ts files. Low complexity, but touches several existing tests.
 
-**Priority:** Tier 1 — trust. Lower urgency than T1-18/T1-19 since the actual exploit window is narrow (UI subscription race), but still real.
+**Priority:** Tier 1 鈥?trust. Lower urgency than T1-18/T1-19 since the actual exploit window is narrow (UI subscription race), but still real.
 
 ---
 
@@ -981,7 +981,7 @@ Tests that need the auto-apply behavior pass this flag explicitly.
 
 The function logs per-line exceptions but doesn't escalate to a safety-off action.
 
-**Identified by:** Phase 1 audit (2026-04-25, ChatGPT). Real failure mode — any interruption between M4 emission and final M5 leaves modal laser-on state.
+**Identified by:** Phase 1 audit (2026-04-25, ChatGPT). Real failure mode 鈥?any interruption between M4 emission and final M5 leaves modal laser-on state.
 
 **Fix:** Wrap the entire frame-line-sending loop in a try/finally. The finally clause unconditionally attempts a priority M5 (and soft reset on writeFailure) regardless of whether the loop completed or threw. Combined with T1-22's critical-write path, the finally also surfaces uncertain-state if the M5 write itself fails.
 
@@ -1014,7 +1014,7 @@ async runFrame(opts: FrameOptions): Promise<void> {
 
 **Estimate:** ~30 min. Single function change, two small tests.
 
-**Priority:** Tier 1 — safety. Note: realistic trigger window is narrower than audit framing suggests. Most "interruption" scenarios (port error, app crash, browser exit) are crash-level events where a try/finally wouldn't necessarily execute anyway. Still defensible as defense-in-depth — covers the cases where exception is recoverable enough that the finally block runs.
+**Priority:** Tier 1 鈥?safety. Note: realistic trigger window is narrower than audit framing suggests. Most "interruption" scenarios (port error, app crash, browser exit) are crash-level events where a try/finally wouldn't necessarily execute anyway. Still defensible as defense-in-depth 鈥?covers the cases where exception is recoverable enough that the finally block runs.
 
 ---
 
@@ -1022,7 +1022,7 @@ async runFrame(opts: FrameOptions): Promise<void> {
 
 **Code reference:** `src/communication/WebSerialPort.ts:44-57` (`write`/`writeByte`), `src/app/ExecutionCoordinator.ts:183-199` (`emergencyLaserOff`/`laserM5OffSync`), `src/controllers/grbl/GrblController.ts` (stop, emergencyStop, disconnect M5/feed-hold paths).
 
-**Problem:** `WebSerialPort.write()` and `writeByte()` are fire-and-forget. They call `_writer.write(...).catch(...)` and return synchronously (return type is void). Higher layers treat the call as if the bytes reached the controller, but the actual write may fail asynchronously after return — USB suspend, cable glitch, browser serial fault, OS-level error.
+**Problem:** `WebSerialPort.write()` and `writeByte()` are fire-and-forget. They call `_writer.write(...).catch(...)` and return synchronously (return type is void). Higher layers treat the call as if the bytes reached the controller, but the actual write may fail asynchronously after return 鈥?USB suspend, cable glitch, browser serial fault, OS-level error.
 
 This means: when `emergencyLaserOff()` calls `M5 S0` via the normal sendCommand path, **the caller has no way to know the M5 actually reached firmware.** Same for the soft reset byte (`0x18`) used by stop and emergencyStop. Callers' assumptions of "laser is off" or "controller is reset" can be silently wrong.
 
@@ -1033,8 +1033,8 @@ This means: when `emergencyLaserOff()` calls `M5 S0` via the normal sendCommand 
 (1) `WebSerialPort.writeCritical(text: string): Promise<void>` and `writeByteCritical(byte: number): Promise<void>`. Both await the underlying writer.write() promise and rethrow on failure (no swallowing).
 
 (2) `GrblController` exposes `safetyOff()`: priority path that bypasses the regular command queue. **Two-stage approach per audit 1C refinement:**
-- Stage 1 — try `M5 S0` via `writeCritical()` with a short ack timeout (~500ms). For idle paths this is preferred since it preserves position.
-- Stage 2 — if M5 doesn't succeed (write rejects, or no ok received within timeout, or active-job state requires more aggressive halt), fall back to `writeByteCritical(0x18)` soft reset. Soft reset is destructive (loses position, may require re-home depending on `$22`) but is GRBL's actual realtime emergency-stop and guarantees laser output disabled at the firmware level.
+- Stage 1 鈥?try `M5 S0` via `writeCritical()` with a short ack timeout (~500ms). For idle paths this is preferred since it preserves position.
+- Stage 2 鈥?if M5 doesn't succeed (write rejects, or no ok received within timeout, or active-job state requires more aggressive halt), fall back to `writeByteCritical(0x18)` soft reset. Soft reset is destructive (loses position, may require re-home depending on `$22`) but is GRBL's actual realtime emergency-stop and guarantees laser output disabled at the firmware level.
 - Returns a result indicating which stage succeeded or that both failed.
 
 (3) `ExecutionCoordinator.emergencyLaserOff()` rewritten to call `controller.safetyOff()`, awaits it, and on failure transitions to a `placement-uncertain` / `laser-state-unknown` state that requires explicit user resolution before further machine control.
@@ -1051,13 +1051,13 @@ This means: when `emergencyLaserOff()` calls `M5 S0` via the normal sendCommand 
 
 **Estimate:** ~1 session. Touches transport, controller safety paths, coordinator, and service. Medium-sized change but constrained scope.
 
-**Priority:** Tier 1 — safety. Single biggest defense-in-depth gain across all the safety commands. T1-21, T1-23, T1-24, T1-28 all benefit from having this path available.
+**Priority:** Tier 1 鈥?safety. Single biggest defense-in-depth gain across all the safety commands. T1-21, T1-23, T1-24, T1-28 all benefit from having this path available.
 
-**Cross-check note (audit 1C, 2026-04-25):** Audit 1C identified the same issue from a different angle — `emergencyLaserOff` only sends regular-command M5 with no soft-reset fallback. Audit's framing ("M5 is NOT realtime in GRBL") is correct: M5 is a planner-buffered command, not a realtime byte. For test-fire scenarios the planner is typically empty so M5 executes promptly, but if the planner has queued commands (e.g. test fire after manual jogs, paused job, etc.) M5 can't preempt them. T1-22's two-stage approach (M5 first, soft-reset fallback) addresses both the "M5 fails to send" case (audit 1A) and the "M5 sends but doesn't execute promptly" case (audit 1C).
+**Cross-check note (audit 1C, 2026-04-25):** Audit 1C identified the same issue from a different angle 鈥?`emergencyLaserOff` only sends regular-command M5 with no soft-reset fallback. Audit's framing ("M5 is NOT realtime in GRBL") is correct: M5 is a planner-buffered command, not a realtime byte. For test-fire scenarios the planner is typically empty so M5 executes promptly, but if the planner has queued commands (e.g. test fire after manual jogs, paused job, etc.) M5 can't preempt them. T1-22's two-stage approach (M5 first, soft-reset fallback) addresses both the "M5 fails to send" case (audit 1A) and the "M5 sends but doesn't execute promptly" case (audit 1C).
 
 ---
 
-### T1-23 | Pause policy — explicit M5 or documented firmware proof
+### T1-23 | Pause policy 鈥?explicit M5 or documented firmware proof
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:538-547` (`pause`), `src/controllers/grbl/GrblController.ts:552-563` (`resume`).
 
@@ -1067,7 +1067,7 @@ This means: when `emergencyLaserOff()` calls `M5 S0` via the normal sendCommand 
 
 LaserForge can run on any GRBL controller, including ones with `$32=0` (CNC routers being repurposed). The current code assumes laser mode is on, which is not safe to assume across all configurations.
 
-`resume()` sends cycle-start (`0x7E`) which restores the previous modal state — if pause didn't actually turn the laser off, resume can re-engage the modal laser-on state without a fresh user action.
+`resume()` sends cycle-start (`0x7E`) which restores the previous modal state 鈥?if pause didn't actually turn the laser off, resume can re-engage the modal laser-on state without a fresh user action.
 
 **Identified by:** Phase 1 audit (2026-04-25, ChatGPT).
 
@@ -1092,11 +1092,11 @@ async resume(): Promise<void> {
 **Tests:** `tests/pause-emits-m5-after-feed-hold.test.ts`:
 - Pause active job. Assert byte sequence: `0x21`, then `M5 S0`.
 - Resume after pause where job was using M4. Assert `M4 S0` sent before `0x7E`.
-- Pause when M5 already (idle). Assert no harm — M5 sent again is fine.
+- Pause when M5 already (idle). Assert no harm 鈥?M5 sent again is fine.
 
 **Estimate:** ~30 min code, depends on T1-22 for `writeCritical`.
 
-**Priority:** Tier 1 — safety. Removes firmware-dependency of pause safety. Note: cross-check with code confirmed audit's diagnosis is correct. However, GRBL spec for `$32=1` (laser mode) DOES disable laser output during feed-hold via firmware contract, so for properly-configured GRBL laser machines pause IS safe today via firmware. The realistic risk is: (a) controllers running `$32=0` (CNC mode, unlikely on a laser machine but possible), (b) GRBL forks like Grbl_ESP32 that may not honor the spec consistently, (c) future non-GRBL controllers. Lower urgency than the audit's framing implies, but the fix is small and the firmware-independence is genuinely valuable.
+**Priority:** Tier 1 鈥?safety. Removes firmware-dependency of pause safety. Note: cross-check with code confirmed audit's diagnosis is correct. However, GRBL spec for `$32=1` (laser mode) DOES disable laser output during feed-hold via firmware contract, so for properly-configured GRBL laser machines pause IS safe today via firmware. The realistic risk is: (a) controllers running `$32=0` (CNC mode, unlikely on a laser machine but possible), (b) GRBL forks like Grbl_ESP32 that may not honor the spec consistently, (c) future non-GRBL controllers. Lower urgency than the audit's framing implies, but the fix is small and the firmware-independence is genuinely valuable.
 
 ---
 
@@ -1106,13 +1106,13 @@ async resume(): Promise<void> {
 
 **Problem:** When GRBL reports `error:N` or `ALARM:N` (or status field shows alarm), the controller's handlers call `_abortJob()` which clears the JS-side queue and marks the controller idle. **No explicit `M5` or soft reset is sent.** The handlers assume the firmware enters a state where laser output is disabled.
 
-This assumption is mostly correct for GRBL alarm states, but it's a firmware-side assumption with no software verification. If the alarm condition itself was caused by a firmware bug, USB glitch, or partial reset, the laser can be in an undefined state — and software is taking no recovery action.
+This assumption is mostly correct for GRBL alarm states, but it's a firmware-side assumption with no software verification. If the alarm condition itself was caused by a firmware bug, USB glitch, or partial reset, the laser can be in an undefined state 鈥?and software is taking no recovery action.
 
 The error handler is even less safe: GRBL `error:N` doesn't necessarily mean motion or laser stopped. Errors can occur on parsing/protocol issues while the laser is still actively cutting.
 
 **Identified by:** Phase 1 audit (2026-04-25, ChatGPT).
 
-**Fix:** Two parts. First, both handlers send a safety-off via T1-22's `safetyOff()` path before clearing state. Second, the post-error state must NOT be plain `idle` (this was a critical finding from audit 1E — error during active laser motion currently transitions to `idle` at line 957, which the UI reads as "ready to start another job").
+**Fix:** Two parts. First, both handlers send a safety-off via T1-22's `safetyOff()` path before clearing state. Second, the post-error state must NOT be plain `idle` (this was a critical finding from audit 1E 鈥?error during active laser motion currently transitions to `idle` at line 957, which the UI reads as "ready to start another job").
 
 ```ts
 private async _handleError(line: string): Promise<void> {
@@ -1124,7 +1124,7 @@ private async _handleError(line: string): Promise<void> {
   }
   this._abortJob();
   // CRITICAL: do NOT transition to 'idle' after error during active job.
-  // Audit 1E identified this as a top safety failure — UI reads 'idle' as
+  // Audit 1E identified this as a top safety failure 鈥?UI reads 'idle' as
   // ready-for-next-job, but the previous laser motion was interrupted with
   // unknown laser state. Instead, transition to 'alarm' (the most conservative
   // existing state) so command gates refuse machine control until user clears.
@@ -1154,9 +1154,9 @@ The `'alarm'` reuse is intentional pragmatism: existing UI gates already refuse 
 
 **Estimate:** ~30 min after T1-22 lands.
 
-**Priority:** Tier 1 — safety. Cross-check with code confirmed audit's diagnosis. Note: split internal priority — **error path is higher urgency** (GRBL `error:N` does NOT trigger alarm state, modal laser state is preserved, so an error during active laser-on means the laser stays on until something else stops it). **Alarm path is lower urgency** (GRBL ALARM:1/ALARM:2 trigger firmware-side spindle/laser disable per spec). Both fixes worthwhile but error handler is the critical one.
+**Priority:** Tier 1 鈥?safety. Cross-check with code confirmed audit's diagnosis. Note: split internal priority 鈥?**error path is higher urgency** (GRBL `error:N` does NOT trigger alarm state, modal laser state is preserved, so an error during active laser-on means the laser stays on until something else stops it). **Alarm path is lower urgency** (GRBL ALARM:1/ALARM:2 trigger firmware-side spindle/laser disable per spec). Both fixes worthwhile but error handler is the critical one.
 
-**Cross-check note (audit 1E, 2026-04-25):** Audit 1E independently identified the same issue from the state-model angle — `_handleError` at line 957 transitions to `idle` after an error, which the UI reads as start-ready. T1-24's scope expanded to include the state-transition fix, not just M5 emission. Audit 1E's complete `MachineSafetyState` type is filed as T2-12; this entry uses the existing `'alarm'` state pragmatically until T2-12 introduces the proper `FAULTED_REQUIRES_INSPECTION`.
+**Cross-check note (audit 1E, 2026-04-25):** Audit 1E independently identified the same issue from the state-model angle 鈥?`_handleError` at line 957 transitions to `idle` after an error, which the UI reads as start-ready. T1-24's scope expanded to include the state-transition fix, not just M5 emission. Audit 1E's complete `MachineSafetyState` type is filed as T2-12; this entry uses the existing `'alarm'` state pragmatically until T2-12 introduces the proper `FAULTED_REQUIRES_INSPECTION`.
 
 ---
 
@@ -1164,7 +1164,7 @@ The `'alarm'` reuse is intentional pragmatism: existing UI gates already refuse 
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:connect` and surrounding init flow.
 
-**Problem:** When `connect()` runs (initial connection or reconnection after disconnect), it queries machine info and settings but doesn't verify the controller is in a known-safe state before allowing machine control. If the previous session ended uncleanly (cable pull mid-job, app crash, browser restart), the firmware could be in alarm state, hold state, or — worst case — running a buffered job from the planner queue.
+**Problem:** When `connect()` runs (initial connection or reconnection after disconnect), it queries machine info and settings but doesn't verify the controller is in a known-safe state before allowing machine control. If the previous session ended uncleanly (cable pull mid-job, app crash, browser restart), the firmware could be in alarm state, hold state, or 鈥?worst case 鈥?running a buffered job from the planner queue.
 
 LaserForge's current behavior: query status, query settings, return success. UI then permits frame, jog, test fire, job start.
 
@@ -1213,9 +1213,9 @@ This primitive is used by:
 
 **Estimate:** ~1-2 sessions. Touches connect flow, controller state model, status parsing (extract FS from status report), UI to surface the new states. Slightly larger than original estimate due to `forceSafeState` primitive.
 
-**Priority:** Tier 1 — safety. Lower urgency than test-fire/command-tokens because the realistic trigger requires a previous-session uncleanness, but real.
+**Priority:** Tier 1 鈥?safety. Lower urgency than test-fire/command-tokens because the realistic trigger requires a previous-session uncleanness, but real.
 
-**Cross-check note (audit 1D):** Audit 1D's required fix #7 (`forceSafeState()` with status-based verification) is folded into this entry rather than filed separately. Audit's framing of "FAIL — best-effort safety, not provable safety" is structurally correct but the fix scope is bounded: status-poll verification is needed at the connect/reconnect boundary, not on every routine M5. T1-22's `safetyOff()` handles routine cases via transport-level verification; `forceSafeState()` handles boundary cases via firmware-state verification.
+**Cross-check note (audit 1D):** Audit 1D's required fix #7 (`forceSafeState()` with status-based verification) is folded into this entry rather than filed separately. Audit's framing of "FAIL 鈥?best-effort safety, not provable safety" is structurally correct but the fix scope is bounded: status-poll verification is needed at the connect/reconnect boundary, not on every routine M5. T1-22's `safetyOff()` handles routine cases via transport-level verification; `forceSafeState()` handles boundary cases via firmware-state verification.
 
 ---
 
@@ -1223,9 +1223,9 @@ This primitive is used by:
 
 **Code reference:** `src/core/output/Output.ts:306-358` (`encodeFooter`), `src/core/job/JobCompiler.ts` (where final gcode lines are assembled), `src/app/MachineService.ts:startValidatedJob` (where lines are sent).
 
-**Problem:** `FOOTER_MISSING_M5` preflight check (in `GcodeTemplateValidator.ts`) is severity `error`, which means it blocks job start — that's correct. But it's a single point of failure: if the validator has a bug (e.g. regex doesn't catch a valid M5 form like `M  5` or `m5`, or a profile bypasses the validator entirely), a custom footer without M5 could reach the controller.
+**Problem:** `FOOTER_MISSING_M5` preflight check (in `GcodeTemplateValidator.ts`) is severity `error`, which means it blocks job start 鈥?that's correct. But it's a single point of failure: if the validator has a bug (e.g. regex doesn't catch a valid M5 form like `M  5` or `m5`, or a profile bypasses the validator entirely), a custom footer without M5 could reach the controller.
 
-Defense-in-depth: append `M5 S0` at the send boundary regardless of footer content. Idempotent — if footer already ends with M5, the appended one is harmless. If it doesn't, this is the safety net.
+Defense-in-depth: append `M5 S0` at the send boundary regardless of footer content. Idempotent 鈥?if footer already ends with M5, the appended one is harmless. If it doesn't, this is the safety net.
 
 **Identified by:** Phase 1 audit (2026-04-25, ChatGPT). Audit's framing was overstated (claimed validator only warns), but the recommendation is still defensible as defense-in-depth.
 
@@ -1248,7 +1248,7 @@ if (!/\bM5\b/i.test(tail)) {
 
 **Estimate:** ~30 min.
 
-**Priority:** Tier 1 — safety, defense-in-depth. Note: cross-check with code showed audit's framing was overstated. `FOOTER_MISSING_M5` is severity `error` in `GcodeTemplateValidator.ts:111`, which means it BLOCKS job start, not just warns. So the situation is not as dire as the audit claimed. T1-26 is still worth shipping as belt-and-suspenders (validator could have a regex bug, profile could bypass validator, send-time append is unconditional), but lower urgency than the audit suggested.
+**Priority:** Tier 1 鈥?safety, defense-in-depth. Note: cross-check with code showed audit's framing was overstated. `FOOTER_MISSING_M5` is severity `error` in `GcodeTemplateValidator.ts:111`, which means it BLOCKS job start, not just warns. So the situation is not as dire as the audit claimed. T1-26 is still worth shipping as belt-and-suspenders (validator could have a regex bug, profile could bypass validator, send-time append is unconditional), but lower urgency than the audit suggested.
 
 ---
 
@@ -1256,7 +1256,7 @@ if (!/\bM5\b/i.test(tail)) {
 
 **Code reference:** `electron/preload.ts:15` (the exposed API), `electron/main.ts:256-261` (the IPC handler), `src/types/web-serial.d.ts:14` (the TypeScript declaration).
 
-**Problem:** Electron's preload exposes `window.electronAPI.sendGcode(cmd)` which routes through IPC `serial:send` to `writeSerialLine(line)`. The IPC handler validates only string type, length ≤ 127, and no CR/LF — no semantic safety check. **This bypasses MachineService, ExecutionCoordinator, and GrblController entirely.** A renderer process (including any compromised renderer, vendored dependency, or future plugin path with `window` access) can write arbitrary G-code directly to the serial port.
+**Problem:** Electron's preload exposes `window.electronAPI.sendGcode(cmd)` which routes through IPC `serial:send` to `writeSerialLine(line)`. The IPC handler validates only string type, length 鈮?127, and no CR/LF 鈥?no semantic safety check. **This bypasses MachineService, ExecutionCoordinator, and GrblController entirely.** A renderer process (including any compromised renderer, vendored dependency, or future plugin path with `window` access) can write arbitrary G-code directly to the serial port.
 
 Cross-check confirmed: `grep -rn "sendGcode\|electronAPI\.sendGcode" src/` returns ONLY the type declaration in `src/types/web-serial.d.ts:14`. **No application code calls `sendGcode`.** It's dead code that only exposes risk.
 
@@ -1264,17 +1264,17 @@ Cross-check confirmed: `grep -rn "sendGcode\|electronAPI\.sendGcode" src/` retur
 
 **Fix:** Remove the IPC handler, the preload exposure, and the type declaration. Three files, three small deletions:
 
-(1) `electron/preload.ts` — delete `sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,` (line 15).
+(1) `electron/preload.ts` 鈥?delete `sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,` (line 15).
 
-(2) `electron/main.ts` — delete the entire `ipcMain.handle('serial:send', ...)` block (lines 256-261).
+(2) `electron/main.ts` 鈥?delete the entire `ipcMain.handle('serial:send', ...)` block (lines 256-261).
 
-(3) `src/types/web-serial.d.ts` — delete the `sendGcode?: (cmd: string) => Promise<void>;` line.
+(3) `src/types/web-serial.d.ts` 鈥?delete the `sendGcode?: (cmd: string) => Promise<void>;` line.
 
-**Tests:** `tests/no-electron-sendgcode-export.test.ts` — static guard. Scans `electron/preload.ts` and asserts no occurrence of `sendGcode` or `serial:send`. If a future maintainer reintroduces the bypass, the test fails. Pattern mirrors `no-localstorage-in-core` (T2-2 phase 9), `no-gcode-in-ui` (T2-4 phase 8), `service-layer-pro-gate-coverage` (T2-3).
+**Tests:** `tests/no-electron-sendgcode-export.test.ts` 鈥?static guard. Scans `electron/preload.ts` and asserts no occurrence of `sendGcode` or `serial:send`. If a future maintainer reintroduces the bypass, the test fails. Pattern mirrors `no-localstorage-in-core` (T2-2 phase 9), `no-gcode-in-ui` (T2-4 phase 8), `service-layer-pro-gate-coverage` (T2-3).
 
 **Estimate:** ~15 minutes including the static guard.
 
-**Priority:** Tier 1 — safety. Highest value-to-effort ratio of any safety item: zero functional impact (nothing calls it), critical bypass closed, ~15 min work. Should ship before any other Tier 1 safety item because it's free.
+**Priority:** Tier 1 鈥?safety. Highest value-to-effort ratio of any safety item: zero functional impact (nothing calls it), critical bypass closed, ~15 min work. Should ship before any other Tier 1 safety item because it's free.
 
 ---
 
@@ -1291,11 +1291,11 @@ const timer = setTimeout(() => {
 }, timeoutMs);
 ```
 
-`cleanup()` only removes listeners and clears the timer. **No safety command is issued** — no M5, no soft reset, no motion-stop. The Promise rejects and the function returns control to the caller, which is `MachineService.autoFocus` which just propagates the error.
+`cleanup()` only removes listeners and clears the timer. **No safety command is issued** 鈥?no M5, no soft reset, no motion-stop. The Promise rejects and the function returns control to the caller, which is `MachineService.autoFocus` which just propagates the error.
 
 The danger is real for autofocus specifically: it typically uses Z-axis motion against a probe. If firmware hangs mid-probe (probe pin floating, Z-stage stuck, mechanical interference), the head could be pressing into the workpiece while the laser may still be in M3/M4 modal state from a previous operation. Software walks away and leaves the machine in an undefined state.
 
-**Identified by:** Audit 1C (2026-04-25, ChatGPT). Cross-checked with code — confirmed.
+**Identified by:** Audit 1C (2026-04-25, ChatGPT). Cross-checked with code 鈥?confirmed.
 
 **Fix:** Both timeout and alarm paths in `runAutoFocus` must trigger safety actions before rejecting.
 
@@ -1304,7 +1304,7 @@ const timer = setTimeout(async () => {
   cleanup();
   // T1-22 dependency: safetyOff handles M5-then-soft-reset fallback
   await this.safetyOff().catch(() => {/* logged in safetyOff */});
-  reject(new Error('Auto-focus timed out — safety-off attempted'));
+  reject(new Error('Auto-focus timed out 鈥?safety-off attempted'));
 }, timeoutMs);
 
 // In the alarm branch:
@@ -1326,7 +1326,7 @@ For the timeout path specifically, the soft-reset fallback in T1-22's `safetyOff
 
 **Estimate:** ~30 min after T1-22 lands. Single function change plus tests.
 
-**Priority:** Tier 1 — safety. Cross-check confirmed. Lower realistic frequency than test-fire deadman (autofocus failures are rarer than UI freezes), but the consequence — head pressing into workpiece with possibly-on laser — is severe. Depends on T1-22's `safetyOff()`.
+**Priority:** Tier 1 鈥?safety. Cross-check confirmed. Lower realistic frequency than test-fire deadman (autofocus failures are rarer than UI freezes), but the consequence 鈥?head pressing into workpiece with possibly-on laser 鈥?is severe. Depends on T1-22's `safetyOff()`.
 
 ---
 
@@ -1338,7 +1338,7 @@ For the timeout path specifically, the soft-reset fallback in T1-22's `safetyOff
 
 The current beforeunload handler (App.tsx:535-549) attempts `ctrl.stop()` and `emergencyLaserOff()` but doesn't persist a flag. Browser may kill the renderer mid-write. The unload promise-style writes can't reliably complete during page unload anyway.
 
-T1-25 (reconnect handshake) catches the case where firmware reports alarm/run/hold on next connect. **But** if firmware happened to finish processing buffered commands cleanly while the app was dead (e.g. small remaining job, fast firmware), firmware reports clean idle and T1-25's check passes — even though the previous session was an uncontrolled crash.
+T1-25 (reconnect handshake) catches the case where firmware reports alarm/run/hold on next connect. **But** if firmware happened to finish processing buffered commands cleanly while the app was dead (e.g. small remaining job, fast firmware), firmware reports clean idle and T1-25's check passes 鈥?even though the previous session was an uncontrolled crash.
 
 The realistic scenario: user is mid-burn, browser tab crashes, firmware finishes the buffered moves (laser off at end-of-job), user relaunches. Firmware reports idle. App proceeds normally. **The user has no signal that anything went wrong.** Worse: if the buffered moves DIDN'T finish cleanly (cable pulled mid-burn, then plugged back in after firmware re-initialized), the same state appears.
 
@@ -1351,9 +1351,9 @@ The realistic scenario: user is mid-burn, browser tab crashes, firmware finishes
 - The flag is the source of truth: "we attempted to start a job; if you see this on next launch, something went wrong."
 
 (2) **Clear flag on clean shutdown paths:**
-- Job completion (clean or stopped) → clear flag.
-- `MachineService.disconnect` after successful `safetyOff()` (per T1-22) → clear flag.
-- App.tsx beforeunload handler after `safetyOff()` returns success → clear flag.
+- Job completion (clean or stopped) 鈫?clear flag.
+- `MachineService.disconnect` after successful `safetyOff()` (per T1-22) 鈫?clear flag.
+- App.tsx beforeunload handler after `safetyOff()` returns success 鈫?clear flag.
 
 (3) **Check flag on app startup:**
 - Before normal connect flow, check localStorage.
@@ -1363,10 +1363,10 @@ The realistic scenario: user is mid-burn, browser tab crashes, firmware finishes
 - Flag is cleared after successful `forceSafeState()` confirmation.
 
 (4) **What counts as "unsafe":**
-- Mid-job crash → unsafe.
-- Disconnect during active job (not stop-then-disconnect) → unsafe.
-- App close while connected without explicit user disconnect → may be unsafe (set flag with `kind: 'unclean-disconnect'` rather than `'job-running'` to differentiate).
-- Clean stop → disconnect → close → safe (no flag).
+- Mid-job crash 鈫?unsafe.
+- Disconnect during active job (not stop-then-disconnect) 鈫?unsafe.
+- App close while connected without explicit user disconnect 鈫?may be unsafe (set flag with `kind: 'unclean-disconnect'` rather than `'job-running'` to differentiate).
+- Clean stop 鈫?disconnect 鈫?close 鈫?safe (no flag).
 
 The differentiation matters because `kind: 'unclean-disconnect'` (no active job) is mostly informational (firmware probably idle, M5 may not have been delivered), while `kind: 'job-running'` is high-concern (workpiece may be partially burnt, head may be in dangerous position).
 
@@ -1379,9 +1379,9 @@ The differentiation matters because `kind: 'unclean-disconnect'` (no active job)
 
 **Estimate:** ~1 session. Touches MachineService, App.tsx unload handler, new localStorage key, new UI dialog for recovery acknowledgement, integration with T1-25's `forceSafeState`.
 
-**Priority:** Tier 1 — safety. Realistic exposure is moderate (browser crashes happen, especially given the render-loop bugs we fixed in T1-14, T1-16). The flag is cheap to maintain and the recovery flow is short. Depends on T1-25 (`forceSafeState`).
+**Priority:** Tier 1 鈥?safety. Realistic exposure is moderate (browser crashes happen, especially given the render-loop bugs we fixed in T1-14, T1-16). The flag is cheap to maintain and the recovery flow is short. Depends on T1-25 (`forceSafeState`).
 
-**Cross-check note (audit 1D):** Audit framed this as one of the top failures. Real concern but bounded scope. Audit's "persist unsafe disconnect state across reconnects" recommendation is implemented exactly here. The pushback I have on the audit's framing: not every disconnect is unsafe — specifically distinguishing `job-running` vs `unclean-disconnect` keeps the recovery flow proportional to actual risk. If we mark every clean app close as unsafe (because we can't prove M5 delivery), users hit a recovery flow on every restart. The differentiation matters.
+**Cross-check note (audit 1D):** Audit framed this as one of the top failures. Real concern but bounded scope. Audit's "persist unsafe disconnect state across reconnects" recommendation is implemented exactly here. The pushback I have on the audit's framing: not every disconnect is unsafe 鈥?specifically distinguishing `job-running` vs `unclean-disconnect` keeps the recovery flow proportional to actual risk. If we mark every clean app close as unsafe (because we can't prove M5 delivery), users hit a recovery flow on every restart. The differentiation matters.
 
 ---
 
@@ -1389,17 +1389,17 @@ The differentiation matters because `kind: 'unclean-disconnect'` (no active job)
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:509` (`canFrame`), surrounding `canJog`/`canStart`/test-fire enablement, `src/ui/components/connection/MachineControls.tsx`.
 
-**Problem:** Cross-check confirmed audit 1E's claim. `canFrame = isConnected && !isRunning` — that's the entire safety check before allowing a low-power laser dot trace operation. Same shape for jog and test-fire enablement. The gates ignore:
+**Problem:** Cross-check confirmed audit 1E's claim. `canFrame = isConnected && !isRunning` 鈥?that's the entire safety check before allowing a low-power laser dot trace operation. Same shape for jog and test-fire enablement. The gates ignore:
 
-(1) **Alarm state** — currently the alarm-blocking is checked elsewhere but inconsistently. Frame can technically activate from `'hold'` or `'check'` state.
+(1) **Alarm state** 鈥?currently the alarm-blocking is checked elsewhere but inconsistently. Frame can technically activate from `'hold'` or `'check'` state.
 
-(2) **Unknown laser state** — once T1-22 introduces `laserOutputState`, gates should require `'off'` (not `'unknown'` or `'on'`) before any laser-on operation.
+(2) **Unknown laser state** 鈥?once T1-22 introduces `laserOutputState`, gates should require `'off'` (not `'unknown'` or `'on'`) before any laser-on operation.
 
-(3) **Active operation** — once T2-11 introduces operation mutex, gates should refuse if any other temporary-laser-on operation is in flight. Current `canFrame && !isRunning` only checks streaming-job state, not test-fire or autofocus.
+(3) **Active operation** 鈥?once T2-11 introduces operation mutex, gates should refuse if any other temporary-laser-on operation is in flight. Current `canFrame && !isRunning` only checks streaming-job state, not test-fire or autofocus.
 
-(4) **Post-error state** — once T1-24 transitions error-during-job to `'alarm'` instead of `'idle'`, gates that check `!isAlarm` will catch this. But explicit error code presence (`errorCode != null`) should also block.
+(4) **Post-error state** 鈥?once T1-24 transitions error-during-job to `'alarm'` instead of `'idle'`, gates that check `!isAlarm` will catch this. But explicit error code presence (`errorCode != null`) should also block.
 
-(5) **Unsafe-prior-state recovery pending** — once T1-29 lands, gates must refuse if a recovery acknowledgement is pending.
+(5) **Unsafe-prior-state recovery pending** 鈥?once T1-29 lands, gates must refuse if a recovery acknowledgement is pending.
 
 **Identified by:** Audit 1E (2026-04-25, ChatGPT). Cross-check confirmed `canFrame = isConnected && !isRunning` at line 509.
 
@@ -1431,25 +1431,25 @@ function computeCommandGates(state: MachineState, laserOutput: LaserOutputState,
 
 Replace all `isConnected && !isRunning` style ad-hoc checks with reads from this single helper. UI components consume the gate map, never recompute their own gates.
 
-**Frame-safe (M5-only) note:** Audit suggested all frame operations require `OFF_CONFIRMED + user consent`. I disagree on the "user consent" part for frame-safe — it doesn't fire the laser, it traces the bounds with the head while M5 is asserted. Adding a consent dialog for every frame check would add friction without safety benefit. Frame-DOT (which uses M4 at low power) does need consent, which it already has.
+**Frame-safe (M5-only) note:** Audit suggested all frame operations require `OFF_CONFIRMED + user consent`. I disagree on the "user consent" part for frame-safe 鈥?it doesn't fire the laser, it traces the bounds with the head while M5 is asserted. Adding a consent dialog for every frame check would add friction without safety benefit. Frame-DOT (which uses M4 at low power) does need consent, which it already has.
 
 **Tests:** `tests/command-gates-honor-safety-state.test.ts`:
-- Idle + off + no-op + no-error → all baseSafe gates true.
-- Idle + unknown laser → frame/test-fire/start/jog all false.
-- Idle + off + active test fire (operation mutex held) → frame/start false, test-fire false.
-- Hold → pause/resume gates correct, others false.
-- Alarm → only stop/emergency-stop/unlock allowed.
-- ErrorCode != null → all action gates false until cleared.
+- Idle + off + no-op + no-error 鈫?all baseSafe gates true.
+- Idle + unknown laser 鈫?frame/test-fire/start/jog all false.
+- Idle + off + active test fire (operation mutex held) 鈫?frame/start false, test-fire false.
+- Hold 鈫?pause/resume gates correct, others false.
+- Alarm 鈫?only stop/emergency-stop/unlock allowed.
+- ErrorCode != null 鈫?all action gates false until cleared.
 
 **Estimate:** ~1 session. Single helper file + replace ~10 ad-hoc gate computations across UI. Most of the work is identifying the gate sites, not writing the helper.
 
-**Priority:** Tier 1 — safety. Tightens gates everywhere at once. Should ship after T1-22, T1-24, T2-11, T1-29 since those introduce the state fields the gates read. T2-12 (formal MachineSafetyState type) collapses these into one canonical state.
+**Priority:** Tier 1 鈥?safety. Tightens gates everywhere at once. Should ship after T1-22, T1-24, T2-11, T1-29 since those introduce the state fields the gates read. T2-12 (formal MachineSafetyState type) collapses these into one canonical state.
 
-**Cross-check note (audit 1E):** Audit framed enablement weakness as one of the top failures. Real but bounded — most users don't hit `'hold'` mid-frame in normal flow. The fix is small enough to be worthwhile, and centralizing gates prevents future divergence.
+**Cross-check note (audit 1E):** Audit framed enablement weakness as one of the top failures. Real but bounded 鈥?most users don't hit `'hold'` mid-frame in normal flow. The fix is small enough to be worthwhile, and centralizing gates prevents future divergence.
 
 ---
 
-### T1-31 | Raster image strategy — single M4 per pass with inline S modulation
+### T1-31 | Raster image strategy 鈥?single M4 per pass with inline S modulation
 
 **Code reference:** `src/core/plan/PlanOptimizer.ts:599-662` (`planRasterOperation`), compare with `src/core/plan/PlanOptimizer.ts:498-583` (`planFillOperation`) which already implements the correct pattern.
 
@@ -1462,14 +1462,14 @@ M4 S{power}                 ; laser on (laserOn move)
 M5 S0                       ; laser off (laserOff move)
 ```
 
-Repeat per segment. A typical photo engrave has hundreds to thousands of these segments per pass, producing hundreds to thousands of M4→M5 transitions in the gcode stream.
+Repeat per segment. A typical photo engrave has hundreds to thousands of these segments per pass, producing hundreds to thousands of M4鈫扢5 transitions in the gcode stream.
 
 For comparison, **fill engraving (planFillOperation) does it correctly:** ONE `laserOn` (M4 S0) at start of the operation, then S-modulation via `linear` moves with `power: 0` for gaps and `power: full` for burns, then ONE `laserOff` (M5) at end. This matches LightBurn's raster strategy and produces clean continuous scanlines.
 
 **Why the difference matters in practice:**
-1. **Quality** — repeated modal laser state changes can cause planner stutter, inconsistent burn edges, fat or weak segments at the modulation boundaries. Continuous M4 mode with inline S modulation is the GRBL-native pattern for photo engraving.
-2. **Performance** — each M4/M5 is a separate command in the GRBL planner buffer. For a 4MP photo at 0.1mm scan resolution, that's potentially 40,000+ extra command lines vs. modal continuous output.
-3. **Streaming health** — the controller's character-counting buffer can saturate with the extra modal commands, reducing the effective send rate during raster passes.
+1. **Quality** 鈥?repeated modal laser state changes can cause planner stutter, inconsistent burn edges, fat or weak segments at the modulation boundaries. Continuous M4 mode with inline S modulation is the GRBL-native pattern for photo engraving.
+2. **Performance** 鈥?each M4/M5 is a separate command in the GRBL planner buffer. For a 4MP photo at 0.1mm scan resolution, that's potentially 40,000+ extra command lines vs. modal continuous output.
+3. **Streaming health** 鈥?the controller's character-counting buffer can saturate with the extra modal commands, reducing the effective send rate during raster passes.
 
 **Identified by:** Audit 2A (2026-04-25, ChatGPT). Cross-check verified at PlanOptimizer.ts lines 624-658.
 
@@ -1484,7 +1484,7 @@ function planRasterOperation(...): Move[] {
   moves.push({ type: 'laserOn', power: 0 });
 
   for (const scanline of scanlines) {
-    // Rapid to overscan start of this scanline (G0 — laser auto-off in M4 mode)
+    // Rapid to overscan start of this scanline (G0 鈥?laser auto-off in M4 mode)
     const overscanStart = computeOverscanStart(scanline);
     moves.push({ type: 'rapid', to: overscanStart });
 
@@ -1517,21 +1517,21 @@ function planRasterOperation(...): Move[] {
 }
 ```
 
-The `appendRasterBurnMoves` helper already exists and handles the per-segment velocity/power logic — keep it. The structural change is the outer loop: single M4 at the top, single M5 at the bottom, scanlines stitched together with G1 S0 gaps between segments instead of M5/G0/M4.
+The `appendRasterBurnMoves` helper already exists and handles the per-segment velocity/power logic 鈥?keep it. The structural change is the outer loop: single M4 at the top, single M5 at the bottom, scanlines stitched together with G1 S0 gaps between segments instead of M5/G0/M4.
 
 **Tests:** `tests/raster-output-uses-modal-m4.test.ts`:
 - Generate a raster with 5 scanlines, 3 segments each. Assert emitted gcode contains exactly ONE `M4` and ONE `M5` (not 15 of each).
 - Assert burn segments use correct power S values via inline `S` modulation.
 - Assert blank gaps between segments use `S0` linear moves (not rapid moves).
-- Existing raster tests continue to pass — power, accel awareness, scanning offsets all unchanged.
+- Existing raster tests continue to pass 鈥?power, accel awareness, scanning offsets all unchanged.
 
 **Estimate:** ~1-2 sessions. Mostly mechanical refactor of `planRasterOperation`. Existing helpers (`appendRasterBurnMoves`, `interpolateOffset`, `applyScanOffset`) are reused. Tests of overscan, scanning offsets, bidirectional mode need verification that they still pass.
 
-**Priority:** Tier 1. Output quality issue. Active competitive disadvantage vs LightBurn. Hardware-verified before merge — burn a calibration grid photo at 100mm/s and visually inspect for stutter/ghosting at segment boundaries.
+**Priority:** Tier 1. Output quality issue. Active competitive disadvantage vs LightBurn. Hardware-verified before merge 鈥?burn a calibration grid photo at 100mm/s and visually inspect for stutter/ghosting at segment boundaries.
 
-**Cross-check note (audit 2A):** Audit identified this as the top output-quality failure ("biggest Phase 2A failure"). Verified: per-segment M4/M5 cycling exists exactly as described. Audit's proposed fix matches existing fill strategy structure precisely — both reference the same pattern. Implementation is contained to one function.
+**Cross-check note (audit 2A):** Audit identified this as the top output-quality failure ("biggest Phase 2A failure"). Verified: per-segment M4/M5 cycling exists exactly as described. Audit's proposed fix matches existing fill strategy structure precisely 鈥?both reference the same pattern. Implementation is contained to one function.
 
-**Cross-check note (audit 2B refinement):** Audit 2B's analysis of grayscale segment explosion (`extractSegmentsGrayscale` at RasterGenerator.ts:222 uses `S !== currentPower` exact equality) folds into this fix. Currently for a continuous photo gradient, every pixel can become its own segment because adjacent power values differ by 1-2 out of 0-1000. Once T1-31 lands with continuous-row motion, the segment count matters less — each segment becomes one G1 line instead of M4+G1+M5+G0. **Bonus refinement** to consider in T1-31 implementation: tolerance-based segment merge (e.g. merge if `|S - currentPower| <= 2`) — adjacent power values within 2/1000 are visually indistinguishable in laser output. Reduces line count further. Optional but cheap to add.
+**Cross-check note (audit 2B refinement):** Audit 2B's analysis of grayscale segment explosion (`extractSegmentsGrayscale` at RasterGenerator.ts:222 uses `S !== currentPower` exact equality) folds into this fix. Currently for a continuous photo gradient, every pixel can become its own segment because adjacent power values differ by 1-2 out of 0-1000. Once T1-31 lands with continuous-row motion, the segment count matters less 鈥?each segment becomes one G1 line instead of M4+G1+M5+G0. **Bonus refinement** to consider in T1-31 implementation: tolerance-based segment merge (e.g. merge if `|S - currentPower| <= 2`) 鈥?adjacent power values within 2/1000 are visually indistinguishable in laser output. Reduces line count further. Optional but cheap to add.
 
 ---
 
@@ -1554,9 +1554,9 @@ For diode laser users this is dangerous: a moment of full-power laser at the pat
 ```ts
 // New blocker: refuse jobs that use M4 dynamic mode if controller $32 != 1
 function checkLaserModeForDynamicPower(input: PreflightInput): PreflightIssue[] {
-  if (!input.controllerState) return []; // disconnected — skip; runtime preflight will catch
-  if (!input.outputUsesM4) return [];     // not using M4 — fine
-  if (input.controllerState.laserMode === true) return []; // $32=1 — safe
+  if (!input.controllerState) return []; // disconnected 鈥?skip; runtime preflight will catch
+  if (!input.outputUsesM4) return [];     // not using M4 鈥?fine
+  if (input.controllerState.laserMode === true) return []; // $32=1 鈥?safe
 
   return [{
     code: 'MACHINE_LASER_MODE_DISABLED',
@@ -1573,7 +1573,7 @@ function checkLaserModeForDynamicPower(input: PreflightInput): PreflightIssue[] 
 }
 ```
 
-The `input.outputUsesM4` flag is set during the compile step — `GrblStrategy.encodeLaserOn` returns `M4 S{power}` so any GRBL job with at least one `laserOn` move uses M4.
+The `input.outputUsesM4` flag is set during the compile step 鈥?`GrblStrategy.encodeLaserOn` returns `M4 S{power}` so any GRBL job with at least one `laserOn` move uses M4.
 
 **Tests:** `tests/preflight-rejects-m4-without-laser-mode.test.ts`:
 - Connected controller with `$32=1`, scene with engrave layer. Assert preflight passes.
@@ -1582,7 +1582,7 @@ The `input.outputUsesM4` flag is set during the compile step — `GrblStrategy.e
 
 **Estimate:** ~30 min. Single new preflight rule + test + integration in MachinePreflight.
 
-**Priority:** Tier 1 — safety. Real failure mode for diode laser users running on CNC controllers (e.g. someone repurposing a 3018 router for laser duty without setting `$32=1`).
+**Priority:** Tier 1 鈥?safety. Real failure mode for diode laser users running on CNC controllers (e.g. someone repurposing a 3018 router for laser duty without setting `$32=1`).
 
 **Cross-check note (audit 2A):** Audit framed `$32` verification as Priority 2 of its required fixes. Cross-check confirmed `$32` is parsed but never verified. Audit is technically right that this also affects vector quality (M4 before first G1 leaves stationary laser-on in CNC mode), but the more concrete issue is between-segment stationary states where the planner can briefly stall.
 
@@ -1607,7 +1607,7 @@ The audit's failure scenario:
 - Controller `$30 = 255` (older Falcon firmware ships with 255, newer with 1000)
 - User selects 50% power
 - Compile generates `S500`
-- Controller clamps to 255 internally → actual output is 100% (255/255), not 50%
+- Controller clamps to 255 internally 鈫?actual output is 100% (255/255), not 50%
 
 This produces wrong burn power. Either:
 - Over-power: user expected 50%, got 100%. Burn is too dark, may flare/ignite.
@@ -1647,18 +1647,18 @@ if (profile?.maxSpindle && controllerMaxSpindle) {
 ```
 
 **Tests:** `tests/compile-uses-controller-maxspindle-when-connected.test.ts`:
-- Profile=1000, controllerMaxSpindle=255, 50% power → assert generated `S=128` (50% of 255).
-- Profile=1000, controllerMaxSpindle=null (disconnected), 50% power → assert `S=500`.
-- Profile=null, controllerMaxSpindle=1000 → assert `S=500`.
+- Profile=1000, controllerMaxSpindle=255, 50% power 鈫?assert generated `S=128` (50% of 255).
+- Profile=1000, controllerMaxSpindle=null (disconnected), 50% power 鈫?assert `S=500`.
+- Profile=null, controllerMaxSpindle=1000 鈫?assert `S=500`.
 
 `tests/preflight-mismatch-maxspindle.test.ts`:
-- Profile=1000, controller=255 → preflight error.
-- Profile=1000, controller=1000 → no preflight error.
-- Profile=1000, controller=970 (3% diff) → no preflight error (within tolerance).
+- Profile=1000, controller=255 鈫?preflight error.
+- Profile=1000, controller=1000 鈫?no preflight error.
+- Profile=1000, controller=970 (3% diff) 鈫?no preflight error (within tolerance).
 
 **Estimate:** ~30 min. Single line precedence flip + preflight rule + tests.
 
-**Priority:** Tier 1 — safety + quality. Wrong power output is both a quality issue (burns don't match expected calibration) and a safety issue (over-power can cause flare-up on flammable materials).
+**Priority:** Tier 1 鈥?safety + quality. Wrong power output is both a quality issue (burns don't match expected calibration) and a safety issue (over-power can cause flare-up on flammable materials).
 
 **Cross-check note (audit 2A):** Audit identified this clearly. Verified at exact line numbers.
 
@@ -1666,7 +1666,7 @@ if (profile?.maxSpindle && controllerMaxSpindle) {
 
 ### T1-34 | Serpentine error-diffusion dithering
 
-**Code reference:** `src/import/Dithering.ts:166-183` (Floyd-Steinberg / Jarvis / Stucki / Atkinson / Burkes / Sierra error-diffusion loop), `src/import/Dithering.ts:202-212` (ordered Bayer — not affected, single-pass).
+**Code reference:** `src/import/Dithering.ts:166-183` (Floyd-Steinberg / Jarvis / Stucki / Atkinson / Burkes / Sierra error-diffusion loop), `src/import/Dithering.ts:202-212` (ordered Bayer 鈥?not affected, single-pass).
 
 **Problem:** Cross-check confirmed at lines 166-167:
 
@@ -1682,7 +1682,7 @@ All seven error-diffusion algorithms (Floyd-Steinberg, Jarvis, Stucki, Atkinson,
 
 **Why this matters for engraving quality:**
 1. **Directional artifacts.** Always-same-direction error diffusion creates subtle diagonal "worm" patterns that propagate from the top-left to the bottom-right of the image. On uniform mid-tone areas these are visible as faint structured noise.
-2. **Worse on bidirectional engraving.** When the engraver scans alternating directions but the dither was created with single-direction error propagation, the visual artifacts compound — every other row was diffused in the "wrong" relative direction.
+2. **Worse on bidirectional engraving.** When the engraver scans alternating directions but the dither was created with single-direction error propagation, the visual artifacts compound 鈥?every other row was diffused in the "wrong" relative direction.
 3. **Industry standard.** Serpentine scanning is the standard fix for these artifacts. It alternates row direction during dithering: even rows scan left-to-right with error propagating right; odd rows scan right-to-left with error propagating left. This breaks the directional coherence and produces noticeably cleaner mid-tone gradients.
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT). Cross-check verified Dithering.ts:166-167.
@@ -1691,7 +1691,7 @@ All seven error-diffusion algorithms (Floyd-Steinberg, Jarvis, Stucki, Atkinson,
 
 ```ts
 for (let y = 0; y < height; y++) {
-  const reverse = y % 2 === 1;  // serpentine — every other row reversed
+  const reverse = y % 2 === 1;  // serpentine 鈥?every other row reversed
   const xStart = reverse ? width - 1 : 0;
   const xEnd = reverse ? -1 : width;
   const xStep = reverse ? -1 : 1;
@@ -1704,7 +1704,7 @@ for (let y = 0; y < height; y++) {
     const error = oldVal - newVal;
 
     for (const [dx, dy, weight] of kernel.offsets) {
-      // Mirror dx on reverse rows — kernel still propagates "forward" relative to scan
+      // Mirror dx on reverse rows 鈥?kernel still propagates "forward" relative to scan
       const effectiveDx = reverse ? -dx : dx;
       const nx = x + effectiveDx;
       const ny = y + dy;
@@ -1719,14 +1719,14 @@ for (let y = 0; y < height; y++) {
 The kernel definitions stay the same. Only the scan order changes. All error-diffusion modes benefit: Floyd-Steinberg, Jarvis, Stucki, Atkinson, Burkes, Sierra variants. Ordered (Bayer) and random modes are unaffected (no error propagation).
 
 **Tests:** `tests/dither-serpentine.test.ts`:
-- Generate a uniform mid-tone gradient (128 on a 100×100 image). Run Floyd-Steinberg dither. Assert pixel distribution does NOT show diagonal directional bias (compute autocorrelation along x+y and x-y diagonals; both should be similar).
+- Generate a uniform mid-tone gradient (128 on a 100脳100 image). Run Floyd-Steinberg dither. Assert pixel distribution does NOT show diagonal directional bias (compute autocorrelation along x+y and x-y diagonals; both should be similar).
 - Compare deterministic output before vs after the change to verify the patterns are different (regression test that the change actually took effect).
 
 **Estimate:** ~30 min. Single-function change, plus tests.
 
-**Priority:** Tier 1 — output quality. Visible improvement for mid-tone photo engraving. Independent of T1-31 (raster motion strategy) — both are quality improvements but address different parts of the pipeline.
+**Priority:** Tier 1 鈥?output quality. Visible improvement for mid-tone photo engraving. Independent of T1-31 (raster motion strategy) 鈥?both are quality improvements but address different parts of the pipeline.
 
-**Cross-check note (audit 2B):** Audit identified this as one of the dithering weaknesses. Verified at code level. Audit's other dithering concerns (no blue-noise, "random" mode is crude) are real but less impactful — blue-noise would be a separate medium-effort feature; "random" mode quality is bounded and users who care pick error-diffusion modes anyway.
+**Cross-check note (audit 2B):** Audit identified this as one of the dithering weaknesses. Verified at code level. Audit's other dithering concerns (no blue-noise, "random" mode is crude) are real but less impactful 鈥?blue-noise would be a separate medium-effort feature; "random" mode quality is bounded and users who care pick error-diffusion modes anyway.
 
 ---
 
@@ -1741,12 +1741,12 @@ const maxDim = 1000;
 const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
 ```
 
-Hard-coded resolution cap. Any image with longest dimension > 1000 pixels is silently downscaled at import. A 4000×3000 phone photo (12 MP) becomes 1000×750 (0.75 MP) before any further processing.
+Hard-coded resolution cap. Any image with longest dimension > 1000 pixels is silently downscaled at import. A 4000脳3000 phone photo (12 MP) becomes 1000脳750 (0.75 MP) before any further processing.
 
 **Practical impact:** For raster engraving at typical DPI/LPI:
-- 100mm × 75mm engrave at 254 DPI (10 lines/mm): needs 1000×750 pixels minimum. The cap is exactly the threshold.
-- 200mm × 150mm at 254 DPI: needs 2000×1500. Cap loses half the resolution.
-- 300mm × 225mm at 254 DPI: cap loses 2/3 of available detail.
+- 100mm 脳 75mm engrave at 254 DPI (10 lines/mm): needs 1000脳750 pixels minimum. The cap is exactly the threshold.
+- 200mm 脳 150mm at 254 DPI: needs 2000脳1500. Cap loses half the resolution.
+- 300mm 脳 225mm at 254 DPI: cap loses 2/3 of available detail.
 
 For larger formats and high DPI photo engraving, the user is silently working with degraded source material and may not realize it. They'll calibrate their settings against soft input and produce worse engravings than the source supports.
 
@@ -1754,36 +1754,36 @@ For larger formats and high DPI photo engraving, the user is silently working wi
 
 **Fix:** Two parts.
 
-(1) **Raise the default cap.** Modern hardware can handle 4000×4000 grayscale (16 MB) without performance issues, especially after T1-17 Pass 1 moves processing into a worker. Set default to 4000 or 8000.
+(1) **Raise the default cap.** Modern hardware can handle 4000脳4000 grayscale (16 MB) without performance issues, especially after T1-17 Pass 1 moves processing into a worker. Set default to 4000 or 8000.
 
 (2) **Make it configurable** via `userPreferences.imageImportMaxDim` (existing user preferences infrastructure). Surface in settings as "Image import max resolution (px). Larger values preserve detail in big photos but use more memory."
 
-(3) **Surface a warning in import** when a high-resolution image is being downscaled. UI notification: "Imported 4000×3000 image. Downscaled to 1000×750 to fit current import limit. Increase limit in Settings → Performance to preserve detail."
+(3) **Surface a warning in import** when a high-resolution image is being downscaled. UI notification: "Imported 4000脳3000 image. Downscaled to 1000脳750 to fit current import limit. Increase limit in Settings 鈫?Performance to preserve detail."
 
 **Sequencing with T1-17:** T1-17 Pass 1 moves the import grayscale loop to a Web Worker. Once that's done, larger images don't block the UI. So T1-35's "raise the cap" is much safer after T1-17 Pass 1 lands. **Recommend: T1-17 Pass 1 first, then T1-35.**
 
 **Tests:** `tests/import-respects-max-dim-preference.test.ts`:
-- Default preference: 4000×3000 image stays 4000×3000.
-- Set preference to 1000: same image scales to 1000×750.
+- Default preference: 4000脳3000 image stays 4000脳3000.
+- Set preference to 1000: same image scales to 1000脳750.
 - Verify aspect ratio preserved at all caps.
 
 **Estimate:** ~1 hour. Replace the constant, plumb the preference, add UI surface, write tests. Dependent on T1-17 Pass 1 (worker offload) for the practical safety of raising the cap.
 
-**Priority:** Tier 1 — output quality. Affects every user engraving photos at typical sizes. Currently silently capped, no user signal.
+**Priority:** Tier 1 鈥?output quality. Affects every user engraving photos at typical sizes. Currently silently capped, no user signal.
 
-**Cross-check note (audit 2B):** Audit didn't catch this directly but discussed import as part of raster pipeline review. The maxDim=1000 cap was visible in the code I reviewed for the audit cross-check. Filed as Tier 1 because the silent-downscale behavior is the kind of thing users won't realize until they wonder why their engraving doesn't match the source — a hard-to-debug quality cliff.
+**Cross-check note (audit 2B):** Audit didn't catch this directly but discussed import as part of raster pipeline review. The maxDim=1000 cap was visible in the code I reviewed for the audit cross-check. Filed as Tier 1 because the silent-downscale behavior is the kind of thing users won't realize until they wonder why their engraving doesn't match the source 鈥?a hard-to-debug quality cliff.
 
 ---
 
 ### T1-36 | Offset-with-holes for kerf compensation
 
-**Code reference:** `src/geometry/OffsetPath.ts:25-67` (`offsetObject`), `src/geometry/BooleanOps.ts:95-136` (`objectToPolygon` — produces input for offset), `src/geometry/BooleanOps.ts:153-188` (`polygonToPathGeometry` — converts result back).
+**Code reference:** `src/geometry/OffsetPath.ts:25-67` (`offsetObject`), `src/geometry/BooleanOps.ts:95-136` (`objectToPolygon` 鈥?produces input for offset), `src/geometry/BooleanOps.ts:153-188` (`polygonToPathGeometry` 鈥?converts result back).
 
 **Problem:** Cross-check confirmed at OffsetPath.ts line 33-44:
 
 ```ts
 for (const poly of multi) {
-  const outerRing = poly[0];        // ← only outer ring
+  const outerRing = poly[0];        // 鈫?only outer ring
   if (!outerRing || outerRing.length < 3) continue;
   // ... offsets outerRing only ...
 }
@@ -1795,7 +1795,7 @@ For kerf compensation specifically, this is broken: the user expects the OUTER c
 
 There's a second related problem in `objectToPolygon` (BooleanOps.ts:132): each subpath of an SVG path becomes its own MultiPolygon entry `[ring]` (a polygon with a single outer ring and no holes), instead of a polygon with multiple rings (outer + holes). The polygon-offset library can't know which subpath was meant as a hole because the input doesn't preserve that information.
 
-**Identified by:** Audit 2C (2026-04-25, ChatGPT). Cross-check confirmed at exact line numbers. This is a **real product bug** — kerf compensation produces wrong output for any shape with holes (gears, inlays, joints, masks, lettering with closed loops).
+**Identified by:** Audit 2C (2026-04-25, ChatGPT). Cross-check confirmed at exact line numbers. This is a **real product bug** 鈥?kerf compensation produces wrong output for any shape with holes (gears, inlays, joints, masks, lettering with closed loops).
 
 **Fix:** Two parts.
 
@@ -1848,14 +1848,14 @@ for (const poly of multi) {
 The `polygon-offset` library does support holes when given a polygon array with multiple rings. The current code just doesn't pass them.
 
 **Tests:** `tests/offset-preserves-holes.test.ts`:
-- Offset a 50×50 square with a 20×20 hole at center, distance +1mm. Assert result is 51×51 outer with 19×19 inner (hole shrinks toward material because the offset expanded both outer and the inward direction of the hole).
-- Offset same shape, distance -1mm. Assert result is 49×49 outer with 21×21 inner.
+- Offset a 50脳50 square with a 20脳20 hole at center, distance +1mm. Assert result is 51脳51 outer with 19脳19 inner (hole shrinks toward material because the offset expanded both outer and the inward direction of the hole).
+- Offset same shape, distance -1mm. Assert result is 49脳49 outer with 21脳21 inner.
 - Offset a compound path with island (hole-in-hole, e.g. letter B). Assert the island is preserved through the offset.
-- Empty hole or invalid hole → outer-only fallback, log warning.
+- Empty hole or invalid hole 鈫?outer-only fallback, log warning.
 
 **Estimate:** ~1-2 sessions. The polygon-offset API supports compound polygons; the work is in `objectToPolygon` preserving structure and `offsetObject` passing it through correctly. Bounded.
 
-**Priority:** Tier 1. Real product bug — kerf compensation is silently wrong for any shape with holes. Affects every user doing inlay work, gears, joints, lettering with closed loops.
+**Priority:** Tier 1. Real product bug 鈥?kerf compensation is silently wrong for any shape with holes. Affects every user doing inlay work, gears, joints, lettering with closed loops.
 
 **Cross-check note (audit 2C):** Audit identified this as Critical 2 with severity "production-safe failure." Verified at exact line numbers (OffsetPath.ts:34, BooleanOps.ts:132). The polygon-offset library can handle compound polygons; current code just doesn't pass them through. T1-36 is the band-aid fix; T2-15 (CompoundPath model) is the architectural cleanup that makes this kind of issue structurally impossible.
 
@@ -1873,22 +1873,22 @@ const fillAngles: number[] =
   fillMode === 'cross-hatch' ? [baseAngle, baseAngle + 90] : [baseAngle];
 ```
 
-`'offset'` is not `'cross-hatch'` so it gets `[baseAngle]` — same as line fill. **The user picks "Offset" expecting contour-parallel fill, gets line fill instead. No warning, no error.**
+`'offset'` is not `'cross-hatch'` so it gets `[baseAngle]` 鈥?same as line fill. **The user picks "Offset" expecting contour-parallel fill, gets line fill instead. No warning, no error.**
 
 This is a real user-trust failure: the UI says one thing, the output does another.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT). Cross-check verified UI and planner.
 
-**Fix:** Quickest path — disable the ConnectionPanelMain offset button to match LayerPanel's behavior. Two-line change:
+**Fix:** Quickest path 鈥?disable the ConnectionPanelMain offset button to match LayerPanel's behavior. Two-line change:
 
 ```ts
 // ConnectionPanelMain.tsx:1163-1174
 React.createElement('button', {
   type: 'button',
   key: f.mode,
-  disabled: f.mode === 'offset',     // ← add
+  disabled: f.mode === 'offset',     // 鈫?add
   onClick: () => {
-    if (f.mode === 'offset') return;  // ← add (defensive)
+    if (f.mode === 'offset') return;  // 鈫?add (defensive)
     onUpdateLayerFillMode(layer.id, f.mode);
   },
   title: f.mode === 'offset' ? 'Offset fill not yet implemented' : undefined,
@@ -1907,9 +1907,9 @@ The button text could also change to "Offset (coming soon)" to match LayerPanel'
 
 **Estimate:** ~15 minutes. Pure UI change, smallest possible fix.
 
-**Priority:** Tier 1 — user trust. The cost of leaving this exposed is low-frequency but high-impact: a user picks Offset, runs a job expecting contour-parallel, gets line fill, and may not notice until the engraving is wrong.
+**Priority:** Tier 1 鈥?user trust. The cost of leaving this exposed is low-frequency but high-impact: a user picks Offset, runs a job expecting contour-parallel, gets line fill, and may not notice until the engraving is wrong.
 
-**Cross-check note (audit 2C):** Audit framed this as Critical 3. Verified the inconsistency between LayerPanel (correctly disabled) and ConnectionPanelMain (silently functional). The audit's recommendation was "either remove/disable from UI OR implement true contour-parallel fill" — T1-37 is the disable path. Implementing offset fill is a real feature for a future ticket, not roadmap-blocking.
+**Cross-check note (audit 2C):** Audit framed this as Critical 3. Verified the inconsistency between LayerPanel (correctly disabled) and ConnectionPanelMain (silently functional). The audit's recommendation was "either remove/disable from UI OR implement true contour-parallel fill" 鈥?T1-37 is the disable path. Implementing offset fill is a real feature for a future ticket, not roadmap-blocking.
 
 ---
 
@@ -1922,7 +1922,7 @@ The button text could also change to "Offset (coming soon)" to match LayerPanel'
 ```ts
 export function subPathToPoints(
   segments: ...,
-  tolerance: number = 0.5,    // ← default 0.5mm
+  tolerance: number = 0.5,    // 鈫?default 0.5mm
 ): Point[] { ... }
 ```
 
@@ -1935,7 +1935,7 @@ For typical hobbyist work at 100mm+ scale, 0.5mm faceting on curves is acceptabl
 - Inlays and kerf-sensitive geometry
 - Detailed engraving boundaries
 
-...0.5mm produces visibly faceted curves. A 20mm-diameter circle flattened at 0.5mm tolerance has ~16 segments — a regular hexadecagon, not a circle.
+...0.5mm produces visibly faceted curves. A 20mm-diameter circle flattened at 0.5mm tolerance has ~16 segments 鈥?a regular hexadecagon, not a circle.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT). Cross-check verified at line 814.
 
@@ -1943,10 +1943,10 @@ For typical hobbyist work at 100mm+ scale, 0.5mm faceting on curves is acceptabl
 
 ```ts
 const TOLERANCE_BY_INTENT = {
-  cut: 0.05,           // tight — visible edges
-  score: 0.05,         // tight — visible engraving
-  fillBoundary: 0.03,  // tight — fills hug the boundary
-  preview: 0.5,        // coarse — UI rendering only
+  cut: 0.05,           // tight 鈥?visible edges
+  score: 0.05,         // tight 鈥?visible engraving
+  fillBoundary: 0.03,  // tight 鈥?fills hug the boundary
+  preview: 0.5,        // coarse 鈥?UI rendering only
 } as const;
 
 function getFlatteningTolerance(operationMode: 'cut' | 'score' | 'engrave', context: 'output' | 'preview'): number {
@@ -1959,11 +1959,11 @@ function getFlatteningTolerance(operationMode: 'cut' | 'score' | 'engrave', cont
 }
 ```
 
-In JobCompiler's path branch, pass the operation mode through and call subPathToPoints with the right tolerance. Same for text (which already uses 0.05mm — leave as is, that's the right value).
+In JobCompiler's path branch, pass the operation mode through and call subPathToPoints with the right tolerance. Same for text (which already uses 0.05mm 鈥?leave as is, that's the right value).
 
-Per-layer override: existing `LayerSettings` could gain optional `flatteningTolerance?: number` for users who need tighter or looser. Default null → use the operation-aware value.
+Per-layer override: existing `LayerSettings` could gain optional `flatteningTolerance?: number` for users who need tighter or looser. Default null 鈫?use the operation-aware value.
 
-Performance impact: tighter tolerance produces more points. Worst case for a complex SVG with thousands of curves at 0.05mm vs 0.5mm: roughly 10× more points. JobCompiler and PlanOptimizer handle this fine — point counts in the 10K-100K range are routine. Output gcode line counts grow, but the controller streaming layer handles that already.
+Performance impact: tighter tolerance produces more points. Worst case for a complex SVG with thousands of curves at 0.05mm vs 0.5mm: roughly 10脳 more points. JobCompiler and PlanOptimizer handle this fine 鈥?point counts in the 10K-100K range are routine. Output gcode line counts grow, but the controller streaming layer handles that already.
 
 **Tests:** `tests/flattening-tolerance-by-operation.test.ts`:
 - Compile a 20mm circle on a `cut` layer. Assert resulting polygon has > 100 segments (tight tolerance).
@@ -1973,9 +1973,9 @@ Performance impact: tighter tolerance produces more points. Worst case for a com
 
 **Estimate:** ~1 session. Plumb operation mode through the geometryToPoints call chain, write tests, verify no test regressions.
 
-**Priority:** Tier 1 — output quality. Affects every user doing detailed vector work. Low risk: tighter defaults always produce equal-or-better output than coarser ones.
+**Priority:** Tier 1 鈥?output quality. Affects every user doing detailed vector work. Low risk: tighter defaults always produce equal-or-better output than coarser ones.
 
-**Cross-check note (audit 2C):** Audit identified this as Critical 5. Verified default is 0.5mm at JobCompiler.ts:814. Audit's recommended values (cut: 0.02-0.05mm, score: 0.05mm, fill boundary: 0.03-0.05mm, preview: coarser) match the proposal here. The 0.02mm cut tolerance is probably tighter than needed — 0.05mm is below typical kerf width on diode lasers, so curves will be smoother than the laser can resolve anyway. Sticking with 0.05mm cut keeps point counts bounded.
+**Cross-check note (audit 2C):** Audit identified this as Critical 5. Verified default is 0.5mm at JobCompiler.ts:814. Audit's recommended values (cut: 0.02-0.05mm, score: 0.05mm, fill boundary: 0.03-0.05mm, preview: coarser) match the proposal here. The 0.02mm cut tolerance is probably tighter than needed 鈥?0.05mm is below typical kerf width on diode lasers, so curves will be smoother than the laser can resolve anyway. Sticking with 0.05mm cut keeps point counts bounded.
 
 ---
 
@@ -1997,13 +1997,13 @@ for (let i = 1; i < corners.length; i++) {
 
 The first delta from relative origin `(0, 0)` to `corners[0]` is **never emitted**. Frame motion starts from wherever the head currently is, jumping directly to `corners[1] - corners[0]` instead of first moving to `corners[0]`.
 
-**Why this is severe for front-origin machines:** For Falcon, SCULPFUN, Atomstack, and most consumer diode lasers (front-left origin), the design's top-left scene corner — `corners[0]` — transforms via Y-flip to `(0, jobHeight)` in machine space. So the actual job's first relative move is `(0, jobHeight)` — but the frame skips this. The frame traces a rectangle starting from the head position, while the burn starts from `(0, jobHeight)` relative to head.
+**Why this is severe for front-origin machines:** For Falcon, SCULPFUN, Atomstack, and most consumer diode lasers (front-left origin), the design's top-left scene corner 鈥?`corners[0]` 鈥?transforms via Y-flip to `(0, jobHeight)` in machine space. So the actual job's first relative move is `(0, jobHeight)` 鈥?but the frame skips this. The frame traces a rectangle starting from the head position, while the burn starts from `(0, jobHeight)` relative to head.
 
-**Result: frame is vertically shifted by `jobHeight` from actual burn area.** For a 100×50mm design, the frame and burn are off by 50mm vertically. The whole point of framing — verifying the burn area before committing — is defeated.
+**Result: frame is vertically shifted by `jobHeight` from actual burn area.** For a 100脳50mm design, the frame and burn are off by 50mm vertically. The whole point of framing 鈥?verifying the burn area before committing 鈥?is defeated.
 
-For rear-origin machines (rear-left), `corners[0]` typically transforms to `(0, 0)` so the missing move is zero-length and the bug is invisible. That's why this hasn't been caught yet — it works on test machines that are rear-origin.
+For rear-origin machines (rear-left), `corners[0]` typically transforms to `(0, 0)` so the missing move is zero-length and the bug is invisible. That's why this hasn't been caught yet 鈥?it works on test machines that are rear-origin.
 
-**Identified by:** Audit 2D (2026-04-25, ChatGPT). Cross-check verified at exact line numbers. **Real safety failure** — frame ≠ burn for the most common consumer machine configuration.
+**Identified by:** Audit 2D (2026-04-25, ChatGPT). Cross-check verified at exact line numbers. **Real safety failure** 鈥?frame 鈮?burn for the most common consumer machine configuration.
 
 **Fix:** Initialize `prev` to `(0, 0)` and start the loop at `i = 0`:
 
@@ -2011,8 +2011,8 @@ For rear-origin machines (rear-left), `corners[0]` typically transforms to `(0, 
 if (startMode === 'current') {
   const out: string[] = ['G91', 'G21'];
   out.push(laserMode === 'dot' ? `M4 S${frameDotS}` : 'M5 S0');
-  let prev = { x: 0, y: 0 };  // ← was: corners[0]!
-  for (let i = 0; i < corners.length; i++) {  // ← was: i = 1
+  let prev = { x: 0, y: 0 };  // 鈫?was: corners[0]!
+  for (let i = 0; i < corners.length; i++) {  // 鈫?was: i = 1
     const c = corners[i]!;
     const dx = c.x - prev.x;
     const dy = c.y - prev.y;
@@ -2029,18 +2029,18 @@ if (startMode === 'current') {
 }
 ```
 
-This makes the frame's first move identical to the actual job's first move. The closing return-to-origin is also new — currently the frame ends wherever `corners[N]` left the head, not back at the start.
+This makes the frame's first move identical to the actual job's first move. The closing return-to-origin is also new 鈥?currently the frame ends wherever `corners[N]` left the head, not back at the start.
 
 **Tests:** `tests/frame-current-mode-emits-first-move.test.ts`:
-- Front-left machine, 100×50mm design, current mode. Build frame corners. Build frame gcode. Assert first emitted G0/G1 line moves to the same XY as the job's first move would.
+- Front-left machine, 100脳50mm design, current mode. Build frame corners. Build frame gcode. Assert first emitted G0/G1 line moves to the same XY as the job's first move would.
 - Rear-left machine, same design. Frame still works (corners[0] = origin, first move is zero-length, skipped by eps check).
 - Front-right and rear-right machines: deferred until T1-40.
 
 **Estimate:** ~30 minutes. Two-line code change. Test setup is the bulk of the time.
 
-**Priority:** Tier 1 — safety. Real frame-vs-burn divergence on front-origin machines. Should ship in the same session as the test that proves the fix. Hardware-verify by framing a job at different positions on the bed and confirming the frame outline matches the actual burn area.
+**Priority:** Tier 1 鈥?safety. Real frame-vs-burn divergence on front-origin machines. Should ship in the same session as the test that proves the fix. Hardware-verify by framing a job at different positions on the bed and confirming the frame outline matches the actual burn area.
 
-**Cross-check note (audit 2D):** Audit identified this as Critical 4 ("Frame can disagree with actual burn"). Verified exactly. Single most actionable safety fix from audit 2D. Independent of T1-40 (right-origin support) and T1-41 (saved-origin verification) — those are larger fixes for different problems.
+**Cross-check note (audit 2D):** Audit identified this as Critical 4 ("Frame can disagree with actual burn"). Verified exactly. Single most actionable safety fix from audit 2D. Independent of T1-40 (right-origin support) and T1-41 (saved-origin verification) 鈥?those are larger fixes for different problems.
 
 ---
 
@@ -2048,9 +2048,9 @@ This makes the frame's first move identical to the actual job's first move. The 
 
 **Code reference:** `src/core/devices/DeviceProfile.ts:20` (type allows right-origin), `src/ui/components/WelcomeWizard.tsx:378,386` (UI exposes right-origin as selectable), `src/core/plan/MachineTransform.ts:71-91, 137-151` (transform never mirrors X).
 
-**Problem:** Cross-check confirmed: `MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right'`. WelcomeWizard at lines 378/386 actively presents `rear-right` and `front-right` as user-selectable options during initial setup. BUT — `applyMachineTransform` at lines 71-91 only computes `flipY` (via `useFrontOriginYFlip`); X is always `move.to.x + offsetX` (lines 141, 149). No `useRightOriginXFlip` function exists.
+**Problem:** Cross-check confirmed: `MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right'`. WelcomeWizard at lines 378/386 actively presents `rear-right` and `front-right` as user-selectable options during initial setup. BUT 鈥?`applyMachineTransform` at lines 71-91 only computes `flipY` (via `useFrontOriginYFlip`); X is always `move.to.x + offsetX` (lines 141, 149). No `useRightOriginXFlip` function exists.
 
-**Result:** A user who selects `front-right` or `rear-right` during setup gets gcode that's correct for `front-left`/`rear-left`. Their machine, with physical zero on the right side, interprets `X+` as moving leftward into the bed — but LaserForge sends X-positive coordinates expecting leftward-from-right-zero. Output is mirrored horizontally.
+**Result:** A user who selects `front-right` or `rear-right` during setup gets gcode that's correct for `front-left`/`rear-left`. Their machine, with physical zero on the right side, interprets `X+` as moving leftward into the bed 鈥?but LaserForge sends X-positive coordinates expecting leftward-from-right-zero. Output is mirrored horizontally.
 
 **This is shippable wrong behavior.** Right-origin machines (some Roly, some commercial CO2) silently produce wrong output.
 
@@ -2058,16 +2058,16 @@ This makes the frame's first move identical to the actual job's first move. The 
 
 **Fix:** Two-stage. Ship the band-aid first, then the proper fix.
 
-**Stage 1 — Band-aid (~15 min):** Disable right-origin selection in WelcomeWizard until proper support lands. Add a "(coming soon)" label like LayerPanel did for offset fill. Existing users with right-origin profiles in their saved settings continue to use them (backward compat) but a one-time warning surfaces: "Right-origin support is incomplete. Output may be mirrored. Select left-origin if your machine has zero on the left side."
+**Stage 1 鈥?Band-aid (~15 min):** Disable right-origin selection in WelcomeWizard until proper support lands. Add a "(coming soon)" label like LayerPanel did for offset fill. Existing users with right-origin profiles in their saved settings continue to use them (backward compat) but a one-time warning surfaces: "Right-origin support is incomplete. Output may be mirrored. Select left-origin if your machine has zero on the left side."
 
-**Stage 2 — Proper fix (~1-2 sessions):** Implement X-flip throughout the coordinate stack.
+**Stage 2 鈥?Proper fix (~1-2 sessions):** Implement X-flip throughout the coordinate stack.
 
 (1) Add `bedWidthMm` to `MachineTransformOptions`:
 ```ts
 export interface MachineTransformOptions {
   // ... existing fields ...
   bedHeightMm: number;
-  bedWidthMm: number;  // ← new
+  bedWidthMm: number;  // 鈫?new
 }
 ```
 
@@ -2104,23 +2104,23 @@ function transformMove(move, offsetX, offsetY, flipReferenceX, flipReferenceY, f
 
 (5) Update `SceneRenderer` overlay to mirror the bed rectangle when right-origin is active.
 
-(6) Update preflight messages — "X out of bed" reasoning is reversed for right-origin (negative X means past the right edge, not the left).
+(6) Update preflight messages 鈥?"X out of bed" reasoning is reversed for right-origin (negative X means past the right edge, not the left).
 
 **Tests:** `tests/right-origin-x-flip.test.ts`:
-- Front-right machine, 100×50mm design at canvas (10, 20). Compile absolute mode. Assert generated X coordinates are `bedWidth - 110` to `bedWidth - 10`, not `10` to `110`.
+- Front-right machine, 100脳50mm design at canvas (10, 20). Compile absolute mode. Assert generated X coordinates are `bedWidth - 110` to `bedWidth - 10`, not `10` to `110`.
 - Rear-right machine, same design. Assert X mirroring without Y flip.
 - Frame corners for right-origin machines match the compiled job's machine bounds (sanity check).
 - Preflight rejects right-origin job with X exceeding the right side of bed (i.e. negative `flipReferenceX - x + offsetX`).
 
 **Estimate:** Stage 1: ~15 min. Stage 2: ~1-2 sessions including UI overlay updates and preflight message tweaks.
 
-**Priority:** Tier 1 — safety. Shippable wrong behavior. Stage 1 (band-aid) ships immediately. Stage 2 can land later but should be Tier 1 too.
+**Priority:** Tier 1 鈥?safety. Shippable wrong behavior. Stage 1 (band-aid) ships immediately. Stage 2 can land later but should be Tier 1 too.
 
 **Cross-check note (audit 2D):** Audit identified this as Critical 3 ("right-origin support is a false promise"). Verified at exact line numbers. Audit's proposed fix (X-flip with `bedWidthMm` as flip reference) matches the proposal here. The two-stage approach (disable first, implement properly) parallels how T1-37 disabled the offset fill UI option until proper implementation.
 
 ---
 
-### T1-41 | Saved-origin verification — query $# at frame/start, compare to stored snapshot
+### T1-41 | Saved-origin verification 鈥?query $# at frame/start, compare to stored snapshot
 
 **Code reference:** `src/core/output/GcodeOrigin.ts:39-55` (`computeGcodeOffset` ignores `_savedOrigin`), `src/app/sendSetOriginWcsCommand.ts` (Set Origin sends `G10 L20 P1 X0 Y0`), `src/controllers/grbl/GrblController.ts:765-783` (WCS normalize sends `G10 L2 P1 X0 Y0 Z0`), `src/app/MachineService.ts` (where the verification check would live).
 
@@ -2171,21 +2171,21 @@ The proactive invalidation is the cheap safeguard. The pre-start verification is
 
 **Tests:** `tests/saved-origin-verifies-wcs.test.ts`:
 - Set Origin: snapshot G54. Run saved-origin job. Verify proceeds.
-- Set Origin → simulate WCS normalize → run saved-origin job. Assert blocked with mismatch error.
-- Set Origin → user sends `G10 L2 P1 X10 Y20` via console → run saved-origin job. Assert blocked.
-- Set Origin → disconnect → reconnect → verify saved-origin state is invalidated, run requires re-setup.
+- Set Origin 鈫?simulate WCS normalize 鈫?run saved-origin job. Assert blocked with mismatch error.
+- Set Origin 鈫?user sends `G10 L2 P1 X10 Y20` via console 鈫?run saved-origin job. Assert blocked.
+- Set Origin 鈫?disconnect 鈫?reconnect 鈫?verify saved-origin state is invalidated, run requires re-setup.
 
 **Estimate:** ~1-2 sessions. Touches Set Origin command, MachineService, UI saved-origin state, the gcode start path, and the WCS-normalize flow.
 
-**Priority:** Tier 1 — safety. Saved-origin is a primary user workflow ("set zero on the corner of my workpiece, then run repeat jobs"). Currently producing silently-wrong output when the assumed G54 has drifted is a serious safety regression.
+**Priority:** Tier 1 鈥?safety. Saved-origin is a primary user workflow ("set zero on the corner of my workpiece, then run repeat jobs"). Currently producing silently-wrong output when the assumed G54 has drifted is a serious safety regression.
 
-**Cross-check note (audit 2D):** Audit's Critical 1 + Critical 2 + Fix 1. Verified at every line. Audit proposed two architectural options: (A) WCS-based saved origin with verification, or (B) compile-based saved origin (emit absolute machine coordinates). This entry follows option A — keep G54 as the anchor but verify it. Option B would require known homed machine coordinates, which not every Falcon ships with reliably; A is the more compatible fix.
+**Cross-check note (audit 2D):** Audit's Critical 1 + Critical 2 + Fix 1. Verified at every line. Audit proposed two architectural options: (A) WCS-based saved origin with verification, or (B) compile-based saved origin (emit absolute machine coordinates). This entry follows option A 鈥?keep G54 as the anchor but verify it. Option B would require known homed machine coordinates, which not every Falcon ships with reliably; A is the more compatible fix.
 
 ---
 
 ### T1-42 | Frame bounds confirmation uses `buildFrameCorners`, not `workFrame`
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:499-507` (`workFrame` computation), `src/ui/components/ConnectionPanelMain.tsx:737-746` (`confirmFrameBounds`), `src/app/frameGcode.ts:10-21` (`buildFrameCorners` — used by actual framing).
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:499-507` (`workFrame` computation), `src/ui/components/ConnectionPanelMain.tsx:737-746` (`confirmFrameBounds`), `src/app/frameGcode.ts:10-21` (`buildFrameCorners` 鈥?used by actual framing).
 
 **Problem:** Cross-check confirmed at ConnectionPanelMain.tsx:499-507:
 
@@ -2236,18 +2236,18 @@ const frameMachineBounds = useMemo(() => {
 }, [startMode, savedOrigin, activeProfile, sceneBounds]);
 ```
 
-`confirmFrameBounds` then uses `frameMachineBounds` to compare against bed limits, replacing the existing `workFrame`-based logic. The displayed "Frame will cover X×Y at (minX, minY)" string also uses these values.
+`confirmFrameBounds` then uses `frameMachineBounds` to compare against bed limits, replacing the existing `workFrame`-based logic. The displayed "Frame will cover X脳Y at (minX, minY)" string also uses these values.
 
 **Hardening:** beyond just warning, frame motion should be **hard-blocked** when machine-space bounds are off-bed (audit's Fix in Finding 2D-09). Currently frame is "warn and continue." Should be "block and require user override or fix scene." Frame-dot in particular fires a low-power laser; off-bed motion with laser-on is a real risk.
 
 **Tests:** `tests/frame-confirm-uses-machine-corners.test.ts`:
-- Front-left machine, 100×50mm design at canvas (10, 20). Display frame bounds. Assert displayed bounds match what the actual frame motion will trace (machine-space, post-Y-flip).
+- Front-left machine, 100脳50mm design at canvas (10, 20). Display frame bounds. Assert displayed bounds match what the actual frame motion will trace (machine-space, post-Y-flip).
 - Rear-left machine, same design. Assert displayed bounds match.
 - Design that would go off-bed when transformed. Assert frame is blocked, not just warned.
 
 **Estimate:** ~1 session. Replace the memoization, plumb `bedWidthMm` (depends on T1-40 stage 1), update display strings, change warn to block, add tests.
 
-**Priority:** Tier 1. Closely related to T1-39 (frame motion bug) — both produce frame-vs-burn mismatches. T1-39 is the motion fix; T1-42 is the bounds-check fix.
+**Priority:** Tier 1. Closely related to T1-39 (frame motion bug) 鈥?both produce frame-vs-burn mismatches. T1-39 is the motion fix; T1-42 is the bounds-check fix.
 
 **Cross-check note (audit 2D):** Audit's Finding 2D-07. Verified that `workFrame` and `buildFrameCorners` use different coordinate models. Pushback on framing: audit also flags 2D-09 (frame not hard-blocked) as separate; folding both into this entry because the same code path owns both behaviors.
 
@@ -2292,7 +2292,7 @@ encodeHeader(job, options) {
 }
 ```
 
-The reassert is idempotent — if customStart already left the mode in the right state, the line is a no-op.
+The reassert is idempotent 鈥?if customStart already left the mode in the right state, the line is a no-op.
 
 (2) **Validator catches mode-flips in customStart:**
 
@@ -2312,12 +2312,12 @@ The reassert in (1) is defense-in-depth even if validator misses something. Vali
 
 **Tests:** `tests/customstart-mode-reassertion.test.ts`:
 - customStart contains `G90`, job in current mode. Assert validator emits TEMPLATE_G90_IN_HEADER_OR_CUSTOMSTART error AND emitted gcode reasserts G91 after the custom block.
-- customStart contains `G91`, job in absolute mode. Same — validator + reassert.
+- customStart contains `G91`, job in absolute mode. Same 鈥?validator + reassert.
 - Empty customStart. Assert no extra lines emitted (existing behavior preserved).
 
 **Estimate:** ~1 hour. Two small code changes, validator additions, tests.
 
-**Priority:** Tier 1 — safety. Real failure mode: user with a custom-start template they wrote months ago, forgotten about the G90 they put in, runs a current-mode job, output goes nowhere expected. Cheap to fix.
+**Priority:** Tier 1 鈥?safety. Real failure mode: user with a custom-start template they wrote months ago, forgotten about the G90 they put in, runs a current-mode job, output goes nowhere expected. Cheap to fix.
 
 **Cross-check note (audit 2D):** Audit's Finding 2D-11. Verified at exact lines. Audit's recommendation matches the proposal. Note: T2-14 (non-removable safety wrapper) restructures the header generation more thoroughly. T1-43 is the bounded fix that ships independently; T2-14 absorbs it into the broader safety-wrapper architecture.
 
@@ -2375,7 +2375,7 @@ private _checkJobBounds(lines: string[]): string | null {
       if (xMatch) curX += parseFloat(xMatch[1]);
       if (yMatch) curY += parseFloat(yMatch[1]);
     } else {
-      // Absolute — use the values directly
+      // Absolute 鈥?use the values directly
       if (xMatch) curX = parseFloat(xMatch[1]);
       if (yMatch) curY = parseFloat(yMatch[1]);
     }
@@ -2398,30 +2398,30 @@ Two key changes:
 - Check accumulated position against bed for G91, current position for G90
 
 **Tests:** `tests/controller-bounds-checks-g91.test.ts`:
-- G91 job with deltas summing to within bed → pass.
-- G91 job with deltas summing past bed edge from current position → blocked.
-- G91 job started with unknown position (no fresh status) → blocked with "position unknown" error.
-- G91 → G90 mid-job → simulation switches modes correctly.
+- G91 job with deltas summing to within bed 鈫?pass.
+- G91 job with deltas summing past bed edge from current position 鈫?blocked.
+- G91 job started with unknown position (no fresh status) 鈫?blocked with "position unknown" error.
+- G91 鈫?G90 mid-job 鈫?simulation switches modes correctly.
 
-**Estimate:** ~1 session. Algorithm change in `_checkJobBounds` plus tests. Tests are most of the work — need fault-injection scenarios (T2-13 helps here).
+**Estimate:** ~1 session. Algorithm change in `_checkJobBounds` plus tests. Tests are most of the work 鈥?need fault-injection scenarios (T2-13 helps here).
 
-**Priority:** Tier 1 — defense-in-depth safety. Compile-time check exists; this closes the runtime gap for relative-mode jobs.
+**Priority:** Tier 1 鈥?defense-in-depth safety. Compile-time check exists; this closes the runtime gap for relative-mode jobs.
 
 **Cross-check note (audit 2D):** Audit's Finding 2D-06 + Fix 6. Verified `if (relative) continue` at line 469. Audit's recommendation matches: simulate relative motion from known starting position, refuse if unknown. Implementation is contained to one function.
 
 ---
 
-### T1-45 | Compile complexity gate — warn/block on huge jobs before they freeze the renderer
+### T1-45 | Compile complexity gate 鈥?warn/block on huge jobs before they freeze the renderer
 
 **Code reference:** New preflight rule, plus integration in `src/app/PipelineService.ts:89-200` (compileGcode) before the heavy compile work begins.
 
-**Problem:** Cross-check confirmed audit 2E's central architectural claim: compile/output runs on the renderer thread synchronously, with no progress, no cancel, and no estimate. Worst case: a user imports a 4000×3000 photo, hits "compile" — and the app freezes for tens of seconds to minutes while it runs grayscale segment extraction → planner moves → G-code text generation. Users can't tell if the app is processing or hung; some kill it; some wait 30s+.
+**Problem:** Cross-check confirmed audit 2E's central architectural claim: compile/output runs on the renderer thread synchronously, with no progress, no cancel, and no estimate. Worst case: a user imports a 4000脳3000 photo, hits "compile" 鈥?and the app freezes for tens of seconds to minutes while it runs grayscale segment extraction 鈫?planner moves 鈫?G-code text generation. Users can't tell if the app is processing or hung; some kill it; some wait 30s+.
 
-The audit's 16MP / 16-24M-line stress scenarios are extreme. **But intermediate sizes hit pain too:** a 200mm × 200mm photo at 254 DPI is 4MP (audit's 4.0 MP scenario), generates plausibly 1-4M G-code lines if grayscale per-pixel, and produces multi-second renderer freezes today.
+The audit's 16MP / 16-24M-line stress scenarios are extreme. **But intermediate sizes hit pain too:** a 200mm 脳 200mm photo at 254 DPI is 4MP (audit's 4.0 MP scenario), generates plausibly 1-4M G-code lines if grayscale per-pixel, and produces multi-second renderer freezes today.
 
 The full streaming architecture fix (T3-15) is multi-week work that doesn't help current users. **The compile complexity gate is the cheap defense:** estimate the job's expected complexity from the scene (raster pixels, expected scanline rows, vector path count) and warn/block before launching the actual compile.
 
-**Identified by:** Audit 2E (2026-04-25, ChatGPT). Cross-check confirmed at every line — no preflight estimates exist for compile cost.
+**Identified by:** Audit 2E (2026-04-25, ChatGPT). Cross-check confirmed at every line 鈥?no preflight estimates exist for compile cost.
 
 **Fix:** New preflight rule `src/core/preflight/rules/CompileComplexityPreflight.ts` runs BEFORE the actual compile starts:
 
@@ -2464,7 +2464,7 @@ export function checkCompileComplexity(estimate: ComplexityEstimate): PreflightI
     return [{
       code: 'COMPILE_COMPLEXITY_CONFIRM',
       severity: 'warning',
-      title: 'Large job — compile will take time',
+      title: 'Large job 鈥?compile will take time',
       detail: `Estimated ${estimate.expectedGcodeLineCount.toLocaleString()} G-code lines. Compile may take 30+ seconds and the UI will be unresponsive during it.`,
       fix: 'Click "Compile anyway" to proceed, or reduce job complexity.',
     }];
@@ -2483,32 +2483,32 @@ export function checkCompileComplexity(estimate: ComplexityEstimate): PreflightI
 The gate runs as part of the existing preflight engine. Unique behavior: it runs BEFORE compile (most preflight rules run after, on the compiled ticket). Add a "preflight phase" distinction or call this estimator separately in `compileGcode` before the actual work.
 
 **Tests:** `tests/compile-complexity-gate.test.ts`:
-- Scene with single 100×100mm vector cut → no warning.
-- Scene with 200×200mm photo at 254 DPI in grayscale mode → estimated >1M lines, warning fires.
-- Scene with full-bed 400×400mm at 254 DPI in grayscale → estimated >10M lines, hard block.
-- Same scene in 1-bit dithered mode → estimate is 100x smaller, no warning.
+- Scene with single 100脳100mm vector cut 鈫?no warning.
+- Scene with 200脳200mm photo at 254 DPI in grayscale mode 鈫?estimated >1M lines, warning fires.
+- Scene with full-bed 400脳400mm at 254 DPI in grayscale 鈫?estimated >10M lines, hard block.
+- Same scene in 1-bit dithered mode 鈫?estimate is 100x smaller, no warning.
 
 **Estimate:** ~1 session. Estimator function + preflight integration + tests.
 
-**Priority:** Tier 1 — UX safety. Cheap defense against the most painful current failure mode (unresponsive app during compile of large photo). Doesn't fix the underlying architecture but makes it visible to the user before they hit it.
+**Priority:** Tier 1 鈥?UX safety. Cheap defense against the most painful current failure mode (unresponsive app during compile of large photo). Doesn't fix the underlying architecture but makes it visible to the user before they hit it.
 
-**Cross-check note (audit 2E):** Audit's Priority 0 ("Introduce a large-job complexity gate"). Verified compile is synchronous and unbounded. The audit's framing of "FAIL — cannot be trusted for large jobs" is overstated for the typical Falcon-class user (median work is well under 1M lines), but the unbounded behavior is real and worth gating. **Filing this as Tier 1 specifically because it's the cheapest defense — full architectural streaming (T3-15) is the proper fix but takes weeks; this ships in a session and protects users from the worst surprises.**
+**Cross-check note (audit 2E):** Audit's Priority 0 ("Introduce a large-job complexity gate"). Verified compile is synchronous and unbounded. The audit's framing of "FAIL 鈥?cannot be trusted for large jobs" is overstated for the typical Falcon-class user (median work is well under 1M lines), but the unbounded behavior is real and worth gating. **Filing this as Tier 1 specifically because it's the cheapest defense 鈥?full architectural streaming (T3-15) is the proper fix but takes weeks; this ships in a session and protects users from the worst surprises.**
 
 ---
 
 ### T1-46 | `notifySimulatorTx` per-line loop blocks job start
 
-**Code reference:** `src/app/MachineService.ts:456` — `for (const line of lines) notifySimulatorTx(line);` runs synchronously before `sendJob(lines)` at line 457.
+**Code reference:** `src/app/MachineService.ts:456` 鈥?`for (const line of lines) notifySimulatorTx(line);` runs synchronously before `sendJob(lines)` at line 457.
 
-**Problem:** Cross-check confirmed at MachineService.ts:456: every job line is dispatched to `notifySimulatorTx` synchronously BEFORE the controller's `sendJob` is called. For a 2M-line job, this loop alone is the time-to-first-byte — the controller doesn't see any G-code until the simulator has been notified about every single line.
+**Problem:** Cross-check confirmed at MachineService.ts:456: every job line is dispatched to `notifySimulatorTx` synchronously BEFORE the controller's `sendJob` is called. For a 2M-line job, this loop alone is the time-to-first-byte 鈥?the controller doesn't see any G-code until the simulator has been notified about every single line.
 
-The simulator/log path receives all lines at once. Whatever it does with them (record, append to a buffer, update internal state) is also done synchronously inside this loop. For very large jobs this can be a multi-second freeze RIGHT AT THE MOMENT THE USER CLICKS START — the worst possible time for UI stutter, because the user expects "click start → laser begins" within ~100ms.
+The simulator/log path receives all lines at once. Whatever it does with them (record, append to a buffer, update internal state) is also done synchronously inside this loop. For very large jobs this can be a multi-second freeze RIGHT AT THE MOMENT THE USER CLICKS START 鈥?the worst possible time for UI stutter, because the user expects "click start 鈫?laser begins" within ~100ms.
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) section 6.3. Cross-check verified exact line.
 
 **Fix:** Two options, simplest first.
 
-**Option A — Sampled notification (~30 min):** The simulator doesn't need every line; it needs a sufficient sampling to support its features (streaming progress, replay, stats). Notify every Nth line (e.g. every 100th), or summarize as "lines 0-99 sent" instead of 100 individual notifications.
+**Option A 鈥?Sampled notification (~30 min):** The simulator doesn't need every line; it needs a sufficient sampling to support its features (streaming progress, replay, stats). Notify every Nth line (e.g. every 100th), or summarize as "lines 0-99 sent" instead of 100 individual notifications.
 
 ```ts
 // MachineService.ts
@@ -2520,7 +2520,7 @@ for (let i = 0; i < lines.length; i += NOTIFY_INTERVAL) {
 notifySimulatorTxBulk(lines);  // simulator decides internally how to handle
 ```
 
-**Option B — Move to RAF / deferred (~1 hour):** Notify on a setTimeout(0) loop or RAF (requestAnimationFrame). Lets the controller start streaming immediately while simulator catches up.
+**Option B 鈥?Move to RAF / deferred (~1 hour):** Notify on a setTimeout(0) loop or RAF (requestAnimationFrame). Lets the controller start streaming immediately while simulator catches up.
 
 ```ts
 // Start sendJob immediately
@@ -2546,7 +2546,7 @@ Investigate first: what does `notifySimulatorTx` actually do? If it just appends
 
 **Estimate:** ~30 min - 1 hour depending on which option. Investigation of simulator usage is most of the time.
 
-**Priority:** Tier 1 — UX. Cheap fix for a real user-visible freeze at the worst possible moment (clicking Start). Independent of the broader streaming architecture (T3-15).
+**Priority:** Tier 1 鈥?UX. Cheap fix for a real user-visible freeze at the worst possible moment (clicking Start). Independent of the broader streaming architecture (T3-15).
 
 **Cross-check note (audit 2E):** Audit's section 6.3. Verified at exact line. Audit's recommendation matches Option A (sampling). Option B (deferred full notification) is a slight refinement that preserves simulator features.
 
@@ -2600,7 +2600,7 @@ This guard runs as part of every `npm test` and fails immediately if a new test 
 
 **Estimate:** ~30 min total.
 
-**Priority:** Tier 1 — test infrastructure correctness. The kind of cheap, defensive change that pays back over years.
+**Priority:** Tier 1 鈥?test infrastructure correctness. The kind of cheap, defensive change that pays back over years.
 
 **Cross-check note (audit 2F):** Audit identified the exact filename. Pattern (auto-discover or meta-test) matches the audit's recommendation.
 
@@ -2610,15 +2610,15 @@ This guard runs as part of every `npm test` and fails immediately if a new test 
 
 **Code reference:** `src/core/output/Output.ts:184` (`createdAt: new Date().toISOString()`), `src/core/output/Output.ts:203` (`; Date: ${new Date().toISOString()}` in default header).
 
-**Problem:** Cross-check confirmed both timestamps. The header `; Date:` comment (line 203) is normalized away in the E2E `compileToGcode` helper. **But the `createdAt` field on the Output object (line 184) is not normalized** — any test that asserts on Output's metadata fields gets non-deterministic timestamp data. This breaks reproducible builds (the same input produces a different Output object on different days), affects any future replay tooling that hashes the Output for cache-key purposes, and contaminates snapshot tests that compare Output objects rather than just the text field.
+**Problem:** Cross-check confirmed both timestamps. The header `; Date:` comment (line 203) is normalized away in the E2E `compileToGcode` helper. **But the `createdAt` field on the Output object (line 184) is not normalized** 鈥?any test that asserts on Output's metadata fields gets non-deterministic timestamp data. This breaks reproducible builds (the same input produces a different Output object on different days), affects any future replay tooling that hashes the Output for cache-key purposes, and contaminates snapshot tests that compare Output objects rather than just the text field.
 
-The header date comment is also a small determinism wart even though normalization handles it — every emitted G-code file has a date stamp that changes per compile, requiring normalization in every snapshot consumer.
+The header date comment is also a small determinism wart even though normalization handles it 鈥?every emitted G-code file has a date stamp that changes per compile, requiring normalization in every snapshot consumer.
 
 **Identified by:** Audit 2F (2026-04-25, ChatGPT) section 7. Cross-check verified at exact lines.
 
 **Fix:** Two-part.
 
-(1) **`createdAt` field — make injectable.** Accept an optional `clock: () => string` in `GcodeGenerateOptions`. Default to `() => new Date().toISOString()` for production. Tests pass `() => '2024-01-01T00:00:00.000Z'` for determinism.
+(1) **`createdAt` field 鈥?make injectable.** Accept an optional `clock: () => string` in `GcodeGenerateOptions`. Default to `() => new Date().toISOString()` for production. Tests pass `() => '2024-01-01T00:00:00.000Z'` for determinism.
 
 ```ts
 // In Output.ts
@@ -2632,7 +2632,7 @@ return {
 
 `compileGcode` in PipelineService.ts forwards the option from its caller. Test helpers set the deterministic clock; production paths use real time.
 
-(2) **Header `; Date:` comment — drop entirely or use the same injected clock.** The comment is informational only, never read by any controller. Removing it is harmless. Alternative: same `clock()` injection so deterministic tests don't need to normalize away the date.
+(2) **Header `; Date:` comment 鈥?drop entirely or use the same injected clock.** The comment is informational only, never read by any controller. Removing it is harmless. Alternative: same `clock()` injection so deterministic tests don't need to normalize away the date.
 
 **Tests:** `tests/output-deterministic-with-clock-injection.test.ts`:
 - Compile same scene twice with `clock: () => '2024-01-01T00:00:00.000Z'`. Assert Output objects are byte-identical including `createdAt`.
@@ -2640,7 +2640,7 @@ return {
 
 **Estimate:** ~30 min including plumbing through PipelineService and updating any test that relies on real timestamps.
 
-**Priority:** Tier 1 — test infrastructure. Foundation for T2-23 (determinism gate). Without this, the determinism gate would have to special-case `createdAt`.
+**Priority:** Tier 1 鈥?test infrastructure. Foundation for T2-23 (determinism gate). Without this, the determinism gate would have to special-case `createdAt`.
 
 **Cross-check note (audit 2F):** Audit's section 7 finding 1 + finding 2. Verified at exact line numbers.
 
@@ -2658,9 +2658,9 @@ async connectRealLaser(baudRate: number): Promise<void> {
     throw new Error('Web Serial not supported in this browser');
   }
   const ws = createSerialPort('web') as WebSerialPort;
-  this.portRef.current = ws;            // ← assigned BEFORE open/handshake
-  await ws.requestAndOpen(baudRate);    // ← can throw
-  await this.controllerRef.current.connect(ws);  // ← can throw
+  this.portRef.current = ws;            // 鈫?assigned BEFORE open/handshake
+  await ws.requestAndOpen(baudRate);    // 鈫?can throw
+  await this.controllerRef.current.connect(ws);  // 鈫?can throw
   this.state.isSimulator = false;
 }
 ```
@@ -2716,7 +2716,7 @@ async connectRealLaser(baudRate: number): Promise<void> {
 
 **Estimate:** ~30 min. Single function rewrite + 3 tests.
 
-**Priority:** Tier 1 — defect fix. Real issue affecting users today: failed connections wedge the app until reload.
+**Priority:** Tier 1 鈥?defect fix. Real issue affecting users today: failed connections wedge the app until reload.
 
 **Cross-check note (audit 3B):** Audit's section 6.3, 7, P0 fix #4. Verified at exact lines.
 
@@ -2724,7 +2724,7 @@ async connectRealLaser(baudRate: number): Promise<void> {
 
 ### T1-50 | Connect button mutex / abortable connect
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:542-555` (`connectRealLaser` UI handler — no mutex), `src/ui/components/connection/ConnectWizard.tsx:25-33` (Connect button — no `connecting` state).
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:542-555` (`connectRealLaser` UI handler 鈥?no mutex), `src/ui/components/connection/ConnectWizard.tsx:25-33` (Connect button 鈥?no `connecting` state).
 
 **Problem:** Cross-check verified: UI Connect button has no mutex. Two rapid clicks each call `machineService.connectRealLaser()`, each creating a new `WebSerialPort` and each calling `requestAndOpen`. The first one to finish handshake succeeds (controller assigns `_port`); the second one's controller connect rejects with "Already connected. Disconnect first." But the second's `WebSerialPort` instance is already opened and not closed.
 
@@ -2734,7 +2734,7 @@ Plus `ExecutionCoordinator.safeDisconnect` early-returns when status is `connect
 
 **Fix:** Two parts.
 
-**Part A — UI mutex.** Add `connecting` state to ConnectionPanelMain and ConnectWizard. While true, Connect button is disabled (with visual feedback "Connecting..."). Sequence:
+**Part A 鈥?UI mutex.** Add `connecting` state to ConnectionPanelMain and ConnectWizard. While true, Connect button is disabled (with visual feedback "Connecting..."). Sequence:
 
 ```ts
 // ConnectionPanelMain
@@ -2750,7 +2750,7 @@ const connectRealLaser = async () => {
     appendMessage('Port opened, waiting for GRBL welcome...');
     await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200);
     setSimulator(false);
-    appendMessage('✓ Real laser connected via USB');
+    appendMessage('鉁?Real laser connected via USB');
   } catch (e: any) {
     appendMessage(`Connection failed: ${e.message}`);
   } finally {
@@ -2759,11 +2759,11 @@ const connectRealLaser = async () => {
 };
 
 <button disabled={connecting} onClick={connectRealLaser}>
-  {connecting ? 'Connecting...' : '🔌 Connect via USB'}
+  {connecting ? 'Connecting...' : '馃攲 Connect via USB'}
 </button>
 ```
 
-**Part B — Abortable connect.** `MachineService.connectRealLaser` accepts an optional AbortSignal. If signaled, the in-flight `requestAndOpen` and `controller.connect` are aborted/cancelled, and cleanup runs.
+**Part B 鈥?Abortable connect.** `MachineService.connectRealLaser` accepts an optional AbortSignal. If signaled, the in-flight `requestAndOpen` and `controller.connect` are aborted/cancelled, and cleanup runs.
 
 ```ts
 async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
@@ -2779,7 +2779,7 @@ async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
 
 UI's Cancel-Connect button calls `abortController.abort()`. Service catches the AbortError and runs T1-49's cleanup path.
 
-Part B is more invasive — it requires AbortSignal propagation through `WebSerialPort.requestAndOpen` (lands in T2-33) and `GrblController.connect` (lands in connection-state-FSM T2-32). For T1-50 scope, ship Part A now and stub Part B's interface (accept `signal?` parameter, ignore for now).
+Part B is more invasive 鈥?it requires AbortSignal propagation through `WebSerialPort.requestAndOpen` (lands in T2-33) and `GrblController.connect` (lands in connection-state-FSM T2-32). For T1-50 scope, ship Part A now and stub Part B's interface (accept `signal?` parameter, ignore for now).
 
 `ExecutionCoordinator.safeDisconnect` updated: when status is `connecting`, instead of early-return, it triggers `abortController.abort()` and waits for the connect to clean up.
 
@@ -2789,13 +2789,13 @@ Part B is more invasive — it requires AbortSignal propagation through `WebSeri
 
 **Estimate:** Part A ~30 min (UI state + button disable). Part B ~1 session (AbortSignal plumbing). Total ~1 session.
 
-**Priority:** Tier 1 — defect fix. Connect-double-click is a realistic user scenario that wedges state.
+**Priority:** Tier 1 鈥?defect fix. Connect-double-click is a realistic user scenario that wedges state.
 
 **Cross-check note (audit 3B):** Audit's section 6.4, 8.1, 8.2 + P0 fix #2.
 
 ---
 
-### T1-51 | Strengthen GRBL handshake proof — reject raw `ok` as welcome
+### T1-51 | Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:223-228` (welcome predicate including `line === 'ok'`).
 
@@ -2830,9 +2830,9 @@ const isWelcome =
   isGrblStatusWelcome;                              // <State|MPos:...> from ?
 ```
 
-If the device responds only with `ok` to the probe sequence, treat as **incomplete handshake** — wait the full timeout, then either (a) retry probes more aggressively (newline + `?` + `$I` repeated), or (b) reject with explicit error: "Device responded but didn't identify as GRBL. Check that you selected the correct port."
+If the device responds only with `ok` to the probe sequence, treat as **incomplete handshake** 鈥?wait the full timeout, then either (a) retry probes more aggressively (newline + `?` + `$I` repeated), or (b) reject with explicit error: "Device responded but didn't identify as GRBL. Check that you selected the correct port."
 
-Probe sequence already includes `$I` (line 223 area). After `ok` is received, if no GRBL/[VER:]/[OPT:]/[MSG:]/<State| line follows within a follow-up window, the connect fails — preserving the existing 10s overall timeout but with a more specific failure reason.
+Probe sequence already includes `$I` (line 223 area). After `ok` is received, if no GRBL/[VER:]/[OPT:]/[MSG:]/<State| line follows within a follow-up window, the connect fails 鈥?preserving the existing 10s overall timeout but with a more specific failure reason.
 
 **Tests:** `tests/grbl-handshake-rejects-bare-ok.test.ts`:
 - Mock device that only responds `ok` to probes. Connect. Assert connect rejects after timeout with reason `unknown-device`.
@@ -2842,19 +2842,19 @@ Probe sequence already includes `$I` (line 223 area). After `ok` is received, if
 
 **Estimate:** ~30 min including tests. Single-line change in the predicate; tests verify the matrix.
 
-**Priority:** Tier 1 — defect fix. Wrong-device scenarios produce silent misbehavior today.
+**Priority:** Tier 1 鈥?defect fix. Wrong-device scenarios produce silent misbehavior today.
 
 **Cross-check note (audit 3B):** Audit's section 7 + P0 handshake fix. Verified at line 228.
 
 ---
 
-### T1-52 | Auto-detect machine settings must include `$30 → maxSpindle`
+### T1-52 | Auto-detect machine settings must include `$30 鈫?maxSpindle`
 
 **Code reference:** `src/ui/components/App.tsx:440-457` (`handleAutoDetectMachine`).
 
 **Problem:** Cross-check verified exactly. Auto-detect copies bed size, max rates, and acceleration from `grblMachineInfo` into the active profile, but **does NOT copy `maxSpindle`**, despite `grblMachineInfo.maxSpindle` being available (the controller parses `$30` correctly per audit's positive findings).
 
-The UI labels this button as auto-detecting "machine settings." Users reasonably expect that all machine settings sync. They click it, see bed/rates update, and trust that the profile now matches. **`maxSpindle` (the most safety-relevant power-scaling value) silently does not update.** Combined with T1-53 (profile maxSpindle wins over live $30), this means a user with `$30=255` and `profile.maxSpindle=1000` who clicks Auto-Detect still has `profile.maxSpindle=1000` and compile still emits S values scaled to 1000 — burning at 4× intended power.
+The UI labels this button as auto-detecting "machine settings." Users reasonably expect that all machine settings sync. They click it, see bed/rates update, and trust that the profile now matches. **`maxSpindle` (the most safety-relevant power-scaling value) silently does not update.** Combined with T1-53 (profile maxSpindle wins over live $30), this means a user with `$30=255` and `profile.maxSpindle=1000` who clicks Auto-Detect still has `profile.maxSpindle=1000` and compile still emits S values scaled to 1000 鈥?burning at 4脳 intended power.
 
 This is a 15-minute defect fix that materially improves correctness for non-default-`$30` machines.
 
@@ -2893,7 +2893,7 @@ homingEnabled: grblMachineInfo.homingEnabled !== undefined ? grblMachineInfo.hom
 softLimitsEnabled: grblMachineInfo.softLimitsEnabled !== undefined ? grblMachineInfo.softLimitsEnabled : current.softLimitsEnabled,  // from $20
 ```
 
-`$23` (origin direction) is more dangerous to auto-apply because it requires mapping firmware semantics to LaserForge's `originCorner` model. Audit's Priority 3 explicitly says "only if mapping is safe and user-confirmed" — leave `$23` for explicit user action, perhaps a future ticket. Profile schema may need new `laserModeEnabled` field if not present.
+`$23` (origin direction) is more dangerous to auto-apply because it requires mapping firmware semantics to LaserForge's `originCorner` model. Audit's Priority 3 explicitly says "only if mapping is safe and user-confirmed" 鈥?leave `$23` for explicit user action, perhaps a future ticket. Profile schema may need new `laserModeEnabled` field if not present.
 
 **Tests:** `tests/auto-detect-includes-max-spindle.test.ts`:
 - Mock grblMachineInfo with `maxSpindle: 255`, `bedWidth: 220`. Call handleAutoDetectMachine. Assert profile updated with `maxSpindle: 255`.
@@ -2902,7 +2902,7 @@ softLimitsEnabled: grblMachineInfo.softLimitsEnabled !== undefined ? grblMachine
 
 **Estimate:** ~30 min including tests + profile schema field addition for laserModeEnabled.
 
-**Priority:** Tier 1 — real defect fix. Tiny scope, real safety value.
+**Priority:** Tier 1 鈥?real defect fix. Tiny scope, real safety value.
 
 **Cross-check note (audit 3C):** Audit's Finding 4.3 + Critical 3 + Priority 3. Verified at exact lines.
 
@@ -2912,18 +2912,18 @@ softLimitsEnabled: grblMachineInfo.softLimitsEnabled !== undefined ? grblMachine
 
 **Code reference:** `src/app/PipelineService.ts:131-134` (current resolution: `profile?.maxSpindle ?? controllerMaxSpindle ?? 1000`).
 
-**Problem:** Cross-check verified at exact lines. Current resolution prefers profile over live `$30`. Combined with `createBlankProfile` always setting `maxSpindle: 1000` (verified at DeviceProfile.ts:339), the live controller value is **always ignored** unless someone manually edits the profile schema's required `maxSpindle` field — which the schema doesn't permit being null.
+**Problem:** Cross-check verified at exact lines. Current resolution prefers profile over live `$30`. Combined with `createBlankProfile` always setting `maxSpindle: 1000` (verified at DeviceProfile.ts:339), the live controller value is **always ignored** unless someone manually edits the profile schema's required `maxSpindle` field 鈥?which the schema doesn't permit being null.
 
 Concrete scenario from audit (verified plausible):
 - Controller firmware has `$30=255` (some Falcon variants, many CO2 controllers, all 8-bit controllers)
 - Active profile has `maxSpindle=1000` (default from createBlankProfile)
 - User compiles 100% power layer
-- `encodePowerValue(100)` → `Math.round((100/100) * 1000)` = `S1000`
-- Controller receives `M4 S1000`. With `$30=255`, the controller clamps S to 255 silently. Result: 100% requested → 100% delivered (clamped).
+- `encodePowerValue(100)` 鈫?`Math.round((100/100) * 1000)` = `S1000`
+- Controller receives `M4 S1000`. With `$30=255`, the controller clamps S to 255 silently. Result: 100% requested 鈫?100% delivered (clamped).
 
 But:
 - User compiles 50% power layer
-- `encodePowerValue(50)` → `Math.round((50/100) * 1000)` = `S500`
+- `encodePowerValue(50)` 鈫?`Math.round((50/100) * 1000)` = `S500`
 - Controller receives `M4 S500`. With `$30=255`, controller clamps to 255. **User wanted 50% but gets 100%.**
 
 This is the silent-miscalibration scenario. T1-52 fixes it for users who click Auto-Detect; T1-53 fixes it for users who don't.
@@ -2942,35 +2942,35 @@ const maxSpindle =
 ```
 
 Plus a preflight rule: when connected AND `controllerMaxSpindle != null` AND `controllerMaxSpindle !== profile.maxSpindle`, surface a **blocker** (severity: error, not warning). The blocker offers two resolutions:
-1. **Update profile** — write `controllerMaxSpindle` into `profile.maxSpindle` and recompile.
-2. **Continue with live value** — explicitly acknowledge that profile is stale; compile uses live value, profile is not modified.
+1. **Update profile** 鈥?write `controllerMaxSpindle` into `profile.maxSpindle` and recompile.
+2. **Continue with live value** 鈥?explicitly acknowledge that profile is stale; compile uses live value, profile is not modified.
 
 This means the user always knows when they're working off-spec. Silent miscalibration is the worst possible outcome.
 
 When NOT connected (`controllerMaxSpindle == null`), profile wins as it does today. This is correct for offline export, pre-connect compile, and simulator mode.
 
 **Tests:** `tests/maxspindle-live-overrides-profile.test.ts`:
-- Connected with `controllerMaxSpindle=255`, profile=1000 → compiled output uses S scaled to 255.
-- Connected with no `$30` (controllerMaxSpindle=null), profile=1000 → uses 1000.
-- Disconnected (no controllerMaxSpindle), profile=500 → uses 500.
+- Connected with `controllerMaxSpindle=255`, profile=1000 鈫?compiled output uses S scaled to 255.
+- Connected with no `$30` (controllerMaxSpindle=null), profile=1000 鈫?uses 1000.
+- Disconnected (no controllerMaxSpindle), profile=500 鈫?uses 500.
 
 `tests/preflight-maxspindle-mismatch-blocks.test.ts`:
-- Connected with `controllerMaxSpindle=255`, profile=1000 → preflight surfaces blocker.
-- Connected with matching values → no blocker.
+- Connected with `controllerMaxSpindle=255`, profile=1000 鈫?preflight surfaces blocker.
+- Connected with matching values 鈫?no blocker.
 
 **Estimate:** ~1 session. Touches PipelineService resolution + new preflight rule + UI for the blocker dialog.
 
-**Priority:** Tier 1 — real defect. Combined with T1-52, closes the silent-miscalibration scenario.
+**Priority:** Tier 1 鈥?real defect. Combined with T1-52, closes the silent-miscalibration scenario.
 
 **Cross-check note (audit 3C):** Audit's Finding 4.2 + Critical 2 + Priority 2. Verified at exact lines.
 
 ---
 
-### T1-54 | Block job start if GRBL output uses M4 and `$32 ≠ 1`
+### T1-54 | Block job start if GRBL output uses M4 and `$32 鈮?1`
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:1281` ($32 parsed into `_laserMode`), `:778` (only used for diagnostic logging), `src/core/output/GrblStrategy.ts:25-27` (`encodeLaserOn` emits `M4 ...` unconditionally).
 
-**Problem:** Cross-check verified all three locations. `$32` (laser mode) controls GRBL firmware's behavior on M3 vs M4. With `$32=1` (laser mode enabled), M4 produces dynamic-power behavior — power scales with feed rate and zeroes during pauses; this is the planner's assumption. With `$32=0` (laser mode disabled / spindle mode), M4 may behave like M3 (static power) on some firmware, or behave undefined on others.
+**Problem:** Cross-check verified all three locations. `$32` (laser mode) controls GRBL firmware's behavior on M3 vs M4. With `$32=1` (laser mode enabled), M4 produces dynamic-power behavior 鈥?power scales with feed rate and zeroes during pauses; this is the planner's assumption. With `$32=0` (laser mode disabled / spindle mode), M4 may behave like M3 (static power) on some firmware, or behave undefined on others.
 
 Currently:
 - `_laserMode` is parsed from `$32` correctly.
@@ -3021,7 +3021,7 @@ Optional UX improvement: in the blocker dialog, offer a one-click "Enable laser 
 
 **Estimate:** ~30 min for the preflight rule + ~30 min for the optional one-click fix UX. ~1 hour total.
 
-**Priority:** Tier 1 — real defect with silent-miscalibration consequences.
+**Priority:** Tier 1 鈥?real defect with silent-miscalibration consequences.
 
 **Cross-check note (audit 3C):** Audit's Finding 4.4 + Critical 4 + Priority 4. Verified at lines 1281 (parsing), 778 (logging only), GrblStrategy.ts:25-27 (unconditional M4).
 
@@ -3034,9 +3034,9 @@ Optional UX improvement: in the blocker dialog, offer a one-click "Enable laser 
 **Problem:** Cross-check verified all four fallback locations. When the controller is connected but `$$` query failed or hasn't completed, every laser-on path falls back to profile or hardcoded 1000. Audit Finding 7.1: "for a laser controller, unknown should be treated as unsafe."
 
 The current state collapses three different scenarios into the same behavior:
-1. Disconnected, profile says 1000 — using profile is correct.
-2. Connected, `$30=1000` matches profile — using either is correct.
-3. Connected, `$30` unknown (settings query failed/timed out) — using profile is **a guess**, not a verified value.
+1. Disconnected, profile says 1000 鈥?using profile is correct.
+2. Connected, `$30=1000` matches profile 鈥?using either is correct.
+3. Connected, `$30` unknown (settings query failed/timed out) 鈥?using profile is **a guess**, not a verified value.
 
 For laser CAM, scenario 3 should refuse to fire the laser. The user has connected to the machine but doesn't know what the machine actually expects. Firing test fire / frame dot / starting a job here means LaserForge is guessing the S-scale.
 
@@ -3072,13 +3072,13 @@ When DISCONNECTED, profile-based fallback continues to work as today (offline co
 
 **Estimate:** ~30 min - 1 hour. Helper + 4 call site updates + tests.
 
-**Priority:** Tier 1 — real defect. Pairs with T1-53, T1-54 to close the "guessing about machine state" surface.
+**Priority:** Tier 1 鈥?real defect. Pairs with T1-53, T1-54 to close the "guessing about machine state" surface.
 
 **Cross-check note (audit 3C):** Audit's Finding 7.1, Critical 5, Priority 7.
 
 ---
 
-### T1-56 | Preflight `machinePlanBounds` reads wrong source — `activeJobTransform?.plan.bounds` is always null before Start
+### T1-56 | Preflight `machinePlanBounds` reads wrong source 鈥?`activeJobTransform?.plan.bounds` is always null before Start
 
 **Code reference:** `src/ui/components/App.tsx:1719`. Cross-check verified at exact line.
 
@@ -3086,7 +3086,7 @@ When DISCONNECTED, profile-based fallback continues to work as today (offline co
 
 1. `App.tsx:1719` passes `machinePlanBounds: activeJobTransform?.plan.bounds ?? null` to ConnectionPanelMain (which feeds preflight).
 2. `activeJobTransform` is `null` until job actually starts running. It's only set inside the `useEffect(..., [grbl.isJobRunning])` at lines 480-501, in the `if (grbl.isJobRunning && !wasJobRunningRef.current)` branch. Until the user clicks Start, it stays null.
-3. `lastResult.machinePlanBounds` IS available pre-Start — `CompileGcodeResult` at PipelineService.ts:67 declares the field, and it's populated at lines 184/195. But the App is reading from the wrong source.
+3. `lastResult.machinePlanBounds` IS available pre-Start 鈥?`CompileGcodeResult` at PipelineService.ts:67 declares the field, and it's populated at lines 184/195. But the App is reading from the wrong source.
 
 **Concrete impact:** Preflight bounds validation runs against scene-space bounds or G-code coordinate scan instead of the **machine-space transformed** bounds. This means transform-specific placement errors slip through preflight:
 - Saved-origin mode: scene fits the bed in canvas, but after origin offset the machine-space output extends beyond the bed.
@@ -3108,7 +3108,7 @@ machinePlanBounds: activeJobTransform?.plan.bounds ?? null,
 machinePlanBounds: lastResult?.machinePlanBounds ?? null,
 ```
 
-`activeJobTransform` stays — it's still needed for the live canvas overlay (lines 247-251 use it to convert machine-space WPos back to canvas coordinates). The two roles are different: one drives preflight (compile-time machine bounds), the other drives runtime overlay (live position). Conflating them was the bug.
+`activeJobTransform` stays 鈥?it's still needed for the live canvas overlay (lines 247-251 use it to convert machine-space WPos back to canvas coordinates). The two roles are different: one drives preflight (compile-time machine bounds), the other drives runtime overlay (live position). Conflating them was the bug.
 
 **Tests:** `tests/preflight-machine-bounds-source.test.ts`:
 - Render App with a compile result where `machinePlanBounds.maxX = 350`. Open connection panel BEFORE pressing Start. Assert ConnectionPanelMain receives `machinePlanBounds.maxX = 350`, NOT null.
@@ -3117,13 +3117,13 @@ machinePlanBounds: lastResult?.machinePlanBounds ?? null,
 
 **Estimate:** ~15 minutes. One-line code change + ~3 unit tests.
 
-**Priority:** Tier 1 — real defect with concrete safety implications (preflight is the last gate before laser-on).
+**Priority:** Tier 1 鈥?real defect with concrete safety implications (preflight is the last gate before laser-on).
 
 **Cross-check note (audit 4A):** Audit's Critical Failure 1 + Required Fix 1. Verified at App.tsx:1719 and confirmed `activeJobTransform` lifecycle at lines 480-501.
 
 ---
 
-### T1-57 | Compile manager has no request-id guard — async results can commit out of order
+### T1-57 | Compile manager has no request-id guard 鈥?async results can commit out of order
 
 **Code reference:** `src/ui/hooks/useCompileManager.ts:155-184`. Cross-check verified the missing guard at line 172.
 
@@ -3132,11 +3132,11 @@ machinePlanBounds: lastResult?.machinePlanBounds ?? null,
 ```ts
 const result = await pipelineCompileGcode(...);
 setLastResult(result);
-lastCompiledRevisionRef.current = sceneCompileTickRef.current;  // ← reads CURRENT tick at completion
+lastCompiledRevisionRef.current = sceneCompileTickRef.current;  // 鈫?reads CURRENT tick at completion
 setGcodeStale(false);
 ```
 
-`sceneCompileTickRef.current` is the current tick at completion time, not the tick when this compile started. If compile A starts (tick=5), user edits scene (tick=6), compile B starts (tick=6), B finishes first and sets `lastCompiledRevisionRef.current = 6`, then A finishes and sets `lastCompiledRevisionRef.current = 6` again — but `lastResult` now holds A's older result. The "stale" flag says fresh, but the result is from the older scene.
+`sceneCompileTickRef.current` is the current tick at completion time, not the tick when this compile started. If compile A starts (tick=5), user edits scene (tick=6), compile B starts (tick=6), B finishes first and sets `lastCompiledRevisionRef.current = 6`, then A finishes and sets `lastCompiledRevisionRef.current = 6` again 鈥?but `lastResult` now holds A's older result. The "stale" flag says fresh, but the result is from the older scene.
 
 There's also no abort logic. Cancelled compiles continue running, then commit their stale result.
 
@@ -3187,7 +3187,7 @@ Two changes:
 1. **Reject stale completions:** if `requestId !== compileRequestIdRef.current`, another compile started; this result is discarded.
 2. **Use `sceneTickAtStart` for staleness tracking:** correctly marks result as fresh against the scene-tick that this compile actually compiled, not the current scene-tick at completion time.
 
-T1-57 is necessary infrastructure for T2-51 (CompiledJobState) — but T2-51 is the broader refactor. T1-57 ships the correctness fix in ~30 min without waiting for the full refactor.
+T1-57 is necessary infrastructure for T2-51 (CompiledJobState) 鈥?but T2-51 is the broader refactor. T1-57 ships the correctness fix in ~30 min without waiting for the full refactor.
 
 **Tests:** `tests/compile-race-guard.test.ts`:
 - Start compile A. Bump scene tick. Start compile B. Resolve B first, then A. Assert lastResult is B's result, not A's.
@@ -3196,7 +3196,7 @@ T1-57 is necessary infrastructure for T2-51 (CompiledJobState) — but T2-51 is 
 
 **Estimate:** ~30 minutes including tests.
 
-**Priority:** Tier 1 — concurrency correctness bug. Narrow today but real.
+**Priority:** Tier 1 鈥?concurrency correctness bug. Narrow today but real.
 
 **Cross-check note (audit 4A):** Audit's Race 1 + Critical Failure 3 + Fix 3. Verified at useCompileManager.ts:155-184.
 
@@ -3208,7 +3208,7 @@ T1-57 is necessary infrastructure for T2-51 (CompiledJobState) — but T2-51 is 
 
 **Problem:** Cross-check verified at exact lines. Audit Coupling 3 + Required Fix: `compileGcode` reads `getActiveProfile()` from global storage internally. This breaks compile determinism in two ways:
 
-1. **Race during compile:** UI starts a compile thinking it's compiling for profile A. Mid-compile (~50-500ms depending on scene complexity), the active profile changes to B (could be programmatic — backfillFalconAutofocus migration, profile import, even storage event from another tab). When the pipeline reaches line 117, it reads profile B. Compile result is computed against B's settings (bed dimensions, max spindle, origin corner) but the UI labels it as the result for "the current scene." The result's `ticket.profileHash` reflects B, but lastResult is consumed under the assumption it matches the UI's notion of the active profile.
+1. **Race during compile:** UI starts a compile thinking it's compiling for profile A. Mid-compile (~50-500ms depending on scene complexity), the active profile changes to B (could be programmatic 鈥?backfillFalconAutofocus migration, profile import, even storage event from another tab). When the pipeline reaches line 117, it reads profile B. Compile result is computed against B's settings (bed dimensions, max spindle, origin corner) but the UI labels it as the result for "the current scene." The result's `ticket.profileHash` reflects B, but lastResult is consumed under the assumption it matches the UI's notion of the active profile.
 
 2. **Untestable:** Tests can't compile against a specific profile shape without mutating global state. They have to set up the active profile before each test, run compile, then clean up. Pure-function compile would take profile as input and return result without side effects.
 
@@ -3230,7 +3230,7 @@ export async function compileGcode(
   controllerAccelMmPerS2: number | null,
 ): Promise<CompileGcodeResult | null> {
   // ...
-  const profile = getActiveProfile();   // ← global read
+  const profile = getActiveProfile();   // 鈫?global read
   // ...
 }
 
@@ -3242,7 +3242,7 @@ export interface CompileGcodeOptions {
   outputFormat: OutputFormat;
   machineBedFromController: { width: number; height: number } | null;
   controllerAccelMmPerS2: number | null;
-  profile: DeviceProfile | null;          // ← required, snapshot at call site
+  profile: DeviceProfile | null;          // 鈫?required, snapshot at call site
 }
 
 export async function compileGcode(
@@ -3266,7 +3266,7 @@ const result = await pipelineCompileGcode(targetScene, {
 });
 
 if (profileHashAtStart !== hashObject(getActiveProfile())) {
-  // Profile changed during compile — discard or recompile
+  // Profile changed during compile 鈥?discard or recompile
   return null;
 }
 ```
@@ -3277,19 +3277,19 @@ T2-51 (CompiledJobState) consumes the now-known scene/profile hash pair to drive
 
 **Tests:** `tests/pipeline-uses-profile-snapshot.test.ts`:
 - Set active profile to A. Call compileGcode(scene, { profile: A }). Mid-call, change active profile to B. Assert result corresponds to A's settings (max spindle, bed dims, origin), not B's.
-- Pure function test: same scene + same profile → same result, regardless of global active profile state.
+- Pure function test: same scene + same profile 鈫?same result, regardless of global active profile state.
 
 **Estimate:** ~1 hour. Signature change + caller updates + tests. Two compile entry points (compileGcode + compileToolpath) need parallel changes.
 
-**Priority:** Tier 1 — real determinism bug + makes pipeline testable. Foundation for T2-51.
+**Priority:** Tier 1 鈥?real determinism bug + makes pipeline testable. Foundation for T2-51.
 
 **Cross-check note (audit 4A):** Audit's Coupling 3 + Race 5 + Required Fix (Pipeline). Verified at PipelineService.ts:117, 228.
 
 ---
 
-### T1-59 | Frame-before-start gate — `canStartJob` must require `hasFramed`
+### T1-59 | Frame-before-start gate 鈥?`canStartJob` must require `hasFramed`
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:288` (`hasFramed = useRef(false)`), `:402, 763, 817` (set/reset call sites), `:985-990` (`canStartJob` definition — does NOT check hasFramed).
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:288` (`hasFramed = useRef(false)`), `:402, 763, 817` (set/reset call sites), `:985-990` (`canStartJob` definition 鈥?does NOT check hasFramed).
 
 **Problem:** Cross-check verified exactly. The data is there:
 - Line 288: `hasFramed` is a useRef tracking whether the user has framed since the last relevant change.
@@ -3303,7 +3303,7 @@ But `canStartJob` at lines 985-990 only requires:
 4. `!gcodeStale`
 5. `!machineBlocksJobStart`
 
-**It does not check `hasFramed.current`.** A user can compile, never frame, and click Start — the laser fires immediately at whatever location origin/start-mode resolves to. For a beginner with origin/saved-origin/right-corner-mirror confusions, this can mean burning in the wrong place.
+**It does not check `hasFramed.current`.** A user can compile, never frame, and click Start 鈥?the laser fires immediately at whatever location origin/start-mode resolves to. For a beginner with origin/saved-origin/right-corner-mirror confusions, this can mean burning in the wrong place.
 
 Audit 4B Critical UX failure 2: "this is a high-risk workflow failure." Cross-check fully agrees. The logic is one new clause in canStartJob.
 
@@ -3325,11 +3325,11 @@ const canStartJob =
 const startDisabledReason: string | null = (() => {
   if (isRunning) return null;
   if (!gcode) return 'Click G-code in the toolbar to compile this design';
-  if (gcodeStale) return 'Design changed - click ↻ Update above';
+  if (gcodeStale) return 'Design changed - click 鈫?Update above';
   if (!preflight?.canStart) return 'Fix the issues listed below first';
-  if (machineBlocksJobStart) return `Machine is "${machineStatus}" — wait for idle`;
+  if (machineBlocksJobStart) return `Machine is "${machineStatus}" 鈥?wait for idle`;
   if (requireFrame && !hasFramed.current) {
-    return 'Frame the job first (use Frame button) — this confirms where the laser will burn';
+    return 'Frame the job first (use Frame button) 鈥?this confirms where the laser will burn';
   }
   return null;
 })();
@@ -3347,20 +3347,20 @@ The `advancedMode` toggle is a separate concern (T2-64). For the first ship of T
 T2-60 (Frame freshness invalidation) widens the reset triggers. T1-59 just adds the gate.
 
 **Tests:** `tests/frame-required-before-start.test.ts`:
-- `hasFramed = false`, all other conditions met → `canStartJob = false`, startDisabledReason mentions framing.
-- `hasFramed = true`, all other conditions met → `canStartJob = true`.
-- After frame, change scene → frame invalidated → `canStartJob = false`.
-- Advanced mode override (when T2-64 lands) → `canStartJob = true` even without frame.
+- `hasFramed = false`, all other conditions met 鈫?`canStartJob = false`, startDisabledReason mentions framing.
+- `hasFramed = true`, all other conditions met 鈫?`canStartJob = true`.
+- After frame, change scene 鈫?frame invalidated 鈫?`canStartJob = false`.
+- Advanced mode override (when T2-64 lands) 鈫?`canStartJob = true` even without frame.
 
 **Estimate:** ~30 minutes. One-line addition to canStartJob + one branch in startDisabledReason + tests. The advanced override is deferred to T2-64.
 
-**Priority:** Tier 1 — real safety/UX gap. Trivial fix, large user-impact win.
+**Priority:** Tier 1 鈥?real safety/UX gap. Trivial fix, large user-impact win.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 2 + Priority 2. Verified at ConnectionPanelMain.tsx:288, 402, 763, 817, 985-990.
 
 ---
 
-### T1-60 | Pin device profile selector to header — out of "More options"
+### T1-60 | Pin device profile selector to header 鈥?out of "More options"
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:1575-1599`. Cross-check verified that `DeviceProfileSelector` (line 1594) is inside the `showMore && ...` block (line 1591), collapsed under a "More options" toggle button.
 
@@ -3372,7 +3372,7 @@ T2-60 (Frame freshness invalidation) widens the reset triggers. T1-59 just adds 
 - Header/footer templates (what runs at job start/end)
 - Origin policy (negative coordinates allowed, WCS consent suppression)
 
-A wrong profile makes every other setting wrong. Despite being safety-critical, the selector is **collapsed** under "More options" — a beginner connecting their machine has to click a hidden expand button to even see which profile is active.
+A wrong profile makes every other setting wrong. Despite being safety-critical, the selector is **collapsed** under "More options" 鈥?a beginner connecting their machine has to click a hidden expand button to even see which profile is active.
 
 Audit 4B Critical UX failure 3: "the active profile selector lives under More options. That is wrong for a laser app."
 
@@ -3383,13 +3383,7 @@ Audit 4B Critical UX failure 3: "the active profile selector lives under More op
 UI shape:
 
 ```
-┌─ Connection Panel Header ──────────────────────┐
-│ ● Connected via USB                  [Disconnect]│
-│ Profile: Creality Falcon A1 Pro          [Change ▾]│
-│   Bed: 400 × 400 mm  ·  Origin: front-left      │
-│   Max spindle: 1000  ·  Homing: off              │
-└────────────────────────────────────────────────┘
-```
+鈹屸攢 Connection Panel Header 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?鈼?Connected via USB                  [Disconnect]鈹?鈹?Profile: Creality Falcon A1 Pro          [Change 鈻綸鈹?鈹?  Bed: 400 脳 400 mm  路  Origin: front-left      鈹?鈹?  Max spindle: 1000  路  Homing: off              鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
 
 When connected and a profile is active, the header shows the four most critical fields (bed, origin, max spindle, homing). When profile is mismatched with live machine settings (T1-53 / T3-57), the header shows a warning state.
 
@@ -3400,7 +3394,7 @@ When connected and a profile is active, the header shows the four most critical 
 
 **Estimate:** ~30 minutes - 1 hour. Visual restructuring of the header + minor refactor of DeviceProfileSelector to support both inline (in More options) and modal (from header click) presentations.
 
-**Priority:** Tier 1 — UX safety. Profile-mismatch is one of the top 3 user-disaster causes (audit's "Why did it burn in the wrong place?" support burden).
+**Priority:** Tier 1 鈥?UX safety. Profile-mismatch is one of the top 3 user-disaster causes (audit's "Why did it burn in the wrong place?" support burden).
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 3 + Priority 3. Verified at ConnectionPanelMain.tsx:1575-1599.
 
@@ -3414,17 +3408,17 @@ When connected and a profile is active, the header shows the four most critical 
 
 ```ts
 const modes: Array<{ mode: GcodeStartMode; label: string }> = [
-  { mode: 'absolute', label: '📍 Bed' },
-  { mode: 'current', label: '🎯 Head' },
-  { mode: 'savedOrigin', label: '⚑ Origin' },
+  { mode: 'absolute', label: '馃搷 Bed' },
+  { mode: 'current', label: '馃幆 Head' },
+  { mode: 'savedOrigin', label: '鈿?Origin' },
 ];
 ```
 
 These three buttons control the most safety-relevant decision in the run flow: where will the laser burn relative to the machine?
 
-- `'📍 Bed'` doesn't communicate "absolute machine bed coordinates from the bed origin."
-- `'🎯 Head'` doesn't communicate "use the current laser head position as the job origin (everything is offset from where the head is right now)."
-- `'⚑ Origin'` doesn't communicate "use the saved origin point set earlier (everything is offset from that fixed point on the machine)."
+- `'馃搷 Bed'` doesn't communicate "absolute machine bed coordinates from the bed origin."
+- `'馃幆 Head'` doesn't communicate "use the current laser head position as the job origin (everything is offset from where the head is right now)."
+- `'鈿?Origin'` doesn't communicate "use the saved origin point set earlier (everything is offset from that fixed point on the machine)."
 
 A beginner clicking buttons can't predict the burn location from these labels. The audit calls this "one of the most trust-destroying laser mistakes." Combined with T1-59 (frame-before-start), labeling clarity is the second leg of preventing wrong-position burns.
 
@@ -3461,9 +3455,9 @@ const modes: Array<{
 ```
 
 Plus a small diagram next to the button row showing the chosen mode visually:
-- Bed coordinates → bed rectangle with job pinned to absolute X/Y
-- From laser head → bed rectangle with job pinned to current head position (animated dot)
-- From saved origin → bed rectangle with saved-origin marker and job offset from it
+- Bed coordinates 鈫?bed rectangle with job pinned to absolute X/Y
+- From laser head 鈫?bed rectangle with job pinned to current head position (animated dot)
+- From saved origin 鈫?bed rectangle with saved-origin marker and job offset from it
 
 T3-70 covers the diagrams more fully; T1-61 adds the labels and tooltips as the immediate clarity fix.
 
@@ -3474,7 +3468,7 @@ T3-70 covers the diagrams more fully; T1-61 adds the labels and tooltips as the 
 
 **Estimate:** ~30 minutes. Label rewrite is mechanical; tooltip/UI for the long-form text is small.
 
-**Priority:** Tier 1 — UX clarity for safety-critical control. Pairs with T1-59 (frame gate) and T1-60 (profile visibility) as the "wrong-place burn prevention" cluster.
+**Priority:** Tier 1 鈥?UX clarity for safety-critical control. Pairs with T1-59 (frame gate) and T1-60 (profile visibility) as the "wrong-place burn prevention" cluster.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 6 + Priority 4. Verified at Workflow.tsx:95-99.
 
@@ -3482,9 +3476,9 @@ T3-70 covers the diagrams more fully; T1-61 adds the labels and tooltips as the 
 
 ### T1-62 | `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:42-62, 1558`. Cross-check verified at line 52 — collapses to 'Running' when `modes.size > 1`.
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:42-62, 1558`. Cross-check verified at line 52 鈥?collapses to 'Running' when `modes.size > 1`.
 
-**Problem:** Cross-check confirmed. When a job has multiple operation modes (mixed engrave + cut, the most common multi-layer case), `jobModeLabel` returns `'Running'` (line 52) — exactly the same as a job with no objects (line 49). The progress UI shows "Running" with no indication of what operation is currently active.
+**Problem:** Cross-check confirmed. When a job has multiple operation modes (mixed engrave + cut, the most common multi-layer case), `jobModeLabel` returns `'Running'` (line 52) 鈥?exactly the same as a job with no objects (line 49). The progress UI shows "Running" with no indication of what operation is currently active.
 
 For a 12-minute job with engrave then cut, the user cannot tell:
 - Is the laser engraving now? Then a sudden bright flash means it's switched to cut.
@@ -3512,26 +3506,26 @@ function jobModeLabel(scene: Scene, jobProgress: JobProgress | null, compileResu
 }
 ```
 
-Compile result already has operation metadata (each plan operation has its source layer). Mapping line number → operation requires the compile pipeline to record line ranges per operation, which is a small additional bookkeeping step.
+Compile result already has operation metadata (each plan operation has its source layer). Mapping line number 鈫?operation requires the compile pipeline to record line ranges per operation, which is a small additional bookkeeping step.
 
 If the line-range tracking is too invasive for a Tier 1 ticket, a fallback that's still better than today: show the **planned operation order** as static text next to "Running":
 
 ```
 Running
-Plan: Engrave → Cut
+Plan: Engrave 鈫?Cut
 ```
 
 This at least tells the user what's coming, even without live-current-operation tracking. The full live-current-operation is then T2-63 (operation order preview).
 
 **Tests:** `tests/job-mode-label-multi-mode.test.ts`:
-- Single-mode job (all engrave) → "Engraving".
-- Multi-mode job, no progress → "Running" + planned order text.
-- Multi-mode job mid-engrave → "Engraving Layer 1" + "next: Cut Layer 2".
-- Multi-mode job mid-cut → "Cutting Layer 2" + "(last operation)".
+- Single-mode job (all engrave) 鈫?"Engraving".
+- Multi-mode job, no progress 鈫?"Running" + planned order text.
+- Multi-mode job mid-engrave 鈫?"Engraving Layer 1" + "next: Cut Layer 2".
+- Multi-mode job mid-cut 鈫?"Cutting Layer 2" + "(last operation)".
 
 **Estimate:** ~30 min - 1 hour. The planned-order static-text version is ~30 min; live-tracking via compile metadata is ~1 hour. Recommend shipping the static-text version first.
 
-**Priority:** Tier 1 — UX correctness on a feature that already exists. Small scope.
+**Priority:** Tier 1 鈥?UX correctness on a feature that already exists. Small scope.
 
 **Cross-check note (audit 4B):** Audit's Finding 9.2. Verified at ConnectionPanelMain.tsx:42-62.
 
@@ -3546,20 +3540,20 @@ This at least tells the user what's coming, even without live-current-operation 
 ```ts
 preflight.issues
   .filter(i => i.severity === 'warning')
-  .map(i => `\u25B2 ${i.title}`)   // ← title only
+  .map(i => `\u25B2 ${i.title}`)   // 鈫?title only
   .join('\n')
 ```
 
-The blocker dialog (line 31) DOES include `${i.fix}`, but the warning confirmation — the dialog users see most often before pressing Start — shows only the title.
+The blocker dialog (line 31) DOES include `${i.fix}`, but the warning confirmation 鈥?the dialog users see most often before pressing Start 鈥?shows only the title.
 
 A user sees:
 
 ```
 3 warning(s):
 
-▲ High cut power
-▲ Layer settings unusual
-▲ Frame may exceed bed
+鈻?High cut power
+鈻?Layer settings unusual
+鈻?Frame may exceed bed
 
 Start job anyway?
 ```
@@ -3576,7 +3570,7 @@ preflight.issues
   .map(i => {
     let line = `\u25B2 ${i.title}`;
     if (i.detail) line += `\n  ${i.detail}`;
-    if (i.fix) line += `\n  → ${i.fix}`;
+    if (i.fix) line += `\n  鈫?${i.fix}`;
     return line;
   })
   .join('\n\n')
@@ -3587,18 +3581,18 @@ Plus consider a richer modal that shows each warning as a card rather than a tex
 ```
 3 warnings before starting:
 
-[▲] High cut power (90%)
+[鈻瞉 High cut power (90%)
     Layer "Outline" uses 90% power. Diode lasers > 80% may
     overheat. Reduce power or add passes.
     [Open layer settings]   [Acknowledge and continue]
 
-[▲] Layer settings unusual
+[鈻瞉 Layer settings unusual
     Engrave layer "Text" runs at 120 mm/min. Typical engrave
     speed is 1500-3000 mm/min.
     [Open layer settings]   [Acknowledge and continue]
 
-[▲] Frame exceeds bed by 2mm
-    Output bounds X 401–402 fall just outside bed ($130=400).
+[鈻瞉 Frame exceeds bed by 2mm
+    Output bounds X 401鈥?02 fall just outside bed ($130=400).
     Move design left by 2mm or accept clamping.
     [Move design]   [Acknowledge and continue]
 
@@ -3608,13 +3602,13 @@ Plus consider a richer modal that shows each warning as a card rather than a tex
 Per-warning acknowledgement is more friction than today's single confirm, but it converts the warning list from "scary list of unknowns" to "explained and decided." For a paid product, this friction is worth it. For Tier 1, the simpler change (add detail+fix to existing dialog) ships in 15 minutes; the per-warning card UI is T2-58 (Ready-to-Run panel).
 
 **Tests:** `tests/warning-confirmation-includes-detail.test.ts`:
-- Warning with detail and fix → dialog string contains all three.
-- Warning with only title → dialog string contains title only (graceful).
-- Multiple warnings → newline-separated cards.
+- Warning with detail and fix 鈫?dialog string contains all three.
+- Warning with only title 鈫?dialog string contains title only (graceful).
+- Multiple warnings 鈫?newline-separated cards.
 
 **Estimate:** ~15 minutes for the simple version (add detail/fix to existing dialog). The richer card UI is part of T2-58.
 
-**Priority:** Tier 1 — small, safety-relevant fix. 15 minutes well spent.
+**Priority:** Tier 1 鈥?small, safety-relevant fix. 15 minutes well spent.
 
 **Cross-check note (audit 4B):** Audit's Finding 7.4 + Section 14. Verified at confirmPreflightForJobStart.ts:43.
 
@@ -3627,18 +3621,18 @@ Per-warning acknowledgement is more friction than today's single confirm, but it
 **Problem:** Cross-check confirmed:
 
 ```ts
-// handlePauseResume — line 866-868
+// handlePauseResume 鈥?line 866-868
 } catch (err: unknown) {
   console.warn('[Pause/Resume]', err instanceof Error ? err.message : err);
 }
 
-// handleStop — line 878-880
+// handleStop 鈥?line 878-880
 } catch (err: unknown) {
   console.warn('[Stop]', err instanceof Error ? err.message : err);
 }
 ```
 
-These are safety-critical machine controls. If `machineService.stopAndEnsureLaserOff` throws (controller rejects, port disconnected mid-call, write timeout), the catch suppresses the error to console — invisible to the user. The user clicks Stop, the call fails silently, the job potentially keeps running, and the UI gives no indication anything went wrong.
+These are safety-critical machine controls. If `machineService.stopAndEnsureLaserOff` throws (controller rejects, port disconnected mid-call, write timeout), the catch suppresses the error to console 鈥?invisible to the user. The user clicks Stop, the call fails silently, the job potentially keeps running, and the UI gives no indication anything went wrong.
 
 For a stop command, this is a real defect with safety implications. The user MUST know if their stop request didn't reach the machine.
 
@@ -3659,8 +3653,8 @@ const handlePauseResume = useCallback(async () => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[Pause/Resume]', msg);
-    appendMessage(`⚠ ${held ? 'Resume' : 'Pause'} command not accepted: ${msg}`);
-    // For pause specifically — the job may still be running. Surface as banner.
+    appendMessage(`鈿?${held ? 'Resume' : 'Pause'} command not accepted: ${msg}`);
+    // For pause specifically 鈥?the job may still be running. Surface as banner.
     if (!held) {
       void showAlert('Pause failed',
         `The pause command was not accepted by the machine. The job may still be running.\n\n` +
@@ -3677,7 +3671,7 @@ const handleStop = useCallback(async () => {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[Stop]', msg);
-    // Stop failure is critical — show modal, not just message log
+    // Stop failure is critical 鈥?show modal, not just message log
     void showAlert('Stop command may not have completed',
       `The stop command failed: ${msg}\n\n` +
       `Check the laser immediately. ` +
@@ -3689,13 +3683,13 @@ const handleStop = useCallback(async () => {
 For Stop, the modal is non-negotiable: a failed stop is a safety issue that demands user attention right now, not buried in a message log. Pause failure is less immediately dangerous but still needs user notification.
 
 **Tests:** `tests/pause-stop-error-visibility.test.ts`:
-- machineService.pause throws → assert appendMessage called with pause-failed text and showAlert called.
-- machineService.stopAndEnsureLaserOff throws → assert showAlert called with critical wording.
-- Successful pause/stop → no error UI surfaced.
+- machineService.pause throws 鈫?assert appendMessage called with pause-failed text and showAlert called.
+- machineService.stopAndEnsureLaserOff throws 鈫?assert showAlert called with critical wording.
+- Successful pause/stop 鈫?no error UI surfaced.
 
 **Estimate:** ~30 minutes including tests.
 
-**Priority:** Tier 1 — real safety defect. Stop failures must not be invisible.
+**Priority:** Tier 1 鈥?real safety defect. Stop failures must not be invisible.
 
 **Cross-check note (audit 4C):** Audit's Critical 1 + Silent 2 + Silent 3 + Priority 2. Verified at ConnectionPanelMain.tsx:867, 879.
 
@@ -3771,7 +3765,7 @@ Do not start the job until framing completes successfully.
 
 **Estimate:** ~30 minutes including tests + small UI integration for the new reason.
 
-**Priority:** Tier 1 — real safety defect. Pairs with T1-59 (frame-before-start) — together they ensure framing actually means what the UI says it means.
+**Priority:** Tier 1 鈥?real safety defect. Pairs with T1-59 (frame-before-start) 鈥?together they ensure framing actually means what the UI says it means.
 
 **Cross-check note (audit 4C):** Audit's Silent 4 + Critical 3 + Priority 8. Verified at ExecutionCoordinator.ts:141-154.
 
@@ -3791,7 +3785,7 @@ try {
 }
 ```
 
-Jog can fail for legitimate reasons (controller in alarm, command classifier blocked, port not ready). If jog fails silently, the user clicks again, then assumes the machine is broken or they're using the controls wrong. Worse, after a jog "succeeded" (per UI signal), the user might assume the laser head moved when it didn't — confusing their position model.
+Jog can fail for legitimate reasons (controller in alarm, command classifier blocked, port not ready). If jog fails silently, the user clicks again, then assumes the machine is broken or they're using the controls wrong. Worse, after a jog "succeeded" (per UI signal), the user might assume the laser head moved when it didn't 鈥?confusing their position model.
 
 **Identified by:** Audit 4C (2026-04-26, ChatGPT) Silent failure 1 + Critical failure 1.
 
@@ -3803,7 +3797,7 @@ try {
 } catch (err: unknown) {
   const msg = err instanceof Error ? err.message : String(err);
   console.warn('[Jog]', msg);
-  appendMessage(`⚠ Jog blocked: ${msg}`);
+  appendMessage(`鈿?Jog blocked: ${msg}`);
 }
 ```
 
@@ -3829,13 +3823,13 @@ For T1-66, the simpler `appendMessage` form ships first.
 
 **Estimate:** ~15 minutes.
 
-**Priority:** Tier 1 — small UX safety fix. Trivial scope.
+**Priority:** Tier 1 鈥?small UX safety fix. Trivial scope.
 
 **Cross-check note (audit 4C):** Audit's Silent 1. Verified at ConnectionPanelMain.tsx:626-630.
 
 ---
 
-### T1-67 | Ticket hash mismatch messages — hide hashes from user, expose under "Advanced details"
+### T1-67 | Ticket hash mismatch messages 鈥?hide hashes from user, expose under "Advanced details"
 
 **Code reference:** `src/app/MachineService.ts:330-346`. Cross-check verified at exact lines.
 
@@ -3888,10 +3882,10 @@ Cannot start job
 The design changed after this G-code was created.
 Update G-code, then frame again before starting.
 
-▸ Advanced details
-   • Cause: scene-hash-mismatch
-   • Ticket hash: a3f8d2bc...
-   • Current hash: 9c1e7afb...
+鈻?Advanced details
+   鈥?Cause: scene-hash-mismatch
+   鈥?Ticket hash: a3f8d2bc...
+   鈥?Current hash: 9c1e7afb...
 ```
 
 The "Advanced details" expander is collapsed by default. Power users who want the hashes click to see them; everyone else sees the actionable English message.
@@ -3905,13 +3899,13 @@ Same treatment for the profile-hash mismatch and other validation failures.
 
 **Estimate:** ~30 minutes including type changes + caller updates + tests.
 
-**Priority:** Tier 1 — small UX/professionalism fix. Hash leakage in errors is the kind of detail that distinguishes "professional product" from "internal tool."
+**Priority:** Tier 1 鈥?small UX/professionalism fix. Hash leakage in errors is the kind of detail that distinguishes "professional product" from "internal tool."
 
 **Cross-check note (audit 4C):** Audit's Weak 3 + Critical 7 + Priority 6. Verified at MachineService.ts:330-346.
 
 ---
 
-### T1-68 | Autosave must await write before clearing dirty flag — critical data-loss bug
+### T1-68 | Autosave must await write before clearing dirty flag 鈥?critical data-loss bug
 
 **Code reference:** `src/app/autosavePersistence.ts:34-38` (writeAutosave fire-and-forget), `src/ui/components/App.tsx:1094-1096` (caller marks clean immediately).
 
@@ -3943,7 +3937,7 @@ export async function writeAutosave(json: string): Promise<void> {
 ```
 
 ```ts
-// App.tsx — autosave effect
+// App.tsx 鈥?autosave effect
 useEffect(() => {
   const interval = setInterval(async () => {
     if (!sceneIsDirtyRef.current) return;
@@ -3963,7 +3957,7 @@ useEffect(() => {
       lastSavedSceneRef.current = json;
       sceneIsDirtyRef.current = false;
     } catch (err) {
-      // Keep dirty flag true — write failed
+      // Keep dirty flag true 鈥?write failed
       console.warn('[LaserForge] Autosave write failed:', err);
       // After T2-65, this becomes:
       //   reportError({ domain: 'project', severity: 'warning', title: 'Autosave failed', ... });
@@ -3973,18 +3967,18 @@ useEffect(() => {
 }, [scene]);
 ```
 
-The setInterval callback is async but the interval itself doesn't care about the return value — that's fine. What matters is that `sceneIsDirtyRef.current = false` only runs after `await writeAutosave(json)` completes successfully.
+The setInterval callback is async but the interval itself doesn't care about the return value 鈥?that's fine. What matters is that `sceneIsDirtyRef.current = false` only runs after `await writeAutosave(json)` completes successfully.
 
 If write fails, dirty stays true, so the next 30-second tick retries. After T2-65 (central error reporter) lands, the failure also surfaces to the user with recovery guidance.
 
 **Tests:** `tests/autosave-awaits-write.test.ts`:
 - Mock storage that rejects `.set`. Trigger autosave tick. Assert `sceneIsDirtyRef.current` remains true.
 - Mock storage that succeeds. Trigger autosave tick. Assert dirty=false after the await.
-- Trigger autosave, immediately abort the test (simulating tab kill). Assert that the write was awaited (Promise was resolved) before the setter ran — using a controllable storage mock.
+- Trigger autosave, immediately abort the test (simulating tab kill). Assert that the write was awaited (Promise was resolved) before the setter ran 鈥?using a controllable storage mock.
 
 **Estimate:** ~30 minutes including tests. Signature change is mechanical; the value is the awaiting.
 
-**Priority:** Tier 1 — **most critical 4D defect**. Real data-loss bug.
+**Priority:** Tier 1 鈥?**most critical 4D defect**. Real data-loss bug.
 
 **Cross-check note (audit 4D):** Audit's Critical failure 1 + Priority 1. Verified at autosavePersistence.ts:34-38 + App.tsx:1094-1096.
 
@@ -3994,14 +3988,14 @@ If write fails, dirty stays true, so the next 30-second tick retries. After T2-6
 
 **Code reference:** `src/ui/hooks/useFileHandlers.ts:36-43` (`syncAutosaveAfterFileSave` clears dirty after download trigger), `src/io/FileIO.ts:50-70` (`saveSceneToFile` triggers `a.click()` and returns).
 
-**Problem:** Cross-check verified at exact lines. `saveSceneToFile` triggers a browser download via `a.click()` (line 63) and returns when the click is dispatched — NOT when the file is actually written. The browser may:
+**Problem:** Cross-check verified at exact lines. `saveSceneToFile` triggers a browser download via `a.click()` (line 63) and returns when the click is dispatched 鈥?NOT when the file is actually written. The browser may:
 - Silently block the download (popup-blocker, security policy)
 - Show the user a Save As dialog they cancel
 - Successfully receive bytes but fail to write to disk (out of space, permissions)
 
 `saveSceneToFile` cannot detect any of these failures. But the caller `handleKeyboardSave` (line 47-48) treats successful return as "save complete" and calls `syncAutosaveAfterFileSave` which sets `sceneIsDirtyRef.current = false`.
 
-A user who clicks Save, then sees their browser block the download, sees the dirty indicator clear — and reasonably concludes their file is saved. It isn't.
+A user who clicks Save, then sees their browser block the download, sees the dirty indicator clear 鈥?and reasonably concludes their file is saved. It isn't.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Critical failure 2 + Required Priority 4.
 
@@ -4013,33 +4007,33 @@ type SaveStatus =
   | { status: 'download-started'; triggeredAt: number; filename: string }
   | { status: 'confirmed-saved'; savedAt: number; mode: 'file-system-access' | 'electron-fs' };
 
-// (no 'confirmed-saved' result from browser-download mode — it can't be confirmed)
+// (no 'confirmed-saved' result from browser-download mode 鈥?it can't be confirmed)
 ```
 
 Second, the dirty flag is not cleared by browser-download mode. Instead, the UI shows a "download triggered" state that doesn't claim safe persistence:
 
 ```
 File saved
-└─ project.laserforge.json — Make sure your browser saved the file.
+鈹斺攢 project.laserforge.json 鈥?Make sure your browser saved the file.
    The app cannot confirm browser downloads. If the download didn't
    complete, click Save Project again.
 
-   [Got it — file is saved]   [Save again]
+   [Got it 鈥?file is saved]   [Save again]
 ```
 
-The user clicks "Got it — file is saved" to confirm they verified the file. Only then does the dirty flag clear. (This is the explicit-acknowledge model; alternative is "never claim browser-download saves are confirmed" — equally valid.)
+The user clicks "Got it 鈥?file is saved" to confirm they verified the file. Only then does the dirty flag clear. (This is the explicit-acknowledge model; alternative is "never claim browser-download saves are confirmed" 鈥?equally valid.)
 
-When File System Access API or Electron file system is available (T3-1 future), that mode CAN confirm write — and dirty clears automatically.
+When File System Access API or Electron file system is available (T3-1 future), that mode CAN confirm write 鈥?and dirty clears automatically.
 
 For T1-69's first ship, the minimum is: don't unconditionally call `syncAutosaveAfterFileSave` after `saveSceneToFile`. Instead, show a "download triggered" dialog with explicit user acknowledgement before clearing dirty.
 
 **Tests:** `tests/manual-save-needs-acknowledgement.test.ts`:
-- Trigger save → assert dirty remains true until user-acknowledge.
-- After acknowledge → assert dirty clears + autosave still runs.
+- Trigger save 鈫?assert dirty remains true until user-acknowledge.
+- After acknowledge 鈫?assert dirty clears + autosave still runs.
 
 **Estimate:** ~30 min - 1 hour. UI dialog + state change + tests.
 
-**Priority:** Tier 1 — real defect in current behavior. Pairs with T1-68 (the autosave-clear bug) — together they fix the two paths that prematurely mark clean state.
+**Priority:** Tier 1 鈥?real defect in current behavior. Pairs with T1-68 (the autosave-clear bug) 鈥?together they fix the two paths that prematurely mark clean state.
 
 **Cross-check note (audit 4D):** Audit's Critical failure 2 + Priority 4. Verified at useFileHandlers.ts:36-43 + FileIO.ts:50-70.
 
@@ -4060,14 +4054,14 @@ const handleRecover = useCallback(async () => {
       handleNewProject(recovered);
     }
   } catch (e) {
-    console.error('Recovery failed:', e);     // ← console only
+    console.error('Recovery failed:', e);     // 鈫?console only
   }
-  setShowRecover(false);                        // ← always hides prompt
+  setShowRecover(false);                        // 鈫?always hides prompt
   setRecoverAutosaveTimeLabel?.(null);
 }, [handleNewProject, setShowRecover, setRecoverAutosaveTimeLabel]);
 ```
 
-If recovery fails (corrupted autosave, unsupported version, deserialization throw), the catch logs to console only and unconditionally hides the recovery prompt. The user clicks Recover, sees nothing happen, the prompt disappears, and concludes their work is gone — even though it might be partially recoverable, or recoverable from a previous slot (when T2-70 lands), or fixable by sending the autosave file to support.
+If recovery fails (corrupted autosave, unsupported version, deserialization throw), the catch logs to console only and unconditionally hides the recovery prompt. The user clicks Recover, sees nothing happen, the prompt disappears, and concludes their work is gone 鈥?even though it might be partially recoverable, or recoverable from a previous slot (when T2-70 lands), or fixable by sending the autosave file to support.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Critical failure 4 + Required Priority 8.
 
@@ -4093,7 +4087,7 @@ const handleRecover = useCallback(async () => {
       `Could not recover the autosaved project.\n\n${msg}\n\n` +
       `Your autosave data may be corrupted or use a newer file format. ` +
       `You can try the previous autosave slot (when available), or download the autosave file for support diagnosis.`);
-    // Do NOT hide the prompt — let user try other actions:
+    // Do NOT hide the prompt 鈥?let user try other actions:
     //   - Download autosave for support
     //   - Try previous autosave slot (T2-70)
     //   - Discard recovery
@@ -4106,13 +4100,13 @@ The recovery dialog grows actions: Recover (current behavior), Recover previous 
 For T1-70's first ship, just adding the alert + not hiding the prompt on failure is the minimum useful fix.
 
 **Tests:** `tests/recovery-failure-alerts.test.ts`:
-- Mock readAutosave to throw → assert showAlert called with recovery-failed text.
-- Mock readAutosave returns null → assert showAlert called with "no autosave" text.
-- Successful recovery → assert showAlert NOT called.
+- Mock readAutosave to throw 鈫?assert showAlert called with recovery-failed text.
+- Mock readAutosave returns null 鈫?assert showAlert called with "no autosave" text.
+- Successful recovery 鈫?assert showAlert NOT called.
 
 **Estimate:** ~15 minutes including tests.
 
-**Priority:** Tier 1 — small UX safety fix.
+**Priority:** Tier 1 鈥?small UX safety fix.
 
 **Cross-check note (audit 4D):** Audit's Critical failure 4 + Priority 8. Verified at useWizardHandlers.ts:75-87.
 
@@ -4174,19 +4168,19 @@ useEffect(() => {
 }, []);
 ```
 
-The "meaningful change" predicate can refine over time. T2-69 (atomic autosave record) makes this cleaner because the record can include `objectCount`, `layerCount`, etc. as metadata fields — no parsing required.
+The "meaningful change" predicate can refine over time. T2-69 (atomic autosave record) makes this cleaner because the record can include `objectCount`, `layerCount`, etc. as metadata fields 鈥?no parsing required.
 
 Recovery dialog can also show what's recoverable: "Recover 0 objects, 2 layers, material setup."
 
 **Tests:** `tests/recovery-prompt-non-empty-cases.test.ts`:
-- Autosave with objects → recovery offered.
-- Autosave with custom layers but no objects → recovery offered.
-- Autosave with material setup but no layers → recovery offered.
-- Autosave matching default initial scene → recovery NOT offered.
+- Autosave with objects 鈫?recovery offered.
+- Autosave with custom layers but no objects 鈫?recovery offered.
+- Autosave with material setup but no layers 鈫?recovery offered.
+- Autosave matching default initial scene 鈫?recovery NOT offered.
 
 **Estimate:** ~15 minutes.
 
-**Priority:** Tier 1 — small fix that closes a real "lost work" UX gap.
+**Priority:** Tier 1 鈥?small fix that closes a real "lost work" UX gap.
 
 **Cross-check note (audit 4D):** Audit's Critical failure (recovery for setup-only). Verified at App.tsx:608.
 
@@ -4236,7 +4230,7 @@ const APP_VERSION = (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : 
 
 **Estimate:** ~15 min.
 
-**Priority:** Tier 1 — small hygiene fix. Trivial scope.
+**Priority:** Tier 1 鈥?small hygiene fix. Trivial scope.
 
 **Cross-check note (audit 4D):** Audit's Versioning weakness. Verified at SceneSerializer.ts:27.
 
@@ -4255,13 +4249,13 @@ const handleDelete = useCallback(() => {
   historyRef.current.push(newScene);    // pushes history
   setScene(newScene);                    // updates UI
   setSelectedIds(new Set());
-  // ❌ Missing: sceneIsDirtyRef.current = true;
+  // 鉂?Missing: sceneIsDirtyRef.current = true;
 }, [scene, selectedIds]);
 ```
 
 `handleDelete` bypasses `handleSceneCommit` (which sets `sceneIsDirtyRef.current = true` at App.tsx:740). It manually pushes history and updates the scene but never marks the project dirty.
 
-This is a **real data-loss path**. The autosave effect at App.tsx:1084 starts with `if (!sceneIsDirtyRef.current) return;` — so if a user opens the app, deletes some objects, and closes the tab before the next 30-second autosave tick, the deletion may not be persisted at all. Worse, if a separate edit happens before the next tick that DOES set dirty, the autosave includes the deletion as if part of that later edit — but if the user closes between the delete and the next dirty-marking edit, the deletion is lost.
+This is a **real data-loss path**. The autosave effect at App.tsx:1084 starts with `if (!sceneIsDirtyRef.current) return;` 鈥?so if a user opens the app, deletes some objects, and closes the tab before the next 30-second autosave tick, the deletion may not be persisted at all. Worse, if a separate edit happens before the next tick that DOES set dirty, the autosave includes the deletion as if part of that later edit 鈥?but if the user closes between the delete and the next dirty-marking edit, the deletion is lost.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical failure 2 + Required Priority 2.
 
@@ -4271,14 +4265,14 @@ This is a **real data-loss path**. The autosave effect at App.tsx:1084 starts wi
 const handleDelete = useCallback(() => {
   if (selectedIds.size === 0) return;
   const newScene = deleteObjects(scene, selectedIds);
-  handleSceneCommit(newScene);           // ✅ marks dirty + pushes history + sets scene
+  handleSceneCommit(newScene);           // 鉁?marks dirty + pushes history + sets scene
   setSelectedIds(new Set());
 }, [scene, selectedIds, handleSceneCommit]);
 ```
 
 This collapses three lines to one and uses the canonical mutation path. The deps array gains `handleSceneCommit` (already stable via useCallback in App.tsx).
 
-Audit it the same way audit 4E itself did this cross-check: grep for any other `historyRef.current.push(` callers in App.tsx that might have the same pattern. From the cross-check, the only other direct push call in App.tsx is the one inside `handleSceneCommit` itself (line 741) — but other components or hooks might have similar patterns. T1-73 also includes a one-time grep audit + fix for any siblings.
+Audit it the same way audit 4E itself did this cross-check: grep for any other `historyRef.current.push(` callers in App.tsx that might have the same pattern. From the cross-check, the only other direct push call in App.tsx is the one inside `handleSceneCommit` itself (line 741) 鈥?but other components or hooks might have similar patterns. T1-73 also includes a one-time grep audit + fix for any siblings.
 
 **Tests:** `tests/delete-marks-dirty.test.ts`:
 - Setup scene with one object selected, dirty=false.
@@ -4289,7 +4283,7 @@ Audit it the same way audit 4E itself did this cross-check: grep for any other `
 
 **Estimate:** ~10-15 minutes (one-line behavior fix + grep audit + test).
 
-**Priority:** Tier 1 — small but real data-loss defect. Should ship alongside T1-68 (autosave await write) and T1-69 (manual save acknowledgement) as part of "make dirty-state honest" cluster.
+**Priority:** Tier 1 鈥?small but real data-loss defect. Should ship alongside T1-68 (autosave await write) and T1-69 (manual save acknowledgement) as part of "make dirty-state honest" cluster.
 
 **Cross-check note (audit 4E):** Audit's Critical failure 2 + Priority 2. Verified at App.tsx:1147-1153.
 
@@ -4297,7 +4291,7 @@ Audit it the same way audit 4E itself did this cross-check: grep for any other `
 
 ### T1-74 | Text sidebar `patchTextGeometry` must commit history, not just preview
 
-**Code reference:** `src/ui/components/PropertiesPanel.tsx:404-420` (patchTextGeometry body and `(onSceneChange ?? onSceneCommit)` line at 416). Cross-check verified — and additionally verified that `onSceneChange` IS passed to PropertiesPanel via LayerPanel from App.tsx:1761, where it resolves to `handleSceneChange` (App.tsx:734-736), which only calls `setScene` — no history, no dirty flag.
+**Code reference:** `src/ui/components/PropertiesPanel.tsx:404-420` (patchTextGeometry body and `(onSceneChange ?? onSceneCommit)` line at 416). Cross-check verified 鈥?and additionally verified that `onSceneChange` IS passed to PropertiesPanel via LayerPanel from App.tsx:1761, where it resolves to `handleSceneChange` (App.tsx:734-736), which only calls `setScene` 鈥?no history, no dirty flag.
 
 **Problem:** Cross-check confirmed:
 
@@ -4305,13 +4299,13 @@ Audit it the same way audit 4E itself did this cross-check: grep for any other `
 // PropertiesPanel.tsx:416
 (onSceneChange ?? onSceneCommit)(newScene);
 
-// App.tsx:734-736 (handleSceneChange — what onSceneChange resolves to)
+// App.tsx:734-736 (handleSceneChange 鈥?what onSceneChange resolves to)
 const handleSceneChange = useCallback((newScene: Scene) => {
   setScene(newScene);
 }, []);
 ```
 
-When the user changes any text property in the properties sidebar — font, size, bold, italic, alignment, letter spacing, line spacing, word spacing — `patchTextGeometry` is called, which calls `onSceneChange` (truthy because LayerPanel passes it). `handleSceneChange` updates the scene but creates NO history entry and does NOT mark dirty.
+When the user changes any text property in the properties sidebar 鈥?font, size, bold, italic, alignment, letter spacing, line spacing, word spacing 鈥?`patchTextGeometry` is called, which calls `onSceneChange` (truthy because LayerPanel passes it). `handleSceneChange` updates the scene but creates NO history entry and does NOT mark dirty.
 
 This is **two bugs in one**:
 1. **Coverage gap**: Font change is not undoable. Bold toggle is not undoable. Letter spacing is not undoable.
@@ -4336,26 +4330,26 @@ const patchTextGeometry = (updates: Partial<TextGeometry>) => {
         : o
     ),
   };
-  onSceneCommit(newScene);                 // ✅ always commits — single source of truth
+  onSceneCommit(newScene);                 // 鉁?always commits 鈥?single source of truth
   try {
     window.dispatchEvent(new Event('laserforge-canvas-repaint'));
   } catch { /* ignore */ }
 };
 ```
 
-For sliders that fire continuously (letter spacing, line spacing, word spacing), the proper fix is the preview/commit transaction pattern (T2-80 — coalescing). For T1-74's first ship, all callers go through `onSceneCommit` — this overshoots history (one entry per slider tick), but it's a **strictly better** behavior than today: the user gets undo coverage of every step, just more steps than ideal. T2-80 then refines this to one commit per drag.
+For sliders that fire continuously (letter spacing, line spacing, word spacing), the proper fix is the preview/commit transaction pattern (T2-80 鈥?coalescing). For T1-74's first ship, all callers go through `onSceneCommit` 鈥?this overshoots history (one entry per slider tick), but it's a **strictly better** behavior than today: the user gets undo coverage of every step, just more steps than ideal. T2-80 then refines this to one commit per drag.
 
-Buttons (bold, italic, alignment) and dropdowns (font, font size on Enter/blur) are atomic and produce one history entry each — exactly what users expect.
+Buttons (bold, italic, alignment) and dropdowns (font, font size on Enter/blur) are atomic and produce one history entry each 鈥?exactly what users expect.
 
 **Tests:** `tests/text-property-edits-undoable.test.ts`:
-- Change font → assert history entry created, dirty=true.
-- Toggle bold → assert history entry, dirty=true.
-- Change letter spacing slider → assert history entry per step (acknowledged sub-optimal pending T2-80).
+- Change font 鈫?assert history entry created, dirty=true.
+- Toggle bold 鈫?assert history entry, dirty=true.
+- Change letter spacing slider 鈫?assert history entry per step (acknowledged sub-optimal pending T2-80).
 - Undo restores previous text geometry exactly.
 
 **Estimate:** ~30 minutes including test scenarios.
 
-**Priority:** Tier 1 — real defect. Pairs with T1-73 (delete dirty) — both are in the "scene mutations bypass canonical commit path" family.
+**Priority:** Tier 1 鈥?real defect. Pairs with T1-73 (delete dirty) 鈥?both are in the "scene mutations bypass canonical commit path" family.
 
 **Cross-check note (audit 4E):** Audit's Critical failure 3 + Priority 5. Verified at PropertiesPanel.tsx:416 + App.tsx:734-736 + App.tsx:1761 (passing chain).
 
@@ -4388,12 +4382,12 @@ Undo/redo update the scene but do NOT:
 The compile manager's stale-marking effect (verified at useCompileManager.ts:110) early-returns when the connection sidebar is closed. So a user can:
 1. Compile G-code (sidebar open).
 2. Close sidebar.
-3. Undo → scene changes BUT compiled G-code stays internally non-stale.
-4. Reopen sidebar → effect runs and finally marks stale.
+3. Undo 鈫?scene changes BUT compiled G-code stays internally non-stale.
+4. Reopen sidebar 鈫?effect runs and finally marks stale.
 
 During step 3, anything that consumes `currentGcode` directly (preview overlay, export, copy-to-clipboard, debug surfaces) reads G-code that doesn't match the visible scene.
 
-For frame state, the situation is worse — `hasFramed` is a ref, no effect invalidates it on scene change. Undo can change burn bounds while `hasFramed.current === true`, leaving the user with a "framed" state that no longer matches reality.
+For frame state, the situation is worse 鈥?`hasFramed` is a ref, no effect invalidates it on scene change. Undo can change burn bounds while `hasFramed.current === true`, leaving the user with a "framed" state that no longer matches reality.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical failures 1, 6, 7 + Required Priority 4.
 
@@ -4405,16 +4399,16 @@ const applyHistoryScene = useCallback((nextScene: Scene, reason: 'undo' | 'redo'
   setScene(nextScene);
   setSelectedIds(new Set());
 
-  // Dirty state — undo/redo IS a scene mutation from the perspective of "needs save"
+  // Dirty state 鈥?undo/redo IS a scene mutation from the perspective of "needs save"
   sceneIsDirtyRef.current = true;
 
-  // Direct invalidation — don't rely on effects
+  // Direct invalidation 鈥?don't rely on effects
   setGcodeStale(true);                        // refines T2-51 once that lands
   hasFramedRef.current = false;               // pairs with T2-60 (frame freshness)
   // T2-66 (positionTrust) consumes this signal: positionTrust is unaffected by undo
   // (the head didn't move physically), but FRAME confidence IS affected.
 
-  // Optional: emit transition log event (T3-68) — 'SCENE_RECOVERED_FROM_HISTORY' { reason }
+  // Optional: emit transition log event (T3-68) 鈥?'SCENE_RECOVERED_FROM_HISTORY' { reason }
 }, [setGcodeStale]);
 
 const handleUndo = useCallback(() => {
@@ -4428,39 +4422,39 @@ const handleRedo = useCallback(() => {
 }, [applyHistoryScene]);
 ```
 
-Notes on the dirty mark: an alternative model (audit's Priority 3) is content-hash based — `dirty = currentSceneHash !== savedSceneHash`. That's the right long-term answer (because undo back to saved state should mark CLEAN), but it's a larger change. For T1-75's first ship, the conservative behavior is: undo/redo always marks dirty. This is strictly safer than today (autosave will pick up the change) and acceptable UX (user pressing Ctrl+Z gets a "*" indicator, can save, no surprises).
+Notes on the dirty mark: an alternative model (audit's Priority 3) is content-hash based 鈥?`dirty = currentSceneHash !== savedSceneHash`. That's the right long-term answer (because undo back to saved state should mark CLEAN), but it's a larger change. For T1-75's first ship, the conservative behavior is: undo/redo always marks dirty. This is strictly safer than today (autosave will pick up the change) and acceptable UX (user pressing Ctrl+Z gets a "*" indicator, can save, no surprises).
 
-T2-76 (single transaction path) generalizes this — but T1-75 ships the immediate safety fix.
+T2-76 (single transaction path) generalizes this 鈥?but T1-75 ships the immediate safety fix.
 
 **Tests:** `tests/undo-redo-invalidation.test.ts`:
-- Compile, undo → assert gcodeStale=true.
-- Frame, undo → assert hasFramedRef.current=false.
-- Save, undo → assert dirty=true.
-- Connection sidebar closed during undo → still invalidates (no longer effect-dependent).
+- Compile, undo 鈫?assert gcodeStale=true.
+- Frame, undo 鈫?assert hasFramedRef.current=false.
+- Save, undo 鈫?assert dirty=true.
+- Connection sidebar closed during undo 鈫?still invalidates (no longer effect-dependent).
 
 **Estimate:** ~30 minutes.
 
-**Priority:** Tier 1 — real safety defect. Closes the path where undo silently changes the design while compiled G-code and frame state remain "fresh" in the UI's eyes.
+**Priority:** Tier 1 鈥?real safety defect. Closes the path where undo silently changes the design while compiled G-code and frame state remain "fresh" in the UI's eyes.
 
 **Cross-check note (audit 4E):** Audit's Critical 1 + 6 + 7 + Priority 4. Verified at App.tsx:1132-1140 + useCompileManager.ts:110.
 
 ---
 
-### T1-76 | Active layer change — unify path (UI-state OR project-state, not both)
+### T1-76 | Active layer change 鈥?unify path (UI-state OR project-state, not both)
 
-**Code reference:** `src/ui/components/App.tsx:920` (handleSceneChange — no history) vs `src/ui/components/LayerPanel.tsx:157` (onSceneCommit — history). Cross-check verified — same conceptual action takes two different paths depending on UI surface.
+**Code reference:** `src/ui/components/App.tsx:920` (handleSceneChange 鈥?no history) vs `src/ui/components/LayerPanel.tsx:157` (onSceneCommit 鈥?history). Cross-check verified 鈥?same conceptual action takes two different paths depending on UI surface.
 
 **Problem:** The audit identified active layer history as inconsistent. Cross-check confirmed:
 
 ```ts
-// App.tsx:920 — mode tab activation (Cut/Engrave tabs at top)
+// App.tsx:920 鈥?mode tab activation (Cut/Engrave tabs at top)
 handleSceneChange({ ...prev, activeLayerId: layerId });   // no history, no dirty
 
-// LayerPanel.tsx:157 — clicking a layer in the layer panel
+// LayerPanel.tsx:157 鈥?clicking a layer in the layer panel
 onSceneCommit({ ...scene, activeLayerId: layerId });       // history, dirty
 ```
 
-The user clicks a layer in the layer panel → undo can revert it. The user clicks a mode tab to switch to that layer → undo CANNOT revert it. Same conceptual action, two policies.
+The user clicks a layer in the layer panel 鈫?undo can revert it. The user clicks a mode tab to switch to that layer 鈫?undo CANNOT revert it. Same conceptual action, two policies.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical failure 9 + Required Priority 12.
 
@@ -4470,7 +4464,7 @@ The user clicks a layer in the layer panel → undo can revert it. The user clic
 
 `activeLayerId` is moved out of Scene entirely, into a separate UI store. Project files don't persist active layer (or persist it with a clear "session preference" semantic). Undo/redo never touches active layer.
 
-This is structurally cleaner but requires schema migration — pairs with T2-73 (formal migration pipeline). Long-term preferred.
+This is structurally cleaner but requires schema migration 鈥?pairs with T2-73 (formal migration pipeline). Long-term preferred.
 
 **Option B: Active layer is project state**
 
@@ -4485,29 +4479,29 @@ This is the smaller fix. App.tsx:920 changes from `handleSceneChange` to `handle
 const handleActivateLayer = useCallback((layerId: string) => {
   const prev = sceneRef.current;
   if (prev.activeLayerId === layerId) return;
-  // Project state — committed to history for undo/redo consistency.
+  // Project state 鈥?committed to history for undo/redo consistency.
   handleSceneCommit({ ...prev, activeLayerId: layerId });
 }, [handleSceneCommit]);
 ```
 
 This now mirrors LayerPanel:157 exactly. Both paths produce undo entries.
 
-A small UX consequence: clicking through mode tabs creates undo entries. Pressing Ctrl+Z one extra time after a Cut→Engrave→back-to-Cut sequence to undo the previous edit may surprise some users. Acceptable given the consistency benefit; worth a release-note mention.
+A small UX consequence: clicking through mode tabs creates undo entries. Pressing Ctrl+Z one extra time after a Cut鈫扙ngrave鈫抌ack-to-Cut sequence to undo the previous edit may surprise some users. Acceptable given the consistency benefit; worth a release-note mention.
 
 **Tests:** `tests/active-layer-history-consistent.test.ts`:
-- Activate layer via mode tab → assert history entry.
-- Activate layer via panel click → assert history entry (already passes).
+- Activate layer via mode tab 鈫?assert history entry.
+- Activate layer via panel click 鈫?assert history entry (already passes).
 - Undo restores previous active layer either way.
 
 **Estimate:** ~30 minutes.
 
-**Priority:** Tier 1 — small consistency fix. Removes a real "same action, two policies" bug.
+**Priority:** Tier 1 鈥?small consistency fix. Removes a real "same action, two policies" bug.
 
 **Cross-check note (audit 4E):** Audit's Critical 9 + Priority 12. Verified at App.tsx:920 + LayerPanel.tsx:157.
 
 ---
 
-### T1-77 | Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle — commercial-critical
+### T1-77 | Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle 鈥?commercial-critical
 
 **Code reference:** `src/entitlements/testerKey.ts:4-5`. Cross-check verified at exact lines.
 
@@ -4525,7 +4519,7 @@ export function getTesterHmacSecret(): string {
 
 This is the single worst commercial defect in the system. The HMAC secret used to validate tester keys is a string literal in the client bundle. Anyone who downloads a build, opens DevTools, runs `grep` on the source, or loads source maps can extract the secret in under a minute and generate unlimited valid tester keys via the same script as `scripts/generate-tester-key.mjs`.
 
-The 32-bit signature window (testerKey.ts:44 — `hex.slice(0, 8)`) makes brute force feasible even WITHOUT the secret: ~6 hours of WebCrypto signing on consumer hardware. With the secret, it's instant.
+The 32-bit signature window (testerKey.ts:44 鈥?`hex.slice(0, 8)`) makes brute force feasible even WITHOUT the secret: ~6 hours of WebCrypto signing on consumer hardware. With the secret, it's instant.
 
 The env override at line 9 means production builds CAN substitute via `VITE_TESTER_HMAC_SECRET`, but the fallback to the hardcoded default still ships in the bundle if that env var isn't set during build.
 
@@ -4549,11 +4543,11 @@ export async function verifyTesterCode(code: string): Promise<boolean> {
 ```
 
 This means:
-- Dev builds without env set → tester keys never verify (acceptable; devs use the dev-build auto-unlock path).
-- Production builds without env set → tester keys never verify (correct; tester program isn't a feature for end users).
-- Internal/QA builds with `VITE_TESTER_HMAC_SECRET=...` set → tester keys work as today.
+- Dev builds without env set 鈫?tester keys never verify (acceptable; devs use the dev-build auto-unlock path).
+- Production builds without env set 鈫?tester keys never verify (correct; tester program isn't a feature for end users).
+- Internal/QA builds with `VITE_TESTER_HMAC_SECRET=...` set 鈫?tester keys work as today.
 
-**Fix (proper, larger — links to T2-89 + T2-90):** Move tester verification server-side. Tester key entered → HTTPS to LaserForge entitlement server → server verifies and returns signed entitlement token → client verifies token with embedded public key. Private key never ships.
+**Fix (proper, larger 鈥?links to T2-89 + T2-90):** Move tester verification server-side. Tester key entered 鈫?HTTPS to LaserForge entitlement server 鈫?server verifies and returns signed entitlement token 鈫?client verifies token with embedded public key. Private key never ships.
 
 For T1-77's first ship, the stopgap closes the immediate hole. T2-89 / T2-90 ship the proper fix.
 
@@ -4570,7 +4564,7 @@ For T1-77's first ship, the stopgap closes the immediate hole. T2-89 / T2-90 shi
 
 **Estimate:** ~30 minutes for the immediate stopgap (remove default + tests). Proper fix tracked separately under T2-89 + T2-90.
 
-**Priority:** Tier 1 — **commercial-critical**. Should ship before any paid release. Even though the proper server-signed model is bigger work, the stopgap immediately closes the leak in shipped builds.
+**Priority:** Tier 1 鈥?**commercial-critical**. Should ship before any paid release. Even though the proper server-signed model is bigger work, the stopgap immediately closes the leak in shipped builds.
 
 **Cross-check note (audit 5A):** Audit's Critical 1 + Priority 1. Verified at testerKey.ts:4-5, 13, 44.
 
@@ -4596,7 +4590,7 @@ if (!requireFeature('nesting')) {
 }
 ```
 
-This works but is brittle. A future caller might write `requireFeature('feature'); doProThing();` and assume the gate enforced — getting a free pass. The name primes for misuse.
+This works but is brittle. A future caller might write `requireFeature('feature'); doProThing();` and assume the gate enforced 鈥?getting a free pass. The name primes for misuse.
 
 **Identified by:** Audit 5A (2026-04-26, ChatGPT) Critical failure 5 + Required Priority 4.
 
@@ -4624,7 +4618,7 @@ export function assertFeature(feature: ProFeature): void {
   }
 }
 
-// Deprecated alias — keeps existing callers working during migration.
+// Deprecated alias 鈥?keeps existing callers working during migration.
 /** @deprecated Use canUseFeature() or assertFeature() instead. */
 export function requireFeature(feature: ProFeature): boolean {
   return canUseFeature(feature);
@@ -4664,7 +4658,7 @@ try {
 }
 ```
 
-Migration scope: 13 existing `requireFeature(...)` callers (per the cross-check grep). Most use the `if (!requireFeature(...)) throw` pattern → swap for `assertFeature(...)`. JobCompiler's allowlist-building uses → swap for `canUseFeature(...)`. Hooks → either form is fine; `assertFeature` is more idiomatic in service entry hooks.
+Migration scope: 13 existing `requireFeature(...)` callers (per the cross-check grep). Most use the `if (!requireFeature(...)) throw` pattern 鈫?swap for `assertFeature(...)`. JobCompiler's allowlist-building uses 鈫?swap for `canUseFeature(...)`. Hooks 鈫?either form is fine; `assertFeature` is more idiomatic in service entry hooks.
 
 **Tests:** `tests/entitlement-api-split.test.ts`:
 - `canUseFeature` returns boolean.
@@ -4674,23 +4668,23 @@ Migration scope: 13 existing `requireFeature(...)` callers (per the cross-check 
 
 **Estimate:** ~1 hour including caller migration + tests.
 
-**Priority:** Tier 1 — small but real API hygiene fix. Also a foundation for T1-79 (box_generator gate) — once `assertFeature` exists, T1-79 is a one-liner.
+**Priority:** Tier 1 鈥?small but real API hygiene fix. Also a foundation for T1-79 (box_generator gate) 鈥?once `assertFeature` exists, T1-79 is a one-liner.
 
 **Cross-check note (audit 5A):** Audit's Critical 5 + Priority 4. Verified at entitlements/index.ts:21-23.
 
 ---
 
-### T1-79 | Box generator service-level entitlement check — only Pro feature missing one
+### T1-79 | Box generator service-level entitlement check 鈥?only Pro feature missing one
 
-**Code reference:** `src/ui/components/BoxGenerator.tsx` — no `requireFeature`/`canUse`/`assertFeature` import (cross-check confirmed via grep). Button gate at App.tsx:1521-1523 uses `gatedFeature('box_generator')` but the dialog and underlying `generateBoxFaces()` (BoxGenerator.tsx:26) have no entitlement check.
+**Code reference:** `src/ui/components/BoxGenerator.tsx` 鈥?no `requireFeature`/`canUse`/`assertFeature` import (cross-check confirmed via grep). Button gate at App.tsx:1521-1523 uses `gatedFeature('box_generator')` but the dialog and underlying `generateBoxFaces()` (BoxGenerator.tsx:26) have no entitlement check.
 
-**Problem:** Cross-check verified — of all 13 features in `PRO_FEATURES`, **box_generator is the only one without a service-level gate**. Every other feature has at least one of: compile-time stripping (tabs, overcut, lead_in, cross_hatch, power_scale, cut_start_point), service-level throw (nesting, boolean_ops, variable_text, text_to_path, kerf_wizard, material_test), or soft-gate save (job_replay).
+**Problem:** Cross-check verified 鈥?of all 13 features in `PRO_FEATURES`, **box_generator is the only one without a service-level gate**. Every other feature has at least one of: compile-time stripping (tabs, overcut, lead_in, cross_hatch, power_scale, cut_start_point), service-level throw (nesting, boolean_ops, variable_text, text_to_path, kerf_wizard, material_test), or soft-gate save (job_replay).
 
 A user with DevTools can:
 1. Open the app as a free user.
 2. Run `__APP_DIALOGS__.setShowBoxGenerator(true)` (or whatever the equivalent state setter exposure is).
 3. Get the full BoxGenerator dialog.
-4. Click "Generate" → faces appear in the scene.
+4. Click "Generate" 鈫?faces appear in the scene.
 
 No license required. The UI gate at App.tsx:1522 is the only barrier and it's bypassable.
 
@@ -4704,7 +4698,7 @@ import { assertFeature } from '../../entitlements';  // T1-78
 
 // Inside the generate flow:
 function generateBoxFaces() {
-  assertFeature('box_generator');                    // ← throws if not Pro
+  assertFeature('box_generator');                    // 鈫?throws if not Pro
   // ... existing logic
 }
 ```
@@ -4723,7 +4717,7 @@ The thrown `EntitlementError` is caught at the call site and surfaced via T2-65 
 
 **Estimate:** ~15 min including test. Trivial after T1-78 lands.
 
-**Priority:** Tier 1 — closes the only Pro feature with no service gate. Should ship paired with or after T1-78.
+**Priority:** Tier 1 鈥?closes the only Pro feature with no service gate. Should ship paired with or after T1-78.
 
 **Cross-check note (audit 5A):** Audit's Critical 8 (box_generator) + Priority 6. Verified by grep absence in BoxGenerator.tsx.
 
@@ -4738,8 +4732,8 @@ The thrown `EntitlementError` is caught at the call site and surfaced via T2-65 
 ```ts
 const applied = await this.validateAndApplyStoredCode(saved);
 if (!applied) {
-  await getStorage().remove(STORAGE_KEY);              // ← silently deletes license
-  this.setState({ tier: 'free', hasPro: false });      // ← silently downgrades
+  await getStorage().remove(STORAGE_KEY);              // 鈫?silently deletes license
+  this.setState({ tier: 'free', hasPro: false });      // 鈫?silently downgrades
 }
 ```
 
@@ -4748,7 +4742,7 @@ If a user's saved license fails to validate (Gumroad temporarily down, network b
 2. Silently switches to free tier.
 3. Displays the app as if the user is free, with no explanation.
 
-A legitimate paid user opens the app one day, sees Pro features locked with no message, has to dig out their license email to re-enter it. That's a real customer-trust failure — and it makes them wonder if they were wrongly downgraded for some other reason ("did they revoke me?").
+A legitimate paid user opens the app one day, sees Pro features locked with no message, has to dig out their license email to re-enter it. That's a real customer-trust failure 鈥?and it makes them wonder if they were wrongly downgraded for some other reason ("did they revoke me?").
 
 Audit User-trust failure mode "Paid user appears unpaid" verified.
 
@@ -4789,13 +4783,13 @@ const result = await this.validateAndApplyStoredCode(saved);
 if (result.kind === 'verified') {
   this.setState({ tier: 'paid', hasPro: true, status: 'verified', code: saved, lastVerifiedAt: Date.now() });
 } else if (result.kind === 'offline_grace') {
-  // Network failed but cache still valid — keep Pro active in grace window
+  // Network failed but cache still valid 鈥?keep Pro active in grace window
   this.setState({ tier: 'paid', hasPro: true, status: 'offline_grace', code: saved, graceUntil: result.graceUntil });
 } else if (result.kind === 'revoked') {
-  // Server confirmed: license should not work — disable Pro but keep code stored for visibility
+  // Server confirmed: license should not work 鈥?disable Pro but keep code stored for visibility
   this.setState({ tier: 'free', hasPro: false, status: 'revoked', code: saved });
 } else if (result.kind === 'verification_failed') {
-  // Couldn't verify, cache expired — disable Pro, keep code so user can retry
+  // Couldn't verify, cache expired 鈥?disable Pro, keep code so user can retry
   this.setState({ tier: 'free', hasPro: false, status: 'verification_failed', code: saved, lastError: result.error });
 }
 // Note: license code stays in storage in all cases except explicit deactivate()
@@ -4804,34 +4798,34 @@ if (result.kind === 'verified') {
 UI surfaces each state with appropriate messaging:
 
 ```
-✓ Pro verified                                    (status: 'verified')
-⚠ Offline grace — Pro active for 21 more days     (status: 'offline_grace')
-⚠ Could not verify license — Retry now            (status: 'verification_failed')
-✕ License revoked — contact support               (status: 'revoked')
+鉁?Pro verified                                    (status: 'verified')
+鈿?Offline grace 鈥?Pro active for 21 more days     (status: 'offline_grace')
+鈿?Could not verify license 鈥?Retry now            (status: 'verification_failed')
+鉁?License revoked 鈥?contact support               (status: 'revoked')
 ```
 
 Critical: the license code is preserved in storage during `verification_failed` so the user can retry without re-entering. Only explicit `deactivate()` removes it.
 
 **Tests:** `tests/license-status-states.test.ts`:
-- Verified license → status='verified', hasPro=true.
-- Network error within grace → status='offline_grace', hasPro=true.
-- Network error beyond grace → status='verification_failed', hasPro=false, code preserved.
-- Refunded → status='revoked', hasPro=false, code preserved.
-- Manual deactivate → code removed.
+- Verified license 鈫?status='verified', hasPro=true.
+- Network error within grace 鈫?status='offline_grace', hasPro=true.
+- Network error beyond grace 鈫?status='verification_failed', hasPro=false, code preserved.
+- Refunded 鈫?status='revoked', hasPro=false, code preserved.
+- Manual deactivate 鈫?code removed.
 
 **Estimate:** ~1-2 sessions. State enum + result type + UI states + tests.
 
-**Priority:** Tier 1 — real customer-trust defect. Also foundation for T2-93 (license status enum proper), but the Tier 1 ship is the immediate user-facing fix.
+**Priority:** Tier 1 鈥?real customer-trust defect. Also foundation for T2-93 (license status enum proper), but the Tier 1 ship is the immediate user-facing fix.
 
 **Cross-check note (audit 5A):** Audit's User trust + Priority 12. Verified at EntitlementService.ts:92-95.
 
 ---
 
-### T1-81 | CI check — production builds must NOT contain dev-mode auto-unlock
+### T1-81 | CI check 鈥?production builds must NOT contain dev-mode auto-unlock
 
 **Code reference:** `src/entitlements/EntitlementService.ts:14-16` (`isDevBuild`), :77-84 (auto-Pro unlock when DEV=true), :120, :131, :148 (other DEV-gated paths).
 
-**Problem:** Cross-check verified at all line numbers. The codebase has 4 sites that branch on `import.meta.env.DEV`. In Vite, `DEV` is automatically `false` in production builds — but only if the build is correctly configured. A bug in the build config, a forgotten `--mode production`, an Electron build script that re-imports source instead of dist, or any other build misconfiguration could ship a build with `DEV=true`. That build would auto-unlock all Pro features for every user.
+**Problem:** Cross-check verified at all line numbers. The codebase has 4 sites that branch on `import.meta.env.DEV`. In Vite, `DEV` is automatically `false` in production builds 鈥?but only if the build is correctly configured. A bug in the build config, a forgotten `--mode production`, an Electron build script that re-imports source instead of dist, or any other build misconfiguration could ship a build with `DEV=true`. That build would auto-unlock all Pro features for every user.
 
 Audit Critical failure 4 + Required Priority 10 + Production build tests verified.
 
@@ -4839,7 +4833,7 @@ Audit Critical failure 4 + Required Priority 10 + Production build tests verifie
 
 **Fix:** Multi-layer check:
 
-**Layer 1 — Build-time assertion.** Add a script that runs after the production build and inspects the bundle:
+**Layer 1 鈥?Build-time assertion.** Add a script that runs after the production build and inspects the bundle:
 
 ```js
 // scripts/verify-production-build.mjs
@@ -4850,7 +4844,7 @@ const distDir = './dist';
 const bundles = walkBundleJsFiles(distDir);
 
 const REJECT_PATTERNS = [
-  // Dev-build-only string literal — should be tree-shaken in prod
+  // Dev-build-only string literal 鈥?should be tree-shaken in prod
   /tier:\s*['"]developer['"]/,
   // Default tester secret (T1-77)
   /bf5c9e2a-7d41-4c8e-9a1b-laserforge-tester-hmac-v1/,
@@ -4861,7 +4855,7 @@ for (const file of bundles) {
   const content = fs.readFileSync(file, 'utf8');
   for (const pattern of REJECT_PATTERNS) {
     if (pattern.test(content)) {
-      console.error(`✗ Production bundle ${file} contains forbidden pattern: ${pattern}`);
+      console.error(`鉁?Production bundle ${file} contains forbidden pattern: ${pattern}`);
       failed = true;
     }
   }
@@ -4871,7 +4865,7 @@ if (failed) {
   console.error('Production build verification FAILED');
   process.exit(1);
 }
-console.log('✓ Production build verification passed');
+console.log('鉁?Production build verification passed');
 ```
 
 Wire into `package.json`:
@@ -4885,9 +4879,9 @@ Wire into `package.json`:
 }
 ```
 
-**Layer 2 — CI gate.** GitHub Actions / equivalent runs the verification on every release-candidate build. PR cannot merge to release branch if check fails.
+**Layer 2 鈥?CI gate.** GitHub Actions / equivalent runs the verification on every release-candidate build. PR cannot merge to release branch if check fails.
 
-**Layer 3 — Runtime self-check (defense in depth).** On app boot in `runInitialize`, if BOTH `import.meta.env.PROD === true` AND we're about to take a dev-only path → log loudly and refuse to take that path:
+**Layer 3 鈥?Runtime self-check (defense in depth).** On app boot in `runInitialize`, if BOTH `import.meta.env.PROD === true` AND we're about to take a dev-only path 鈫?log loudly and refuse to take that path:
 
 ```ts
 function isDevBuild(): boolean {
@@ -4909,7 +4903,7 @@ This is paranoid but cheap, and provides a safety net even if Layer 1 / Layer 2 
 
 **Estimate:** ~1 hour for Layers 1-3 + CI wiring.
 
-**Priority:** Tier 1 — real release-safety net. Should ship before any public release.
+**Priority:** Tier 1 鈥?real release-safety net. Should ship before any public release.
 
 **Cross-check note (audit 5A):** Audit's Critical 4 + Priority 10. Verified at EntitlementService.ts:14-16, 77-84.
 
@@ -4919,7 +4913,7 @@ This is paranoid but cheap, and provides a safety net even if Layer 1 / Layer 2 
 
 **Code reference:** `src/entitlements/EntitlementService.ts:60-61` writes `'laserforge_pro' = 'true'`/removes on every state change. The audit notes the migration test confirms this key migrates, but couldn't find a clear consumer that needs it.
 
-**Problem:** Cross-check confirmed line 60-61 actively maintains the legacy `PRO_FLAG_KEY` boolean even though the audit notes "It is not the main authority in EntitlementService." That's true — but writing it on every state change means future code reading `localStorage.getItem('laserforge_pro') === 'true'` would see a "current" value. That's a foot-gun: a copy-paste from a bug fix or a feature flag pattern could read this key directly and bypass the proper EntitlementService API.
+**Problem:** Cross-check confirmed line 60-61 actively maintains the legacy `PRO_FLAG_KEY` boolean even though the audit notes "It is not the main authority in EntitlementService." That's true 鈥?but writing it on every state change means future code reading `localStorage.getItem('laserforge_pro') === 'true'` would see a "current" value. That's a foot-gun: a copy-paste from a bug fix or a feature flag pattern could read this key directly and bypass the proper EntitlementService API.
 
 If the key has a documented purpose (e.g. read by an Electron preload script, or by a build-time tool), it should be commented in source. If it doesn't, it should be deleted.
 
@@ -4927,10 +4921,10 @@ If the key has a documented purpose (e.g. read by an Electron preload script, or
 
 **Fix:** Audit + decide:
 
-1. **Search for readers.** `grep -rn "laserforge_pro" src/ electron/` — if nothing reads it (other than the migration code), delete the writes at lines 60-61.
+1. **Search for readers.** `grep -rn "laserforge_pro" src/ electron/` 鈥?if nothing reads it (other than the migration code), delete the writes at lines 60-61.
 
 ```ts
-// EntitlementService.ts:57-66 — REMOVE the write logic
+// EntitlementService.ts:57-66 鈥?REMOVE the write logic
 private setState(next: EntitlementState): void {
   this.state = next;
   this.emit();
@@ -4948,7 +4942,7 @@ The migration code at lines 102-115 also reads `PRO_FLAG_KEY`; once writes are r
 
 **Estimate:** ~30 min including grep audit + decision + test.
 
-**Priority:** Tier 1 — small hygiene fix. Removes a foot-gun.
+**Priority:** Tier 1 鈥?small hygiene fix. Removes a foot-gun.
 
 **Cross-check note (audit 5A):** Audit's Storage findings. Verified at EntitlementService.ts:60-61.
 
@@ -4958,11 +4952,11 @@ The migration code at lines 102-115 also reads `PRO_FLAG_KEY`; once writes are r
 
 **Code reference:** `electron/tsconfig.json:12` has `"sourceMap": true`. `package.json:32-36` packages `dist-electron/**/*` which includes generated `.js.map` files.
 
-**Problem:** Cross-check confirmed — source maps for the Electron main process are generated and end up in the packaged installer. This:
+**Problem:** Cross-check confirmed 鈥?source maps for the Electron main process are generated and end up in the packaged installer. This:
 - Leaks file structure and original variable names of the main process and preload code
 - Makes reverse engineering significantly easier
 - Combines badly with audit 5A findings (the tester HMAC secret and entitlement logic both live in code that source maps would expose)
-- Doesn't help end users — main process maps aren't shown in any user-facing devtools by default
+- Doesn't help end users 鈥?main process maps aren't shown in any user-facing devtools by default
 
 The Vite renderer build is configured separately and may or may not also be emitting source maps; T1-83 includes verifying that path too.
 
@@ -4970,7 +4964,7 @@ The Vite renderer build is configured separately and may or may not also be emit
 
 **Fix:** Two parts.
 
-**Part 1 — Disable Electron source maps for production:**
+**Part 1 鈥?Disable Electron source maps for production:**
 
 ```json
 // electron/tsconfig.json
@@ -4982,7 +4976,7 @@ The Vite renderer build is configured separately and may or may not also be emit
 }
 ```
 
-OR (preferred — keep dev source maps, exclude from package):
+OR (preferred 鈥?keep dev source maps, exclude from package):
 
 Keep `sourceMap: true` for local debugging, but exclude maps from the package via Electron Builder's files glob:
 
@@ -4997,9 +4991,9 @@ Keep `sourceMap: true` for local debugging, but exclude maps from the package vi
 ]
 ```
 
-The negation glob is the right call — keeps maps available locally for debugging crashes, but Electron Builder skips them during packaging.
+The negation glob is the right call 鈥?keeps maps available locally for debugging crashes, but Electron Builder skips them during packaging.
 
-**Part 2 — Verify Vite renderer build:**
+**Part 2 鈥?Verify Vite renderer build:**
 
 Vite's default for `vite build` is to emit source maps if `build.sourcemap` is set. Check `vite.config.ts`:
 
@@ -5025,13 +5019,13 @@ test('packaged installer does not contain main process source maps', () => {
 
 **Estimate:** ~30 minutes including verification of both parts.
 
-**Priority:** Tier 1 — small fix, real commercial-security improvement. Pairs with T1-77 (tester secret) and T1-81 (CI check).
+**Priority:** Tier 1 鈥?small fix, real commercial-security improvement. Pairs with T1-77 (tester secret) and T1-81 (CI check).
 
 **Cross-check note (audit 5B):** Audit's Critical 5 + Priority 7. Verified at electron/tsconfig.json:12 + package.json:32-36.
 
 ---
 
-### T1-84 | Restrict `storage:clear` IPC — remove or scope to specific domains
+### T1-84 | Restrict `storage:clear` IPC 鈥?remove or scope to specific domains
 
 **Code reference:** `electron/main.ts:219-221` (handler), `electron/preload.ts:22` (exposed to renderer), `electron/storage.ts:75-91` (deletes every `.json` in storage directory).
 
@@ -5052,14 +5046,14 @@ Any renderer process can call `window.electronAPI.storageClear()` and wipe ALL a
 - Job logs (history gone)
 - All settings
 
-This is a single point of catastrophic data loss. Even without an attacker — a developer console copy-paste accident, a misbehaving browser extension that gains renderer access, or a future code path that calls clear inappropriately can wipe a paid customer's entire app state.
+This is a single point of catastrophic data loss. Even without an attacker 鈥?a developer console copy-paste accident, a misbehaving browser extension that gains renderer access, or a future code path that calls clear inappropriately can wipe a paid customer's entire app state.
 
 **Identified by:** Audit 5B (2026-04-26, ChatGPT) Critical failure 10 + Required Priority 14.
 
 **Fix:** Replace the all-or-nothing clear with scoped operations. Each scope deletes only its own keys:
 
 ```ts
-// electron/storage.ts — add scoped clear function
+// electron/storage.ts 鈥?add scoped clear function
 storageClearScope(scope: 'autosave' | 'job_logs' | 'material_cache'): void {
   const dir = getDir();
   const allowedKeyPrefixes: Record<string, string[]> = {
@@ -5081,10 +5075,10 @@ storageClearScope(scope: 'autosave' | 'job_logs' | 'material_cache'): void {
 }
 ```
 
-Notice what's NOT in any scope: `laserforge_license`, `laserforge_license_cache`, device profiles, material presets. Those require explicit operations (deactivate license, delete profile, delete preset) — never bulk-cleared.
+Notice what's NOT in any scope: `laserforge_license`, `laserforge_license_cache`, device profiles, material presets. Those require explicit operations (deactivate license, delete profile, delete preset) 鈥?never bulk-cleared.
 
 ```ts
-// electron/main.ts — replace the unscoped handler
+// electron/main.ts 鈥?replace the unscoped handler
 ipcMain.handle('storage:clearScope', (_event, scope: unknown) => {
   if (typeof scope !== 'string') throw new Error('Invalid scope');
   storageClearScope(scope as 'autosave' | 'job_logs' | 'material_cache');
@@ -5095,7 +5089,7 @@ ipcMain.handle('storage:clearScope', (_event, scope: unknown) => {
 ```
 
 ```ts
-// electron/preload.ts — replace the broad API
+// electron/preload.ts 鈥?replace the broad API
 storageClearScope: (scope: string) =>
   ipcRenderer.invoke('storage:clearScope', scope) as Promise<void>,
 
@@ -5104,7 +5098,7 @@ storageClearScope: (scope: string) =>
 
 If existing renderer code calls `storageClear()`, find each call and migrate to a specific scope, OR if the call was wrong (shouldn't have been clearing everything), fix the actual intent.
 
-The `storageClear()` function in `electron/storage.ts` itself can stay (used by tests and possibly by main-process logic) — what changes is the IPC surface. The renderer can no longer trigger it directly.
+The `storageClear()` function in `electron/storage.ts` itself can stay (used by tests and possibly by main-process logic) 鈥?what changes is the IPC surface. The renderer can no longer trigger it directly.
 
 **Tests:** `tests/storage-ipc-no-broad-clear.test.ts`:
 - `window.electronAPI.storageClear` is undefined.
@@ -5114,7 +5108,7 @@ The `storageClear()` function in `electron/storage.ts` itself can stay (used by 
 
 **Estimate:** ~1 hour including audit of existing callers + scope definition + tests.
 
-**Priority:** Tier 1 — small fix, real customer-data-protection improvement.
+**Priority:** Tier 1 鈥?small fix, real customer-data-protection improvement.
 
 **Cross-check note (audit 5B):** Audit's Critical 10 + Priority 14. Verified at electron/main.ts:219-221, preload.ts:22, storage.ts:75-91.
 
@@ -5134,11 +5128,11 @@ const isDev = !app.isPackaged || process.argv.includes('--dev');
 
 Branch 2 means a packaged production installer can be launched as `LaserForge.exe --dev` and it will:
 - Open DevTools (line 98)
-- Auto-unlock developer entitlement if EntitlementService also reads `import.meta.env.DEV` — but actually that's a Vite build-time check so it's safe in packaged builds (T1-81 covers that). But the `isDev` flag in main.ts still controls runtime DevTools.
+- Auto-unlock developer entitlement if EntitlementService also reads `import.meta.env.DEV` 鈥?but actually that's a Vite build-time check so it's safe in packaged builds (T1-81 covers that). But the `isDev` flag in main.ts still controls runtime DevTools.
 
 End users who get a binary, run with `--dev`, can poke around the renderer with full DevTools access. This isn't catastrophic on its own, but combined with the source maps (T1-83) and entitlement state inspection (renderer DOM and React DevTools), it weakens commercial posture.
 
-**Identified by:** Audit 5B (2026-04-26, ChatGPT) — implicit from Production-vs-development separation findings. Not called out as a specific critical failure but verified during cross-check.
+**Identified by:** Audit 5B (2026-04-26, ChatGPT) 鈥?implicit from Production-vs-development separation findings. Not called out as a specific critical failure but verified during cross-check.
 
 **Fix:**
 
@@ -5149,7 +5143,7 @@ const isDev = !app.isPackaged;
 // Set ELECTRON_ENABLE_DEVTOOLS=1 env var if you need DevTools on a packaged build for support diagnosis.
 ```
 
-If there's a legitimate use case (support engineer needs DevTools on a customer's installed copy to diagnose), provide a less-discoverable env var path — `ELECTRON_ENABLE_DEVTOOLS=1` — that requires deliberate setup. A command-line `--dev` flag is too easy to discover and use casually.
+If there's a legitimate use case (support engineer needs DevTools on a customer's installed copy to diagnose), provide a less-discoverable env var path 鈥?`ELECTRON_ENABLE_DEVTOOLS=1` 鈥?that requires deliberate setup. A command-line `--dev` flag is too easy to discover and use casually.
 
 **Tests:** `tests/packaged-app-no-dev-arg.test.ts`:
 - Mock `app.isPackaged = true` and `process.argv = ['app.exe', '--dev']`.
@@ -5157,17 +5151,17 @@ If there's a legitimate use case (support engineer needs DevTools on a customer'
 
 **Estimate:** ~15 minutes.
 
-**Priority:** Tier 1 — small commercial-posture fix.
+**Priority:** Tier 1 鈥?small commercial-posture fix.
 
 **Cross-check note (audit 5B):** Implicit from production-vs-dev separation findings. Verified at electron/main.ts:11.
 
 ---
 
-### T1-86 | `npmRebuild` decision — either enable rebuild or document proven-safe alternative
+### T1-86 | `npmRebuild` decision 鈥?either enable rebuild or document proven-safe alternative
 
 **Code reference:** `package.json:27` has `"npmRebuild": false`. `package.json` declares `"serialport": "^13.0.0"` as production dependency.
 
-**Problem:** Cross-check confirmed. `serialport` is a native module — it has compiled binary bindings to the OS. Native modules need to be built against the specific Electron version's Node ABI, which is typically different from the Node version used at install time.
+**Problem:** Cross-check confirmed. `serialport` is a native module 鈥?it has compiled binary bindings to the OS. Native modules need to be built against the specific Electron version's Node ABI, which is typically different from the Node version used at install time.
 
 Electron Builder's `npmRebuild: true` (default) handles this by running `electron-rebuild` automatically before packaging. Setting `false` disables that rebuild step.
 
@@ -5176,13 +5170,13 @@ Setting it to false is correct ONLY if:
 2. CI/dev environments install those prebuilds successfully, AND
 3. The packaged app actually ships those prebuilds correctly.
 
-Without verifying all three, the app may install successfully but crash on first serialport call ("Module did not self-register" or similar ABI mismatch errors). This breaks the core feature of LaserForge — connecting to the laser.
+Without verifying all three, the app may install successfully but crash on first serialport call ("Module did not self-register" or similar ABI mismatch errors). This breaks the core feature of LaserForge 鈥?connecting to the laser.
 
 **Identified by:** Audit 5B (2026-04-26, ChatGPT) Major build problem (native dependency rebuild) + Critical failure 3.
 
 **Fix:** Audit + decide.
 
-**Step 1 — Verify the current state.** Run:
+**Step 1 鈥?Verify the current state.** Run:
 
 ```bash
 # After packaging
@@ -5192,7 +5186,7 @@ node -e "require('serialport').SerialPort.list().then(console.log)"
 
 If this succeeds, the prebuilds are shipping correctly. If it fails with ABI errors, npmRebuild is too aggressive.
 
-**Step 2a — If prebuilds work**, document this in package.json:
+**Step 2a 鈥?If prebuilds work**, document this in package.json:
 
 ```json
 {
@@ -5206,7 +5200,7 @@ If this succeeds, the prebuilds are shipping correctly. If it fails with ABI err
 
 Plus the smoke test that runs in CI (T3-86).
 
-**Step 2b — If prebuilds don't work**, switch:
+**Step 2b 鈥?If prebuilds don't work**, switch:
 
 ```json
 "npmRebuild": true
@@ -5214,13 +5208,13 @@ Plus the smoke test that runs in CI (T3-86).
 
 And update CI to install platform build tools (windows-build-tools / Xcode CLT / build-essential) as needed.
 
-**Step 3 — Always:** add a packaged-app smoke test (T3-86) that asserts serialport loads after install. This is what catches regressions if the dependency upgrades to a version without prebuilds for the next Electron major.
+**Step 3 鈥?Always:** add a packaged-app smoke test (T3-86) that asserts serialport loads after install. This is what catches regressions if the dependency upgrades to a version without prebuilds for the next Electron major.
 
 **Tests:** T3-86 covers this.
 
 **Estimate:** ~30 minutes for audit and decision; CI changes (if 2b) are larger and tracked separately.
 
-**Priority:** Tier 1 — real risk to core product. Should ship before any commercial release.
+**Priority:** Tier 1 鈥?real risk to core product. Should ship before any commercial release.
 
 **Cross-check note (audit 5B):** Audit's Critical 3. Verified at package.json:27.
 
@@ -5247,7 +5241,7 @@ And update CI to install platform build tools (windows-build-tools / Xcode CLT /
 }
 ```
 
-If `controller.sendJob(lines)` throws — port closed mid-init, controller buffer rejected first command, network blip on simulator, any reason — the catch nullifies `currentJobLog` and `activeReplay` WITHOUT persisting them. The user sees an error, retries or gives up, and support has no record of the failed start: no machine state at the time, no reason, no controller traffic that did go out before the throw.
+If `controller.sendJob(lines)` throws 鈥?port closed mid-init, controller buffer rejected first command, network blip on simulator, any reason 鈥?the catch nullifies `currentJobLog` and `activeReplay` WITHOUT persisting them. The user sees an error, retries or gives up, and support has no record of the failed start: no machine state at the time, no reason, no controller traffic that did go out before the throw.
 
 For a machine-control app, failed starts are exactly the kind of event support needs to investigate. They're often more diagnostic than completed jobs because they expose mismatches between app state and machine state.
 
@@ -5263,7 +5257,7 @@ For a machine-control app, failed starts are exactly the kind of event support n
       addLogEntry(log, 'error',
         `Job failed to start: ${err instanceof Error ? err.message : String(err)}`);
       finalizeLog(log, 'failed', 0);
-      // Save before nullifying — best-effort, don't let save failure block cleanup
+      // Save before nullifying 鈥?best-effort, don't let save failure block cleanup
       void saveJobLog(log).catch(saveErr => {
         console.warn('[MachineService] Failed to save failed-start log:', saveErr);
       });
@@ -5306,7 +5300,7 @@ Support can now answer "what happened" instead of "the user said it didn't start
 
 **Estimate:** ~30 minutes including test.
 
-**Priority:** Tier 1 — real diagnostic recovery. Pairs with T2-67 (job outcome enum) which formalizes the outcome categorization.
+**Priority:** Tier 1 鈥?real diagnostic recovery. Pairs with T2-67 (job outcome enum) which formalizes the outcome categorization.
 
 **Cross-check note (audit 5C):** Audit's Major issue + Critical failure 3. Verified at MachineService.ts:458-469.
 
@@ -5314,7 +5308,7 @@ Support can now answer "what happened" instead of "the user said it didn't start
 
 ### T1-88 | Make diagnostic trace capture free, not Pro-gated
 
-**Code reference:** `src/app/MachineService.ts:434` — `if (requireFeature('job_replay')) { ... }` gates JobReplay capture behind Pro entitlement.
+**Code reference:** `src/app/MachineService.ts:434` 鈥?`if (requireFeature('job_replay')) { ... }` gates JobReplay capture behind Pro entitlement.
 
 **Problem:** Cross-check confirmed at line 434. Free users get only the basic JobLog (compacted RX/TX, ~25 first / 25 last entries). Pro users additionally get the richer JobReplay capture. **Diagnostic capture for support is gated behind Pro.**
 
@@ -5333,7 +5327,7 @@ The CAPTURE is a support tool. The VISUALIZATION is the product.
 **Fix:** Remove the gate around capture, keep gates on advanced UI surfaces:
 
 ```ts
-// MachineService.ts:434 — REMOVE the requireFeature wrap, always capture
+// MachineService.ts:434 鈥?REMOVE the requireFeature wrap, always capture
 const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => ({
   name: l.name,
   mode: l.settings.mode,
@@ -5344,7 +5338,7 @@ const layerSettings = scene.layers.filter(l => l.visible && l.output).map(l => (
 this.activeReplay = createReplay(/* ... */);
 ```
 
-Move the gate to the consumer side — wherever JobReplay is rendered as a visualization:
+Move the gate to the consumer side 鈥?wherever JobReplay is rendered as a visualization:
 
 ```ts
 // In a JobReplayViewer component
@@ -5355,9 +5349,9 @@ return <ReplayTimelineUI replay={replay} />;
 ```
 
 The PRO_FEATURES list (from T2-91 feature matrix) splits:
-- `job_replay` (data capture) → REMOVED, always-on
-- `job_replay_viewer` (advanced UI) → Pro-only
-- `job_replay_export` (export to support) → always-on (free users can export their own diagnostic bundle)
+- `job_replay` (data capture) 鈫?REMOVED, always-on
+- `job_replay_viewer` (advanced UI) 鈫?Pro-only
+- `job_replay_export` (export to support) 鈫?always-on (free users can export their own diagnostic bundle)
 
 **Tests:** `tests/job-replay-capture-not-gated.test.ts`:
 - Set entitlement to free.
@@ -5367,7 +5361,7 @@ The PRO_FEATURES list (from T2-91 feature matrix) splits:
 
 **Estimate:** ~30 minutes including viewer-side gate adjustment + tests.
 
-**Priority:** Tier 1 — small fix, real support-fairness improvement. Pairs with T2-91 (feature matrix) for the split.
+**Priority:** Tier 1 鈥?small fix, real support-fairness improvement. Pairs with T2-91 (feature matrix) for the split.
 
 **Cross-check note (audit 5C):** Audit's Critical 4 + Priority 5. Verified at MachineService.ts:434.
 
@@ -5375,7 +5369,7 @@ The PRO_FEATURES list (from T2-91 feature matrix) splits:
 
 ### T1-89 | Enable Electron `sandbox: true` for the renderer
 
-**Code reference:** `electron/main.ts:62-67` — `webPreferences` sets `nodeIntegration: false`, `contextIsolation: true`, `webviewTag: false` but does NOT set `sandbox: true`.
+**Code reference:** `electron/main.ts:62-67` 鈥?`webPreferences` sets `nodeIntegration: false`, `contextIsolation: true`, `webviewTag: false` but does NOT set `sandbox: true`.
 
 **Problem:** Cross-check verified via absence. The current Electron baseline is good (audit fair credit) but missing the strongest renderer isolation primitive. Without `sandbox: true`, a renderer that's compromised by XSS or by malicious imported content (a doctored SVG, project file, or DXF) has access to the full preload bridge AND to non-sandboxed Chromium APIs. With `sandbox: true`, the renderer is restricted to a smaller API surface and loses access to several Node-bridging features that exist outside contextIsolation's strict `contextBridge` boundary.
 
@@ -5394,8 +5388,8 @@ webPreferences: {
 },
 ```
 
-**Caveats — this may break things:**
-- The preload script must be entirely contextBridge-based (no direct DOM mutation, no direct `require` outside of Electron's allowed list). The current preload exposes APIs via `contextBridge.exposeInMainWorld` — already correct for sandbox.
+**Caveats 鈥?this may break things:**
+- The preload script must be entirely contextBridge-based (no direct DOM mutation, no direct `require` outside of Electron's allowed list). The current preload exposes APIs via `contextBridge.exposeInMainWorld` 鈥?already correct for sandbox.
 - Some libraries that the renderer depends on may use `process.platform` or other Node globals that are unavailable in sandbox mode. Test thoroughly.
 - Native module loading from the renderer was never possible (nodeIntegration: false), so sandbox doesn't change that.
 
@@ -5411,7 +5405,7 @@ webPreferences: {
 
 **Estimate:** ~1-2 sessions including breakage debugging.
 
-**Priority:** Tier 1 — security defense-in-depth. Some risk of breakage requires careful verification, but the value is high.
+**Priority:** Tier 1 鈥?security defense-in-depth. Some risk of breakage requires careful verification, but the value is high.
 
 **Cross-check note (audit 5D):** Audit's Critical 2 + Priority 1. Verified at electron/main.ts:62-67.
 
@@ -5433,9 +5427,9 @@ For a packaged Electron app loading `file://`, every navigation attempt should b
 **Fix:**
 
 ```ts
-// electron/main.ts — after BrowserWindow creation (~line 71)
+// electron/main.ts 鈥?after BrowserWindow creation (~line 71)
 
-// Block window.open and target=_blank — open in OS browser instead
+// Block window.open and target=_blank 鈥?open in OS browser instead
 mainWindow.webContents.setWindowOpenHandler(({ url }) => {
   // Allow only http(s) URLs, open externally
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -5474,13 +5468,13 @@ The existing `app.on('web-contents-created', ...)` at line 16 is already wiring 
 
 **Estimate:** ~30 minutes.
 
-**Priority:** Tier 1 — small fix, closes a real escape hatch.
+**Priority:** Tier 1 鈥?small fix, closes a real escape hatch.
 
 **Cross-check note (audit 5D):** Audit's Medium weakness. Verified via grep zero hits.
 
 ---
 
-### T1-91 | Sanitize G-code template variables — close newline injection vector
+### T1-91 | Sanitize G-code template variables 鈥?close newline injection vector
 
 **Code reference:** `src/core/plan/GcodeTemplates.ts:67` (`JOB_NAME` returned verbatim), `:75` (`MATERIAL_NAME` returned verbatim). Default templates at lines 94, 97 use them inside G-code COMMENT lines.
 
@@ -5510,7 +5504,7 @@ M5
 
 The first line is a benign comment. The next three lines are interpreted as G-code by the controller. Result: laser fires for 5 seconds at full power without the user's intent.
 
-The template validator (preflight) may catch some patterns, but the audit correctly notes that relying on preflight alone is insufficient — preflight is a UI surface, not a hard enforcement layer. The renderer is the one source of this string today.
+The template validator (preflight) may catch some patterns, but the audit correctly notes that relying on preflight alone is insufficient 鈥?preflight is a UI surface, not a hard enforcement layer. The renderer is the one source of this string today.
 
 Vectors:
 - User typing `\n` into a project name (browser textareas allow it).
@@ -5524,7 +5518,7 @@ Vectors:
 **Fix:**
 
 ```ts
-// src/core/plan/GcodeTemplates.ts — add sanitizer
+// src/core/plan/GcodeTemplates.ts 鈥?add sanitizer
 
 /**
  * Sanitize a string for safe insertion into G-code comment context.
@@ -5533,8 +5527,8 @@ Vectors:
 function gcodeCommentSafe(value: string | undefined | null): string {
   if (!value) return '';
   return value
-    .replace(/[\r\n]+/g, ' ')          // newlines → space (closes injection)
-    .replace(/[^\x20-\x7E]/g, '?')      // non-printable ASCII → ?
+    .replace(/[\r\n]+/g, ' ')          // newlines 鈫?space (closes injection)
+    .replace(/[^\x20-\x7E]/g, '?')      // non-printable ASCII 鈫??
     .slice(0, 120);                     // length cap
 }
 
@@ -5545,7 +5539,7 @@ export function renderTemplate(template: string, context: GcodeTemplateContext):
       case 'JOB_NAME': return gcodeCommentSafe(context.jobName);
       case 'MATERIAL_NAME': return gcodeCommentSafe(context.materialName) || 'none';
       case 'ESTIMATED_TIME': return gcodeCommentSafe(context.estimatedTime) || 'unknown';
-      // Numeric values are already safe via toFixed/toString — no change needed
+      // Numeric values are already safe via toFixed/toString 鈥?no change needed
       case 'DATE': return context.date;
       case 'TIME': return context.time;
       case 'BED_WIDTH': return context.bedWidthMm.toFixed(0);
@@ -5564,14 +5558,14 @@ The sanitizer applies only to string values that user-controlled content can flo
 
 **Tests:** `tests/gcode-template-sanitization.test.ts`:
 - Project name `"Job\nM3 S1000"` renders as `"Job M3 S1000"` (single line).
-- Project name with non-ASCII (`"Café"`) renders as `"Caf?"` (or accept Unicode if confidence is high — design choice).
+- Project name with non-ASCII (`"Caf茅"`) renders as `"Caf?"` (or accept Unicode if confidence is high 鈥?design choice).
 - Project name longer than 120 chars truncated.
 - Numeric variables unaffected.
 - An end-to-end test compiles a job with malicious project name and asserts no extra lines in output.
 
 **Estimate:** ~30 minutes including end-to-end test.
 
-**Priority:** Tier 1 — real injection vector. Small fix, high value.
+**Priority:** Tier 1 鈥?real injection vector. Small fix, high value.
 
 **Cross-check note (audit 5D):** Audit's Critical 9 + Priority 9. Verified at GcodeTemplates.ts:67, 75, 94, 97.
 
@@ -5579,7 +5573,7 @@ The sanitizer applies only to string values that user-controlled content can flo
 
 ### T1-92 | `dialog:open` enforce file size limit by extension before reading
 
-**Code reference:** `electron/main.ts:182-183` — `fs.readFileSync(filePath, 'utf-8')` reads entire file with no size check.
+**Code reference:** `electron/main.ts:182-183` 鈥?`fs.readFileSync(filePath, 'utf-8')` reads entire file with no size check.
 
 **Problem:** Cross-check verified. The current handler:
 
@@ -5589,7 +5583,7 @@ const content = fs.readFileSync(filePath, 'utf-8');
 return { filePath, content, ext: path.extname(filePath).toLowerCase() };
 ```
 
-A user (or social-engineering attack) selects a 5GB SVG. `readFileSync` blocks the main process for many seconds, then allocates 5GB into a string, then sends 5GB over IPC to the renderer — at which point the renderer tries to parse it as XML. App freezes or crashes.
+A user (or social-engineering attack) selects a 5GB SVG. `readFileSync` blocks the main process for many seconds, then allocates 5GB into a string, then sends 5GB over IPC to the renderer 鈥?at which point the renderer tries to parse it as XML. App freezes or crashes.
 
 This isn't a sophisticated attack, it's just a misconfigured exporter or a user who doesn't realize their CAD package emits absurdly large SVG files.
 
@@ -5644,15 +5638,15 @@ This SVG is 87.3 MB, larger than the 25 MB limit for SVG files.
 ```
 
 **Tests:** `tests/dialog-open-file-size-limit.test.ts`:
-- Mock 30MB .svg → throws.
-- Mock 24MB .svg → succeeds.
-- Mock 99MB .gcode → succeeds.
-- Mock 105MB .gcode → throws.
+- Mock 30MB .svg 鈫?throws.
+- Mock 24MB .svg 鈫?succeeds.
+- Mock 99MB .gcode 鈫?succeeds.
+- Mock 105MB .gcode 鈫?throws.
 - Unknown extension defaults to 50MB limit.
 
 **Estimate:** ~30 minutes.
 
-**Priority:** Tier 1 — closes obvious DoS vector with simple fix.
+**Priority:** Tier 1 鈥?closes obvious DoS vector with simple fix.
 
 **Cross-check note (audit 5D):** Audit's Critical 6 + Priority 6. Verified at electron/main.ts:182-183.
 
@@ -5675,9 +5669,9 @@ This leaks:
 - Any path components that reveal sensitive context (folder names, project names)
 
 If the path then flows into:
-- Any logged error message → the username/path reaches logs
-- Any future support bundle (T2-108) → leaks unless redacted
-- Any analytics/telemetry → leaks
+- Any logged error message 鈫?the username/path reaches logs
+- Any future support bundle (T2-108) 鈫?leaks unless redacted
+- Any analytics/telemetry 鈫?leaks
 - The undo/redo history (some apps include "loaded from X" entries)
 - The recent-files list (acceptable IF user expects it; surprising IF they don't)
 
@@ -5686,7 +5680,7 @@ If the path then flows into:
 **Fix:**
 
 ```ts
-// electron/main.ts:182-183 — return basename, not full path
+// electron/main.ts:182-183 鈥?return basename, not full path
 const filePath = result.filePaths[0];
 const content = fs.readFileSync(filePath, 'utf-8');
 return {
@@ -5696,9 +5690,9 @@ return {
 };
 ```
 
-If a feature truly needs the full path (e.g., recent-files list with "open from same folder"), expose it through a separate explicit IPC `recent-files:get-canonical-path` that the user has consented to via opt-in setting — never as the default of every file open.
+If a feature truly needs the full path (e.g., recent-files list with "open from same folder"), expose it through a separate explicit IPC `recent-files:get-canonical-path` that the user has consented to via opt-in setting 鈥?never as the default of every file open.
 
-The renderer-side import code currently uses the file path; needs to be updated to use `fileName` instead. This is a small refactor — most code only uses the file name for display, not for actual path operations.
+The renderer-side import code currently uses the file path; needs to be updated to use `fileName` instead. This is a small refactor 鈥?most code only uses the file name for display, not for actual path operations.
 
 **Tests:** `tests/dialog-open-no-full-path.test.ts`:
 - Mock dialog returning `/Users/jane/file.svg`.
@@ -5706,7 +5700,7 @@ The renderer-side import code currently uses the file path; needs to be updated 
 
 **Estimate:** ~15 min for the IPC change + ~30 min for renderer-side updates if any code currently uses `filePath`.
 
-**Priority:** Tier 1 — privacy hygiene. Small fix.
+**Priority:** Tier 1 鈥?privacy hygiene. Small fix.
 
 **Cross-check note (audit 5D):** Audit's Specific issue + Data leakage. Verified at electron/main.ts:183.
 
@@ -5714,11 +5708,11 @@ The renderer-side import code currently uses the file path; needs to be updated 
 
 ### T1-94 | Falcon WebSocket practical frame size cap (256 KB frame, 1 MB buffer)
 
-**Code reference:** `electron/falcon-wifi/FalconWebSocket.ts:190` — `if (big > BigInt(Number.MAX_SAFE_INTEGER))` rejects only frames larger than ~9 petabytes.
+**Code reference:** `electron/falcon-wifi/FalconWebSocket.ts:190` 鈥?`if (big > BigInt(Number.MAX_SAFE_INTEGER))` rejects only frames larger than ~9 petabytes.
 
 **Problem:** Cross-check verified at line 190. A malicious local-network actor (compromised router, ARP spoofing, fake Falcon device) sends a WebSocket frame claiming a 1GB length. The current check passes (1GB < MAX_SAFE_INTEGER). The buffer accumulator at line 205 (`if (state.buffer.length < hlen + len) return;`) keeps reading from the socket, growing `state.buffer` until OOM.
 
-The Falcon protocol's actual frame sizes are tiny — JSON status updates, progress events, error reports. A reasonable cap is far below 1MB.
+The Falcon protocol's actual frame sizes are tiny 鈥?JSON status updates, progress events, error reports. A reasonable cap is far below 1MB.
 
 **Identified by:** Audit 5D (2026-04-26, ChatGPT) Critical failure 11 + Required Priority 12.
 
@@ -5763,28 +5757,28 @@ function onData(chunk: Buffer) {
 }
 ```
 
-A legitimate Falcon device never sends a frame > 256 KB. If the cap is hit, the connection is closed, the user sees a "Falcon WiFi disconnected (oversized frame)" message, and reconnection is attempted. A persistent attack continues to disconnect — by design, it can't accumulate memory.
+A legitimate Falcon device never sends a frame > 256 KB. If the cap is hit, the connection is closed, the user sees a "Falcon WiFi disconnected (oversized frame)" message, and reconnection is attempted. A persistent attack continues to disconnect 鈥?by design, it can't accumulate memory.
 
 **Tests:** `tests/falcon-ws-frame-cap.test.ts`:
-- Inject a fake 257 KB frame → connection destroyed.
-- Inject a 200 KB frame → parsed normally.
-- Send 100 small chunks totaling 1.1 MB without delimiter → buffer overflow detected, connection destroyed.
+- Inject a fake 257 KB frame 鈫?connection destroyed.
+- Inject a 200 KB frame 鈫?parsed normally.
+- Send 100 small chunks totaling 1.1 MB without delimiter 鈫?buffer overflow detected, connection destroyed.
 
 **Estimate:** ~30 minutes including tests.
 
-**Priority:** Tier 1 — closes a real DoS vector. Small fix.
+**Priority:** Tier 1 鈥?closes a real DoS vector. Small fix.
 
 **Cross-check note (audit 5D):** Audit's Critical 11 + Priority 12. Verified at FalconWebSocket.ts:190.
 
 ---
 
-## Tier 2 — This month
+## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
 
-**Problem:** Three related but separately-stored things — the `Scene`, the preflight `PreflightSummary`, and the compiled `gcode: string` — live in different React state slots. Current freshness tracking is a `gcodeStale` UI flag. If a mutation between compile and start is missed, the "thing that was validated" is not the "thing that is executed." `GrblController.sendJob(lines: string[])` has no way to verify what it receives matches what was validated.
+**Problem:** Three related but separately-stored things 鈥?the `Scene`, the preflight `PreflightSummary`, and the compiled `gcode: string` 鈥?live in different React state slots. Current freshness tracking is a `gcodeStale` UI flag. If a mutation between compile and start is missed, the "thing that was validated" is not the "thing that is executed." `GrblController.sendJob(lines: string[])` has no way to verify what it receives matches what was validated.
 
 **Fix:** Introduce `ValidatedJobTicket`:
 
@@ -5809,13 +5803,13 @@ interface ValidatedJobTicket {
 - `confirmPreflightForJobStart` validates and returns the ticket with its preflight results attached.
 - `MachineService.startValidatedJob(ticket)` becomes the only entry point for job start.
 - Before streaming, the controller (or MachineService) recomputes `sceneHash`/`profileHash` from current state; if any hash mismatches, reject the ticket.
-- Any mutation (scene edit, profile switch, origin change) invalidates the ticket — cleared via a `useEffect` watching the relevant state slices.
+- Any mutation (scene edit, profile switch, origin change) invalidates the ticket 鈥?cleared via a `useEffect` watching the relevant state slices.
 
 **Test:** `tests/validated-job-ticket.test.ts`:
-- Ticket hashes match on clean start → job starts.
-- Ticket hashes mismatch (scene mutated after ticket) → job refused.
-- Ticket from a different profile → refused.
-- Ticket for gcode that doesn't match the streamed lines → refused.
+- Ticket hashes match on clean start 鈫?job starts.
+- Ticket hashes mismatch (scene mutated after ticket) 鈫?job refused.
+- Ticket from a different profile 鈫?refused.
+- Ticket for gcode that doesn't match the streamed lines 鈫?refused.
 
 **Estimate:** 3-5 sessions. Big architectural change; touches pipeline, preflight, MachineService, and the primary start-job UI path. Do incrementally:
 1. Add the `ValidatedJobTicket` type, populate from `compileGcode`, thread through `confirmPreflightForJobStart` without changing behavior.
@@ -5830,15 +5824,15 @@ interface ValidatedJobTicket {
 
 **Post-ship follow-up (shipped, commit `3c93114`):** Phase 5 introduced a false-positive hash mismatch on real hardware. Root cause: `compileGcode` hashed `sceneForJob` (post `expandTextOutlinesForCompile`, with `outlineSubPaths` populated and render caches invalidated), while `validateTicket` hashed the live `scene` (with rendering-populated `_bounds` / `_worldTransform` caches and no `outlineSubPaths`). Same logical document, different byte representation, different hash.
 
-Fix: new `hashSceneForTicket(scene)` helper strips derived fields before hashing — `_bounds`, `_worldTransform`, and text `outlineSubPaths`. Both compile and validation now hash via the same canonical view.
+Fix: new `hashSceneForTicket(scene)` helper strips derived fields before hashing 鈥?`_bounds`, `_worldTransform`, and text `outlineSubPaths`. Both compile and validation now hash via the same canonical view.
 
-Follow-up-to-the-follow-up (not yet shipped): the current strip-list is deny-list-based — any new derived cache field added to `SceneObject` in the future could silently reintroduce hash drift. Safer approach: allow-list canonical fields explicitly. Tracked as part of T2-6 (scene store refactor) — a well-defined `SceneStore` shape makes the canonical view structural, not conventional.
+Follow-up-to-the-follow-up (not yet shipped): the current strip-list is deny-list-based 鈥?any new derived cache field added to `SceneObject` in the future could silently reintroduce hash drift. Safer approach: allow-list canonical fields explicitly. Tracked as part of T2-6 (scene store refactor) 鈥?a well-defined `SceneStore` shape makes the canonical view structural, not conventional.
 
-**Related perf nit:** Connect triggers 4 compiles (bed dims, accel, max spindle, WCS consent resolution each bump `sceneCompileTick`). The hash fix makes this correctness-safe, but it's wasted work and burns battery. Coalesce in `useCompileManager` — debounce or merge tick bumps that arrive within one event loop turn. ~30-minute fix, file as T2-1.post2 follow-up.
+**Related perf nit:** Connect triggers 4 compiles (bed dims, accel, max spindle, WCS consent resolution each bump `sceneCompileTick`). The hash fix makes this correctness-safe, but it's wasted work and burns battery. Coalesce in `useCompileManager` 鈥?debounce or merge tick bumps that arrive within one event loop turn. ~30-minute fix, file as T2-1.post2 follow-up.
 
 ---
 
-### T2-2 | `Storage` interface — remove localStorage from `core/`
+### T2-2 | `Storage` interface 鈥?remove localStorage from `core/`
 
 **Code reference (7 files using localStorage in core):**
 - `src/core/devices/DeviceProfile.ts` (device profiles list, active profile id)
@@ -5874,12 +5868,12 @@ interface StorageAdapter {
 
 Rewrite the 7 files to take a `StorageAdapter` injected at construction. App boundary (`App.tsx` or a bootstrap module) picks the adapter based on runtime environment.
 
-**Autosave-specific:** move to the same adapter, drop the image-stripping path entirely. Autosave should preserve the full scene — no silent data loss.
+**Autosave-specific:** move to the same adapter, drop the image-stripping path entirely. Autosave should preserve the full scene 鈥?no silent data loss.
 
 **Test:**
-- `tests/storage-adapter-contract.test.ts` — shared contract test both adapters pass (get/set/remove/list round-trip, persistence across instances, atomic writes).
-- `tests/device-profile-storage-injection.test.ts` — pass a fake adapter, verify DeviceProfile reads/writes through it, verify no direct `localStorage` references remain (grep-based assertion).
-- `tests/autosave-large-scene.test.ts` — autosave a scene with a 50MB image, reload, assert image survives.
+- `tests/storage-adapter-contract.test.ts` 鈥?shared contract test both adapters pass (get/set/remove/list round-trip, persistence across instances, atomic writes).
+- `tests/device-profile-storage-injection.test.ts` 鈥?pass a fake adapter, verify DeviceProfile reads/writes through it, verify no direct `localStorage` references remain (grep-based assertion).
+- `tests/autosave-large-scene.test.ts` 鈥?autosave a scene with a 50MB image, reload, assert image survives.
 
 **Estimate:** 5-7 sessions. Sequence:
 1. Define the interface + write both adapters + contract test.
@@ -5901,30 +5895,30 @@ Rewrite the 7 files to take a `StorageAdapter` injected at construction. App bou
 **Code reference:**
 - `src/entitlements/EntitlementService.ts` (state held in memory + localStorage)
 - `src/ui/gates/proGate.ts` (`isProUnlocked()`)
-- `src/app/MachineService.ts:beginJobRun` — the only service-level gate (replay recording)
+- `src/app/MachineService.ts:beginJobRun` 鈥?the only service-level gate (replay recording)
 - All other gates are JSX-level
 
 **Problem:** Pro gates are hidden-button, not locked-service. Anyone who opens DevTools can `localStorage.setItem('laserforge_pro', 'true')` and reload. Bypass is one line. Dev builds also auto-grant Pro via `import.meta.env.DEV`.
 
 **Fix:**
-1. **Move Pro enforcement to the service layer.** `PipelineService.compileGcode` checks Pro for features like D.13 material calibration curves. `MachineService` checks Pro for job replay recording. Settings UI checks are convenience only — real enforcement at service boundary.
+1. **Move Pro enforcement to the service layer.** `PipelineService.compileGcode` checks Pro for features like D.13 material calibration curves. `MachineService` checks Pro for job replay recording. Settings UI checks are convenience only 鈥?real enforcement at service boundary.
 2. **Sign capability tokens server-side.** On successful Gumroad activation, the server (a tiny Cloudflare Worker or similar) signs an Ed25519 token with a local-only payload (user email, activated-at). Client caches the signed token. `hasPro()` verifies the signature, not the boolean. Signature scheme is public key embedded in the client, private key server-only.
 3. **Accept desktop-app reality.** Determined attackers can still patch the binary. Goal: "casual-proof," not "reverse-engineer-proof."
 4. **Dev-build behavior:** keep auto-PRO in dev BUT do not ship dev builds. Production builds from CI only, with `NODE_ENV=production` enforced via the build pipeline.
 
 **Test:**
-- `tests/paywall-service-enforcement.test.ts` — for each Pro feature, call the service method with `hasPro=false` and assert it refuses, then `hasPro=true` and assert it proceeds.
-- `tests/paywall-token-signature.test.ts` — valid token unlocks, tampered token does not, expired token does not (if expiry is part of the scheme).
+- `tests/paywall-service-enforcement.test.ts` 鈥?for each Pro feature, call the service method with `hasPro=false` and assert it refuses, then `hasPro=true` and assert it proceeds.
+- `tests/paywall-token-signature.test.ts` 鈥?valid token unlocks, tampered token does not, expired token does not (if expiry is part of the scheme).
 
 **Estimate:** 2-3 sessions for the service-layer gates alone. Token signing is another 2 sessions (server + client verify + key management).
 
 **Priority:** Tier 2 for service gates; Tier 3 for full token signing (only when ready to charge).
 
-**Status:** Service-layer gates shipped `f2280eb` (2026-04-25). New `requireFeature(feature: ProFeature)` helper in entitlements module. JobCompiler strips settings-baked Pro features (tabs, overcut, lead_in, cross_hatch, power_scale, cut_start_point) when no Pro license, with one console.warn listing dropped features. Standalone operations gated at service-layer chokepoints: `applyNesting`/`nestShapes` (Nester.ts), `booleanOperation` (BooleanOps.ts), `convertTextToPath` (useSceneOperations — TextToPath primitive intentionally ungated since it's also used at compile time for free-tier text emission). Hook-level gates for kerf wizard, material_test, variable_text — these features are implemented IN the hook (no separate core function), so the hook IS the chokepoint. `MachineService.startValidatedJob` job_replay gate switched from `hasPro()` to `requireFeature('job_replay')` for consistency.
+**Status:** Service-layer gates shipped `f2280eb` (2026-04-25). New `requireFeature(feature: ProFeature)` helper in entitlements module. JobCompiler strips settings-baked Pro features (tabs, overcut, lead_in, cross_hatch, power_scale, cut_start_point) when no Pro license, with one console.warn listing dropped features. Standalone operations gated at service-layer chokepoints: `applyNesting`/`nestShapes` (Nester.ts), `booleanOperation` (BooleanOps.ts), `convertTextToPath` (useSceneOperations 鈥?TextToPath primitive intentionally ungated since it's also used at compile time for free-tier text emission). Hook-level gates for kerf wizard, material_test, variable_text 鈥?these features are implemented IN the hook (no separate core function), so the hook IS the chokepoint. `MachineService.startValidatedJob` job_replay gate switched from `hasPro()` to `requireFeature('job_replay')` for consistency.
 
-**Status — token signing:** Not done. Tier 3 work, deferred until Pro is actively charged.
+**Status 鈥?token signing:** Not done. Tier 3 work, deferred until Pro is actively charged.
 
-**Static guard:** `tests/service-layer-pro-gate-coverage.test.ts` — scans src/core, src/app, and Pro-feature hooks for ProFeature usage; asserts each file imports `requireFeature` or `hasPro`. Allowlists type definitions, hash files, MaterialLibrary preset persistence, TextToPath primitive, and UI components (which gate at the hook layer below them). Pattern mirrors `no-localstorage-in-core` (T2-2 phase 9) and `no-gcode-in-ui` (T2-4 phase 8).
+**Static guard:** `tests/service-layer-pro-gate-coverage.test.ts` 鈥?scans src/core, src/app, and Pro-feature hooks for ProFeature usage; asserts each file imports `requireFeature` or `hasPro`. Allowlists type definitions, hash files, MaterialLibrary preset persistence, TextToPath primitive, and UI components (which gate at the hook layer below them). Pattern mirrors `no-localstorage-in-core` (T2-2 phase 9) and `no-gcode-in-ui` (T2-4 phase 8).
 
 ---
 
@@ -5932,7 +5926,7 @@ Rewrite the 7 files to take a `StorageAdapter` injected at construction. App bou
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (1,788 lines)
 
-**Problem:** Holds machine authority. Constructs raw jog strings (`$J=G91 G21 X{n} F3000`), frame motion, test-fire `M3`/`M4` commands, the comment-stripping filter, and the preflight confirm flow. Machine-safety-relevant code lives in a React component — every UI change carries risk.
+**Problem:** Holds machine authority. Constructs raw jog strings (`$J=G91 G21 X{n} F3000`), frame motion, test-fire `M3`/`M4` commands, the comment-stripping filter, and the preflight confirm flow. Machine-safety-relevant code lives in a React component 鈥?every UI change carries risk.
 
 **Fix:** Extract `ExecutionCoordinator` service:
 
@@ -5955,25 +5949,25 @@ class ExecutionCoordinator {
 
 The React component calls these methods. No `G` character in React files. No gcode string construction in React. The service owns safety-relevant details (frame uses validated bounds; test-fire uses deadman timer; jog clamps distance against machine extents).
 
-**Test:** `tests/execution-coordinator.test.ts` — each method, mocked controller, verify correct gcode emitted for each operation. Run once, regression-proof.
+**Test:** `tests/execution-coordinator.test.ts` 鈥?each method, mocked controller, verify correct gcode emitted for each operation. Run once, regression-proof.
 
 **Estimate:** 5-8 sessions. Sequence:
 1. Create `ExecutionCoordinator` with empty methods.
 2. Move `handleAutoFocus` into `autoFocus()`.
-3. Move `handleSaveOrigin` → `setOrigin()`.
-4. Move jog wiring → `jog()`.
-5. Move frame wiring → `frameBounds()`.
-6. Move test-fire → `testFire()`.
-7. Move `handleStartJob` → `startValidatedJob()` (depends on T2-1).
+3. Move `handleSaveOrigin` 鈫?`setOrigin()`.
+4. Move jog wiring 鈫?`jog()`.
+5. Move frame wiring 鈫?`frameBounds()`.
+6. Move test-fire 鈫?`testFire()`.
+7. Move `handleStartJob` 鈫?`startValidatedJob()` (depends on T2-1).
 8. Delete the now-unused code in `ConnectionPanelMain`.
 
 **Priority:** Tier 2.
 
 **Status:** Shipped (8 phases, commits `57bd7ba`, `347aa00`, `d1f3c6a`, `c6ef259`, `7627bce`, `89bf95d`, plus phase 4 frame extraction). All operational machine-authority methods (jog, frame, unlock, home, test fire, set origin, autofocus, validated job start, safe disconnect) live on `ExecutionCoordinator`. `ConnectionPanelMain` retains UI orchestration (consent dialogs, gates, state) but emits zero gcode strings. New static guard `tests/no-gcode-in-ui.test.ts` enforces the invariant.
 
-**Follow-up — Unicode-escape workaround in UI strings:** The `no-gcode-in-ui` static guard fires on literal `$H` / `$X` / `M5 S` substrings in source, including legitimate UI strings (tooltips, settings copy referencing those commands). Phase 8 worked around with `\u0024H` / `\u0024X` etc., which the compiler emits identically but the regex doesn't catch. Cleaner long-term: extend the guard to recognize string-literal contexts (between matched `'`/`"`/`` ` ``) and exempt them, then unescape the source. ~1 hour. Estimate-only; not blocking.
+**Follow-up 鈥?Unicode-escape workaround in UI strings:** The `no-gcode-in-ui` static guard fires on literal `$H` / `$X` / `M5 S` substrings in source, including legitimate UI strings (tooltips, settings copy referencing those commands). Phase 8 worked around with `\u0024H` / `\u0024X` etc., which the compiler emits identically but the regex doesn't catch. Cleaner long-term: extend the guard to recognize string-literal contexts (between matched `'`/`"`/`` ` ``) and exempt them, then unescape the source. ~1 hour. Estimate-only; not blocking.
 
-**Follow-up — `ConnectionPanelMain` size:** Still 1786 lines after T2-4. Authority migrated; UI orchestration still concentrated. Sub-component extraction (Jog panel, Workflow panel, Console panel as discrete components) is its own refactor — file under T2-6 (Zustand stores + App split).
+**Follow-up 鈥?`ConnectionPanelMain` size:** Still 1786 lines after T2-4. Authority migrated; UI orchestration still concentrated. Sub-component extraction (Jog panel, Workflow panel, Console panel as discrete components) is its own refactor 鈥?file under T2-6 (Zustand stores + App split).
 
 ---
 
@@ -6015,7 +6009,7 @@ Separate "trusted built-in" templates (pass validation always) from "advanced us
 - Bounds-violating template rejected.
 - User "advanced" opt-in allows previously-blocked content for one ticket only.
 
-**Estimate:** 3-4 sessions. Non-trivial — a mini gcode parser is needed for the bounds check.
+**Estimate:** 3-4 sessions. Non-trivial 鈥?a mini gcode parser is needed for the bounds check.
 
 **Priority:** Tier 2.
 
@@ -6029,19 +6023,19 @@ Separate "trusted built-in" templates (pass validation always) from "advanced us
 
 **Fix:** Move state into Zustand stores (already in the plan per PROJECT_MAP, not built):
 
-- `sceneStore` — scene, selection, active tool, history.
-- `viewportStore` — canvas zoom, pan, viewport dimensions.
-- `machineStore` — start mode, saved origin, last-used profile.
-- `dialogsStore` — modal visibility flags.
-- `settingsStore` — window preferences, last-opened locations.
+- `sceneStore` 鈥?scene, selection, active tool, history.
+- `viewportStore` 鈥?canvas zoom, pan, viewport dimensions.
+- `machineStore` 鈥?start mode, saved origin, last-used profile.
+- `dialogsStore` 鈥?modal visibility flags.
+- `settingsStore` 鈥?window preferences, last-opened locations.
 
 App.tsx becomes a thin composition of stores + top-level effects for persistence.
 
-**Test:** Per-store unit tests — state transitions, subscribers, persistence. One integration test that reproduces the app boot sequence with all stores.
+**Test:** Per-store unit tests 鈥?state transitions, subscribers, persistence. One integration test that reproduces the app boot sequence with all stores.
 
 **Estimate:** 8-12 sessions. Sequence:
 1. Create empty store scaffolding.
-2. Move one concern at a time from useState → store (scene first).
+2. Move one concern at a time from useState 鈫?store (scene first).
 3. For each concern, replace every App.tsx useState with a store hook; verify tests still pass.
 4. At the end, App.tsx should be under 500 lines.
 
@@ -6049,14 +6043,14 @@ App.tsx becomes a thin composition of stores + top-level effects for persistence
 
 ---
 
-### T2-7 | Real controller abstraction — Marlin stub
+### T2-7 | Real controller abstraction 鈥?Marlin stub
 
 **Code reference:**
 - `src/controllers/ControllerRegistry.ts:4` (`type ControllerId = 'grbl'`)
-- `src/controllers/ControllerInterface.ts:86` (`maxSpindle` — GRBL-only)
-- `src/controllers/ControllerInterface.ts:91` (`sendJob(lines: string[])` — assumes text streaming)
+- `src/controllers/ControllerInterface.ts:86` (`maxSpindle` 鈥?GRBL-only)
+- `src/controllers/ControllerInterface.ts:91` (`sendJob(lines: string[])` 鈥?assumes text streaming)
 - `src/ui/components/App.tsx:258-279` (four `instanceof GrblController` checks)
-- `JobProgress.bufferFill/ackRateHz/expectedAckRateHz/healthStatus` — GRBL-specific streaming metrics
+- `JobProgress.bufferFill/ackRateHz/expectedAckRateHz/healthStatus` 鈥?GRBL-specific streaming metrics
 
 **Problem:** "Controller-agnostic" is marketing text. There is one controller, and its concerns leak through the interface.
 
@@ -6074,15 +6068,15 @@ App.tsx becomes a thin composition of stores + top-level effects for persistence
 4. Build a Marlin controller stub. Minimal viable: implements the interface, sends gcode via serial, parses `ok`/`error`/`Resend` responses. Does NOT need to be production-quality. It exists to force discovery of the abstraction holes.
 
 **Test:**
-- `tests/marlin-controller-basic.test.ts` — connect, send a small job, verify ok sequence, disconnect.
-- `tests/controller-registry-multi.test.ts` — register both controllers, verify `createController('marlin')` returns a Marlin instance, `createController('grbl')` returns GRBL.
-- `tests/controller-interface-compliance.test.ts` — both controllers satisfy the interface; any new required method added to the interface breaks the build if not implemented in both.
+- `tests/marlin-controller-basic.test.ts` 鈥?connect, send a small job, verify ok sequence, disconnect.
+- `tests/controller-registry-multi.test.ts` 鈥?register both controllers, verify `createController('marlin')` returns a Marlin instance, `createController('grbl')` returns GRBL.
+- `tests/controller-interface-compliance.test.ts` 鈥?both controllers satisfy the interface; any new required method added to the interface breaks the build if not implemented in both.
 
 **Estimate:** 4-6 sessions.
 
 **Priority:** Tier 2 (only if planning to support Marlin or any second controller; otherwise skip and document the GRBL-only stance).
 
-**Cross-check note (audit 3A, 2026-04-25):** Audit 3A confirms this ticket's framing is correct but proposes a more rigorous decomposition. The "force discovery of abstraction holes" approach is now superseded — audit 3A explicitly enumerates the holes (verified 22 leak locations across MachineService, ExecutionCoordinator, frameGcode, electron/serial.ts, PipelineService, GcodeTemplateValidator). T2-7's actual implementation should now sequence as: T2-24 (interface split) → T2-25 (capabilities) → T2-26 (operations API) → T2-27 (executeJob) → T2-29 (ticket refactor) → T3-42 (dialect validators) → THEN T2-7 (Marlin controller as concrete second controller). The original T2-7 spec sketched what audit 3A formalized; this entry remains for the actual Marlin controller implementation, which becomes much smaller (~1-2 sessions) once the foundation is in place.
+**Cross-check note (audit 3A, 2026-04-25):** Audit 3A confirms this ticket's framing is correct but proposes a more rigorous decomposition. The "force discovery of abstraction holes" approach is now superseded 鈥?audit 3A explicitly enumerates the holes (verified 22 leak locations across MachineService, ExecutionCoordinator, frameGcode, electron/serial.ts, PipelineService, GcodeTemplateValidator). T2-7's actual implementation should now sequence as: T2-24 (interface split) 鈫?T2-25 (capabilities) 鈫?T2-26 (operations API) 鈫?T2-27 (executeJob) 鈫?T2-29 (ticket refactor) 鈫?T3-42 (dialect validators) 鈫?THEN T2-7 (Marlin controller as concrete second controller). The original T2-7 spec sketched what audit 3A formalized; this entry remains for the actual Marlin controller implementation, which becomes much smaller (~1-2 sessions) once the foundation is in place.
 
 ---
 
@@ -6117,27 +6111,27 @@ Each returns a typed `PreflightFinding[]`. `runPreflight` aggregates. Severity, 
 
 **Problem:** Cross-check with audit confirmed: there is no single enforced command authority. Multiple call paths can write G-code to the controller, each with different validation:
 
-(1) `MachineService.sendCommand(cmd, source)` — forwards directly. Comment says "gating is the UI's job."
-(2) `GrblController.sendCommand(cmd, _source)` — `_source` underscored, intentionally unused. Only enforces transport-level checks (length, no CR/LF, not while job running).
+(1) `MachineService.sendCommand(cmd, source)` 鈥?forwards directly. Comment says "gating is the UI's job."
+(2) `GrblController.sendCommand(cmd, _source)` 鈥?`_source` underscored, intentionally unused. Only enforces transport-level checks (length, no CR/LF, not while job running).
 (3) `ExecutionCoordinator` direct `ctrl.sendCommand` calls in `jog`, `frame`, `frameDot`, `beginTestFire`, `emergencyLaserOff`, `setOriginAtCurrentPosition`.
 (4) `sendSetOriginWcsCommand` helper takes a controller ref and calls `controller.sendCommand` directly.
 (5) `runAutoFocus` writes profile-supplied commands directly via `_writeLine` after only idle/length checks.
 
-The `source: 'internal' | 'user'` parameter is documentation, not enforcement — anyone can pass `'internal'`. The classifier (`classifyUserGrbl`) exists in `MachineService` but is only consulted by UI code voluntarily.
+The `source: 'internal' | 'user'` parameter is documentation, not enforcement 鈥?anyone can pass `'internal'`. The classifier (`classifyUserGrbl`) exists in `MachineService` but is only consulted by UI code voluntarily.
 
 This is an architectural problem, not a single bug. Individual T1 items (T1-19 command tokens, T1-22 critical writes, T1-23 pause M5, T1-24 error/alarm, T1-26 footer enforce) each address a slice of the same underlying issue: command authority is spread across UI, service, coordinator, helper, and controller, with no single place to reason about command legality.
 
-**Identified by:** Audit 1B (2026-04-25, ChatGPT). Cross-check confirmed — every claimed bypass exists in code.
+**Identified by:** Audit 1B (2026-04-25, ChatGPT). Cross-check confirmed 鈥?every claimed bypass exists in code.
 
 **Fix (incremental, multi-pass):**
 
-**Pass 1 — Introduce the gateway as a delegating wrapper** (~1 session). Create `src/app/MachineCommandGateway.ts`. Initially it just delegates to controller:
+**Pass 1 鈥?Introduce the gateway as a delegating wrapper** (~1 session). Create `src/app/MachineCommandGateway.ts`. Initially it just delegates to controller:
 
 ```ts
 export class MachineCommandGateway {
   constructor(private readonly controller: LaserController) {}
 
-  // Operation methods — these become the public API
+  // Operation methods 鈥?these become the public API
   async laserOff(): Promise<void> { /* delegates */ }
   async setOrigin(opts: SetOriginOpts): Promise<void> { /* delegates */ }
   // ... one method per operation
@@ -6146,31 +6140,31 @@ export class MachineCommandGateway {
 
 No policy enforcement yet. New code uses gateway, old code keeps working. Allows incremental migration without breaking anything.
 
-**Pass 2 — Migrate ExecutionCoordinator callers** (~1 session). Coordinator's `frame`, `frameDot`, `beginTestFire`, `emergencyLaserOff`, `setOriginAtCurrentPosition`, `jog` all route through gateway methods. Coordinator no longer holds a direct `controllerRef` for command emission — only for status queries. Direct `ctrl.sendCommand` calls in coordinator are removed.
+**Pass 2 鈥?Migrate ExecutionCoordinator callers** (~1 session). Coordinator's `frame`, `frameDot`, `beginTestFire`, `emergencyLaserOff`, `setOriginAtCurrentPosition`, `jog` all route through gateway methods. Coordinator no longer holds a direct `controllerRef` for command emission 鈥?only for status queries. Direct `ctrl.sendCommand` calls in coordinator are removed.
 
-**Pass 3 — Migrate helpers** (~30 min). `sendSetOriginWcsCommand` becomes `gateway.setOrigin()`. Anything similar gets the same treatment.
+**Pass 3 鈥?Migrate helpers** (~30 min). `sendSetOriginWcsCommand` becomes `gateway.setOrigin()`. Anything similar gets the same treatment.
 
-**Pass 4 — Add policy enforcement** (~1 session). Now that all paths route through the gateway, add the classifier check inside gateway methods. Coordinate with T1-19 (command approval tokens) — the gateway IS the enforcement point T1-19 calls for. `requireFeature`-like helper for safety: `requireOperation(intent: CommandIntent)`.
+**Pass 4 鈥?Add policy enforcement** (~1 session). Now that all paths route through the gateway, add the classifier check inside gateway methods. Coordinate with T1-19 (command approval tokens) 鈥?the gateway IS the enforcement point T1-19 calls for. `requireFeature`-like helper for safety: `requireOperation(intent: CommandIntent)`.
 
-**Pass 5 — Mark `controller.sendCommand` and `machineService.sendCommand` as `@internal`** (~30 min). TS-level deprecation. Goal: eventually move to `private` once nothing outside the gateway uses them.
+**Pass 5 鈥?Mark `controller.sendCommand` and `machineService.sendCommand` as `@internal`** (~30 min). TS-level deprecation. Goal: eventually move to `private` once nothing outside the gateway uses them.
 
-**Static guard:** `tests/no-direct-controller-sendcommand.test.ts` — scans `src/app/`, `src/ui/` (excluding gateway file) for `controller.sendCommand`, `controllerRef.current.sendCommand`, `ctrl.sendCommand` patterns. Asserts zero matches outside the gateway. Pattern mirrors existing static guards.
+**Static guard:** `tests/no-direct-controller-sendcommand.test.ts` 鈥?scans `src/app/`, `src/ui/` (excluding gateway file) for `controller.sendCommand`, `controllerRef.current.sendCommand`, `ctrl.sendCommand` patterns. Asserts zero matches outside the gateway. Pattern mirrors existing static guards.
 
 **DO NOT TOUCH:**
-- `controller.sendJob()` for validated jobs — that's the validated path, doesn't need gateway routing.
-- Realtime byte writes (status `?`, feed-hold `!`, cycle-start `~`, soft reset `0x18`) — these are protocol-level, not command-level. They go through their own priority path (T1-22).
-- WebSerial transport methods — those are below the gateway; gateway uses them.
+- `controller.sendJob()` for validated jobs 鈥?that's the validated path, doesn't need gateway routing.
+- Realtime byte writes (status `?`, feed-hold `!`, cycle-start `~`, soft reset `0x18`) 鈥?these are protocol-level, not command-level. They go through their own priority path (T1-22).
+- WebSerial transport methods 鈥?those are below the gateway; gateway uses them.
 
 **Tests:** Each pass has its own focused tests. Final state:
-- `tests/gateway-rejects-unrouted-laser-on.test.ts` — calling gateway with unauthorized laser-on intent throws.
-- `tests/gateway-routes-frame-correctly.test.ts` — frame operation produces expected gcode sequence through gateway.
-- `tests/no-direct-controller-sendcommand.test.ts` — static guard.
+- `tests/gateway-rejects-unrouted-laser-on.test.ts` 鈥?calling gateway with unauthorized laser-on intent throws.
+- `tests/gateway-routes-frame-correctly.test.ts` 鈥?frame operation produces expected gcode sequence through gateway.
+- `tests/no-direct-controller-sendcommand.test.ts` 鈥?static guard.
 
 **Estimate:** 4-6 sessions across 5 passes. Highest-value architectural improvement.
 
-**Priority:** Tier 2. Note on priority: this is the architectural fix that closes the entire class of bypass issues. **However, the individual T1 fixes (T1-19, T1-22, T1-23, T1-24, T1-26, T1-27) deliver incremental safety wins faster** and are independently valuable. Recommended sequencing: ship T1-27 first (free), then T1-18 (test-fire deadman, urgent), then start T2-10 Pass 1-2 in parallel with the remaining T1 items. T1-19 (approval tokens) lands as part of T2-10 Pass 4 — they're the same fix.
+**Priority:** Tier 2. Note on priority: this is the architectural fix that closes the entire class of bypass issues. **However, the individual T1 fixes (T1-19, T1-22, T1-23, T1-24, T1-26, T1-27) deliver incremental safety wins faster** and are independently valuable. Recommended sequencing: ship T1-27 first (free), then T1-18 (test-fire deadman, urgent), then start T2-10 Pass 1-2 in parallel with the remaining T1 items. T1-19 (approval tokens) lands as part of T2-10 Pass 4 鈥?they're the same fix.
 
-**Audit's recommendation pushback:** Audit suggested removing all raw `sendCommand` access. That's correct as an end-state but cannot be a single commit — gradual migration through 5 passes is the realistic path. The audit's `CommandIntent` discriminated union shape is reasonable; we may simplify based on what operations actually need.
+**Audit's recommendation pushback:** Audit suggested removing all raw `sendCommand` access. That's correct as an end-state but cannot be a single commit 鈥?gradual migration through 5 passes is the realistic path. The audit's `CommandIntent` discriminated union shape is reasonable; we may simplify based on what operations actually need.
 
 ---
 
@@ -6218,7 +6212,7 @@ async endTestFire(): Promise<void> {
 
 `tryAcquireOperation` returns false if another operation is active (or if the same operation was already acquired). Operations release in finally blocks.
 
-The existing `_isJobRunning` controller-level lock stays — it gates `sendCommand` against the streaming-job state. The new operation mutex is a layer above it: it gates `beginTestFire`/`runFrame`/etc. against each other.
+The existing `_isJobRunning` controller-level lock stays 鈥?it gates `sendCommand` against the streaming-job state. The new operation mutex is a layer above it: it gates `beginTestFire`/`runFrame`/etc. against each other.
 
 **Integration with T1-18, T1-21, T1-28:** These three deadman/finally fixes naturally release the operation mutex in their finally blocks. Implementing them first means T2-11 just adds the acquire-side checks.
 
@@ -6232,11 +6226,11 @@ The existing `_isJobRunning` controller-level lock stays — it gates `sendComma
 
 **Priority:** Tier 2. Note: audit framed this as critical safety, but realistic exposure is low (UI prevents most overlap, programmatic callers are limited to tests/future scripting). Worth doing as defense-in-depth and to enable future programmatic use cases. Should ship after T1-18, T1-21, T1-28 since those provide the finally blocks that release the mutex.
 
-**Cross-check note:** Audit 1C's "FAIL — undefined behavior" framing is structurally correct but operationally rare. The fix is small enough (~1 session) that it's worth doing for the defense-in-depth value alone.
+**Cross-check note:** Audit 1C's "FAIL 鈥?undefined behavior" framing is structurally correct but operationally rare. The fix is small enough (~1 session) that it's worth doing for the defense-in-depth value alone.
 
 ---
 
-### T2-12 | Unified MachineSafetyState — consolidation of safety fields into canonical type
+### T2-12 | Unified MachineSafetyState 鈥?consolidation of safety fields into canonical type
 
 **Code reference:** `src/controllers/ControllerInterface.ts:9-32` (existing `MachineState`/`MachineStatus`), plus all the safety fields introduced by T1-22 (`laserOutputState`), T1-24 (post-error state), T1-25 (`forceSafeState` results), T1-29 (`unsafePriorState` flag), T2-11 (`activeOperation`).
 
@@ -6257,7 +6251,7 @@ Plus `LaserOutputState`, `OperationState`, `DisconnectSafety` as separate types.
 
 **Identified by:** Audit 1E (2026-04-25, ChatGPT). Cross-check confirmed: zero formal safety state types exist today. Existing `MachineState` includes status + position + spindleSpeed but no safety semantics.
 
-**Deliberate scoping (PUSHBACK on audit):** The audit's ask is to introduce this type as the foundation that everything else builds on. **I disagree with that ordering.** Filing one ticket that says "introduce the canonical safety type" before any of the underlying state fields exist would mean the type is speculative — we'd be naming states like `RUNNING_TEMP_LASER` before there's any operation mutex (T2-11) to drive them, naming `LASER_OFF_CONFIRMED` before there's any `safetyOff()` method (T1-22) to confirm it.
+**Deliberate scoping (PUSHBACK on audit):** The audit's ask is to introduce this type as the foundation that everything else builds on. **I disagree with that ordering.** Filing one ticket that says "introduce the canonical safety type" before any of the underlying state fields exist would mean the type is speculative 鈥?we'd be naming states like `RUNNING_TEMP_LASER` before there's any operation mutex (T2-11) to drive them, naming `LASER_OFF_CONFIRMED` before there's any `safetyOff()` method (T1-22) to confirm it.
 
 This is the same architectural-rewrite-in-isolation pattern that's failed earlier in this session. The type emerges from the work, not before it.
 
@@ -6294,12 +6288,12 @@ export type LaserOutputState = 'OFF_CONFIRMED' | 'ON_COMMANDED' | 'OFF_COMMANDED
 export type DisconnectSafety = 'NEVER_CONNECTED' | 'SAFE_SHUTDOWN_CONFIRMED' | 'CLOSED_DURING_IDLE_UNVERIFIED' | 'CLOSED_DURING_ACTIVE_OPERATION' | 'TRANSPORT_LOST_DURING_ACTIVE_OPERATION' | 'APP_EXIT_DURING_ACTIVE_OPERATION';
 ```
 
-(2) Implement state transition function `computeMachineSafetyState(grbl, laser, op, recovery, disconnectSafety): MachineSafetyState` — pure function that derives canonical state from existing fields. Single source of truth.
+(2) Implement state transition function `computeMachineSafetyState(grbl, laser, op, recovery, disconnectSafety): MachineSafetyState` 鈥?pure function that derives canonical state from existing fields. Single source of truth.
 
 (3) Migrate UI gates to read from the canonical state, not from individual fields. T1-30's `computeCommandGates` becomes `computeCommandGates(safetyState: MachineSafetyState)` with switch-on-kind.
 
 (4) Migrate the pragmatic state choices made earlier:
-- T1-24 used `'alarm'` for post-error-during-job → migrate to `FAULTED_REQUIRES_INSPECTION`
+- T1-24 used `'alarm'` for post-error-during-job 鈫?migrate to `FAULTED_REQUIRES_INSPECTION`
 - T1-25 status query results map onto `IDLE_SAFE` / `IDLE_UNKNOWN` / `ALARM_UNKNOWN`
 - T1-29 unsafe-prior-state flag becomes input to `DISCONNECTED_UNSAFE` (UI dialog reads from this)
 
@@ -6309,9 +6303,9 @@ export type DisconnectSafety = 'NEVER_CONNECTED' | 'SAFE_SHUTDOWN_CONFIRMED' | '
 
 **Estimate:** 1-2 sessions when scheduled (after the prerequisite T1 items). The work itself is mostly mechanical migration; the design happens in the prerequisite tickets.
 
-**Priority:** Tier 2. Sequencing: ship T1-22 → T1-25 → T1-29 → T1-30 → T2-11 → T2-12. T2-12 is the consolidation pass that turns the scattered safety fields into a canonical type.
+**Priority:** Tier 2. Sequencing: ship T1-22 鈫?T1-25 鈫?T1-29 鈫?T1-30 鈫?T2-11 鈫?T2-12. T2-12 is the consolidation pass that turns the scattered safety fields into a canonical type.
 
-**Cross-check note (audit 1E):** Audit framed the absence of formal safety state as the central architectural failure. Verified — zero results for any of the proposed type names exist in the codebase today. Audit's proposed types (`MachineSafetyState`, `LaserOutputState`, `OperationState`, `DisconnectSafety`) are correct in structure. Pushback is on ordering: build the underlying state fields first via individual T1 tickets, then consolidate into the canonical type. Filing as the integration ticket means the type design happens informed by what each underlying fix actually needs, not as a speculative architectural prerequisite.
+**Cross-check note (audit 1E):** Audit framed the absence of formal safety state as the central architectural failure. Verified 鈥?zero results for any of the proposed type names exist in the codebase today. Audit's proposed types (`MachineSafetyState`, `LaserOutputState`, `OperationState`, `DisconnectSafety`) are correct in structure. Pushback is on ordering: build the underlying state fields first via individual T1 tickets, then consolidate into the canonical type. Filing as the integration ticket means the type design happens informed by what each underlying fix actually needs, not as a speculative architectural prerequisite.
 
 ---
 
@@ -6321,18 +6315,18 @@ export type DisconnectSafety = 'NEVER_CONNECTED' | 'SAFE_SHUTDOWN_CONFIRMED' | '
 
 **Problem:** Cross-check confirmed audit 1F's claim. Existing `MockSerialPort.write(data)` is `void`-returning, synchronous, records to `received[]` immediately, and responds via `injectResponse` synchronously. It cannot simulate:
 
-(1) Async write failure — write succeeds at API level then rejects asynchronously after caller returned.
-(2) Dropped writes — write resolves but bytes never reach controller.
-(3) Partial writes — only some bytes delivered.
-(4) Port close mid-write — connection drops while a write is in flight.
-(5) Missing ok — controller doesn't ack a sent command.
-(6) Delayed ok — ack arrives after a long timeout (testing T1-22's safetyOff fallback).
-(7) Stale status — `?` query response is from before a state change.
+(1) Async write failure 鈥?write succeeds at API level then rejects asynchronously after caller returned.
+(2) Dropped writes 鈥?write resolves but bytes never reach controller.
+(3) Partial writes 鈥?only some bytes delivered.
+(4) Port close mid-write 鈥?connection drops while a write is in flight.
+(5) Missing ok 鈥?controller doesn't ack a sent command.
+(6) Delayed ok 鈥?ack arrives after a long timeout (testing T1-22's safetyOff fallback).
+(7) Stale status 鈥?`?` query response is from before a state change.
 (8) Buffer-full backpressure during stop.
 
-These are exactly the failure modes T1-22's `safetyOff()` is supposed to handle. Without a transport that can simulate them, T1-22's tests can only verify "M5 was sent" — not "M5 failure produced UNKNOWN state" which is the actual safety contract.
+These are exactly the failure modes T1-22's `safetyOff()` is supposed to handle. Without a transport that can simulate them, T1-22's tests can only verify "M5 was sent" 鈥?not "M5 failure produced UNKNOWN state" which is the actual safety contract.
 
-Same problem extends to T1-25 (reconnect handshake — needs to simulate "no welcome message"), T1-28 (autofocus timeout — needs to simulate "controller never leaves Idle"), T1-29 (unsafe disconnect — needs to simulate USB pull mid-burn).
+Same problem extends to T1-25 (reconnect handshake 鈥?needs to simulate "no welcome message"), T1-28 (autofocus timeout 鈥?needs to simulate "controller never leaves Idle"), T1-29 (unsafe disconnect 鈥?needs to simulate USB pull mid-burn).
 
 **Identified by:** Audit 1F (2026-04-25, ChatGPT). Cross-check confirmed: zero failure-injection infrastructure exists. MockSerialPort is the only test transport.
 
@@ -6359,19 +6353,19 @@ class FaultInjectingSerialPort implements SerialPortLike {
 ```
 
 Used by:
-- T1-22 tests — verify `safetyOff()` falls back to soft reset when M5 omits ok within timeout.
-- T1-25 tests — verify connect refuses on no-welcome, alarm-on-connect, run-on-connect.
-- T1-28 tests — verify autofocus timeout triggers safety-off.
-- T1-29 tests — verify USB pull mid-burn flips persisted unsafe-state flag.
-- T1-21 tests — verify frame-dot try/finally fires M5 on mid-loop transport failure.
+- T1-22 tests 鈥?verify `safetyOff()` falls back to soft reset when M5 omits ok within timeout.
+- T1-25 tests 鈥?verify connect refuses on no-welcome, alarm-on-connect, run-on-connect.
+- T1-28 tests 鈥?verify autofocus timeout triggers safety-off.
+- T1-29 tests 鈥?verify USB pull mid-burn flips persisted unsafe-state flag.
+- T1-21 tests 鈥?verify frame-dot try/finally fires M5 on mid-loop transport failure.
 
-**Tests for the harness itself:** `tests/fault-injecting-serial-port.test.ts` — verifies the harness behaves as documented. Each fault mode tested independently before any safety test depends on it.
+**Tests for the harness itself:** `tests/fault-injecting-serial-port.test.ts` 鈥?verifies the harness behaves as documented. Each fault mode tested independently before any safety test depends on it.
 
 **Estimate:** ~1 session for the harness + tests for the harness. Subsequent safety tests in dependent tickets (T1-22, T1-25, T1-28, T1-29) get a small boost from having the harness available.
 
-**Priority:** Tier 2 — infrastructure. Should ship BEFORE T1-22 lands, since T1-22's tests need this harness to actually verify the safety contract. Without it, T1-22's tests can only check "command was attempted," not "failure was handled correctly."
+**Priority:** Tier 2 鈥?infrastructure. Should ship BEFORE T1-22 lands, since T1-22's tests need this harness to actually verify the safety contract. Without it, T1-22's tests can only check "command was attempted," not "failure was handled correctly."
 
-**Cross-check note (audit 1F):** Audit 1F is fundamentally about test infrastructure and methodology. Most of its 9 proposed test files map directly to existing T1 tickets (see audit cross-check notes). This entry is the only piece of audit 1F that's a standalone deliverable — the harness that enables those existing tests to actually exercise failure conditions. Audit's "Phase A failing characterization tests" pattern is overscoped (maintaining failing tests in CI is bad practice without ticket linkage); better discipline is to write tests WITH each fix in the same commit, using this harness.
+**Cross-check note (audit 1F):** Audit 1F is fundamentally about test infrastructure and methodology. Most of its 9 proposed test files map directly to existing T1 tickets (see audit cross-check notes). This entry is the only piece of audit 1F that's a standalone deliverable 鈥?the harness that enables those existing tests to actually exercise failure conditions. Audit's "Phase A failing characterization tests" pattern is overscoped (maintaining failing tests in CI is bad practice without ticket linkage); better discipline is to write tests WITH each fix in the same commit, using this harness.
 
 ---
 
@@ -6390,8 +6384,8 @@ let base = options?.gcodeHeaderTemplate
 The `GcodeTemplateValidator` (T2-5, already shipped) catches dangerous template content with `severity: 'error'` blockers (e.g. `FOOTER_MISSING_M5`, motion outside bed, S>maxSpindle). T1-26 adds enforce-M5-at-send as defense-in-depth. So the validator side is reasonably strong.
 
 But the structural concern from audit 2A is real: **the emitter itself doesn't enforce a non-removable modal safety wrapper.** Templates are trusted to include the correct modal setup. Validator catches missing M5 in footer. But validator doesn't catch:
-- Missing `G21` (units — defaults to inches in some firmware)
-- Missing `G90` (positioning mode — could be left as G91 from previous job)
+- Missing `G21` (units 鈥?defaults to inches in some firmware)
+- Missing `G90` (positioning mode 鈥?could be left as G91 from previous job)
 - Missing `M4 S0` / `M5 S0` initial state (template author assumes prior state)
 - Future modal changes added as features (G17 plane, G94 feed mode, $32-derived state)
 
@@ -6403,14 +6397,14 @@ Each new safety-relevant modal would need validator updates, otherwise template 
 
 ```ts
 encodeHeader(job, options) {
-  // Safety baseline — always emitted, always first
+  // Safety baseline 鈥?always emitted, always first
   const safetyHeader = [
     'G21 ; mm',
     this.useRelative ? 'G91 ; relative' : 'G90 ; absolute',
     'M5 S0 ; safety: laser off at start',
   ];
 
-  // Template extras — placed AFTER safety baseline, BEFORE first motion
+  // Template extras 鈥?placed AFTER safety baseline, BEFORE first motion
   const extras: string[] = [];
   if (options?.gcodeHeaderTemplate) {
     extras.push(renderTemplate(options.gcodeHeaderTemplate, ctx));
@@ -6423,12 +6417,12 @@ encodeHeader(job, options) {
 }
 
 encodeFooter(job, options) {
-  // Template extras / custom footer — placed first
+  // Template extras / custom footer 鈥?placed first
   const extras: string[] = [];
   if (options?.customEndGcode) extras.push(...splitLines(options.customEndGcode));
   if (options?.gcodeFooterTemplate) extras.push(renderTemplate(options.gcodeFooterTemplate, ctx));
 
-  // Safety baseline — always emitted, always last
+  // Safety baseline 鈥?always emitted, always last
   const safetyFooter = [
     'M5 S0 ; safety: laser off at end',
     'M2 ; program end',
@@ -6443,7 +6437,7 @@ The double-M5/double-G21 at runtime is harmless (idempotent). User templates don
 **Migration considerations:**
 - Existing user templates that DO emit M5 at end will produce duplicate M5. Harmless but noisy in gcode output.
 - Existing user templates that emit `G91 ; relative` for relative-mode jobs will conflict with the safety baseline `G90`. Need to handle the relative/absolute switch as part of the safety baseline (use `useRelative` flag, like the example above).
-- Existing tests of template output need updates — they'll see additional baseline lines.
+- Existing tests of template output need updates 鈥?they'll see additional baseline lines.
 
 **Tests:** `tests/output-safety-wrapper-non-removable.test.ts`:
 - Empty templates. Assert output starts with `G21\nG90\nM5 S0` and ends with `M5 S0\nM2`.
@@ -6459,15 +6453,15 @@ The double-M5/double-G21 at runtime is harmless (idempotent). User templates don
 
 ---
 
-### T2-15 | CompoundPath model — preserve outer/hole/island semantics through compile pipeline
+### T2-15 | CompoundPath model 鈥?preserve outer/hole/island semantics through compile pipeline
 
 **Code reference:** `src/core/job/JobCompiler.ts:625-684` (compileGeometry / flattenObject), `src/core/job/JobCompiler.ts:689-692` (FlatPath only tracks `closed: boolean`), `src/core/plan/FillGenerator.ts:185-189` (global edge pool, no path-of-origin), `src/geometry/BooleanOps.ts:95-136` (each subpath becomes own polygon), `src/geometry/OffsetPath.ts:33-44` (only outer ring offset).
 
 **Problem:** Cross-check confirmed: every step of the geometry pipeline drops compound-path semantics.
 
-(a) `flattenObject` produces independent FlatPaths from each subpath of a path geometry. Audit at JobCompiler.ts:689-692 — `FlatPath` is just `{ points: number[]; closed: boolean }`. No fillRule, no role (outer/hole/island), no group membership.
+(a) `flattenObject` produces independent FlatPaths from each subpath of a path geometry. Audit at JobCompiler.ts:689-692 鈥?`FlatPath` is just `{ points: number[]; closed: boolean }`. No fillRule, no role (outer/hole/island), no group membership.
 
-(b) `FillGenerator.generateFillRows` (line 185) takes ALL closed paths from ALL objects into one global edge pool, then runs scanline pairing using even-odd over the full pool. Self-intersecting paths, overlapping shapes, compound holes all blur together. For a shape that the user designed with nonzero fill rule, the renderer/preview shows nonzero behavior but compile produces even-odd output. Preview ≠ output.
+(b) `FillGenerator.generateFillRows` (line 185) takes ALL closed paths from ALL objects into one global edge pool, then runs scanline pairing using even-odd over the full pool. Self-intersecting paths, overlapping shapes, compound holes all blur together. For a shape that the user designed with nonzero fill rule, the renderer/preview shows nonzero behavior but compile produces even-odd output. Preview 鈮?output.
 
 (c) `OffsetPath.offsetObject` (verified in T1-36) only offsets `poly[0]` of each MultiPolygon entry. Holes are dropped because `objectToPolygon` (BooleanOps.ts:132) wraps each subpath into its own `[ring]` MultiPolygon entry instead of grouping outers + holes.
 
@@ -6498,18 +6492,18 @@ export interface CompoundPath {
 
 Migration plan (multi-pass to avoid one-big-commit):
 
-**Pass 1 — Introduce the type alongside FlatPath.** New `CompoundPath` type, new `flattenObjectAsCompound` function. JobCompiler can now produce either FlatPath[] (legacy) or CompoundPath (new). Existing call sites continue to work. ~1 session.
+**Pass 1 鈥?Introduce the type alongside FlatPath.** New `CompoundPath` type, new `flattenObjectAsCompound` function. JobCompiler can now produce either FlatPath[] (legacy) or CompoundPath (new). Existing call sites continue to work. ~1 session.
 
-**Pass 2 — Migrate FillGenerator to consume CompoundPath.** `generateFillRows` accepts CompoundPath input. Inside, edge pool is per-CompoundPath, not global. Even-odd is applied within a single compound, not across all objects. Preview parity tests added. ~1 session.
+**Pass 2 鈥?Migrate FillGenerator to consume CompoundPath.** `generateFillRows` accepts CompoundPath input. Inside, edge pool is per-CompoundPath, not global. Even-odd is applied within a single compound, not across all objects. Preview parity tests added. ~1 session.
 
-**Pass 3 — Migrate OffsetPath to consume CompoundPath.** `offsetObject` builds proper MultiPolygon `[outer, ...holes]` from CompoundPath input. Replaces T1-36's band-aid with the structural fix. T1-36 stays merged as the interim. ~1 session.
+**Pass 3 鈥?Migrate OffsetPath to consume CompoundPath.** `offsetObject` builds proper MultiPolygon `[outer, ...holes]` from CompoundPath input. Replaces T1-36's band-aid with the structural fix. T1-36 stays merged as the interim. ~1 session.
 
-**Pass 4 — Migrate BooleanOps.** Boolean operations preserve CompoundPath semantics through input → operation → output. Result polygons retain outer/hole role. ~1-2 sessions.
+**Pass 4 鈥?Migrate BooleanOps.** Boolean operations preserve CompoundPath semantics through input 鈫?operation 鈫?output. Result polygons retain outer/hole role. ~1-2 sessions.
 
-**Pass 5 — Output emission.** Final FlatPath conversion happens at the output boundary, not earlier. Each contour of a CompoundPath becomes a FlatPath, but with role tagged so PlanOptimizer can use it for path ordering (holes-before-outer-cuts within the same compound).
+**Pass 5 鈥?Output emission.** Final FlatPath conversion happens at the output boundary, not earlier. Each contour of a CompoundPath becomes a FlatPath, but with role tagged so PlanOptimizer can use it for path ordering (holes-before-outer-cuts within the same compound).
 
 **Tests:** Per-pass regression tests + new `tests/compound-path-pipeline.test.ts`:
-- Compound path with outer + hole + island survives compile → fill → output as expected fill pattern.
+- Compound path with outer + hole + island survives compile 鈫?fill 鈫?output as expected fill pattern.
 - Same compound path through offset preserves all three contours with correct role-based sign.
 - Boolean union of two compounds produces correct compound result with merged holes.
 
@@ -6520,9 +6514,9 @@ Migration plan (multi-pass to avoid one-big-commit):
 **Cross-check note (audit 2C):** Audit's P0 #2 ("Replace FlatPath[] as the only manufacturing geometry model"). Verified the structural problem at every layer. Pushback on framing: this is multi-pass work, not a single ticket. T1-36 is the band-aid for the most painful symptom (kerf compensation broken). T2-15 is the architectural fix that catches everything.
 
 **Notes folded in (from audit 2C):**
-- SVG `<text>` skipped — Pass 5 of T2-15 could add a warning at import time when text elements are skipped. UI-only change.
-- Group style inheritance — same area; flatten-time style resolution can collect inherited styles before flattening.
-- viewBox-only → mm convention — already user-controllable via `unitMode` option; no change needed.
+- SVG `<text>` skipped 鈥?Pass 5 of T2-15 could add a warning at import time when text elements are skipped. UI-only change.
+- Group style inheritance 鈥?same area; flatten-time style resolution can collect inherited styles before flattening.
+- viewBox-only 鈫?mm convention 鈥?already user-controllable via `unitMode` option; no change needed.
 
 ---
 
@@ -6537,7 +6531,7 @@ Real-world failure modes:
 - User pastes a shape and forgets they had a copy already
 - Multiple imports of the same template
 
-Without detection, the controller burns each duplicate independently — twice the time, twice the power deposited, charred edges, wasted material.
+Without detection, the controller burns each duplicate independently 鈥?twice the time, twice the power deposited, charred edges, wasted material.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT) as P2 priority.
 
@@ -6546,7 +6540,7 @@ Without detection, the controller burns each duplicate independently — twice t
 ```ts
 export function detectDuplicatePaths(scene: Scene): PreflightIssue[] {
   const issues: PreflightIssue[] = [];
-  const fingerprints = new Map<string, string[]>();  // fingerprint → object IDs
+  const fingerprints = new Map<string, string[]>();  // fingerprint 鈫?object IDs
 
   for (const obj of scene.objects) {
     if (!obj.visible) continue;
@@ -6562,7 +6556,7 @@ export function detectDuplicatePaths(scene: Scene): PreflightIssue[] {
         severity: 'warning',
         category: 'design',
         title: `${ids.length} potentially duplicate objects detected`,
-        detail: `Objects ${ids.slice(0, 3).join(', ')}${ids.length > 3 ? '…' : ''} have identical bounding box and perimeter. They may be stacked duplicates that will be cut multiple times.`,
+        detail: `Objects ${ids.slice(0, 3).join(', ')}${ids.length > 3 ? '鈥? : ''} have identical bounding box and perimeter. They may be stacked duplicates that will be cut multiple times.`,
         fix: 'Inspect the canvas. Delete duplicates if unintended, or confirm to proceed.',
       });
     }
@@ -6573,19 +6567,19 @@ export function detectDuplicatePaths(scene: Scene): PreflightIssue[] {
 
 Fingerprint: bounding box (rounded to 0.001mm) + perimeter (rounded) + first-point coords. Collisions are possible but rare; real duplicates almost always share all three values.
 
-Severity is `warning` not `error` — sometimes users intentionally stack shapes (e.g. for double cuts or power doubling). Block would be too aggressive. Warning surfaces in the preflight panel; user confirms or removes.
+Severity is `warning` not `error` 鈥?sometimes users intentionally stack shapes (e.g. for double cuts or power doubling). Block would be too aggressive. Warning surfaces in the preflight panel; user confirms or removes.
 
 **Tests:** `tests/preflight-duplicate-geometry.test.ts`:
-- Two identical 50×50 squares at same position → 1 warning.
-- Two squares at different positions → no warning.
-- Two squares same position, different rotation → no warning (different bounding box after transform).
-- 3+ duplicates → single warning listing the count.
+- Two identical 50脳50 squares at same position 鈫?1 warning.
+- Two squares at different positions 鈫?no warning.
+- Two squares same position, different rotation 鈫?no warning (different bounding box after transform).
+- 3+ duplicates 鈫?single warning listing the count.
 
 **Estimate:** ~1 session. New preflight rule + fingerprint helper + tests + integration into preflight orchestrator.
 
-**Priority:** Tier 2 — quality. Real but bounded failure mode. Audit framed as P2; that's about right.
+**Priority:** Tier 2 鈥?quality. Real but bounded failure mode. Audit framed as P2; that's about right.
 
-**Cross-check note (audit 2C):** Audit listed this as P2 with "double cuts, charred edges, wasted material" as consequences. Verified zero duplicate-detection exists. Implementation is contained to a new preflight rule; no architectural changes needed. Could ship before or after T2-15 — independent.
+**Cross-check note (audit 2C):** Audit listed this as P2 with "double cuts, charred edges, wasted material" as consequences. Verified zero duplicate-detection exists. Implementation is contained to a new preflight rule; no architectural changes needed. Could ship before or after T2-15 鈥?independent.
 
 ---
 
@@ -6595,7 +6589,7 @@ Severity is `warning` not `error` — sometimes users intentionally stack shapes
 
 **Problem:** Cross-check confirmed: compile is async-shaped (`async compileGcode(scene)`) but completely uncancellable internally. Once the user clicks compile, every loop runs to completion. No `AbortSignal`, no progress callback, no yield points. Combined with renderer-thread execution (per the code's own comment at useCompileManager.ts:151-153, "compiles block the main thread"), the user's only options during a runaway compile are to wait or kill the app.
 
-This intersects with T1-45 (complexity gate) — gate prevents huge compiles from starting; this ticket makes any compile cancellable and progress-visible. Together they cover both the prevention (gate) and the recovery (cancel).
+This intersects with T1-45 (complexity gate) 鈥?gate prevents huge compiles from starting; this ticket makes any compile cancellable and progress-visible. Together they cover both the prevention (gate) and the recovery (cancel).
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 3. Cross-check verified absence at exact lines.
 
@@ -6649,16 +6643,16 @@ UI integration:
 - Display progress bar from `onProgress` callback
 - Catch `AbortError` and clean up state without showing an error toast
 
-**Sequencing with T1-17:** T1-17's image processing worker offload should consume this same AbortSignal/progress API. Worker + AbortSignal naturally compose — terminating the worker on abort is straightforward. Workers also free the renderer thread to actually display the progress UI.
+**Sequencing with T1-17:** T1-17's image processing worker offload should consume this same AbortSignal/progress API. Worker + AbortSignal naturally compose 鈥?terminating the worker on abort is straightforward. Workers also free the renderer thread to actually display the progress UI.
 
 **Tests:** `tests/compile-cancellable.test.ts`:
 - Start compile of large scene with AbortController. Call `abort()` after 100ms. Assert compile rejects with AbortError within ~50ms of abort.
 - Compile small scene with progress callback. Assert callback fires at least once per phase with monotonically-increasing overallFraction.
-- Compile finished without abort → no AbortError; result is correct.
+- Compile finished without abort 鈫?no AbortError; result is correct.
 
 **Estimate:** ~2 sessions. Cooperative-cancel pattern is mechanical but applied across many functions; testing each phase's progress reporting is the bulk of the work.
 
-**Priority:** Tier 2 — UX. Significant quality-of-life improvement. Sequencing: ship T1-45 (complexity gate) first because it prevents most cases that would need cancellation; then T2-17 as the fallback for cases the gate didn't catch or the user wanted to cancel mid-compile.
+**Priority:** Tier 2 鈥?UX. Significant quality-of-life improvement. Sequencing: ship T1-45 (complexity gate) first because it prevents most cases that would need cancellation; then T2-17 as the fallback for cases the gate didn't catch or the user wanted to cancel mid-compile.
 
 **Cross-check note (audit 2E):** Audit's Priority 3. Verified absence. Pushback on framing: audit listed this alongside Priority 1 (full streaming AsyncIterable architecture) as both critical. They're not equally urgent. T2-17 is bounded and ships in days; the streaming architecture (T3-15) is multi-week and doesn't help current users. Filing them at different tiers reflects this.
 
@@ -6666,9 +6660,9 @@ UI integration:
 
 ### T2-18 | Semantic G-code parser test helper
 
-**Code reference:** New `tests/helpers/parseGcode.ts`. Currently no parser exists — verified via `grep -rn "ModalState\|parseGcodeLine\|class GcodeParser"` returning zero hits.
+**Code reference:** New `tests/helpers/parseGcode.ts`. Currently no parser exists 鈥?verified via `grep -rn "ModalState\|parseGcodeLine\|class GcodeParser"` returning zero hits.
 
-**Problem:** Cross-check confirmed the audit's central architectural concern: **the test suite has no semantic G-code parser.** Tests rely on string includes (`gcode.includes('G21')`) or regex (`/^G91\b/`). This is shallow protection — a test asserting `gcode.includes('M5')` passes whether M5 appears at the right spot in the file or buried in a comment, whether it's the FIRST or LAST one, whether modal state was correct when it was emitted.
+**Problem:** Cross-check confirmed the audit's central architectural concern: **the test suite has no semantic G-code parser.** Tests rely on string includes (`gcode.includes('G21')`) or regex (`/^G91\b/`). This is shallow protection 鈥?a test asserting `gcode.includes('M5')` passes whether M5 appears at the right spot in the file or buried in a comment, whether it's the FIRST or LAST one, whether modal state was correct when it was emitted.
 
 The downstream effect: even after T1-39 (frame skips first move), T1-41 (saved-origin verification), T1-43 (mode reassertion), T1-31 (raster strategy) all ship with passing unit tests, the test suite still can't prove "the emitted G-code does not have unsafe modal states anywhere." Every byte-level regression has to be interpreted by a human reading snapshots.
 
@@ -6753,13 +6747,13 @@ assert(parsed.burnBounds.minX === expectedBurnMinX, 'Saved-origin offset honored
 ```
 
 **Tests:** `tests/helpers/parseGcode.test.ts` validates the parser itself:
-- Round-trip simple G-code → parse → assert state at every line.
+- Round-trip simple G-code 鈫?parse 鈫?assert state at every line.
 - Edge cases: M3/M4/M5 sequences, G90/G91 toggles, comments, realtime bytes (note: not present in text gcode but parser should ignore).
 - Adversarial: malformed lines (unrecognized commands, bad numbers).
 
-**Estimate:** ~2-3 sessions. Parser is well-defined but exhaustive — needs to cover every modal command LaserForge emits. Plus migration of existing tests to use it (~50 test files have shallow assertions that could be tightened).
+**Estimate:** ~2-3 sessions. Parser is well-defined but exhaustive 鈥?needs to cover every modal command LaserForge emits. Plus migration of existing tests to use it (~50 test files have shallow assertions that could be tightened).
 
-**Priority:** Tier 2 — test infrastructure foundation. **Single most valuable test investment.** Powers T2-19 (burn-bounds), T2-23 (determinism), T3-36 (frame-vs-burn), T3-38 (fill-with-holes), and most malformed-input tests. Without this, those tests can't be written meaningfully.
+**Priority:** Tier 2 鈥?test infrastructure foundation. **Single most valuable test investment.** Powers T2-19 (burn-bounds), T2-23 (determinism), T3-36 (frame-vs-burn), T3-38 (fill-with-holes), and most malformed-input tests. Without this, those tests can't be written meaningfully.
 
 **Cross-check note (audit 2F):** Audit's C1 + P0 #1. Verified the parser absence at codebase level. Pushback on framing: audit treated this as one of many P0 items; in practice it's the foundation that makes the others possible.
 
@@ -6794,9 +6788,9 @@ export function analyzeBurnBounds(parsed: ParsedGcode): BurnAnalysis;
 **Fix:** Implementation walks `parsed.moves` accumulating bounds per category. Use the parser's `laserOn` flag (derived from M3/M4 active AND S > 0) to separate burn vs rapid.
 
 Tests use the analyzer to verify:
-- "Job should burn within rectangle X×Y" → `analyzeBurnBounds(parsed).burnBounds` exactly matches expected.
+- "Job should burn within rectangle X脳Y" 鈫?`analyzeBurnBounds(parsed).burnBounds` exactly matches expected.
 - "Frame should trace the same area as job burns" (T3-36 frame-vs-burn): compute analysis for both frame and job, compare bounds.
-- "No surprise overscan beyond declared region" → `overscanRegions` are within tolerance of declared overscan setting.
+- "No surprise overscan beyond declared region" 鈫?`overscanRegions` are within tolerance of declared overscan setting.
 
 **Tests:** `tests/helpers/analyzeBurnBounds.test.ts`:
 - Synthetic G-code with known burn region. Assert analysis returns matching bounds.
@@ -6805,7 +6799,7 @@ Tests use the analyzer to verify:
 
 **Estimate:** ~1 session after T2-18 lands.
 
-**Priority:** Tier 2 — depends on T2-18. The pair (T2-18 parser + T2-19 analyzer) makes most other audit-2F tests possible.
+**Priority:** Tier 2 鈥?depends on T2-18. The pair (T2-18 parser + T2-19 analyzer) makes most other audit-2F tests possible.
 
 **Cross-check note (audit 2F):** Audit's P0 #1.
 
@@ -6813,23 +6807,23 @@ Tests use the analyzer to verify:
 
 ### T2-20 | Pixel fixture harness for raster regression tests
 
-**Code reference:** New `tests/helpers/imageFixtures.ts` and a set of fixtures under `tests/fixtures/raster/`. Existing image-processing tests at `tests/image-processing.test.ts` cover narrow behavior (brightness, contrast, etc.) but not full pipeline pixel→G-code output.
+**Code reference:** New `tests/helpers/imageFixtures.ts` and a set of fixtures under `tests/fixtures/raster/`. Existing image-processing tests at `tests/image-processing.test.ts` cover narrow behavior (brightness, contrast, etc.) but not full pipeline pixel鈫扜-code output.
 
 **Problem:** Audit 2F C2 / Gate C: missing pixel-level fixture matrix. The required fixtures:
 
 | Fixture | Purpose |
 |---|---|
-| 1×1 black pixel | Smallest possible burn — verifies rounding, S-value, single-pixel handling |
-| 1×1 white pixel | Verifies blank-pixel skip / S0 |
-| 2×2 checkerboard | High-contrast adjacency — verifies dither/segment logic |
-| Horizontal gradient | Power smooth ramp — verifies grayscale S-modulation |
+| 1脳1 black pixel | Smallest possible burn 鈥?verifies rounding, S-value, single-pixel handling |
+| 1脳1 white pixel | Verifies blank-pixel skip / S0 |
+| 2脳2 checkerboard | High-contrast adjacency 鈥?verifies dither/segment logic |
+| Horizontal gradient | Power smooth ramp 鈥?verifies grayscale S-modulation |
 | Vertical gradient | Cross-row consistency |
-| Transparent pixel | Alpha → no-burn behavior (verified at useImport.ts:103, but no E2E test) |
+| Transparent pixel | Alpha 鈫?no-burn behavior (verified at useImport.ts:103, but no E2E test) |
 | Blank row | Skip behavior |
 | Black row | Continuous burn segment |
 | Diagonal line | Bidirectional + scanline crossover |
 
-Currently, no fixture in tests/ exercises the FULL pipeline (image → JobCompiler → PlanOptimizer → Output) with pixel-level expected G-code. The image-processing tests stop at pixel arrays; the planner tests use synthetic moves; nothing connects them.
+Currently, no fixture in tests/ exercises the FULL pipeline (image 鈫?JobCompiler 鈫?PlanOptimizer 鈫?Output) with pixel-level expected G-code. The image-processing tests stop at pixel arrays; the planner tests use synthetic moves; nothing connects them.
 
 This means: a bug in raster scanline coordinate calculation (e.g. T1-31 raster strategy fix, or any future raster change) can ship with passing image-processing tests AND passing E2E snapshot tests, while pixel-level output is wrong.
 
@@ -6837,9 +6831,9 @@ This means: a bug in raster scanline coordinate calculation (e.g. T1-31 raster s
 
 **Fix:** Build the fixture harness:
 
-(1) `tests/helpers/imageFixtures.ts` — utilities to construct test images programmatically:
+(1) `tests/helpers/imageFixtures.ts` 鈥?utilities to construct test images programmatically:
 ```ts
-export function blackPixel(): SceneObject; // 1×1 fully opaque black
+export function blackPixel(): SceneObject; // 1脳1 fully opaque black
 export function whitePixel(): SceneObject;
 export function checkerboard(size: number): SceneObject;
 export function horizontalGradient(width: number, height: number): SceneObject;
@@ -6848,9 +6842,9 @@ export function transparentPixel(rgba: [number,number,number,number][]): SceneOb
 // All construct a SceneObject with ImageGeometry + grayscaleData + position + transform
 ```
 
-(2) `tests/fixtures/raster/` — golden expected G-code files for each fixture, generated once and committed.
+(2) `tests/fixtures/raster/` 鈥?golden expected G-code files for each fixture, generated once and committed.
 
-(3) `tests/raster-pixel-fixtures.test.ts` — for each fixture:
+(3) `tests/raster-pixel-fixtures.test.ts` 鈥?for each fixture:
 - Compile to G-code
 - Parse via T2-18
 - Analyze bounds via T2-19
@@ -6861,7 +6855,7 @@ export function transparentPixel(rgba: [number,number,number,number][]): SceneOb
 
 **Estimate:** ~2-3 sessions. Each fixture is small but verifying expected output requires careful manual computation of expected scanlines + power values. T1-31 (raster strategy) should ship FIRST so the fixtures match the corrected behavior.
 
-**Priority:** Tier 2 — test infrastructure. Closes a major regression gap. Sequenced after T1-31 (raster motion fix).
+**Priority:** Tier 2 鈥?test infrastructure. Closes a major regression gap. Sequenced after T1-31 (raster motion fix).
 
 **Cross-check note (audit 2F):** Audit's C2 / Gate C / P0 #2. Verified.
 
@@ -6871,7 +6865,7 @@ export function transparentPixel(rgba: [number,number,number,number][]): SceneOb
 
 **Code reference:** New `tests/property/` directory. fast-check dependency to be added.
 
-**Problem:** Audit 2F section 10: no property-based test framework. Hand-fixture tests miss edge cases — near-zero segments, nearly-collinear points, self-intersections, huge/small coordinate values, rotated nested transforms, compound paths with holes. Property-based testing generates thousands of random valid inputs and asserts invariants hold.
+**Problem:** Audit 2F section 10: no property-based test framework. Hand-fixture tests miss edge cases 鈥?near-zero segments, nearly-collinear points, self-intersections, huge/small coordinate values, rotated nested transforms, compound paths with holes. Property-based testing generates thousands of random valid inputs and asserts invariants hold.
 
 For laser CAM, the invariants matter: every closed path stays closed after transform; every fill segment midpoint lies inside its outer polygon; every emitted coordinate is finite; every spindle value is within [0, maxSpindle]. These are easy to write as properties; manual fixture tests don't approach this coverage.
 
@@ -6940,19 +6934,19 @@ Required property categories (audit 2F section 10):
 
 **Estimate:** ~2 sessions. Most time spent on building good arbitrary-* generators (random valid scenes / polygons / transforms). Property bodies are short.
 
-**Priority:** Tier 2 — test depth. Catches edge cases manual fixtures miss.
+**Priority:** Tier 2 鈥?test depth. Catches edge cases manual fixtures miss.
 
 **Cross-check note (audit 2F):** Audit's section 10 / P1. Verified absence.
 
 ---
 
-### T2-22 | Standardize test runner — auto-discovery + consistent reporter
+### T2-22 | Standardize test runner 鈥?auto-discovery + consistent reporter
 
 **Code reference:** `scripts/run-tests.mjs` (manual list of 119 test files), various tests using mixed assertion patterns (custom counters vs `node:test` vs ad-hoc).
 
 **Problem:** Audit 2F C7 / Gate H / P2. Two issues compound:
 
-(1) Manual test registration → drift (T1-47 catches this defensively, but the underlying issue is the manual-list architecture).
+(1) Manual test registration 鈫?drift (T1-47 catches this defensively, but the underlying issue is the manual-list architecture).
 
 (2) Mixed test framework usage. Some tests use custom `passed`/`failed` counters with `console.log`. Some use `node:test`. The output is inconsistent, filtering tests is ad-hoc, CI integration is custom.
 
@@ -6962,32 +6956,32 @@ Both issues mean the test suite is harder to reason about, harder to extend, and
 
 **Fix:** Two stages.
 
-**Stage 1 (~1 session) — Auto-discovery.** Replace the manual test list in `run-tests.mjs` with a glob walk. The runner discovers `tests/**/*.test.ts(x)` and runs each via tsx. This eliminates registration drift entirely and supersedes T1-47's meta-test guard.
+**Stage 1 (~1 session) 鈥?Auto-discovery.** Replace the manual test list in `run-tests.mjs` with a glob walk. The runner discovers `tests/**/*.test.ts(x)` and runs each via tsx. This eliminates registration drift entirely and supersedes T1-47's meta-test guard.
 
-**Stage 2 (~2-3 sessions) — Migrate to a consistent runner.** Options:
+**Stage 2 (~2-3 sessions) 鈥?Migrate to a consistent runner.** Options:
 - Vitest: fast, modern, built-in TS support, good reporter, parallel execution.
 - Node's built-in `node:test`: zero deps, official, decent reporter.
 - Keep tsx but standardize via a shared assertion helper that all tests use.
 
-Vitest is the strongest option for new tests; migration of existing tests can be incremental (file-by-file) over time. Some tests may need refactoring (custom counter pattern → `it()`/`expect()` style).
+Vitest is the strongest option for new tests; migration of existing tests can be incremental (file-by-file) over time. Some tests may need refactoring (custom counter pattern 鈫?`it()`/`expect()` style).
 
 **Tests:** Each migrated file passes its own existing tests after migration. Coverage doesn't decrease.
 
 **Estimate:** Stage 1 ~1 session. Stage 2 ~2-3 sessions for migration + one additional session per ~30 test files.
 
-**Priority:** Tier 2 — quality-of-life. Stage 1 is high-value/low-cost; Stage 2 is bigger and lower-priority.
+**Priority:** Tier 2 鈥?quality-of-life. Stage 1 is high-value/low-cost; Stage 2 is bigger and lower-priority.
 
 **Cross-check note (audit 2F):** Audit's C7 / Gate H / P2. Verified the manual list and mixed usage. Pushback on framing: audit listed Stage 2 as P2; that's about right. Stage 1 is more impactful and could be Tier 1 if we want to retire T1-47's meta-test guard sooner.
 
 ---
 
-### T2-23 | Determinism gate — same scene compiled 20× must be byte-identical
+### T2-23 | Determinism gate 鈥?same scene compiled 20脳 must be byte-identical
 
 **Code reference:** New test using existing compile pipeline. Depends on T1-48 (deterministic Output.createdAt) and T2-18 (parser for normalization).
 
 **Problem:** Audit 2F section 7 / Gate B. Determinism is not currently asserted across multiple runs. Several risks:
 - Floating-point formatting variance (currently `toFixed(3)` is good, but no test).
-- Iteration order over Maps/Sets in path optimizer — JavaScript Map iteration order is insertion order, but Set may not be stable across implementations.
+- Iteration order over Maps/Sets in path optimizer 鈥?JavaScript Map iteration order is insertion order, but Set may not be stable across implementations.
 - Tie-breaking in path optimization for equal-cost paths.
 - Async font loading timing affecting text outline cache.
 - Date/timestamp leakage (T1-48 fixes the obvious one).
@@ -7015,7 +7009,7 @@ test('same scene compiles to byte-identical G-code 20 times', () => {
   }
 });
 
-test('compile order independence — randomized scene object insertion order produces same output', () => {
+test('compile order independence 鈥?randomized scene object insertion order produces same output', () => {
   const baseObjects = [/* ... */];
   const reference = compileGcode(sceneFromObjects(baseObjects, /* canonical order */));
   for (let trial = 0; trial < 10; trial++) {
@@ -7032,7 +7026,7 @@ When this test fails, the failure points at exactly which non-determinism source
 
 **Estimate:** ~1 session including investigating any failures it surfaces. Depends on T1-48 (timestamp injection).
 
-**Priority:** Tier 2. Foundation for trust in snapshot tests — without determinism, snapshots are unreliable signals.
+**Priority:** Tier 2. Foundation for trust in snapshot tests 鈥?without determinism, snapshots are unreliable signals.
 
 **Cross-check note (audit 2F):** Audit's section 7. Verified determinism is asserted only narrowly (`deterministic-ids.test.ts` covers IDs; nothing covers full output).
 
@@ -7050,11 +7044,11 @@ When this test fails, the failure points at exactly which non-determinism source
 
 (3) Interface includes optional methods clearly named after GRBL: `maxSpindle` (GRBL `$30`), `getFirmwareHomingCycleEnabled` (GRBL `$22`), `getCurrentWcsState` (G54/`$10`), `onWcsConsentNeeded`, `applyWcsNormalization`, `skipWcsNormalization`, `setStopOnError` (GRBL `error:` semantics). These leak GRBL concepts into the supposedly universal contract.
 
-(4) `JobProgress` includes `bufferFill`, `ackRateHz`, `expectedAckRateHz` — pure GRBL character-counting streaming health metrics. For file-upload or device-side-progress controllers, these fields don't apply.
+(4) `JobProgress` includes `bufferFill`, `ackRateHz`, `expectedAckRateHz` 鈥?pure GRBL character-counting streaming health metrics. For file-upload or device-side-progress controllers, these fields don't apply.
 
-(5) `sendCommand(command: string, ...)` exposes raw GRBL commands as a primary API. Generic services (T2-26) call this for jog, home, unlock, frame, set-origin, test-fire, laser-off — all GRBL command strings.
+(5) `sendCommand(command: string, ...)` exposes raw GRBL commands as a primary API. Generic services (T2-26) call this for jog, home, unlock, frame, set-origin, test-fire, laser-off 鈥?all GRBL command strings.
 
-The header comment "Adding a new controller type means implementing this interface. Nothing else changes." is aspirational fiction — the audit's leak table (verified at all 22 line references) shows generic services would need to change.
+The header comment "Adding a new controller type means implementing this interface. Nothing else changes." is aspirational fiction 鈥?the audit's leak table (verified at all 22 line references) shows generic services would need to change.
 
 **Identified by:** Audit 3A (2026-04-25, ChatGPT) section 3 + Priority 1.
 
@@ -7077,7 +7071,7 @@ interface LaserController {
   stopJob(handle?: JobHandle, reason?: StopReason): Promise<OperationResult>;
   emergencyStop(reason?: EmergencyReason): Promise<OperationResult>;
 
-  readonly operations: MachineOperationApi;  // T2-26 / T3-47 — semantic operations
+  readonly operations: MachineOperationApi;  // T2-26 / T3-47 鈥?semantic operations
   readonly events: ControllerEventBus;       // generic event subscription
 }
 
@@ -7103,15 +7097,15 @@ Generic services (MachineService, ExecutionCoordinator) only know about `LaserCo
 
 **Estimate:** ~3-5 sessions. Foundation for T2-25 through T2-30. The interface split itself is mechanical (~1 session); rewiring all consumers is the bulk.
 
-**Priority:** Tier 2. **Foundation ticket — most of T2-25 through T2-30 depend on this.** But itself depends on no other audit-3A tickets, so this is the entry point.
+**Priority:** Tier 2. **Foundation ticket 鈥?most of T2-25 through T2-30 depend on this.** But itself depends on no other audit-3A tickets, so this is the entry point.
 
-**Cross-check note (audit 3A):** Verified at every line reference. Audit's Priority 1. Pushback on framing: the audit's "Critical 1: not protocol-neutral" wording suggests this is a release blocker. For a Falcon-A1-only commercial product targeting GRBL, the existing GRBL-shaped interface is fit-for-purpose — the cost of refactoring before non-GRBL customer demand is real architectural debt deferred, not customer-facing damage. Filed at Tier 2 (this month) rather than Tier 1 (this week) accordingly.
+**Cross-check note (audit 3A):** Verified at every line reference. Audit's Priority 1. Pushback on framing: the audit's "Critical 1: not protocol-neutral" wording suggests this is a release blocker. For a Falcon-A1-only commercial product targeting GRBL, the existing GRBL-shaped interface is fit-for-purpose 鈥?the cost of refactoring before non-GRBL customer demand is real architectural debt deferred, not customer-facing damage. Filed at Tier 2 (this month) rather than Tier 1 (this week) accordingly.
 
 ---
 
 ### T2-25 | Create real ControllerCapabilities model
 
-**Code reference:** New `src/controllers/ControllerCapabilities.ts`. Currently capabilities are scattered across `DeviceProfile.ts` as booleans (`autoFocusSupported`, `homingEnabled`, `softLimitsEnabled`, `allowsNegativeWorkspace`, `stopOnError`, `suppressWcsConsent`) — verified at `src/core/devices/DeviceProfile.ts`.
+**Code reference:** New `src/controllers/ControllerCapabilities.ts`. Currently capabilities are scattered across `DeviceProfile.ts` as booleans (`autoFocusSupported`, `homingEnabled`, `softLimitsEnabled`, `allowsNegativeWorkspace`, `stopOnError`, `suppressWcsConsent`) 鈥?verified at `src/core/devices/DeviceProfile.ts`.
 
 **Problem:** Audit 3A section 5: profile fields exist but no first-class `ControllerCapabilities` object gates UI, output generation, preflight, safety operations, and execution. Generic operations assume GRBL semantics universally:
 
@@ -7193,7 +7187,7 @@ async unlock(): Promise<OperationResult> {
 
 **Estimate:** ~2-3 sessions. Type definition is fast (~1 hour). Wiring it through every UI hook + service is the bulk.
 
-**Priority:** Tier 2 — depends on T2-24. Has user-visible benefit even today: profile-specific UI that hides operations the active machine doesn't support.
+**Priority:** Tier 2 鈥?depends on T2-24. Has user-visible benefit even today: profile-specific UI that hides operations the active machine doesn't support.
 
 **Cross-check note (audit 3A):** Verified scattered booleans in DeviceProfile.ts. Audit's Priority 2.
 
@@ -7205,7 +7199,7 @@ async unlock(): Promise<OperationResult> {
 
 **Problem:** Cross-check verified all 22 leak locations from audit's section 4 table. Generic application code emits GRBL command strings directly; for any future non-GRBL controller these emissions are wrong syntax or wrong semantics.
 
-This is the **biggest blocker** for adding any second controller — and the leakage is in the most-touched files (MachineService, ExecutionCoordinator, frameGcode), making the leakage hard to remove via a single refactor.
+This is the **biggest blocker** for adding any second controller 鈥?and the leakage is in the most-touched files (MachineService, ExecutionCoordinator, frameGcode), making the leakage hard to remove via a single refactor.
 
 **Identified by:** Audit 3A (2026-04-25, ChatGPT) section 4 + Priority 3.
 
@@ -7228,23 +7222,23 @@ Then `GrblController.operations` implements each by emitting the GRBL command st
 
 Migration plan (multi-pass):
 
-**Pass 1 — Add operations API to LaserController, implement in GrblController.** No call-site changes yet. ~1 session.
+**Pass 1 鈥?Add operations API to LaserController, implement in GrblController.** No call-site changes yet. ~1 session.
 
-**Pass 2 — Migrate ExecutionCoordinator.** Replace direct command emission with `ctrl.operations.X()` calls. Each operation tested independently. ~1-2 sessions.
+**Pass 2 鈥?Migrate ExecutionCoordinator.** Replace direct command emission with `ctrl.operations.X()` calls. Each operation tested independently. ~1-2 sessions.
 
-**Pass 3 — Migrate MachineService.** Replace M5 S0, $J, etc. ~1 session.
+**Pass 3 鈥?Migrate MachineService.** Replace M5 S0, $J, etc. ~1 session.
 
-**Pass 4 — Migrate frameGcode.ts.** This is trickier: frame G-code is currently generated in the generic layer and sent line-by-line via sendCommand. Better: `ctrl.operations.frame(corners)` builds GRBL G-code internally inside GrblController. ~1 session.
+**Pass 4 鈥?Migrate frameGcode.ts.** This is trickier: frame G-code is currently generated in the generic layer and sent line-by-line via sendCommand. Better: `ctrl.operations.frame(corners)` builds GRBL G-code internally inside GrblController. ~1 session.
 
-**Pass 5 — Migrate sendSetOriginWcsCommand.ts and electron/serial.ts cleanup.** ~30 min.
+**Pass 5 鈥?Migrate sendSetOriginWcsCommand.ts and electron/serial.ts cleanup.** ~30 min.
 
-**Pass 6 — Static guard.** New test `tests/no-grbl-commands-in-generic.test.ts` scans `src/app/` files for hardcoded GRBL command literals (`/\$[JXH]\b/`, `/\bM[345]\b/`, `/G10 L20/`). Pattern matches T2-2/T2-4 static guards. ~30 min.
+**Pass 6 鈥?Static guard.** New test `tests/no-grbl-commands-in-generic.test.ts` scans `src/app/` files for hardcoded GRBL command literals (`/\$[JXH]\b/`, `/\bM[345]\b/`, `/G10 L20/`). Pattern matches T2-2/T2-4 static guards. ~30 min.
 
-**Tests:** Per-pass tests. End-to-end: with a mock controller whose operations record their calls, run a typical user flow (connect → jog → home → frame → start job → pause → resume → stop) and assert the operations API was called, never raw `sendCommand`.
+**Tests:** Per-pass tests. End-to-end: with a mock controller whose operations record their calls, run a typical user flow (connect 鈫?jog 鈫?home 鈫?frame 鈫?start job 鈫?pause 鈫?resume 鈫?stop) and assert the operations API was called, never raw `sendCommand`.
 
-**Estimate:** ~5-6 sessions across 6 passes. Largest item in audit 3A by far. Could be paused after Pass 3 — the remaining passes are incremental cleanup.
+**Estimate:** ~5-6 sessions across 6 passes. Largest item in audit 3A by far. Could be paused after Pass 3 鈥?the remaining passes are incremental cleanup.
 
-**Priority:** Tier 2 — depends on T2-24, T2-25. **The actual unblocker for multi-controller support.** Without this, T2-7 (Marlin stub) cannot ship cleanly.
+**Priority:** Tier 2 鈥?depends on T2-24, T2-25. **The actual unblocker for multi-controller support.** Without this, T2-7 (Marlin stub) cannot ship cleanly.
 
 **Cross-check note (audit 3A):** Verified at every leak line. Audit's Priority 3 + Critical 2.
 
@@ -7291,13 +7285,13 @@ async executeJob(output: ControllerOutput, ticket: JobTicket): Promise<JobHandle
 `PipelineService` constructs `ControllerOutput` based on profile/controller (T2-28). MachineService accepts `output: ControllerOutput` and forwards to controller.
 
 **Tests:** `tests/execute-job-rejects-mismatched-output.test.ts`:
-- GrblController + binary-job output → throws.
-- GrblController + marlin-dialect gcode-lines → throws.
-- GrblController + grbl-dialect gcode-lines → accepts.
+- GrblController + binary-job output 鈫?throws.
+- GrblController + marlin-dialect gcode-lines 鈫?throws.
+- GrblController + grbl-dialect gcode-lines 鈫?accepts.
 
 **Estimate:** ~2 sessions. Touches LaserController interface, GrblController, MachineService, PipelineService, ValidatedJobTicket (T2-29).
 
-**Priority:** Tier 2 — depends on T2-24. Required before any non-G-code controller can be added.
+**Priority:** Tier 2 鈥?depends on T2-24. Required before any non-G-code controller can be added.
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 4 + Critical 3.
 
@@ -7354,25 +7348,25 @@ export function compileGcode(
 Same in `compileToolpath` for preview.
 
 **Tests:** `tests/output-target-resolution.test.ts`:
-- GRBL profile + GrblController capabilities → target='grbl'.
-- Mock Marlin profile + Marlin capabilities → target='marlin'.
-- Mismatch (GRBL profile + Marlin capabilities only) → throws or falls back to first supported.
+- GRBL profile + GrblController capabilities 鈫?target='grbl'.
+- Mock Marlin profile + Marlin capabilities 鈫?target='marlin'.
+- Mismatch (GRBL profile + Marlin capabilities only) 鈫?throws or falls back to first supported.
 
 **Estimate:** ~1-2 sessions. Plumbing through compileGcode + compileToolpath + their callers.
 
-**Priority:** Tier 2 — depends on T2-25 (capabilities), independent of T2-24. Could ship before T2-24 if needed.
+**Priority:** Tier 2 鈥?depends on T2-25 (capabilities), independent of T2-24. Could ship before T2-24 if needed.
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 5 + Critical 4.
 
 ---
 
-### T2-29 | Refactor ValidatedJobTicket — controller-family-agnostic schema
+### T2-29 | Refactor ValidatedJobTicket 鈥?controller-family-agnostic schema
 
 **Code reference:** `src/core/job/ValidatedJobTicket.ts:21-25` (gcodeLines/gcodeText/controllerType fields), `src/app/PipelineService.ts:183-186` (ticket construction), `src/app/MachineService.ts:349-355` (ticket validation against `currentControllerType: 'grbl'`).
 
 **Problem:** Cross-check confirmed: ticket schema hardcodes G-code-only fields (`gcodeLines: readonly string[]`, `gcodeText: string`) and controller type literally `'grbl'`. For any binary-output controller, the ticket cannot represent the job.
 
-The validation at MachineService:349 (`currentControllerType !== ticket.controllerType`) is theater — `currentControllerType` is the literal `'grbl'`, so the check never fails in practice but appears to validate something.
+The validation at MachineService:349 (`currentControllerType !== ticket.controllerType`) is theater 鈥?`currentControllerType` is the literal `'grbl'`, so the check never fails in practice but appears to validate something.
 
 **Identified by:** Audit 3A (2026-04-25, ChatGPT) section 4 + Priority 6.
 
@@ -7410,13 +7404,13 @@ if (!ctrl.capabilities.output.formats.includes(ticket.outputFormat)) {
 ```
 
 **Tests:** `tests/ticket-validation-controller-family.test.ts`:
-- GRBL ticket + GrblController → accepts.
-- Marlin-family ticket + GrblController → blocks with `controller-family-mismatch`.
-- GRBL ticket + GrblController whose capabilities don't include 'grbl' → blocks (synthetic but proves capability gate works).
+- GRBL ticket + GrblController 鈫?accepts.
+- Marlin-family ticket + GrblController 鈫?blocks with `controller-family-mismatch`.
+- GRBL ticket + GrblController whose capabilities don't include 'grbl' 鈫?blocks (synthetic but proves capability gate works).
 
 **Estimate:** ~2 sessions. Ticket schema change ripples through serialization, hashing, validation, persistence (job log).
 
-**Priority:** Tier 2 — depends on T2-27. Required before T2-7 (Marlin stub) can ship.
+**Priority:** Tier 2 鈥?depends on T2-27. Required before T2-7 (Marlin stub) can ship.
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 6.
 
@@ -7426,32 +7420,32 @@ if (!ctrl.capabilities.output.formats.includes(ticket.outputFormat)) {
 
 **Code reference:** `electron/falcon-wifi/FalconWiFiService.ts` (Electron-side service), `electron/falcon-wifi/FalconWebSocket.ts` (WebSocket), `electron/falcon-wifi/FalconHttpClient.ts` (HTTP), `src/ui/components/falcon-wifi/falconIpc.ts` (UI-side IPC bridge), `src/ui/components/falcon-wifi/FalconWiFiStatusPanel.tsx` (UI panel, status-only). Cross-check confirmed: NO `FalconWiFiController` implements `LaserController`.
 
-**Problem:** Falcon WiFi infrastructure is **already shipped to users in the UI** but is "status-only" — users can see WiFi devices and check connection status but cannot run jobs over WiFi. Jobs must use USB serial. This is a real product gap visible to customers right now.
+**Problem:** Falcon WiFi infrastructure is **already shipped to users in the UI** but is "status-only" 鈥?users can see WiFi devices and check connection status but cannot run jobs over WiFi. Jobs must use USB serial. This is a real product gap visible to customers right now.
 
 Audit 3A Critical 6: Falcon WiFi is a parallel subsystem, not a controller implementation. The DeviceProfile already has `connection.kind: 'falcon-wifi'`, but `ControllerRegistry` only creates `'grbl'` (verified). When a user selects a Falcon WiFi profile, what controller actually runs is undefined.
 
-**Identified by:** Audit 3A (2026-04-25, ChatGPT) section 7.2 + 12.4 + Priority 7 + Critical 6. **Bumped from T3 to T2** because Falcon WiFi UI is already exposed to users — this isn't hypothetical multi-controller support, it's an existing product feature that doesn't actually work end-to-end.
+**Identified by:** Audit 3A (2026-04-25, ChatGPT) section 7.2 + 12.4 + Priority 7 + Critical 6. **Bumped from T3 to T2** because Falcon WiFi UI is already exposed to users 鈥?this isn't hypothetical multi-controller support, it's an existing product feature that doesn't actually work end-to-end.
 
 **Fix:** Two architectural options. Option B is preferred.
 
-**Option A — `FalconWiFiTransport` used by GrblController.** If Falcon WiFi accepts GRBL-compatible commands (likely, given Falcon hardware uses GRBL-LPC firmware), build a `FalconWiFiTransport` that implements the line-transport interface (T3-45) by relaying lines over WebSocket. `GrblController` accepts any `LineTransport`, not just `SerialPortLike`. ~3 sessions.
+**Option A 鈥?`FalconWiFiTransport` used by GrblController.** If Falcon WiFi accepts GRBL-compatible commands (likely, given Falcon hardware uses GRBL-LPC firmware), build a `FalconWiFiTransport` that implements the line-transport interface (T3-45) by relaying lines over WebSocket. `GrblController` accepts any `LineTransport`, not just `SerialPortLike`. ~3 sessions.
 
-**Option B — `FalconWiFiController implements LaserController`.** Build a dedicated controller that knows Falcon's WiFi protocol (status reports, job upload, progress callbacks). ~5-6 sessions, more code but closer match to actual Falcon WiFi semantics if they differ from GRBL serial.
+**Option B 鈥?`FalconWiFiController implements LaserController`.** Build a dedicated controller that knows Falcon's WiFi protocol (status reports, job upload, progress callbacks). ~5-6 sessions, more code but closer match to actual Falcon WiFi semantics if they differ from GRBL serial.
 
 Both options require:
-(1) T2-24 (interface split — accept `ConnectionDescriptor` not `SerialPortLike`).
+(1) T2-24 (interface split 鈥?accept `ConnectionDescriptor` not `SerialPortLike`).
 (2) T3-45 (transport abstraction layer).
 (3) Job-execution path for Falcon WiFi: probably file-upload semantics with Falcon-side progress reporting (different from GRBL ack-based streaming).
-(4) Safety semantics: WebSocket close ≠ laser off; need a Falcon-specific "stop job" command. Connect with T3-17 (Wi-Fi safety model) which is already filed at Tier 3.
+(4) Safety semantics: WebSocket close 鈮?laser off; need a Falcon-specific "stop job" command. Connect with T3-17 (Wi-Fi safety model) which is already filed at Tier 3.
 
 **Tests:**
 - `tests/falcon-wifi-controller-creation.test.ts`: registry creates `falcon-wifi` controller for profile with `connection.kind: 'falcon-wifi'`.
-- `tests/falcon-wifi-job-execution-path.test.ts`: mock Falcon WiFi service, verify job goes through proper upload-then-run flow (or whatever Falcon's actual protocol is — needs hardware investigation first).
+- `tests/falcon-wifi-job-execution-path.test.ts`: mock Falcon WiFi service, verify job goes through proper upload-then-run flow (or whatever Falcon's actual protocol is 鈥?needs hardware investigation first).
 - `tests/falcon-wifi-safety.test.ts` (overlaps with T3-17): WebSocket close mid-job triggers safety state.
 
-**Estimate:** ~3 sessions Option A, ~5-6 sessions Option B. **Hardware investigation required first** — needs to understand Falcon WiFi's actual command protocol (does it accept GRBL? Does it use proprietary commands? Does it require job-file upload?). Audit 3A is fundamentally architectural; the implementation depends on facts I don't have.
+**Estimate:** ~3 sessions Option A, ~5-6 sessions Option B. **Hardware investigation required first** 鈥?needs to understand Falcon WiFi's actual command protocol (does it accept GRBL? Does it use proprietary commands? Does it require job-file upload?). Audit 3A is fundamentally architectural; the implementation depends on facts I don't have.
 
-**Priority:** Tier 2 — depends on T2-24, T3-45. Promoted from T3 because product feature exposed to users today doesn't fully work.
+**Priority:** Tier 2 鈥?depends on T2-24, T3-45. Promoted from T3 because product feature exposed to users today doesn't fully work.
 
 **Cross-check note (audit 3A):** Verified Falcon WiFi has zero LaserController implementation. Audit's Priority 7 + Critical 6.
 
@@ -7471,7 +7465,7 @@ Both options require:
 
 Consequences confirmed by audit:
 - UI/controller can believe the port is fully closed while browser is still closing it.
-- Rapid reconnect can request/open while old handle is still closing → permission/handle race.
+- Rapid reconnect can request/open while old handle is still closing 鈫?permission/handle race.
 - Close errors are swallowed (the `.catch(() => {})` at line 113 area).
 - Abstraction cannot express `'disconnecting'` state.
 
@@ -7530,14 +7524,14 @@ async close(reason?: string): Promise<void> {
     }
   }
 
-  // 5. Emit close event exactly once (subscription model — see T2-36)
+  // 5. Emit close event exactly once (subscription model 鈥?see T2-36)
   this._closeCallback?.();
 }
 ```
 
 Migration: every `close()` call site becomes `await close()`. This is straightforward in MachineService.disconnect, GrblController.disconnect, ExecutionCoordinator paths. Only the safe-disconnect-on-quit path (electron before-quit) needs careful timeout handling.
 
-`MachineService.disconnect` and `connectRealLaser` (T1-49 cleanup) already conceptually want `await ws.close()` — this enables that.
+`MachineService.disconnect` and `connectRealLaser` (T1-49 cleanup) already conceptually want `await ws.close()` 鈥?this enables that.
 
 **Tests:** `tests/serial-close-async.test.ts`:
 - Mock SerialPort whose `close()` resolves slowly. Call `WebSerialPort.close()`. Assert returned promise pends until mock close resolves.
@@ -7546,13 +7540,13 @@ Migration: every `close()` call site becomes `await close()`. This is straightfo
 
 **Estimate:** ~1 session. Interface change touches ~6 call sites; tests for each transition state.
 
-**Priority:** Tier 2 — foundation for T1-49 (full cleanup), T2-32 (lifecycle FSM), T2-33 (partial-open cleanup). The partial-failure cleanup path in T1-49 lands without it but works better with it.
+**Priority:** Tier 2 鈥?foundation for T1-49 (full cleanup), T2-32 (lifecycle FSM), T2-33 (partial-open cleanup). The partial-failure cleanup path in T1-49 lands without it but works better with it.
 
 **Cross-check note (audit 3B):** Audit's section 3.2 + P0 fix #3. Verified at exact lines.
 
 ---
 
-### T2-32 | Connection lifecycle state machine — `ConnectionManager`
+### T2-32 | Connection lifecycle state machine 鈥?`ConnectionManager`
 
 **Code reference:** New `src/app/ConnectionManager.ts`. Currently connection state is fragmented across `WebSerialPort._isOpen`, `GrblController._state.status`, `MachineService.portRef`, React local state, Electron IPC port, Falcon WiFi globals.
 
@@ -7643,12 +7637,12 @@ export class ConnectionManager {
 **Tests:** `tests/connection-manager-fsm.test.ts`:
 - Cannot connect from `'ready'` state.
 - Disconnect during `'opening'` aborts and transitions to `'disconnected'`.
-- Stale connect resolution after `_activeConnectionId` changed → `_guardConnection` throws.
+- Stale connect resolution after `_activeConnectionId` changed 鈫?`_guardConnection` throws.
 - Subscribers receive each state transition exactly once.
 
 **Estimate:** ~3-5 sessions. Foundational refactor; carefully migrate existing call sites.
 
-**Priority:** Tier 2 — depends on T2-24 (LaserController split for connection descriptor), T2-31 (async close). Foundation for T2-33, T2-34, T1-50 Part B.
+**Priority:** Tier 2 鈥?depends on T2-24 (LaserController split for connection descriptor), T2-31 (async close). Foundation for T2-33, T2-34, T1-50 Part B.
 
 **Cross-check note (audit 3B):** Audit's section 6 + P0 fix #1.
 
@@ -7694,7 +7688,7 @@ async requestAndOpen(baudRate: number = 115200, signal?: AbortSignal): Promise<v
     reader = port!.readable?.getReader() || null;
     if (!reader) throw new Error('Failed to acquire reader lock');
 
-    // All acquisitions succeeded — commit
+    // All acquisitions succeeded 鈥?commit
     this._port = port;
     this._writer = writer;
     this._reader = reader;
@@ -7733,13 +7727,13 @@ Plus AbortSignal acceptance for T1-50 Part B.
 
 **Estimate:** ~1 session including tests.
 
-**Priority:** Tier 2 — depends on T2-31 (async close infrastructure). Pairs naturally with T1-49 (MachineService cleanup) — both are partial-failure correctness.
+**Priority:** Tier 2 鈥?depends on T2-31 (async close infrastructure). Pairs naturally with T1-49 (MachineService cleanup) 鈥?both are partial-failure correctness.
 
 **Cross-check note (audit 3B):** Audit's section 3.3 + scenarios 7.3, 7.4 + P0 fix #4.
 
 ---
 
-### T2-34 | Connection generation guard — token tagged on transport callbacks
+### T2-34 | Connection generation guard 鈥?token tagged on transport callbacks
 
 **Code reference:** `src/communication/WebSerialPort.ts:122-159` (`_startReadLoop` has no connection ID), `src/controllers/grbl/GrblController.ts:182-330` (`connect` registers callbacks without generation tag).
 
@@ -7767,7 +7761,7 @@ interface SerialPortLike {
 }
 ```
 
-In `_startReadLoop`, capture the connectionId at loop start; on each callback, pass the captured ID. Listeners can drop events whose connectionId ≠ active.
+In `_startReadLoop`, capture the connectionId at loop start; on each callback, pass the captured ID. Listeners can drop events whose connectionId 鈮?active.
 
 `GrblController.connect` receives a connectionId from ConnectionManager (T2-32). All controller-internal state changes guard on the connectionId being current; stale events become no-ops:
 
@@ -7779,25 +7773,25 @@ private _onTransportData(line: string, ctx: TransportCallbackContext): void {
 ```
 
 **Tests:** `tests/connection-generation-guard.test.ts`:
-- Connect → set up old transport → simulate disconnect → connect new → simulate STALE old-transport data event → assert new controller state is unchanged.
+- Connect 鈫?set up old transport 鈫?simulate disconnect 鈫?connect new 鈫?simulate STALE old-transport data event 鈫?assert new controller state is unchanged.
 
 **Estimate:** ~1-2 sessions. Touches transport callback signatures, controller event handlers, ConnectionManager.
 
-**Priority:** Tier 2 — depends on T2-32 (ConnectionManager owns connectionIds). Subscription-based callbacks (T2-36) make this cleaner but not mandatory.
+**Priority:** Tier 2 鈥?depends on T2-32 (ConnectionManager owns connectionIds). Subscription-based callbacks (T2-36) make this cleaner but not mandatory.
 
 **Cross-check note (audit 3B):** Audit's section 9.4, 8.4, 3.8.
 
 ---
 
-### T2-35 | Electron serial subsystem decision — complete it OR remove it
+### T2-35 | Electron serial subsystem decision 鈥?complete it OR remove it
 
 **Code reference:** `electron/preload.ts:11-15` (exposes `connectPort`, `disconnectPort`, `sendGcode`), `electron/main.ts:245-260` (registers `serial:connect`, `serial:disconnect`, `serial:send` IPC handlers), `electron/serial.ts` (full subsystem). Cross-check verified zero usage in `src/`.
 
-**Problem:** Cross-check confirmed: the Electron serial subsystem is exposed end-to-end (preload → IPC → main → serialport) but unused by the renderer. The renderer uses WebSerial through `MachineService.connectRealLaser`, not through `electronAPI.connectPort`.
+**Problem:** Cross-check confirmed: the Electron serial subsystem is exposed end-to-end (preload 鈫?IPC 鈫?main 鈫?serialport) but unused by the renderer. The renderer uses WebSerial through `MachineService.connectRealLaser`, not through `electronAPI.connectPort`.
 
 T1-27 already covers removing `window.electronAPI.sendGcode` (per audit 1B finding) but that's a single function in preload. Audit 3B's broader question: **the entire parallel serial subsystem (~5 files, ~150 lines) is dead code.** Either:
-1. **Remove it** — delete the IPC handlers, preload bridges, and `electron/serial.ts`. T1-27 becomes part of this. ~1-2 sessions.
-2. **Complete it** — wire it up as a real `SerialPortLike` for environments where WebSerial isn't available. Add data event forwarding (currently missing per audit 4.4), error/close handlers (missing per 4.5), normalize disconnect to send M5 (missing per 4.6), integrate with controller. ~3-4 sessions.
+1. **Remove it** 鈥?delete the IPC handlers, preload bridges, and `electron/serial.ts`. T1-27 becomes part of this. ~1-2 sessions.
+2. **Complete it** 鈥?wire it up as a real `SerialPortLike` for environments where WebSerial isn't available. Add data event forwarding (currently missing per audit 4.4), error/close handlers (missing per 4.5), normalize disconnect to send M5 (missing per 4.6), integrate with controller. ~3-4 sessions.
 
 Leaving it in the current state is the worst option:
 - Confuses future maintainers (looks like a feature)
@@ -7812,7 +7806,7 @@ Leaving it in the current state is the worst option:
 1. Confirm no production code path uses `window.electronAPI.connectPort/disconnectPort/sendGcode` (cross-check confirmed for sendGcode; verify connectPort/disconnectPort).
 2. Remove from `electron/preload.ts`.
 3. Remove `serial:connect`, `serial:disconnect`, `serial:send` IPC handlers from `electron/main.ts`.
-4. Remove `electron/serial.ts` open/close functions BUT keep `safeCloseSerial` if needed for app-quit path. Actually — verify `safeCloseSerial` is still used by `before-quit`; if it operates on the (now-unused) global `port`, it's dead code too.
+4. Remove `electron/serial.ts` open/close functions BUT keep `safeCloseSerial` if needed for app-quit path. Actually 鈥?verify `safeCloseSerial` is still used by `before-quit`; if it operates on the (now-unused) global `port`, it's dead code too.
 5. Remove `connectPort?`, `disconnectPort?`, `sendGcode?` from `src/types/web-serial.d.ts` Window interface.
 6. Audit before-quit safety: ensure renderer-side WebSerial close happens during `beforeunload`/`pagehide` (T3-52).
 
@@ -7822,7 +7816,7 @@ Leaving it in the current state is the worst option:
 
 **Estimate:** Option 1 (removal) ~1-2 sessions. Option 2 (completion) ~3-4 sessions. **Decision required** before estimate is final.
 
-**Priority:** Tier 2 — quality / security hygiene. Option 1 supersedes T1-27 (both touch the same area; T1-27 stays valid as a partial-removal step if T2-35 is deferred).
+**Priority:** Tier 2 鈥?quality / security hygiene. Option 1 supersedes T1-27 (both touch the same area; T1-27 stays valid as a partial-removal step if T2-35 is deferred).
 
 **Cross-check note (audit 3B):** Audit's section 4 + P1. Verified zero src/ usage of `connectPort`/`sendGcode`.
 
@@ -7871,7 +7865,7 @@ Same for error and close.
 
 **Estimate:** ~30 min including tests.
 
-**Priority:** Tier 2 — quality/extensibility. Pairs naturally with T2-34 (connection generation guard requires multi-listener for separate guards on logger vs controller).
+**Priority:** Tier 2 鈥?quality/extensibility. Pairs naturally with T2-34 (connection generation guard requires multi-listener for separate guards on logger vs controller).
 
 **Cross-check note (audit 3B):** Audit's section 3.7.
 
@@ -7937,7 +7931,7 @@ When blocked, UI offers: "Machine settings have changed since this G-code was co
 
 ### T2-38 | `CapabilityValue<T>` model with source / confidence / verifiedAt
 
-**Code reference:** Refines T2-25 (ControllerCapabilities model). Currently bed/maxSpindle resolution loses provenance — see PipelineService.ts:131-134 where `1000` could mean verified `$30=1000` or default fallback or stale profile, with no way to tell.
+**Code reference:** Refines T2-25 (ControllerCapabilities model). Currently bed/maxSpindle resolution loses provenance 鈥?see PipelineService.ts:131-134 where `1000` could mean verified `$30=1000` or default fallback or stale profile, with no way to tell.
 
 **Problem:** Cross-check confirmed audit's Finding 3.2 framing: a value of `1000` in compile output could mean any of:
 - verified `$30=1000` (live read this session)
@@ -7999,13 +7993,13 @@ function resolveMaxSpindle(profile, controller): CapabilityValue<number> {
 Compile, preflight, UI, and ticket all consume `CapabilityValue<T>` instead of bare `number`. UI renders confidence indicators (T3-58). Preflight gates on confidence (T3-56).
 
 **Tests:** `tests/capability-value-resolution.test.ts`:
-- Connected with `$30` known → resolveMaxSpindle returns `firmware/verified`.
-- Disconnected with profile → returns `profile/manual`.
-- No profile, no controller → returns `default/fallback`.
+- Connected with `$30` known 鈫?resolveMaxSpindle returns `firmware/verified`.
+- Disconnected with profile 鈫?returns `profile/manual`.
+- No profile, no controller 鈫?returns `default/fallback`.
 
 **Estimate:** ~2-3 sessions. Schema-level refactor; touches every consumer of capability values.
 
-**Priority:** Tier 2. Foundation for T1-53 (using firmware-source for compile), T1-55 (blocking on `connected-unknown`), T2-37 (snapshot hash), T3-56, T3-58. Could ship as part of T2-25's expansion rather than separate ticket — but filed separately per no-fold rule because the source/confidence schema is the audit's specific demand.
+**Priority:** Tier 2. Foundation for T1-53 (using firmware-source for compile), T1-55 (blocking on `connected-unknown`), T2-37 (snapshot hash), T3-56, T3-58. Could ship as part of T2-25's expansion rather than separate ticket 鈥?but filed separately per no-fold rule because the source/confidence schema is the audit's specific demand.
 
 **Cross-check note (audit 3C):** Audit's Finding 3.2 + Priority 1. Refines T2-25.
 
@@ -8013,15 +8007,15 @@ Compile, preflight, UI, and ticket all consume `CapabilityValue<T>` instead of b
 
 ### T2-39 | Strict profile validation on save
 
-**Code reference:** `src/core/devices/DeviceProfile.ts` — currently no validation on save beyond shape.
+**Code reference:** `src/core/devices/DeviceProfile.ts` 鈥?currently no validation on save beyond shape.
 
 **Problem:** Cross-check confirmed audit Finding 5.1: profiles are user-editable and validation is too permissive. Concrete failures the audit highlights (verifiable as "no validation exists for these"):
-- `bedWidth=0` or negative — silently accepted
-- `maxSpindle=0` — silently accepted (would produce all-zero S values, no engraving)
-- `maxSpindle=NaN` or `Infinity` — silently accepted
-- `originCorner` set to a non-enum value via storage edit — silently accepted
-- `autoFocusCommand` containing arbitrary G-code — silently accepted (potential safety issue)
-- `maxFeedRate` negative — silently accepted
+- `bedWidth=0` or negative 鈥?silently accepted
+- `maxSpindle=0` 鈥?silently accepted (would produce all-zero S values, no engraving)
+- `maxSpindle=NaN` or `Infinity` 鈥?silently accepted
+- `originCorner` set to a non-enum value via storage edit 鈥?silently accepted
+- `autoFocusCommand` containing arbitrary G-code 鈥?silently accepted (potential safety issue)
+- `maxFeedRate` negative 鈥?silently accepted
 
 Audit Required Priority 9.
 
@@ -8029,8 +8023,8 @@ Audit Required Priority 9.
 
 **Fix:** Add `validateProfile(profile): ValidationResult[]` that runs on save and rejects/warns on:
 
-- `bedWidth/bedHeight`: positive finite, ≤ some sane upper bound (e.g. 5000mm).
-- `maxSpindle`: positive finite, ≤ 65535 (typical microcontroller PWM ceiling).
+- `bedWidth/bedHeight`: positive finite, 鈮?some sane upper bound (e.g. 5000mm).
+- `maxSpindle`: positive finite, 鈮?65535 (typical microcontroller PWM ceiling).
 - `maxFeedRate`, `maxRateX`, `maxRateY`: positive finite.
 - `maxAccelX/Y`: positive finite.
 - `originCorner`: must be one of the enum values.
@@ -8041,14 +8035,14 @@ Audit Required Priority 9.
 Save UI shows specific error per field. Existing profiles with invalid values trigger a "profile needs review" banner on load.
 
 **Tests:** `tests/profile-validation.test.ts`:
-- Profile with `bedWidth=-100` → rejected.
-- Profile with `maxSpindle=NaN` → rejected.
-- Profile with `originCorner='upside-down'` → rejected.
-- Profile with `autoFocusCommand='M3 S1000'` → rejected (laser-on outside test-fire context).
+- Profile with `bedWidth=-100` 鈫?rejected.
+- Profile with `maxSpindle=NaN` 鈫?rejected.
+- Profile with `originCorner='upside-down'` 鈫?rejected.
+- Profile with `autoFocusCommand='M3 S1000'` 鈫?rejected (laser-on outside test-fire context).
 
 **Estimate:** ~1-2 sessions. Validation logic + UI integration + migration handling for existing invalid profiles.
 
-**Priority:** Tier 2 — quality/safety hygiene. Mostly closes safety holes, not user-facing pain.
+**Priority:** Tier 2 鈥?quality/safety hygiene. Mostly closes safety holes, not user-facing pain.
 
 **Cross-check note (audit 3C):** Audit's Finding 5.1 + Priority 9.
 
@@ -8110,10 +8104,10 @@ export function canExecuteOperation(
 }
 ```
 
-Every UI button, every ExecutionCoordinator operation, every service layer entry point consults `canExecuteOperation` instead of inlining its own rules. UI uses the result for tooltips ("Why is this disabled?" → reason+detail).
+Every UI button, every ExecutionCoordinator operation, every service layer entry point consults `canExecuteOperation` instead of inlining its own rules. UI uses the result for tooltips ("Why is this disabled?" 鈫?reason+detail).
 
 **Tests:** `tests/capability-gate-decisions.test.ts`:
-- For each operation × each relevant capability state, assert correct decision.
+- For each operation 脳 each relevant capability state, assert correct decision.
 - UI integration: render component, mock capabilities. Assert button enabled/disabled matches gate decision.
 
 **Estimate:** ~2-3 sessions. The decision logic itself is small; consolidating all the scattered gates into a single source of truth is the bulk.
@@ -8128,7 +8122,7 @@ Every UI button, every ExecutionCoordinator operation, every service layer entry
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:538-613` (pause/resume/stop/emergencyStop all return `void`), `src/controllers/ControllerInterface.ts:99-103` (interface declares void returns), `src/app/ExecutionCoordinator.ts:183, 188` (emergencyLaserOff/endTestFire return Promise<void>).
 
-**Problem:** Cross-check verified all four methods return void. When any safety operation is invoked — pause, resume, stop, emergencyStop, laserOff, disconnectSafe — there is no observable outcome. Caller cannot know:
+**Problem:** Cross-check verified all four methods return void. When any safety operation is invoked 鈥?pause, resume, stop, emergencyStop, laserOff, disconnectSafe 鈥?there is no observable outcome. Caller cannot know:
 - whether the command was sent
 - whether the port was open
 - whether laser-off was attempted
@@ -8205,13 +8199,13 @@ This data drives:
 - **State machine transitions** (T2-44): result drives the safety state.
 
 **Tests:** `tests/safety-action-results.test.ts`:
-- GrblController.stop() with port open → returns `accepted: true, requiresRehome: true`.
-- GrblController.stop() with port closed → returns `accepted: false, requiresReconnect: true`.
-- emergencyLaserOff after port closed → returns `laserState: 'unknown', accepted: false`.
+- GrblController.stop() with port open 鈫?returns `accepted: true, requiresRehome: true`.
+- GrblController.stop() with port closed 鈫?returns `accepted: false, requiresReconnect: true`.
+- emergencyLaserOff after port closed 鈫?returns `laserState: 'unknown', accepted: false`.
 
 **Estimate:** ~2-3 sessions. Touches every safety method signature, every consumer (UI, service layer, audit log). Carefully migrate.
 
-**Priority:** Tier 2. Foundation for T2-44 (state machine), T2-46 (user messages), T3-61 (per-family safety tests). Refines T1-21, T1-22, T1-23, T1-24, T1-25 (existing safety hardening tickets) — those tickets become more useful with typed results.
+**Priority:** Tier 2. Foundation for T2-44 (state machine), T2-46 (user messages), T3-61 (per-family safety tests). Refines T1-21, T1-22, T1-23, T1-24, T1-25 (existing safety hardening tickets) 鈥?those tickets become more useful with typed results.
 
 **Cross-check note (audit 3D):** Audit's Critical 1 + 6 + 7.1 + P0 safety contract.
 
@@ -8287,15 +8281,15 @@ UI receives the result and shows "Pause not supported" gracefully.
 
 **Estimate:** ~2 sessions. Interface design + GrblController migration. Depends on T2-41 (SafetyActionResult).
 
-**Priority:** Tier 2 — depends on T2-41. Foundation for T2-46 (user messages), T3-60 (disconnect-stops-job).
+**Priority:** Tier 2 鈥?depends on T2-41. Foundation for T2-46 (user messages), T3-60 (disconnect-stops-job).
 
 **Cross-check note (audit 3D):** Audit's P0 safety contract.
 
 ---
 
-### T2-43 | `ControllerSafetyCapabilities` — typed safety capability declarations
+### T2-43 | `ControllerSafetyCapabilities` 鈥?typed safety capability declarations
 
-**Code reference:** Refines T2-25 (`ControllerCapabilities` from audit 3A) with safety-specific fields. Currently safety capabilities are not declared anywhere — they're assumed to follow GRBL behavior.
+**Code reference:** Refines T2-25 (`ControllerCapabilities` from audit 3A) with safety-specific fields. Currently safety capabilities are not declared anywhere 鈥?they're assumed to follow GRBL behavior.
 
 **Problem:** Audit 3D Required P0 capability gating: every safety operation should be capability-declared so the UI/service can refuse unsupported operations cleanly. Current code assumes:
 - Pause is always recoverable
@@ -8367,32 +8361,32 @@ T2-40 (CapabilityGate) consults these capabilities for safety operations. T2-46 
 
 **Tests:** `tests/grbl-safety-capabilities.test.ts`:
 - GrblController.capabilities.safety has all required fields populated.
-- Mock controller without supportsRecoverablePause → CapabilityGate refuses pauseJob with reason.
+- Mock controller without supportsRecoverablePause 鈫?CapabilityGate refuses pauseJob with reason.
 
 **Estimate:** ~1-2 sessions after T2-25 lands. Schema additions are small; populating GRBL values requires careful research of GRBL spec edge cases.
 
-**Priority:** Tier 2 — depends on T2-25. Pairs with T2-41 (SafetyActionResult), T2-42 (SafetyOps).
+**Priority:** Tier 2 鈥?depends on T2-25. Pairs with T2-41 (SafetyActionResult), T2-42 (SafetyOps).
 
 **Cross-check note (audit 3D):** Audit's P0 safety capability gating.
 
 ---
 
-### T2-44 | Extended safety state machine — refine T2-12 with audit 3D's states
+### T2-44 | Extended safety state machine 鈥?refine T2-12 with audit 3D's states
 
 **Code reference:** T2-12 (formal safety state model) is filed but unimplemented. Audit 3D Required P1 demands richer state set than T2-12 originally specified.
 
 **Problem:** Cross-check confirmed audit Finding 6.2: GRBL pause sets state to 'hold' optimistically before status confirms. Audit Required P1 enumerates richer states needed:
 
-- `safeIdle` — verified ready, no recent unsafe transitions
-- `running` — job streaming
-- `pauseRequested` — pause command sent, awaiting confirmation
-- `pausedVerified` — controller confirms in hold/paused state
-- `abortRequested` — stop sent, awaiting verification
-- `emergencyStopping` — emergency stop in flight
-- `stoppedPositionUnknown` — stop completed but position not trusted
-- `laserOffCommandedUnknown` — laser-off command sent, can't verify
-- `unsafeUnknown` — failed safety operation, must inspect
-- `requiresInspection` — soft-reset / alarm / known-unsafe state pending user clearance
+- `safeIdle` 鈥?verified ready, no recent unsafe transitions
+- `running` 鈥?job streaming
+- `pauseRequested` 鈥?pause command sent, awaiting confirmation
+- `pausedVerified` 鈥?controller confirms in hold/paused state
+- `abortRequested` 鈥?stop sent, awaiting verification
+- `emergencyStopping` 鈥?emergency stop in flight
+- `stoppedPositionUnknown` 鈥?stop completed but position not trusted
+- `laserOffCommandedUnknown` 鈥?laser-off command sent, can't verify
+- `unsafeUnknown` 鈥?failed safety operation, must inspect
+- `requiresInspection` 鈥?soft-reset / alarm / known-unsafe state pending user clearance
 
 T2-12 originally specified a smaller state set; T2-44 extends it with these richer audit-3D-derived states and the transitions between them.
 
@@ -8423,13 +8417,13 @@ function transitionFromSafetyResult(
 UI subscribes to safety state. `unsafeUnknown` and `requiresInspection` block all subsequent commands until user explicitly clears (with appropriate confirmation).
 
 **Tests:** `tests/safety-state-transitions.test.ts`:
-- Pause result with motionState='paused' → state='pausedVerified'.
-- emergencyStop result with accepted=false → state='unsafeUnknown'.
-- Stop with requiresRehome → state='stoppedPositionUnknown'; "Start Job" blocked until home.
+- Pause result with motionState='paused' 鈫?state='pausedVerified'.
+- emergencyStop result with accepted=false 鈫?state='unsafeUnknown'.
+- Stop with requiresRehome 鈫?state='stoppedPositionUnknown'; "Start Job" blocked until home.
 
 **Estimate:** ~1-2 sessions, layered on T2-12. Effectively expands T2-12's scope.
 
-**Priority:** Tier 2 — refines T2-12. Depends on T2-41 (SafetyActionResult) for the input data.
+**Priority:** Tier 2 鈥?refines T2-12. Depends on T2-41 (SafetyActionResult) for the input data.
 
 **Cross-check note (audit 3D):** Audit's P1 explicit safety state machine. T2-12 covers the formal state model concept; T2-44 specifies the 10-state enrichment.
 
@@ -8471,7 +8465,7 @@ For GRBL, the session is a thin wrapper around current behavior. The architectur
 
 **Estimate:** ~2 sessions. Depends on T2-27. Mostly a refactor that shapes the existing GRBL streaming behavior into the new shape.
 
-**Priority:** Tier 2 — refines T2-27. Required before non-line-stream controllers can have their own pause/stop semantics.
+**Priority:** Tier 2 鈥?refines T2-27. Required before non-line-stream controllers can have their own pause/stop semantics.
 
 **Cross-check note (audit 3D):** Audit's P1 + Critical 7.
 
@@ -8496,7 +8490,7 @@ Current UI shows "Disconnected" without distinguishing: clean shutdown vs cable-
 ```ts
 // src/ui/safety/SafetyOutcomeMessages.ts
 export function formatSafetyOutcome(result: SafetyActionResult): UserMessage {
-  // Map (action × accepted × motionState × laserState × requires*) into plain English.
+  // Map (action 脳 accepted 脳 motionState 脳 laserState 脳 requires*) into plain English.
   // Distinguish:
   //  - confirmed-safe: green, dismissable
   //  - commanded-unverified: yellow, "Verification unavailable"
@@ -8507,29 +8501,29 @@ export function formatSafetyOutcome(result: SafetyActionResult): UserMessage {
 
 Plus a "Safety Activity Log" UI panel that records every safety action with timestamp + outcome, scrollable, exportable for incident analysis. Users can review what was attempted and what succeeded after a job ended unexpectedly.
 
-**Tests:** Snapshot tests for each (action, outcome) combination → expected user message.
+**Tests:** Snapshot tests for each (action, outcome) combination 鈫?expected user message.
 
 **Estimate:** ~2-3 sessions. Mostly UI work + the Activity Log persistence.
 
-**Priority:** Tier 2 — depends on T2-41 (SafetyActionResult). User-facing trust/transparency improvement.
+**Priority:** Tier 2 鈥?depends on T2-41 (SafetyActionResult). User-facing trust/transparency improvement.
 
 **Cross-check note (audit 3D):** Audit's P2 user-facing safety messages.
 
 ---
 
-### T2-47 | Realistic GRBL firmware simulator — planner queue, RX buffer, modal state, alarm lock
+### T2-47 | Realistic GRBL firmware simulator 鈥?planner queue, RX buffer, modal state, alarm lock
 
 **Code reference:** Refines `src/communication/SerialPort.ts:20-263` (`MockSerialPort`). Currently 263 lines, models welcome / position tracking / G90/G91 modal flag / canned responses.
 
 **Problem:** Cross-check verified `MockSerialPort` is a "transport mock with GRBL-flavored canned behavior" (audit's framing, exactly accurate). It is missing realistic GRBL firmware semantics:
 
-- **No RX buffer model** — accepts any volume of writes; real GRBL has ~127-byte receive buffer that overflows if character-counting is wrong.
-- **No planner queue model** — moves complete in single-line ticks; real GRBL queues moves and runs them out of buffer.
-- **Modal state limited to G90/G91** — no G20/G21 (units), no M3/M4/M5 modal laser state, no `S` value tracking, no WCS selection (G54-G59), no G92 offsets.
-- **No alarm lock semantics** — after `0x18` soft reset, real GRBL enters alarm state and refuses motion until `$X` unlock + `$H` home; mock just records the byte.
-- **No hard/soft limit modeling** — `$130/$131` are returned in `$$` dump but bed-edge motion isn't enforced firmware-side.
-- **No door/hold/sleep states** — feed-hold (`!`) sets nothing; resume (`~`) records nothing; the planner-buffer-drain behavior isn't simulated.
-- **Realtime byte effects not modeled** — `0x18` soft reset is recorded in `realtimeBytes` array but doesn't actually alter mock state (no position invalidation, no alarm transition, no modal reset).
+- **No RX buffer model** 鈥?accepts any volume of writes; real GRBL has ~127-byte receive buffer that overflows if character-counting is wrong.
+- **No planner queue model** 鈥?moves complete in single-line ticks; real GRBL queues moves and runs them out of buffer.
+- **Modal state limited to G90/G91** 鈥?no G20/G21 (units), no M3/M4/M5 modal laser state, no `S` value tracking, no WCS selection (G54-G59), no G92 offsets.
+- **No alarm lock semantics** 鈥?after `0x18` soft reset, real GRBL enters alarm state and refuses motion until `$X` unlock + `$H` home; mock just records the byte.
+- **No hard/soft limit modeling** 鈥?`$130/$131` are returned in `$$` dump but bed-edge motion isn't enforced firmware-side.
+- **No door/hold/sleep states** 鈥?feed-hold (`!`) sets nothing; resume (`~`) records nothing; the planner-buffer-drain behavior isn't simulated.
+- **Realtime byte effects not modeled** 鈥?`0x18` soft reset is recorded in `realtimeBytes` array but doesn't actually alter mock state (no position invalidation, no alarm transition, no modal reset).
 
 This means tests can assert "the right byte was sent" but cannot assert "the controller responds the right way to receiving that byte." Audit Critical 1 + Findings 8.1, 8.2, 8.3 verified.
 
@@ -8553,8 +8547,8 @@ export class GrblSimulator {
   plannerCapacity = 35;  // typical GRBL planner block count
 
   // Transport-side I/O
-  receiveBytes(bytes: Uint8Array): void;        // host → firmware
-  readOutgoingBytes(): Uint8Array[];             // firmware → host
+  receiveBytes(bytes: Uint8Array): void;        // host 鈫?firmware
+  readOutgoingBytes(): Uint8Array[];             // firmware 鈫?host
   tick(elapsedMs: number): void;                  // advance simulation
 
   // Test API
@@ -8565,12 +8559,12 @@ export class GrblSimulator {
 ```
 
 Behaviors to model:
-1. **RX buffer enforcement** — if host writes faster than firmware consumes, eventually emit `error:24` or stop accepting. Tests exercising character-counting can prove the streaming logic is correct.
-2. **Planner queue** — moves enter the queue; `tick(ms)` advances the executing move. Status reports return the active move's mid-position, not just last commanded position.
-3. **Modal state validation** — G1 with no F set produces `error:22`; M3 without S produces firmware-default S; etc.
-4. **Alarm lock** — after `0x18` reset OR after limit-switch trigger, `state = 'alarm'`. All non-realtime motion commands return `error:9` ("locked"). `$X` unlock transitions to idle.
-5. **Soft reset modal effects** — clears modal G91 → G90, resets feed/spindle, optionally resets WCS depending on `$10`. After reset, position is "lost" until homed (status report shows MPos but flag tracks it as untrusted).
-6. **Door/hold transitions** — `!` transitions idle/run → hold; `~` transitions hold → run if planner has work.
+1. **RX buffer enforcement** 鈥?if host writes faster than firmware consumes, eventually emit `error:24` or stop accepting. Tests exercising character-counting can prove the streaming logic is correct.
+2. **Planner queue** 鈥?moves enter the queue; `tick(ms)` advances the executing move. Status reports return the active move's mid-position, not just last commanded position.
+3. **Modal state validation** 鈥?G1 with no F set produces `error:22`; M3 without S produces firmware-default S; etc.
+4. **Alarm lock** 鈥?after `0x18` reset OR after limit-switch trigger, `state = 'alarm'`. All non-realtime motion commands return `error:9` ("locked"). `$X` unlock transitions to idle.
+5. **Soft reset modal effects** 鈥?clears modal G91 鈫?G90, resets feed/spindle, optionally resets WCS depending on `$10`. After reset, position is "lost" until homed (status report shows MPos but flag tracks it as untrusted).
+6. **Door/hold transitions** 鈥?`!` transitions idle/run 鈫?hold; `~` transitions hold 鈫?run if planner has work.
 
 Wrap behind a transport adapter:
 
@@ -8588,7 +8582,7 @@ Existing `MockSerialPort` stays for legacy tests; new tests use `GrblSimulator` 
 - Stream a 200-line job. Assert RX buffer never overflows (proves character-counting is correct in `GrblController`).
 - Send `0x18` mid-job. Assert simulator transitions to alarm, position-trusted=false, planner cleared.
 - Send `$H` from alarm state. Assert error.
-- Send `$X` from alarm. Assert state→idle.
+- Send `$X` from alarm. Assert state鈫抜dle.
 - Send `G1 X10` without prior G1 modal. Assert correct modal continuation.
 
 **Estimate:** ~3-5 sessions. Builds on T2-13 (FaultInjectingSerialPort) for the transport side; T2-47 is the firmware-side state machine. Spread:
@@ -8598,17 +8592,17 @@ Existing `MockSerialPort` stays for legacy tests; new tests use `GrblSimulator` 
 - ~1 session for tests asserting current GRBL controller behavior is consistent with simulator
 - ~1 session for the SimulatedSerialPort adapter and migrating a few representative tests
 
-**Priority:** Tier 2 — test infrastructure. Foundation for proving GRBL behavior under realistic firmware state conditions. Required before T2-49 (virtual-time tests) becomes valuable.
+**Priority:** Tier 2 鈥?test infrastructure. Foundation for proving GRBL behavior under realistic firmware state conditions. Required before T2-49 (virtual-time tests) becomes valuable.
 
 **Cross-check note (audit 3E):** Audit's Critical 1 + Findings 8.1-8.3 + P0 simulator architecture. Refines T2-13 (which provides the transport-side fault injection); T2-47 adds the firmware-side state model.
 
 ---
 
-### T2-48 | Multi-controller simulator framework — `SimulatedControllerDevice` interface
+### T2-48 | Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface
 
 **Code reference:** New `tests/simulators/`. Refines T3-43 (controller test matrix from audit 3A) with the simulator-side contract.
 
-**Problem:** Cross-check confirmed audit Critical 7 + section 7: `MockSerialPort` is GRBL-shaped. There's no abstraction for "this is a simulated controller of type X" that GRBL/Marlin/DSP/WiFi simulators could all implement. As soon as T2-7 (Marlin stub) lands, the test approach breaks down — Marlin behavior would need a parallel mock class with no shared contract.
+**Problem:** Cross-check confirmed audit Critical 7 + section 7: `MockSerialPort` is GRBL-shaped. There's no abstraction for "this is a simulated controller of type X" that GRBL/Marlin/DSP/WiFi simulators could all implement. As soon as T2-7 (Marlin stub) lands, the test approach breaks down 鈥?Marlin behavior would need a parallel mock class with no shared contract.
 
 **Identified by:** Audit 3E (2026-04-25, ChatGPT) Critical 7 + section 7 + Required P1 multi-controller simulator framework.
 
@@ -8668,10 +8662,10 @@ The compliance tests catch architectural bugs in `LaserController` interface or 
 
 **Problem:** Cross-check verified at line 137. Tests that exercise time-sensitive behavior (status polling cadence, character-counting flow control, deadman timers, reconnect retry intervals, ack-rate health classification) currently rely on real `setTimeout` and arbitrary flush delays. This is:
 
-1. **Slow** — tests waste seconds waiting for real timers.
-2. **Flaky** — heavy CI loads cause timing tests to fail intermittently.
-3. **Imprecise** — exact event order under race conditions can't be asserted.
-4. **Not isolated** — leaked timers from one test can affect the next; current runner mitigates with per-process isolation but at cost of startup overhead.
+1. **Slow** 鈥?tests waste seconds waiting for real timers.
+2. **Flaky** 鈥?heavy CI loads cause timing tests to fail intermittently.
+3. **Imprecise** 鈥?exact event order under race conditions can't be asserted.
+4. **Not isolated** 鈥?leaked timers from one test can affect the next; current runner mitigates with per-process isolation but at cost of startup overhead.
 
 Audit Required P1 specifies:
 
@@ -8751,7 +8745,7 @@ Plus migration of representative tests (e.g. `tests/streaming-health.test.ts`, `
 
 ---
 
-### T2-50 | Scenario-driven failure injection API — typed `injectFault({type, ...})`
+### T2-50 | Scenario-driven failure injection API 鈥?typed `injectFault({type, ...})`
 
 **Code reference:** Refines T2-13 (FaultInjectingSerialPort from audit 1F) + extends `MockSerialPort` ad-hoc fault tools (`simulateDisconnect`, `simulateError`, `injectResponse`).
 
@@ -8824,7 +8818,7 @@ This makes failure scenarios first-class, reusable across test files, and discov
 - Each fault type has a test that injects it and asserts the correct controller behavior.
 - Compose multiple faults: `disconnect at 2500ms` + `alarm before disconnect`. Assert correct event order.
 
-**Estimate:** ~2-3 sessions. Discriminated-union fault model is mechanical; the bulk is implementing each fault correctly inside the simulator. Pairs with T2-47 (GrblSimulator) — most of T2-50's faults need the firmware state machine to act on.
+**Estimate:** ~2-3 sessions. Discriminated-union fault model is mechanical; the bulk is implementing each fault correctly inside the simulator. Pairs with T2-47 (GrblSimulator) 鈥?most of T2-50's faults need the firmware state machine to act on.
 
 **Priority:** Tier 2. Refines T2-13 (transport-level fault injection) by raising it to a typed scenario API at the controller-simulator level.
 
@@ -8832,9 +8826,9 @@ This makes failure scenarios first-class, reusable across test files, and discov
 
 ---
 
-### T2-51 | `CompiledJobState` — atomic state shape replacing 5+ scattered compile state values
+### T2-51 | `CompiledJobState` 鈥?atomic state shape replacing 5+ scattered compile state values
 
-**Code reference:** `src/ui/hooks/useCompileManager.ts:68-79` (5 useState/useRef declarations for compile state). Cross-check verified that the current compile state spans `currentGcode`, `lastResult`, `isCompiling`, `sceneCompileTick`, `sceneCompileTickRef`, `lastCompiledRevisionRef`, `gcodeStale`, `gcodeStaleRef` — 5 React states + 4 refs representing one logical concept.
+**Code reference:** `src/ui/hooks/useCompileManager.ts:68-79` (5 useState/useRef declarations for compile state). Cross-check verified that the current compile state spans `currentGcode`, `lastResult`, `isCompiling`, `sceneCompileTick`, `sceneCompileTickRef`, `lastCompiledRevisionRef`, `gcodeStale`, `gcodeStaleRef` 鈥?5 React states + 4 refs representing one logical concept.
 
 **Problem:** Cross-check verified at exact lines. The current compile state model:
 
@@ -8894,12 +8888,12 @@ export const selectIsStale = (s: CompiledJobState): boolean =>
   s.status === 'stale';
 ```
 
-Side-effect: T1-56 (machinePlanBounds source defect) becomes structurally impossible — selectMachinePlanBounds returns the right value by construction. T1-57 (compile race) is integrated via the requestId field. T1-58 (profile snapshot) ties profileHash to the state.
+Side-effect: T1-56 (machinePlanBounds source defect) becomes structurally impossible 鈥?selectMachinePlanBounds returns the right value by construction. T1-57 (compile race) is integrated via the requestId field. T1-58 (profile snapshot) ties profileHash to the state.
 
 **Tests:** `tests/compiled-job-state.test.ts`:
 - Initial state = `{ status: 'none' }`. Selectors return null/false.
 - Transition to compiling, then ready. Selectors return result fields.
-- Scene change while ready → stale. Selectors return null for active result, but selectStaleResult returns previous.
+- Scene change while ready 鈫?stale. Selectors return null for active result, but selectStaleResult returns previous.
 - Out-of-order request IDs are rejected (T1-57 integrated).
 
 **Estimate:** ~2-3 sessions. The shape is mechanical; the work is finding every consumer of the old fields (`currentGcode`, `lastResult`, `gcodeStale`) and routing through selectors. Touches App.tsx, ConnectionPanelMain.tsx, useCompileManager, possibly preflight callers.
@@ -8910,17 +8904,17 @@ Side-effect: T1-56 (machinePlanBounds source defect) becomes structurally imposs
 
 ---
 
-### T2-52 | Centralized active-profile store — replace polling + storage events + custom events with `useSyncExternalStore`
+### T2-52 | Centralized active-profile store 鈥?replace polling + storage events + custom events with `useSyncExternalStore`
 
 **Code reference:** `src/ui/components/ConnectionPanel.tsx:43` (1-second polling + storage event + custom event), `src/ui/components/ConnectionPanelMain.tsx:479` (similar interval), App.tsx:287-290 (`profileRevision` revision counter), various `getActiveProfile()` reads scattered through the codebase.
 
 **Problem:** Cross-check verified at ConnectionPanel.tsx:43. The current profile-state synchronization model:
 
 1. `getActiveProfile()` reads from storage imperatively.
-2. Components want React-reactive updates → they wrap reads in useState, then add:
+2. Components want React-reactive updates 鈫?they wrap reads in useState, then add:
    - `window.addEventListener('storage', refresh)` (for cross-tab updates)
    - `window.addEventListener('laserforge:active-profile-changed', refresh)` (in-app updates via custom event)
-   - `setInterval(refresh, 1000)` (the polling — admitted concession that the events don't reliably fire on every code path that mutates the profile)
+   - `setInterval(refresh, 1000)` (the polling 鈥?admitted concession that the events don't reliably fire on every code path that mutates the profile)
 
 App.tsx uses a different mechanism: `profileRevision` counter that's bumped whenever profiles change, with downstream useMemo'd `getActiveProfile()` calls keyed on `[profileRevision]`.
 
@@ -8985,13 +8979,13 @@ export function useActiveProfile(): DeviceProfile | null {
 Migration:
 1. Replace `useActiveProfile` in ConnectionPanel.tsx with this hook. Polling goes away.
 2. Replace `profileRevision` counter in App.tsx with the same hook. The custom event becomes unnecessary.
-3. Profile mutations go through `activeProfileStore.setActiveProfile(...)` — single write path.
+3. Profile mutations go through `activeProfileStore.setActiveProfile(...)` 鈥?single write path.
 
 **Tests:** `tests/active-profile-store.test.ts`:
-- Subscribe → set profile → assert listener fired with new value.
-- Multiple subscribers → all notified.
-- Storage event from another tab → listeners notified.
-- Unsubscribe → no further notifications.
+- Subscribe 鈫?set profile 鈫?assert listener fired with new value.
+- Multiple subscribers 鈫?all notified.
+- Storage event from another tab 鈫?listeners notified.
+- Unsubscribe 鈫?no further notifications.
 
 **Estimate:** ~1-2 sessions. Store implementation ~1 session; migration of existing consumers ~1 session. Components that currently use the various sync mechanisms each need a small change.
 
@@ -9001,23 +8995,23 @@ Migration:
 
 ---
 
-### T2-53 | Job session state machine — `JobPhase` replacing scattered `isJobRunning` / `isPaused` / `machineState.status`
+### T2-53 | Job session state machine 鈥?`JobPhase` replacing scattered `isJobRunning` / `isPaused` / `machineState.status`
 
 **Code reference:** Multiple authorities for "is the job running":
 - `grbl.isJobRunning` (App.tsx, useControllerConnection)
 - `controllerRef.current?.isJobRunning` (ConnectionPanelMain.tsx:380-ish)
 - `machineState?.status` (`'hold'` reads as paused)
-- `isPaused` (ConnectionPanelMain.tsx:257 — local UI state, optimistic at line 865)
-- `displayPaused` (ConnectionPanelMain.tsx:396 — derived: `isPaused || machineState?.status === 'hold'`)
+- `isPaused` (ConnectionPanelMain.tsx:257 鈥?local UI state, optimistic at line 865)
+- `displayPaused` (ConnectionPanelMain.tsx:396 鈥?derived: `isPaused || machineState?.status === 'hold'`)
 - `jobStoppedByUserRef` (sentinel ref)
 
 **Problem:** Cross-check verified all six authorities. Audit Finding 2: UI state and controller state can disagree. Concrete failure modes:
 
-- pause() command fails silently → controller.isJobRunning still true, machineState.status not yet hold. UI optimistically sets `isPaused = true` at line 865. UI shows "paused"; machine is still running.
-- Resume after error → controller.isJobRunning resets, but local `isPaused` from previous pause is still set until `setIsPaused(false)` runs (at line 877 in stop, line 414 in another path).
-- Job completes naturally → controller.onProgress fires, isJobRunning flips false, but `isPaused` from a hold during the job lingers if pause-resume sequence wasn't fully observed.
+- pause() command fails silently 鈫?controller.isJobRunning still true, machineState.status not yet hold. UI optimistically sets `isPaused = true` at line 865. UI shows "paused"; machine is still running.
+- Resume after error 鈫?controller.isJobRunning resets, but local `isPaused` from previous pause is still set until `setIsPaused(false)` runs (at line 877 in stop, line 414 in another path).
+- Job completes naturally 鈫?controller.onProgress fires, isJobRunning flips false, but `isPaused` from a hold during the job lingers if pause-resume sequence wasn't fully observed.
 
-This pairs with audit 3D's T2-44 (safety state machine) and T2-41 (SafetyActionResult) — those ensure pause/resume have observable outcomes; T2-53 builds the job-phase state machine on top of those outcomes.
+This pairs with audit 3D's T2-44 (safety state machine) and T2-41 (SafetyActionResult) 鈥?those ensure pause/resume have observable outcomes; T2-53 builds the job-phase state machine on top of those outcomes.
 
 **Identified by:** Audit 4A (2026-04-26, ChatGPT) Finding 2 + Duplication 4 + Critical Failure 4 + Required Fix 5.
 
@@ -9068,19 +9062,19 @@ The `'stopping'` phase (audit's reset/cleanup point) is explicit, fixing the gap
 
 **Tests:** `tests/job-session-transitions.test.ts`:
 - All 7 phases covered by transition tests.
-- Pause command fails (SafetyActionResult.accepted = false) → phase stays 'running', not 'paused'.
-- Pause succeeds → phase = 'paused'.
-- Stop while paused → phase = 'stopping' → 'completed'.
+- Pause command fails (SafetyActionResult.accepted = false) 鈫?phase stays 'running', not 'paused'.
+- Pause succeeds 鈫?phase = 'paused'.
+- Stop while paused 鈫?phase = 'stopping' 鈫?'completed'.
 
 **Estimate:** ~3-4 sessions. State machine ~1 session, UI migration (removing isPaused, displayPaused, etc.) ~2 sessions, tests ~1 session.
 
-**Priority:** Tier 2. Depends on T2-41 (SafetyActionResult). Foundation for T2-44 (safety state machine) — they're related but distinct: T2-44 covers safety states (alarm/unsafeUnknown/requiresInspection); T2-53 covers job phases (starting/running/paused/stopping). Both consume SafetyActionResult.
+**Priority:** Tier 2. Depends on T2-41 (SafetyActionResult). Foundation for T2-44 (safety state machine) 鈥?they're related but distinct: T2-44 covers safety states (alarm/unsafeUnknown/requiresInspection); T2-53 covers job phases (starting/running/paused/stopping). Both consume SafetyActionResult.
 
 **Cross-check note (audit 4A):** Audit's Finding 2 + Duplication 4 + Critical Failure 4 + Fix 5. Verified at all 6 authority sites.
 
 ---
 
-### T2-54 | Unified disconnect transaction — one path, all callers route through it
+### T2-54 | Unified disconnect transaction 鈥?one path, all callers route through it
 
 **Code reference:** Cross-check identified 7+ disconnect call sites with inconsistent cleanup:
 - `useControllerConnection.disconnect` at line 49
@@ -9094,7 +9088,7 @@ The `'stopping'` phase (audit's reset/cleanup point) is explicit, fixing the gap
 **Problem:** Cross-check verified. Each disconnect path does some subset of: stop, laser-off, controller.disconnect, machineService.disconnect, port cleanup, message clearing, panel closing. Not consistently. A user pressing the toolbar disconnect button gets different cleanup than one pressing the panel disconnect button which differs again from beforeunload.
 
 Concrete failure modes:
-- Toolbar disconnect during running job uses `safeDisconnect({ skipStop: true })` (line 1259) — but skipping stop while running could leave the machine moving.
+- Toolbar disconnect during running job uses `safeDisconnect({ skipStop: true })` (line 1259) 鈥?but skipping stop while running could leave the machine moving.
 - Panel disconnect (line 572) calls `machineService.disconnect()` directly without the safety preamble in safeDisconnect.
 - beforeunload (browser closing) might not run any of them depending on timing.
 
@@ -9170,7 +9164,7 @@ All callers route through this:
 - beforeunload: `{ reason: 'beforeunload', stopPolicy: 'stop-if-running' }` (if time permits)
 
 **Tests:** `tests/disconnect-transaction.test.ts`:
-- Each (reason × stopPolicy) combination produces correct call sequence.
+- Each (reason 脳 stopPolicy) combination produces correct call sequence.
 - Stop failure produces honest DisconnectResult.errors entry.
 - 'beforeunload' completes synchronously enough for browser to allow close.
 
@@ -9182,7 +9176,7 @@ All callers route through this:
 
 ---
 
-### T2-55 | Transactional `resetProjectRuntimeState()` — single function, all reset paths route through it
+### T2-55 | Transactional `resetProjectRuntimeState()` 鈥?single function, all reset paths route through it
 
 **Code reference:** `src/ui/components/App.tsx:1015-1020` (`handleNewProject` clears scene/history/selection only). Cross-check verified the gaps audit identified.
 
@@ -9236,18 +9230,18 @@ export function resetProjectRuntimeState(
 ```
 
 Callers:
-- `handleNewProject(newScene)` → `resetProjectRuntimeState(newScene, resetters)`
-- `handleRecover(newScene)` → same
-- `handleKeyboardOpen(newScene)` → same
-- Template load → same
-- Major profile switch (bed dimensions changed) → same
+- `handleNewProject(newScene)` 鈫?`resetProjectRuntimeState(newScene, resetters)`
+- `handleRecover(newScene)` 鈫?same
+- `handleKeyboardOpen(newScene)` 鈫?same
+- Template load 鈫?same
+- Major profile switch (bed dimensions changed) 鈫?same
 
-In React batching mode (React 18+), all setters in one synchronous function call result in one re-render — atomic from the user's perspective.
+In React batching mode (React 18+), all setters in one synchronous function call result in one re-render 鈥?atomic from the user's perspective.
 
 **Tests:** `tests/project-runtime-reset.test.ts`:
 - Set up state with all dirty values. Call resetProjectRuntimeState. Assert every field reset.
-- New project after job completion → activeJob* cleared.
-- Profile switch with machine dimension change → resetProjectRuntimeState called; profile switch with non-machine change → resetProjectRuntimeState NOT called.
+- New project after job completion 鈫?activeJob* cleared.
+- Profile switch with machine dimension change 鈫?resetProjectRuntimeState called; profile switch with non-machine change 鈫?resetProjectRuntimeState NOT called.
 
 **Estimate:** ~1-2 sessions. Function ~30 min, identifying all reset call sites and migrating them ~1 session, tests ~30 min.
 
@@ -9261,7 +9255,7 @@ In React batching mode (React 18+), all setters in one synchronous function call
 
 **Code reference:** `src/ui/components/ConnectionPanel.tsx:140-149` (the useEffect that calls `tryFinalizeJobLog`).
 
-**Problem:** Cross-check verified at ConnectionPanel.tsx:142-149. Job log finalization is currently driven by a React effect inside ConnectionPanel. If the connection sidebar is closed (component unmounted) at the moment of the relevant transition (machineState.status changes from 'run' to 'idle', or controller.isJobRunning flips false), the effect doesn't fire — finalization is delayed until the panel remounts, or missed entirely if the user never re-opens the panel.
+**Problem:** Cross-check verified at ConnectionPanel.tsx:142-149. Job log finalization is currently driven by a React effect inside ConnectionPanel. If the connection sidebar is closed (component unmounted) at the moment of the relevant transition (machineState.status changes from 'run' to 'idle', or controller.isJobRunning flips false), the effect doesn't fire 鈥?finalization is delayed until the panel remounts, or missed entirely if the user never re-opens the panel.
 
 MachineService HAS the `jobObservedRunning` and `activeJobSessionId` fields (the audit acknowledges this), which guards against double-finalization. But the trigger to run finalization is still in mounted UI.
 
@@ -9319,13 +9313,13 @@ const lastJobLog = useLastJobLog();  // useSyncExternalStore
 
 ---
 
-### T2-57 | Typed error state per domain — `compile.error`, `connection.error`, `job.error`, `machine.alarm`
+### T2-57 | Typed error state per domain 鈥?`compile.error`, `connection.error`, `job.error`, `machine.alarm`
 
 **Code reference:** Currently errors are `console.warn` / `console.error` / `appendMessage` / `showAlert`. No typed durable error state exists.
 
 **Problem:** Audit Finding 8 + Critical: errors are textual logs in messages array. No code can ask "is the connection currently in a failed state?" or "is there a compile error blocking start?" The UI consumes a flat message list; logic that should gate actions on errors instead has to gate on absence-of-recent-success-message, which is fragile.
 
-Concrete failure: connection fails. `appendMessage('Connection failed: ...')` appends to console messages. User clicks Start anyway — there's no `connection.error` to check, and `machineState.status` is 'disconnected' which is the same as "never connected" or "user disconnected manually." Different error semantics, same observable state.
+Concrete failure: connection fails. `appendMessage('Connection failed: ...')` appends to console messages. User clicks Start anyway 鈥?there's no `connection.error` to check, and `machineState.status` is 'disconnected' which is the same as "never connected" or "user disconnected manually." Different error semantics, same observable state.
 
 **Identified by:** Audit 4A (2026-04-26, ChatGPT) Error-state findings + Required Fix.
 
@@ -9366,13 +9360,13 @@ const connectionError = useConnectionError();
 const canConnect = connectionError === null || connectionError.retryable;
 ```
 
-The flat `messages` array remains for the user-facing console log (timeline of events), but it's no longer the source of truth for error gating — typed errors are.
+The flat `messages` array remains for the user-facing console log (timeline of events), but it's no longer the source of truth for error gating 鈥?typed errors are.
 
 **Tests:** `tests/typed-error-domains.test.ts`:
 - Connection failure sets connection.error to typed value with `kind: 'open-failed'`.
 - Successful reconnect clears connection.error.
 - Compile failure sets compile.error; new compile attempt clears it.
-- Multiple errors don't pile up — most recent wins per domain.
+- Multiple errors don't pile up 鈥?most recent wins per domain.
 
 **Estimate:** ~2-3 sessions. Schema design + per-domain stores + migration of error-handling sites. Many sites; gradual migration.
 
@@ -9386,7 +9380,7 @@ The flat `messages` array remains for the user-facing console log (timeline of e
 
 **Code reference:** Currently job-prep info is scattered across StatusBar (machine status), Issues panel (preflight blockers/warnings), Workflow steps (frame/jog/origin), Controls (Start/Pause/Stop), output layer overview, and various sidebar elements. There's no single place that summarizes "everything important about what's about to happen."
 
-**Problem:** Audit 4B Critical UX failure 1 + Priority 1: "the app needs one final preparation panel showing machine, profile, material, origin mode, job bounds, layer order, estimated time, warnings, frame status, focus/material reminders." Without this, users can't form a confident "yes I want to do this" mental model — they form impressions from fragmented signals scattered across the UI.
+**Problem:** Audit 4B Critical UX failure 1 + Priority 1: "the app needs one final preparation panel showing machine, profile, material, origin mode, job bounds, layer order, estimated time, warnings, frame status, focus/material reminders." Without this, users can't form a confident "yes I want to do this" mental model 鈥?they form impressions from fragmented signals scattered across the UI.
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Critical UX failure 1 + Priority 1.
 
@@ -9395,18 +9389,18 @@ The flat `messages` array remains for the user-facing console log (timeline of e
 ```tsx
 <ReadyToRunPanel>
   <MachineSection>
-    ✓ Profile: Creality Falcon A1 Pro
-    ✓ Connection: USB connected
-    ✓ Status: Idle
-    ✓ Bed: 400 × 400 mm
-    ✓ Position: X 0.000 Y 0.000 (homed)
+    鉁?Profile: Creality Falcon A1 Pro
+    鉁?Connection: USB connected
+    鉁?Status: Idle
+    鉁?Bed: 400 脳 400 mm
+    鉁?Position: X 0.000 Y 0.000 (homed)
   </MachineSection>
 
   <JobSection>
-    ✓ 3 objects on 2 layers
-    ✓ Operation order: Engrave → Cut
-    ✓ Estimated time: 11:30
-    ✓ Output bounds: X 40-160 Y 30-120 mm (machine space)
+    鉁?3 objects on 2 layers
+    鉁?Operation order: Engrave 鈫?Cut
+    鉁?Estimated time: 11:30
+    鉁?Output bounds: X 40-160 Y 30-120 mm (machine space)
   </JobSection>
 
   <MaterialSection>
@@ -9420,12 +9414,12 @@ The flat `messages` array remains for the user-facing console log (timeline of e
     Mode: From saved origin
     Origin: X 100 Y 80
     {hasFramed
-      ? '✓ Frame completed (8 seconds ago)'
-      : '⚠ Frame not yet performed — required'}
+      ? '鉁?Frame completed (8 seconds ago)'
+      : '鈿?Frame not yet performed 鈥?required'}
   </PositionSection>
 
   <WarningsSection count={1}>
-    ▲ High cut power (90%)  [Open layer]  [Acknowledge]
+    鈻?High cut power (90%)  [Open layer]  [Acknowledge]
   </WarningsSection>
 
   <StartButton disabled={!canStartJob}>
@@ -9446,7 +9440,7 @@ The material checkboxes are user-acknowledged reminders, not enforced state. The
 
 **Estimate:** ~3-5 sessions. Component design ~1 session, integration with existing data sources ~1-2 sessions, replacing scattered surfaces ~1-2 sessions, tests ~1 session.
 
-**Priority:** Tier 2 — biggest UX improvement in the audit. Foundation for trust. Depends on T2-51 (CompiledJobState) for the unified job data, T2-53 (job session phase) for the status data.
+**Priority:** Tier 2 鈥?biggest UX improvement in the audit. Foundation for trust. Depends on T2-51 (CompiledJobState) for the unified job data, T2-53 (job session phase) for the status data.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 1 + Priority 1. The Sherrington of UX work in Phase 4B.
 
@@ -9456,7 +9450,7 @@ The material checkboxes are user-acknowledged reminders, not enforced state. The
 
 **Code reference:** Layer settings currently appear in `LayerPanel`, `ConnectionPanelMain` layer overview, and the material bar. Material presets exist but are not the workflow center.
 
-**Problem:** Audit 4B Critical UX failure 4 + Priority 5: "speed/power/pass values exist, but the workflow does not guide users from material → operation → recommended setting → test → run." Currently a user sets numbers manually with no signal whether the values are tested-safe, community-recommended, or wild guesses.
+**Problem:** Audit 4B Critical UX failure 4 + Priority 5: "speed/power/pass values exist, but the workflow does not guide users from material 鈫?operation 鈫?recommended setting 鈫?test 鈫?run." Currently a user sets numbers manually with no signal whether the values are tested-safe, community-recommended, or wild guesses.
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Critical UX failure 4 + Priority 5 + Section 5.
 
@@ -9464,25 +9458,25 @@ The material checkboxes are user-acknowledged reminders, not enforced state. The
 
 ```
 Material setup card:
-1. What material? [Basswood plywood ▾]   (or "Other / unknown")
-2. Thickness? [3 mm ▾]
+1. What material? [Basswood plywood 鈻綸   (or "Other / unknown")
+2. Thickness? [3 mm 鈻綸
 3. Operation? (Cut / Engrave / Score)
 
-→ App suggests:
+鈫?App suggests:
    Power: 85%
    Speed: 220 mm/min
    Passes: 1
    Air assist: Recommended
 
-→ Preset confidence label:
-   ✓ Built-in tested preset (Falcon A1 Pro · Basswood 3mm · Cut)
-   • User preset
-   ⚠ Estimated (no tested data for this combination)
-   ⚠ Manual / unverified
+鈫?Preset confidence label:
+   鉁?Built-in tested preset (Falcon A1 Pro 路 Basswood 3mm 路 Cut)
+   鈥?User preset
+   鈿?Estimated (no tested data for this combination)
+   鈿?Manual / unverified
 
-→ Recommendations:
+鈫?Recommendations:
    "First time with this material? Run a material test first."
-   [Run material test]  [Skip — I've cut this before]
+   [Run material test]  [Skip 鈥?I've cut this before]
 ```
 
 Schema additions to layer settings:
@@ -9501,7 +9495,7 @@ interface LayerSettingsConfidence {
 </LayerSettings>
 ```
 
-When a user manually edits a value that came from a tested preset, the badge transitions to "manual-unverified" — visible to them.
+When a user manually edits a value that came from a tested preset, the badge transitions to "manual-unverified" 鈥?visible to them.
 
 Material preset library is at T4-1. T2-59 builds the consumption-side workflow around whatever presets exist.
 
@@ -9512,13 +9506,13 @@ Material preset library is at T4-1. T2-59 builds the consumption-side workflow a
 
 **Estimate:** ~3-5 sessions. Design + state management + UI + integration with material presets.
 
-**Priority:** Tier 2 — large UX improvement. One of the biggest sources of user "is this right?" anxiety.
+**Priority:** Tier 2 鈥?large UX improvement. One of the biggest sources of user "is this right?" anxiety.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 4 + Priority 5 + Section 5.
 
 ---
 
-### T2-60 | Frame freshness invalidation — any relevant change resets `hasFramed`
+### T2-60 | Frame freshness invalidation 鈥?any relevant change resets `hasFramed`
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:402` (current reset call site).
 
@@ -9559,23 +9553,23 @@ const isFrameFresh = hasFramed(computeFrameFreshnessKey({ ... }));
 ```
 
 Each input that changes the frame path drives invalidation by changing the freshness key:
-- `compiledTicketId` change → scene/profile changed → re-frame
-- `startMode` change → frame shifts → re-frame
-- `savedOrigin` change → offset shifts → re-frame
-- `profileId` change → bed/origin-corner could differ → re-frame
-- Bed dimensions change (live `$130/$131` vs profile) → frame coordinates differ → re-frame
+- `compiledTicketId` change 鈫?scene/profile changed 鈫?re-frame
+- `startMode` change 鈫?frame shifts 鈫?re-frame
+- `savedOrigin` change 鈫?offset shifts 鈫?re-frame
+- `profileId` change 鈫?bed/origin-corner could differ 鈫?re-frame
+- Bed dimensions change (live `$130/$131` vs profile) 鈫?frame coordinates differ 鈫?re-frame
 
 The user-visible signal: when the frame becomes stale, the workflow step "Frame the job" un-completes itself, and the Start button blocks (T1-59).
 
 **Tests:** `tests/frame-freshness-invalidation.test.ts`:
 - Frame after compile. Assert hasFramed=true.
 - Frame, then change start mode. Assert hasFramed=false.
-- Frame, then re-compile (scene unchanged). Assert hasFramed key unchanged → still fresh.
+- Frame, then re-compile (scene unchanged). Assert hasFramed key unchanged 鈫?still fresh.
 - Frame, swap profile. Assert hasFramed=false.
 
 **Estimate:** ~1-2 sessions. Hash function ~30 min, integration with all the input sources ~1 session, tests ~30 min.
 
-**Priority:** Tier 2 — required correctness for T1-59's gate to be useful. Without invalidation, users frame once and the gate gets out of date silently.
+**Priority:** Tier 2 鈥?required correctness for T1-59's gate to be useful. Without invalidation, users frame once and the gate gets out of date silently.
 
 **Cross-check note (audit 4B):** Audit's Section 8.3 + Critical UX failure 2 detail.
 
@@ -9597,7 +9591,7 @@ The user-visible signal: when the frame becomes stale, the workflow step "Frame 
 - Active job monitoring
 - Recovery (T2-62)
 
-Text spacing edits, image dithering settings, raster mode toggles, fill interval edits — all return to the LayerPanel / properties sidebar where they were before they leaked into the connection panel.
+Text spacing edits, image dithering settings, raster mode toggles, fill interval edits 鈥?all return to the LayerPanel / properties sidebar where they were before they leaked into the connection panel.
 
 This is a refactor with no functional change for the user (the controls work in their original location too); the fix is removing the duplicate from the connection panel.
 
@@ -9605,19 +9599,19 @@ This is a refactor with no functional change for the user (the controls work in 
 
 **Estimate:** ~1-2 sessions. The move is mechanical; the work is auditing all of ConnectionPanelMain for similar editing-leak patterns and migrating each.
 
-**Priority:** Tier 2 — UX coherence. Pairs with T2-58 to establish the connection panel's actual scope.
+**Priority:** Tier 2 鈥?UX coherence. Pairs with T2-58 to establish the connection panel's actual scope.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 7 + Priority 8. Verified at ConnectionPanelMain.tsx:1320-1430.
 
 ---
 
-### T2-62 | Recovery cards — alarm / disconnect / frame-fail / E-stop
+### T2-62 | Recovery cards 鈥?alarm / disconnect / frame-fail / E-stop
 
-**Code reference:** Currently recovery is alarm banner ("Click Unlock to clear, then re-home if your machine supports it"), connection failure messages, frame-failure messages — all short alert/log strings without next-step guidance.
+**Code reference:** Currently recovery is alarm banner ("Click Unlock to clear, then re-home if your machine supports it"), connection failure messages, frame-failure messages 鈥?all short alert/log strings without next-step guidance.
 
 **Problem:** Audit 4B Critical UX failure 5 + Priority 7: "alarm, disconnect, failed frame, failed job, and emergency stop need recovery cards, not just logs and alerts." Each major error state needs a card answering: what happened, why it matters, what to do now, what NOT to do.
 
-This refines T2-46 (user-facing safety messages from audit 3D) — T2-46 specifies the messages for safety operations (laserOff, pause, stop, emergencyStop); T2-62 specifies the broader UI surface that hosts those messages and adds non-safety errors (connection failure, frame failure).
+This refines T2-46 (user-facing safety messages from audit 3D) 鈥?T2-46 specifies the messages for safety operations (laserOff, pause, stop, emergencyStop); T2-62 specifies the broader UI surface that hosts those messages and adds non-safety errors (connection failure, frame failure).
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Critical UX failure 5 + Priority 7 + Section 10.
 
@@ -9674,7 +9668,7 @@ This refines T2-46 (user-facing safety messages from audit 3D) — T2-46 specifi
   <ol>
     <li>Inspect the machine, material, and any visible damage.</li>
     <li>Reconnect: <button>Reconnect</button></li>
-    <li>Re-home (required — position is lost). <button>Home</button></li>
+    <li>Re-home (required 鈥?position is lost). <button>Home</button></li>
     <li>Frame the job again before pressing Start.</li>
   </ol>
   <p className="warning"><strong>Do not:</strong> Reconnect and immediately Start the previous job.</p>
@@ -9687,7 +9681,7 @@ These render in place of the current alarm banner / message log entries when the
 
 **Estimate:** ~3-4 sessions. Component + 4 variants + integration with state detection (T2-57 typed errors makes the detection clean) + content review.
 
-**Priority:** Tier 2 — major trust improvement. Refines T2-46.
+**Priority:** Tier 2 鈥?major trust improvement. Refines T2-46.
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 5 + Priority 7 + Section 10.
 
@@ -9697,7 +9691,7 @@ These render in place of the current alarm banner / message log entries when the
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:42-62` (jobModeLabel). T1-62 adds basic operation labeling; T2-63 adds the full pre-flight ordering view.
 
-**Problem:** Audit 4B Priority 9: users need to see the operation order before pressing Start, with a warning if the order is wrong (cut before engrave is the classic mistake — once the piece is cut out, it shifts and the engrave is misregistered).
+**Problem:** Audit 4B Priority 9: users need to see the operation order before pressing Start, with a warning if the order is wrong (cut before engrave is the classic mistake 鈥?once the piece is cut out, it shifts and the engrave is misregistered).
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Priority 9.
 
@@ -9705,21 +9699,21 @@ These render in place of the current alarm banner / message log entries when the
 
 ```
 Operation order:
-1. Engrave — Text layer — 20% power — 3000 mm/min
-2. Score   — Detail layer — 15% power — 5000 mm/min
-3. Cut     — Outline layer — 85% power — 220 mm/min — 1 pass
+1. Engrave 鈥?Text layer 鈥?20% power 鈥?3000 mm/min
+2. Score   鈥?Detail layer 鈥?15% power 鈥?5000 mm/min
+3. Cut     鈥?Outline layer 鈥?85% power 鈥?220 mm/min 鈥?1 pass
 
-✓ Order looks correct (engrave before cut)
+鉁?Order looks correct (engrave before cut)
 ```
 
 If the order is unusual:
 
 ```
 Operation order:
-1. Cut     — Outline layer — 85% power
-2. Engrave — Text layer — 20% power
+1. Cut     鈥?Outline layer 鈥?85% power
+2. Engrave 鈥?Text layer 鈥?20% power
 
-⚠ Cut is before Engrave. The piece may shift after cutting,
+鈿?Cut is before Engrave. The piece may shift after cutting,
   causing the engrave to be misregistered.
   [Reorder layers]   [Acknowledge]
 ```
@@ -9729,12 +9723,12 @@ Order checking heuristic:
 - Multiple cuts: same-piece cuts should be last (interior cuts before exterior cuts is fine if no movement)
 - Travel-only operations don't matter
 
-The warning is informational — users with intentional unusual orders (e.g. cut a fixture frame, then engrave inside it) can acknowledge and proceed.
+The warning is informational 鈥?users with intentional unusual orders (e.g. cut a fixture frame, then engrave inside it) can acknowledge and proceed.
 
 **Tests:** `tests/operation-order-warning.test.ts`:
-- Engrave → Cut: no warning.
-- Cut → Engrave: warning emitted.
-- Score → Engrave → Cut: no warning.
+- Engrave 鈫?Cut: no warning.
+- Cut 鈫?Engrave: warning emitted.
+- Score 鈫?Engrave 鈫?Cut: no warning.
 - Single layer of any mode: no warning.
 
 **Estimate:** ~1-2 sessions. Order analysis + UI integration into T2-58.
@@ -9794,7 +9788,7 @@ your machine's behavior.
 [Stay in Beginner mode]   [Switch to Advanced]
 ```
 
-Advanced → Beginner is a free transition (re-enabling protections is always safe).
+Advanced 鈫?Beginner is a free transition (re-enabling protections is always safe).
 
 **Tests:** `tests/user-mode-gates.test.ts`:
 - Each gate behavior matches the table above for each mode.
@@ -9803,25 +9797,25 @@ Advanced → Beginner is a free transition (re-enabling protections is always sa
 
 **Estimate:** ~2-3 sessions. Setting plumbing + per-gate conditional logic + UI + transition dialog.
 
-**Priority:** Tier 2 — enables T1-59 (frame gate) to work for both audiences. Foundation for several Phase 4B improvements.
+**Priority:** Tier 2 鈥?enables T1-59 (frame gate) to work for both audiences. Foundation for several Phase 4B improvements.
 
 **Cross-check note (audit 4B):** Audit's Section 11 + Priority 2 advanced override.
 
 ---
 
-### T2-65 | Central error reporter — `reportError({domain, severity, recovery, developerDetails})`
+### T2-65 | Central error reporter 鈥?`reportError({domain, severity, recovery, developerDetails})`
 
 **Code reference:** Currently errors are scattered across `appendMessage(...)` calls, `showAlert(...)` calls, `console.warn/error(...)` calls, and silent `.catch(() => {})` patterns. There's no single API.
 
 **Problem:** Audit 4C Required Priority 1 + Critical 1: the app needs a single API that all error sites consume. Different error sites reach for different surfaces inconsistently:
 - Some use `appendMessage` (visible in message log only)
-- Some use `showAlert` (modal — interrupts user)
+- Some use `showAlert` (modal 鈥?interrupts user)
 - Some use `console.warn` (invisible to user)
 - Some use silent catches (no observability at all)
 
 This makes consistent error handling impossible: the same class of error gets different visibility depending on which file the catch lives in.
 
-T2-57 (typed error state per domain — audit 4A) covers the durable state side. T2-65 covers the API side: every catch block calls one function that decides where to surface based on severity and domain.
+T2-57 (typed error state per domain 鈥?audit 4A) covers the durable state side. T2-65 covers the API side: every catch block calls one function that decides where to surface based on severity and domain.
 
 **Identified by:** Audit 4C (2026-04-26, ChatGPT) Critical 1 + Required Priority 1. **Refines T2-57** with the API surface.
 
@@ -9916,10 +9910,10 @@ Migration: every catch block becomes a `reportError` call:
 }
 ```
 
-T1-64, T1-66 (machine-control catches surfaced) become trivial after T2-65 — they just call `reportError` instead of inlining `appendMessage` plus `showAlert`.
+T1-64, T1-66 (machine-control catches surfaced) become trivial after T2-65 鈥?they just call `reportError` instead of inlining `appendMessage` plus `showAlert`.
 
 **Tests:** `tests/error-reporter.test.ts`:
-- Each severity routes correctly (info → log only, critical → modal + banner).
+- Each severity routes correctly (info 鈫?log only, critical 鈫?modal + banner).
 - Subscribers receive emitted errors.
 - Developer details always logged to console regardless of severity.
 - Transition log emits ERROR_REPORTED for each report.
@@ -9938,7 +9932,7 @@ T1-64, T1-66 (machine-control catches surfaced) become trivial after T2-65 — t
 
 **Problem:** Audit 4C Required Priority 9: after alarm (soft reset), emergency stop (controller reset), disconnect mid-job, manual realtime command, or failed frame, the machine's actual position may not match the controller's reported position. The app should track this explicitly and block Start/jog-to-saved-positions until trust is restored (re-home, re-set origin, or re-frame).
 
-T2-44 (extended safety state machine — audit 3D) includes a `'stoppedPositionUnknown'` state. T2-66 widens this concept: position trust is its own field that any event can invalidate, independent of the safety state machine's overall phase.
+T2-44 (extended safety state machine 鈥?audit 3D) includes a `'stoppedPositionUnknown'` state. T2-66 widens this concept: position trust is its own field that any event can invalidate, independent of the safety state machine's overall phase.
 
 **Identified by:** Audit 4C (2026-04-26, ChatGPT) Required Priority 9 + Misleading state 4 detail.
 
@@ -9967,9 +9961,9 @@ State transitions:
 - **Manual saved-origin set after untrusted state:** `{ trusted: true }` (user is asserting trust by setting origin)
 
 Trust restoration paths:
-- `$H` home → trusted (firmware confirms position)
-- "Save origin here" → trusted (user is asserting position)
-- Successful frame after trust loss → trusted (frame proves machine reached the boundary)
+- `$H` home 鈫?trusted (firmware confirms position)
+- "Save origin here" 鈫?trusted (user is asserting position)
+- Successful frame after trust loss 鈫?trusted (frame proves machine reached the boundary)
 
 UI consequences:
 - When `positionTrust.trusted === false`, show banner: "Position untrusted ({reason}). Re-home, set origin, or frame to restore position trust."
@@ -9985,7 +9979,7 @@ UI consequences:
 
 **Estimate:** ~2 sessions. State + transitions + UI integration + tests.
 
-**Priority:** Tier 2 — pairs with T2-44 (safety state machine) and T2-53 (job session). Closes a real safety gap: today, after E-stop the user can press Start before re-homing.
+**Priority:** Tier 2 鈥?pairs with T2-44 (safety state machine) and T2-53 (job session). Closes a real safety gap: today, after E-stop the user can press Start before re-homing.
 
 **Cross-check note (audit 4C):** Audit's Priority 9 + Misleading state 4. Refines T2-44.
 
@@ -10063,7 +10057,7 @@ vs
 Job interrupted at line 1247 of 1850 (alarm)
 Elapsed: 4:32
 
-ALARM:2 — motion exceeded travel limits
+ALARM:2 鈥?motion exceeded travel limits
 
 The machine reported an alarm during the job. Your material may be partially burned.
 
@@ -10089,7 +10083,7 @@ Next steps:
 
 ### T2-68 | Critical error history preserved across `clearMessages()` and disconnect
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:582` (clearMessages on disconnect — verified). Plus various other clearMessages call sites that may erase important context.
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:582` (clearMessages on disconnect 鈥?verified). Plus various other clearMessages call sites that may erase important context.
 
 **Problem:** Cross-check verified at line 582: disconnect calls `clearMessages()` unconditionally. If a user disconnects after a job failure to reconnect for diagnosis, the message log explaining what failed is wiped. Same pattern for any other clear-messages flow that fires after meaningful errors.
 
@@ -10101,13 +10095,13 @@ Audit Logging problem 2 + Visibility failure 2: critical errors must survive ses
 
 ```ts
 interface MessageStores {
-  // Current session log — cleared on disconnect / new session
+  // Current session log 鈥?cleared on disconnect / new session
   sessionMessages: Message[];
 
-  // Critical events — preserved across clear ops, persists to storage
+  // Critical events 鈥?preserved across clear ops, persists to storage
   criticalEvents: CriticalEvent[];
 
-  // Last known critical error per domain — for "Last problem" UI surface
+  // Last known critical error per domain 鈥?for "Last problem" UI surface
   lastByDomain: Map<ErrorDomain, CriticalEvent>;
 }
 
@@ -10133,19 +10127,19 @@ function clearSessionMessages(): void {
 UI surface in connection panel header:
 
 ```
-⚠ Last problem: Connection lost during job (4 minutes ago)
+鈿?Last problem: Connection lost during job (4 minutes ago)
   [View details]   [Dismiss]
 ```
 
 Clicking View details opens a panel showing the last critical event per domain. User can review history even after clearing the session log.
 
-Persistence: critical events also persist to localStorage (or IndexedDB once T3-1 ships) so they survive a page reload — important for support workflows where user reloads then reports.
+Persistence: critical events also persist to localStorage (or IndexedDB once T3-1 ships) so they survive a page reload 鈥?important for support workflows where user reloads then reports.
 
 **Tests:** `tests/critical-event-preservation.test.ts`:
-- Report error → appears in both session messages and critical events.
-- Call clearSessionMessages → session empty, critical events still present.
-- Disconnect → session cleared, critical events persisted.
-- Page reload simulation → critical events restored from storage.
+- Report error 鈫?appears in both session messages and critical events.
+- Call clearSessionMessages 鈫?session empty, critical events still present.
+- Disconnect 鈫?session cleared, critical events persisted.
+- Page reload simulation 鈫?critical events restored from storage.
 
 **Estimate:** ~2 sessions. Two-store split + persistence layer + UI integration + tests.
 
@@ -10155,7 +10149,7 @@ Persistence: critical events also persist to localStorage (or IndexedDB once T3-
 
 ---
 
-### T2-69 | Atomic autosave record — single key with checksum + scene metadata
+### T2-69 | Atomic autosave record 鈥?single key with checksum + scene metadata
 
 **Code reference:** `src/app/autosavePersistence.ts:44-45` (separate sequential awaits for JSON and timestamp).
 
@@ -10166,7 +10160,7 @@ await storage.set(AUTOSAVE_KEY, json);
 await storage.set(AUTOSAVE_TIME_KEY, timestamp);
 ```
 
-Two sequential writes. If line 44 succeeds and the browser crashes before line 45, the JSON is current but the timestamp is stale (or absent — readAutosave handles that with `time ?? new Date().toISOString()` at line 60, hiding the inconsistency). More importantly, the writes are not atomic at the storage level: a partial state can be observed by another tab reading concurrently.
+Two sequential writes. If line 44 succeeds and the browser crashes before line 45, the JSON is current but the timestamp is stale (or absent 鈥?readAutosave handles that with `time ?? new Date().toISOString()` at line 60, hiding the inconsistency). More importantly, the writes are not atomic at the storage level: a partial state can be observed by another tab reading concurrently.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Critical failure (autosave atomicity) + Required Priority 2.
 
@@ -10220,10 +10214,10 @@ async function migrateAutosaveFromOldKeys(): Promise<void> {
 }
 ```
 
-T2-70 (previous slot) builds on this — record format makes adding a `_previous` key straightforward.
+T2-70 (previous slot) builds on this 鈥?record format makes adding a `_previous` key straightforward.
 
 **Tests:** `tests/atomic-autosave-record.test.ts`:
-- Write record → read record returns same fields.
+- Write record 鈫?read record returns same fields.
 - Old-format autosave migrates to new format on first read.
 - Checksum mismatch is detectable.
 
@@ -10235,7 +10229,7 @@ T2-70 (previous slot) builds on this — record format makes adding a `_previous
 
 ---
 
-### T2-70 | Previous autosave backup slot — recovery offers latest + previous
+### T2-70 | Previous autosave backup slot 鈥?recovery offers latest + previous
 
 **Code reference:** Currently single `AUTOSAVE_KEY` at autosavePersistence.ts:3. No backup slot.
 
@@ -10253,7 +10247,7 @@ export async function writeAutosave(scene: Scene, json: string): Promise<void> {
   const record = buildAutosaveRecord(scene, json);
   const storage = getStorage();
 
-  // 1. Move current → previous (preserves last known good)
+  // 1. Move current 鈫?previous (preserves last known good)
   const existingCurrent = await storage.get(AUTOSAVE_CURRENT_KEY);
   if (existingCurrent) {
     await storage.set(AUTOSAVE_PREVIOUS_KEY, existingCurrent);
@@ -10294,9 +10288,9 @@ Previous autosave: Today at 14:01 (5 objects, 2 layers)  [Recover previous]
 The "Try previous" path is what makes T1-70 (recovery alert) actionable: when latest fails, the user has a real next step.
 
 **Tests:** `tests/autosave-previous-slot.test.ts`:
-- Three sequential writes. Read previous → second-most-recent.
-- Read current → latest.
-- Corrupted current → readAutosave('current') throws; readAutosave('previous') returns valid record.
+- Three sequential writes. Read previous 鈫?second-most-recent.
+- Read current 鈫?latest.
+- Corrupted current 鈫?readAutosave('current') throws; readAutosave('previous') returns valid record.
 
 **Estimate:** ~1 session. Slot logic + recovery UI updates + tests.
 
@@ -10310,12 +10304,12 @@ The "Try previous" path is what makes T1-70 (recovery alert) actionable: when la
 
 **Code reference:** `src/core/scene/Scene.ts:76-77` (metadata has only `deviceProfileId`), `src/io/SceneSerializer.ts:278` (persists ID only).
 
-**Problem:** Cross-check confirmed: project metadata stores `deviceProfileId` only, not a snapshot. If the user edits/deletes/renames the referenced profile after save, the loaded project depends on whatever the current profile is — which may be entirely different.
+**Problem:** Cross-check confirmed: project metadata stores `deviceProfileId` only, not a snapshot. If the user edits/deletes/renames the referenced profile after save, the loaded project depends on whatever the current profile is 鈥?which may be entirely different.
 
 Concrete scenarios:
-- User saves a project on Falcon A1 Pro (400×400, S1000, front-left origin).
+- User saves a project on Falcon A1 Pro (400脳400, S1000, front-left origin).
 - User later edits the profile to S255 to match a hardware change.
-- User reloads old project. Compile uses S255. Output power is wrong by 4×.
+- User reloads old project. Compile uses S255. Output power is wrong by 4脳.
 
 For a CAM application, project files MUST be reproducible. The current model isn't.
 
@@ -10328,7 +10322,7 @@ For a CAM application, project files MUST be reproducible. The current model isn
 metadata: {
   // ...
   deviceProfileId: string | null;
-  deviceProfileSnapshot?: DeviceProfile;  // NEW — full profile at save time
+  deviceProfileSnapshot?: DeviceProfile;  // NEW 鈥?full profile at save time
   // ...
 }
 ```
@@ -10358,13 +10352,13 @@ Load dialog:
 ```
 This project was saved with a different machine profile
 
-Saved profile:    Falcon A1 Pro (400×400, S1000)
-Current profile:  Falcon A1 Pro (400×400, S255)  ← Max spindle changed
+Saved profile:    Falcon A1 Pro (400脳400, S1000)
+Current profile:  Falcon A1 Pro (400脳400, S255)  鈫?Max spindle changed
 
 How do you want to proceed?
 
-[Use saved profile snapshot — preserves original behavior]
-[Use current profile  — accept the changes]
+[Use saved profile snapshot 鈥?preserves original behavior]
+[Use current profile  鈥?accept the changes]
 [Create new profile from snapshot]
 ```
 
@@ -10372,8 +10366,8 @@ The "saved snapshot" option creates a session-scoped profile override that doesn
 
 **Tests:** `tests/project-profile-snapshot.test.ts`:
 - Save project with profile A. Modify profile A. Load project. Assert dialog offers snapshot.
-- Save with profile, delete profile, load → 'profile-deleted' state.
-- Save with snapshot matching current → 'match' state, no dialog.
+- Save with profile, delete profile, load 鈫?'profile-deleted' state.
+- Save with snapshot matching current 鈫?'match' state, no dialog.
 
 **Estimate:** ~2-3 sessions. Schema + serialization + diff logic + dialog + tests.
 
@@ -10389,7 +10383,7 @@ The "saved snapshot" option creates a session-scoped profile override that doesn
 
 **Problem:** Same class of issue as T2-71 but for material presets. A layer's settings come from a material preset; if the preset library changes after save, the layer's effective settings diverge from what the user intended.
 
-Concrete: layer references `materialPresetId: "basswood-3mm-cut"`. The preset says 85% power, 220 mm/min. User updates the preset to 90% power, 200 mm/min after running tests. Old project loads — layer settings come from the new preset version. Compile produces different output.
+Concrete: layer references `materialPresetId: "basswood-3mm-cut"`. The preset says 85% power, 220 mm/min. User updates the preset to 90% power, 200 mm/min after running tests. Old project loads 鈥?layer settings come from the new preset version. Compile produces different output.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Critical failure 3 (material preset variant) + Required Priority 6.
 
@@ -10432,12 +10426,12 @@ Current preset version:
 [Keep saved settings]   [Update to new preset]
 ```
 
-Per-layer mismatch (some layers may be stale, others fresh) — dialog can list all affected layers in one summary.
+Per-layer mismatch (some layers may be stale, others fresh) 鈥?dialog can list all affected layers in one summary.
 
 **Tests:** `tests/material-preset-snapshot.test.ts`:
-- Apply preset to layer → snapshot captured.
-- Modify preset → next compile of saved project uses snapshot, not new preset.
-- "Update to new preset" → snapshot replaced with current preset.
+- Apply preset to layer 鈫?snapshot captured.
+- Modify preset 鈫?next compile of saved project uses snapshot, not new preset.
+- "Update to new preset" 鈫?snapshot replaced with current preset.
 
 **Estimate:** ~2 sessions. Schema + diff + UI + tests.
 
@@ -10447,9 +10441,9 @@ Per-layer mismatch (some layers may be stale, others fresh) — dialog can list 
 
 ---
 
-### T2-73 | Formal migration pipeline — version bumps with explicit migrations
+### T2-73 | Formal migration pipeline 鈥?version bumps with explicit migrations
 
-**Code reference:** `src/io/SceneSerializer.ts:27` (APP_VERSION = '0.1.0' hardcoded), various ad-hoc legacy compatibility branches scattered through deserializer (`_sourceText` → `sourceText` rename, legacy grayscale buffer formats, etc.).
+**Code reference:** `src/io/SceneSerializer.ts:27` (APP_VERSION = '0.1.0' hardcoded), various ad-hoc legacy compatibility branches scattered through deserializer (`_sourceText` 鈫?`sourceText` rename, legacy grayscale buffer formats, etc.).
 
 **Problem:** Audit 4D Versioning weakness: "the project file is versioned, but the migration strategy is not yet production-grade." The version stays at "1.0" while the schema evolves through ad-hoc compatibility patches inside deserialization functions. Future loaders cannot know what version of the schema they're looking at.
 
@@ -10500,9 +10494,9 @@ export function migrateProjectFile(raw: unknown): MigrationResult {
 ```
 
 Schema bumps follow rules:
-- **Patch (1.0 → 1.0.1):** No format change. Internal version increment only.
-- **Minor (1.0 → 1.1):** Backward-compatible. Old loader can still read; new fields are optional.
-- **Major (1.x → 2.0):** Breaking. New loader required; old loader rejects.
+- **Patch (1.0 鈫?1.0.1):** No format change. Internal version increment only.
+- **Minor (1.0 鈫?1.1):** Backward-compatible. Old loader can still read; new fields are optional.
+- **Major (1.x 鈫?2.0):** Breaking. New loader required; old loader rejects.
 
 Each migration has a test that:
 - Loads a frozen fixture file from the previous version
@@ -10513,28 +10507,28 @@ T1-72 (APP_VERSION wiring) provides the build-time constant. T2-73 builds the ve
 
 **Tests:** `tests/migration-pipeline.test.ts`:
 - Each migration has fixture-pair tests (before/after).
-- Skipping a migration version → throws.
-- Round-trip current-version save+load → no migrations applied.
+- Skipping a migration version 鈫?throws.
+- Round-trip current-version save+load 鈫?no migrations applied.
 
 **Estimate:** ~2-3 sessions. Framework + first 1-2 migrations + tests + version-bump documentation.
 
-**Priority:** Tier 2. Required before any new schema fields land (T2-71, T2-72 add `deviceProfileSnapshot`, `materialPresetSnapshot` — both should ride a version bump).
+**Priority:** Tier 2. Required before any new schema fields land (T2-71, T2-72 add `deviceProfileSnapshot`, `materialPresetSnapshot` 鈥?both should ride a version bump).
 
 **Cross-check note (audit 4D):** Audit's Versioning + Priority 7. Verified at SceneSerializer.ts:27.
 
 ---
 
-### T2-74 | Surface load repair report to user — `deserializeSceneWithReport`
+### T2-74 | Surface load repair report to user 鈥?`deserializeSceneWithReport`
 
 **Code reference:** `src/io/SceneSerializer.ts:285-313` (silent repairs to activeLayerId, orphan layerIds, broken parentIds, duplicate object IDs).
 
 **Problem:** Cross-check verified at exact lines. The deserializer makes silent modifications to loaded data:
-- Invalid `activeLayerId` → first layer (no warning at all)
-- Orphan layerId → first layer (`console.warn` only)
-- Broken parentId → null (silent)
-- Duplicate object IDs → filtered out (silent)
+- Invalid `activeLayerId` 鈫?first layer (no warning at all)
+- Orphan layerId 鈫?first layer (`console.warn` only)
+- Broken parentId 鈫?null (silent)
+- Duplicate object IDs 鈫?filtered out (silent)
 
-A user loading their own project may discover that two objects they explicitly grouped are now ungrouped, or that an object they placed on a deleted layer is now on a different layer — without knowing it happened.
+A user loading their own project may discover that two objects they explicitly grouped are now ungrouped, or that an object they placed on a deleted layer is now on a different layer 鈥?without knowing it happened.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Critical failure 5 + Required Priority 8.
 
@@ -10582,13 +10576,13 @@ Project opened with repairs
 
 The following changes were made to load this project:
 
-▸ 3 objects relocated
+鈻?3 objects relocated
   Their original layers no longer exist; they were moved to "Default Layer."
 
-▸ 1 duplicate object removed
+鈻?1 duplicate object removed
   Two objects shared the same ID; the second was removed.
 
-▸ 1 broken group reference cleared
+鈻?1 broken group reference cleared
   An object referenced a parent that was removed.
 
 This may indicate the project file was edited externally or saved with an
@@ -10603,8 +10597,8 @@ T1-71 (recovery prompt for setup-only projects) consumes the same report format 
 
 **Tests:** `tests/load-repair-report.test.ts`:
 - Each repair kind has a fixture that triggers it. Assert report.repairs contains the expected entry.
-- Clean project → empty repairs array.
-- Multiple repair kinds in one project → all reported.
+- Clean project 鈫?empty repairs array.
+- Multiple repair kinds in one project 鈫?all reported.
 
 **Estimate:** ~1-2 sessions. Schema + repair tracking + dialog UI + tests.
 
@@ -10616,7 +10610,7 @@ T1-71 (recovery prompt for setup-only projects) consumes the same report format 
 
 ### T2-75 | Deep geometry/settings validation on load
 
-**Code reference:** `src/io/SceneSerializer.ts` deserializer — validates transform finiteness but not geometry shape fields or layer setting numeric fields.
+**Code reference:** `src/io/SceneSerializer.ts` deserializer 鈥?validates transform finiteness but not geometry shape fields or layer setting numeric fields.
 
 **Problem:** Audit 4D Required Priority 9: many geometry and settings fields can be NaN, Infinity, negative, or absurdly large without being caught:
 - `rect.width`, `rect.height` not validated > 0
@@ -10626,7 +10620,7 @@ T1-71 (recovery prompt for setup-only projects) consumes the same report format 
 - Layer `power.min/max`, `speed`, `passes`, `fill.interval` not deeply validated
 - Path segment coordinates not all checked
 
-A corrupted but still parseable JSON can load successfully and crash later during compile, render, or preflight — far from the load site, making diagnosis hard.
+A corrupted but still parseable JSON can load successfully and crash later during compile, render, or preflight 鈥?far from the load site, making diagnosis hard.
 
 **Identified by:** Audit 4D (2026-04-26, ChatGPT) Required Priority 9.
 
@@ -10667,13 +10661,13 @@ Default mode is auto-repair (most failures are recoverable); user can opt into s
 
 ---
 
-### T2-76 | Single mutation transaction path — `commitSceneTransaction({ scene, reason, meta })`
+### T2-76 | Single mutation transaction path 鈥?`commitSceneTransaction({ scene, reason, meta })`
 
 **Code reference:** Currently scene mutations use a mix of paths:
-- `handleSceneCommit` (App.tsx:739-743) — marks dirty + history + setScene
-- `handleSceneChange` (App.tsx:734-736) — only setScene
-- Manual push pattern (App.tsx:1147-1153 in `handleDelete`) — pushes history + setScene, no dirty (T1-73 fixes)
-- Undo/redo (App.tsx:1132-1140) — only setScene + clear selection (T1-75 fixes invalidation)
+- `handleSceneCommit` (App.tsx:739-743) 鈥?marks dirty + history + setScene
+- `handleSceneChange` (App.tsx:734-736) 鈥?only setScene
+- Manual push pattern (App.tsx:1147-1153 in `handleDelete`) 鈥?pushes history + setScene, no dirty (T1-73 fixes)
+- Undo/redo (App.tsx:1132-1140) 鈥?only setScene + clear selection (T1-75 fixes invalidation)
 
 T1-73, T1-74, T1-75, T1-76 each fix one inconsistency. T2-76 generalizes: there should be ONE function for "the scene is changing, here's why," and every mutation path goes through it.
 
@@ -10709,7 +10703,7 @@ function commitSceneTransaction(
 
   setScene(nextScene);
 
-  // History — preview is excluded, history-navigation already moved cursor
+  // History 鈥?preview is excluded, history-navigation already moved cursor
   if (!isPreview && reason.kind !== 'history' && !isLoad) {
     historyRef.current.push(nextScene, {
       action: reason.kind === 'edit' ? reason.action : reason.kind,
@@ -10720,7 +10714,7 @@ function commitSceneTransaction(
   }
   if (isLoad) historyRef.current.reset(nextScene);
 
-  // Dirty — preview is excluded; load explicitly resets baseline
+  // Dirty 鈥?preview is excluded; load explicitly resets baseline
   if (isPreview) {
     // no-op
   } else if (isLoad) {
@@ -10730,7 +10724,7 @@ function commitSceneTransaction(
     sceneIsDirtyRef.current = true;
   }
 
-  // Invalidation — defaults vary by reason kind; meta can override
+  // Invalidation 鈥?defaults vary by reason kind; meta can override
   const invalidateCompile = meta?.invalidatesCompile ?? !isPreview;
   const invalidateFrame = meta?.invalidatesFrame ?? !isPreview;
   const invalidatePreflight = meta?.invalidatesPreflight ?? !isPreview;
@@ -10777,7 +10771,7 @@ const handleNewProject = (newScene: Scene) =>
   commitSceneTransaction(newScene, { kind: 'load', source: 'file' });
 ```
 
-T1-73, T1-74, T1-75, T1-76 ship first as targeted point-fixes. T2-76 then unifies them all under one function — the point-fixes provide the safety net during migration.
+T1-73, T1-74, T1-75, T1-76 ship first as targeted point-fixes. T2-76 then unifies them all under one function 鈥?the point-fixes provide the safety net during migration.
 
 **Tests:** `tests/scene-transaction-unified.test.ts`:
 - Each reason kind produces correct dirty / history / invalidation behavior.
@@ -10794,13 +10788,13 @@ T1-73, T1-74, T1-75, T1-76 ship first as targeted point-fixes. T2-76 then unifie
 
 ### T2-77 | Async revision guards on trace, image import, and other long-running scene producers
 
-**Code reference:** `src/ui/components/PropertiesPanel.tsx:200-280` (trace handler captures scene in closure, commits stale after async work — verified). Image import has the same pattern.
+**Code reference:** `src/ui/components/PropertiesPanel.tsx:200-280` (trace handler captures scene in closure, commits stale after async work 鈥?verified). Image import has the same pattern.
 
 **Problem:** Cross-check verified the trace handler captures `scene` from React closure at the start of the async operation, then `await`s `traceToSceneObjectAsync` (potentially seconds for large images), then commits a `newScene` built from the stale captured `scene` (PropertiesPanel.tsx:271-280):
 
 ```ts
 const newScene = {
-  ...scene,                                  // ← stale
+  ...scene,                                  // 鈫?stale
   layers: layersForCommit,
   activeLayerId: targetLayerId,
   objects: deleteImageAfterTrace
@@ -10823,7 +10817,7 @@ T1-57 (compile request-id guard from audit 4A) handles this for the compile mana
 export function useSceneRevisionCheck() {
   const sceneRevisionRef = useRef(0);
 
-  // Bump on every scene change — wired from App via context or zustand store
+  // Bump on every scene change 鈥?wired from App via context or zustand store
   useLayoutEffect(() => {
     sceneRevisionRef.current += 1;
   }, [scene]);
@@ -10866,14 +10860,14 @@ const handleTrace = async () => {
       const latestScene = sceneRef.current;
       const stillExists = latestScene.objects.some(o => o.id === targetObjectId);
       if (!stillExists && deleteImageAfterTrace) {
-        // Source image was already deleted — just add the trace
+        // Source image was already deleted 鈥?just add the trace
       }
       const newScene = applyTraceToScene(latestScene, finalObj, targetObjectId, deleteImageAfterTrace);
       commitSceneTransaction(newScene, { kind: 'async-result', operation: 'trace' });
       return;
     }
 
-    // No conflict — commit normally
+    // No conflict 鈥?commit normally
     const newScene = applyTraceToScene(scene, finalObj, targetObjectId, deleteImageAfterTrace);
     commitSceneTransaction(newScene, { kind: 'async-result', operation: 'trace' });
   } finally {
@@ -10884,13 +10878,13 @@ const handleTrace = async () => {
 
 Same pattern for image import (`importImageUnified`) and any other producer.
 
-The "apply to current scene" rebase logic needs care — for trace, it means using the latest scene's layer list and object list, but inserting the new traced object. If the source image was deleted in the meantime, the trace still adds the new path (deleting a non-existent image is a no-op).
+The "apply to current scene" rebase logic needs care 鈥?for trace, it means using the latest scene's layer list and object list, but inserting the new traced object. If the source image was deleted in the meantime, the trace still adds the new path (deleting a non-existent image is a no-op).
 
 **Tests:** `tests/async-scene-producer-guards.test.ts`:
-- Trace + edit during trace → conflict dialog shown.
-- Trace + no edits during trace → commits normally.
-- Discard choice → no scene change.
-- Apply-to-current choice → trace added to LATEST scene, not stale captured scene.
+- Trace + edit during trace 鈫?conflict dialog shown.
+- Trace + no edits during trace 鈫?commits normally.
+- Discard choice 鈫?no scene change.
+- Apply-to-current choice 鈫?trace added to LATEST scene, not stale captured scene.
 - Same scenarios for image import.
 
 **Estimate:** ~2 sessions. Hook + per-producer migration + dialog + tests.
@@ -10901,15 +10895,15 @@ The "apply to current scene" rebase logic needs care — for trace, it means usi
 
 ---
 
-### T2-78 | History entries with action metadata — name, timestamp, selectionBefore/After, invalidatesOutput
+### T2-78 | History entries with action metadata 鈥?name, timestamp, selectionBefore/After, invalidatesOutput
 
-**Code reference:** `src/ui/history/HistoryManager.ts:41` — `_stack: Scene[]` is a flat array of scenes with no metadata.
+**Code reference:** `src/ui/history/HistoryManager.ts:41` 鈥?`_stack: Scene[]` is a flat array of scenes with no metadata.
 
 **Problem:** Audit 4E Required Priority 7: history entries are bare scenes. There's no record of what action produced each entry. This blocks:
 - Action-named undo/redo UI ("Undo Move" / "Redo Paste")
 - Selection restore on undo (need `selectionBefore` and `selectionAfter`)
-- Debugging — which mutation produced this entry?
-- Future history coalescing (T2-80) — needs to know if consecutive entries are the same action
+- Debugging 鈥?which mutation produced this entry?
+- Future history coalescing (T2-80) 鈥?needs to know if consecutive entries are the same action
 - Audit/diagnostic tooling
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Required Priority 7.
@@ -10945,15 +10939,15 @@ class HistoryManager {
 `commitSceneTransaction` from T2-76 is the natural producer of this metadata.
 
 UI consumers:
-- Toolbar undo/redo buttons → tooltip shows "Undo Move" / "Redo Paste"
-- Cmd+Z keybinding → optional toast "Undid: Delete 3 objects"
-- Debug menu → list recent entries with timestamps
+- Toolbar undo/redo buttons 鈫?tooltip shows "Undo Move" / "Redo Paste"
+- Cmd+Z keybinding 鈫?optional toast "Undid: Delete 3 objects"
+- Debug menu 鈫?list recent entries with timestamps
 
-The default action name when not specified is `'edit'` — many existing call sites can ship without naming, then progressively get descriptive names.
+The default action name when not specified is `'edit'` 鈥?many existing call sites can ship without naming, then progressively get descriptive names.
 
 **Tests:** `tests/history-entry-metadata.test.ts`:
-- Push with metadata → undo returns entry with same metadata.
-- Push without name → defaults to 'edit'.
+- Push with metadata 鈫?undo returns entry with same metadata.
+- Push without name 鈫?defaults to 'edit'.
 - Existing tests still pass after migration.
 
 **Estimate:** ~1-2 sessions. Type changes + caller migration + UI integration + tests.
@@ -10966,14 +10960,14 @@ The default action name when not specified is `'edit'` — many existing call si
 
 ### T2-79 | Selection restore on undo / redo
 
-**Code reference:** `src/ui/components/App.tsx:1132-1140` — `setSelectedIds(new Set())` always clears selection on undo/redo.
+**Code reference:** `src/ui/components/App.tsx:1132-1140` 鈥?`setSelectedIds(new Set())` always clears selection on undo/redo.
 
 **Problem:** Audit 4E Critical failure 10 + Required Priority 8: undo/redo unconditionally clears selection. Safe (no stale IDs) but primitive. Professional editors restore selection meaningfully:
-- Undo delete → restored objects are selected (so the user can immediately see what came back)
-- Redo delete → selection clears (objects no longer exist)
-- Undo move → moved object stays selected
-- Undo paste → clipboard objects unselected (gone), prior selection restored
-- Redo paste → pasted objects selected (so user can keep working with them)
+- Undo delete 鈫?restored objects are selected (so the user can immediately see what came back)
+- Redo delete 鈫?selection clears (objects no longer exist)
+- Undo move 鈫?moved object stays selected
+- Undo paste 鈫?clipboard objects unselected (gone), prior selection restored
+- Redo paste 鈫?pasted objects selected (so user can keep working with them)
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical 10 + Priority 8.
 
@@ -11002,10 +10996,10 @@ const handleRedo = () => {
 Validation: before applying a stored selection, verify each ID still exists in the scene being applied. If any ID is missing (which shouldn't happen for entries produced by T2-78 but defensive coding), drop the missing ones.
 
 **Tests:** `tests/selection-restore.test.ts`:
-- Delete object, undo → object selected after undo.
-- Delete object, redo → selection empty.
-- Move object, undo → moved object stays selected.
-- Paste 3 objects, undo, redo → 3 pasted objects selected after redo.
+- Delete object, undo 鈫?object selected after undo.
+- Delete object, redo 鈫?selection empty.
+- Move object, undo 鈫?moved object stays selected.
+- Paste 3 objects, undo, redo 鈫?3 pasted objects selected after redo.
 
 **Estimate:** ~1 session. Depends on T2-78 metadata.
 
@@ -11015,13 +11009,13 @@ Validation: before applying a stored selection, verify each ID still exists in t
 
 ---
 
-### T2-80 | History coalescing for slider / numeric inputs — begin / preview / commit transactions
+### T2-80 | History coalescing for slider / numeric inputs 鈥?begin / preview / commit transactions
 
-**Code reference:** Layer power, layer speed, image brightness/contrast/gamma sliders, text spacing sliders. Various components — pattern is "every input event commits."
+**Code reference:** Layer power, layer speed, image brightness/contrast/gamma sliders, text spacing sliders. Various components 鈥?pattern is "every input event commits."
 
-**Problem:** Audit 4E Critical failure (atomicity, layer settings) + Required Priority 9: dragging a slider from 20 to 60 produces 40 history entries. User pressing Ctrl+Z one time goes 60→59, not 60→20. To undo a slider change, user has to press Ctrl+Z 40 times.
+**Problem:** Audit 4E Critical failure (atomicity, layer settings) + Required Priority 9: dragging a slider from 20 to 60 produces 40 history entries. User pressing Ctrl+Z one time goes 60鈫?9, not 60鈫?0. To undo a slider change, user has to press Ctrl+Z 40 times.
 
-T1-74 (text patchTextGeometry → onSceneCommit) ships the simpler "always commit" model first, knowing it produces too many entries. T2-80 then fixes the volume.
+T1-74 (text patchTextGeometry 鈫?onSceneCommit) ships the simpler "always commit" model first, knowing it produces too many entries. T2-80 then fixes the volume.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Atomicity findings + Required Priority 9.
 
@@ -11079,28 +11073,28 @@ const tx = useSliderTransaction();
 
 For keyboard input fields (number boxes), the equivalent is begin on focus, preview on every keystroke (or debounced), commit on blur or Enter.
 
-This refines/replaces T1-74's "always commit" stopgap — text spacing sliders go from 40 entries per drag to 1.
+This refines/replaces T1-74's "always commit" stopgap 鈥?text spacing sliders go from 40 entries per drag to 1.
 
 **Tests:** `tests/slider-transactions.test.ts`:
-- Drag slider from 20 to 60 (40 onChange events) → exactly 1 history entry.
-- Drag, release → undo restores 20 directly.
-- Drag, cancel via lost pointer capture → scene restored, no history entry.
+- Drag slider from 20 to 60 (40 onChange events) 鈫?exactly 1 history entry.
+- Drag, release 鈫?undo restores 20 directly.
+- Drag, cancel via lost pointer capture 鈫?scene restored, no history entry.
 
 **Estimate:** ~2 sessions. Hook + caller migration (multiple slider components) + tests.
 
-**Priority:** Tier 2. UX polish — high impact for users who use sliders heavily (raster work, fine power tuning).
+**Priority:** Tier 2. UX polish 鈥?high impact for users who use sliders heavily (raster work, fine power tuning).
 
 **Cross-check note (audit 4E):** Audit's Atomicity findings + Priority 9.
 
 ---
 
-### T2-81 | Raster buffers stored outside history — image params in history, generated buffers in cache
+### T2-81 | Raster buffers stored outside history 鈥?image params in history, generated buffers in cache
 
 **Code reference:** Image objects have `_grayscaleData`, `_adjustedData` Uint8Array buffers. These ride along inside Scene snapshots in history. ImageStore.ts already separates raw image data from scene serialization for autosave purposes; T2-81 extends this to history.
 
 **Problem:** Audit 4E Critical failure 8 + Required Priority 10: a single raster image's `adjustedData` can be megabytes. An image-heavy project doing slider-driven brightness adjustments stores a new buffer in scene snapshots on every commit. With max history size 100, this can balloon to hundreds of MB.
 
-ImageStore already established the pattern: image bytes live in IndexedDB, scene objects reference them by ID. History should follow the same model — history snapshots store image references and parameters, not regenerated buffers.
+ImageStore already established the pattern: image bytes live in IndexedDB, scene objects reference them by ID. History should follow the same model 鈥?history snapshots store image references and parameters, not regenerated buffers.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical 8 + Priority 10.
 
@@ -11110,16 +11104,16 @@ ImageStore already established the pattern: image bytes live in IndexedDB, scene
 - crop/resolution parameters
 
 NOT:
-- `_grayscaleData` — derive from imageId + crop on demand
-- `_adjustedData` — derive from imageId + params on demand
+- `_grayscaleData` 鈥?derive from imageId + crop on demand
+- `_adjustedData` 鈥?derive from imageId + params on demand
 
 A separate adjusted-buffer cache keyed by `imageId + paramHash` lives outside history. When undo/redo restores an old scene, the cache lookup re-derives buffers (or re-runs the adjustment computation). Scene snapshots stay small.
 
-This requires the adjustment pipeline to be deterministic and idempotent — same params + same source = same output. That's already true in the existing code; the change is structural (where we cache) not algorithmic.
+This requires the adjustment pipeline to be deterministic and idempotent 鈥?same params + same source = same output. That's already true in the existing code; the change is structural (where we cache) not algorithmic.
 
 **Tests:** `tests/raster-buffers-out-of-history.test.ts`:
-- 100 brightness-slider commits on a 5MB image → history total memory < 50MB (params only).
-- Undo to old brightness → adjusted buffer cache hit OR re-derived correctly.
+- 100 brightness-slider commits on a 5MB image 鈫?history total memory < 50MB (params only).
+- Undo to old brightness 鈫?adjusted buffer cache hit OR re-derived correctly.
 
 **Estimate:** ~3-4 sessions. Significant refactor: adjustment pipeline split, cache layer, scene serialization changes. Pairs with T2-72 (material preset snapshot) which has similar "snapshot vs reference" tension.
 
@@ -11129,9 +11123,9 @@ This requires the adjustment pipeline to be deterministic and idempotent — sam
 
 ---
 
-### T2-82 | History memory budget — both count and approximate-bytes limits
+### T2-82 | History memory budget 鈥?both count and approximate-bytes limits
 
-**Code reference:** `src/ui/history/HistoryManager.ts:46` — `constructor(maxSize: number = 100)`. Single count limit, no byte budget.
+**Code reference:** `src/ui/history/HistoryManager.ts:46` 鈥?`constructor(maxSize: number = 100)`. Single count limit, no byte budget.
 
 **Problem:** Audit 4E Required Priority 11: count-based limit alone is insufficient for image-heavy projects. 50 entries with 5MB images = 250MB, well over what most browsers tolerate before slowdowns. T2-81 reduces per-entry size by moving rasters out, but a budget is still needed for cases T2-81 can't fully address (large path geometries, many text objects with complex glyphs).
 
@@ -11147,7 +11141,7 @@ class HistoryManager {
   ) { /* ... */ }
 
   private estimateEntryBytes(entry: HistoryEntry): number {
-    // Rough estimate — JSON.stringify length is a reasonable proxy
+    // Rough estimate 鈥?JSON.stringify length is a reasonable proxy
     // For T2-81 era, image references are tiny; total is dominated by paths.
     return JSON.stringify(entry.scene).length;
   }
@@ -11180,8 +11174,8 @@ Consider reducing image resolution or using fewer raster objects.
 ```
 
 **Tests:** `tests/history-memory-budget.test.ts`:
-- Push 200 small scenes → only 100 retained (count limit).
-- Push 50 large scenes (each 5MB) → eviction triggers when bytes exceed 100MB.
+- Push 200 small scenes 鈫?only 100 retained (count limit).
+- Push 50 large scenes (each 5MB) 鈫?eviction triggers when bytes exceed 100MB.
 - Always retain at least one entry.
 
 **Estimate:** ~1 session.
@@ -11194,9 +11188,9 @@ Consider reducing image resolution or using fewer raster objects.
 
 ### T2-83 | Block or quarantine undo / redo while job is running
 
-**Code reference:** Currently undo/redo (App.tsx:1132-1140) has no check for `isJobRunning`. The compile manager's scene-revision effect (useCompileManager.ts:94) DOES bail when running, but that just prevents recompile — it doesn't prevent the user from triggering undo and changing the visible scene.
+**Code reference:** Currently undo/redo (App.tsx:1132-1140) has no check for `isJobRunning`. The compile manager's scene-revision effect (useCompileManager.ts:94) DOES bail when running, but that just prevents recompile 鈥?it doesn't prevent the user from triggering undo and changing the visible scene.
 
-**Problem:** Audit 4E Required Priority 13: while a job is streaming, the active job context is pinned (good — refines T2-53 job session state machine). But the visible scene can drift if the user undoes design changes during streaming. UI can show a different design than what's actually being burned.
+**Problem:** Audit 4E Required Priority 13: while a job is streaming, the active job context is pinned (good 鈥?refines T2-53 job session state machine). But the visible scene can drift if the user undoes design changes during streaming. UI can show a different design than what's actually being burned.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Critical risk (undo while running) + Priority 13.
 
@@ -11207,7 +11201,7 @@ Consider reducing image resolution or using fewer raster objects.
 ```ts
 const handleUndo = useCallback(() => {
   if (isJobRunning) {
-    appendMessage('⚠ Undo blocked: a job is running. Stop the job first to edit the design.');
+    appendMessage('鈿?Undo blocked: a job is running. Stop the job first to edit the design.');
     return;
   }
   const prev = historyRef.current.undo();
@@ -11224,8 +11218,8 @@ This is a fuller solution but requires the job session state machine (T2-53) to 
 **Recommendation:** Ship Option A as T2-83 (immediate safety). Schedule Option B as part of T2-53's full implementation.
 
 **Tests:** `tests/undo-during-job.test.ts`:
-- Start job → assert undo button disabled, keyboard shortcut shows blocked message.
-- Stop job → undo/redo work normally.
+- Start job 鈫?assert undo button disabled, keyboard shortcut shows blocked message.
+- Stop job 鈫?undo/redo work normally.
 
 **Estimate:** ~1 session for Option A.
 
@@ -11239,19 +11233,19 @@ This is a fuller solution but requires the job session state machine (T2-53) to 
 
 **Code reference:** Currently runtime state is scattered across `App.tsx` (refs and useStates), `MachineService`, `ExecutionCoordinator`, `useCompileManager`, `ConnectionPanelMain`, profile storage, and others. No single container holds them.
 
-**Problem:** Audit 4F Critical failure 1 + Required Priority 1: "LaserForge does not have a unified state model for: project, editor, compile, frame, machine, job, recovery, persistence." This is a synthesis observation across the entire 4-series — every previous audit identified one or more pieces of scattered state, and 4F names the missing meta-structure that would tie them together.
+**Problem:** Audit 4F Critical failure 1 + Required Priority 1: "LaserForge does not have a unified state model for: project, editor, compile, frame, machine, job, recovery, persistence." This is a synthesis observation across the entire 4-series 鈥?every previous audit identified one or more pieces of scattered state, and 4F names the missing meta-structure that would tie them together.
 
 The individual pieces are being filed:
-- **`CompiledJobState`** → T2-51 (audit 4A)
-- **`MachineSessionState`** (extended safety state machine) → T2-44 (audit 3D)
-- **`JobSessionState`** → T2-53 (audit 4A)
-- **`FrameState`** explicit type → T2-86 (this audit)
-- **`RecoveryState`** explicit type → T2-87 (this audit)
-- **`PersistenceState`** (autosave status, save-status, last-saved-hash) → currently scattered, partial coverage in T2-69
-- **`ProjectState`** (the loaded scene + metadata snapshot) → currently the bare `scene` state
-- **`EditorState`** (selection, viewport, dialog visibility, etc.) → currently scattered useStates
+- **`CompiledJobState`** 鈫?T2-51 (audit 4A)
+- **`MachineSessionState`** (extended safety state machine) 鈫?T2-44 (audit 3D)
+- **`JobSessionState`** 鈫?T2-53 (audit 4A)
+- **`FrameState`** explicit type 鈫?T2-86 (this audit)
+- **`RecoveryState`** explicit type 鈫?T2-87 (this audit)
+- **`PersistenceState`** (autosave status, save-status, last-saved-hash) 鈫?currently scattered, partial coverage in T2-69
+- **`ProjectState`** (the loaded scene + metadata snapshot) 鈫?currently the bare `scene` state
+- **`EditorState`** (selection, viewport, dialog visibility, etc.) 鈫?currently scattered useStates
 
-T2-84 is the meta-ticket that brings these pieces together once they exist individually. It's NOT a "rewrite everything" ticket — each piece has its own ticket. T2-84 is the coordination structure that holds them and provides a single subscribe point for cross-cutting concerns (debug overlays, transition log, error reporter).
+T2-84 is the meta-ticket that brings these pieces together once they exist individually. It's NOT a "rewrite everything" ticket 鈥?each piece has its own ticket. T2-84 is the coordination structure that holds them and provides a single subscribe point for cross-cutting concerns (debug overlays, transition log, error reporter).
 
 **Identified by:** Audit 4F (2026-04-26, ChatGPT) Critical failure 1 + Required Priority 1.
 
@@ -11311,7 +11305,7 @@ Cross-cutting consumers (debug overlay, transition log, error reporter) subscrib
 2. T2-44 (MachineSessionState extended), T2-53 (JobSessionState), T2-86 (FrameState), T2-87 (RecoveryState) land in any order
 3. T2-84 then composes them into the container
 
-Trying to land T2-84 first (before its constituents) would mean defining placeholder types for sub-states and refactoring everything to use the placeholders — a lot of churn for no value.
+Trying to land T2-84 first (before its constituents) would mean defining placeholder types for sub-states and refactoring everything to use the placeholders 鈥?a lot of churn for no value.
 
 **Tests:** `tests/runtime-state-store.test.ts`:
 - Store updates propagate to subscribers.
@@ -11326,9 +11320,9 @@ Trying to land T2-84 first (before its constituents) would mean defining placeho
 
 ---
 
-### T2-85 | Explicit `JobFingerprint` type — refines T2-51
+### T2-85 | Explicit `JobFingerprint` type 鈥?refines T2-51
 
-**Code reference:** `src/core/job/ValidatedJobTicket.ts:18-25` currently has `sceneHash + profileHash + gcodeHash + controllerType` — only 4 fields. Audit 4F prescribes 7 fields.
+**Code reference:** `src/core/job/ValidatedJobTicket.ts:18-25` currently has `sceneHash + profileHash + gcodeHash + controllerType` 鈥?only 4 fields. Audit 4F prescribes 7 fields.
 
 **Problem:** Audit 4F Required Priority 3 + Critical failure 2: a compiled job is currently invalidated only by scene/profile/gcode/controller mismatches. But the job result is also a function of:
 - start mode
@@ -11347,7 +11341,7 @@ If any of those change between compile and start, the job result is silently wro
 export interface JobFingerprint {
   sceneHash: string;
   profileHash: string;
-  materialHash: string;             // new — covers material preset state
+  materialHash: string;             // new 鈥?covers material preset state
   startMode: string;                // 'bed' | 'head' | 'origin'
   savedOriginHash: string;          // hash of {x, y} or 'none'
   machineCapabilitiesHash: string;  // depends on T2-25
@@ -11398,8 +11392,8 @@ Recompile to continue.
 ```
 
 **Tests:** `tests/job-fingerprint.test.ts`:
-- Same inputs → identical fingerprints.
-- Single field change → fingerprintsEqual returns false.
+- Same inputs 鈫?identical fingerprints.
+- Single field change 鈫?fingerprintsEqual returns false.
 - Diff function returns specific changed fields.
 
 **Estimate:** ~1-2 sessions. Type + builder + diff + ValidatedJobTicket migration + tests. Depends on T2-25 (capabilities) for the machineCapabilitiesHash.
@@ -11460,15 +11454,15 @@ const canStart = compile.status === 'ready'
               && recovery.status === 'none';
 ```
 
-UI surfaces `frame.status` directly — different copy per state:
-- `'none'` → "Frame the job before starting"
-- `'running'` → "Framing in progress…"
-- `'valid'` → "✓ Framed (safe mode) — bounds 124 × 78 mm"
-- `'stale'` → "Frame is stale (design changed). Frame again."
-- `'failed'` → specific reason + recovery card from T2-62
+UI surfaces `frame.status` directly 鈥?different copy per state:
+- `'none'` 鈫?"Frame the job before starting"
+- `'running'` 鈫?"Framing in progress鈥?
+- `'valid'` 鈫?"鉁?Framed (safe mode) 鈥?bounds 124 脳 78 mm"
+- `'stale'` 鈫?"Frame is stale (design changed). Frame again."
+- `'failed'` 鈫?specific reason + recovery card from T2-62
 
 **Tests:** `tests/frame-state-transitions.test.ts`:
-- Each transition (none → running → valid; valid → stale on scene change; valid → failed on alarm).
+- Each transition (none 鈫?running 鈫?valid; valid 鈫?stale on scene change; valid 鈫?failed on alarm).
 - canStart rule consumes frame.status correctly.
 
 **Estimate:** ~1-2 sessions. Type + transitions + UI integration + tests. Depends on T2-60 (invalidation triggers) and T2-85 (JobFingerprint).
@@ -11481,7 +11475,7 @@ UI surfaces `frame.status` directly — different copy per state:
 
 ### T2-87 | Explicit `RecoveryState` state machine
 
-**Code reference:** Currently recovery is implicit — alarm banner, unlock button, message log, scattered preflight blockers. No unified "recovery is required and incomplete" state.
+**Code reference:** Currently recovery is implicit 鈥?alarm banner, unlock button, message log, scattered preflight blockers. No unified "recovery is required and incomplete" state.
 
 **Problem:** Audit 4F Critical failure 7 + Required Priority 5: errors are detected but recovery is mostly messaging rather than blocking state. The audit prescribes an explicit state machine that consolidates pieces from T2-62 (recovery cards UI), T2-66 (positionTrusted), T2-67 (job outcome enum) into a single RecoveryState.
 
@@ -11539,35 +11533,24 @@ export function recoveryAllowsStart(r: RecoveryState): boolean {
 Hard rule: `canStart` consumes `recoveryAllowsStart(recovery)`. Start is impossible while recovery is incomplete, regardless of any other state.
 
 Recovery transitions out of each state require specific user actions:
-- `'alarm'` → cleared by: (inspect-acknowledged AND unlock AND home AND frame). Not just unlock alone.
-- `'disconnectDuringJob'` → cleared by: (reconnect AND home AND frame).
-- `'emergencyStopped'` → cleared by: (reconnect AND home AND frame).
-- `'frameFailed'` → cleared by: successful frame.
-- `'compileFailed'` → cleared by: successful compile.
+- `'alarm'` 鈫?cleared by: (inspect-acknowledged AND unlock AND home AND frame). Not just unlock alone.
+- `'disconnectDuringJob'` 鈫?cleared by: (reconnect AND home AND frame).
+- `'emergencyStopped'` 鈫?cleared by: (reconnect AND home AND frame).
+- `'frameFailed'` 鈫?cleared by: successful frame.
+- `'compileFailed'` 鈫?cleared by: successful compile.
 
 T2-62's recovery cards become the UI surface for each state:
 
 ```
-┌─────────────────────────────────────────┐
-│ Recovery required: Machine alarm        │
-│                                         │
-│  ☑ Inspect machine                      │
-│  ☑ Click Unlock                         │
-│  ☐ Re-home                              │
-│  ☐ Frame again                          │
-│                                         │
-│  Start is blocked until all steps       │
-│  complete.                              │
-└─────────────────────────────────────────┘
-```
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Recovery required: Machine alarm        鈹?鈹?                                        鈹?鈹? 鈽?Inspect machine                      鈹?鈹? 鈽?Click Unlock                         鈹?鈹? 鈽?Re-home                              鈹?鈹? 鈽?Frame again                          鈹?鈹?                                        鈹?鈹? Start is blocked until all steps       鈹?鈹? complete.                              鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
 
 When the last checkbox checks, `RecoveryState` transitions to `'none'` and Start unblocks.
 
 **Tests:** `tests/recovery-state-transitions.test.ts`:
-- Alarm → recovery state populated correctly.
-- Partial recovery (unlock done, not framed) → recovery still active.
-- Full recovery sequence → recovery transitions to 'none', Start unblocks.
-- Concurrent recovery causes (alarm AND disconnect) → most-severe wins.
+- Alarm 鈫?recovery state populated correctly.
+- Partial recovery (unlock done, not framed) 鈫?recovery still active.
+- Full recovery sequence 鈫?recovery transitions to 'none', Start unblocks.
+- Concurrent recovery causes (alarm AND disconnect) 鈫?most-severe wins.
 
 **Estimate:** ~2 sessions. Type + transitions + UI integration + tests.
 
@@ -11577,7 +11560,7 @@ When the last checkbox checks, `RecoveryState` transitions to `'none'` and Start
 
 ---
 
-### T2-88 | Hash-derived dirty state — replace manual `sceneIsDirtyRef` toggling
+### T2-88 | Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling
 
 **Code reference:** `sceneIsDirtyRef.current = true` / `false` scattered across App.tsx, useFileHandlers.ts, autosave path. T1-75 (audit 4E) sets it on undo/redo as a stopgap; T2-88 is the proper fix.
 
@@ -11590,7 +11573,7 @@ dirty = hash(currentPersistableScene) !== hash(lastConfirmedSavedScene)
 ```
 
 This makes dirty correct by construction:
-- New mutation site? Doesn't matter — dirty is computed.
+- New mutation site? Doesn't matter 鈥?dirty is computed.
 - User undoes back to last saved state? Dirty becomes false automatically.
 - User redoes away from last saved state? Dirty becomes true automatically.
 - User makes change A, then change B, then change inverse-A, then inverse-B (round trip back to saved)? Dirty becomes false. Manual flagging cannot do this.
@@ -11610,7 +11593,7 @@ export interface PersistenceState {
 
 export function isDirty(scene: Scene, persistence: PersistenceState): boolean {
   if (persistence.lastSavedSceneHash === null) {
-    // Never saved — dirty if scene has any meaningful content (T1-71's "non-empty" test)
+    // Never saved 鈥?dirty if scene has any meaningful content (T1-71's "non-empty" test)
     return hasContentBeyondInitial(scene);
   }
   const currentHash = hashSceneForPersistence(scene);
@@ -11634,23 +11617,23 @@ async function commitAutosave(scene: Scene): Promise<void> {
 }
 ```
 
-UI consumes `isDirty(scene, persistence)` — no more `sceneIsDirtyRef.current` reads. The dirty flag becomes a derived selector, not stored state. T1-73, T1-74, T1-75 stopgaps become dead code (they were setting a value that's no longer read).
+UI consumes `isDirty(scene, persistence)` 鈥?no more `sceneIsDirtyRef.current` reads. The dirty flag becomes a derived selector, not stored state. T1-73, T1-74, T1-75 stopgaps become dead code (they were setting a value that's no longer read).
 
-`hashSceneForPersistence` is canonical — same scene → same hash regardless of property order, ID enumeration order, etc. This is the same canonicalization needed for T3-77 (project integrity checksum) — the two share infrastructure.
+`hashSceneForPersistence` is canonical 鈥?same scene 鈫?same hash regardless of property order, ID enumeration order, etc. This is the same canonicalization needed for T3-77 (project integrity checksum) 鈥?the two share infrastructure.
 
 **Migration concern.** Hashing the entire scene on every change has a cost. For large projects, this could be tens of milliseconds per mutation. Mitigations:
 1. Hash only after debounced settle (10-100ms after last mutation).
-2. Use a structural hash that exploits immutable scene-op references — only re-hash subtrees that changed.
+2. Use a structural hash that exploits immutable scene-op references 鈥?only re-hash subtrees that changed.
 3. Lazy: compute on demand (autosave check, save dialog open) rather than on every mutation.
 
 For T2-88's first ship, lazy on-demand is the simplest and avoids the cost entirely outside the autosave path.
 
 **Tests:** `tests/dirty-derivation.test.ts`:
-- Scene == saved → not dirty.
-- Scene mutated → dirty.
-- Scene mutated then undone back to saved → not dirty.
-- Save → not dirty.
-- Save → mutate → not-saved hash unchanged → dirty.
+- Scene == saved 鈫?not dirty.
+- Scene mutated 鈫?dirty.
+- Scene mutated then undone back to saved 鈫?not dirty.
+- Save 鈫?not dirty.
+- Save 鈫?mutate 鈫?not-saved hash unchanged 鈫?dirty.
 
 **Estimate:** ~2 sessions. Hash function + canonicalization + persistence state + caller migration + tests.
 
@@ -11660,14 +11643,14 @@ For T2-88's first ship, lazy on-demand is the simplest and avoids the cost entir
 
 ---
 
-### T2-89 | Server-side entitlement service — signed token issuance
+### T2-89 | Server-side entitlement service 鈥?signed token issuance
 
 **Code reference:** Currently `EntitlementService.verifyGumroad` (EntitlementService.ts:252-312) calls `https://api.gumroad.com/v2/licenses/verify` directly from the client. No LaserForge-controlled server in the flow.
 
-**Problem:** Audit 5A Critical failure 2 + Required Priority 2: relying only on client → Gumroad means:
+**Problem:** Audit 5A Critical failure 2 + Required Priority 2: relying only on client 鈫?Gumroad means:
 - The client trusts Gumroad's response and stores a local cache.
 - There's no business-rule enforcement (refund-window grace, manual revocations, plan changes, device limits, abuse detection).
-- Token format is whatever Gumroad returns plus client-stored JSON — no LaserForge-issued cryptographic guarantee.
+- Token format is whatever Gumroad returns plus client-stored JSON 鈥?no LaserForge-issued cryptographic guarantee.
 - Client can be patched to skip Gumroad entirely.
 
 A proper commercial entitlement system has a LaserForge-controlled server that:
@@ -11677,7 +11660,7 @@ A proper commercial entitlement system has a LaserForge-controlled server that:
 
 **Identified by:** Audit 5A (2026-04-26, ChatGPT) Critical 2 + Priority 2.
 
-**Fix:** Stand up a minimal entitlement server. Stack-agnostic — could be Cloudflare Workers, Vercel Functions, AWS Lambda, anything that can sign tokens. Endpoints:
+**Fix:** Stand up a minimal entitlement server. Stack-agnostic 鈥?could be Cloudflare Workers, Vercel Functions, AWS Lambda, anything that can sign tokens. Endpoints:
 
 ```
 POST /entitlement/activate
@@ -11695,7 +11678,7 @@ POST /entitlement/refresh
 
 GET /entitlement/public-key
   Returns: PEM-encoded public key (matches private key used to sign tokens).
-  (In practice the public key is embedded in the client at build time, not fetched at runtime — but exposing the endpoint makes it easy to verify CI uses the right key.)
+  (In practice the public key is embedded in the client at build time, not fetched at runtime 鈥?but exposing the endpoint makes it easy to verify CI uses the right key.)
 ```
 
 Token shape (Ed25519 or ECDSA P-256):
@@ -11704,9 +11687,9 @@ Token shape (Ed25519 or ECDSA P-256):
 // Signed payload
 interface EntitlementTokenPayload {
   iss: 'laserforge';            // issuer
-  sub: string;                  // subject — license ID or user identifier
+  sub: string;                  // subject 鈥?license ID or user identifier
   tier: 'free' | 'paid' | 'tester';
-  features: string[];           // explicit feature list — supports per-plan granularity
+  features: string[];           // explicit feature list 鈥?supports per-plan granularity
   iat: number;                  // issued at (server time)
   exp: number;                  // expires at
   jti: string;                  // unique token ID for revocation
@@ -11720,14 +11703,14 @@ The Gumroad direct-verify path stays as a fallback for offline-grace scenarios w
 
 **Phased delivery:**
 - **Phase 1:** server stands up, issues tokens. Client gains an "if token present, prefer it" path.
-- **Phase 2:** client requires server tokens — direct Gumroad path retired.
+- **Phase 2:** client requires server tokens 鈥?direct Gumroad path retired.
 - **Phase 3:** add device binding, plan granularity, revocation API.
 
 **Tests:** integration tests against a staging server endpoint. Mock the server in unit tests.
 
 **Estimate:** ~3-5 sessions for Phase 1 (server + client signed-token verify). Phases 2-3 are separate work.
 
-**Priority:** Tier 2 — the real fix for the commercial-credibility gap. T1-77 ships the immediate stopgap (remove tester secret); T2-89 ships the structural fix.
+**Priority:** Tier 2 鈥?the real fix for the commercial-credibility gap. T1-77 ships the immediate stopgap (remove tester secret); T2-89 ships the structural fix.
 
 **Cross-check note (audit 5A):** Audit's Critical 2 + Priority 2.
 
@@ -11735,7 +11718,7 @@ The Gumroad direct-verify path stays as a fallback for offline-grace scenarios w
 
 ### T2-90 | Signed local entitlement token with public-key verification
 
-**Code reference:** `src/entitlements/EntitlementService.ts:238-250` — `setCachedLicense` writes raw JSON.
+**Code reference:** `src/entitlements/EntitlementService.ts:238-250` 鈥?`setCachedLicense` writes raw JSON.
 
 **Problem:** Audit 5A Critical failure 3 + Required Priority 3: local cache has no signature. A user can edit `laserforge_license_cache` in IndexedDB to:
 
@@ -11760,7 +11743,7 @@ export interface SignedEntitlementToken {
   payload: string;              // base64url-encoded JSON of EntitlementTokenPayload
   signature: string;             // base64url-encoded Ed25519/ECDSA signature
   alg: 'EdDSA' | 'ES256';        // signing algorithm
-  kid: string;                   // key ID — supports key rotation
+  kid: string;                   // key ID 鈥?supports key rotation
 }
 
 export const ENTITLEMENT_PUBLIC_KEY: JsonWebKey = {
@@ -11816,10 +11799,10 @@ A user editing the cache JSON now produces an invalid signature and the verifica
 
 **Tests:** `tests/signed-entitlement-token.test.ts`:
 - Valid token verifies.
-- Tampered payload → verification fails.
-- Tampered signature → verification fails.
-- Wrong public key → verification fails.
-- Expired token (exp < now) → still verifies cryptographically but caller must check exp.
+- Tampered payload 鈫?verification fails.
+- Tampered signature 鈫?verification fails.
+- Wrong public key 鈫?verification fails.
+- Expired token (exp < now) 鈫?still verifies cryptographically but caller must check exp.
 
 **Estimate:** ~2 sessions. Token format + crypto + cache migration + tests. Depends on T2-89 (server-issued tokens).
 
@@ -11829,11 +11812,11 @@ A user editing the cache JSON now produces an invalid signature and the verifica
 
 ---
 
-### T2-91 | Feature enforcement registry — `FEATURE_MATRIX` with per-feature `enforce` declarations
+### T2-91 | Feature enforcement registry 鈥?`FEATURE_MATRIX` with per-feature `enforce` declarations
 
 **Code reference:** Pro features listed at `src/entitlements/types.ts:1-15`. Enforcement scattered: compile-time (JobCompiler.ts:76-81), service-level (Nester.ts:65, BooleanOps.ts:193, hooks), UI-only (App.tsx:1521-1523 box generator).
 
-**Problem:** Audit 5A Required Priority 5: there's no central registry that says, for each Pro feature, where enforcement must occur. The current state is "look at each feature individually and hope" — which is exactly how box_generator ended up with no service gate (T1-79).
+**Problem:** Audit 5A Required Priority 5: there's no central registry that says, for each Pro feature, where enforcement must occur. The current state is "look at each feature individually and hope" 鈥?which is exactly how box_generator ended up with no service gate (T1-79).
 
 **Identified by:** Audit 5A (2026-04-26, ChatGPT) Required Priority 5.
 
@@ -11913,13 +11896,13 @@ The test suite then catches future regressions: if someone adds a Pro feature to
 
 ---
 
-### T2-92 | Per-feature granular `canUse` — replace single `hasPro` boolean
+### T2-92 | Per-feature granular `canUse` 鈥?replace single `hasPro` boolean
 
 **Code reference:** `src/entitlements/EntitlementService.ts:37-40`:
 
 ```ts
 canUse(feature: ProFeature): boolean {
-  void feature;                                // ← parameter ignored
+  void feature;                                // 鈫?parameter ignored
   return this.state.hasPro;
 }
 ```
@@ -11947,7 +11930,7 @@ export class EntitlementService {
   }
 
   hasPro(): boolean {
-    // Legacy compatibility — true if user has access to any pro feature.
+    // Legacy compatibility 鈥?true if user has access to any pro feature.
     return this.state.features.length > 0 || this.state.tier === 'developer' || this.state.tier === 'tester_permanent';
   }
 }
@@ -11958,12 +11941,12 @@ The `features` array is populated from:
 - All-features-list for developer/tester tiers (current behavior preserved)
 - Empty for free tier
 
-`hasPro()` becomes a derived helper for "any Pro feature" — useful for "Upgrade to Pro" CTAs that don't care which feature. Specific feature checks use `canUse(feature)`.
+`hasPro()` becomes a derived helper for "any Pro feature" 鈥?useful for "Upgrade to Pro" CTAs that don't care which feature. Specific feature checks use `canUse(feature)`.
 
 **Tests:** `tests/per-feature-granularity.test.ts`:
-- Token with features=['nesting'] → canUse('nesting')=true, canUse('boolean_ops')=false.
-- Developer tier → all features true regardless of features array.
-- Free tier → all features false.
+- Token with features=['nesting'] 鈫?canUse('nesting')=true, canUse('boolean_ops')=false.
+- Developer tier 鈫?all features true regardless of features array.
+- Free tier 鈫?all features false.
 
 **Estimate:** ~1-2 sessions. State expansion + caller migration (most callers already pass the feature param, just no logic ran on it).
 
@@ -11973,9 +11956,9 @@ The `features` array is populated from:
 
 ---
 
-### T2-93 | License status enum — `LicenseStatus` first-class
+### T2-93 | License status enum 鈥?`LicenseStatus` first-class
 
-**Code reference:** Currently the entitlement state has `tier` and `hasPro` — no explicit status indicating verification confidence. T1-80 ships a stopgap (status field added with basic states); T2-93 promotes it to a first-class enum that drives all license-state UI.
+**Code reference:** Currently the entitlement state has `tier` and `hasPro` 鈥?no explicit status indicating verification confidence. T1-80 ships a stopgap (status field added with basic states); T2-93 promotes it to a first-class enum that drives all license-state UI.
 
 **Problem:** Audit 5A Required Priority 8: status should be explicit, not inferred from a combination of tier + hasPro + cache age + last-error. T1-80 fixes the immediate "silently downgrade" defect. T2-93 builds the proper state machine.
 
@@ -12011,23 +11994,23 @@ UI surfaces vary per status:
 
 ```
 { kind: 'verified', expiresAt }
-  → "✓ Pro verified — refreshes in 7 days"
+  鈫?"鉁?Pro verified 鈥?refreshes in 7 days"
 
 { kind: 'offline_grace', graceUntil }
-  → "⚠ Offline grace — Pro active for 21 more days. Connect to verify."
+  鈫?"鈿?Offline grace 鈥?Pro active for 21 more days. Connect to verify."
 
 { kind: 'expired' }
-  → "Subscription expired — renew to restore Pro features."
+  鈫?"Subscription expired 鈥?renew to restore Pro features."
 
 { kind: 'verification_failed', lastError }
-  → "Could not verify license. [Retry] [Contact support]"
-  → Details panel shows lastError.
+  鈫?"Could not verify license. [Retry] [Contact support]"
+  鈫?Details panel shows lastError.
 
 { kind: 'revoked', reason }
-  → "License revoked (reason). [Contact support]"
+  鈫?"License revoked (reason). [Contact support]"
 ```
 
-The status drives the entire license-related UX surface — no more derived booleans.
+The status drives the entire license-related UX surface 鈥?no more derived booleans.
 
 **Tests:** `tests/license-status-machine.test.ts`:
 - Each status transitions to the right next state on each event.
@@ -12043,9 +12026,9 @@ The status drives the entire license-related UX surface — no more derived bool
 
 ### T2-94 | Clock-tamper detection for offline grace
 
-**Code reference:** `src/entitlements/EntitlementService.ts:255` and `:304` — `Date.now() - cached.validatedAt`. Cross-check verified.
+**Code reference:** `src/entitlements/EntitlementService.ts:255` and `:304` 鈥?`Date.now() - cached.validatedAt`. Cross-check verified.
 
-**Problem:** Audit 5A Critical failure 7 + Required Priority 7: offline grace uses local clock. A user can roll back the system clock to extend grace indefinitely. With the unsigned cache (T2-90 fixes), the clock is the only barrier — making it trivial to bypass.
+**Problem:** Audit 5A Critical failure 7 + Required Priority 7: offline grace uses local clock. A user can roll back the system clock to extend grace indefinitely. With the unsigned cache (T2-90 fixes), the clock is the only barrier 鈥?making it trivial to bypass.
 
 **Identified by:** Audit 5A (2026-04-26, ChatGPT) Critical 7 + Priority 7.
 
@@ -12083,15 +12066,15 @@ if (isClockSuspicious(persisted, Date.now())) {
 }
 ```
 
-This isn't perfect — a sophisticated attacker can edit the persisted clock state too. But once T2-90 is in place (signed cache), the clock state can also be inside the signed payload, raising the bar significantly.
+This isn't perfect 鈥?a sophisticated attacker can edit the persisted clock state too. But once T2-90 is in place (signed cache), the clock state can also be inside the signed payload, raising the bar significantly.
 
-The most effective mitigation is **server-time grace**: instead of "30 days from validatedAt as measured by local clock," the server token says "valid until UTC timestamp X" and the client checks that against its local clock. If local clock is rolled back, the token doesn't grant additional grace — it grants AT MOST what the server said. If local clock is rolled forward, the token expires earlier than expected — fine for the licensor.
+The most effective mitigation is **server-time grace**: instead of "30 days from validatedAt as measured by local clock," the server token says "valid until UTC timestamp X" and the client checks that against its local clock. If local clock is rolled back, the token doesn't grant additional grace 鈥?it grants AT MOST what the server said. If local clock is rolled forward, the token expires earlier than expected 鈥?fine for the licensor.
 
 ```ts
 // In T2-89 token payload
 {
   iat: 1730000000,        // server time at issue
-  exp: 1732600000,        // server time at expiry — INCLUDES offline grace
+  exp: 1732600000,        // server time at expiry 鈥?INCLUDES offline grace
   // ...
 }
 
@@ -12099,13 +12082,13 @@ The most effective mitigation is **server-time grace**: instead of "30 days from
 if (Date.now() > token.exp * 1000) return { status: 'expired' };
 ```
 
-Local clock can be rolled back, but the user can't move the server's `exp` field — they can't forge the signature.
+Local clock can be rolled back, but the user can't move the server's `exp` field 鈥?they can't forge the signature.
 
 **Tests:** `tests/clock-tamper.test.ts`:
-- Wall clock rolls back → suspicious detected.
-- Wall clock jumps forward 2 years → suspicious detected.
-- Token with future exp + local clock past exp → expired.
-- Token with future exp + local clock rolled back to before exp → still expired (local clock can't grant more grace than server said).
+- Wall clock rolls back 鈫?suspicious detected.
+- Wall clock jumps forward 2 years 鈫?suspicious detected.
+- Token with future exp + local clock past exp 鈫?expired.
+- Token with future exp + local clock rolled back to before exp 鈫?still expired (local clock can't grant more grace than server said).
 
 **Estimate:** ~1-2 sessions. Mostly relies on T2-89 + T2-90 being in place.
 
@@ -12115,7 +12098,7 @@ Local clock can be rolled back, but the user can't move the server's `exp` field
 
 ---
 
-### T2-95 | Real trial model — currently `'trial'` tier exists in types but no implementation
+### T2-95 | Real trial model 鈥?currently `'trial'` tier exists in types but no implementation
 
 **Code reference:** `src/entitlements/types.ts` includes `'trial'` in `EntitlementTier` union, but no code path produces or consumes it. The audit confirmed there's `skipToFreeSession()` which gives session-only free, not a real time-bound trial.
 
@@ -12129,17 +12112,17 @@ Local clock can be rolled back, but the user can't move the server's `exp` field
 2. Server issues a signed trial token: `{ tier: 'trial', features: [...], iat, exp: iat + 30days, sub: emailHash }`.
 3. Client stores token same way as paid tokens (T2-90).
 4. Client tier reflects `'trial'`. UI shows "Trial: X days left."
-5. Trial expiry: token's `exp` field passes → client transitions to `'expired'` (T2-93).
+5. Trial expiry: token's `exp` field passes 鈫?client transitions to `'expired'` (T2-93).
 6. Trial renewal blocked: server tracks `sub` (email hash) and refuses second trial for same email.
 
 Device binding (T2-89's optional `deviceId`) further raises the bar against trial farming.
 
-For the no-server interim (e.g. early product, no entitlement service yet): document that "trial" is intentionally not implemented and skipToFreeSession is the only free path. Don't ship a trial gated by local storage only — that's worse than no trial because it implies enforcement that doesn't exist.
+For the no-server interim (e.g. early product, no entitlement service yet): document that "trial" is intentionally not implemented and skipToFreeSession is the only free path. Don't ship a trial gated by local storage only 鈥?that's worse than no trial because it implies enforcement that doesn't exist.
 
 **Tests:** `tests/trial-model.test.ts`:
-- Trial token issued with future exp → tier='trial', hasPro=true.
-- Trial token expired → tier='expired'.
-- Server refuses second trial for same email → activate returns error.
+- Trial token issued with future exp 鈫?tier='trial', hasPro=true.
+- Trial token expired 鈫?tier='expired'.
+- Server refuses second trial for same email 鈫?activate returns error.
 
 **Estimate:** ~3-4 sessions. Server endpoints + email gate + client integration. Depends heavily on T2-89.
 
@@ -12149,14 +12132,14 @@ For the no-server interim (e.g. early product, no entitlement service yet): docu
 
 ---
 
-### T2-96 | Subscription / plan lifecycle support — revoked / cancelled / downgraded
+### T2-96 | Subscription / plan lifecycle support 鈥?revoked / cancelled / downgraded
 
-**Code reference:** Currently the only license states are tier+hasPro. T2-93 adds `LicenseStatus` (verified/offline_grace/expired/verification_failed/revoked). T2-96 is the lifecycle EVENTS that drive transitions — server-pushed or polled.
+**Code reference:** Currently the only license states are tier+hasPro. T2-93 adds `LicenseStatus` (verified/offline_grace/expired/verification_failed/revoked). T2-96 is the lifecycle EVENTS that drive transitions 鈥?server-pushed or polled.
 
 **Problem:** Audit 5A Critical failure 9 + Required Priority 11: even one-time-purchase products need lifecycle handling for refund/chargeback/manual-revoke events. Currently a refund detected during a verification call disables Pro at next verify, but there's no infrastructure for:
-- Refund detected after offline grace started → Pro keeps working until grace expires.
-- Manual seller revocation (e.g. license sharing detected) → only takes effect on next online verify.
-- Plan changes (Pro Lite → Pro Full upgrade, or downgrade) → not modeled.
+- Refund detected after offline grace started 鈫?Pro keeps working until grace expires.
+- Manual seller revocation (e.g. license sharing detected) 鈫?only takes effect on next online verify.
+- Plan changes (Pro Lite 鈫?Pro Full upgrade, or downgrade) 鈫?not modeled.
 
 **Identified by:** Audit 5A (2026-04-26, ChatGPT) Critical 9 + Priority 11.
 
@@ -12171,7 +12154,7 @@ GET /entitlement/revocations?since=<timestamp>
 
 Client behavior:
 - On every successful entitlement check, also poll `/revocations?since=lastSeen`.
-- If current token's `jti` appears → immediately transition to `'revoked'` regardless of cache age.
+- If current token's `jti` appears 鈫?immediately transition to `'revoked'` regardless of cache age.
 - Persist `revocations` list locally so even offline, a previously-seen revocation stays in effect.
 
 Lifecycle event types:
@@ -12190,8 +12173,8 @@ type LifecycleEvent =
 ```
 
 **Tests:** `tests/lifecycle-revocation.test.ts`:
-- Token's jti in revocation list → immediately revoked.
-- Plan downgrade event → features array updated, Pro features T2-92 reflect new list.
+- Token's jti in revocation list 鈫?immediately revoked.
+- Plan downgrade event 鈫?features array updated, Pro features T2-92 reflect new list.
 
 **Estimate:** ~2-3 sessions. Server endpoint + client polling + state transitions + tests. Depends on T2-89.
 
@@ -12203,7 +12186,7 @@ type LifecycleEvent =
 
 ### T2-97 | Entitlement checks must never block safety controls
 
-**Code reference:** No specific defect at any line — this is a guarantee that needs to be made explicit.
+**Code reference:** No specific defect at any line 鈥?this is a guarantee that needs to be made explicit.
 
 **Problem:** Audit 5A Required Priority 9 (User-trust failure mode "Losing access while job running"): if the entitlement state changes mid-job (license expires, server says revoked, network blip + offline grace exceeded), the app must NEVER block:
 - Stop / Pause / Resume
@@ -12219,7 +12202,7 @@ Today there's no specific code path that does block these on entitlement, but th
 
 **Fix:** Two-part.
 
-**Part 1 — Documented guarantee.** Add a `SAFETY_GUARANTEES.md` or equivalent that lists the controls that must NEVER consult entitlement:
+**Part 1 鈥?Documented guarantee.** Add a `SAFETY_GUARANTEES.md` or equivalent that lists the controls that must NEVER consult entitlement:
 
 ```
 The following actions MUST be available regardless of entitlement state:
@@ -12232,7 +12215,7 @@ The following actions MUST be available regardless of entitlement state:
 - Connection wizard (so user can reconnect to recover a stuck machine)
 ```
 
-**Part 2 — Tests that enforce.** A test suite that:
+**Part 2 鈥?Tests that enforce.** A test suite that:
 
 ```ts
 test('safety controls work with no entitlement', async () => {
@@ -12249,7 +12232,7 @@ test('safety controls work with revoked license', async () => {
 });
 ```
 
-Plus a static-analysis test that scans safety-critical files for entitlement imports — if a future commit adds `requireFeature` or `assertFeature` inside `MachineService.stopAndEnsureLaserOff`, the lint/test fails.
+Plus a static-analysis test that scans safety-critical files for entitlement imports 鈥?if a future commit adds `requireFeature` or `assertFeature` inside `MachineService.stopAndEnsureLaserOff`, the lint/test fails.
 
 **Tests:** as above.
 
@@ -12265,7 +12248,7 @@ Plus a static-analysis test that scans safety-critical files for entitlement imp
 
 **Code reference:** `.github/workflows/ci.yml` runs only `npm ci`, `npm run build`, `npm test` on `ubuntu-latest`. No installer build, no platform-specific runners.
 
-**Problem:** Cross-check verified — CI is green when the installer is broken because CI never builds the installer. The Vite renderer build (`npm run build`) is platform-agnostic; the actual `electron-builder --win` / `electron-builder --mac` runs are completely untested in CI. Native module ABI issues, packaging path issues, signing config issues, NSIS template issues — none of these surface until someone runs the build manually on the right platform.
+**Problem:** Cross-check verified 鈥?CI is green when the installer is broken because CI never builds the installer. The Vite renderer build (`npm run build`) is platform-agnostic; the actual `electron-builder --win` / `electron-builder --mac` runs are completely untested in CI. Native module ABI issues, packaging path issues, signing config issues, NSIS template issues 鈥?none of these surface until someone runs the build manually on the right platform.
 
 For a commercial desktop app, every PR should produce a build that proves the installer works on every supported platform.
 
@@ -12273,7 +12256,7 @@ For a commercial desktop app, every PR should produce a build that proves the in
 
 **Fix:** Add platform-specific build workflows. Two approaches:
 
-**Approach A — add to existing CI (per-PR builds):**
+**Approach A 鈥?add to existing CI (per-PR builds):**
 
 ```yaml
 # .github/workflows/ci.yml
@@ -12315,27 +12298,27 @@ jobs:
           retention-days: 7
 ```
 
-**Approach B — separate release workflow** (only on tag pushes):
+**Approach B 鈥?separate release workflow** (only on tag pushes):
 
 If per-PR Windows + macOS builds are too slow/expensive (each takes minutes of paid CI time), add a `.github/workflows/release.yml` that triggers on tag push only. Per-PR builds stay Linux-only (faster) but tagged releases get full installer builds.
 
-For T2-98's first ship, recommend Approach A even with the cost — catching a broken installer at PR time is much cheaper than discovering it at release time.
+For T2-98's first ship, recommend Approach A even with the cost 鈥?catching a broken installer at PR time is much cheaper than discovering it at release time.
 
 **Signing happens here too:** Once T2-99 (Windows signing) and T2-100 (macOS signing) land, the signing certificates are available as GitHub secrets, and the release builds become signed. Per-PR builds can stay unsigned (faster, no cert exposure).
 
 **Estimate:** ~1-2 sessions including Windows/macOS runner debugging.
 
-**Priority:** Tier 2 — release-engineering foundation. Should land before T2-99 / T2-100 (which need a working CI build to sign).
+**Priority:** Tier 2 鈥?release-engineering foundation. Should land before T2-99 / T2-100 (which need a working CI build to sign).
 
 **Cross-check note (audit 5B):** Audit's Critical 4 + Priority 1. Verified at .github/workflows/ci.yml.
 
 ---
 
-### T2-99 | Windows code signing — cert + Electron Builder env config + signed CI builds
+### T2-99 | Windows code signing 鈥?cert + Electron Builder env config + signed CI builds
 
 **Code reference:** `package.json:44` has `"signAndEditExecutable": false`. No certificate, no signing env vars referenced.
 
-**Problem:** Cross-check verified. Unsigned Windows builds trigger SmartScreen warnings ("Windows protected your PC. Microsoft Defender SmartScreen prevented an unrecognized app from starting."). Users have to click "More info" → "Run anyway" — many won't, and those who do correctly assume they're being asked to trust an unknown publisher. For commercial software, this is unacceptable.
+**Problem:** Cross-check verified. Unsigned Windows builds trigger SmartScreen warnings ("Windows protected your PC. Microsoft Defender SmartScreen prevented an unrecognized app from starting."). Users have to click "More info" 鈫?"Run anyway" 鈥?many won't, and those who do correctly assume they're being asked to trust an unknown publisher. For commercial software, this is unacceptable.
 
 EV certificates ($300-700/year from sectigo, comodo, digicert) provide instant SmartScreen reputation. Standard OV certificates ($150-300/year) build reputation over time.
 
@@ -12343,9 +12326,9 @@ EV certificates ($300-700/year from sectigo, comodo, digicert) provide instant S
 
 **Fix:** Three parts.
 
-**Part 1 — Acquire certificate.** Decision is business-side: EV vs OV. EV recommended for serious commercial release. Issuer ships a `.p12` or `.pfx` file plus password.
+**Part 1 鈥?Acquire certificate.** Decision is business-side: EV vs OV. EV recommended for serious commercial release. Issuer ships a `.p12` or `.pfx` file plus password.
 
-**Part 2 — Electron Builder config:**
+**Part 2 鈥?Electron Builder config:**
 
 ```json
 // package.json
@@ -12363,13 +12346,13 @@ EV certificates ($300-700/year from sectigo, comodo, digicert) provide instant S
 ```
 
 Electron Builder picks up signing credentials from environment variables:
-- `CSC_LINK` — base64-encoded `.pfx` file or `file://` URL
-- `CSC_KEY_PASSWORD` — certificate password
+- `CSC_LINK` 鈥?base64-encoded `.pfx` file or `file://` URL
+- `CSC_KEY_PASSWORD` 鈥?certificate password
 
-**Part 3 — CI integration (extends T2-98):**
+**Part 3 鈥?CI integration (extends T2-98):**
 
 ```yaml
-# .github/workflows/release.yml — Windows signed build
+# .github/workflows/release.yml 鈥?Windows signed build
 - name: Build signed Windows installer
   env:
     CSC_LINK: ${{ secrets.WIN_CERT_PFX_BASE64 }}
@@ -12381,11 +12364,11 @@ The certificate is stored as a GitHub Actions secret (base64-encoded PFX). It's 
 
 **Per-PR builds stay unsigned** (signing slows CI and exposing cert risk on every PR is unnecessary). Only tagged release builds sign.
 
-**Tests:** Manual verification post-release: download installer, right-click → Properties → Digital Signatures tab shows valid signature. Optionally automate with `signtool verify /pa release/*.exe` in a final CI step.
+**Tests:** Manual verification post-release: download installer, right-click 鈫?Properties 鈫?Digital Signatures tab shows valid signature. Optionally automate with `signtool verify /pa release/*.exe` in a final CI step.
 
 **Estimate:** ~1-2 sessions after cert is acquired (acquisition is business-side, not engineering-time).
 
-**Priority:** Tier 2 — commercial-release blocking. Cannot ship paid product Windows-side without this.
+**Priority:** Tier 2 鈥?commercial-release blocking. Cannot ship paid product Windows-side without this.
 
 **Cross-check note (audit 5B):** Audit's Critical 2 + Priority 3. Verified at package.json:44.
 
@@ -12393,7 +12376,7 @@ The certificate is stored as a GitHub Actions secret (base64-encoded PFX). It's 
 
 ### T2-100 | macOS code signing + notarization + stapling
 
-**Code reference:** `package.json:54-58` has `"mac": { "target": "dmg", "icon": ..., "category": ... }` — no `identity`, no `hardenedRuntime`, no `entitlements`, no `notarize` config.
+**Code reference:** `package.json:54-58` has `"mac": { "target": "dmg", "icon": ..., "category": ... }` 鈥?no `identity`, no `hardenedRuntime`, no `entitlements`, no `notarize` config.
 
 **Problem:** Cross-check verified. Unsigned macOS DMGs trigger Gatekeeper:
 
@@ -12407,19 +12390,19 @@ Or worse, on Apple Silicon Macs running newer macOS versions:
 "LaserForge.app" is damaged and can't be opened. You should move it to the Trash.
 ```
 
-Users have to right-click → Open or use `xattr -cr` on the .app bundle. Most won't bother.
+Users have to right-click 鈫?Open or use `xattr -cr` on the .app bundle. Most won't bother.
 
-The full macOS distribution flow has three steps: **sign → notarize → staple**. All three are required for a clean install experience.
+The full macOS distribution flow has three steps: **sign 鈫?notarize 鈫?staple**. All three are required for a clean install experience.
 
 **Identified by:** Audit 5B (2026-04-26, ChatGPT) Critical failure 2 + Required Priority 4.
 
 **Fix:** Three parts.
 
-**Part 1 — Apple Developer Program enrollment** ($99/year). Get:
+**Part 1 鈥?Apple Developer Program enrollment** ($99/year). Get:
 - Developer ID Application certificate
 - App-specific password OR Apple ID API key for notarization
 
-**Part 2 — Electron Builder config:**
+**Part 2 鈥?Electron Builder config:**
 
 ```json
 // package.json
@@ -12459,7 +12442,7 @@ Plus `build/entitlements.mac.plist`:
 
 The USB entitlement is critical for serialport access on macOS.
 
-**Part 3 — CI integration (extends T2-98):**
+**Part 3 鈥?CI integration (extends T2-98):**
 
 ```yaml
 - name: Build signed + notarized macOS DMG
@@ -12474,7 +12457,7 @@ The USB entitlement is critical for serialport access on macOS.
 
 Electron Builder handles notarization automatically via `notarytool` when these env vars are set.
 
-**Stapling** happens automatically after successful notarization — Electron Builder embeds the notarization ticket into the app bundle so it doesn't require an internet connection at first launch.
+**Stapling** happens automatically after successful notarization 鈥?Electron Builder embeds the notarization ticket into the app bundle so it doesn't require an internet connection at first launch.
 
 **Apple Silicon vs Intel:** ship a universal binary (`arch: ["x64", "arm64"]`) or two separate DMGs. Universal is simpler, larger.
 
@@ -12482,13 +12465,13 @@ Electron Builder handles notarization automatically via `notarytool` when these 
 
 **Estimate:** ~2 sessions after Apple Developer enrollment. Notarization debugging can take time on first setup.
 
-**Priority:** Tier 2 — commercial-release blocking for macOS.
+**Priority:** Tier 2 鈥?commercial-release blocking for macOS.
 
 **Cross-check note (audit 5B):** Audit's Critical 2 + Priority 4. Verified at package.json:54-58.
 
 ---
 
-### T2-101 | Auto-update infrastructure — `electron-updater` with signed releases + update feed
+### T2-101 | Auto-update infrastructure 鈥?`electron-updater` with signed releases + update feed
 
 **Code reference:** No `electron-updater` dependency in package.json. No `latest.yml`, no `app-update.yml`, no autoUpdater code.
 
@@ -12503,7 +12486,7 @@ Electron Builder handles notarization automatically via `notarytool` when these 
 
 **Fix:** Standard Electron auto-update pattern:
 
-**Part 1 — Add dependency:**
+**Part 1 鈥?Add dependency:**
 
 ```json
 "dependencies": {
@@ -12511,7 +12494,7 @@ Electron Builder handles notarization automatically via `notarytool` when these 
 }
 ```
 
-**Part 2 — Wire into main.ts:**
+**Part 2 鈥?Wire into main.ts:**
 
 ```ts
 // electron/main.ts
@@ -12545,7 +12528,7 @@ ipcMain.handle('update:install', () => {
 The renderer surfaces update events:
 
 ```
-Update available — LaserForge 1.0.3
+Update available 鈥?LaserForge 1.0.3
 [View release notes]   [Download now]   [Remind me later]
 
 Once downloaded:
@@ -12568,7 +12551,7 @@ ipcMain.handle('update:install', () => {
 
 The renderer tracks `isJobRunning` from the runtime state (T2-84) and disables the install button while jobs are active.
 
-**Part 3 — Publish config:**
+**Part 3 鈥?Publish config:**
 
 ```json
 // package.json
@@ -12583,7 +12566,7 @@ The renderer tracks `isJobRunning` from the runtime state (T2-84) and disables t
 
 (Or S3, generic, or other provider. GitHub Releases is the simplest.)
 
-**Part 4 — Release flow:**
+**Part 4 鈥?Release flow:**
 
 Tagged releases produce signed installers (T2-99 + T2-100). Electron Builder generates `latest.yml` (Windows) and `latest-mac.yml` (macOS) update manifests with:
 - Version
@@ -12596,23 +12579,23 @@ These manifests + the installers are uploaded to the GitHub Release. `electron-u
 
 **Critical safety properties:**
 - The update manifest is fetched over HTTPS.
-- The installer's signature (T2-99 / T2-100) is verified before install — `electron-updater` does this automatically.
+- The installer's signature (T2-99 / T2-100) is verified before install 鈥?`electron-updater` does this automatically.
 - An attacker who compromises the update feed cannot ship a malicious installer because they can't sign it.
 
-**Tests:** Hard to test fully without a release pipeline — but verify:
+**Tests:** Hard to test fully without a release pipeline 鈥?but verify:
 - `update:available` event fires when manifest version > current.
 - `quitAndInstall` blocked during running job.
 - Network failure during update check is non-fatal (catch + log).
 
 **Estimate:** ~2-3 sessions including release flow, error handling, UI integration.
 
-**Priority:** Tier 2 — commercial-release foundation. Depends on T2-98 (CI builds), T2-99 + T2-100 (signing).
+**Priority:** Tier 2 鈥?commercial-release foundation. Depends on T2-98 (CI builds), T2-99 + T2-100 (signing).
 
 **Cross-check note (audit 5B):** Audit's Critical 1 + Priority 5.
 
 ---
 
-### T2-102 | Rollback strategy — failed-launch detection + previous-version retention
+### T2-102 | Rollback strategy 鈥?failed-launch detection + previous-version retention
 
 **Code reference:** No rollback infrastructure exists.
 
@@ -12622,7 +12605,7 @@ These manifests + the installers are uploaded to the GitHub Release. `electron-u
 
 **Fix:** Multi-layer rollback strategy.
 
-**Layer 1 — Crash-loop detection:**
+**Layer 1 鈥?Crash-loop detection:**
 
 On boot, write a marker:
 
@@ -12649,7 +12632,7 @@ if (consecutiveCrashCount >= 3) {
 }
 ```
 
-**Layer 2 — Previous version retention:**
+**Layer 2 鈥?Previous version retention:**
 
 When `electron-updater` installs a new version, retain the previous installer at `userData/installers/previous.exe`. On crash-loop detection, offer the user a rollback:
 
@@ -12662,7 +12645,7 @@ This may be caused by the latest update. You can:
 
 The rollback runs the previous installer and overwrites the broken version.
 
-**Layer 3 — Backward-compatible user data:**
+**Layer 3 鈥?Backward-compatible user data:**
 
 T2-104 (versioned user-data migration) is a hard prerequisite. If 1.0.3 migrates user data to a new schema, rolling back to 1.0.2 must work. Either:
 - 1.0.3 keeps user data backward-compatible (preferred)
@@ -12671,8 +12654,8 @@ T2-104 (versioned user-data migration) is a hard prerequisite. If 1.0.3 migrates
 The test gate: every release with a user-data migration must include a roll-forward + roll-back round-trip test.
 
 **Tests:** `tests/crash-loop-detection.test.ts`:
-- Boot 3 times without ready-to-show → 4th boot detects crash loop.
-- Successful boot → marker cleared, count resets.
+- Boot 3 times without ready-to-show 鈫?4th boot detects crash loop.
+- Successful boot 鈫?marker cleared, count resets.
 
 **Estimate:** ~2-3 sessions for full rollback flow. Layer 1 (crash-loop detection) is the smallest piece and could ship independently.
 
@@ -12682,7 +12665,7 @@ The test gate: every release with a user-data migration must include a roll-forw
 
 ---
 
-### T2-103 | Release artifact integrity — SHA256 + SBOM + signed checksum + release provenance
+### T2-103 | Release artifact integrity 鈥?SHA256 + SBOM + signed checksum + release provenance
 
 **Code reference:** No artifact integrity infrastructure exists.
 
@@ -12849,7 +12832,7 @@ The backup keys live indefinitely or until user deactivates them; they're the ro
 
 **Fix:** Multi-layer.
 
-**Layer 1 — Process-level handlers:**
+**Layer 1 鈥?Process-level handlers:**
 
 ```ts
 // electron/main.ts
@@ -12861,7 +12844,7 @@ function logStartup(line: string) {
 
 process.on('uncaughtException', (err) => {
   logStartup(`UNCAUGHT: ${err.stack || err.message}`);
-  // Don't dialog.showErrorBox here — it can cascade. Just log and exit.
+  // Don't dialog.showErrorBox here 鈥?it can cascade. Just log and exit.
   process.exit(1);
 });
 
@@ -12876,7 +12859,7 @@ app.on('render-process-gone', (_event, _webContents, details) => {
 
 Startup log accumulates across runs. On the 4th launch attempt after 3 failures, safe mode triggers (overlap with T2-102 layer 1).
 
-**Layer 2 — Safe mode:**
+**Layer 2 鈥?Safe mode:**
 
 ```ts
 function shouldEnterSafeMode(): boolean {
@@ -12911,7 +12894,7 @@ Last 3 startup logs:
 [ Send these logs to support ]
 ```
 
-**Layer 3 — Reset settings option:**
+**Layer 3 鈥?Reset settings option:**
 
 In safe mode (and via a hidden menu in normal mode), provide:
 
@@ -12939,7 +12922,7 @@ This calls a scoped clear (T1-84) for settings but preserves project files saved
 
 **Estimate:** ~2-3 sessions including safe mode UI.
 
-**Priority:** Tier 2 — real customer-recovery tool. Pairs with T2-102 (rollback) for full bad-update recovery.
+**Priority:** Tier 2 鈥?real customer-recovery tool. Pairs with T2-102 (rollback) for full bad-update recovery.
 
 **Cross-check note (audit 5B):** Audit's Critical 9 + Priority 13.
 
@@ -12947,7 +12930,7 @@ This calls a scoped clear (T1-84) for settings but preserves project files saved
 
 ### T2-106 | Dependency security scanning in CI
 
-**Code reference:** `.github/workflows/license-check.yml` exists for license compliance (good — fair credit). No `npm audit` step, no Dependabot config.
+**Code reference:** `.github/workflows/license-check.yml` exists for license compliance (good 鈥?fair credit). No `npm audit` step, no Dependabot config.
 
 **Problem:** Audit 5B Required Priority 10: the license workflow catches GPL/AGPL contamination but doesn't catch dependencies with known vulnerabilities. For an Electron app handling files and serial communication, dependency CVEs can have real impact.
 
@@ -12955,7 +12938,7 @@ This calls a scoped clear (T1-84) for settings but preserves project files saved
 
 **Fix:** Three layers.
 
-**Layer 1 — `npm audit` in CI:**
+**Layer 1 鈥?`npm audit` in CI:**
 
 ```yaml
 # .github/workflows/ci.yml
@@ -12965,7 +12948,7 @@ This calls a scoped clear (T1-84) for settings but preserves project files saved
 
 This fails CI when production dependencies have moderate-or-higher CVEs. `--omit=dev` skips vitest, eslint, etc., where dev-only CVEs don't ship.
 
-**Layer 2 — Dependabot config:**
+**Layer 2 鈥?Dependabot config:**
 
 ```yaml
 # .github/dependabot.yml
@@ -12986,7 +12969,7 @@ updates:
 
 Dependabot opens PRs for security updates automatically.
 
-**Layer 3 — OSV scanner (optional, broader coverage):**
+**Layer 3 鈥?OSV scanner (optional, broader coverage):**
 
 ```yaml
 - uses: google/osv-scanner-action@v1
@@ -13006,7 +12989,7 @@ OSV scans all known vulnerability databases (not just npm advisories) and produc
 
 ---
 
-### T2-107 | Tighten production CSP — remove `unsafe-eval` minimum, then `unsafe-inline`
+### T2-107 | Tighten production CSP 鈥?remove `unsafe-eval` minimum, then `unsafe-inline`
 
 **Code reference:** `electron/main.ts:81`:
 
@@ -13016,22 +12999,22 @@ script-src 'self' 'unsafe-inline' 'unsafe-eval'
 
 **Problem:** Cross-check verified at exact line. CSP includes both `'unsafe-inline'` and `'unsafe-eval'`. Audit notes this may be required by current tooling but should be tracked as security debt.
 
-For an Electron app handling user files (SVG/DXF/image imports), CSP is the last line of defense against XSS via malicious content. `'unsafe-eval'` enables `eval`, `new Function`, `setTimeout(string)`, etc. — any of which an attacker could leverage given an XSS hole.
+For an Electron app handling user files (SVG/DXF/image imports), CSP is the last line of defense against XSS via malicious content. `'unsafe-eval'` enables `eval`, `new Function`, `setTimeout(string)`, etc. 鈥?any of which an attacker could leverage given an XSS hole.
 
 **Identified by:** Audit 5B (2026-04-26, ChatGPT) Startup verdict + CSP debt.
 
 **Fix:** Two-stage.
 
-**Stage 1 — Remove `unsafe-eval`:**
+**Stage 1 鈥?Remove `unsafe-eval`:**
 
 Audit which dependencies actually need eval. Common culprits:
 - Some older versions of Vite's HMR (dev only)
 - Some templating libraries
 - Some math expression evaluators
 
-In production, most likely nothing core needs eval. Removing it requires testing — features that use polynomial expressions, formula parsing, etc., may break. Replace eval-based libraries with parsers.
+In production, most likely nothing core needs eval. Removing it requires testing 鈥?features that use polynomial expressions, formula parsing, etc., may break. Replace eval-based libraries with parsers.
 
-**Stage 2 — Remove `unsafe-inline`:**
+**Stage 2 鈥?Remove `unsafe-inline`:**
 
 Inline `<style>` and `<script>` tags need either nonces or hashes. React itself doesn't need inline scripts in production (the bundle is loaded via `<script src=...>`). The bigger issue is inline styles from libraries.
 
@@ -13041,52 +13024,52 @@ Migrate to:
 
 This is significant work. T2-107 tracks the debt; the implementation might be split into T2-107a (drop unsafe-eval) and T2-107b (drop unsafe-inline) if needed.
 
-**Tests:** Manual — load each major user-flow surface and verify no CSP violations in console.
+**Tests:** Manual 鈥?load each major user-flow surface and verify no CSP violations in console.
 
 **Estimate:** Stage 1: ~1 session. Stage 2: ~3-5 sessions depending on library audit.
 
-**Priority:** Tier 2 — security debt. Lower urgency than T2-99/T2-100/T2-101 but worth tracking explicitly.
+**Priority:** Tier 2 鈥?security debt. Lower urgency than T2-99/T2-100/T2-101 but worth tracking explicitly.
 
 **Cross-check note (audit 5B):** Audit's Startup verdict. Verified at electron/main.ts:81.
 
 ---
 
-### T2-108 | Support bundle exporter — `Help → Export Diagnostic Bundle`
+### T2-108 | Support bundle exporter 鈥?`Help 鈫?Export Diagnostic Bundle`
 
 **Code reference:** No support bundle exists today (grep confirmed zero hits for `supportBundle`, `exportDiagnostic`, etc.).
 
-**Problem:** Audit 5C Critical failure 1 + Required Priority 2: when users hit problems, there's no way to export a diagnostic package for support. The current support workflow degrades to "screenshots and asking questions" — slow, lossy, and not commercial-grade.
+**Problem:** Audit 5C Critical failure 1 + Required Priority 2: when users hit problems, there's no way to export a diagnostic package for support. The current support workflow degrades to "screenshots and asking questions" 鈥?slow, lossy, and not commercial-grade.
 
 **Identified by:** Audit 5C (2026-04-26, ChatGPT) Critical 1 + Priority 2.
 
-**Fix:** Build `Help → Export Diagnostic Bundle` flow. Output is a single ZIP file containing:
+**Fix:** Build `Help 鈫?Export Diagnostic Bundle` flow. Output is a single ZIP file containing:
 
 ```
 laserforge-diagnostics-{timestamp}-{sessionId}.zip
-├── manifest.json                    # bundle metadata, schema version, exclusions selected
-├── app-info.json                    # version, build, channel, electron/chromium/node versions
-├── system-info.json                 # OS, arch, language, screen, locale (no MAC/IP)
-├── machine-profile-snapshot.json    # active profile (no serial numbers)
-├── recent-job-logs.json             # last 20 job logs (compacted)
-├── recent-replays.json              # last 10 replays (if user opts in)
-├── recent-errors.json               # last 100 logged errors via T2-65 reporter
-├── recent-crashes.json              # last 20 crash reports via T2-114
-├── preflight-reports.json           # last 20 preflight runs
-├── compile-metadata.json            # last 20 compile fingerprints (T2-85)
-├── storage-health.json              # quota, sizes, prune events (T2-116)
-├── settings-summary.json            # non-sensitive settings
-├── correlation-ids.json             # session/project/compile/job IDs (T2-117)
-└── (optional) gcode-{jobId}.txt     # only if user opts in
-└── (optional) project-{projectId}.lf # only if user opts in
-└── (optional) raw-images-{ids}.zip   # only if user opts in
+鈹溾攢鈹€ manifest.json                    # bundle metadata, schema version, exclusions selected
+鈹溾攢鈹€ app-info.json                    # version, build, channel, electron/chromium/node versions
+鈹溾攢鈹€ system-info.json                 # OS, arch, language, screen, locale (no MAC/IP)
+鈹溾攢鈹€ machine-profile-snapshot.json    # active profile (no serial numbers)
+鈹溾攢鈹€ recent-job-logs.json             # last 20 job logs (compacted)
+鈹溾攢鈹€ recent-replays.json              # last 10 replays (if user opts in)
+鈹溾攢鈹€ recent-errors.json               # last 100 logged errors via T2-65 reporter
+鈹溾攢鈹€ recent-crashes.json              # last 20 crash reports via T2-114
+鈹溾攢鈹€ preflight-reports.json           # last 20 preflight runs
+鈹溾攢鈹€ compile-metadata.json            # last 20 compile fingerprints (T2-85)
+鈹溾攢鈹€ storage-health.json              # quota, sizes, prune events (T2-116)
+鈹溾攢鈹€ settings-summary.json            # non-sensitive settings
+鈹溾攢鈹€ correlation-ids.json             # session/project/compile/job IDs (T2-117)
+鈹斺攢鈹€ (optional) gcode-{jobId}.txt     # only if user opts in
+鈹斺攢鈹€ (optional) project-{projectId}.lf # only if user opts in
+鈹斺攢鈹€ (optional) raw-images-{ids}.zip   # only if user opts in
 ```
 
 **Privacy by default:**
 - License keys: NEVER included.
 - File paths: redacted via T2-115.
 - Email/IP: redacted.
-- Project name: optional (default off — replaced with "Project A", "Project B", etc.).
-- G-code: optional (default off — only hash + line count + bounds included).
+- Project name: optional (default off 鈥?replaced with "Project A", "Project B", etc.).
+- G-code: optional (default off 鈥?only hash + line count + bounds included).
 - Project file: optional (default off).
 - Raw images: optional (default off).
 
@@ -13096,17 +13079,17 @@ laserforge-diagnostics-{timestamp}-{sessionId}.zip
 Export Diagnostic Bundle
 
 What to include:
-☑ App version, build, OS                       (always included)
-☑ Recent job logs                              (always included, last 20)
-☑ Recent errors and crash reports              (always included)
-☑ Active machine profile                       (always included)
-☐ G-code from recent jobs                      (off by default)
-☐ Project file (.laserforge.json)              (off by default)
-☐ Imported images                              (off by default)
+鈽?App version, build, OS                       (always included)
+鈽?Recent job logs                              (always included, last 20)
+鈽?Recent errors and crash reports              (always included)
+鈽?Active machine profile                       (always included)
+鈽?G-code from recent jobs                      (off by default)
+鈽?Project file (.laserforge.json)              (off by default)
+鈽?Imported images                              (off by default)
 
 Project names:
-○ Replace with placeholders (Project A, B...)  (recommended)
-○ Include actual project names
+鈼?Replace with placeholders (Project A, B...)  (recommended)
+鈼?Include actual project names
 
 [Cancel]   [Generate bundle]
 ```
@@ -13117,7 +13100,7 @@ After generation, show user the file location and offer:
 - Email to support (opens mail client with bundle attached, if supported)
 
 **Implementation phases:**
-- **Phase 1** (~2 sessions): minimum viable bundle — manifest, app/system info, recent jobs, recent errors. ZIP it.
+- **Phase 1** (~2 sessions): minimum viable bundle 鈥?manifest, app/system info, recent jobs, recent errors. ZIP it.
 - **Phase 2** (~2 sessions): privacy controls, optional inclusions, UI dialog.
 - **Phase 3** (~1 session): correlation IDs, troubleshooting links.
 
@@ -13131,20 +13114,20 @@ After generation, show user the file location and offer:
 
 **Estimate:** ~5-6 sessions for full implementation.
 
-**Priority:** Tier 2. The single most valuable supportability feature. Depends on T2-65 (error reporter), T2-109 (reconstruction-grade JobLog), T2-114 (crash capture), T2-115 (redaction), T2-117 (correlation IDs). Phase 1 can ship before its dependencies are complete — bundles will improve as the dependencies land.
+**Priority:** Tier 2. The single most valuable supportability feature. Depends on T2-65 (error reporter), T2-109 (reconstruction-grade JobLog), T2-114 (crash capture), T2-115 (redaction), T2-117 (correlation IDs). Phase 1 can ship before its dependencies are complete 鈥?bundles will improve as the dependencies land.
 
 **Cross-check note (audit 5C):** Audit's Critical 1 + Priority 2.
 
 ---
 
-### T2-109 | Reconstruction-grade JobLog — embed app/system/profile/controller/preflight/fingerprint snapshots
+### T2-109 | Reconstruction-grade JobLog 鈥?embed app/system/profile/controller/preflight/fingerprint snapshots
 
-**Code reference:** `src/core/job/JobLog.ts:13-48`. Cross-check verified — current JobLog stores ~17 fields, missing the ~30 fields the audit lists as needed for failure reconstruction.
+**Code reference:** `src/core/job/JobLog.ts:13-48`. Cross-check verified 鈥?current JobLog stores ~17 fields, missing the ~30 fields the audit lists as needed for failure reconstruction.
 
 **Problem:** Cross-check confirmed JobLog stores: id, started/completed timestamps, status, projectName, gcodeLines, estimatedTime, basic layers, machineStatus, startPosition, entries, linesCompleted, errors, warnings, actualDuration. Missing for failure reconstruction:
 - App version / build / platform / Electron version
 - Active device profile snapshot (T2-71 covers project file; this is per-job)
-- Controller settings ($30, $32, $130, $131) — T2-110
+- Controller settings ($30, $32, $130, $131) 鈥?T2-110
 - Material preset snapshot (T2-72 covers project file; this is per-job)
 - Preflight result + user-confirmed warnings
 - Full job fingerprint (T2-85): ticketId, sceneHash, profileHash, gcodeHash, materialHash, startMode, savedOriginHash, machineCapabilitiesHash, compileOptionsHash
@@ -13195,7 +13178,7 @@ export interface JobLog {
     outputBounds: AABB;
     startMode: StartMode;
     savedOrigin: { x: number; y: number } | null;
-    frameState: FrameState;                   // T2-86 — full state at start
+    frameState: FrameState;                   // T2-86 鈥?full state at start
     gcodeExcerpt?: { first50: string[]; last50: string[]; hash: string };
   };
 
@@ -13216,7 +13199,7 @@ export interface JobLog {
 }
 ```
 
-This is a large change to the JobLog schema. Pairs with T2-104 (user-data migration framework) for backward compatibility — old JobLogs without the new fields still readable.
+This is a large change to the JobLog schema. Pairs with T2-104 (user-data migration framework) for backward compatibility 鈥?old JobLogs without the new fields still readable.
 
 **Privacy:** the snapshot fields are needed for support but contain potentially sensitive data (project name, file paths in profile names). T2-115 (redaction) handles export-time scrubbing.
 
@@ -13235,11 +13218,11 @@ This is a large change to the JobLog schema. Pairs with T2-104 (user-data migrat
 
 ---
 
-### T2-110 | Controller settings snapshot before job — `$$ + $I + $G + $#` capture
+### T2-110 | Controller settings snapshot before job 鈥?`$$ + $I + $G + $#` capture
 
 **Code reference:** No code today queries GRBL settings before job start. Settings are only parsed when the user runs `$$` manually via console (parsed at GrblController.ts:1270-1281 for `$30` and `$32`).
 
-**Problem:** Audit 5C Required Priority 4 + Critical failure 7: GRBL settings ($30 max spindle, $32 laser mode, $130/$131 max travel, $110/$111 max rates, $120/$121 acceleration, $#  WCS offsets) directly affect output behavior. When a job produces wrong output, support's first questions are usually "what's your $30?" "what's your $32?" "where is work-zero?" — and currently the user has to type these into a chat.
+**Problem:** Audit 5C Required Priority 4 + Critical failure 7: GRBL settings ($30 max spindle, $32 laser mode, $130/$131 max travel, $110/$111 max rates, $120/$121 acceleration, $#  WCS offsets) directly affect output behavior. When a job produces wrong output, support's first questions are usually "what's your $30?" "what's your $32?" "where is work-zero?" 鈥?and currently the user has to type these into a chat.
 
 **Identified by:** Audit 5C (2026-04-26, ChatGPT) Critical 7 + Priority 4.
 
@@ -13279,8 +13262,8 @@ jobLog.machine.settings = controllerSettings;
 ```
 
 Two concerns:
-- **Latency:** querying settings adds ~200-500ms before job start. For a long job, this is fine. For tiny jobs (test fires), it's noticeable. Mitigation: cache the snapshot — re-query only when controller reconnects or the user explicitly refreshes.
-- **Compatibility:** older GRBL versions may not respond to all queries cleanly. The implementation must handle each query independently — failure of `$#` shouldn't block the job.
+- **Latency:** querying settings adds ~200-500ms before job start. For a long job, this is fine. For tiny jobs (test fires), it's noticeable. Mitigation: cache the snapshot 鈥?re-query only when controller reconnects or the user explicitly refreshes.
+- **Compatibility:** older GRBL versions may not respond to all queries cleanly. The implementation must handle each query independently 鈥?failure of `$#` shouldn't block the job.
 
 The snapshot becomes part of `JobLog.machine.settings` (T2-109).
 
@@ -13291,15 +13274,15 @@ The snapshot becomes part of `JobLog.machine.settings` (T2-109).
 
 **Estimate:** ~2 sessions including parser robustness + caching strategy.
 
-**Priority:** Tier 2. Pairs with T2-109 + T2-25 (capabilities — derived from same data).
+**Priority:** Tier 2. Pairs with T2-109 + T2-25 (capabilities 鈥?derived from same data).
 
 **Cross-check note (audit 5C):** Audit's Critical 7 + Priority 4.
 
 ---
 
-### T2-111 | Persist partial job log during running job — every N seconds
+### T2-111 | Persist partial job log during running job 鈥?every N seconds
 
-**Code reference:** `src/app/MachineService.ts:256-312` — `tryFinalizeJobLog` only saves on idle transition. No periodic checkpointing during the run.
+**Code reference:** `src/app/MachineService.ts:256-312` 鈥?`tryFinalizeJobLog` only saves on idle transition. No periodic checkpointing during the run.
 
 **Problem:** Audit 5C Required Priority 7: if the renderer crashes, app closes, or machine disconnects mid-job, the in-memory `currentJobLog` is lost. Even if the next run restores some state, the failed job's evidence is gone.
 
@@ -13308,7 +13291,7 @@ The snapshot becomes part of `JobLog.machine.settings` (T2-109).
 **Fix:** Add periodic checkpointing:
 
 ```ts
-// MachineService — when a job becomes active, start a checkpoint timer
+// MachineService 鈥?when a job becomes active, start a checkpoint timer
 private checkpointTimer: NodeJS.Timeout | null = null;
 
 private startJobCheckpointing(): void {
@@ -13336,9 +13319,9 @@ private stopJobCheckpointing(): void {
 3. App reboots. Read job logs.
 4. Find `status: 'running'` log with no active session.
 5. Finalize as `'unknown_interruption'`. Save with note: "App crashed during job. Last checkpoint at line N."
-6. User sees in job history: "Job interrupted (crash) — at line N of M (Y%)".
+6. User sees in job history: "Job interrupted (crash) 鈥?at line N of M (Y%)".
 
-This combines with T2-105 (crash-loop recovery) — the crash report from T2-105 references the orphaned job log via correlation ID (T2-117).
+This combines with T2-105 (crash-loop recovery) 鈥?the crash report from T2-105 references the orphaned job log via correlation ID (T2-117).
 
 **Performance:** writing the JobLog every 10s isn't free for long jobs (large entry arrays serialize each time). Mitigations:
 - Compact entries before write (T2-112 event-window strategy).
@@ -13359,11 +13342,11 @@ This combines with T2-105 (crash-loop recovery) — the crash report from T2-105
 
 ---
 
-### T2-112 | Improved RX/TX retention strategy — event-window, not first/last
+### T2-112 | Improved RX/TX retention strategy 鈥?event-window, not first/last
 
-**Code reference:** `src/core/job/JobLog.ts:62-75` — `compactJobLogForStorage` keeps first 25 + last 25 raw entries when total exceeds 200. Cross-check verified at line 69.
+**Code reference:** `src/core/job/JobLog.ts:62-75` 鈥?`compactJobLogForStorage` keeps first 25 + last 25 raw entries when total exceeds 200. Cross-check verified at line 69.
 
-**Problem:** Audit 5C Critical failure 5 + Required Priority 6: for a long job that fails halfway, the most diagnostic raw traffic is RIGHT BEFORE the failure — somewhere in the middle of the entries array. First-25/last-25 truncation discards exactly this window.
+**Problem:** Audit 5C Critical failure 5 + Required Priority 6: for a long job that fails halfway, the most diagnostic raw traffic is RIGHT BEFORE the failure 鈥?somewhere in the middle of the entries array. First-25/last-25 truncation discards exactly this window.
 
 **Identified by:** Audit 5C (2026-04-26, ChatGPT) Critical 5 + Priority 6.
 
@@ -13426,9 +13409,9 @@ If this exceeds the storage quota, T2-116 (storage health) surfaces it.
 
 ---
 
-### T2-113 | Structured RX/TX events — line numbers, buffer state, classification
+### T2-113 | Structured RX/TX events 鈥?line numbers, buffer state, classification
 
-**Code reference:** `src/app/MachineService.ts:215-227` — RX/TX entries stored as `{ timestamp, type: 'sent'|'received', message: string }` where message is a flat formatted string.
+**Code reference:** `src/app/MachineService.ts:215-227` 鈥?RX/TX entries stored as `{ timestamp, type: 'sent'|'received', message: string }` where message is a flat formatted string.
 
 **Problem:** Cross-check confirmed RX/TX entries are flat strings. Lost information:
 - Controller line number (which streamed line did this respond to?)
@@ -13438,7 +13421,7 @@ If this exceeds the storage quota, T2-116 (storage health) surfaces it.
 - Send queue depth
 - Timestamp deltas (how long between sent and received?)
 
-**Identified by:** Audit 5C (2026-04-26, ChatGPT) Required Priority — RX/TX classification.
+**Identified by:** Audit 5C (2026-04-26, ChatGPT) Required Priority 鈥?RX/TX classification.
 
 **Fix:** Replace string `message` with structured fields:
 
@@ -13472,7 +13455,7 @@ export interface JobLogEntry {
 
 Tools that consume entries can use `classification.direction` and `classification.commandType` for filtering instead of regex-parsing the message string. Replay visualization (T1-88) becomes much richer.
 
-This is a schema change — pairs with T2-104 (user-data migration). Old logs with only `{ timestamp, type, message }` continue to work; new fields are optional.
+This is a schema change 鈥?pairs with T2-104 (user-data migration). Old logs with only `{ timestamp, type, message }` continue to work; new fields are optional.
 
 **Tests:** `tests/structured-rx-tx-entries.test.ts`:
 - TX entry has direction='tx', source classification.
@@ -13483,7 +13466,7 @@ This is a schema change — pairs with T2-104 (user-data migration). Old logs wi
 
 **Priority:** Tier 2. Refines T2-65 (error reporter) and T3-74 (structured log events) by extending to RX/TX domain.
 
-**Cross-check note (audit 5C):** Audit's Required Priority — RX/TX classification.
+**Cross-check note (audit 5C):** Audit's Required Priority 鈥?RX/TX classification.
 
 ---
 
@@ -13491,7 +13474,7 @@ This is a schema change — pairs with T2-104 (user-data migration). Old logs wi
 
 **Code reference:** No `componentDidCatch`, no `window.onerror`, no `unhandledrejection` listener. Cross-check confirmed zero hits.
 
-**Problem:** Audit 5C Critical failure 2 + Required Priority 8: renderer crashes are completely invisible to support. A React component throws → white screen, no log, no recovery. An unhandled promise rejection → silently dropped, app may continue in inconsistent state.
+**Problem:** Audit 5C Critical failure 2 + Required Priority 8: renderer crashes are completely invisible to support. A React component throws 鈫?white screen, no log, no recovery. An unhandled promise rejection 鈫?silently dropped, app may continue in inconsistent state.
 
 T2-105 (audit 5B) covers Electron main-process side; T2-114 is the renderer side.
 
@@ -13499,7 +13482,7 @@ T2-105 (audit 5B) covers Electron main-process side; T2-114 is the renderer side
 
 **Fix:** Three components.
 
-**Component 1 — React error boundary at the app root:**
+**Component 1 鈥?React error boundary at the app root:**
 
 ```tsx
 // src/ui/components/AppErrorBoundary.tsx
@@ -13559,7 +13542,7 @@ Error: TypeError: Cannot read property 'machine' of undefined
 
 The "Export support bundle" link triggers T2-108 directly, pre-filled with the crash report.
 
-**Component 2 — Global error and rejection handlers:**
+**Component 2 鈥?Global error and rejection handlers:**
 
 ```ts
 // src/main.tsx (entry point)
@@ -13592,12 +13575,12 @@ window.addEventListener('unhandledrejection', (event) => {
 });
 ```
 
-**Component 3 — Last user action tracker:**
+**Component 3 鈥?Last user action tracker:**
 
 A small middleware/hook that records the user's last meaningful action (button click, menu item, drag start, etc.). Crash reports include this so support can ask "did this happen during X?"
 
 **Tests:** `tests/error-boundary.test.tsx`:
-- Component throws → CrashScreen renders.
+- Component throws 鈫?CrashScreen renders.
 - componentDidCatch persists crash report via reportError.
 - Recover button resets state.
 - Global error handler persists uncaught errors.
@@ -13614,7 +13597,7 @@ A small middleware/hook that records the user's last meaningful action (button c
 
 **Code reference:** No redaction infrastructure exists.
 
-**Problem:** Audit 5C Required Priority 10: support bundles, crash reports, and exported logs may contain sensitive data — license keys, file paths with usernames, email addresses, IP addresses, project content. Without a central redaction layer, every export site is one bug away from leaking customer data.
+**Problem:** Audit 5C Required Priority 10: support bundles, crash reports, and exported logs may contain sensitive data 鈥?license keys, file paths with usernames, email addresses, IP addresses, project content. Without a central redaction layer, every export site is one bug away from leaking customer data.
 
 **Identified by:** Audit 5C (2026-04-26, ChatGPT) Critical failure 9 + Priority 10.
 
@@ -13671,15 +13654,15 @@ zip.addFile('recent-job-logs.json', JSON.stringify(redactedJobLogs));
 ```
 
 Special cases:
-- License keys: ALWAYS redacted, no user opt-out (defense-in-depth — bundles never leak licenses).
-- Project file: if user opts to include, NO redaction (it's the actual project — they're choosing to share it).
+- License keys: ALWAYS redacted, no user opt-out (defense-in-depth 鈥?bundles never leak licenses).
+- Project file: if user opts to include, NO redaction (it's the actual project 鈥?they're choosing to share it).
 - G-code: if user opts to include, optionally redact comments containing project metadata.
 
 **Tests:** `tests/redaction.test.ts`:
-- License key in any string field → replaced with placeholder.
-- Email in error message → redacted.
-- File path in stack trace → redacted.
-- Nested objects → recursively redacted.
+- License key in any string field 鈫?replaced with placeholder.
+- Email in error message 鈫?redacted.
+- File path in stack trace 鈫?redacted.
+- Nested objects 鈫?recursively redacted.
 - Project file inclusion bypasses redaction (when explicitly opted in).
 
 **Estimate:** ~1-2 sessions. Patterns + recursive redaction + tests.
@@ -13750,7 +13733,7 @@ Surface in two places:
 When health is bad (>80% quota used, recent save failures), surface a warning:
 
 ```
-⚠ Storage nearly full
+鈿?Storage nearly full
 
 LaserForge has used 47 MB of 50 MB available.
 Older job logs and autosaves may be discarded.
@@ -13759,9 +13742,9 @@ Older job logs and autosaves may be discarded.
 ```
 
 **Tests:** `tests/storage-health.test.ts`:
-- Empty storage → all domains 0.
-- Mock 100MB across domains → correct totals + breakdown.
-- Mock save failures → captured in lastSaveFailures.
+- Empty storage 鈫?all domains 0.
+- Mock 100MB across domains 鈫?correct totals + breakdown.
+- Mock save failures 鈫?captured in lastSaveFailures.
 
 **Estimate:** ~1-2 sessions including UI surface.
 
@@ -13771,7 +13754,7 @@ Older job logs and autosaves may be discarded.
 
 ---
 
-### T2-117 | Correlation IDs across systems — sessionId / projectId / compileId / frameId / jobId / supportBundleId
+### T2-117 | Correlation IDs across systems 鈥?sessionId / projectId / compileId / frameId / jobId / supportBundleId
 
 **Code reference:** Today: jobs have IDs (JobLog.id), replays have IDs, tickets have IDs (ValidatedJobTicket.ticketId). No top-level session ID, no project ID, no compile ID, no frame ID, no support bundle ID.
 
@@ -13825,9 +13808,9 @@ When a support engineer reads a bundle:
 4. Same `sessionId` shows the broader app session context.
 
 **Tests:** `tests/correlation-ids.test.ts`:
-- New session → unique sessionId.
-- Project load → new projectId.
-- Compile → new compileId, parent sessionId/projectId preserved.
+- New session 鈫?unique sessionId.
+- Project load 鈫?new projectId.
+- Compile 鈫?new compileId, parent sessionId/projectId preserved.
 - Each error report includes current correlation snapshot.
 
 **Estimate:** ~1-2 sessions. ID generation + propagation through reportError, JobLog, crash reports + tests.
@@ -13838,7 +13821,7 @@ When a support engineer reads a bundle:
 
 ---
 
-### T2-118 | Troubleshooting panel — `Help → Diagnostics`
+### T2-118 | Troubleshooting panel 鈥?`Help 鈫?Diagnostics`
 
 **Code reference:** No dedicated diagnostics surface today. JobLogViewer exists but is narrow.
 
@@ -13850,21 +13833,19 @@ When a support engineer reads a bundle:
 
 **Identified by:** Audit 5C (2026-04-26, ChatGPT) Required Priority 11.
 
-**Fix:** Add `Help → Diagnostics` panel:
+**Fix:** Add `Help 鈫?Diagnostics` panel:
 
 ```
-═══════════════════════════════════════════════
-  Diagnostics
-═══════════════════════════════════════════════
-
+鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?  Diagnostics
+鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?
   Connection
-  ─────────────────────────────────────────────
+  鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   Status:        Connected (USB CH340)
-  Profile:       Falcon A1 Pro (correct ✓)
+  Profile:       Falcon A1 Pro (correct 鉁?
   Position:      Trusted (homed 4 minutes ago)
 
   Last Job
-  ─────────────────────────────────────────────
+  鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   Status:        Stopped at line 1247 of 1850 (67%)
   Reason:        User pressed Stop
   Started:       14:25
@@ -13872,29 +13853,26 @@ When a support engineer reads a bundle:
   [ View details ]
 
   Recent Issues
-  ─────────────────────────────────────────────
-  ⚠ Frame failed (3 minutes ago)
+  鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  鈿?Frame failed (3 minutes ago)
     Command "G1 X100 F3000" was blocked.
     [ View details ]
 
   Storage
-  ─────────────────────────────────────────────
+  鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
   Used:          47 MB / ~50 MB
-  Last save:     2 minutes ago ✓
-
+  Last save:     2 minutes ago 鉁?
   Common issues
-  ─────────────────────────────────────────────
-  Connection problems   →  [ Open guide ]
-  Job stopped halfway   →  [ Open guide ]
-  Wrong position/burn   →  [ Open guide ]
-  Output too light/dark →  [ Open guide ]
-  App won't open        →  [ Open guide ]
+  鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+  Connection problems   鈫? [ Open guide ]
+  Job stopped halfway   鈫? [ Open guide ]
+  Wrong position/burn   鈫? [ Open guide ]
+  Output too light/dark 鈫? [ Open guide ]
+  App won't open        鈫? [ Open guide ]
 
-  ═══════════════════════════════════════════════
-  [ Export Diagnostic Bundle ]
+  鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?  [ Export Diagnostic Bundle ]
   [ Copy Support Summary ]
-  ═══════════════════════════════════════════════
-```
+  鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺愨晲鈺?```
 
 Each "Open guide" link leads to a per-issue troubleshooting page that shows:
 - What evidence the app captured for this issue
@@ -13907,7 +13885,7 @@ The "Copy Support Summary" produces a one-paragraph plain-text summary the user 
 ```
 LaserForge 1.0.3 on Windows 11
 Session: session_1730_abc / Job: job_1730_def
-Last issue: Frame failed (3 minutes ago) — command G1 X100 F3000 blocked
+Last issue: Frame failed (3 minutes ago) 鈥?command G1 X100 F3000 blocked
 Connection: Falcon A1 Pro via USB CH340
 Storage: 47/50 MB used
 ```
@@ -13925,7 +13903,7 @@ Storage: 47/50 MB used
 
 ---
 
-### T2-119 | IPC sender verification — `assertTrustedSender` in every handler
+### T2-119 | IPC sender verification 鈥?`assertTrustedSender` in every handler
 
 **Code reference:** Cross-check verified zero hits for `senderFrame`, `event.sender`, `assertTrustedSender` in electron/main.ts. Every IPC handler accepts requests from any frame.
 
@@ -13982,12 +13960,12 @@ grep -A 1 "ipcMain.handle" electron/main.ts | grep -B 1 -v "assertTrustedSender"
 **Tests:** `tests/ipc-sender-verification.test.ts`:
 - Mock `event.senderFrame.url = 'http://attacker.com/'`.
 - Each IPC handler throws "Blocked IPC from untrusted sender".
-- Mock packaged + `file://` → succeeds.
-- Mock dev + `http://localhost:3000/` → succeeds.
+- Mock packaged + `file://` 鈫?succeeds.
+- Mock dev + `http://localhost:3000/` 鈫?succeeds.
 
 **Estimate:** ~1-2 sessions. Utility + apply across ~15 IPC handlers + tests + CI grep check.
 
-**Priority:** Tier 2. Required by T1-89 (sandbox) for full effect — sandbox + sender verification together substantially harden the IPC surface.
+**Priority:** Tier 2. Required by T1-89 (sandbox) for full effect 鈥?sandbox + sender verification together substantially harden the IPC surface.
 
 **Cross-check note (audit 5D):** Audit's Critical 5 + Priority 3. Verified via grep zero hits.
 
@@ -13995,7 +13973,7 @@ grep -A 1 "ipcMain.handle" electron/main.ts | grep -B 1 -v "assertTrustedSender"
 
 ### T2-120 | Replace generic storage IPC with typed namespaced APIs
 
-**Code reference:** `electron/preload.ts:17-22` exposes `storageGet`, `storageSet`, `storageRemove`, `storageList`, `storageClear` — five primitives that take ANY key and ANY string value.
+**Code reference:** `electron/preload.ts:17-22` exposes `storageGet`, `storageSet`, `storageRemove`, `storageList`, `storageClear` 鈥?five primitives that take ANY key and ANY string value.
 
 **Problem:** Cross-check verified the broad surface. Any renderer code (or compromised renderer) can:
 - Read the license cache: `storageGet('laserforge_license_cache')`
@@ -14011,7 +13989,7 @@ There's no namespace authorization, no schema validation at the storage boundary
 **Fix:** Typed namespaced IPC. Each domain has its own handler with its own validation:
 
 ```ts
-// electron/preload.ts — replace generic storage with typed APIs
+// electron/preload.ts 鈥?replace generic storage with typed APIs
 contextBridge.exposeInMainWorld('electronAPI', {
   // === Profiles ===
   profilesList: () => ipcRenderer.invoke('profiles:list'),
@@ -14059,14 +14037,14 @@ ipcMain.handle('profiles:save', (event, profile: unknown) => {
 });
 ```
 
-License cache writes are NOT exposed to renderer at all — they happen via the licensing service which validates server signatures (T2-90).
+License cache writes are NOT exposed to renderer at all 鈥?they happen via the licensing service which validates server signatures (T2-90).
 
 **Migration of existing renderer code:**
-- Replace `getStorage().get('laserforge_device_profile_X')` → `window.electronAPI.profilesGet('X')`.
-- Replace `getStorage().list('laserforge_material_')` → `window.electronAPI.materialsList()`.
+- Replace `getStorage().get('laserforge_device_profile_X')` 鈫?`window.electronAPI.profilesGet('X')`.
+- Replace `getStorage().list('laserforge_material_')` 鈫?`window.electronAPI.materialsList()`.
 - Etc.
 
-The renderer-side `Storage` adapter abstraction stays — it now wraps the typed APIs instead of generic IPC.
+The renderer-side `Storage` adapter abstraction stays 鈥?it now wraps the typed APIs instead of generic IPC.
 
 **Tests:** `tests/typed-storage-ipc.test.ts`:
 - Each domain's typed API works.
@@ -14083,7 +14061,7 @@ The renderer-side `Storage` adapter abstraction stays — it now wraps the typed
 
 ### T2-121 | Main-process serial command classification enforcement
 
-**Code reference:** `electron/main.ts:256-261` — `serial:send` validates only type, length, and CR/LF.
+**Code reference:** `electron/main.ts:256-261` 鈥?`serial:send` validates only type, length, and CR/LF.
 
 **Problem:** Cross-check verified. The renderer-side `commandClassifier.ts` warns the user before sending dangerous commands like `$RST`, `$SLP`, `$X`, `M3 S1000`, `G92 X0 Y0`. But the main-process `serial:send` accepts ANY one-line string up to 127 chars. A compromised renderer (or a developer-tools paste, or a future code path that bypasses the classifier) sends:
 
@@ -14098,7 +14076,7 @@ window.electronAPI.sendGcode('M3 S1000');
 **Fix:** Move command classification into main process. The classifier becomes a shared module imported by both renderer (for UI warnings) and main (for IPC enforcement):
 
 ```ts
-// shared/CommandClassifier.ts (new — shared between renderer and main)
+// shared/CommandClassifier.ts (new 鈥?shared between renderer and main)
 export type CommandSeverity = 'safe' | 'caution' | 'dangerous';
 
 export interface CommandClassification {
@@ -14161,13 +14139,13 @@ ipcMain.handle('serial:send', async (event, line: unknown) => {
 
 The renderer-side classifier still runs for UX (warn before sending). Main process is the security boundary.
 
-For internal app paths (job streaming, jog, recovery flow) that need to send commands the classifier would reject — they use TYPED command IPC (T2-122) that bypasses the generic `serial:send` entirely.
+For internal app paths (job streaming, jog, recovery flow) that need to send commands the classifier would reject 鈥?they use TYPED command IPC (T2-122) that bypasses the generic `serial:send` entirely.
 
 **Tests:** `tests/main-process-command-classification.test.ts`:
-- `serial:send('M3 S1000')` → throws "Blocked dangerous command".
-- `serial:send('$RST=*')` → throws.
-- `serial:send('?')` (status query, safe) → succeeds.
-- `serial:send('$X')` → succeeds with caution log.
+- `serial:send('M3 S1000')` 鈫?throws "Blocked dangerous command".
+- `serial:send('$RST=*')` 鈫?throws.
+- `serial:send('?')` (status query, safe) 鈫?succeeds.
+- `serial:send('$X')` 鈫?succeeds with caution log.
 
 **Estimate:** ~2 sessions. Shared classifier extraction + main enforcement + tests.
 
@@ -14177,11 +14155,11 @@ For internal app paths (job streaming, jog, recovery flow) that need to send com
 
 ---
 
-### T2-122 | Typed serial command IPC — replace generic `sendGcode(arbitraryString)`
+### T2-122 | Typed serial command IPC 鈥?replace generic `sendGcode(arbitraryString)`
 
 **Code reference:** `electron/preload.ts:17-22` exposes `sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd)`. Renderer calls this from many places: jog buttons, manual console, alarm unlock, laser test, frame test, etc.
 
-**Problem:** The generic `sendGcode` is the wrong primitive to expose. It says "any line goes" — and then T2-121 has to add a classifier to reject some of them. A typed API expresses intent: the renderer asks for "jog X by 10mm", "stop the job", "test fire for 1 second", "unlock from alarm" — and the main process composes the actual G-code.
+**Problem:** The generic `sendGcode` is the wrong primitive to expose. It says "any line goes" 鈥?and then T2-121 has to add a classifier to reject some of them. A typed API expresses intent: the renderer asks for "jog X by 10mm", "stop the job", "test fire for 1 second", "unlock from alarm" 鈥?and the main process composes the actual G-code.
 
 **Identified by:** Audit 5D (2026-04-26, ChatGPT) Required Priority 5 (typed commands).
 
@@ -14205,7 +14183,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     testFire: (powerPercent: number, durationMs: number) =>
       ipcRenderer.invoke('serial:testFire', { powerPercent, durationMs }),
     rawConsoleCommand: (line: string) => ipcRenderer.invoke('serial:rawConsole', line),
-    // ↑ rawConsoleCommand is ONLY for the user console; goes through T2-121 classifier
+    // 鈫?rawConsoleCommand is ONLY for the user console; goes through T2-121 classifier
   },
 });
 
@@ -14230,12 +14208,12 @@ ipcMain.handle('serial:laserOff', async (event) => {
 
 ipcMain.handle('serial:rawConsole', async (event, line: unknown) => {
   assertTrustedSender(event);
-  // Goes through T2-121 classifier — only safe + caution (with logging) allowed
+  // Goes through T2-121 classifier 鈥?only safe + caution (with logging) allowed
   // Dangerous commands rejected
 });
 ```
 
-Job streaming uses `sendJobLine` (no classification — job lines are pre-validated by the compiler / preflight).
+Job streaming uses `sendJobLine` (no classification 鈥?job lines are pre-validated by the compiler / preflight).
 
 **Tests:** `tests/typed-serial-ipc.test.ts`:
 - `electronAPI.serial.jog('X', 10, 3000)` produces correct G91+G1+G90 sequence.
@@ -14251,17 +14229,17 @@ Job streaming uses `sendJobLine` (no classification — job lines are pre-valida
 
 ---
 
-### T2-123 | SVG complexity limits — node count, depth, path tokens, segments, polygon points
+### T2-123 | SVG complexity limits 鈥?node count, depth, path tokens, segments, polygon points
 
 **Code reference:** `src/import/svg/SvgParser.ts:204-212` correctly skips script/style/foreignObject (fair credit) BUT recursive `traverse(child, ...)` at line 206 has no depth bound. No global node count, path token, segment count, or polygon point limits anywhere in the parser.
 
 **Problem:** Cross-check verified. A malicious SVG can:
-- Nest `<g>` elements 10,000 levels deep → recursion stack exhaustion or O(n²) transform multiplication.
-- Contain a single `<path d="M0,0 L1,1 L2,2 ...">` with 10 million path commands → multi-GB string parsing.
-- Contain 1,000,000 `<rect>` elements → multi-GB scene allocation.
-- Contain a `<polygon points="...">` with 50 million points → memory exhaustion.
+- Nest `<g>` elements 10,000 levels deep 鈫?recursion stack exhaustion or O(n虏) transform multiplication.
+- Contain a single `<path d="M0,0 L1,1 L2,2 ...">` with 10 million path commands 鈫?multi-GB string parsing.
+- Contain 1,000,000 `<rect>` elements 鈫?multi-GB scene allocation.
+- Contain a `<polygon points="...">` with 50 million points 鈫?memory exhaustion.
 
-The audit isn't paranoid — these aren't theoretical. Bug bounty reports against drawing apps regularly include "SVG with 10M path commands crashes the renderer."
+The audit isn't paranoid 鈥?these aren't theoretical. Bug bounty reports against drawing apps regularly include "SVG with 10M path commands crashes the renderer."
 
 **Identified by:** Audit 5D (2026-04-26, ChatGPT) Critical failure 7 + Required Priority 7.
 
@@ -14354,15 +14332,15 @@ curves before exporting. Try exporting with curve simplification enabled.
 ```
 
 **Tests:** `tests/svg-complexity-limits.test.ts`:
-- Nest 101 `<g>` elements → throws MAX_DEPTH.
-- 50,001 `<rect>` elements → throws MAX_NODES.
-- Path with 200,001 tokens → throws.
-- Polygon with 100,001 points → throws.
+- Nest 101 `<g>` elements 鈫?throws MAX_DEPTH.
+- 50,001 `<rect>` elements 鈫?throws MAX_NODES.
+- Path with 200,001 tokens 鈫?throws.
+- Polygon with 100,001 points 鈫?throws.
 - Normal SVG (within limits) parses fine.
 
 **Estimate:** ~2 sessions including limits + tests.
 
-**Priority:** Tier 2. Pairs with T1-92 (file size limit) — file size catches the easy case, complexity limits catch crafted attacks.
+**Priority:** Tier 2. Pairs with T1-92 (file size limit) 鈥?file size catches the easy case, complexity limits catch crafted attacks.
 
 **Cross-check note (audit 5D):** Audit's Critical 7 + Priority 7. Verified at SvgParser.ts:204-212.
 
@@ -14370,10 +14348,10 @@ curves before exporting. Try exporting with curve simplification enabled.
 
 ### T2-124 | Image pre-decode size + pixel limits (decompression bomb protection)
 
-**Code reference:** `src/ui/hooks/useImport.ts:38-53` — file read fully, decoded fully, before any pixel-count check. The `maxDim = 1000` cap at line 86 only affects DOWNSTREAM grayscale processing.
+**Code reference:** `src/ui/hooks/useImport.ts:38-53` 鈥?file read fully, decoded fully, before any pixel-count check. The `maxDim = 1000` cap at line 86 only affects DOWNSTREAM grayscale processing.
 
-**Problem:** Cross-check verified. A 50,000 × 50,000 PNG of a single color compresses to ~1MB on disk. When decoded:
-- `naturalWidth × naturalHeight × 4 bytes` = 10 GB allocated by browser
+**Problem:** Cross-check verified. A 50,000 脳 50,000 PNG of a single color compresses to ~1MB on disk. When decoded:
+- `naturalWidth 脳 naturalHeight 脳 4 bytes` = 10 GB allocated by browser
 - Renderer tab crashes (Chromium kills tabs that exceed certain memory thresholds)
 - If it doesn't crash, the renderer freezes for many seconds
 
@@ -14383,13 +14361,13 @@ The check at line 86 happens AFTER the bomb has already detonated. To prevent th
 
 **Fix:** Two-stage check.
 
-**Stage 1 — file size (already covered partially by T1-92).** Catches the easy case of "user accidentally selected a 5GB BMP."
+**Stage 1 鈥?file size (already covered partially by T1-92).** Catches the easy case of "user accidentally selected a 5GB BMP."
 
-**Stage 2 — pre-decode pixel cap.** Use `createImageBitmap` with options that allow inspecting dimensions before full decode, OR use a quick header-only parser:
+**Stage 2 鈥?pre-decode pixel cap.** Use `createImageBitmap` with options that allow inspecting dimensions before full decode, OR use a quick header-only parser:
 
 ```ts
 // src/ui/hooks/useImport.ts
-const MAX_IMAGE_PIXELS = 50_000_000;  // 50 megapixels (~7100×7100)
+const MAX_IMAGE_PIXELS = 50_000_000;  // 50 megapixels (~7100脳7100)
 const MAX_IMAGE_FILE_BYTES = 50 * 1024 * 1024;
 
 async function importImage(source: File | string, fileName?: string) {
@@ -14418,7 +14396,7 @@ async function importImage(source: File | string, fileName?: string) {
     const totalPixels = bitmap.width * bitmap.height;
     if (totalPixels > MAX_IMAGE_PIXELS) {
       throw new Error(
-        `Image too large: ${bitmap.width}×${bitmap.height} = ${(totalPixels / 1_000_000).toFixed(1)}M pixels. Maximum: 50 megapixels.`,
+        `Image too large: ${bitmap.width}脳${bitmap.height} = ${(totalPixels / 1_000_000).toFixed(1)}M pixels. Maximum: 50 megapixels.`,
       );
     }
   } finally {
@@ -14437,14 +14415,14 @@ async function importImage(source: File | string, fileName?: string) {
 }
 ```
 
-Note: `createImageBitmap` does decode the image, but it allows immediate close + GC. If the image truly is 10GB, even `createImageBitmap` will fail or crash — which is acceptable (browser handles it). The point is: if the image is just oversized but valid, we reject it with a clear message instead of trying to process it and freezing the UI.
+Note: `createImageBitmap` does decode the image, but it allows immediate close + GC. If the image truly is 10GB, even `createImageBitmap` will fail or crash 鈥?which is acceptable (browser handles it). The point is: if the image is just oversized but valid, we reject it with a clear message instead of trying to process it and freezing the UI.
 
 For maximum safety, future T-ticket: replace `createImageBitmap` probe with a header-only parser (PNG IHDR chunk, JPEG SOF marker) that reads only the first ~30 bytes. That's a more involved implementation tracked separately if T2-124's approach proves insufficient.
 
 **Tests:** `tests/image-decompression-bomb.test.ts`:
-- 100MB image file → rejected at stage 1.
-- 50,000×50,000 image (small file size, huge pixels) → rejected at stage 2.
-- 5000×5000 image (within both limits) → succeeds.
+- 100MB image file 鈫?rejected at stage 1.
+- 50,000脳50,000 image (small file size, huge pixels) 鈫?rejected at stage 2.
+- 5000脳5000 image (within both limits) 鈫?succeeds.
 
 **Estimate:** ~1-2 sessions.
 
@@ -14456,7 +14434,7 @@ For maximum safety, future T-ticket: replace `createImageBitmap` probe with a he
 
 ### T2-125 | Compiler/output layer enforces template validation (defense in depth)
 
-**Code reference:** Template validation today happens via preflight (UI surface) — `src/core/preflight/...`. The compiler at `src/core/output/Output.ts:210-322` calls `renderTemplate` directly without re-validating.
+**Code reference:** Template validation today happens via preflight (UI surface) 鈥?`src/core/preflight/...`. The compiler at `src/core/output/Output.ts:210-322` calls `renderTemplate` directly without re-validating.
 
 **Problem:** Audit 5D Required Priority 10: preflight is a UI thing. It runs when the user clicks Start. But the compiler can also be invoked directly:
 - Programmatic compile (testing, dev tools)
@@ -14493,14 +14471,14 @@ export function compileScene(scene: Scene, options: CompileOptions): CompileResu
 }
 ```
 
-The `validateTemplate` function is the same one preflight uses — extracted from the preflight module into a shared utility. Preflight UI continues to call it for warnings; compiler calls it for hard rejection.
+The `validateTemplate` function is the same one preflight uses 鈥?extracted from the preflight module into a shared utility. Preflight UI continues to call it for warnings; compiler calls it for hard rejection.
 
 This is **defense in depth**, not a replacement: preflight gives users a chance to fix templates with friendly UI; the compiler refuses to emit unsafe G-code under any circumstances. Both layers run.
 
 **Tests:** `tests/compiler-template-validation.test.ts`:
-- Compile with header containing `$RST` → throws TemplateValidationError.
-- Compile with footer missing M5 → throws.
-- Compile with valid template → succeeds.
+- Compile with header containing `$RST` 鈫?throws TemplateValidationError.
+- Compile with footer missing M5 鈫?throws.
+- Compile with valid template 鈫?succeeds.
 
 **Estimate:** ~1-2 sessions including extracting validator + applying.
 
@@ -14510,24 +14488,24 @@ This is **defense in depth**, not a replacement: preflight gives users a chance 
 
 ---
 
-### T2-126 | Falcon WiFi treated as untrusted telemetry — UI labels + safety boundary
+### T2-126 | Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary
 
 **Code reference:** `electron/falcon-wifi/FalconHttpClient.ts:11` ("No auth of any kind"). No UI surface marks WiFi state as untrusted.
 
-**Problem:** Audit 5D Critical failure 10 + Required Priority 11: a local network attacker (or fake Falcon device, or compromised router doing DNS rebinding) can respond to HTTP and WS queries with fabricated state. The app currently displays Falcon WiFi state with the same UI prominence as serial state — the user has no way to know which is more trustworthy.
+**Problem:** Audit 5D Critical failure 10 + Required Priority 11: a local network attacker (or fake Falcon device, or compromised router doing DNS rebinding) can respond to HTTP and WS queries with fabricated state. The app currently displays Falcon WiFi state with the same UI prominence as serial state 鈥?the user has no way to know which is more trustworthy.
 
 **Identified by:** Audit 5D (2026-04-26, ChatGPT) Critical 10 + Priority 11.
 
 **Fix:** Three-part response.
 
-**Part 1 — UI labeling:**
+**Part 1 鈥?UI labeling:**
 
 Wherever the connection panel shows a Falcon WiFi connection, mark it as telemetry:
 
 ```
 Falcon A1 Pro (192.168.1.42)  [WiFi, telemetry only]  [Disconnect]
 
-⚠ WiFi is not authenticated. Use USB for safety-critical operations.
+鈿?WiFi is not authenticated. Use USB for safety-critical operations.
 ```
 
 Falcon WiFi controls (start job, frame, jog) are either disabled OR show extra confirmation:
@@ -14541,7 +14519,7 @@ Recommended: connect via USB for jobs.
 [ Use USB instead ]   [ Cancel ]   [ Start over WiFi anyway ]
 ```
 
-**Part 2 — Safety boundary:** Several existing safety checks should NOT accept WiFi state as proof. For example, "machine is idle" before a job start currently trusts whatever the controller reports. If WiFi is the connection, this trust is misplaced. The check should:
+**Part 2 鈥?Safety boundary:** Several existing safety checks should NOT accept WiFi state as proof. For example, "machine is idle" before a job start currently trusts whatever the controller reports. If WiFi is the connection, this trust is misplaced. The check should:
 
 ```ts
 function canStartJob(state: MachineState): boolean {
@@ -14552,13 +14530,13 @@ function canStartJob(state: MachineState): boolean {
 ```
 
 WiFi mode either:
-- Refuses to start jobs (read-only telemetry — strictest), OR
+- Refuses to start jobs (read-only telemetry 鈥?strictest), OR
 - Requires explicit user override per job (medium), OR
 - Shows persistent warning during the job (loosest).
 
 The exact policy is a product decision; the security floor is "WiFi state never silently authorizes a safety-critical action."
 
-**Part 3 — Identity verification:**
+**Part 3 鈥?Identity verification:**
 
 Store the expected Falcon serial number when the user first pairs:
 
@@ -14568,7 +14546,7 @@ const knownDevice = settings.knownFalconWifi[ipAddress];
 const reported = await falcon.getDeviceStatus();
 
 if (knownDevice && knownDevice.serial !== reported.serial) {
-  // Different device responding at same IP — warn and disconnect
+  // Different device responding at same IP 鈥?warn and disconnect
   showAlert(
     `Different device detected at ${ipAddress}. ` +
     `Expected serial ${knownDevice.serial}, got ${reported.serial}. ` +
@@ -14595,7 +14573,7 @@ This catches the dumb spoofing case (someone plugging a fake device into the net
 
 ### T2-127 | Storage value size limits per-key
 
-**Code reference:** `electron/storage.ts:44-49` — `storageSet` accepts any string value with no size limit.
+**Code reference:** `electron/storage.ts:44-49` 鈥?`storageSet` accepts any string value with no size limit.
 
 **Problem:** Audit 5D DoS vector 6 + Required Priority 13: a renderer (legitimate or compromised) can call `storageSet(key, hugeValue)` and either:
 - Fill the userData directory until disk is full
@@ -14624,7 +14602,7 @@ function checkNamespaceLimit(namespace: keyof typeof NAMESPACE_LIMITS, valueByte
   if (valueBytes > limit.maxValueBytes) {
     throw new Error(`Value too large for ${namespace}: ${valueBytes} > ${limit.maxValueBytes}`);
   }
-  // Also enforce total — list namespace, sum existing, reject if would exceed
+  // Also enforce total 鈥?list namespace, sum existing, reject if would exceed
 }
 ```
 
@@ -14643,9 +14621,9 @@ ipcMain.handle('profiles:save', (event, profile: unknown) => {
 The autosave namespace gets a much higher limit because real projects with embedded images legitimately reach 30+ MB.
 
 **Tests:** `tests/storage-size-limits.test.ts`:
-- 200KB device profile → rejected.
-- 80KB device profile → succeeds.
-- Total profile storage > 5MB → next save rejected with "namespace full" error.
+- 200KB device profile 鈫?rejected.
+- 80KB device profile 鈫?succeeds.
+- Total profile storage > 5MB 鈫?next save rejected with "namespace full" error.
 
 **Estimate:** ~1-2 sessions. Limits + per-namespace checks + tests.
 
@@ -14659,7 +14637,7 @@ The autosave namespace gets a much higher limit because real projects with embed
 
 **Code reference:** Today: `storageGet`, `storageSet` etc. accept any key. Even after T2-120 (typed IPC), the underlying `storage.ts` functions don't know which namespace they're serving.
 
-**Problem:** Defense in depth — even with typed IPC at the boundary (T2-120), a future bug that calls `storageSet(key, value)` directly from main-process code could write to any namespace. T2-128 makes the storage layer itself namespace-aware.
+**Problem:** Defense in depth 鈥?even with typed IPC at the boundary (T2-120), a future bug that calls `storageSet(key, value)` directly from main-process code could write to any namespace. T2-128 makes the storage layer itself namespace-aware.
 
 **Identified by:** Audit 5D (2026-04-26, ChatGPT) Required Priority 4 (typed APIs deep in storage). Refines T1-84 + T2-120.
 
@@ -14698,7 +14676,7 @@ ipcMain.handle('profiles:save', (event, profile) => {
 The generic `storageSet(key, value)` is removed entirely. There is no longer a code path that can write outside a namespace.
 
 **Tests:** `tests/namespace-isolation.test.ts`:
-- Save profile → only goes to profiles namespace.
+- Save profile 鈫?only goes to profiles namespace.
 - Cannot pass `key='laserforge_license'` to `namespacedSet('profiles', ...)` (prefix wouldn't match).
 - Generic `storageSet` no longer exported.
 
@@ -14710,7 +14688,7 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 ---
 
-## Tier 3 — This quarter
+## Tier 3 鈥?This quarter
 
 ### T3-1 | Autosave to IndexedDB / filesystem
 
@@ -14718,9 +14696,9 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 **Problem:** Autosave serializes scenes minus image buffers into localStorage to fit the 5MB quota. Image-stripping is silent data loss. Reload from autosave yields scenes with missing image raster data.
 
-**Fix:** Part of T2-2 (`Storage` interface). Autosave writes the full scene — including images — through the filesystem adapter. In Electron, that's JSON in userData plus separate image files.
+**Fix:** Part of T2-2 (`Storage` interface). Autosave writes the full scene 鈥?including images 鈥?through the filesystem adapter. In Electron, that's JSON in userData plus separate image files.
 
-**Test:** `tests/autosave-roundtrip.test.ts` — scene with 50MB image, autosave, reload, assert image data is byte-identical.
+**Test:** `tests/autosave-roundtrip.test.ts` 鈥?scene with 50MB image, autosave, reload, assert image data is byte-identical.
 
 **Estimate:** Covered by T2-2.
 
@@ -14734,19 +14712,19 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 **Fix:** Add these tests. They're the top-priority gap closers.
 
-1. **`tests/ui-start-job-end-to-end.test.ts`** — Compile a scene → pass through `handleStartJob`'s filter → through `GrblController.startJob` → assert `onObjectLifecycle` fires for each object in order. Catches T0-1 regressions forever.
+1. **`tests/ui-start-job-end-to-end.test.ts`** 鈥?Compile a scene 鈫?pass through `handleStartJob`'s filter 鈫?through `GrblController.startJob` 鈫?assert `onObjectLifecycle` fires for each object in order. Catches T0-1 regressions forever.
 
-2. **`tests/template-safety-enforcement.test.ts`** — 6 cases: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, template injecting `$X`, template with motion outside plan bounds. All rejected.
+2. **`tests/template-safety-enforcement.test.ts`** 鈥?6 cases: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, template injecting `$X`, template with motion outside plan bounds. All rejected.
 
-3. **`tests/stale-gcode-blocks-start.test.ts`** — Compile, mutate scene, attempt start without recompile. Blocked. Becomes trivial with `ValidatedJobTicket` (T2-1).
+3. **`tests/stale-gcode-blocks-start.test.ts`** 鈥?Compile, mutate scene, attempt start without recompile. Blocked. Becomes trivial with `ValidatedJobTicket` (T2-1).
 
-4. **`tests/profile-change-blocks-start.test.ts`** — Compile for 400×400 bed, switch profile to 300×300, attempt start. Blocked.
+4. **`tests/profile-change-blocks-start.test.ts`** 鈥?Compile for 400脳400 bed, switch profile to 300脳300, attempt start. Blocked.
 
-5. **`tests/cable-yanked-mid-job.test.ts`** — MockSerialPort fires `onError` mid-plan. Assertions: autosave not corrupted, controller disconnected, UI state consistent, reconnect-then-start works.
+5. **`tests/cable-yanked-mid-job.test.ts`** 鈥?MockSerialPort fires `onError` mid-plan. Assertions: autosave not corrupted, controller disconnected, UI state consistent, reconnect-then-start works.
 
 **Estimate:** 1 session per test, 5 sessions total.
 
-**Priority:** Tier 3 (do as each fix lands — #1 with T0-1, #2 with T2-5, #3 and #4 with T2-1, #5 as a standalone).
+**Priority:** Tier 3 (do as each fix lands 鈥?#1 with T0-1, #2 with T2-5, #3 and #4 with T2-1, #5 as a standalone).
 
 ---
 
@@ -14785,7 +14763,7 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Problem:** No update mechanism. Users stay on whatever version they installed. Critical bug fixes don't reach them unless they manually re-download.
 
-**Fix:** `electron-builder` ships with `electron-updater`. Wire it to a release server (GitHub Releases works for a start). On app start, check for updates. Offer download + install on next restart. Staged rollout (10% → 50% → 100%) if you want to be careful.
+**Fix:** `electron-builder` ships with `electron-updater`. Wire it to a release server (GitHub Releases works for a start). On app start, check for updates. Offer download + install on next restart. Staged rollout (10% 鈫?50% 鈫?100%) if you want to be careful.
 
 **Estimate:** 2 sessions.
 
@@ -14823,7 +14801,7 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Problem:** CSP includes `'unsafe-eval'` and `'unsafe-inline'` in script-src. Needed for Vite dev, but should not be in production builds.
 
-**Fix:** Dual CSP config: one for dev (relaxed), one for production (no `unsafe-eval`, no `unsafe-inline` for scripts — switch to nonces). Audit runtime for any scripts that need `unsafe-*` in production and fix at source.
+**Fix:** Dual CSP config: one for dev (relaxed), one for production (no `unsafe-eval`, no `unsafe-inline` for scripts 鈥?switch to nonces). Audit runtime for any scripts that need `unsafe-*` in production and fix at source.
 
 **Estimate:** 1-2 sessions, possibly more if code relies on inline scripts.
 
@@ -14860,10 +14838,10 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Fix:**
 - DXF: at read boundary, reject files over 50MB (configurable). Inside parser, cap total entity count at 500K and per-entity group count at 10K.
-- Dithering: wrap in a Web Worker (pattern already exists for `PotraceTracer`). Cap input to 4000×4000 with a user-visible warning for anything larger.
+- Dithering: wrap in a Web Worker (pattern already exists for `PotraceTracer`). Cap input to 4000脳4000 with a user-visible warning for anything larger.
 - Images: reject over 50MB total before decode. Downsample to a configurable max before storing.
 
-**Test:** `tests/import-limits.test.ts` — feed 100MB DXF stub, assert rejection. Feed 10000×10000 image to dither, assert it either rejects or completes without blocking (via worker).
+**Test:** `tests/import-limits.test.ts` 鈥?feed 100MB DXF stub, assert rejection. Feed 10000脳10000 image to dither, assert it either rejects or completes without blocking (via worker).
 
 **Estimate:** 2 sessions.
 
@@ -14875,16 +14853,16 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Code references:**
 - `src/controllers/grbl/GrblController.ts:831-833` (lifecycle fires on send, not ack)
-- `src/ui/renderers/SceneRenderer.ts:826-834` (✓ anchor at right edge can render outside bed)
+- `src/ui/renderers/SceneRenderer.ts:826-834` (鉁?anchor at right edge can render outside bed)
 
 **Problem:** From this session's burn-progress audit.
 
-- **Bug B (lifecycle lag):** Halo jumps ahead of where the laser actually is by up to 5 seconds because GRBL's 128-byte buffer holds lines ahead of execution. Fix: track line→marker association as a queue; advance cursor on `ok` ack, not on send.
-- **Bug C (✓ position):** `ctx.fillText('✓', worldBounds.maxX, worldBounds.minY)` with textAlign='right' anchors the check at the object's top-right corner. Objects at bed-right render the ✓ outside the bed rectangle. Fix: inset by a few screen pixels or switch to textAlign='left'.
+- **Bug B (lifecycle lag):** Halo jumps ahead of where the laser actually is by up to 5 seconds because GRBL's 128-byte buffer holds lines ahead of execution. Fix: track line鈫抦arker association as a queue; advance cursor on `ok` ack, not on send.
+- **Bug C (鉁?position):** `ctx.fillText('鉁?, worldBounds.maxX, worldBounds.minY)` with textAlign='right' anchors the check at the object's top-right corner. Objects at bed-right render the 鉁?outside the bed rectangle. Fix: inset by a few screen pixels or switch to textAlign='left'.
 
 **Fix:** As noted above.
 
-**Test:** `tests/burn-progress-ack-timing.test.ts` verifies lifecycle fires after ok ack, not on send. Visual test skipped — cosmetic.
+**Test:** `tests/burn-progress-ack-timing.test.ts` verifies lifecycle fires after ok ack, not on send. Visual test skipped 鈥?cosmetic.
 
 **Estimate:** Bug B: 1 session. Bug C: 15 minutes.
 
@@ -14894,11 +14872,11 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 ### T3-12 | Hardware-in-the-loop safety verification suite
 
-**Code reference:** None yet — this is a future build-out, not a code fix.
+**Code reference:** None yet 鈥?this is a future build-out, not a code fix.
 
 **Problem:** Software-only tests can prove "the app sent M5" or "the app handled a simulated transport failure," but they cannot prove "the laser physical output reached zero." Audit 1F correctly notes that final safety verification requires hardware-in-the-loop testing: real GRBL board + photodiode/relay/current sensor on the laser enable line + automated test harness that exercises USB disconnect, emergency stop latency, reconnect after reset/alarm, and similar physical failure modes.
 
-This is genuinely needed eventually — it's the only way to verify firmware-side guarantees we're currently assuming (e.g. "GRBL feed-hold disables laser output in $32=1 mode" — T1-23's firmware-dependency mitigated by T1-23's M5 belt-and-suspenders, but for actual proof we'd need to measure the laser pin).
+This is genuinely needed eventually 鈥?it's the only way to verify firmware-side guarantees we're currently assuming (e.g. "GRBL feed-hold disables laser output in $32=1 mode" 鈥?T1-23's firmware-dependency mitigated by T1-23's M5 belt-and-suspenders, but for actual proof we'd need to measure the laser pin).
 
 **Identified by:** Audit 1F (2026-04-25, ChatGPT). Files this as future work, not current.
 
@@ -14915,12 +14893,12 @@ This is genuinely needed eventually — it's the only way to verify firmware-sid
 **Why Tier 3:**
 - Requires physical hardware build-out (1-2 weekends of electronics work).
 - Requires test runner infrastructure that doesn't currently exist.
-- Software-side tests cover most safety contracts — HIL is the final 10% that proves firmware-level assumptions.
+- Software-side tests cover most safety contracts 鈥?HIL is the final 10% that proves firmware-level assumptions.
 - Should ship after T1-22, T2-12 land, since those define WHAT the HIL tests are verifying.
 
 **Estimate:** 1-2 weeks for initial build (hardware + minimum scenario coverage). Ongoing maintenance proportional to test count.
 
-**Priority:** Tier 3. Not blocking commercial release of LaserForge as beta software, but blocking any "verified safe" claim. Belongs in the same maturity tier as code signing, auto-update, and crash reporting — release-readiness work, not core development.
+**Priority:** Tier 3. Not blocking commercial release of LaserForge as beta software, but blocking any "verified safe" claim. Belongs in the same maturity tier as code signing, auto-update, and crash reporting 鈥?release-readiness work, not core development.
 
 **Cross-check note (audit 1F):** Audit framed HIL as part of the safety-test rating. Real and valuable, but explicitly future work. Filing here so it doesn't get lost.
 
@@ -14930,13 +14908,13 @@ This is genuinely needed eventually — it's the only way to verify firmware-sid
 
 **Code reference:** `src/core/plan/FillGenerator.ts:222-269` (per-row scanline loop), `src/core/plan/FillGenerator.ts:359-381` (`findIntersections` checks every edge for every scanline).
 
-**Problem:** Cross-check confirmed at FillGenerator.ts:359-381: `findIntersections` loops over every edge in the global edge pool for every scanline. The complexity is O(scanlines × edges). The audit's worst-case math: a dense text/SVG fill with 50,000 edges × 4,000 scanlines = ~200M edge checks before generating a single move.
+**Problem:** Cross-check confirmed at FillGenerator.ts:359-381: `findIntersections` loops over every edge in the global edge pool for every scanline. The complexity is O(scanlines 脳 edges). The audit's worst-case math: a dense text/SVG fill with 50,000 edges 脳 4,000 scanlines = ~200M edge checks before generating a single move.
 
 LaserForge's existing scanline cap (`MAX_SCANLINES = 50000` at FillGenerator.ts:204-215) prevents pathological row counts but does nothing for edge counts. A complex glyph fill (a Times Roman uppercase letter outline has ~200 edges; a paragraph of glyphs at fill = thousands of edges) compounds quickly when combined with thin scanline intervals.
 
 Standard polygon rasterization solves this with an active-edge-table (AET) algorithm:
 1. Pre-bucket edges by their `y_min` (start row).
-2. Maintain an "active edge list" — edges whose Y range includes the current scanline.
+2. Maintain an "active edge list" 鈥?edges whose Y range includes the current scanline.
 3. Per scanline: add edges entering Y range, remove edges leaving Y range. Only intersect against active edges.
 4. Sort active list once; on subsequent rows, edges stay sorted unless they swap.
 
@@ -14944,7 +14922,7 @@ Complexity becomes O((scanlines + edges) log edges), which for 50k edges + 4k sc
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 5. Cross-check verified the per-row-per-edge loop.
 
-**Why Tier 3:** Real algorithmic improvement, but the practical impact is bounded by typical scene complexity. Most fills are <1000 edges (a few text characters or moderate vector shapes), where the current algorithm completes in milliseconds. The pathological case the audit highlights — dense full-paragraph text fill or huge SVG fills — is rare in actual user work. Worth doing for the upper-end users; not a blocker for typical use.
+**Why Tier 3:** Real algorithmic improvement, but the practical impact is bounded by typical scene complexity. Most fills are <1000 edges (a few text characters or moderate vector shapes), where the current algorithm completes in milliseconds. The pathological case the audit highlights 鈥?dense full-paragraph text fill or huge SVG fills 鈥?is rare in actual user work. Worth doing for the upper-end users; not a blocker for typical use.
 
 **Fix (when scheduled):**
 
@@ -14953,7 +14931,7 @@ Complexity becomes O((scanlines + edges) log edges), which for 50k edges + 4k sc
 (3) Per scanline, update active edge list incrementally.
 (4) Intersect only with active edges.
 
-`src/core/plan/FillGenerator.ts` is contained — most of the change is internal to `generateFillRows` and `findIntersections`.
+`src/core/plan/FillGenerator.ts` is contained 鈥?most of the change is internal to `generateFillRows` and `findIntersections`.
 
 **Tests:** Existing fill tests should produce identical output; assert that. New benchmark: 50k-edge fill should complete in <1s (currently >30s).
 
@@ -14969,9 +14947,9 @@ Complexity becomes O((scanlines + edges) log edges), which for 50k edges + 4k sc
 
 **Code reference:** `src/ui/components/GcodePreview.tsx:17-58` (parses every line), `src/ui/components/GcodePreview.tsx:106-160` (renders every move per frame).
 
-**Problem:** Cross-check confirmed at GcodePreview.tsx:27 — preview does `gcode.split('\n')` and stores every parsed move. Lines 106-160 iterate the full moves array on every animation frame for the path display. For a 1M-line job, parsing alone is ~1s; per-frame iteration is hundreds of ms, making the preview unusable.
+**Problem:** Cross-check confirmed at GcodePreview.tsx:27 鈥?preview does `gcode.split('\n')` and stores every parsed move. Lines 106-160 iterate the full moves array on every animation frame for the path display. For a 1M-line job, parsing alone is ~1s; per-frame iteration is hundreds of ms, making the preview unusable.
 
-The user opens the preview tab to verify their compiled job before running it. For huge jobs, the preview tab becomes the bottleneck — they wait for parse, then the page is slow, then they can't pan/zoom smoothly.
+The user opens the preview tab to verify their compiled job before running it. For huge jobs, the preview tab becomes the bottleneck 鈥?they wait for parse, then the page is slow, then they can't pan/zoom smoothly.
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 7. Cross-check verified.
 
@@ -14979,7 +14957,7 @@ The user opens the preview tab to verify their compiled job before running it. F
 
 (1) Sampled parsing: for >100K-line jobs, parse every Nth line (with N adaptive to total line count). Sufficient for visual verification; user can always inspect the raw G-code text if they need exactness.
 
-(2) Level-of-detail rendering: zoom out → render a subsampled path; zoom in → render the full detail of just the visible region. Standard CAD-style LOD.
+(2) Level-of-detail rendering: zoom out 鈫?render a subsampled path; zoom in 鈫?render the full detail of just the visible region. Standard CAD-style LOD.
 
 (3) Web Worker parsing: move the parse off the main thread. UI shows "loading preview..." during parse; thread is free for pan/zoom of partial preview.
 
@@ -14999,7 +14977,7 @@ The user opens the preview tab to verify their compiled job before running it. F
 
 ### T3-15 | Spool-based G-code output (AsyncIterable streaming)
 
-**Code reference:** `src/core/output/Output.ts:53-66` (OutputStrategy interface — returns full Output object), `src/core/output/Output.ts:130-189` (generates full lines array, joined string, encoded bytes), `src/app/PipelineService.ts:175-189` (pipeline stores full text + split lines), `src/controllers/grbl/GrblController.ts:371-440` (sendJob requires `string[]` upfront, parses again into `_jobLines`).
+**Code reference:** `src/core/output/Output.ts:53-66` (OutputStrategy interface 鈥?returns full Output object), `src/core/output/Output.ts:130-189` (generates full lines array, joined string, encoded bytes), `src/app/PipelineService.ts:175-189` (pipeline stores full text + split lines), `src/controllers/grbl/GrblController.ts:371-440` (sendJob requires `string[]` upfront, parses again into `_jobLines`).
 
 **Problem:** Cross-check confirmed audit 2E's central architectural claim. The current pipeline holds the entire G-code job in memory at multiple stages:
 
@@ -15016,11 +14994,11 @@ For a 50MB G-code file (typical full-bed photo engrave), the cumulative memory f
 
 The proper fix is fundamental: replace `OutputStrategy.generate(plan, job): Output` with `OutputStrategy.generateGcode(jobPlan): AsyncIterable<GcodeChunk>` (or a spool-to-file API), then have `sendJob` accept the async iterable directly. G-code is generated and streamed; the controller pulls chunks as it acks lines; only a sliding window stays in memory.
 
-This is the audit's Priority 1 and is genuinely valuable. **It's also a multi-week project.** It touches every output strategy (currently just GRBL, but Marlin stub T2-7 also implements OutputStrategy), the ticket model (no more `gcodeText` field — replaced by spool handle + hash), the controller (sendJob signature), the preview (consumes from the spool), the simulator (consumes from the spool), validators that scan output lines.
+This is the audit's Priority 1 and is genuinely valuable. **It's also a multi-week project.** It touches every output strategy (currently just GRBL, but Marlin stub T2-7 also implements OutputStrategy), the ticket model (no more `gcodeText` field 鈥?replaced by spool handle + hash), the controller (sendJob signature), the preview (consumes from the spool), the simulator (consumes from the spool), validators that scan output lines.
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 1, marked CRITICAL 1 ("blocker"). Cross-check verified at every line.
 
-**Why Tier 3 (deliberately not promoted):** The audit's "blocker" framing implies this prevents commercial use. **It does not.** Typical Falcon-class user jobs are well under 1M lines and well under 100MB. The cumulative memory issue exists but doesn't bite in practice for the LaserForge target user. Hypothetical 16MP / 16M-line jobs would break the app — but T1-45 (complexity gate) catches those before they start, providing a band-aid that ships in a session vs. weeks of architectural work.
+**Why Tier 3 (deliberately not promoted):** The audit's "blocker" framing implies this prevents commercial use. **It does not.** Typical Falcon-class user jobs are well under 1M lines and well under 100MB. The cumulative memory issue exists but doesn't bite in practice for the LaserForge target user. Hypothetical 16MP / 16M-line jobs would break the app 鈥?but T1-45 (complexity gate) catches those before they start, providing a band-aid that ships in a session vs. weeks of architectural work.
 
 **Right time to promote:** when actual users hit memory walls. Until then, the band-aids (T1-45 gate, T1-46 simulator notify, T2-17 cancel/progress, T1-31 raster strategy reducing line counts, T1-17 image worker reducing freezes) cover the realistic pain. Promoting T3-15 ahead of those is architecture-for-architecture's-sake.
 
@@ -15055,7 +15033,7 @@ export interface StreamingOutputStrategy {
 
 **Priority:** Tier 3. Genuinely valuable when scheduled; not currently a blocker for typical commercial use.
 
-**Cross-check note (audit 2E):** Audit's Priority 1, framed as CRITICAL 1 ("blocker"). Pushback on framing: it's a real architectural limitation but not a blocker for current users. Filed at Tier 3 with explicit reasoning for not promoting. Re-evaluate when user reports indicate actual memory pressure (currently zero such reports). The audit's overall 3.5/10 rating is too low specifically because this issue's practical impact is overstated — the architecture has problems for hypothetical extreme jobs but works fine for actual use. Closer to 5-6/10 in my assessment.
+**Cross-check note (audit 2E):** Audit's Priority 1, framed as CRITICAL 1 ("blocker"). Pushback on framing: it's a real architectural limitation but not a blocker for current users. Filed at Tier 3 with explicit reasoning for not promoting. Re-evaluate when user reports indicate actual memory pressure (currently zero such reports). The audit's overall 3.5/10 rating is too low specifically because this issue's practical impact is overstated 鈥?the architecture has problems for hypothetical extreme jobs but works fine for actual use. Closer to 5-6/10 in my assessment.
 
 ---
 
@@ -15065,14 +15043,14 @@ export interface StreamingOutputStrategy {
 
 **Problem:** Audit 1A (2026-04-25) Scenario 5: USB cable physically pulled mid-job. The browser's WebSerial API emits a close event after some delay, but the firmware may continue executing buffered commands until power-cycled. Before close-event fires, the app's serial writer can return success on writes that never reach the controller. After close, the app shows "disconnected" but firmware state is unknown.
 
-This is partially addressed by T1-29 (persisted unsafe-prior-state flag) — on reconnect after unclean disconnect, the app surfaces a recovery dialog. But the audit's specific concern was the live transition: detecting the cable pull as it happens and acting on it before the user reconnects.
+This is partially addressed by T1-29 (persisted unsafe-prior-state flag) 鈥?on reconnect after unclean disconnect, the app surfaces a recovery dialog. But the audit's specific concern was the live transition: detecting the cable pull as it happens and acting on it before the user reconnects.
 
 **Identified by:** Audit 1A (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "hardware/firmware concern, document but don't fix in software" — wrong. The detection latency is software's concern; better detection lets the safety-state machine react sooner.
+**Originally dismissed because:** Said "hardware/firmware concern, document but don't fix in software" 鈥?wrong. The detection latency is software's concern; better detection lets the safety-state machine react sooner.
 
 **Fix:** Detect cable-pull faster via two complementary signals:
-(1) **Status-poll heartbeat.** During a running job, app sends `?` realtime byte every ~500ms and expects a status response within ~200ms. Two consecutive timeouts → assume transport failure → mark `DISCONNECTED_UNSAFE`, set T1-29 unsafe-prior-state flag, alert user.
+(1) **Status-poll heartbeat.** During a running job, app sends `?` realtime byte every ~500ms and expects a status response within ~200ms. Two consecutive timeouts 鈫?assume transport failure 鈫?mark `DISCONNECTED_UNSAFE`, set T1-29 unsafe-prior-state flag, alert user.
 (2) **Write-failure escalation.** When a critical write (M5, soft reset) fails per T1-22, immediately mark transport state as failed and trigger the same unsafe-state path.
 
 **Estimate:** ~1 session.
@@ -15085,17 +15063,17 @@ This is partially addressed by T1-29 (persisted unsafe-prior-state flag) — on 
 
 **Code reference:** `src/transports/falcon-wifi/` (Falcon WiFi transport, currently paused/hidden in UI), `src/ui/components/falcon-wifi/FalconWiFiStatusPanel.tsx`.
 
-**Problem:** The Falcon WiFi transport exists but is paused/hidden in the UI. Audit 1A noted that if revived, it needs its own safety proof model — TCP socket close ≠ laser off; WebSocket disconnect ≠ machine state known. The codebase has Falcon WiFi infrastructure that doesn't currently route through the safety state machine that T2-12 builds.
+**Problem:** The Falcon WiFi transport exists but is paused/hidden in the UI. Audit 1A noted that if revived, it needs its own safety proof model 鈥?TCP socket close 鈮?laser off; WebSocket disconnect 鈮?machine state known. The codebase has Falcon WiFi infrastructure that doesn't currently route through the safety state machine that T2-12 builds.
 
 **Identified by:** Audit 1A (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "future-only" — but if/when WiFi is revived, this becomes a Tier 1 safety blocker. Better to file now so it's not forgotten.
+**Originally dismissed because:** Said "future-only" 鈥?but if/when WiFi is revived, this becomes a Tier 1 safety blocker. Better to file now so it's not forgotten.
 
 **Fix:** When Falcon WiFi is re-enabled in the UI, it must:
 (1) Implement the same `SerialPortLike` async transport interface (T1-22)
 (2) Route through the safety state machine (T2-12) and command gateway (T2-10)
 (3) Define what "safe disconnect" means for a TCP/WebSocket transport (probably: graceful close after status confirms FS:0,0)
-(4) Surface to user when the WiFi link is high-latency/dropping packets — over a wired USB the same threshold means "broken cable"; over WiFi it means "weak signal" with different recovery semantics
+(4) Surface to user when the WiFi link is high-latency/dropping packets 鈥?over a wired USB the same threshold means "broken cable"; over WiFi it means "weak signal" with different recovery semantics
 
 **Estimate:** ~2-3 sessions when Falcon WiFi is revived.
 
@@ -15103,7 +15081,7 @@ This is partially addressed by T1-29 (persisted unsafe-prior-state flag) — on 
 
 ---
 
-### T3-18 | Output validator — semantic scan over emitted G-code
+### T3-18 | Output validator 鈥?semantic scan over emitted G-code
 
 **Code reference:** New module `src/core/preflight/rules/OutputValidator.ts`. Existing `src/core/preflight/GcodeTemplateValidator.ts` validates templates only.
 
@@ -15120,7 +15098,7 @@ Currently the existing `GcodeTemplateValidator` covers templates only. The plan'
 
 **Identified by:** Audit 2A (2026-04-25, ChatGPT) Priority 4.
 
-**Originally dismissed because:** Said "folded into T2-14 (non-removable safety wrapper)" — wrong. T2-14 wraps templates with safety lines but doesn't validate the body. These are different defenses.
+**Originally dismissed because:** Said "folded into T2-14 (non-removable safety wrapper)" 鈥?wrong. T2-14 wraps templates with safety lines but doesn't validate the body. These are different defenses.
 
 **Fix:** New post-emission validator that scans the assembled gcode line array. Tracks modal state through the file (M3/M4/M5, G90/G91, current S value, current feed). Emits preflight errors on invariant violations. Severity: error (blocking).
 
@@ -15138,15 +15116,15 @@ Currently the existing `GcodeTemplateValidator` covers templates only. The plan'
 
 **Identified by:** Audit 2A (2026-04-25, ChatGPT) Priority 5.
 
-**Originally dismissed because:** Said "UX/documentation issue, not filed" — but documentation is actually a deliverable, not nothing. Filing here to remember it.
+**Originally dismissed because:** Said "UX/documentation issue, not filed" 鈥?but documentation is actually a deliverable, not nothing. Filing here to remember it.
 
 **Fix:** Add to user docs a recommendation section: "Production runs: prefer Set Origin + saved-origin mode for repeatable jobs. Use current/head mode for quick one-off jobs, alignment tests, and prototype iterations."
 
-In-app: when user starts a current-mode job that's >5min estimated runtime, surface a one-time tip: "For longer jobs, Set Origin and use saved-origin mode for more predictable results. Learn more →"
+In-app: when user starts a current-mode job that's >5min estimated runtime, surface a one-time tip: "For longer jobs, Set Origin and use saved-origin mode for more predictable results. Learn more 鈫?
 
 **Estimate:** ~1 hour (doc update + one-time tip).
 
-**Priority:** Tier 3 — documentation/UX.
+**Priority:** Tier 3 鈥?documentation/UX.
 
 ---
 
@@ -15158,7 +15136,7 @@ In-app: when user starts a current-mode job that's >5min estimated runtime, surf
 
 **Identified by:** Audit 2A (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "minor, defensive but very low value" — true that GRBL defaults make this rare. But filing in case the cumulative defensive-header argument matters.
+**Originally dismissed because:** Said "minor, defensive but very low value" 鈥?true that GRBL defaults make this rare. But filing in case the cumulative defensive-header argument matters.
 
 **Fix:** Add to `defaultBlock` in `encodeHeader`:
 ```
@@ -15170,7 +15148,7 @@ Trivial change. Two lines added to the default header.
 
 **Estimate:** ~10 minutes.
 
-**Priority:** Tier 3 — minor defensive hardening. Combines naturally with T2-14 (non-removable safety wrapper).
+**Priority:** Tier 3 鈥?minor defensive hardening. Combines naturally with T2-14 (non-removable safety wrapper).
 
 ---
 
@@ -15182,19 +15160,19 @@ Trivial change. Two lines added to the default header.
 
 **Identified by:** Audit 2A (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "real but very minor, fold into a future polish ticket" — but "future polish" means "forgotten." Filing as its own entry.
+**Originally dismissed because:** Said "real but very minor, fold into a future polish ticket" 鈥?but "future polish" means "forgotten." Filing as its own entry.
 
 **Fix:** New profile setting `frameDotFeedRate` (default 3000). New per-user override in settings UI. Read in `buildFrameGcode` and emit `F${frameDotFeedRate}` instead of hardcoded.
 
 **Estimate:** ~30 min.
 
-**Priority:** Tier 3 — UX polish.
+**Priority:** Tier 3 鈥?UX polish.
 
 ---
 
 ### T3-22 | Tolerance-based grayscale segment merge in raster
 
-**Code reference:** `src/core/plan/RasterGenerator.ts:222` (`extractSegmentsGrayscale` — exact equality `S !== currentPower`).
+**Code reference:** `src/core/plan/RasterGenerator.ts:222` (`extractSegmentsGrayscale` 鈥?exact equality `S !== currentPower`).
 
 **Problem:** Audit 2B noted that adjacent grayscale pixels with power values differing by 1-2 out of 0-1000 are visually indistinguishable in laser output, but the current code creates new segments on any power change. For a continuous photo gradient, every pixel can become its own segment.
 
@@ -15202,9 +15180,9 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Folded into T1-31 as a "bonus refinement note" — that means it'll get skipped during T1-31 implementation under time pressure. Filing as its own ticket.
+**Originally dismissed because:** Folded into T1-31 as a "bonus refinement note" 鈥?that means it'll get skipped during T1-31 implementation under time pressure. Filing as its own ticket.
 
-**Fix:** Replace `S !== currentPower` with `Math.abs(S - currentPower) > tolerance`, where tolerance is a configurable setting (default 2 — i.e. 0.2% of full power).
+**Fix:** Replace `S !== currentPower` with `Math.abs(S - currentPower) > tolerance`, where tolerance is a configurable setting (default 2 鈥?i.e. 0.2% of full power).
 
 **Estimate:** ~1 hour including tests.
 
@@ -15214,19 +15192,19 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 ### T3-23 | Warn when powerMin > 0 with photo-style image content
 
-**Code reference:** `src/core/plan/RasterGenerator.ts:208` (`luminanceToLaserPower` — white pixels map to powerMin), `src/core/preflight/rules/RasterPreflight.ts` (where the warning would go).
+**Code reference:** `src/core/plan/RasterGenerator.ts:208` (`luminanceToLaserPower` 鈥?white pixels map to powerMin), `src/core/preflight/rules/RasterPreflight.ts` (where the warning would go).
 
 **Problem:** Audit 2B noted: in grayscale raster mode, white pixels (luminance 255) map to `powerMin`. If user sets `powerMin = 5%` (sometimes wanted for materials needing minimum marking power), white areas of a photo also get 5% burn. For photo engraving where users expect white to mean "no burn," this produces unintended marking on the workpiece background.
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "minor UX, not roadmap-worthy alone" — but unintended marking of photo backgrounds is a real-quality complaint that's hard to debug ("why does my photo have lines in the white areas?").
+**Originally dismissed because:** Said "minor UX, not roadmap-worthy alone" 鈥?but unintended marking of photo backgrounds is a real-quality complaint that's hard to debug ("why does my photo have lines in the white areas?").
 
 **Fix:** New preflight warning when (a) layer mode is engrave with grayscale image and (b) `powerMin > 0`. Severity: warning, not blocking. Surfaces in preflight panel: "Layer X has powerMin = 5% with a photo-style image. White areas will receive 5% laser power. For photo engraving, set powerMin to 0."
 
 **Estimate:** ~1 hour.
 
-**Priority:** Tier 3 — UX/quality.
+**Priority:** Tier 3 鈥?UX/quality.
 
 ---
 
@@ -15234,11 +15212,11 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 **Code reference:** `src/core/materials/MaterialPresets.ts`, `src/core/materials/ResponseCurve.ts`. Infrastructure exists; library content does not.
 
-**Problem:** Audit 2B noted that ResponseCurve infrastructure exists but no shipped library of pre-calibrated material curves. Users have to run material tests themselves to build calibration. LightBurn ships with calibrated presets for common materials (3mm birch ply, anodized aluminum, leather, etc.) — LaserForge does not.
+**Problem:** Audit 2B noted that ResponseCurve infrastructure exists but no shipped library of pre-calibrated material curves. Users have to run material tests themselves to build calibration. LightBurn ships with calibrated presets for common materials (3mm birch ply, anodized aluminum, leather, etc.) 鈥?LaserForge does not.
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "Tier 4 content/library work, not filed" — but content gaps are real product gaps. Filing as Tier 3 because it's a clear competitive deficit, not just internal polish. Overlaps with T4-1 (starter preset library) — T3-24 is the calibration-curve dimension; T4-1 is the cut/engrave settings dimension. Could ship together.
+**Originally dismissed because:** Said "Tier 4 content/library work, not filed" 鈥?but content gaps are real product gaps. Filing as Tier 3 because it's a clear competitive deficit, not just internal polish. Overlaps with T4-1 (starter preset library) 鈥?T3-24 is the calibration-curve dimension; T4-1 is the cut/engrave settings dimension. Could ship together.
 
 **Fix:** Run material tests on a Falcon A1 Pro across:
 - 3mm birch plywood (cut, engrave, photo)
@@ -15250,11 +15228,11 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 - Cork (cut, engrave)
 - Cardboard (cut)
 
-For each, capture optimal speed/power/passes plus a 256-point luminance→power response curve. Ship as MaterialPresets the user can select directly.
+For each, capture optimal speed/power/passes plus a 256-point luminance鈫抪ower response curve. Ship as MaterialPresets the user can select directly.
 
 **Estimate:** Several days of hardware testing + curve extraction. Possibly leverage community submissions over time.
 
-**Priority:** Tier 3 — competitive parity. Could also be community-driven content rather than internal work.
+**Priority:** Tier 3 鈥?competitive parity. Could also be community-driven content rather than internal work.
 
 ---
 
@@ -15262,11 +15240,11 @@ For each, capture optimal speed/power/passes plus a 256-point luminance→power 
 
 **Code reference:** `src/core/plan/RasterGenerator.ts:113` (`lineIndex++` only increments after non-empty row).
 
-**Problem:** Audit 2B Section 8.2: bidirectional direction alternation uses `lineIndex` which only increments for non-empty rows. So a sparse image where rows 1, 5, 10, 15 have content (with empty rows 2-4, 6-9, 11-14 between) produces directions LTR, RTL, LTR, RTL based on lineIndex 0,1,2,3 — but on the physical machine, rows 1 and 5 are 4 row-pitches apart. If scanning offset compensation was calibrated assuming raw-row parity, the calibration is off.
+**Problem:** Audit 2B Section 8.2: bidirectional direction alternation uses `lineIndex` which only increments for non-empty rows. So a sparse image where rows 1, 5, 10, 15 have content (with empty rows 2-4, 6-9, 11-14 between) produces directions LTR, RTL, LTR, RTL based on lineIndex 0,1,2,3 鈥?but on the physical machine, rows 1 and 5 are 4 row-pitches apart. If scanning offset compensation was calibrated assuming raw-row parity, the calibration is off.
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "narrow concern, not filed" — but for users running scanning offset calibration (a Pro feature), this matters. Filing.
+**Originally dismissed because:** Said "narrow concern, not filed" 鈥?but for users running scanning offset calibration (a Pro feature), this matters. Filing.
 
 **Fix:** Use `row` (raw row index) instead of `lineIndex` (non-empty count) for direction selection:
 ```ts
@@ -15276,7 +15254,7 @@ const direction: 'ltr' | 'rtl' =
 
 **Estimate:** ~30 min including tests.
 
-**Priority:** Tier 3 — quality/correctness for users with calibrated bidirectional setups.
+**Priority:** Tier 3 鈥?quality/correctness for users with calibrated bidirectional setups.
 
 ---
 
@@ -15284,23 +15262,23 @@ const direction: 'ltr' | 'rtl' =
 
 **Code reference:** `src/import/Dithering.ts` (existing modes: threshold, floyd-steinberg, jarvis, stucki, atkinson, burkes, sierra variants, ordered (Bayer), random).
 
-**Problem:** Audit 2B noted that LaserForge's dithering breadth is good but lacks blue-noise / advanced halftone screening — both of which produce visibly cleaner mid-tone gradients than error-diffusion modes for photo engraving on materials with sharp burn-no-burn transitions (anodized aluminum, painted metal).
+**Problem:** Audit 2B noted that LaserForge's dithering breadth is good but lacks blue-noise / advanced halftone screening 鈥?both of which produce visibly cleaner mid-tone gradients than error-diffusion modes for photo engraving on materials with sharp burn-no-burn transitions (anodized aluminum, painted metal).
 
 **Identified by:** Audit 2B (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "real but separate medium-effort feature; not filed as Tier 1" — but it's still a feature gap. Filing.
+**Originally dismissed because:** Said "real but separate medium-effort feature; not filed as Tier 1" 鈥?but it's still a feature gap. Filing.
 
-**Fix:** Add `'blue-noise'` to DitherMode enum. Implement using a precomputed 64×64 or 128×128 blue-noise threshold matrix (public-domain matrices available, e.g. from Christoph Peters). Pixel value compared against matrix entry at `(x % matrixSize, y % matrixSize)`. Single-pass like Bayer ordered, but with much better visual quality.
+**Fix:** Add `'blue-noise'` to DitherMode enum. Implement using a precomputed 64脳64 or 128脳128 blue-noise threshold matrix (public-domain matrices available, e.g. from Christoph Peters). Pixel value compared against matrix entry at `(x % matrixSize, y % matrixSize)`. Single-pass like Bayer ordered, but with much better visual quality.
 
 Optional follow-on: classical halftone screening (clustered-dot patterns at user-configurable LPI angle) for true print-style reproduction.
 
 **Estimate:** ~1 session for blue-noise. ~1-2 sessions for halftone.
 
-**Priority:** Tier 3 — quality. Photo engraving niche but real.
+**Priority:** Tier 3 鈥?quality. Photo engraving niche but real.
 
 ---
 
-### T3-27 | SVG `<text>` element import — convert to outlines or warn
+### T3-27 | SVG `<text>` element import 鈥?convert to outlines or warn
 
 **Code reference:** `src/import/svg/SvgParser.ts:183-186` (RENDERABLE_TAGS missing `text`).
 
@@ -15308,15 +15286,15 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "real but addressable via documentation, filed as a polish note in T2-15" — but a polish note in another ticket gets lost. Filing.
+**Originally dismissed because:** Said "real but addressable via documentation, filed as a polish note in T2-15" 鈥?but a polish note in another ticket gets lost. Filing.
 
 **Fix:** Two options (could ship in sequence).
-(1) **Stage 1 (~30 min):** Detect `<text>` elements during import and surface a warning: "X text elements skipped during import. Convert text to outlines in your design tool (Illustrator: Type → Create Outlines; Inkscape: Path → Object to Path) before re-importing." User-actionable, no code-side text rendering required.
+(1) **Stage 1 (~30 min):** Detect `<text>` elements during import and surface a warning: "X text elements skipped during import. Convert text to outlines in your design tool (Illustrator: Type 鈫?Create Outlines; Inkscape: Path 鈫?Object to Path) before re-importing." User-actionable, no code-side text rendering required.
 (2) **Stage 2 (~2-3 sessions):** Actually convert SVG `<text>` to outlines using opentype.js (already a dependency). Honor x/y/dx/dy/textLength/font-family/font-size attributes. Falls back to canvas-trace for fonts not available in opentype.
 
 **Estimate:** Stage 1 ~30 min. Stage 2 ~2-3 sessions.
 
-**Priority:** Tier 3 — real product gap, addressable via warning quickly.
+**Priority:** Tier 3 鈥?real product gap, addressable via warning quickly.
 
 ---
 
@@ -15324,11 +15302,11 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 **Code reference:** `src/import/svg/SvgToScene.ts:178` (comment "Group inheritance is not available after flattening"), `src/import/svg/SvgParser.ts:200-211` (transform inheritance works; style does not).
 
-**Problem:** Audit 2C: SVG group transforms ARE inherited (via `worldTransform = multiplyMatrix(parentTransform, ownTransform)` at SvgParser:202), but style attributes (stroke, fill, stroke-width) are NOT. A `<g stroke="red">` containing paths without local stroke values flattens to paths with no stroke color, then color→layer-mode mapping picks the default (typically engrave) rather than the intended cut layer.
+**Problem:** Audit 2C: SVG group transforms ARE inherited (via `worldTransform = multiplyMatrix(parentTransform, ownTransform)` at SvgParser:202), but style attributes (stroke, fill, stroke-width) are NOT. A `<g stroke="red">` containing paths without local stroke values flattens to paths with no stroke color, then color鈫抣ayer-mode mapping picks the default (typically engrave) rather than the intended cut layer.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "real but bounded by modern SVG exporter behavior" — not entirely true. Adobe Illustrator and Inkscape commonly export with group-level styles. Filing.
+**Originally dismissed because:** Said "real but bounded by modern SVG exporter behavior" 鈥?not entirely true. Adobe Illustrator and Inkscape commonly export with group-level styles. Filing.
 
 **Fix:** During traversal, accumulate inherited styles alongside the inherited transform. Pass an "active style context" down through `traverse()` recursion. When a renderable element doesn't have a local stroke/fill/stroke-width, walk up the inherited context.
 
@@ -15351,25 +15329,25 @@ Then `getSvgElementColor` consults `inheritedStyle` if the element has no direct
 
 **Estimate:** ~1 session.
 
-**Priority:** Tier 3 — real correctness issue for production SVG imports.
+**Priority:** Tier 3 鈥?real correctness issue for production SVG imports.
 
 ---
 
-### T3-29 | Open path ordering within cut operations — score-before-cut
+### T3-29 | Open path ordering within cut operations 鈥?score-before-cut
 
 **Code reference:** `src/core/plan/PlanOptimizer.ts:833-839` (open paths appended after closed paths within an operation).
 
 **Problem:** Audit 2C confirmed: within a single cut operation containing both open and closed paths, the open paths execute AFTER all closed paths. For users who intentionally place open scores on a CUT layer (rather than a separate score layer), the scores happen after the part is already free, and the part has potentially shifted.
 
-OperationOrderer correctly handles inter-mode ordering (engrave → score → cut) for users who use separate layers. But within-operation ordering can still be wrong for mixed open/closed-on-same-layer cases.
+OperationOrderer correctly handles inter-mode ordering (engrave 鈫?score 鈫?cut) for users who use separate layers. But within-operation ordering can still be wrong for mixed open/closed-on-same-layer cases.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "bounded; users put scores on score layer" — but assuming users follow the recommended workflow isn't a fix. Filing.
+**Originally dismissed because:** Said "bounded; users put scores on score layer" 鈥?but assuming users follow the recommended workflow isn't a fix. Filing.
 
 **Fix:** Two options.
 (1) **Document the recommended workflow** more clearly. Add a tooltip/hint in the layer panel: "For score lines, use a Score layer (executes before Cut)." Tier 3 documentation.
-(2) **Within-operation reorder** — for cut operations specifically, run open paths BEFORE closed paths. This matches the "score before separate" user expectation regardless of layering.
+(2) **Within-operation reorder** 鈥?for cut operations specifically, run open paths BEFORE closed paths. This matches the "score before separate" user expectation regardless of layering.
 
 Option 2 is opinionated but matches typical CAM expectations. Option 1 is non-invasive.
 
@@ -15384,27 +15362,27 @@ Option 2 is opinionated but matches typical CAM expectations. Option 1 is non-in
 **Code reference:** `src/import/svg/SvgParser.ts:212` (comment "Skip: text, defs, style, clipPath, mask, etc.").
 
 **Problem:** Audit 2C: production SVGs from Illustrator/Inkscape/Figma frequently contain:
-- `<clipPath>` — clipping regions; affected geometry should only render inside the clip
-- `<mask>` — alpha-masking; common in logos
-- `<use>` — symbol reuse; e.g. icon sprites where one shape definition is reused at multiple positions
-- `<defs>` — definitions referenced by `<use>`
-- `<style>` — CSS rules applying to elements via class selectors
+- `<clipPath>` 鈥?clipping regions; affected geometry should only render inside the clip
+- `<mask>` 鈥?alpha-masking; common in logos
+- `<use>` 鈥?symbol reuse; e.g. icon sprites where one shape definition is reused at multiple positions
+- `<defs>` 鈥?definitions referenced by `<use>`
+- `<style>` 鈥?CSS rules applying to elements via class selectors
 
 All of these are silently skipped. Users importing real-world art assets get incomplete results.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "Tier 3+ work, not currently a roadmap blocker" — filing it now so it's tracked rather than buried in a comment.
+**Originally dismissed because:** Said "Tier 3+ work, not currently a roadmap blocker" 鈥?filing it now so it's tracked rather than buried in a comment.
 
 **Fix:** Multi-pass.
-(1) **`<use>` + `<defs>`** — resolve `<use href="#id">` references during parse by inlining the referenced definition with the use-element's transform applied.
-(2) **`<style>`** — parse CSS, apply class selectors to elements during attribute extraction.
-(3) **`<clipPath>`** — at minimum, warn that clipping was present and may be lost. Proper support requires polygon clipping (could leverage T2-15's CompoundPath model + a clipping library).
-(4) **`<mask>`** — even harder than clipPath; raster masks have no good polygon representation. Warn + skip.
+(1) **`<use>` + `<defs>`** 鈥?resolve `<use href="#id">` references during parse by inlining the referenced definition with the use-element's transform applied.
+(2) **`<style>`** 鈥?parse CSS, apply class selectors to elements during attribute extraction.
+(3) **`<clipPath>`** 鈥?at minimum, warn that clipping was present and may be lost. Proper support requires polygon clipping (could leverage T2-15's CompoundPath model + a clipping library).
+(4) **`<mask>`** 鈥?even harder than clipPath; raster masks have no good polygon representation. Warn + skip.
 
 **Estimate:** Stage 1 (`<use>`/`<defs>`) ~1-2 sessions. Stage 2 (`<style>`) ~1 session. Stage 3 (`<clipPath>` warn) ~30 min, real support multi-session. Stage 4 just adds a warn.
 
-**Priority:** Tier 3 — real product gap. Stage 1 covers the most common case (icon sprites). Stage 3 warning is cheap; full clipPath support deferred until users actually request it.
+**Priority:** Tier 3 鈥?real product gap. Stage 1 covers the most common case (icon sprites). Stage 3 warning is cheap; full clipPath support deferred until users actually request it.
 
 ---
 
@@ -15416,37 +15394,37 @@ All of these are silently skipped. Users importing real-world art assets get inc
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "high-value but deep work; needs robust geometry library. Tier 3" — agree on tier, but should still be filed not just mentioned.
+**Originally dismissed because:** Said "high-value but deep work; needs robust geometry library. Tier 3" 鈥?agree on tier, but should still be filed not just mentioned.
 
 **Fix:** Two layers.
-(1) **Detection** — Bentley-Ottmann sweep-line algorithm to find self-intersections. Surface as preflight warning. ~1-2 sessions.
-(2) **Repair** — at compile time, decompose self-intersecting paths into simple polygons (the geometry library used for boolean ops, like polygon-clipping or Clipper2, can do this). ~2-3 sessions.
+(1) **Detection** 鈥?Bentley-Ottmann sweep-line algorithm to find self-intersections. Surface as preflight warning. ~1-2 sessions.
+(2) **Repair** 鈥?at compile time, decompose self-intersecting paths into simple polygons (the geometry library used for boolean ops, like polygon-clipping or Clipper2, can do this). ~2-3 sessions.
 
 **Estimate:** Detection 1-2 sessions. Repair 2-3 additional sessions.
 
-**Priority:** Tier 3 — quality/correctness. Bigger fix than T2-16 (duplicate detection); can ship detection first as warning, defer repair.
+**Priority:** Tier 3 鈥?quality/correctness. Bigger fix than T2-16 (duplicate detection); can ship detection first as warning, defer repair.
 
 ---
 
-### T3-32 | SVG viewBox-only unit interpretation — UX
+### T3-32 | SVG viewBox-only unit interpretation 鈥?UX
 
 **Code reference:** `src/import/svg/SvgParser.ts:107` (laser convention: viewBox-only treats user units as mm), `src/import/svg/SvgParser.ts:128` (spec mode treats them as px).
 
-**Problem:** Audit 2C: viewBox-only SVGs (no `width`/`height` in mm) interpret user units differently between LaserForge default ("laser convention" = mm) and SVG spec (px @ 96dpi = 0.265mm). A 100×100 viewBox file:
-- Default mode: 100mm × 100mm
-- Spec mode: 26.46mm × 26.46mm
+**Problem:** Audit 2C: viewBox-only SVGs (no `width`/`height` in mm) interpret user units differently between LaserForge default ("laser convention" = mm) and SVG spec (px @ 96dpi = 0.265mm). A 100脳100 viewBox file:
+- Default mode: 100mm 脳 100mm
+- Spec mode: 26.46mm 脳 26.46mm
 
 Both modes are correct under their assumptions. The problem is users don't always know which their file expects, and the choice is buried in settings.
 
 **Identified by:** Audit 2C (2026-04-25, ChatGPT).
 
-**Originally dismissed because:** Said "user-controllable; no change needed" — but discoverability of the setting matters.
+**Originally dismissed because:** Said "user-controllable; no change needed" 鈥?but discoverability of the setting matters.
 
-**Fix:** During import of a viewBox-only SVG, surface a one-time prompt: "This SVG has dimensions 100×100 with no explicit units. Interpret as: (a) 100×100 mm (laser convention, common in Inkscape) (b) 26.46×26.46 mm (SVG spec, common in Illustrator)." Default to the user's previous choice; show a thumbnail preview of the result if possible.
+**Fix:** During import of a viewBox-only SVG, surface a one-time prompt: "This SVG has dimensions 100脳100 with no explicit units. Interpret as: (a) 100脳100 mm (laser convention, common in Inkscape) (b) 26.46脳26.46 mm (SVG spec, common in Illustrator)." Default to the user's previous choice; show a thumbnail preview of the result if possible.
 
 **Estimate:** ~1 session.
 
-**Priority:** Tier 3 — UX.
+**Priority:** Tier 3 鈥?UX.
 
 ---
 
@@ -15458,13 +15436,13 @@ Both modes are correct under their assumptions. The problem is users don't alway
 
 **Identified by:** Audit 2D (2026-04-25, ChatGPT) Finding 2D-04.
 
-**Originally dismissed because:** Said "minor; UI rendering doesn't affect safety. Note in T1-40" — but this means the preview the user sees doesn't match the actual machine motion. Filing.
+**Originally dismissed because:** Said "minor; UI rendering doesn't affect safety. Note in T1-40" 鈥?but this means the preview the user sees doesn't match the actual machine motion. Filing.
 
 **Fix:** Refactor SceneRenderer's machine-origin drawing to use the same `transformPointToMachine` / `applyMachineTransform` helpers that the actual G-code path uses. Single source of truth: if the math is wrong, both preview AND output are wrong (which is better than silent disagreement).
 
 **Estimate:** ~1 session. Depends on T1-40 stage 2 (right-origin X-flip) for correctness.
 
-**Priority:** Tier 3 — preview/output trust.
+**Priority:** Tier 3 鈥?preview/output trust.
 
 ---
 
@@ -15476,21 +15454,21 @@ Both modes are correct under their assumptions. The problem is users don't alway
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 4.
 
-**Originally dismissed because:** Said "included in T1-31 implementation. Can be done in same refactor" — but T1-31's scope is "make the gcode pattern correct," not "make memory bounded." Filing as separate concern.
+**Originally dismissed because:** Said "included in T1-31 implementation. Can be done in same refactor" 鈥?but T1-31's scope is "make the gcode pattern correct," not "make memory bounded." Filing as separate concern.
 
-**Fix:** Process raster row-by-row. Generate scanline N → emit moves for scanline N → emit gcode lines for scanline N → release the scanline. Never hold more than O(rowWidth) data in memory.
+**Fix:** Process raster row-by-row. Generate scanline N 鈫?emit moves for scanline N 鈫?emit gcode lines for scanline N 鈫?release the scanline. Never hold more than O(rowWidth) data in memory.
 
 This requires the streaming output infrastructure from T3-15 to land first (or at minimum, the ability to emit gcode chunks rather than full materialization).
 
 **Estimate:** ~1-2 sessions, after T3-15 lands.
 
-**Priority:** Tier 3 — depends on T3-15.
+**Priority:** Tier 3 鈥?depends on T3-15.
 
 ---
 
-### T3-35 | Cache invalidation strategies — image processed cache, fill rows cache
+### T3-35 | Cache invalidation strategies 鈥?image processed cache, fill rows cache
 
-**Code reference:** Various caches throughout — text outline cache exists at `src/geometry/textOutlineFingerprint.ts`; no equivalent for processed raster or generated fill rows.
+**Code reference:** Various caches throughout 鈥?text outline cache exists at `src/geometry/textOutlineFingerprint.ts`; no equivalent for processed raster or generated fill rows.
 
 **Problem:** Audit 2E Priority 8 noted opportunities for caches that don't currently exist:
 - Processed raster keyed by image+settings+crop+transform (so brightness/contrast adjustments don't reprocess from scratch every time)
@@ -15499,16 +15477,16 @@ This requires the streaming output infrastructure from T3-15 to land first (or a
 
 **Identified by:** Audit 2E (2026-04-25, ChatGPT) Priority 8.
 
-**Originally dismissed because:** Said "opportunistic, not a roadmap item" — but caches are real engineering work that improves real user-perceived performance. Filing.
+**Originally dismissed because:** Said "opportunistic, not a roadmap item" 鈥?but caches are real engineering work that improves real user-perceived performance. Filing.
 
 **Fix:** Add caches as separate ticketed work, smallest-first:
 (1) Processed raster cache keyed by FNV-1a hash of (imageId + brightness + contrast + gamma + invert + threshold + dither). Bounded to N entries by LRU. ~1 session.
 (2) Fill rows cache keyed by path fingerprint + fill settings. ~1 session.
-(3) Output chunk cache — only safe if input is fully deterministic. ~1-2 sessions; lower value than first two.
+(3) Output chunk cache 鈥?only safe if input is fully deterministic. ~1-2 sessions; lower value than first two.
 
 **Estimate:** Each ~1 session. Total ~3 sessions if all done.
 
-**Priority:** Tier 3 — performance.
+**Priority:** Tier 3 鈥?performance.
 
 ---
 
@@ -15516,11 +15494,11 @@ This requires the streaming output infrastructure from T3-15 to land first (or a
 
 **Code reference:** New `tests/frame-vs-burn-equivalence.test.ts`. Depends on T2-18 (parser) and T2-19 (bounds analyzer).
 
-**Problem:** Audit 2F section 6.1: a frame can be mathematically correct in isolation and still wrong compared to the actual burn job — different coordinate models, different overscan inclusion, different bed-height Y mirror, different origin handling. T1-39 (frame skips first move) and T1-42 (frame bounds use buildFrameCorners) FIX the codegen, but **no test compares the parsed frame G-code bounds against the parsed burn G-code bounds.** Future regressions to either path can silently desync them.
+**Problem:** Audit 2F section 6.1: a frame can be mathematically correct in isolation and still wrong compared to the actual burn job 鈥?different coordinate models, different overscan inclusion, different bed-height Y mirror, different origin handling. T1-39 (frame skips first move) and T1-42 (frame bounds use buildFrameCorners) FIX the codegen, but **no test compares the parsed frame G-code bounds against the parsed burn G-code bounds.** Future regressions to either path can silently desync them.
 
 **Identified by:** Audit 2F (2026-04-25, ChatGPT) section 6.1 / P1.
 
-**Fix:** Test matrix for every origin mode × representative scene type:
+**Fix:** Test matrix for every origin mode 脳 representative scene type:
 
 ```ts
 const ORIGIN_MODES: GcodeStartMode[] = ['absolute', 'current', 'savedOrigin'];
@@ -15548,13 +15526,13 @@ for (const startMode of ORIGIN_MODES) {
 }
 ```
 
-That's 3 × 4 × 5 = 60 test cases minimum. Most will reuse fixtures. The matrix is exhaustive specifically because audit 2D found multiple coordinate-system bugs that only manifested for specific combinations (front-origin + current mode + first-move skip in T1-39).
+That's 3 脳 4 脳 5 = 60 test cases minimum. Most will reuse fixtures. The matrix is exhaustive specifically because audit 2D found multiple coordinate-system bugs that only manifested for specific combinations (front-origin + current mode + first-move skip in T1-39).
 
 **Tests:** The matrix IS the tests. Some combinations may need to skip until T1-40 stage 2 lands (right-origin proper support).
 
 **Estimate:** ~1-2 sessions. Most time on edge-case scenarios (near-edge, raster-with-overscan).
 
-**Priority:** Tier 3 — regression protection. Depends on T1-39, T1-40, T1-42 (frame fixes), T2-18, T2-19 (test infrastructure).
+**Priority:** Tier 3 鈥?regression protection. Depends on T1-39, T1-40, T1-42 (frame fixes), T2-18, T2-19 (test infrastructure).
 
 **Cross-check note (audit 2F):** Audit's section 6.1 / P1.
 
@@ -15566,11 +15544,11 @@ That's 3 × 4 × 5 = 60 test cases minimum. Most will reuse fixtures. The matrix
 
 **Problem:** Audit 2F section 6.2: existing `origin-saved.test.ts` snapshots output but doesn't prove the physical WCS state. The complete lifecycle that needs testing:
 
-1. User clicks Set Origin → app emits `G10 L20 P1 X0 Y0`
+1. User clicks Set Origin 鈫?app emits `G10 L20 P1 X0 Y0`
 2. App stores saved-origin state (including expected G54 snapshot per T1-41)
-3. App reconnects → connect-time WCS normalize runs `G10 L2 P1 X0 Y0 Z0`, destroying the saved G54
+3. App reconnects 鈫?connect-time WCS normalize runs `G10 L2 P1 X0 Y0 Z0`, destroying the saved G54
 4. User attempts to start saved-origin job
-5. Preflight should block because live G54 ≠ stored G54
+5. Preflight should block because live G54 鈮?stored G54
 
 T1-41 implements steps 2 and 5. **But there's no test that exercises the full lifecycle and verifies the block triggers correctly.** A future change that loses the verification (e.g. someone removes the `$#` query during refactoring) wouldn't be caught.
 
@@ -15625,7 +15603,7 @@ test('saved-origin lifecycle: reconnect after unclean disconnect blocks', async 
 
 **Estimate:** ~1 session after T1-41 lands.
 
-**Priority:** Tier 3 — regression protection. Depends on T1-41 (saved-origin verification implementation), T1-29 (unsafe-prior-state flag), T2-13 (fault-injecting transport for mock controller).
+**Priority:** Tier 3 鈥?regression protection. Depends on T1-41 (saved-origin verification implementation), T1-29 (unsafe-prior-state flag), T2-13 (fault-injecting transport for mock controller).
 
 **Cross-check note (audit 2F):** Audit's section 6.2 / Gate E. Verified.
 
@@ -15652,7 +15630,7 @@ This is a property-style assertion that maps cleanly onto the parser + bounds an
 **Identified by:** Audit 2F (2026-04-25, ChatGPT) section 5 / Gate D / P0 #3.
 
 **Fix:** Test fixtures:
-1. Donut (outer 50×50 square + inner 20×20 square hole, centered)
+1. Donut (outer 50脳50 square + inner 20脳20 square hole, centered)
 2. Ring (outer circle radius 25 + inner circle radius 10, centered)
 3. Letter B (real glyph compound path with two holes)
 4. Hole-in-hole (island: outer + hole + inner-island)
@@ -15667,7 +15645,7 @@ For each, compile to G-code, parse, extract burn segments, assert:
 
 **Estimate:** ~1 session after T1-36 ships and T2-15 starts. Could ship before T2-15 fully completes if T1-36's band-aid is sufficient for the test fixtures used.
 
-**Priority:** Tier 3 — regression protection for the most CAM-critical geometric correctness area. Depends on T1-36, T2-15, T2-18, T2-19.
+**Priority:** Tier 3 鈥?regression protection for the most CAM-critical geometric correctness area. Depends on T1-36, T2-15, T2-18, T2-19.
 
 **Cross-check note (audit 2F):** Audit's section 5 / Gate D / P0 #3.
 
@@ -15686,7 +15664,7 @@ For each, compile to G-code, parse, extract burn segments, assert:
 | Huge SVG coordinates (1e10) | Reject or clamp; no Infinity/NaN |
 | NaN coordinates from manual scene construction | Block compile/output |
 | Negative scale | Mirror intentionally; bounds correct |
-| Zero-size image (0×0) | Reject; no empty/broken output |
+| Zero-size image (0脳0) | Reject; no empty/broken output |
 | Huge image (>50MP) | Warn before allocation (T1-45 complexity gate); no crash |
 | Invalid DPI (negative, zero, NaN) | Clamp or reject; no infinite rows |
 | Zero speed | Clamp; never emit `F0` for burn |
@@ -15710,7 +15688,7 @@ Each file enumerates malformed inputs and asserts safe handling. Use parser (T2-
 
 **Estimate:** ~2 sessions. Each malformed input is a small test; matrix is large.
 
-**Priority:** Tier 3 — robustness. Depends on T2-18 for verification.
+**Priority:** Tier 3 鈥?robustness. Depends on T2-18 for verification.
 
 **Cross-check note (audit 2F):** Audit's section 9 / Gate G / P1.
 
@@ -15724,10 +15702,10 @@ Each file enumerates malformed inputs and asserts safe handling. Use parser (T2-
 
 | Test | Fixture | Threshold |
 |---|---|---|
-| Large raster compile | 200×200mm @ 254 DPI grayscale | No crash; reports progress; memory bounded |
+| Large raster compile | 200脳200mm @ 254 DPI grayscale | No crash; reports progress; memory bounded |
 | Dithered raster worst case | High-contrast checkerboard | Line count estimable before generation; cancellable |
-| Dense vector | 50,000 line segments | No O(n²) collapse; deterministic |
-| Dense hatch fill | 200×200mm square, small interval | Warn/limit; no freeze |
+| Dense vector | 50,000 line segments | No O(n虏) collapse; deterministic |
+| Dense hatch fill | 200脳200mm square, small interval | Warn/limit; no freeze |
 | Text outlines | Large paragraph converted to outlines | Cache invalidation correct; no growth |
 | Streaming million lines | Fake GRBL controller | Buffer stable; logs bounded; cancellable |
 | Export huge output | Million-line G-code | Bounded memory; or document failure |
@@ -15750,17 +15728,17 @@ Mark these with `test.skip` or a `failingExpectedUntil` annotation, with clear c
 
 **Estimate:** ~2-3 sessions. Each fixture takes some setup; orchestrating memory measurement in Node.js requires `process.memoryUsage()` polling.
 
-**Priority:** Tier 3 — large-job protection. Depends on T1-45 (complexity gate), T2-17 (cancel/progress), T3-15 (streaming) for full coverage.
+**Priority:** Tier 3 鈥?large-job protection. Depends on T1-45 (complexity gate), T2-17 (cancel/progress), T3-15 (streaming) for full coverage.
 
 **Cross-check note (audit 2F):** Audit's section 8 / Gate F / P1.
 
 ---
 
-### T3-41 | Snapshot semantic-assertion pairing — every snapshot test gets parsed checks
+### T3-41 | Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks
 
 **Code reference:** Every `tests/e2e/*.test.ts` file (rectangle, circle, score, text, multi-pass, mixed scene, origin absolute, origin saved, engrave fill).
 
-**Problem:** Audit 2F section 3: existing E2E tests have snapshot match + shallow `gcode.includes('G21')` style assertions. Once T2-18 (parser) lands, every snapshot test should be paired with semantic assertions that prove modal/safety correctness — not just byte preservation.
+**Problem:** Audit 2F section 3: existing E2E tests have snapshot match + shallow `gcode.includes('G21')` style assertions. Once T2-18 (parser) lands, every snapshot test should be paired with semantic assertions that prove modal/safety correctness 鈥?not just byte preservation.
 
 **Identified by:** Audit 2F (2026-04-25, ChatGPT) section 3 / P0.
 
@@ -15792,9 +15770,9 @@ Audit's table from section 3 lists semantic assertions per fixture. Apply each.
 
 **Tests:** The augmented E2E tests ARE the tests.
 
-**Estimate:** ~1-2 sessions for all ~10 E2E fixtures. Mechanical work — the patterns are repeatable.
+**Estimate:** ~1-2 sessions for all ~10 E2E fixtures. Mechanical work 鈥?the patterns are repeatable.
 
-**Priority:** Tier 3 — depth-of-coverage. Depends on T2-18 (parser), T2-19 (analyzer).
+**Priority:** Tier 3 鈥?depth-of-coverage. Depends on T2-18 (parser), T2-19 (analyzer).
 
 **Cross-check note (audit 2F):** Audit's section 3 / P0. Pattern matches the audit's recommendation exactly.
 
@@ -15839,12 +15817,12 @@ function getValidatorFor(family: ControllerFamily): TemplateValidator {
 `PipelineService` chooses the validator based on active controller family (via T2-25 capabilities or T2-29 ticket schema).
 
 **Tests:** `tests/preflight-validator-dialect-routing.test.ts`:
-- GRBL family + custom template with `$X` → blocks (existing behavior).
-- (Future) Marlin family + same template → does not block (`$X` not Marlin syntax).
+- GRBL family + custom template with `$X` 鈫?blocks (existing behavior).
+- (Future) Marlin family + same template 鈫?does not block (`$X` not Marlin syntax).
 
 **Estimate:** ~1-2 sessions. Mostly mechanical refactor.
 
-**Priority:** Tier 3 — depends on T2-25, T2-29. Only valuable if non-GRBL controllers actually ship.
+**Priority:** Tier 3 鈥?depends on T2-25, T2-29. Only valuable if non-GRBL controllers actually ship.
 
 **Cross-check note (audit 3A):** Verified existing validator is GRBL-shaped. Audit's Priority 8.
 
@@ -15906,13 +15884,13 @@ Test categories:
 
 **Estimate:** ~2-3 sessions. Builds on T2-13 (FaultInjectingSerialPort) for the transport-level mocking.
 
-**Priority:** Tier 3 — regression protection for the multi-controller refactor. Most valuable when T2-24 through T2-30 are partway done; serves as the "did we actually achieve abstraction?" proof.
+**Priority:** Tier 3 鈥?regression protection for the multi-controller refactor. Most valuable when T2-24 through T2-30 are partway done; serves as the "did we actually achieve abstraction?" proof.
 
 **Cross-check note (audit 3A):** Audit's Priority 9.
 
 ---
 
-### T3-44 | Generic progress model — line / byte / percent / device-reported
+### T3-44 | Generic progress model 鈥?line / byte / percent / device-reported
 
 **Code reference:** `src/controllers/ControllerInterface.ts:33-46` (`JobProgress` interface with `linesSent`, `linesAcknowledged`, `totalLines`, `bufferFill`, `ackRateHz`, `expectedAckRateHz`, `healthStatus`).
 
@@ -15954,13 +15932,13 @@ GRBL controller populates `grblHealth`. UI conditionally renders health UI only 
 
 **Estimate:** ~1-2 sessions. Touches LaserController interface, GrblController progress emission, ConnectionPanel UI rendering.
 
-**Priority:** Tier 3 — depends on T2-24. Mostly cosmetic for current GRBL-only product but required for clean multi-controller.
+**Priority:** Tier 3 鈥?depends on T2-24. Mostly cosmetic for current GRBL-only product but required for clean multi-controller.
 
 **Cross-check note (audit 3A):** Audit's section 3.5.
 
 ---
 
-### T3-45 | Transport abstraction layer — Line / Byte / HttpJob transports
+### T3-45 | Transport abstraction layer 鈥?Line / Byte / HttpJob transports
 
 **Code reference:** `src/communication/SerialPort.ts` (current `SerialPortLike` interface), `src/communication/WebSerialPort.ts` (browser), `src/communication/MockSerialPort.ts` (test mock), `electron/serial.ts` (Electron native), `electron/falcon-wifi/` (parallel WiFi subsystem).
 
@@ -16011,17 +15989,17 @@ interface HttpJobTransport extends Transport {
 
 **Estimate:** ~3-4 sessions. Touches transport layer (probably the most fundamental refactor in the audit-3A set), controller wiring, profile.connection.kind interpretation.
 
-**Priority:** Tier 3 — foundation for T2-30 (Falcon WiFi controller) and any binary-protocol controller. Could ship before T2-30 if the implementation order is "transport first, controller second."
+**Priority:** Tier 3 鈥?foundation for T2-30 (Falcon WiFi controller) and any binary-protocol controller. Could ship before T2-30 if the implementation order is "transport first, controller second."
 
 **Cross-check note (audit 3A):** Audit's section 7. Verified `SerialPortLike` is the only transport contract.
 
 ---
 
-### T3-46 | Profile schema split — Device / Controller / Transport / Output
+### T3-46 | Profile schema split 鈥?Device / Controller / Transport / Output
 
 **Code reference:** `src/core/devices/DeviceProfile.ts` (current monolithic profile with bedWidth/bedHeight, baudRate, gcodeHeaderTemplate, autoFocusCommand, suppressWcsConsent, connection.kind, etc. all in one object).
 
-**Problem:** Audit 3A section 6.1: the profile conflates machine geometry, controller firmware/dialect, transport kind, and output format. Falcon WiFi profile comments explicitly note GRBL-specific fields are "kept at defaults so existing code paths don't crash" — the schema has to pretend non-GRBL profiles are GRBL-compatible (audit section 6.2 verified by inspecting profile comments).
+**Problem:** Audit 3A section 6.1: the profile conflates machine geometry, controller firmware/dialect, transport kind, and output format. Falcon WiFi profile comments explicitly note GRBL-specific fields are "kept at defaults so existing code paths don't crash" 鈥?the schema has to pretend non-GRBL profiles are GRBL-compatible (audit section 6.2 verified by inspecting profile comments).
 
 **Identified by:** Audit 3A (2026-04-25, ChatGPT) section 6.1, 6.2, 6.4, 6.5 + recommended split.
 
@@ -16076,8 +16054,8 @@ interface DeviceProfile {
 ```
 
 This makes profile validation possible (audit section 6.5):
-- `transport.kind = 'falcon-wifi'` AND `output.format = 'grbl-line-stream'` → conflict if Falcon WiFi requires file upload.
-- `controller.family != 'grbl'` AND `output.format = 'grbl'` → conflict.
+- `transport.kind = 'falcon-wifi'` AND `output.format = 'grbl-line-stream'` 鈫?conflict if Falcon WiFi requires file upload.
+- `controller.family != 'grbl'` AND `output.format = 'grbl'` 鈫?conflict.
 - Etc.
 
 Migration: existing flat profiles get migrated to the nested structure on load via a one-time migration in `loadProfile` (existing migration scaffolding).
@@ -16088,13 +16066,13 @@ Migration: existing flat profiles get migrated to the nested structure on load v
 
 **Estimate:** ~2-3 sessions. Schema change touches storage, migration, validation, every consumer that reads `profile.X`.
 
-**Priority:** Tier 3 — quality-of-life for adding controllers. Mostly invisible to current users.
+**Priority:** Tier 3 鈥?quality-of-life for adding controllers. Mostly invisible to current users.
 
 **Cross-check note (audit 3A):** Audit's section 6. Verified existing profile is monolithic.
 
 ---
 
-### T3-47 | Generic safety operations API — capability-gated pause / stop / laserOff / testFire
+### T3-47 | Generic safety operations API 鈥?capability-gated pause / stop / laserOff / testFire
 
 **Code reference:** `src/app/ExecutionCoordinator.ts:183-205` (laserOff via `M5 S0`), `src/controllers/grbl/GrblController.ts:538-547` (pause via realtime `0x21`), `:552-563` (resume via realtime `0x7E`), `:emergencyStop` (soft reset `0x18`).
 
@@ -16102,7 +16080,7 @@ Migration: existing flat profiles get migrated to the nested structure on load v
 
 This overlaps with several already-filed safety items:
 - T1-22 (critical write awaitability for safety commands)
-- T1-23 (pause policy — explicit M5 or documented firmware proof)
+- T1-23 (pause policy 鈥?explicit M5 or documented firmware proof)
 - T1-24 (error/alarm M5)
 - T2-12 (formal safety state model)
 
@@ -16131,7 +16109,7 @@ Each controller implements these in its dialect:
 // GrblController.operations
 laserOff(mode): Promise<OperationResult> {
   if (mode === 'emergency') {
-    return this.softReset();  // 0x18 — destructive but guaranteed
+    return this.softReset();  // 0x18 鈥?destructive but guaranteed
   }
   return this.writeCritical('M5 S0');
 }
@@ -16145,13 +16123,13 @@ laserOff(mode): Promise<OperationResult> {
 Safety state machine (T2-12) calls `ctrl.operations.laserOff(mode)` instead of emitting `M5 S0` directly. Capabilities (T2-25) declare which operations the controller supports; safety state machine refuses to enter states whose recovery requires unsupported operations.
 
 **Tests:** `tests/safety-operations-controller-routing.test.ts`:
-- GrblController.operations.laserOff('normal') → M5 S0 emitted.
-- GrblController.operations.laserOff('emergency') → 0x18 soft reset emitted.
-- Mock controller without `canEmergencyStop` capability → safety state machine refuses to enter states needing emergency stop.
+- GrblController.operations.laserOff('normal') 鈫?M5 S0 emitted.
+- GrblController.operations.laserOff('emergency') 鈫?0x18 soft reset emitted.
+- Mock controller without `canEmergencyStop` capability 鈫?safety state machine refuses to enter states needing emergency stop.
 
 **Estimate:** ~2 sessions after T2-26 (operations API) lands. Mostly: migrate existing safety code to call operations.X(), and audit T2-12's safety state machine to reference operations rather than command strings.
 
-**Priority:** Tier 3 — depends on T2-26 and overlaps T2-12. Mostly invisible to users; required for clean non-GRBL safety.
+**Priority:** Tier 3 鈥?depends on T2-26 and overlaps T2-12. Mostly invisible to users; required for clean non-GRBL safety.
 
 **Cross-check note (audit 3A):** Audit's section 9.
 
@@ -16162,9 +16140,9 @@ Safety state machine (T2-12) calls `ctrl.operations.laserOff(mode)` instead of e
 **Code reference:** `src/communication/WebSerialPort.ts:29` (uses only `requestPort()`), `src/communication/WebSerialPort.ts:90-95` (calls `port.forget()` on every close), `src/types/web-serial.d.ts:37-40` (typings include `getPorts()` but it's never called).
 
 **Problem:** Cross-check verified. The current flow:
-1. Connect → `requestPort()` prompts user to pick device.
-2. Disconnect → `port.close()` AND `port.forget()` — explicitly revokes the permission grant.
-3. Reconnect → `requestPort()` prompts user AGAIN.
+1. Connect 鈫?`requestPort()` prompts user to pick device.
+2. Disconnect 鈫?`port.close()` AND `port.forget()` 鈥?explicitly revokes the permission grant.
+3. Reconnect 鈫?`requestPort()` prompts user AGAIN.
 
 Every connect cycle prompts the user. There's no "remember my Falcon" workflow.
 
@@ -16174,9 +16152,9 @@ WebSerial actually supports persistent grants via `getPorts()` which returns pre
 
 **Fix:** Two parts.
 
-**Part A — Stop calling `forget()` on every close.** T2-31's close rewrite already conditionalizes forget on `reason === 'user-forget'`. So the change here is just confirming that the default disconnect path no longer forgets the device.
+**Part A 鈥?Stop calling `forget()` on every close.** T2-31's close rewrite already conditionalizes forget on `reason === 'user-forget'`. So the change here is just confirming that the default disconnect path no longer forgets the device.
 
-**Part B — Use `getPorts()` for reconnect.** New flow:
+**Part B 鈥?Use `getPorts()` for reconnect.** New flow:
 
 ```ts
 async connectKnownPortOrPrompt(baudRate: number, profileDeviceFingerprint?: DeviceFingerprint): Promise<void> {
@@ -16214,11 +16192,11 @@ Profile schema (per T3-46) gains `device.fingerprint?: { usbVendorId: number; us
 **Tests:** `tests/serial-known-port-reuse.test.ts`:
 - Mock `getPorts()` returning known port matching profile fingerprint. Connect. Assert `requestPort()` was NOT called.
 - Mock `getPorts()` returning no matches. Connect. Assert `requestPort()` was called as fallback.
-- "Forget device" button → confirm `port.forget()` called.
+- "Forget device" button 鈫?confirm `port.forget()` called.
 
 **Estimate:** ~1-2 sessions. Mostly straightforward; depends on T3-46 (profile schema split) for storing fingerprint cleanly.
 
-**Priority:** Tier 3 — UX. Removes a friction point for repeat users.
+**Priority:** Tier 3 鈥?UX. Removes a friction point for repeat users.
 
 **Cross-check note (audit 3B):** Audit's section 3.4.
 
@@ -16235,7 +16213,7 @@ Profile schema (per T3-46) gains `device.fingerprint?: { usbVendorId: number; us
 
 These signals are inconsistent across browser/platform/cable-pull-timing. Some pulls produce read rejection within ms; some take seconds; some leave the read loop hanging until next `?` realtime poll fails.
 
-The navigator-level `disconnect` event is the canonical signal — it fires immediately when the OS detects USB removal. Using it would normalize cable-pull detection across all platforms.
+The navigator-level `disconnect` event is the canonical signal 鈥?it fires immediately when the OS detects USB removal. Using it would normalize cable-pull detection across all platforms.
 
 **Identified by:** Audit 3B (2026-04-25, ChatGPT) section 3.5. Adjacent to T3-16 (cable-pull recovery) but distinct: T3-16 is about heartbeat-based detection; T3-49 is about using the navigator event.
 
@@ -16276,18 +16254,18 @@ Combine with T3-16 (heartbeat) for defense-in-depth: navigator event is the fast
 
 **Estimate:** ~1 session.
 
-**Priority:** Tier 3 — improves reliability of cable-pull detection. Pairs with T3-16.
+**Priority:** Tier 3 鈥?improves reliability of cable-pull detection. Pairs with T3-16.
 
 **Cross-check note (audit 3B):** Audit's section 3.5.
 
 ---
 
-### T3-50 | Device identity verification on connect — require `$I` firmware response
+### T3-50 | Device identity verification on connect 鈥?require `$I` firmware response
 
 **Code reference:** `src/controllers/grbl/GrblController.ts:182-330` (current connect flow queries settings AFTER welcome).
 
 **Problem:** Cross-check verified. Current flow:
-1. Welcome line received → `welcomeReceived = true`, status set to idle, polling started.
+1. Welcome line received 鈫?`welcomeReceived = true`, status set to idle, polling started.
 2. `_queryMachineSettings()` queued asynchronously.
 3. Settings (including `$I` firmware info, `$30` max spindle, `$130/$131` bed dims) parsed when responses arrive.
 
@@ -16327,9 +16305,9 @@ interface DeviceIdentity {
 ```
 
 ConnectionManager (T2-32) compares identity against active profile after connect:
-- Active profile says 400×400, identity reports 220×220 → warning, optional block.
-- Active profile expects laser mode `$32=1`, identity reports `$32=0` → warning.
-- `$I` returns no [VER:] block within timeout → warn "Could not confirm GRBL firmware version."
+- Active profile says 400脳400, identity reports 220脳220 鈫?warning, optional block.
+- Active profile expects laser mode `$32=1`, identity reports `$32=0` 鈫?warning.
+- `$I` returns no [VER:] block within timeout 鈫?warn "Could not confirm GRBL firmware version."
 
 **Tests:** `tests/grbl-identity-verification.test.ts`:
 - Mock GRBL device responding with full $I + $$. Connect. Assert returned identity matches.
@@ -16338,7 +16316,7 @@ ConnectionManager (T2-32) compares identity against active profile after connect
 
 **Estimate:** ~2 sessions. Touches connect flow, settings parsing already exists, ConnectionManager integration.
 
-**Priority:** Tier 3 — depends on T2-32 (ConnectionManager). Builds on T1-51 (handshake proof) — T1-51 is the minimal correctness fix; T3-50 is the comprehensive identity model.
+**Priority:** Tier 3 鈥?depends on T2-32 (ConnectionManager). Builds on T1-51 (handshake proof) 鈥?T1-51 is the minimal correctness fix; T3-50 is the comprehensive identity model.
 
 **Cross-check note (audit 3B):** Audit's section 10 + P1 device identity.
 
@@ -16348,7 +16326,7 @@ ConnectionManager (T2-32) compares identity against active profile after connect
 
 **Code reference:** Builds on T3-50 (identity verification on every connect). New: persist last-known identity per profile; compare on reconnect.
 
-**Problem:** Cross-check verified. Current code does no comparison between the device connected this session and the device connected last session. If a user has two Falcons on the same machine and accidentally selects the wrong port via `requestPort()`, the wrong machine connects with the wrong profile's settings. Bed size mismatch, max-spindle mismatch, scanning offset mismatch — all silently wrong.
+**Problem:** Cross-check verified. Current code does no comparison between the device connected this session and the device connected last session. If a user has two Falcons on the same machine and accidentally selects the wrong port via `requestPort()`, the wrong machine connects with the wrong profile's settings. Bed size mismatch, max-spindle mismatch, scanning offset mismatch 鈥?all silently wrong.
 
 **Identified by:** Audit 3B (2026-04-25, ChatGPT) section 10.4 + Required P1 fix.
 
@@ -16380,13 +16358,13 @@ User can clear `lastConnectedIdentity` via "Forget connected device" UI action.
 
 **Estimate:** ~1 session after T3-50 lands.
 
-**Priority:** Tier 3 — depends on T3-50, T3-46. Niche but valuable for users with multiple machines.
+**Priority:** Tier 3 鈥?depends on T3-50, T3-46. Niche but valuable for users with multiple machines.
 
 **Cross-check note (audit 3B):** Audit's section 10.4.
 
 ---
 
-### T3-52 | Browser lifecycle cleanup — beforeunload / pagehide
+### T3-52 | Browser lifecycle cleanup 鈥?beforeunload / pagehide
 
 **Code reference:** No current handler. Cross-check: zero matches for `addEventListener('beforeunload')` or `'pagehide'` in src/.
 
@@ -16439,7 +16417,7 @@ Hardware verification (manual):
 
 **Estimate:** ~1 session including manual hardware verification.
 
-**Priority:** Tier 3 — real safety gap. Filed at Tier 3 not Tier 1 because (a) the firmware's own watchdog typically catches this within seconds, (b) realistic users don't close the tab mid-burn — but defense-in-depth is the right call.
+**Priority:** Tier 3 鈥?real safety gap. Filed at Tier 3 not Tier 1 because (a) the firmware's own watchdog typically catches this within seconds, (b) realistic users don't close the tab mid-burn 鈥?but defense-in-depth is the right call.
 
 **Cross-check note (audit 3B):** Audit's section 11 + P2.
 
@@ -16487,7 +16465,7 @@ Plus: track consecutive status-report failures. After N (e.g. 3) consecutive fai
 
 **Estimate:** ~30 min - 1 hour.
 
-**Priority:** Tier 3 — log hygiene + clean shutdown. Depends on T2-32 (ConnectionManager) for the device-lost state.
+**Priority:** Tier 3 鈥?log hygiene + clean shutdown. Depends on T2-32 (ConnectionManager) for the device-lost state.
 
 **Cross-check note (audit 3B):** Audit's section 9.3.
 
@@ -16504,16 +16482,16 @@ Plus: track consecutive status-report failures. After N (e.g. 3) consecutive fai
 **Fix:** Build the test matrix. Audit's required test list:
 
 **P0 lifecycle (10):**
-1. Permission denied — assert no portRef, controller disconnected.
-2. Open failure cleanup — assert cleanup, retry works.
-3. Writer acquisition failure — assert no leaked locks (T2-33 enables).
-4. Reader acquisition failure — assert no leaked locks (T2-33 enables).
-5. Handshake timeout — assert portRef.current === null, retry works (T1-49 enables).
-6. Double connect — assert only one survives (T1-50 enables).
-7. Disconnect during connect — assert connect aborts cleanly (T1-50 Part B + T2-32 enable).
-8. Reconnect while close pending — assert no leaked handles (T2-31 enables).
-9. Stale read loop event — assert ignored (T2-34 enables).
-10. Writer write rejection during disconnect — assert disconnect still closes (T1-22 enables).
+1. Permission denied 鈥?assert no portRef, controller disconnected.
+2. Open failure cleanup 鈥?assert cleanup, retry works.
+3. Writer acquisition failure 鈥?assert no leaked locks (T2-33 enables).
+4. Reader acquisition failure 鈥?assert no leaked locks (T2-33 enables).
+5. Handshake timeout 鈥?assert portRef.current === null, retry works (T1-49 enables).
+6. Double connect 鈥?assert only one survives (T1-50 enables).
+7. Disconnect during connect 鈥?assert connect aborts cleanly (T1-50 Part B + T2-32 enable).
+8. Reconnect while close pending 鈥?assert no leaked handles (T2-31 enables).
+9. Stale read loop event 鈥?assert ignored (T2-34 enables).
+10. Writer write rejection during disconnect 鈥?assert disconnect still closes (T1-22 enables).
 
 **P1 device identity (4):**
 11-14. Wrong device, no settings, profile mismatch, reconnect to different machine (T3-50, T3-51 enable).
@@ -16535,7 +16513,7 @@ Each test file is small. The harness needs:
 
 **Estimate:** ~3-4 sessions. Spread across many small test files; bulk is in the mock infrastructure.
 
-**Priority:** Tier 3 — regression protection for T1-49, T1-50, T1-51, T2-31, T2-32, T2-33, T2-34, T3-49, T3-50, T3-51. Depends on most of those being implemented; serves as the proof that they actually work.
+**Priority:** Tier 3 鈥?regression protection for T1-49, T1-50, T1-51, T2-31, T2-32, T2-33, T2-34, T3-49, T3-50, T3-51. Depends on most of those being implemented; serves as the proof that they actually work.
 
 **Cross-check note (audit 3B):** Audit's section 14. Comprehensive test list verified absent in current tests/.
 
@@ -16545,7 +16523,7 @@ Each test file is small. The harness needs:
 
 **Code reference:** `src/core/devices/DeviceProfile.ts:374-393` (`backfillFalconAutofocus`).
 
-**Problem:** Cross-check verified at exact lines. The `backfillFalconAutofocus` function unconditionally sets `autoFocusSupported: true`, `autoFocusCommand: '$HZ1'`, `autoFocusTimeoutMs: 15000` for any profile whose brand/model matches Falcon A1 Pro. The comments at lines 382-386 acknowledge this is "firmware-dictated" and requires firmware ≥ 1.0.38, but **no firmware version check happens before applying the heal.**
+**Problem:** Cross-check verified at exact lines. The `backfillFalconAutofocus` function unconditionally sets `autoFocusSupported: true`, `autoFocusCommand: '$HZ1'`, `autoFocusTimeoutMs: 15000` for any profile whose brand/model matches Falcon A1 Pro. The comments at lines 382-386 acknowledge this is "firmware-dictated" and requires firmware 鈮?1.0.38, but **no firmware version check happens before applying the heal.**
 
 A user with an older Falcon firmware (< 1.0.38) gets `autoFocusSupported: true` in their profile, the Focus button is enabled, clicking it sends `$HZ1` to a firmware that doesn't recognize the command. The firmware emits `error:20` (unsupported command) or just ignores it, and the user sees confusing failure.
 
@@ -16572,7 +16550,7 @@ export function backfillFalconAutofocus(
     };
   }
 
-  // No firmware version known — heal optimistically as today, but T1-55 + T3-56 (conservative unknown)
+  // No firmware version known 鈥?heal optimistically as today, but T1-55 + T3-56 (conservative unknown)
   // means the Focus button is gated separately by 'capabilities-unknown' state
   return {
     ...profile,
@@ -16586,20 +16564,20 @@ export function backfillFalconAutofocus(
 Caller passes `controllerFirmwareVersion` when known (after `$I` query, which T3-50 makes mandatory). If unknown, current heal applies but the Focus button is gated by the broader "capabilities unknown while connected" rule (T1-55, T3-56).
 
 **Tests:** `tests/falcon-autofocus-firmware-gated.test.ts`:
-- Falcon profile + firmware 1.0.40 → heal enables autofocus.
-- Falcon profile + firmware 1.0.30 → heal sets autoFocusSupported=false.
-- Falcon profile + no firmware version → heal enables (today's behavior; T1-55/T3-56 gate at runtime).
-- Non-Falcon profile → heal returns unchanged.
+- Falcon profile + firmware 1.0.40 鈫?heal enables autofocus.
+- Falcon profile + firmware 1.0.30 鈫?heal sets autoFocusSupported=false.
+- Falcon profile + no firmware version 鈫?heal enables (today's behavior; T1-55/T3-56 gate at runtime).
+- Non-Falcon profile 鈫?heal returns unchanged.
 
 **Estimate:** ~30 min - 1 hour. Depends on `isFirmwareVersionAtLeast` helper (probably easy to write) and on T3-50 making firmware version reliably available.
 
-**Priority:** Tier 3 — depends on T3-50 (device identity verification with `$I`).
+**Priority:** Tier 3 鈥?depends on T3-50 (device identity verification with `$I`).
 
 **Cross-check note (audit 3C):** Audit's Finding 5.4. Verified at lines 374-393.
 
 ---
 
-### T3-56 | Conservative unknown-capability handling — block risky operations rather than fall back to defaults
+### T3-56 | Conservative unknown-capability handling 鈥?block risky operations rather than fall back to defaults
 
 **Code reference:** Multiple fallback locations identified in cross-check: PipelineService.ts:131-134, ConnectionPanelMain.tsx:802 + 906, App.tsx:1549, LayerSettingsPreflight.ts:6, Output.ts:125.
 
@@ -16639,32 +16617,32 @@ case 'job-start':
 The "explicit manual mode" escape hatch (audit Finding 7.1): a settings option "Trust profile when machine settings unavailable" that downgrades these blockers to warnings. Default is conservative; users with offline workflows or test setups can opt out.
 
 **Tests:** `tests/conservative-unknown-handling.test.ts`:
-- Connected, `maxSpindle.confidence='unknown'` → job start blocked.
-- Connected, all capabilities verified → job start allowed.
-- Disconnected, profile present → job start allowed (offline mode).
-- Connected with "trust profile" option enabled → job start downgraded to warning.
+- Connected, `maxSpindle.confidence='unknown'` 鈫?job start blocked.
+- Connected, all capabilities verified 鈫?job start allowed.
+- Disconnected, profile present 鈫?job start allowed (offline mode).
+- Connected with "trust profile" option enabled 鈫?job start downgraded to warning.
 
 **Estimate:** ~1-2 sessions. Depends on T2-38 (CapabilityValue), T2-40 (CapabilityGate), T1-55 (the maxSpindle case). T3-56 is the generalization to all capabilities.
 
-**Priority:** Tier 3 — depends on T2-38, T2-40. Closes the audit's Finding 7.1 surface.
+**Priority:** Tier 3 鈥?depends on T2-38, T2-40. Closes the audit's Finding 7.1 surface.
 
 **Cross-check note (audit 3C):** Audit's Finding 7.1 + Critical 5 + Priority 7. Verified five fallback-to-default locations.
 
 ---
 
-### T3-57 | Expand preflight mismatch rules — `$30` / `$32` / `$22` / `$110/$111` / `$120/$121` / firmware version
+### T3-57 | Expand preflight mismatch rules 鈥?`$30` / `$32` / `$22` / `$110/$111` / `$120/$121` / firmware version
 
 **Code reference:** `src/core/preflight/Preflight.ts` (existing bed mismatch check), `src/core/preflight/rules/` (will get new rule files).
 
 **Problem:** Audit Finding 6.5 + Required Priority 10. Existing preflight does check profile bed-size vs live `$130/$131` (one of the audit's positive findings). But it does NOT check:
 
-- `$30` mismatch — covered by T1-53 (becomes a blocker)
-- `$32` mismatch (profile says laser mode, firmware says no) — covered by T1-54
-- `$22` mismatch (profile says homing enabled, firmware $22=0) — NEW
-- `$110/$111` feed mismatch — NEW (warning)
-- `$120/$121` acceleration mismatch — NEW (warning)
-- Firmware version vs. profile expectations — NEW (warning, depends on T3-50)
-- Model/profile mismatch (profile is "Falcon A1 Pro" but firmware identifies different) — NEW (blocker, depends on T3-50)
+- `$30` mismatch 鈥?covered by T1-53 (becomes a blocker)
+- `$32` mismatch (profile says laser mode, firmware says no) 鈥?covered by T1-54
+- `$22` mismatch (profile says homing enabled, firmware $22=0) 鈥?NEW
+- `$110/$111` feed mismatch 鈥?NEW (warning)
+- `$120/$121` acceleration mismatch 鈥?NEW (warning)
+- Firmware version vs. profile expectations 鈥?NEW (warning, depends on T3-50)
+- Model/profile mismatch (profile is "Falcon A1 Pro" but firmware identifies different) 鈥?NEW (blocker, depends on T3-50)
 
 Some of these become blockers (firmware says safety-relevant capability is missing); some are warnings (feed/accel can be planner-clamped, mostly cosmetic correctness).
 
@@ -16680,13 +16658,13 @@ export function checkCapabilityMismatches(
 ): PreflightResult[] {
   const results: PreflightResult[] = [];
 
-  // Already covered by T1-53 (blocker) — included here for completeness
+  // Already covered by T1-53 (blocker) 鈥?included here for completeness
   if (profile.maxSpindle !== capabilities.power.maxSpindle.value &&
       capabilities.power.maxSpindle.confidence === 'verified') {
     results.push({ severity: 'error', code: 'PROFILE_MAX_SPINDLE_MISMATCH', ... });
   }
 
-  // Already covered by T1-54 — included here for completeness
+  // Already covered by T1-54 鈥?included here for completeness
   if (capabilities.firmware.laserModeEnabled.value === false) {
     results.push({ severity: 'error', code: 'GRBL_LASER_MODE_DISABLED', ... });
   }
@@ -16719,14 +16697,14 @@ export function checkCapabilityMismatches(
 Wired into `confirmPreflightForJobStart`. Some rules subsumed by T1-53/T1-54 (already filed); the others (T3-57's new rules) are additive.
 
 **Tests:** `tests/preflight-capability-mismatches.test.ts`:
-- Profile `homingEnabled=true`, firmware `$22=0` → blocker emitted.
-- Profile `maxFeedRate=10000`, firmware `$110=6000` → warning emitted.
-- Profile model `Falcon A1 Pro`, firmware identifies as `Falcon A1 Pro` → no error.
-- Profile model `Falcon A1 Pro`, firmware identifies as different → blocker emitted.
+- Profile `homingEnabled=true`, firmware `$22=0` 鈫?blocker emitted.
+- Profile `maxFeedRate=10000`, firmware `$110=6000` 鈫?warning emitted.
+- Profile model `Falcon A1 Pro`, firmware identifies as `Falcon A1 Pro` 鈫?no error.
+- Profile model `Falcon A1 Pro`, firmware identifies as different 鈫?blocker emitted.
 
 **Estimate:** ~1-2 sessions. Each rule is small; the bulk is the test coverage.
 
-**Priority:** Tier 3 — depends on T2-25 (capabilities model), T2-38 (CapabilityValue), T3-50 (device identity).
+**Priority:** Tier 3 鈥?depends on T2-25 (capabilities model), T2-38 (CapabilityValue), T3-50 (device identity).
 
 **Cross-check note (audit 3C):** Audit's Finding 6.5 + Priority 10. T1-53 and T1-54 cover the most critical mismatches; T3-57 adds the rest.
 
@@ -16734,7 +16712,7 @@ Wired into `confirmPreflightForJobStart`. Some rules subsumed by T1-53/T1-54 (al
 
 ### T3-58 | UI verified / unknown / stale capability indicators
 
-**Code reference:** Settings UI components — `src/ui/components/SettingsPanel.tsx` and equivalent. Currently no "verified vs profile-only" distinction in UI.
+**Code reference:** Settings UI components 鈥?`src/ui/components/SettingsPanel.tsx` and equivalent. Currently no "verified vs profile-only" distinction in UI.
 
 **Problem:** Cross-check confirmed audit Finding 10.1: UI doesn't distinguish "this value came from live firmware" vs "this value is from your saved profile" vs "this value is unknown." Users see "Max Spindle: 1000" with no indication whether that's verified or guessed. For a laser tool where wrong S-scaling means wrong burn power, this lack of trust signal is a real UX problem.
 
@@ -16743,18 +16721,18 @@ Wired into `confirmPreflightForJobStart`. Some rules subsumed by T1-53/T1-54 (al
 **Fix:** UI consumes `CapabilityValue<T>` (T2-38) and renders confidence visually:
 
 ```
-Bed dimensions:   400 × 400 mm   ✓ verified ($130/$131)
-Max spindle:      1000           ⚠ profile only — connect for live value
-Laser mode:       —              ✗ unknown — settings not yet read
-Homing:           enabled        ✓ verified ($22=1)
+Bed dimensions:   400 脳 400 mm   鉁?verified ($130/$131)
+Max spindle:      1000           鈿?profile only 鈥?connect for live value
+Laser mode:       鈥?             鉁?unknown 鈥?settings not yet read
+Homing:           enabled        鉁?verified ($22=1)
 ```
 
 States and visual treatment:
-- `confidence: 'verified'` — green check, optionally timestamp ("verified 2 minutes ago")
-- `confidence: 'manual'` — yellow caution, "profile only"
-- `confidence: 'fallback'` — red warning, "default value"
-- `confidence: 'unknown'` — gray dash, "unknown"
-- Mismatch detected (live ≠ profile) — red warning with both values shown
+- `confidence: 'verified'` 鈥?green check, optionally timestamp ("verified 2 minutes ago")
+- `confidence: 'manual'` 鈥?yellow caution, "profile only"
+- `confidence: 'fallback'` 鈥?red warning, "default value"
+- `confidence: 'unknown'` 鈥?gray dash, "unknown"
+- Mismatch detected (live 鈮?profile) 鈥?red warning with both values shown
 
 When connected and recently-verified vs settings-since-changed: a "stale" state (different from "unknown") for capabilities that were verified earlier in the session but might be out of date now.
 
@@ -16766,7 +16744,7 @@ Audit's Finding 10.3 (unsupported operations not systematically hidden) is close
 
 **Estimate:** ~2 sessions. Touches Settings UI, ConnectionStatus UI, possibly preflight panel. Mostly visual design + integration with T2-38 model.
 
-**Priority:** Tier 3 — UX. Depends on T2-38 (CapabilityValue model).
+**Priority:** Tier 3 鈥?UX. Depends on T2-38 (CapabilityValue model).
 
 **Cross-check note (audit 3C):** Audit's Findings 10.1, 10.2, 10.3.
 
@@ -16778,15 +16756,15 @@ Audit's Finding 10.3 (unsupported operations not systematically hidden) is close
 
 **Problem:** Audit Required Priority 12 lists 12 specific test scenarios that should exist for capability regression protection. Cross-check confirmed: zero tests exist for these scenarios. The audit's required tests:
 
-1. `$30=255`, profile `1000` → job start blocks or output uses 255 (T1-53)
-2. `$32=0`, GRBL M4 output → blocked (T1-54)
-3. Missing `$$` → capabilities unknown; job/test-fire/frame-dot blocked (T1-55, T3-56)
+1. `$30=255`, profile `1000` 鈫?job start blocks or output uses 255 (T1-53)
+2. `$32=0`, GRBL M4 output 鈫?blocked (T1-54)
+3. Missing `$$` 鈫?capabilities unknown; job/test-fire/frame-dot blocked (T1-55, T3-56)
 4. Auto-detect copies `$30` into profile (T1-52)
 5. Auto-detect records `$32/$22/$20/$23` (T1-52 extended)
-6. Reconnect to different settings hash → ticket invalid (T2-37)
-7. Profile bed mismatch with live bed → blocker if output exceeds live (existing + extension)
-8. Wrong profile selected → mismatch warning/blocker (T3-57)
-9. Falcon profile with unsupported firmware autofocus → autofocus disabled (T3-55)
+6. Reconnect to different settings hash 鈫?ticket invalid (T2-37)
+7. Profile bed mismatch with live bed 鈫?blocker if output exceeds live (existing + extension)
+8. Wrong profile selected 鈫?mismatch warning/blocker (T3-57)
+9. Falcon profile with unsupported firmware autofocus 鈫?autofocus disabled (T3-55)
 10. `allowsNegativeWorkspace=false` blocks negative output; true only downgrades when verified (existing + extension)
 11. Unknown bed extents do not skip all bounds enforcement silently (T3-56)
 12. Capability snapshot hash changes after `$30` or `$32` update (T2-37)
@@ -16799,7 +16777,7 @@ Many of these tests get written naturally inside the corresponding ticket. T3-59
 
 **Estimate:** ~1-2 sessions for the cross-cutting tests + verification that per-ticket tests are present. Most of the work is done by individual tickets (T1-52 through T3-58).
 
-**Priority:** Tier 3 — regression protection for the entire capability work cluster (T1-52 through T3-58). Depends on most of those.
+**Priority:** Tier 3 鈥?regression protection for the entire capability work cluster (T1-52 through T3-58). Depends on most of those.
 
 **Cross-check note (audit 3C):** Audit's Priority 12. The matrix is the test plan.
 
@@ -16809,7 +16787,7 @@ Many of these tests get written naturally inside the corresponding ticket. T3-59
 
 **Code reference:** `src/app/MachineService.ts:505-520` (current disconnect: M5 S0 + ctrl.disconnect), `src/controllers/grbl/GrblController.ts:disconnect` (feed-hold + M5 S0 + close), `src/ui/components/ConnectionPanelMain.tsx:563-583` (UI sequences stop+disconnect).
 
-**Problem:** Cross-check verified disconnect sequence. Audit 3D Scenario 8 + Finding 2.7: for GRBL, closing the host port stops the line stream and the machine quickly runs out of buffered moves and stops. **For Wi-Fi controllers and file-upload controllers, closing the host connection does NOT stop the job** — the device runs the entire uploaded job from its internal storage even after the host disconnects.
+**Problem:** Cross-check verified disconnect sequence. Audit 3D Scenario 8 + Finding 2.7: for GRBL, closing the host port stops the line stream and the machine quickly runs out of buffered moves and stops. **For Wi-Fi controllers and file-upload controllers, closing the host connection does NOT stop the job** 鈥?the device runs the entire uploaded job from its internal storage even after the host disconnects.
 
 Current code treats disconnect as a safety primitive ("disconnect ends the job"). For non-GRBL controllers this is dangerously wrong.
 
@@ -16850,12 +16828,12 @@ async disconnect(): Promise<SafetyActionResult> {
 }
 ```
 
-For GRBL (`disconnectStopsJob: true`), the path is unchanged — current behavior was already correct. The new code only adds work for controllers that declare otherwise.
+For GRBL (`disconnectStopsJob: true`), the path is unchanged 鈥?current behavior was already correct. The new code only adds work for controllers that declare otherwise.
 
 **Tests:** `tests/disconnect-stops-job-gating.test.ts`:
-- GRBL controller (caps.disconnectStopsJob=true), job running, disconnect → current behavior, no extra abort step.
-- Mock controller (caps.disconnectStopsJob=false), job running, disconnect → assert abortJob is called BEFORE disconnect.
-- Mock controller (caps.disconnectStopsJob=false), abortJob fails → disconnect blocked, returns unsafe result.
+- GRBL controller (caps.disconnectStopsJob=true), job running, disconnect 鈫?current behavior, no extra abort step.
+- Mock controller (caps.disconnectStopsJob=false), job running, disconnect 鈫?assert abortJob is called BEFORE disconnect.
+- Mock controller (caps.disconnectStopsJob=false), abortJob fails 鈫?disconnect blocked, returns unsafe result.
 
 **Estimate:** ~1 session. Depends on T2-42 (safetyOps), T2-43 (capabilities), T2-41 (SafetyActionResult).
 
@@ -16919,13 +16897,13 @@ test('failed emergency stop transitions to unsafeUnknown and blocks subsequent c
 
 **Estimate:** ~2 sessions. Depends on T2-41, T2-42, T2-43, T2-44, T2-40, T1-18.
 
-**Priority:** Tier 3 — regression protection for the entire safety-architecture cluster (T2-41 through T2-46, T3-60). Refines T3-43.
+**Priority:** Tier 3 鈥?regression protection for the entire safety-architecture cluster (T2-41 through T2-46, T3-60). Refines T3-43.
 
 **Cross-check note (audit 3D):** Audit's P1 safety regression tests.
 
 ---
 
-### T3-62 | Ruida controller safety stub — design before implementation
+### T3-62 | Ruida controller safety stub 鈥?design before implementation
 
 **Code reference:** No current Ruida code. Audit 3D Required P1 asks for "design stub before real support."
 
@@ -16952,7 +16930,7 @@ This is **deferred future work**, not active implementation. Filed at Tier 3 wit
 
 **Estimate:** ~1 day for the design document. Future Ruida implementation: 4-8 weeks separately.
 
-**Priority:** Tier 3 — design documentation only. Implementation only happens if customer demand justifies it.
+**Priority:** Tier 3 鈥?design documentation only. Implementation only happens if customer demand justifies it.
 
 **Cross-check note (audit 3D):** Audit's section 3.3 + P1.
 
@@ -16960,13 +16938,13 @@ This is **deferred future work**, not active implementation. Filed at Tier 3 wit
 
 ### T3-63 | Fake WebSerial byte-stream harness with chunking realism
 
-**Code reference:** New `tests/harness/fakeWebSerial.ts`. Refines T3-54 (connection lifecycle test suite from audit 3B). Cross-check: `grep -rn WebSerialPort tests/` returns zero — current tests bypass `WebSerialPort` entirely by using `MockSerialPort`.
+**Code reference:** New `tests/harness/fakeWebSerial.ts`. Refines T3-54 (connection lifecycle test suite from audit 3B). Cross-check: `grep -rn WebSerialPort tests/` returns zero 鈥?current tests bypass `WebSerialPort` entirely by using `MockSerialPort`.
 
 **Problem:** Cross-check verified. Tests use `MockSerialPort` directly, never exercising the real `src/communication/WebSerialPort.ts` class. So `WebSerialPort._startReadLoop()` line assembly, reader cancellation, writer lock release, partial-line handling, and the interaction with browser `ReadableStream`/`WritableStream` semantics are untested.
 
 Audit's specific gaps verified:
 
-- Real serial arrives in arbitrary byte chunks: `<Id`, then `le|MPos:1.000,`, then `2.000,0.000|FS:0,0>\r\n` — line assembly must stitch them.
+- Real serial arrives in arbitrary byte chunks: `<Id`, then `le|MPos:1.000,`, then `2.000,0.000|FS:0,0>\r\n` 鈥?line assembly must stitch them.
 - `ok\r`, `\n` arriving as separate reads must produce one line, not two.
 - Multiple lines in one read (`<Idle|...>\r\nok\r\n`) must produce two events.
 - `reader.read()` returning `done: true` must fire close exactly once.
@@ -16994,7 +16972,7 @@ export class FakeSerialPort implements SerialPort {
   forget(): Promise<void>;
   getInfo(): SerialPortInfo;
 
-  // Test API — for controlling the fake from inside tests
+  // Test API 鈥?for controlling the fake from inside tests
   scheduleRead(bytes: Uint8Array, atVirtualMs: number): void;
   scheduleReaderError(message: string, atVirtualMs: number): void;
   scheduleReaderDone(atVirtualMs: number): void;
@@ -17043,10 +17021,10 @@ Pairs with the simulator framework (T2-48): the fake transport hooks reads/write
 **Problem:** Cross-check verified. Zero tests exist for the Electron-side serial subsystem. Open/close/drain/write all use real `serialport` module behavior. Audit's gaps:
 
 - `openSerial` failure leaves the global port in unknown state.
-- Second `openSerial` call closes first port — but no test verifies the close completes before reopening.
-- `safeCloseSerial` writes feed-hold + M5 S0 + drains — no test for any of those steps.
-- `writeSerialLine` rejects on closed port — untested.
-- App-quit `before-quit` calls `safeCloseSerial` — untested.
+- Second `openSerial` call closes first port 鈥?but no test verifies the close completes before reopening.
+- `safeCloseSerial` writes feed-hold + M5 S0 + drains 鈥?no test for any of those steps.
+- `writeSerialLine` rejects on closed port 鈥?untested.
+- App-quit `before-quit` calls `safeCloseSerial` 鈥?untested.
 
 T2-35 (Electron serial decision: complete or remove) is filed at Tier 2. T3-64 is the test harness needed if the decision is "complete it"; if the decision is "remove it," T3-64 becomes obsolete.
 
@@ -17130,7 +17108,7 @@ Audit lists Falcon HTTP endpoints that need fake responses:
 
 Plus WebSocket events: snapshots, printer state events, alarm events, malformed payloads, timeouts, disconnects, reconnects, delayed responses.
 
-Without a fake server, these can only be tested via real hardware — meaning regressions ship until a user reports them.
+Without a fake server, these can only be tested via real hardware 鈥?meaning regressions ship until a user reports them.
 
 **Identified by:** Audit 3E (2026-04-25, ChatGPT) section 3.4 + Critical 4 + Required P1 fake Falcon server.
 
@@ -17176,28 +17154,28 @@ test('Alarm event triggers UI alarm state', async () => { /* ... */ });
 
 Audit's full required test list (8 tests) becomes implementable.
 
-T2-30 (Falcon WiFi as real LaserController) depends on this infrastructure — without a fake server, the LaserController implementation can only be tested against real hardware, which makes development friction prohibitive.
+T2-30 (Falcon WiFi as real LaserController) depends on this infrastructure 鈥?without a fake server, the LaserController implementation can only be tested against real hardware, which makes development friction prohibitive.
 
 **Estimate:** ~3-4 sessions. HTTP server with scenarios ~1 session, WebSocket server ~1-2 sessions, scenario harness ~1 session.
 
-**Priority:** Tier 3. Required before T2-30 (Falcon WiFi controller) ships unless we accept "test only on hardware." Filed at T3 because T2-30 itself is at T2 — when T2-30 work begins, T3-65 should be promoted.
+**Priority:** Tier 3. Required before T2-30 (Falcon WiFi controller) ships unless we accept "test only on hardware." Filed at T3 because T2-30 itself is at T2 鈥?when T2-30 work begins, T3-65 should be promoted.
 
 **Cross-check note (audit 3E):** Audit's section 3.4 + Critical 4 + P1.
 
 ---
 
-### T3-66 | CI suite lane separation — unit / output / controller-sim / transport-sim / perf
+### T3-66 | CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf
 
 **Code reference:** Current `scripts/run-tests.mjs` runs all tests as one suite. Refines T2-22 (standardize test runner from audit 2F).
 
 **Problem:** Audit's Required P2: separate test categories so failures are identifiable. Currently all 119 (T1-47 makes it 120) test files run in one batch; a failure in `tests/preflight-bounds.test.ts` looks the same as a failure in `tests/streaming-health.test.ts` looks the same as a (future) failure in `tests/perf/large-raster.test.ts`.
 
 Audit's recommended lanes:
-- **unit** — fast, no external dependencies (most current tests)
-- **output / golden** — E2E G-code snapshot tests
-- **controller-sim** — tests using `SimulatedControllerDevice` (T2-47, T2-48)
-- **transport-sim** — tests using fake WebSerial / fake Electron serialport / fake Falcon server (T3-63, T3-64, T3-65)
-- **perf / stress** — large-job, memory-bounded, long-running (T3-40)
+- **unit** 鈥?fast, no external dependencies (most current tests)
+- **output / golden** 鈥?E2E G-code snapshot tests
+- **controller-sim** 鈥?tests using `SimulatedControllerDevice` (T2-47, T2-48)
+- **transport-sim** 鈥?tests using fake WebSerial / fake Electron serialport / fake Falcon server (T3-63, T3-64, T3-65)
+- **perf / stress** 鈥?large-job, memory-bounded, long-running (T3-40)
 
 Each lane runs as a CI job. Failure in one lane doesn't block triage of others. Performance lane runs with relaxed thresholds in CI (machine variance) and strict thresholds locally.
 
@@ -17217,13 +17195,13 @@ Tests declare their lane via filename convention (`tests/perf/*.test.ts`, `tests
 
 **Estimate:** ~1 session after T2-22 lands.
 
-**Priority:** Tier 3 — CI ergonomics. Quality-of-life for development workflow.
+**Priority:** Tier 3 鈥?CI ergonomics. Quality-of-life for development workflow.
 
 **Cross-check note (audit 3E):** Audit's P2.
 
 ---
 
-### T3-67 | Canonical bounds selectors — `selectSceneBounds`, `selectCompiledMachineBounds`
+### T3-67 | Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds`
 
 **Code reference:** Bounds are computed in multiple places: `App.tsx` `sceneBounds` useMemo, `ConnectionPanelMain.tsx` derives sceneBounds from props, `src/core/preflight/` recomputes object bounds, `PipelineService` recomputes plan bounds, scene objects cache `_bounds` on themselves.
 
@@ -17246,7 +17224,7 @@ export type BoundsMode =
   | 'visible'           // all rendered objects (excludes hidden layers)
   | 'output'            // objects on output layers only (compile target)
   | 'selected'          // currently selected objects
-  | 'all'               // includes locked, hidden, etc. — used for "fit all"
+  | 'all'               // includes locked, hidden, etc. 鈥?used for "fit all"
   ;
 
 export function selectSceneBounds(scene: Scene, mode: BoundsMode): AABB {
@@ -17375,7 +17353,7 @@ Stores call `transitionLog.emit(...)` on every meaningful state change. Bug repo
 
 **Estimate:** ~1-2 sessions. Most of the work is integrating the emit calls into the various stores.
 
-**Priority:** Tier 3 — debuggability. Pays back during incident investigation. Depends on T2-51, T2-52, T2-53 (the stores that emit transitions).
+**Priority:** Tier 3 鈥?debuggability. Pays back during incident investigation. Depends on T2-51, T2-52, T2-53 (the stores that emit transitions).
 
 **Cross-check note (audit 4A):** Audit's Debuggability section + Required Fix.
 
@@ -17391,29 +17369,29 @@ After setup, before the first real project, walk the user through:
 
 ```
 Run your first safe test
-─────────────────────────
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 1. Place scrap material on the bed
 2. Focus the laser to the material surface
 3. Jog the laser to where you want to test
 4. Click "Save origin here"
-5. Frame a 20 mm square — laser will trace the boundary with no power
+5. Frame a 20 mm square 鈥?laser will trace the boundary with no power
 6. If the frame outlines your material correctly, run a low-power test
-7. Confirm result — does the test mark show on your material?
+7. Confirm result 鈥?does the test mark show on your material?
 ```
 
-Each step has a "Done" button advancing to the next, plus help text and a "Skip — I know what I'm doing" link. This builds physical-machine confidence before users tackle their actual project.
+Each step has a "Done" button advancing to the next, plus help text and a "Skip 鈥?I know what I'm doing" link. This builds physical-machine confidence before users tackle their actual project.
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Section 3.1 + Priority 6.
 
 **Fix:** Build `FirstRunGuide` component that renders after WelcomeWizard completes. It uses real machine controls (jog, save origin, frame, low-power test fire) but presents them in a stepwise narrative with explicit content per step. The backing data is a small built-in scene (a 20mm square at the test origin) that the guide compiles internally without showing the canvas.
 
-User can exit to the main app at any step (the test scene is discarded). When they return to a fresh session, they're in the main app — the guide doesn't run again unless they ask.
+User can exit to the main app at any step (the test scene is discarded). When they return to a fresh session, they're in the main app 鈥?the guide doesn't run again unless they ask.
 
 **Tests:** Snapshot per step + integration test that runs the guide steps and asserts each mutation (origin saved, frame ran, test-fire fired) actually executed.
 
 **Estimate:** ~3-4 sessions. Step UI + content + integration with existing controls.
 
-**Priority:** Tier 3 — large UX investment. Depends on T2-58 (Ready-to-Run panel) for the test-fire / frame surface.
+**Priority:** Tier 3 鈥?large UX investment. Depends on T2-58 (Ready-to-Run panel) for the test-fire / frame surface.
 
 **Cross-check note (audit 4B):** Audit's Section 3.1 + Priority 6.
 
@@ -17430,18 +17408,7 @@ User can exit to the main app at any step (the test scene is discarded). When th
 **Fix:** Build a `JobLayoutMiniMap` SVG component that renders inside the ReadyToRunPanel (T2-58):
 
 ```
-┌─────────────────────┐
-│ Bed 400 × 400       │
-│  ┌─────┐            │
-│  │  ▒  │ ← Material │
-│  │ ▢   │            │
-│  │     │            │
-│  └─────┘            │
-│ ✦ ← Saved origin    │
-│ • ← Current head    │
-│ ▢ ← Job extent      │
-└─────────────────────┘
-```
+鈹屸攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?鈹?Bed 400 脳 400       鈹?鈹? 鈹屸攢鈹€鈹€鈹€鈹€鈹?           鈹?鈹? 鈹? 鈻? 鈹?鈫?Material 鈹?鈹? 鈹?鈻?  鈹?           鈹?鈹? 鈹?    鈹?           鈹?鈹? 鈹斺攢鈹€鈹€鈹€鈹€鈹?           鈹?鈹?鉁?鈫?Saved origin    鈹?鈹?鈥?鈫?Current head    鈹?鈹?鈻?鈫?Job extent      鈹?鈹斺攢鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹?```
 
 Symbols:
 - Bed rectangle (full machine bed)
@@ -17453,13 +17420,13 @@ Symbols:
 
 When the user selects a different start mode, the diagram updates: the relationship between job extent and the chosen reference point changes visually.
 
-For origin corner (T1-60 / T2-58 surfaces this in the header), the diagram can also indicate which corner of the bed is X=0 Y=0 — a small "0,0" label in the bed corner matching the active profile's `originCorner`.
+For origin corner (T1-60 / T2-58 surfaces this in the header), the diagram can also indicate which corner of the bed is X=0 Y=0 鈥?a small "0,0" label in the bed corner matching the active profile's `originCorner`.
 
-**Tests:** Snapshot tests per (start mode × origin corner × job extent) combination.
+**Tests:** Snapshot tests per (start mode 脳 origin corner 脳 job extent) combination.
 
 **Estimate:** ~2-3 sessions. SVG layout math + mode integrations + tests.
 
-**Priority:** Tier 3 — depends on T2-58.
+**Priority:** Tier 3 鈥?depends on T2-58.
 
 **Cross-check note (audit 4B):** Audit's Section 3.2 + Section 8 + Priority 4 mini diagrams.
 
@@ -17477,16 +17444,16 @@ For origin corner (T1-60 / T2-58 surfaces this in the header), the diagram can a
 
 ```
 Browser check
-─────────────
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 You're using Firefox 121.
 
 LaserForge requires Web Serial to connect to your laser. Web Serial
 is supported in:
-  ✓ Chrome 89+
-  ✓ Edge 89+
-  ✓ Opera 75+
-  ✗ Firefox (not supported)
-  ✗ Safari (not supported)
+  鉁?Chrome 89+
+  鉁?Edge 89+
+  鉁?Opera 75+
+  鉁?Firefox (not supported)
+  鉁?Safari (not supported)
 
 To use LaserForge with a real machine, please open it in Chrome or Edge.
 You can continue here in simulator mode if you'd like to explore.
@@ -17498,12 +17465,12 @@ For Chrome/Edge, also surface USB cable + browser-permission expectations:
 
 ```
 Connecting your laser
-─────────────────────
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 1. Connect USB cable from machine to computer
 2. Power on the machine
 3. Close any other software that might be using the serial port
    (LightBurn, LaserGRBL, Cura, etc.)
-4. Click Connect — the browser will ask permission to access the serial port
+4. Click Connect 鈥?the browser will ask permission to access the serial port
 5. Choose your laser's port from the popup
 ```
 
@@ -17513,7 +17480,7 @@ This appears as a one-time pre-connect dialog (skippable for users who've connec
 
 **Estimate:** ~1-2 sessions. Detection + content + UX integration.
 
-**Priority:** Tier 3 — first-run UX win. Reduces "won't connect" support load.
+**Priority:** Tier 3 鈥?first-run UX win. Reduces "won't connect" support load.
 
 **Cross-check note (audit 4B):** Audit's Section 3.4.
 
@@ -17531,7 +17498,7 @@ This appears as a one-time pre-connect dialog (skippable for users who've connec
 
 ```
 Job complexity
-──────────────
+鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 Commands:        18,420
 Estimated time:  22:15
 Raster:          300 DPI equivalent
@@ -17540,7 +17507,7 @@ Travel distance: 12.4 m
 Burn distance:   8.2 m
 Complexity:      High
 
-⚠ This raster job is very dense. Reducing fill spacing to 0.1mm
+鈿?This raster job is very dense. Reducing fill spacing to 0.1mm
   cuts time roughly in half. [Open layer settings]
 ```
 
@@ -17550,23 +17517,23 @@ Categories:
 - **Raster:** if any raster layers, equivalent DPI based on fill spacing
 - **Fill spacing:** smallest fill interval across raster layers
 - **Travel/burn distance:** sum of G0 / G1 distances (already computable from compile result)
-- **Complexity:** Low/Medium/High based on commands × estimated time × raster density
+- **Complexity:** Low/Medium/High based on commands 脳 estimated time 脳 raster density
 
 Warnings appear contextually:
-- Very dense raster → "Consider increasing line spacing"
-- Very long job → "Consider running in segments"
-- Very high command count → "Compile may be slow on lower-end machines"
+- Very dense raster 鈫?"Consider increasing line spacing"
+- Very long job 鈫?"Consider running in segments"
+- Very high command count 鈫?"Compile may be slow on lower-end machines"
 
 These don't block Start (T1-45 is the actual gate); they inform.
 
 **Tests:** `tests/job-complexity-summary.test.ts`:
-- Sparse vector job → complexity=Low, no warnings.
-- Dense raster → complexity=High + raster warning.
-- Mixed → complexity=Medium based on dominant factor.
+- Sparse vector job 鈫?complexity=Low, no warnings.
+- Dense raster 鈫?complexity=High + raster warning.
+- Mixed 鈫?complexity=Medium based on dominant factor.
 
 **Estimate:** ~1-2 sessions. Complexity heuristic + UI integration + tests.
 
-**Priority:** Tier 3 — informational UX improvement. Depends on T2-58.
+**Priority:** Tier 3 鈥?informational UX improvement. Depends on T2-58.
 
 **Cross-check note (audit 4B):** Audit's Priority 10 + Section 13.
 
@@ -17574,7 +17541,7 @@ These don't block Start (T1-45 is the actual gate); they inform.
 
 ### T3-73 | `FrameResult.reason` expansion to specific failure types
 
-**Code reference:** `src/app/ExecutionCoordinator.ts:25-28` — current `reason?: 'no-controller' | 'idle-timeout'`. T1-65 adds `'command-failed'`; T3-73 fills the rest.
+**Code reference:** `src/app/ExecutionCoordinator.ts:25-28` 鈥?current `reason?: 'no-controller' | 'idle-timeout'`. T1-65 adds `'command-failed'`; T3-73 fills the rest.
 
 **Problem:** Audit 4C Required Priority 8: frame failure has multiple distinct causes that map to different recovery actions:
 
@@ -17585,7 +17552,7 @@ These don't block Start (T1-45 is the actual gate); they inform.
 | `command-failed` (T1-65) | A specific frame command was rejected | Check command classifier rules / machine state |
 | `machine-alarm` | Machine entered alarm during frame | Recovery card: alarm |
 | `disconnected` | Connection lost during frame | Recovery card: disconnect |
-| `cancelled` | User cancelled frame mid-flight | No special recovery — try again |
+| `cancelled` | User cancelled frame mid-flight | No special recovery 鈥?try again |
 | `unknown` | Catchall | Show diagnostic info |
 
 T1-65 ships the most-impactful new reason (command-failed). T3-73 fills the rest so each gets specific UI + recovery copy.
@@ -17635,13 +17602,13 @@ function frameFailureMessage(reason: FrameResult['reason']): { title, message, r
 
 **Estimate:** ~1 session. Type expansion + 4 new detection paths + UI mapping + tests.
 
-**Priority:** Tier 3 — refines T1-65 with full taxonomy. Depends on T2-17 (AbortSignal for cancellation reason).
+**Priority:** Tier 3 鈥?refines T1-65 with full taxonomy. Depends on T2-17 (AbortSignal for cancellation reason).
 
 **Cross-check note (audit 4C):** Audit's Priority 8.
 
 ---
 
-### T3-74 | Structured log events with severity, domain, recovery — replace string-based message log
+### T3-74 | Structured log events with severity, domain, recovery 鈥?replace string-based message log
 
 **Code reference:** Currently `appendMessage(string)` is the only message API. Refines T2-65 (reportError) with a richer event format for the log itself.
 
@@ -17661,23 +17628,23 @@ After T2-65 lands with `UserFacingError` shape, the message log can consume the 
 Log UI gets filters and detail expansion:
 
 ```
-[All ▾] [Machine ▾] [Severity ≥ warning ▾]
+[All 鈻綸 [Machine 鈻綸 [Severity 鈮?warning 鈻綸
 
-⚠ 14:32:18  machine/error    Frame failed
+鈿?14:32:18  machine/error    Frame failed
                               Command G1 X100 was blocked.
-                              ▸ Recovery   ▸ Details
+                              鈻?Recovery   鈻?Details
 
-ℹ 14:30:05  job/info          Job started: 1850 commands
+鈩?14:30:05  job/info          Job started: 1850 commands
 
-✓ 14:29:42  connection/info   Real laser connected via USB
+鉁?14:29:42  connection/info   Real laser connected via USB
 
-⚠ 14:28:11  machine/warning   Status query timed out twice
+鈿?14:28:11  machine/warning   Status query timed out twice
                               Streaming health: degraded
 ```
 
 Each entry shows time + domain/severity badge + title. Click expands to show full message + recovery + (in advanced mode) developer details.
 
-Filter chips persist across sessions — power users can pin "Machine errors only" as their default view.
+Filter chips persist across sessions 鈥?power users can pin "Machine errors only" as their default view.
 
 **Tests:** `tests/structured-log-events.test.ts`:
 - Filtering by domain returns subset.
@@ -17687,7 +17654,7 @@ Filter chips persist across sessions — power users can pin "Machine errors onl
 
 **Estimate:** ~2-3 sessions. Log UI refactor + filter chips + persistence + tests.
 
-**Priority:** Tier 3 — UX/diagnostic improvement. Depends on T2-65 (reportError) for the underlying event shape. Pairs with T3-68 (transition log) — they're related but different audiences (transition log is developer/incident-investigation; message log is user-facing).
+**Priority:** Tier 3 鈥?UX/diagnostic improvement. Depends on T2-65 (reportError) for the underlying event shape. Pairs with T3-68 (transition log) 鈥?they're related but different audiences (transition log is developer/incident-investigation; message log is user-facing).
 
 **Cross-check note (audit 4C):** Audit's Logging 4 + Priority 1 detail.
 
@@ -17699,7 +17666,7 @@ Filter chips persist across sessions — power users can pin "Machine errors onl
 
 **Problem:** Audit 4D Required Priority 10: a project may reference an image stored in IndexedDB. If the image store data was cleared (browser cleared site data, IndexedDB corruption, manual user action), the project loads with image objects pointing nowhere. Render/compile fails far from the load site.
 
-Manual save (`saveSceneToFile`) embeds IndexedDB images as data URIs to make exported files portable — this is good. But:
+Manual save (`saveSceneToFile`) embeds IndexedDB images as data URIs to make exported files portable 鈥?this is good. But:
 - Autosave keeps `indexeddb://` references for compactness.
 - Loaded projects from the local autosave path can have unresolvable references.
 
@@ -17720,7 +17687,7 @@ async function validateImageReferences(scene: Scene): Promise<ImageValidationRes
       if (!exists) missing.push(obj.id);
     }
     // data: URIs are inline, always resolvable
-    // http(s): URIs are external — could fetch-check, but typically don't on load
+    // http(s): URIs are external 鈥?could fetch-check, but typically don't on load
   }
   return { missing };
 }
@@ -17731,18 +17698,18 @@ If any missing, surface as a repair report entry (T2-74):
 ```
 This project references images that could not be found:
 
-▸ 2 image objects (Layer "Photos") have missing source data.
+鈻?2 image objects (Layer "Photos") have missing source data.
   These objects will appear empty until you re-import the images.
 
 [Got it]   [Show me which objects]
 ```
 
-The objects load — they just render as placeholder rectangles with a "missing" indicator. User can see what's missing and re-import.
+The objects load 鈥?they just render as placeholder rectangles with a "missing" indicator. User can see what's missing and re-import.
 
 **Tests:** `tests/image-reference-validation.test.ts`:
-- Project with valid `indexeddb://` ref (image present) → no missing.
-- Project with `indexeddb://` ref to deleted image → reported as missing.
-- Project with `data:` URI → never reported as missing.
+- Project with valid `indexeddb://` ref (image present) 鈫?no missing.
+- Project with `indexeddb://` ref to deleted image 鈫?reported as missing.
+- Project with `data:` URI 鈫?never reported as missing.
 
 **Estimate:** ~1 session. Validation + UI integration into repair report + tests.
 
@@ -17807,12 +17774,12 @@ async function parseSceneFile(file: File): Promise<Scene> {
 }
 ```
 
-This is a larger task (Worker setup, message protocol, fallback if worker fails) — could ship in stages.
+This is a larger task (Worker setup, message protocol, fallback if worker fails) 鈥?could ship in stages.
 
 **Tests:** `tests/large-project-handling.test.ts`:
-- 60 MB scene → save warns user.
-- File loaded < 5 MB → main thread.
-- File loaded > 5 MB → worker (when worker path is implemented).
+- 60 MB scene 鈫?save warns user.
+- File loaded < 5 MB 鈫?main thread.
+- File loaded > 5 MB 鈫?worker (when worker path is implemented).
 
 **Estimate:** ~2-3 sessions. Size estimation + warnings (~30 min). Worker parsing (~2 sessions).
 
@@ -17869,9 +17836,9 @@ async function validateChecksum(file: SceneFile): Promise<ChecksumResult> {
 ```
 
 On load:
-- `'match'` → proceed silently.
-- `'no-checksum'` → proceed (legacy file, can't verify).
-- `'mismatch'` → show warning and offer choices:
+- `'match'` 鈫?proceed silently.
+- `'no-checksum'` 鈫?proceed (legacy file, can't verify).
+- `'mismatch'` 鈫?show warning and offer choices:
 
 ```
 File integrity check failed
@@ -17883,7 +17850,7 @@ The project file's checksum does not match its contents. This usually means:
 
 You can still try to load it, but the project may behave unexpectedly.
 
-[Try to load anyway]   [Cancel — don't load this file]
+[Try to load anyway]   [Cancel 鈥?don't load this file]
 ```
 
 Same logic for autosave records (T2-69 already includes `checksum` field).
@@ -17891,9 +17858,9 @@ Same logic for autosave records (T2-69 already includes `checksum` field).
 `canonicalJson` is a stable JSON serialization that produces the same bytes for the same logical object regardless of property insertion order. Standard libraries exist; pick one or write a small one.
 
 **Tests:** `tests/checksum-validation.test.ts`:
-- Round-trip save+load → checksum matches.
-- Tamper with one byte of scene → mismatch detected.
-- Legacy file without checksum → loads with warning.
+- Round-trip save+load 鈫?checksum matches.
+- Tamper with one byte of scene 鈫?mismatch detected.
+- Legacy file without checksum 鈫?loads with warning.
 
 **Estimate:** ~1-2 sessions. Hash function + canonical JSON + integration + tests.
 
@@ -17953,7 +17920,7 @@ Some scenarios (large raster, many objects) overlap with T3-40 (general perf/str
 
 **Estimate:** ~2 sessions for the cross-cutting tests + verification that per-feature tests are present. Most of the work is done by individual tickets (T1-68 through T3-77).
 
-**Priority:** Tier 3 — regression protection for the entire persistence cluster.
+**Priority:** Tier 3 鈥?regression protection for the entire persistence cluster.
 
 **Cross-check note (audit 4D):** Audit's Priority 12. Refines T3-40.
 
@@ -17969,7 +17936,7 @@ Some scenarios (large raster, many objects) overlap with T3-40 (general perf/str
 - Selection not restored after group/ungroup undo
 - Paste parentId remapping creating references to generated IDs that aren't actual group objects
 
-T2-74 (load repair report) silently clears broken parentIds at SceneSerializer.ts:299-301 — that's correct on load, but doesn't address the in-session creation of broken parent links via undo/redo across group operations.
+T2-74 (load repair report) silently clears broken parentIds at SceneSerializer.ts:299-301 鈥?that's correct on load, but doesn't address the in-session creation of broken parent links via undo/redo across group operations.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Import/delete/group findings + group risk section.
 
@@ -18011,18 +17978,18 @@ The integrity invariants enforced after every group/ungroup:
 2. Every object referenced as a parent is itself a group-type object.
 3. No parent cycles (A.parentId = B, B.parentId = A).
 
-A `validateParentGraph(scene)` function runs after group/ungroup and returns a list of violations. For T3-79, violations are repaired automatically (orphan → null parent) and reported to the developer console; a follow-up could surface to user via T2-74's load repair report.
+A `validateParentGraph(scene)` function runs after group/ungroup and returns a list of violations. For T3-79, violations are repaired automatically (orphan 鈫?null parent) and reported to the developer console; a follow-up could surface to user via T2-74's load repair report.
 
 Selection restore (via T2-79) covers:
-- Undo group → original objects selected, group gone
-- Redo group → group selected, children's selection cleared (they're "inside" the group)
-- Undo ungroup → group selected, children re-attached
-- Redo ungroup → previously-grouped objects all selected
+- Undo group 鈫?original objects selected, group gone
+- Redo group 鈫?group selected, children's selection cleared (they're "inside" the group)
+- Undo ungroup 鈫?group selected, children re-attached
+- Redo ungroup 鈫?previously-grouped objects all selected
 
 **Tests:** `tests/group-ungroup-integrity.test.ts`:
-- Group 3 objects → parentIds set, group object created.
-- Ungroup → parentIds cleared, group removed.
-- Group → undo → redo → group restored exactly.
+- Group 3 objects 鈫?parentIds set, group object created.
+- Ungroup 鈫?parentIds cleared, group removed.
+- Group 鈫?undo 鈫?redo 鈫?group restored exactly.
 - Pathological case: nested groups, undo intermediate level, verify no orphans.
 
 **Estimate:** ~1-2 sessions. Operations + integrity validation + tests.
@@ -18033,11 +18000,11 @@ Selection restore (via T2-79) covers:
 
 ---
 
-### T3-80 | Test suite for undo / redo correctness — 15+ scenarios from audit Priority 14
+### T3-80 | Test suite for undo / redo correctness 鈥?15+ scenarios from audit Priority 14
 
-**Code reference:** Tests scattered across `tests/` — basic history mechanics covered (push/undo/redo/truncation), specific correctness scenarios from audit 4E Priority 14 not all covered.
+**Code reference:** Tests scattered across `tests/` 鈥?basic history mechanics covered (push/undo/redo/truncation), specific correctness scenarios from audit 4E Priority 14 not all covered.
 
-**Problem:** Audit 4E Required Priority 14 lists 15 specific scenarios that should have direct tests. Most overlap with individual tickets (T1-73 ships its own dirty-mark test, T1-74 ships text-property test, T2-77 ships async-guard test, etc.) — but the cross-cutting suite that ensures these correctness properties remain true together over time is its own asset.
+**Problem:** Audit 4E Required Priority 14 lists 15 specific scenarios that should have direct tests. Most overlap with individual tickets (T1-73 ships its own dirty-mark test, T1-74 ships text-property test, T2-77 ships async-guard test, etc.) 鈥?but the cross-cutting suite that ensures these correctness properties remain true together over time is its own asset.
 
 **Identified by:** Audit 4E (2026-04-26, ChatGPT) Required Priority 14.
 
@@ -18062,7 +18029,7 @@ tests/undo-redo-correctness/
   history-memory-budget-image-heavy.test.ts  (covers T2-81 + T2-82)
 ```
 
-Some scenarios are already covered by individual ticket tests; T3-80's role is the cross-cutting INTEGRATION suite that spins up the full App, runs realistic user sequences, and verifies the end-to-end correctness — not just the unit-level behavior of individual ticket fixes.
+Some scenarios are already covered by individual ticket tests; T3-80's role is the cross-cutting INTEGRATION suite that spins up the full App, runs realistic user sequences, and verifies the end-to-end correctness 鈥?not just the unit-level behavior of individual ticket fixes.
 
 For example: the unit test for T1-75 mocks the compile manager and asserts `setGcodeStale(true)` is called. T3-80's integration test loads a scene, runs an actual compile, calls actual undo, and then asserts the actual gcodeStale state in the actual hook return value. Different assurance level.
 
@@ -18070,7 +18037,7 @@ For example: the unit test for T1-75 mocks the compile manager and asserts `setG
 
 **Estimate:** ~2-3 sessions. ~15 integration tests + setup boilerplate.
 
-**Priority:** Tier 3. Regression protection for the undo/redo cluster — ships AFTER T1-73 through T2-83 land.
+**Priority:** Tier 3. Regression protection for the undo/redo cluster 鈥?ships AFTER T1-73 through T2-83 land.
 
 **Cross-check note (audit 4E):** Audit's Priority 14.
 
@@ -18159,19 +18126,19 @@ tests/end-to-end-workflows/
     Assert: warning dialog with snapshot vs current diff.
 ```
 
-These are integration tests — they spin up the App with a controlled environment (mock controller, mock storage), drive user actions, and assert end-state correctness across subsystems.
+These are integration tests 鈥?they spin up the App with a controlled environment (mock controller, mock storage), drive user actions, and assert end-state correctness across subsystems.
 
 T3-78 and T3-80 are unit-level tests for individual tickets. T3-81 is the cross-cutting workflow suite that protects against composition regressions.
 
 **Estimate:** ~3-4 sessions for the 12 scenarios + harness/mock setup.
 
-**Priority:** Tier 3. Ships AFTER all the relevant subsystem tickets land — this is the regression net for the entire 4-series cleanup.
+**Priority:** Tier 3. Ships AFTER all the relevant subsystem tickets land 鈥?this is the regression net for the entire 4-series cleanup.
 
 **Cross-check note (audit 4F):** Audit's Priority 13.
 
 ---
 
-### T3-82 | Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements
+### T3-82 | Production bundle smoke tests 鈥?no tester secret, no dev unlock, no mock entitlements
 
 **Code reference:** No tests exist today. Refines T1-81 (CI check) with broader coverage.
 
@@ -18223,7 +18190,7 @@ for (const file of distFiles.filter(f => f.endsWith('.js'))) {
 }
 ```
 
-The test suite runs as part of `npm run build:verify` — the same step T1-81 wires into the build pipeline.
+The test suite runs as part of `npm run build:verify` 鈥?the same step T1-81 wires into the build pipeline.
 
 **Estimate:** ~1 session. Test setup + initial pattern list + CI integration.
 
@@ -18233,7 +18200,7 @@ The test suite runs as part of `npm run build:verify` — the same step T1-81 wi
 
 ---
 
-### T3-83 | Tamper-resistance test suite — cache edit / monkey-patch / clock rollback
+### T3-83 | Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback
 
 **Code reference:** Tests exercising bypass attempts. No equivalent today.
 
@@ -18246,7 +18213,7 @@ The test suite runs as part of `npm run build:verify` — the same step T1-81 wi
 ```ts
 // tests/entitlement-tamper-resistance/forged-cache.test.ts
 test('forged cache JSON does not unlock Pro', async () => {
-  // Without T2-90 (signed tokens) — this test will fail until T2-90 ships.
+  // Without T2-90 (signed tokens) 鈥?this test will fail until T2-90 ships.
   // Marked .skip until then, then enabled to lock in the protection.
   await getStorage().set(LICENSE_CACHE_KEY, JSON.stringify({
     code: 'FAKE',
@@ -18266,7 +18233,7 @@ test('rolling system clock back does not extend offline grace', async () => {
 
 // tests/entitlement-tamper-resistance/no-default-tester-secret.test.ts
 test('default tester secret is not present and tester verification fails when env not set', async () => {
-  // After T1-77: VITE_TESTER_HMAC_SECRET unset → all tester keys fail
+  // After T1-77: VITE_TESTER_HMAC_SECRET unset 鈫?all tester keys fail
   delete process.env.VITE_TESTER_HMAC_SECRET;
   const result = await verifyTesterCode('TF-X-12345678');
   expect(result).toBe(false);
@@ -18295,30 +18262,29 @@ test('tampering with entitlementService.state does not affect compiler enforceme
   // Attempt monkey-patch
   (entitlementService as any).state = { tier: 'paid', hasPro: true };
   // Compiler stripping still respects the original token (would fail without T2-90 signed tokens)
-  // This test partially demonstrates the LIMIT of client-side enforcement —
-  // ultimate protection requires server-side gates for premium output (cloud render, etc.).
+  // This test partially demonstrates the LIMIT of client-side enforcement 鈥?  // ultimate protection requires server-side gates for premium output (cloud render, etc.).
 });
 ```
 
 The test suite documents both:
 1. What's protected (after T1-77 through T2-97 land).
-2. What's NOT protected and never will be (client-side enforcement of high-value features in a JS app — fundamentally limited).
+2. What's NOT protected and never will be (client-side enforcement of high-value features in a JS app 鈥?fundamentally limited).
 
 The "what's not protected" section is important: it helps future engineers understand WHY certain Pro features should move server-side (cloud nesting, enterprise reporting, etc.) rather than trying to enforce them more strongly client-side.
 
 **Estimate:** ~2 sessions. Test infrastructure + scenarios.
 
-**Priority:** Tier 3. Ships incrementally as protections land — each new ticket (T1-77, T1-79, T2-90, T2-94, etc.) enables more tests in this suite.
+**Priority:** Tier 3. Ships incrementally as protections land 鈥?each new ticket (T1-77, T1-79, T2-90, T2-94, etc.) enables more tests in this suite.
 
 **Cross-check note (audit 5A):** Audit's Required tests + Tamper resistance.
 
 ---
 
-### T3-84 | Linux packaging — AppImage / .deb / .rpm (if business decides to support Linux)
+### T3-84 | Linux packaging 鈥?AppImage / .deb / .rpm (if business decides to support Linux)
 
 **Code reference:** `package.json` "build" section has no `linux` block. Audit confirmed.
 
-**Problem:** Audit 5B Packaging gap — Linux is not configured. The maker community for laser cutters has a meaningful Linux user base, especially among tinkerers and OSS-friendly users. But supporting Linux adds CI cost, support surface, and dependency complexity.
+**Problem:** Audit 5B Packaging gap 鈥?Linux is not configured. The maker community for laser cutters has a meaningful Linux user base, especially among tinkerers and OSS-friendly users. But supporting Linux adds CI cost, support surface, and dependency complexity.
 
 This is a **business decision**, not an engineering urgency. T3-84 tracks the work IF the decision is to support Linux.
 
@@ -18357,13 +18323,13 @@ build-linux:
 
 **Estimate:** ~1-2 sessions including udev guidance + Linux runner setup.
 
-**Priority:** Tier 3 — defer until business decides. If Linux is dropped, mark this ticket "won't fix" with clear reason.
+**Priority:** Tier 3 鈥?defer until business decides. If Linux is dropped, mark this ticket "won't fix" with clear reason.
 
 **Cross-check note (audit 5B):** Audit's Packaging gap.
 
 ---
 
-### T3-85 | Installer QA matrix — Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths
+### T3-85 | Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths
 
 **Code reference:** No installer QA process exists today.
 
@@ -18381,7 +18347,7 @@ build-linux:
 | Windows 11 | Upgrade install over previous version | User data preserved |
 | Windows 11 | Uninstall / reinstall | Clean slate works |
 | Windows 11 | Path with spaces (e.g. C:\Users\John Smith\Apps) | Path handling |
-| Windows 11 | Path with unicode (e.g. C:\Users\Жанн\Apps) | Encoding |
+| Windows 11 | Path with unicode (e.g. C:\Users\袞邪薪薪\Apps) | Encoding |
 | macOS 14 Intel | Fresh install | x64 build works |
 | macOS 14 ARM | Fresh install | ARM build works (or universal) |
 | macOS 14 ARM | Gatekeeper unsigned-app warning shown clearly | Until T2-100 lands; expected |
@@ -18395,17 +18361,17 @@ A subset can be automated as smoke tests (T3-86 covers the launch-and-load path)
 
 **Estimate:** ~1-2 days of manual QA per release initially. Some scenarios (unicode paths, restricted user) need VMs; others can be done on the build engineer's machine.
 
-**Priority:** Tier 3 — release-time QA process. Should exist before the first paid release.
+**Priority:** Tier 3 鈥?release-time QA process. Should exist before the first paid release.
 
 **Cross-check note (audit 5B):** Audit's Priority 15.
 
 ---
 
-### T3-86 | Native module packaging smoke test — packaged app launches + serialport loads + storage works
+### T3-86 | Native module packaging smoke test 鈥?packaged app launches + serialport loads + storage works
 
 **Code reference:** No packaged-app smoke tests exist.
 
-**Problem:** Audit 5B Required Priority 2 + Critical failure 3: native serialport packaging needs to be PROVEN working in CI. Today nothing automatically catches an ABI mismatch or missing prebuilds — a release can ship that crashes on first connection attempt.
+**Problem:** Audit 5B Required Priority 2 + Critical failure 3: native serialport packaging needs to be PROVEN working in CI. Today nothing automatically catches an ABI mismatch or missing prebuilds 鈥?a release can ship that crashes on first connection attempt.
 
 **Identified by:** Audit 5B (2026-04-26, ChatGPT) Critical 3 + Priority 2.
 
@@ -18443,11 +18409,11 @@ async function smokeTest() {
   // 4. App closes cleanly
   await app.close();
 
-  console.log('✓ Packaged app smoke test passed');
+  console.log('鉁?Packaged app smoke test passed');
 }
 
 smokeTest().catch(err => {
-  console.error('✗ Packaged app smoke test failed:', err);
+  console.error('鉁?Packaged app smoke test failed:', err);
   process.exit(1);
 });
 ```
@@ -18474,7 +18440,7 @@ If serialport fails to load with an ABI error, this test fails CI before the ins
 
 ---
 
-### T3-87 | Log retention policy — per-domain caps, failed-job pinning, optional compression
+### T3-87 | Log retention policy 鈥?per-domain caps, failed-job pinning, optional compression
 
 **Code reference:** Currently retention is `MAX_RETAINED_LOGS = 5` (JobLog.ts:57) and `MAX_RETAINED_REPLAYS = 20` (JobReplay.ts:124). No domain-aware policy, no failed-job pinning, no compression.
 
@@ -18555,8 +18521,8 @@ import { gzip, gunzip } from 'zlib';
 Compression is opt-in via flag in the stored record, so old uncompressed logs continue to work.
 
 **Tests:** `tests/retention-policy.test.ts`:
-- 100 successful jobs + 1 failed → after retention, failed kept regardless of age.
-- 30+ day-old failed job → eventually pruned.
+- 100 successful jobs + 1 failed 鈫?after retention, failed kept regardless of age.
+- 30+ day-old failed job 鈫?eventually pruned.
 - Compression round-trip preserves entries.
 
 **Estimate:** ~1-2 sessions. Policy + bucket logic + compression + tests.
@@ -18567,7 +18533,7 @@ Compression is opt-in via flag in the stored record, so old uncompressed logs co
 
 ---
 
-### T3-88 | IPC fuzz test suite — every handler tested with malformed and oversized inputs
+### T3-88 | IPC fuzz test suite 鈥?every handler tested with malformed and oversized inputs
 
 **Code reference:** No IPC fuzz tests today. The unit tests cover happy paths.
 
@@ -18591,7 +18557,7 @@ const FUZZ_INPUTS = [
   '<script>alert(1)</script>',        // XSS
   '\r\n\r\nM3 S1000',                 // injection
   { __proto__: { polluted: true } },  // prototype pollution
-  '🚀'.repeat(100),                   // unicode
+  '馃殌'.repeat(100),                   // unicode
   'M3 S1000',                          // dangerous command
   '$RST=*',                            // dangerous command
   'a'.repeat(128),                     // boundary length
@@ -18625,15 +18591,15 @@ describe('IPC fuzz test suite', () => {
 });
 ```
 
-The assertion is "doesn't throw an internal error and doesn't corrupt state" — friendly errors are fine.
+The assertion is "doesn't throw an internal error and doesn't corrupt state" 鈥?friendly errors are fine.
 
-This is a recurring CI test, not a one-time audit. As new IPC handlers are added (and they will be — T2-120 alone adds many), they get added to `IPC_HANDLERS` and run against the corpus.
+This is a recurring CI test, not a one-time audit. As new IPC handlers are added (and they will be 鈥?T2-120 alone adds many), they get added to `IPC_HANDLERS` and run against the corpus.
 
 **Tests:** itself a test suite. Runs as part of CI.
 
 **Estimate:** ~2-3 sessions for harness + corpus + initial coverage.
 
-**Priority:** Tier 3. Foundational quality — pays off across all future security work.
+**Priority:** Tier 3. Foundational quality 鈥?pays off across all future security work.
 
 **Cross-check note (audit 5D):** Audit's Required tests.
 
@@ -18676,7 +18642,7 @@ jobs:
         run: |
           ! grep -r "DEFAULT_TESTER_HMAC_SECRET\|laserforge-dev-secret" dist/
 
-      - name: Check production CSP has no unsafe-eval (T2-107 — once fixed)
+      - name: Check production CSP has no unsafe-eval (T2-107 鈥?once fixed)
         run: |
           ! grep -E "unsafe-eval" dist-electron/main.js
 
@@ -18714,7 +18680,7 @@ jobs:
 
 Each check is a small grep or node script. Failures fail CI before release.
 
-The check list grows as security tickets land — when T1-89 (sandbox) ships, the sandbox check is added. When T2-107 (CSP) ships, the unsafe-eval check is enabled. When T1-77 ships, the tester secret check goes in.
+The check list grows as security tickets land 鈥?when T1-89 (sandbox) ships, the sandbox check is added. When T2-107 (CSP) ships, the unsafe-eval check is enabled. When T1-77 ships, the tester secret check goes in.
 
 **Tests:** itself a check.
 
@@ -18726,7 +18692,7 @@ The check list grows as security tickets land — when T1-89 (sandbox) ships, th
 
 ---
 
-## Tier 4 — Later
+## Tier 4 鈥?Later
 
 ### T4-1 | Starter material preset library
 
@@ -18746,7 +18712,7 @@ Kerf compensation exists in the pipeline math. No UI to set or apply it. Add a p
 
 ### T4-3 | Inline coaching
 
-Teach-while-you-work messages. Example: user imports a 3000px PNG at 10mm width, coaching panel says "Image is 300 DPI at this size. Engrave interval set to 0.1mm will produce ~254 DPI output — oversampling by 15%."
+Teach-while-you-work messages. Example: user imports a 3000px PNG at 10mm width, coaching panel says "Image is 300 DPI at this size. Engrave interval set to 0.1mm will produce ~254 DPI output 鈥?oversampling by 15%."
 
 **Priority:** Tier 4.
 
@@ -18768,17 +18734,17 @@ Flag uncertainty in material recommendations. "This setting has been validated o
 
 ---
 
-### T4-6 | D.13 Phase 2 — material calibration
+### T4-6 | D.13 Phase 2 鈥?material calibration
 
-Phase 1 (photo-driven calibration → response curve) is shipped. Phase 2 could extend to: multi-pass depth calibration, feedrate sweeps, corner-burn compensation validation.
+Phase 1 (photo-driven calibration 鈫?response curve) is shipped. Phase 2 could extend to: multi-pass depth calibration, feedrate sweeps, corner-burn compensation validation.
 
 **Priority:** Tier 4.
 
 ---
 
-### T4-7 | Second controller — Marlin
+### T4-7 | Second controller 鈥?Marlin
 
-If T2-7 exposed the abstraction holes, actually shipping a Marlin controller is the follow-through. Or Ruida, or Galvo — pick based on target user.
+If T2-7 exposed the abstraction holes, actually shipping a Marlin controller is the follow-through. Or Ruida, or Galvo 鈥?pick based on target user.
 
 **Priority:** Tier 4.
 
@@ -18800,7 +18766,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 
 ---
 
-## Tracking — summary checklist
+## Tracking 鈥?summary checklist
 
 ### Tier 0 (Today)
 - [ ] T0-1 Delete comment-stripping in start-job path
@@ -18819,63 +18785,63 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-8 Acceleration-aware power sanity bounds
 - [ ] T1-9 Bed-dim resolver sweep / test
 - [ ] T1-10 Wake lock during active jobs (prevent OS suspend)
-- [x] T1-11 Canvas ↔ machine coordinate mismatch during active job (shipped + hardware-verified)
+- [x] T1-11 Canvas 鈫?machine coordinate mismatch during active job (shipped + hardware-verified)
 - [x] T1-12 Preflight effect max-update-depth (shipped; homing dep follow-up pending)
 - [x] T1-13 Double power attenuation in M4 raster mode (shipped + hardware-verified)
 - [x] T1-14 Max-update-depth crashes during fast vector resize (shipped + hardware-verified)
 - [x] T1-15 MachineService job lifecycle hardening (shipped; hardware sanity test pending)
 - [x] T1-16 Three render-loop crashes on load-another-job-after-complete (shipped + hardware-verified)
 - [ ] T1-17 Image import freezes the app (filed; Pass 1 web worker fix unblocks user pain)
-- [ ] T1-18 Service-level test-fire deadman timeout (filed; safety — highest urgency)
+- [ ] T1-18 Service-level test-fire deadman timeout (filed; safety 鈥?highest urgency)
 - [ ] T1-19 Service-level approval tokens for dangerous commands (filed; safety)
 - [ ] T1-20 WCS normalization no-listener fallback hardening (filed; trust)
 - [ ] T1-21 Frame-dot try/finally safety scope (filed; safety)
-- [ ] T1-22 Critical write awaitability for safety commands (filed; safety — biggest defense-in-depth gain)
-- [ ] T1-23 Pause policy — explicit M5 or documented firmware proof (filed; safety, depends on T1-22)
+- [ ] T1-22 Critical write awaitability for safety commands (filed; safety 鈥?biggest defense-in-depth gain)
+- [ ] T1-23 Pause policy 鈥?explicit M5 or documented firmware proof (filed; safety, depends on T1-22)
 - [ ] T1-24 Error/alarm handlers must send laser-off (filed; safety, depends on T1-22)
 - [ ] T1-25 Reconnect safe-state handshake (filed; safety)
 - [ ] T1-26 Custom footer enforce-M5-at-send (filed; safety, defense-in-depth)
-- [ ] T1-27 Remove unused electronAPI.sendGcode IPC bypass (filed; safety — free win, ship first)
+- [ ] T1-27 Remove unused electronAPI.sendGcode IPC bypass (filed; safety 鈥?free win, ship first)
 - [ ] T1-28 Autofocus timeout/error must trigger safety-off (filed; safety, depends on T1-22)
 - [ ] T1-29 Persisted unsafe-prior-state flag across reconnects (filed; safety, depends on T1-25)
 - [ ] T1-30 Tighten command enablement gates (canFrame/canJog/canTestFire) (filed; safety, depends on T1-22, T1-24, T2-11, T1-29)
-- [ ] T1-31 Raster image strategy — single M4 per pass with inline S modulation (filed; output quality)
+- [ ] T1-31 Raster image strategy 鈥?single M4 per pass with inline S modulation (filed; output quality)
 - [ ] T1-32 $32 laser-mode verification before M4 emission (filed; safety)
 - [ ] T1-33 Live $30 controller value should win over profile maxSpindle (filed; safety + quality)
 - [ ] T1-34 Serpentine error-diffusion dithering (filed; output quality)
 - [ ] T1-35 Configurable image import resolution cap (filed; output quality, depends on T1-17 Pass 1)
-- [ ] T1-36 Offset-with-holes for kerf compensation (filed; geometry correctness — real product bug)
-- [ ] T1-37 Hide offset fill UI option until implemented (filed; user trust — 15 min)
+- [ ] T1-36 Offset-with-holes for kerf compensation (filed; geometry correctness 鈥?real product bug)
+- [ ] T1-37 Hide offset fill UI option until implemented (filed; user trust 鈥?15 min)
 - [ ] T1-38 Operation-aware default flattening tolerance (filed; output quality)
-- [ ] T1-39 Frame skips first relative move on front-origin machines (filed; SAFETY — frame ≠ burn)
-- [ ] T1-40 Right-origin X mirror support (filed; SAFETY — shippable wrong behavior; band-aid first)
-- [ ] T1-41 Saved-origin verification — query $# at frame/start (filed; SAFETY)
+- [ ] T1-39 Frame skips first relative move on front-origin machines (filed; SAFETY 鈥?frame 鈮?burn)
+- [ ] T1-40 Right-origin X mirror support (filed; SAFETY 鈥?shippable wrong behavior; band-aid first)
+- [ ] T1-41 Saved-origin verification 鈥?query $# at frame/start (filed; SAFETY)
 - [ ] T1-42 Frame bounds confirmation uses buildFrameCorners not workFrame (filed; SAFETY, depends T1-40)
 - [ ] T1-43 Reassert G90/G91 after customStartGcode + reject mode flips (filed; SAFETY)
 - [ ] T1-44 Controller _checkJobBounds simulates G91 from known starting position (filed; defense-in-depth)
-- [ ] T1-45 Compile complexity gate — warn/block on huge jobs (filed; UX safety)
+- [ ] T1-45 Compile complexity gate 鈥?warn/block on huge jobs (filed; UX safety)
 - [ ] T1-46 notifySimulatorTx per-line loop blocks job start (filed; UX, ~30 min)
 - [ ] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (filed; test infra)
 - [ ] T1-48 Remove `new Date()` from Output.createdAt for determinism (filed; test infra)
 - [ ] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (filed; defect fix, ~30 min)
 - [ ] T1-50 Connect button mutex / abortable connect (filed; defect fix, ~1 session)
-- [ ] T1-51 Strengthen GRBL handshake proof — reject raw `ok` as welcome (filed; defect fix, ~30 min)
-- [ ] T1-52 Auto-detect must include `$30 → maxSpindle` (filed; defect fix, ~30 min)
+- [ ] T1-51 Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome (filed; defect fix, ~30 min)
+- [ ] T1-52 Auto-detect must include `$30 鈫?maxSpindle` (filed; defect fix, ~30 min)
 - [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)
-- [ ] T1-54 Block job start if GRBL output uses M4 and `$32 ≠ 1` (filed; defect fix, ~1 hour)
+- [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
 - [ ] T1-55 Block laser-on operations when `$30` unknown and connected (filed; defect fix, ~1 hour)
-- [ ] T1-56 Preflight machinePlanBounds reads wrong source — `activeJobTransform` always null pre-Start (filed; defect fix, ~15 min — one-line + tests)
-- [ ] T1-57 Compile manager has no request-id guard — async results can commit out of order (filed; defect fix, ~30 min)
+- [ ] T1-56 Preflight machinePlanBounds reads wrong source 鈥?`activeJobTransform` always null pre-Start (filed; defect fix, ~15 min 鈥?one-line + tests)
+- [ ] T1-57 Compile manager has no request-id guard 鈥?async results can commit out of order (filed; defect fix, ~30 min)
 - [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
-- [ ] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (filed; UX/safety gap, ~30 min)
-- [ ] T1-60 Pin device profile selector to header — out of "More options" (filed; UX safety, ~30 min - 1 hour)
+- [ ] T1-59 Frame-before-start gate 鈥?`canStartJob` must require `hasFramed` (filed; UX/safety gap, ~30 min)
+- [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
 - [ ] T1-61 Start mode labels rewritten with full sentences + tooltips (filed; UX clarity, ~30 min)
 - [ ] T1-62 `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs (filed; UX correctness, ~30 min - 1 hour)
 - [ ] T1-63 Warning confirmation includes detail/fix per warning, not just titles (filed; UX safety, ~15 min)
 - [ ] T1-64 Pause/Resume/Stop catch blocks must surface errors to user, not just `console.warn` (filed; safety defect, ~30 min)
 - [ ] T1-65 Frame inner loop must abort on first command failure, not continue partial frame (filed; safety defect, ~30 min)
 - [ ] T1-66 Jog catch must surface "command blocked" to user (filed; UX defect, ~15 min)
-- [ ] T1-67 Ticket hash mismatch messages — hide hashes from user, expose under "Advanced details" (filed; UX/professionalism, ~30 min)
+- [ ] T1-67 Ticket hash mismatch messages 鈥?hide hashes from user, expose under "Advanced details" (filed; UX/professionalism, ~30 min)
 - [ ] T1-68 Autosave must await write before clearing dirty flag (filed; **critical data-loss bug**, ~30 min)
 - [ ] T1-69 Manual save must not mark scene clean before download write confirmation (filed; defect, ~30 min - 1 hour)
 - [ ] T1-70 Recovery failure must alert user, not just `console.error` (filed; UX safety, ~15 min)
@@ -18884,17 +18850,17 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-73 Delete action must mark scene dirty (filed; **real data-loss defect**, ~10 min)
 - [ ] T1-74 Text sidebar `patchTextGeometry` must commit history, not preview-only (filed; **real data-loss + undo-coverage defect**, ~30 min)
 - [ ] T1-75 Undo/redo must mark dirty + invalidate compile/frame state (filed; **real safety defect**, ~30 min)
-- [ ] T1-76 Active layer change unified path — UI-state OR project-state consistently (filed; consistency, ~30 min)
+- [ ] T1-76 Active layer change unified path 鈥?UI-state OR project-state consistently (filed; consistency, ~30 min)
 - [ ] T1-77 Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle (filed; **commercial-critical**, ~30 min stopgap)
 - [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` (filed; API hygiene, ~1 hour)
 - [ ] T1-79 Box generator service-level entitlement check (filed; only Pro feature missing one, ~15 min after T1-78)
 - [ ] T1-80 Validation failure shows user-facing state, not silent downgrade (filed; customer trust, ~1-2 sessions)
-- [ ] T1-81 CI check — production builds must NOT contain dev-mode auto-unlock (filed; release safety, ~1 hour)
+- [ ] T1-81 CI check 鈥?production builds must NOT contain dev-mode auto-unlock (filed; release safety, ~1 hour)
 - [ ] T1-82 Remove `PRO_FLAG_KEY` legacy local boolean or document its purpose (filed; hygiene, ~30 min)
 - [ ] T1-83 Strip Electron source maps from production builds (filed; commercial security, ~30 min)
-- [ ] T1-84 Restrict `storage:clear` IPC — remove or scope (filed; data protection, ~1 hour)
+- [ ] T1-84 Restrict `storage:clear` IPC 鈥?remove or scope (filed; data protection, ~1 hour)
 - [ ] T1-85 Remove `--dev` arg escape hatch in packaged builds (filed; commercial posture, ~15 min)
-- [ ] T1-86 `npmRebuild` decision — verify or enable native module rebuild (filed; release safety, ~30 min audit)
+- [ ] T1-86 `npmRebuild` decision 鈥?verify or enable native module rebuild (filed; release safety, ~30 min audit)
 - [ ] T1-87 Persist failed-start as job log entry, don't silently nullify (filed; diagnostic recovery, ~30 min)
 - [ ] T1-88 Make diagnostic trace capture free, not Pro-gated (filed; support fairness, ~30 min)
 - [ ] T1-89 Enable Electron `sandbox: true` for the renderer (filed; defense-in-depth, ~1-2 sessions)
@@ -18915,30 +18881,30 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-8 Split Preflight into rule modules
 - [ ] T2-10 Establish single MachineCommandGateway choke point (filed; multi-pass architectural)
 - [ ] T2-11 Service-layer operation mutex for laser-on operations (filed; defense-in-depth)
-- [ ] T2-12 Unified MachineSafetyState type — consolidation of safety fields (filed; ships AFTER T1-22/25/29/30, T2-11)
+- [ ] T2-12 Unified MachineSafetyState type 鈥?consolidation of safety fields (filed; ships AFTER T1-22/25/29/30, T2-11)
 - [ ] T2-13 Fault-injecting test transport (FaultInjectingSerialPort) (filed; ship BEFORE T1-22 to enable its tests)
 - [ ] T2-14 Non-removable G-code safety wrapper around custom templates (filed; correctness)
-- [ ] T2-15 CompoundPath model — preserve outer/hole/island semantics (filed; multi-pass architectural; T1-36 is band-aid)
+- [ ] T2-15 CompoundPath model 鈥?preserve outer/hole/island semantics (filed; multi-pass architectural; T1-36 is band-aid)
 - [ ] T2-16 Duplicate / overlap path detection in preflight (filed; quality)
 - [ ] T2-17 AbortSignal + progress callback through compile pipeline (filed; UX, depends on T1-45)
 - [ ] T2-18 Semantic G-code parser test helper (filed; test infra foundation)
 - [ ] T2-19 Burn-bounds analyzer test helper (filed; depends on T2-18)
 - [ ] T2-20 Pixel fixture harness for raster regression tests (filed; depends on T1-31, T2-18)
 - [ ] T2-21 Property-based geometry tests with fast-check (filed; depends on T2-18)
-- [ ] T2-22 Standardize test runner — auto-discovery + consistent reporter (filed; test infra)
-- [ ] T2-23 Determinism gate — same scene compiled 20× must be byte-identical (filed; depends on T1-48, T2-18)
+- [ ] T2-22 Standardize test runner 鈥?auto-discovery + consistent reporter (filed; test infra)
+- [ ] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (filed; depends on T1-48, T2-18)
 - [ ] T2-24 Split LaserController into protocol-neutral core + dialect extensions (filed; foundation for audit 3A work)
 - [ ] T2-25 Create real ControllerCapabilities model (filed; depends on T2-24)
 - [ ] T2-26 Move GRBL command construction out of generic layers (filed; 6-pass migration, depends on T2-24/25)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
-- [ ] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (filed; depends on T2-27)
+- [ ] T2-29 Refactor ValidatedJobTicket 鈥?controller-family-agnostic schema (filed; depends on T2-27)
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)
 - [ ] T2-31 Make `SerialPortLike.close()` async (filed; foundation for T1-49, T2-32, T2-33)
-- [ ] T2-32 Connection lifecycle state machine — ConnectionManager (filed; depends on T2-24, T2-31)
+- [ ] T2-32 Connection lifecycle state machine 鈥?ConnectionManager (filed; depends on T2-24, T2-31)
 - [ ] T2-33 Partial-open cleanup in `WebSerialPort.requestAndOpen` (filed; depends on T2-31)
-- [ ] T2-34 Connection generation guard — token tagged on transport callbacks (filed; depends on T2-32)
-- [ ] T2-35 Electron serial subsystem decision — complete it OR remove it (filed; supersedes T1-27 partial fix)
+- [ ] T2-34 Connection generation guard 鈥?token tagged on transport callbacks (filed; depends on T2-32)
+- [ ] T2-35 Electron serial subsystem decision 鈥?complete it OR remove it (filed; supersedes T1-27 partial fix)
 - [ ] T2-36 Subscription-based transport callbacks (filed; pairs with T2-34)
 - [ ] T2-37 Capability snapshot in ValidatedJobTicket (filed; refines T2-1, T2-29)
 - [ ] T2-38 `CapabilityValue<T>` model with source/confidence/verifiedAt (filed; refines T2-25)
@@ -18950,86 +18916,86 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-44 Extended safety state machine (filed; refines T2-12 with audit 3D's 10-state set)
 - [ ] T2-45 `JobExecutionSession` with safety methods on the session handle (filed; refines T2-27)
 - [ ] T2-46 User-facing safety outcome messages + Activity Log (filed; depends on T2-41)
-- [ ] T2-47 Realistic GRBL firmware simulator — planner queue, RX buffer, modal state, alarm lock (filed; refines T2-13)
-- [ ] T2-48 Multi-controller simulator framework — `SimulatedControllerDevice` interface (filed; refines T3-43)
+- [ ] T2-47 Realistic GRBL firmware simulator 鈥?planner queue, RX buffer, modal state, alarm lock (filed; refines T2-13)
+- [ ] T2-48 Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface (filed; refines T3-43)
 - [ ] T2-49 Virtual time / deterministic scheduler for tests (filed; refines T2-22)
-- [ ] T2-50 Scenario-driven failure injection API — typed `injectFault({type,...})` (filed; refines T2-13)
+- [ ] T2-50 Scenario-driven failure injection API 鈥?typed `injectFault({type,...})` (filed; refines T2-13)
 - [ ] T2-51 `CompiledJobState` atomic state shape (filed; closes T1-56/57/58 structurally)
 - [ ] T2-52 Centralized active-profile store via `useSyncExternalStore` (filed; replaces polling)
-- [ ] T2-53 Job session state machine — `JobPhase` (filed; depends on T2-41, related to T2-44)
+- [ ] T2-53 Job session state machine 鈥?`JobPhase` (filed; depends on T2-41, related to T2-44)
 - [ ] T2-54 Unified disconnect transaction (filed; depends on T2-41, T2-42)
 - [ ] T2-55 Transactional `resetProjectRuntimeState()` (filed; depends on T2-51)
 - [ ] T2-56 Move job log finalization out of mounted UI into MachineService subscription (filed; ~1 session)
-- [ ] T2-57 Typed error state per domain — compile/connection/job/machine (filed; ~2-3 sessions)
+- [ ] T2-57 Typed error state per domain 鈥?compile/connection/job/machine (filed; ~2-3 sessions)
 - [ ] T2-58 Ready-to-Run unified pre-flight panel (filed; biggest UX win, depends on T2-51 + T2-53)
 - [ ] T2-59 Material-first settings workflow with preset confidence labels (filed; large UX, ~3-5 sessions)
-- [ ] T2-60 Frame freshness invalidation — any relevant change resets `hasFramed` (filed; required for T1-59 to work over time)
+- [ ] T2-60 Frame freshness invalidation 鈥?any relevant change resets `hasFramed` (filed; required for T1-59 to work over time)
 - [ ] T2-61 Move design-editing controls (text spacing, etc.) out of connection panel (filed; UX coherence)
-- [ ] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop (filed; refines T2-46)
+- [ ] T2-62 Recovery cards 鈥?alarm / disconnect / frame-fail / E-stop (filed; refines T2-46)
 - [ ] T2-63 Operation order preview with order warning (filed; depends on T2-58)
 - [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
-- [ ] T2-65 Central error reporter — `reportError({domain, severity, recovery, developerDetails})` (filed; refines T2-57)
+- [ ] T2-65 Central error reporter 鈥?`reportError({domain, severity, recovery, developerDetails})` (filed; refines T2-57)
 - [ ] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (filed; refines T2-44)
 - [ ] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (filed; refines T2-56)
 - [ ] T2-68 Critical error history preserved across `clearMessages()` and disconnect (filed; depends on T2-65)
-- [ ] T2-69 Atomic autosave record — single key with checksum + scene metadata (filed; depends on T1-68)
-- [ ] T2-70 Previous autosave backup slot — recovery offers latest + previous (filed; depends on T2-69)
+- [ ] T2-69 Atomic autosave record 鈥?single key with checksum + scene metadata (filed; depends on T1-68)
+- [ ] T2-70 Previous autosave backup slot 鈥?recovery offers latest + previous (filed; depends on T2-69)
 - [ ] T2-71 Embed device profile snapshot in project metadata (filed; project reproducibility)
 - [ ] T2-72 Embed material preset snapshot per layer (filed; project reproducibility, pairs with T2-71)
-- [ ] T2-73 Formal migration pipeline — version bumps with explicit migrations (filed; required before T2-71/T2-72 schema additions)
-- [ ] T2-74 Surface load repair report to user — `deserializeSceneWithReport` (filed; closes silent-repair UX gap)
+- [ ] T2-73 Formal migration pipeline 鈥?version bumps with explicit migrations (filed; required before T2-71/T2-72 schema additions)
+- [ ] T2-74 Surface load repair report to user 鈥?`deserializeSceneWithReport` (filed; closes silent-repair UX gap)
 - [ ] T2-75 Deep geometry/settings validation on load (filed; pairs with T2-74)
-- [ ] T2-76 Single mutation transaction path — `commitSceneTransaction({scene, reason, meta})` (filed; foundation, refines T2-51 / T2-55 / T2-57)
+- [ ] T2-76 Single mutation transaction path 鈥?`commitSceneTransaction({scene, reason, meta})` (filed; foundation, refines T2-51 / T2-55 / T2-57)
 - [ ] T2-77 Async revision guards on trace + image import (filed; data-loss prevention, pairs with T1-57)
 - [ ] T2-78 History entries with action metadata (filed; foundation for T2-79 / T2-80)
 - [ ] T2-79 Selection restore on undo/redo (filed; depends on T2-78)
-- [ ] T2-80 History coalescing for sliders — begin/preview/commit (filed; refines T1-74)
+- [ ] T2-80 History coalescing for sliders 鈥?begin/preview/commit (filed; refines T1-74)
 - [ ] T2-81 Raster buffers stored outside history (filed; raster-heavy memory)
-- [ ] T2-82 History memory budget — count + bytes (filed; pairs with T2-81)
+- [ ] T2-82 History memory budget 鈥?count + bytes (filed; pairs with T2-81)
 - [ ] T2-83 Block undo/redo while job running (filed; safety, pairs with T2-53)
 - [ ] T2-84 System-level `RuntimeState` meta-container (filed; foundation, composes T2-44/51/53/86/87)
-- [ ] T2-85 Explicit `JobFingerprint` type — refines T2-51 (filed; pairs with T2-25)
-- [ ] T2-86 Explicit `FrameState` union type — refines T2-60 (filed; pairs with T2-85)
+- [ ] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (filed; pairs with T2-25)
+- [ ] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (filed; pairs with T2-85)
 - [ ] T2-87 Explicit `RecoveryState` state machine (filed; composes T2-62/66/67)
-- [ ] T2-88 Hash-derived dirty state — replace manual `sceneIsDirtyRef` toggling (filed; promotes T1-73/74/75 stopgaps to permanent)
+- [ ] T2-88 Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling (filed; promotes T1-73/74/75 stopgaps to permanent)
 - [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
 - [ ] T2-90 Signed local entitlement token with public-key verification (filed; depends on T2-89)
-- [ ] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (filed; foundation, pairs with T1-78)
-- [ ] T2-92 Per-feature granular `canUse` — replace single `hasPro` boolean (filed; pairs with T2-89/T2-91)
-- [ ] T2-93 License status enum — `LicenseStatus` first-class state machine (filed; refines T1-80)
+- [ ] T2-91 Feature enforcement registry 鈥?`FEATURE_MATRIX` per-feature `enforce` declarations (filed; foundation, pairs with T1-78)
+- [ ] T2-92 Per-feature granular `canUse` 鈥?replace single `hasPro` boolean (filed; pairs with T2-89/T2-91)
+- [ ] T2-93 License status enum 鈥?`LicenseStatus` first-class state machine (filed; refines T1-80)
 - [ ] T2-94 Clock-tamper detection for offline grace (filed; depends on T2-89/T2-90)
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)
-- [ ] T2-96 Subscription/plan lifecycle support — revoked/cancelled/downgraded (filed; depends on T2-89)
+- [ ] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (filed; depends on T2-89)
 - [ ] T2-97 Entitlement checks must never block safety controls (filed; documented guarantee + tests)
 - [ ] T2-98 CI builds installers on Windows + macOS runners (filed; release-engineering foundation)
 - [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
-- [ ] T2-101 Auto-update infrastructure — `electron-updater` with signed releases (filed; depends on T2-98/99/100)
-- [ ] T2-102 Rollback strategy — failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
-- [ ] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (filed; depends on T2-98)
+- [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
+- [ ] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
+- [ ] T2-103 Release artifact integrity 鈥?SHA256 + SBOM + signed checksum (filed; depends on T2-98)
 - [ ] T2-104 Versioned user-data migration framework (filed; broader scope than T2-73)
 - [ ] T2-105 Startup diagnostics + safe mode + crash-loop recovery (filed; pairs with T2-102)
-- [ ] T2-106 Dependency security scanning in CI — `npm audit` + Dependabot (filed; pairs with license-check)
-- [ ] T2-107 Tighten production CSP — remove `unsafe-eval`, then `unsafe-inline` (filed; security debt)
-- [ ] T2-108 Support bundle exporter — `Help → Export Diagnostic Bundle` (filed; **highest-value supportability feature**)
-- [ ] T2-109 Reconstruction-grade JobLog — embed app/system/profile/controller/preflight/fingerprint snapshots (filed; foundation for T2-108)
-- [ ] T2-110 Controller settings snapshot before job — `$$ + $I + $G + $#` (filed; pairs with T2-25)
-- [ ] T2-111 Persist partial job log during running job — every N seconds (filed; pairs with T2-67/T2-105)
-- [ ] T2-112 Improved RX/TX retention — event-window strategy (filed; refines T2-67)
-- [ ] T2-113 Structured RX/TX events — line numbers, buffer state, classification (filed; refines T3-74)
+- [ ] T2-106 Dependency security scanning in CI 鈥?`npm audit` + Dependabot (filed; pairs with license-check)
+- [ ] T2-107 Tighten production CSP 鈥?remove `unsafe-eval`, then `unsafe-inline` (filed; security debt)
+- [ ] T2-108 Support bundle exporter 鈥?`Help 鈫?Export Diagnostic Bundle` (filed; **highest-value supportability feature**)
+- [ ] T2-109 Reconstruction-grade JobLog 鈥?embed app/system/profile/controller/preflight/fingerprint snapshots (filed; foundation for T2-108)
+- [ ] T2-110 Controller settings snapshot before job 鈥?`$$ + $I + $G + $#` (filed; pairs with T2-25)
+- [ ] T2-111 Persist partial job log during running job 鈥?every N seconds (filed; pairs with T2-67/T2-105)
+- [ ] T2-112 Improved RX/TX retention 鈥?event-window strategy (filed; refines T2-67)
+- [ ] T2-113 Structured RX/TX events 鈥?line numbers, buffer state, classification (filed; refines T3-74)
 - [ ] T2-114 React error boundary + window error/rejection persistence (filed; refines T2-105)
 - [ ] T2-115 Privacy redaction layer for diagnostic exports (filed; required by T2-108)
 - [ ] T2-116 Storage health and quota reporting (filed; pairs with T2-118)
 - [ ] T2-117 Correlation IDs across systems (filed; foundation for T2-108)
-- [ ] T2-118 Troubleshooting panel — `Help → Diagnostics` (filed; user-facing surface, depends on T2-108/65/116/117)
-- [ ] T2-119 IPC sender verification — `assertTrustedSender` in every handler (filed; pairs with T1-89)
+- [ ] T2-118 Troubleshooting panel 鈥?`Help 鈫?Diagnostics` (filed; user-facing surface, depends on T2-108/65/116/117)
+- [ ] T2-119 IPC sender verification 鈥?`assertTrustedSender` in every handler (filed; pairs with T1-89)
 - [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
 - [ ] T2-121 Main-process serial command classification enforcement (filed; pairs with T2-122)
-- [ ] T2-122 Typed serial command IPC — replace generic `sendGcode(string)` (filed; pairs with T2-121)
-- [ ] T2-123 SVG complexity limits — node count, depth, path tokens, segments (filed; pairs with T1-92)
+- [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
+- [ ] T2-123 SVG complexity limits 鈥?node count, depth, path tokens, segments (filed; pairs with T1-92)
 - [ ] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (filed; pairs with T1-92)
 - [ ] T2-125 Compiler/output layer enforces template validation (filed; defense in depth for T1-91)
-- [ ] T2-126 Falcon WiFi treated as untrusted telemetry — UI labels + safety boundary (filed; pairs with T1-94)
+- [ ] T2-126 Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary (filed; pairs with T1-94)
 - [ ] T2-127 Storage value size limits per-key (filed; pairs with T2-120)
 - [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
 
@@ -19044,14 +19010,14 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-8 Electron CSP hardening
 - [ ] T3-9 Tighten IPC attack surface
 - [ ] T3-10 Input file-format size limits
-- [ ] T3-11 Burn-progress lag + ✓ position
+- [ ] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
 - [ ] T3-13 Active-edge-table fill scanline algorithm (filed; algorithmic improvement, upper-end users)
 - [ ] T3-14 Sampled / level-of-detail G-code preview (filed; large-job UX)
-- [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural — multi-week, Tier 3 by design)
+- [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
-- [ ] T3-18 Output validator — semantic scan over emitted G-code
+- [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
 - [ ] T3-19 Doc recommendation: prefer saved-origin absolute mode for production
 - [ ] T3-20 Add G17 plane-select and G94 feed-mode to header baseline
 - [ ] T3-21 Frame-dot hardcoded F3000 should follow profile / settings
@@ -19060,32 +19026,32 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count
 - [ ] T3-26 Blue-noise / advanced halftone dithering modes
-- [ ] T3-27 SVG `<text>` element import — convert to outlines or warn
+- [ ] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn
 - [ ] T3-28 SVG inherited group styles applied at flatten time
-- [ ] T3-29 Open path ordering within cut operations — score-before-cut
+- [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
 - [ ] T3-31 Self-intersection detection and repair for fill/cut
-- [ ] T3-32 SVG viewBox-only unit interpretation — UX disambiguation
+- [ ] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation
 - [ ] T3-33 Scene renderer overlay model matches MachineTransform (depends on T1-40 stage 2)
 - [ ] T3-34 Stripe-based raster G-code emission (memory bound; depends on T3-15)
-- [ ] T3-35 Cache invalidation strategies — processed raster, fill rows, output chunks
+- [ ] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks
 - [ ] T3-36 Frame-vs-burn equivalence test suite (filed; depends on T1-39/40/42, T2-18, T2-19)
 - [ ] T3-37 Saved-origin / WCS lifecycle test (filed; depends on T1-41, T1-29, T2-13)
 - [ ] T3-38 Fill-with-holes geometric correctness test (filed; depends on T1-36, T2-15, T2-18, T2-19)
 - [ ] T3-39 Malformed-input test suite (filed; depends on T2-18)
 - [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
-- [ ] T3-41 Snapshot semantic-assertion pairing — every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
+- [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
-- [ ] T3-44 Generic progress model — line/byte/percent/device-reported (filed; depends on T2-24)
-- [ ] T3-45 Transport abstraction layer — Line/Byte/HttpJob transports (filed; foundation for T2-30 and any non-serial controller)
-- [ ] T3-46 Profile schema split — Device / Controller / Transport / Output (filed; quality-of-life for multi-controller)
-- [ ] T3-47 Generic safety operations API — capability-gated pause/stop/laserOff/testFire (filed; depends on T2-26, overlaps T2-12)
+- [ ] T3-44 Generic progress model 鈥?line/byte/percent/device-reported (filed; depends on T2-24)
+- [ ] T3-45 Transport abstraction layer 鈥?Line/Byte/HttpJob transports (filed; foundation for T2-30 and any non-serial controller)
+- [ ] T3-46 Profile schema split 鈥?Device / Controller / Transport / Output (filed; quality-of-life for multi-controller)
+- [ ] T3-47 Generic safety operations API 鈥?capability-gated pause/stop/laserOff/testFire (filed; depends on T2-26, overlaps T2-12)
 - [ ] T3-48 `navigator.serial.getPorts()` device-reuse flow (filed; UX, depends on T2-31, T3-46)
 - [ ] T3-49 `navigator.serial` connect/disconnect event handling (filed; pairs with T3-16)
-- [ ] T3-50 Device identity verification on connect — require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
+- [ ] T3-50 Device identity verification on connect 鈥?require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
 - [ ] T3-51 Reconnect-same-machine verification (filed; depends on T3-50, T3-46)
-- [ ] T3-52 Browser lifecycle cleanup — beforeunload / pagehide (filed; safety gap)
+- [ ] T3-52 Browser lifecycle cleanup 鈥?beforeunload / pagehide (filed; safety gap)
 - [ ] T3-53 `requestStatusReport` write-failure normalization in polling loop (filed; depends on T2-32)
 - [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
@@ -19095,37 +19061,37 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)
 - [ ] T3-60 Disconnect-stops-job capability gating (filed; depends on T2-42, T2-43)
 - [ ] T3-61 Per-controller-family safety regression tests (filed; refines T3-43)
-- [ ] T3-62 Ruida controller safety stub — design before implementation (filed; design doc only)
+- [ ] T3-62 Ruida controller safety stub 鈥?design before implementation (filed; design doc only)
 - [ ] T3-63 Fake WebSerial byte-stream harness with chunking realism (filed; refines T3-54, depends on T2-48)
 - [ ] T3-64 Fake Electron serialport test harness (filed; conditional on T2-35 keep-decision)
 - [ ] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (filed; required before T2-30 ships)
-- [ ] T3-66 CI suite lane separation — unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
-- [ ] T3-67 Canonical bounds selectors — `selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
-- [ ] T3-68 Debug state graph + named transition log — `window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
-- [ ] T3-69 Guided first-run test job — placement → focus → jog → frame → low-power test → confirm (filed; depends on T2-58)
+- [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
+- [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
+- [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
+- [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
 - [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
 - [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
-- [ ] T3-74 Structured log events with severity, domain, recovery — replace string-based message log (filed; depends on T2-65)
+- [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
-- [ ] T3-80 Test suite for undo/redo correctness — 15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
+- [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
-- [ ] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (filed; refines T1-81)
-- [ ] T3-83 Tamper-resistance test suite — cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
-- [ ] T3-84 Linux packaging — AppImage / .deb / .rpm (filed; defer until business decides)
-- [ ] T3-85 Installer QA matrix — Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
-- [ ] T3-86 Native module packaging smoke test — packaged-app launches + serialport loads + storage works (filed; pairs with T1-86 + T2-98)
-- [ ] T3-87 Log retention policy — per-domain caps, failed-job pinning, compression (filed; pairs with T2-108/116)
-- [ ] T3-88 IPC fuzz test suite — every handler tested with malformed inputs (filed; recurring CI quality gate)
+- [ ] T3-82 Production bundle smoke tests 鈥?no tester secret, no dev unlock, no mock entitlements (filed; refines T1-81)
+- [ ] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
+- [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
+- [ ] T3-85 Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
+- [ ] T3-86 Native module packaging smoke test 鈥?packaged-app launches + serialport loads + storage works (filed; pairs with T1-86 + T2-98)
+- [ ] T3-87 Log retention policy 鈥?per-domain caps, failed-job pinning, compression (filed; pairs with T2-108/116)
+- [ ] T3-88 IPC fuzz test suite 鈥?every handler tested with malformed inputs (filed; recurring CI quality gate)
 - [ ] T3-89 Production security build CI checks (filed; extends T1-81)
 
 ### Tier 4 (Later)
-- [ ] T4-1 through T4-9 — see above
+- [ ] T4-1 through T4-9 鈥?see above
 
 ---
 
