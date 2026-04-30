@@ -77,6 +77,45 @@ function touchMap<K, V>(m: Map<K, V>, key: K): void {
   m.set(key, v);
 }
 
+/**
+ * FNV-1a 32-bit hash for cache key discrimination.
+ *
+ * Not cryptographic -- used only to fingerprint pixel buffers so the
+ * dither preview cache can tell two adjustedData arrays apart even when
+ * they have the same length (T1-17 Pass 2). Math.imul forces 32-bit
+ * signed-int multiplication; `>>> 0` coerces to unsigned. Both
+ * Uint8Array and Uint8ClampedArray are accepted because canvas
+ * ImageData uses Uint8ClampedArray.
+ */
+export function fnv1a32(data: Uint8Array | Uint8ClampedArray): number {
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < data.length; i++) {
+    hash ^= data[i] ?? 0;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Build the dither preview cache key.
+ *
+ * Includes a content hash of `adjustedData` so brightness/contrast/gamma
+ * changes that produce buffers of the same length still get distinct
+ * keys. Before T1-17 Pass 2 the key embedded `adjustedData.length`,
+ * which only depends on image dimensions, so any two settings produced
+ * the same key and the cache returned the stale dither buffer.
+ */
+export function buildDitherCacheKey(
+  loadSrc: string,
+  grayscaleWidth: number,
+  grayscaleHeight: number,
+  ditherMode: string,
+  adjustedData: Uint8Array,
+): string {
+  const contentHash = fnv1a32(adjustedData).toString(36);
+  return `${loadSrc}\x1e${grayscaleWidth}\x1e${grayscaleHeight}\x1e${ditherMode}\x1e${contentHash}`;
+}
+
 function getOrCreateImage(loadSrc: string): HTMLImageElement {
   let img = imageElementBySrc.get(loadSrc);
   if (img) {
@@ -1188,7 +1227,7 @@ function drawGeometry(
         const ditherMode = ims?.imageMode === 'dither' ? ims.dithering : undefined;
         const adjustedData = (geom as ImageGeometry).adjustedData;
         if (ditherMode && ditherMode !== 'none' && adjustedData && geom.grayscaleWidth && geom.grayscaleHeight) {
-          const ditherKey = `${loadSrc}\x1e${geom.grayscaleWidth}\x1e${geom.grayscaleHeight}\x1e${ditherMode}\x1e${adjustedData.length}`;
+          const ditherKey = buildDitherCacheKey(loadSrc, geom.grayscaleWidth, geom.grayscaleHeight, ditherMode, adjustedData);
           let ditherCanvas = ditherCacheGet(ditherKey);
 
           if (!ditherCanvas) {

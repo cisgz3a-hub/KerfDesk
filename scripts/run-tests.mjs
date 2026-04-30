@@ -144,6 +144,7 @@ const files = [
   'raster-with-curve.test.ts',
   'image-processing.test.ts',
   'image-prep-grayscale-equivalence.test.ts',
+  'dither-cache-key-content-hash.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
