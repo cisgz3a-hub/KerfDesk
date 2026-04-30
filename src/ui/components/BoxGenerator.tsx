@@ -105,7 +105,19 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       ctx.textBaseline = 'middle';
       ctx.fillText(face.name, cx * scale + ox, cy * scale + oy);
     }
-  }, [width, height, depth, thickness, fingerWidth, openTop, kerf, dimensionMode]);
+  }, [
+    width,
+    height,
+    depth,
+    resolved.width,
+    resolved.height,
+    resolved.depth,
+    thickness,
+    fingerWidth,
+    openTop,
+    kerf,
+    dimensionMode,
+  ]);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -144,47 +156,69 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       React.createElement('div', {
         style: { padding: '14px 18px', borderBottom: '1px solid #1a1a2e', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 },
       },
-        React.createElement('span', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Box Generator'),
+        React.createElement('div', null,
+          React.createElement('div', { style: { color: '#e0e0ec', fontSize: 14, fontWeight: 600 } }, 'Box Generator'),
+          React.createElement('div', { style: { fontSize: 10, color: '#7a7a95', marginTop: 2 } },
+            dimensionMode === 'inside'
+              ? 'Type the cavity you need - we\'ll add walls.'
+              : 'Type the overall box size you want.',
+          ),
+        ),
         React.createElement('button', { onClick: onClose, style: { background: 'none', border: 'none', color: '#555570', fontSize: 18, cursor: 'pointer' } }, 'x'),
       ),
 
       React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 } },
         React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
-          React.createElement('div', { key: 'dimMode', style: { marginBottom: 10 } },
-            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, 'Dimensions are'),
+          // Dimension mode toggle. 'outside' (default): user-typed W/H/D is the
+          // exterior bounding box. 'inside': user-typed values are the usable
+          // cavity, and exterior is computed by adding wall thickness.
+          React.createElement('div', { key: 'dimMode', style: { marginBottom: 14 } },
+            React.createElement('div', {
+              style: { fontSize: 11, color: '#9090b0', marginBottom: 6, fontWeight: 500 },
+            }, 'What size are you specifying?'),
             React.createElement('div', { style: { display: 'flex', gap: 4 } },
               React.createElement('button', {
                 type: 'button',
                 onClick: () => setDimensionMode('outside'),
+                title: 'The W/H/D you type are the assembled box exterior. Interior cavity is computed by subtracting wall thickness.',
                 style: {
-                  flex: 1, padding: '6px', fontSize: 11,
-                  background: dimensionMode === 'outside' ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                  flex: 1, padding: '8px 6px', fontSize: 11,
+                  background: dimensionMode === 'outside' ? 'rgba(0,212,255,0.12)' : '#0a0a14',
                   border: dimensionMode === 'outside' ? '1px solid #00d4ff' : '1px solid #252540',
                   borderRadius: 6,
-                  color: dimensionMode === 'outside' ? '#00d4ff' : '#555570',
-                  cursor: 'pointer', fontFamily: font,
+                  color: dimensionMode === 'outside' ? '#00d4ff' : '#7a7a95',
+                  cursor: 'pointer', fontFamily: font, lineHeight: 1.3,
                 },
-              }, 'Outside'),
+              },
+                React.createElement('div', { style: { fontWeight: 600 } }, 'Outside'),
+                React.createElement('div', { style: { fontSize: 9, opacity: 0.85, marginTop: 2 } }, 'overall box size'),
+              ),
               React.createElement('button', {
                 type: 'button',
                 onClick: () => setDimensionMode('inside'),
+                title: 'The W/H/D you type are the interior cavity for what will fit inside. Exterior is computed by adding wall thickness.',
                 style: {
-                  flex: 1, padding: '6px', fontSize: 11,
-                  background: dimensionMode === 'inside' ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                  flex: 1, padding: '8px 6px', fontSize: 11,
+                  background: dimensionMode === 'inside' ? 'rgba(0,212,255,0.12)' : '#0a0a14',
                   border: dimensionMode === 'inside' ? '1px solid #00d4ff' : '1px solid #252540',
                   borderRadius: 6,
-                  color: dimensionMode === 'inside' ? '#00d4ff' : '#555570',
-                  cursor: 'pointer', fontFamily: font,
+                  color: dimensionMode === 'inside' ? '#00d4ff' : '#7a7a95',
+                  cursor: 'pointer', fontFamily: font, lineHeight: 1.3,
                 },
-              }, 'Inside'),
+              },
+                React.createElement('div', { style: { fontWeight: 600 } }, 'Inside'),
+                React.createElement('div', { style: { fontSize: 9, opacity: 0.85, marginTop: 2 } }, 'cavity for what fits in'),
+              ),
             ),
           ),
+          // Field labels are explicit so a user looking at one field still
+          // knows whether the value is exterior or cavity size.
           ...[
-            { key: 'width', label: dimensionMode === 'inside' ? 'Width inside (mm)' : 'Width (mm)', value: width, set: setWidth, min: 10, max: 500, step: 1 },
-            { key: 'height', label: dimensionMode === 'inside' ? 'Height inside (mm)' : 'Height (mm)', value: height, set: setHeight, min: 10, max: 500, step: 1 },
-            { key: 'depth', label: dimensionMode === 'inside' ? 'Depth inside (mm)' : 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
-            { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20, step: 0.1 },
-            { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50, step: 1 },
+            { key: 'width', label: dimensionMode === 'inside' ? 'Cavity width (mm)' : 'Outer width (mm)', value: width, set: setWidth, min: 10, max: 500, step: 1 },
+            { key: 'height', label: dimensionMode === 'inside' ? 'Cavity height (mm)' : 'Outer height (mm)', value: height, set: setHeight, min: 10, max: 500, step: 1 },
+            { key: 'depth', label: dimensionMode === 'inside' ? 'Cavity depth (mm)' : 'Outer depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
+            { key: 'thickness', label: 'Material thickness (mm)', value: thickness, set: setThickness, min: 1, max: 20, step: 0.1 },
+            { key: 'fingerWidth', label: 'Finger width (mm)', value: fingerWidth, set: setFingerWidth, min: 3, max: 50, step: 1 },
           ].map(f =>
             React.createElement('div', { key: f.key, style: { marginBottom: 10 } },
               React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, f.label),
@@ -243,19 +277,63 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
                 fontSize: 11, cursor: 'pointer', fontFamily: font,
               },
             }, openTop ? '☑ Open top (no lid)' : '☐ Open top (no lid)'),
+            openTop && dimensionMode === 'inside'
+              ? React.createElement('div', {
+                  style: {
+                    fontSize: 9, color: '#7a7a95', marginTop: 4,
+                    fontStyle: 'italic' as const, lineHeight: 1.4,
+                  },
+                }, 'Open-top: cavity height adds only the floor (1 thickness), not floor + lid (2).')
+              : null,
           ),
-          React.createElement('div', { style: { fontSize: 9, color: '#444460', lineHeight: 1.5 } },
-            `${openTop ? 5 : 6} faces`, React.createElement('br'),
-            `Material: ${thickness}mm`, React.createElement('br'),
-            dimensionMode === 'inside'
-              ? `Exterior: ${resolved.width}×${resolved.height}×${resolved.depth}mm`
-              : `Interior: ${cavity.width}×${cavity.height}×${cavity.depth}mm`,
-            React.createElement('br'),
-            `~${materialAreaCm2}cm² material`,
+          // The derived dimension is the key feedback for this toggle, so it
+          // gets a high-contrast callout instead of dim helper text.
+          React.createElement('div', {
+            style: {
+              padding: '8px 10px',
+              marginBottom: 8,
+              background: dimensionMode === 'inside' ? 'rgba(0,212,255,0.08)' : 'rgba(45,212,160,0.08)',
+              border: `1px solid ${dimensionMode === 'inside' ? 'rgba(0,212,255,0.3)' : 'rgba(45,212,160,0.3)'}`,
+              borderRadius: 6,
+              fontSize: 10,
+              color: '#a0a0c0',
+              lineHeight: 1.5,
+            },
+          },
+            React.createElement('div', {
+              style: { fontSize: 9, color: '#7a7a95', textTransform: 'uppercase' as const, letterSpacing: 0.5, marginBottom: 3 },
+            }, dimensionMode === 'inside' ? 'Will cut as exterior box' : 'Will hold interior cavity'),
+            React.createElement('div', {
+              style: {
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: mono,
+                color: dimensionMode === 'inside' ? '#6db8ff' : '#7dffaf',
+                letterSpacing: 0.3,
+              },
+            }, dimensionMode === 'inside'
+              ? `${resolved.width} × ${resolved.height} × ${resolved.depth} mm`
+              : `${cavity.width} × ${cavity.height} × ${cavity.depth} mm`,
+            ),
+          ),
+          React.createElement('div', { style: { fontSize: 9, color: '#666680', lineHeight: 1.6 } },
+            `${openTop ? 5 : 6} faces · ${thickness}mm material · ~${materialAreaCm2}cm²`,
           ),
         ),
 
         React.createElement('div', { style: { flex: 1, display: 'flex', flexDirection: 'column' as const, minWidth: 0 } },
+          dimensionMode === 'inside'
+            ? React.createElement('div', {
+                style: {
+                  padding: '8px 12px',
+                  borderBottom: '1px solid #1a1a2e',
+                  background: 'rgba(0,212,255,0.06)',
+                  color: '#9bdfff',
+                  fontSize: 11,
+                  fontFamily: mono,
+                },
+              }, `Cut size: ${resolved.width} × ${resolved.height} × ${resolved.depth} mm exterior`)
+            : null,
           React.createElement('canvas', {
             ref: canvasRef,
             style: { width: '100%', flex: 1, background: '#08080f', minHeight: 200 },
