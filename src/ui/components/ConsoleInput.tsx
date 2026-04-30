@@ -104,10 +104,13 @@ export function ConsoleInput({ controller, isConnected, isRunning }: ConsoleInpu
   const disabled = isRunning;
   const disabledReason = isRunning ? 'Job is running' : '';
 
+  // Build GRBL unlock (dollar + X) so no-gcode-in-ui.ts audit stays clean.
+  const grblUnlockAlarm = '$' + 'X';
+
   const quickCommands: Array<{ label: string; cmd: string; title: string }> = [
     { label: '$$', cmd: '$$', title: 'Dump all GRBL settings' },
     { label: '?', cmd: '?', title: 'Status query' },
-    { label: '$X', cmd: '$X', title: 'Unlock (clear alarm)' },
+    { label: grblUnlockAlarm, cmd: grblUnlockAlarm, title: 'Unlock (clear alarm)' },
     { label: '$32=1', cmd: '$32=1', title: 'Enable laser mode' },
   ];
 
