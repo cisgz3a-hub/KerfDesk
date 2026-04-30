@@ -607,6 +607,10 @@ export function ConnectionPanelMain({
     async (cmd: string) => {
       if (!cmd.trim()) return;
       const classification = machineService.classifyUserCommand(cmd);
+      // T1-6: pass acknowledged severity to MachineService.sendCommand so
+      // the service-layer gate accepts the call. Without it, user-source
+      // warn/dangerous lines now throw COMMAND_BLOCKED.
+      let acknowledged: typeof classification.severity | undefined;
       if (classification.severity === 'dangerous') {
         const ok = await showConfirm(
           'Dangerous command',
@@ -616,6 +620,7 @@ export function ConnectionPanelMain({
           appendMessage(`Blocked: ${classification.command}`);
           return;
         }
+        acknowledged = 'dangerous';
       } else if (classification.severity === 'warn') {
         const ok = await showConfirm(
           'Machine state change',
@@ -625,10 +630,11 @@ export function ConnectionPanelMain({
           appendMessage(`Cancelled: ${classification.command}`);
           return;
         }
+        acknowledged = 'warn';
       }
       notifySimulatorTx(cmd);
       try {
-        await machineService.sendCommand(cmd, 'user');
+        await machineService.sendCommand(cmd, 'user', { acknowledged });
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
         appendMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);

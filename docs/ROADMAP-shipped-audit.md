@@ -34,7 +34,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
-| 1 | 94 | ~32 confirmed (Gate 1 cluster + verified-this-session) | 2 | 5 confirmed | est. ~95% |
+| 1 | 94 | ~33 confirmed (Gate 1 cluster + verified-this-session + T1-6 closed 2026-04-30) | 1 | 4 confirmed | est. ~95% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
@@ -127,6 +127,7 @@ The Gate 1 cluster — required for Private Technical Alpha — is fully closed.
 | Ticket | What | Evidence |
 |---|---|---|
 | T1-5 | `_stopOnError` per-profile configurable | `stopOnError?: boolean` field on `DeviceProfile` at line 161 |
+| T1-6 | Classify `sendCommand` and gate dangerous (service-layer) | `MachineService.sendCommand` rejects user-source warn/dangerous lines without matching `acknowledged` severity, throws `COMMAND_BLOCKED` error with structured `severity` / `reason` / `command` fields. UI at `ConnectionPanelMain.sendCmd` passes acknowledged severity through after confirm dialog. Internal callers bypass classification; `ExecutionCoordinator` sends already-confirmed unlock / home operations through the internal path. `tests/machine-service-user-sendcommand.test.ts` (29/29). Shipped 2026-04-30 in `<HASH>`. |
 | T1-7 | JobLog QuotaExceededError visibility | `tests/job-log-quota.test.ts` |
 | T1-8 | Acceleration-aware power sanity bounds | `tests/plan-accel-sanity.test.ts` |
 | T1-9 | Frame bed extents preflight | `tests/bed-height-resolver-parity.test.ts` |
@@ -145,7 +146,6 @@ The Gate 1 cluster — required for Private Technical Alpha — is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-6 | Classify `sendCommand` and gate dangerous | `CommandClassifier` module exists at `src/core/grbl/grblClassifierLines.ts`; referenced from `src/app/MachineService.ts:34` | Service-layer gating that *blocks* dangerous commands (not just classifies them). ~1 session. |
 | T1-17 | Image import freezes the app | `src/import/trace/trace.worker.ts` exists for tracing | Image-import grayscale loop is still on the main thread. Pass 1 ~1 session; full ~3-5 sessions. |
 
 ### ✗ Confirmed open
@@ -317,13 +317,13 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-6** — Classify `sendCommand` and gate dangerous (partial; finish service-layer gating). ~1 session.
-2. **T1-17 pass 1** — Image import freeze: move grayscale loop to a Web Worker. ~1 session.
-3. **T1-19** — Service-level approval tokens for dangerous commands. 1-2 sessions.
-4. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-5. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
+1. **T1-17 pass 1** — Image import freeze: move grayscale loop to a Web Worker. ~1 session.
+2. **T1-19** — Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top — explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
+3. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
+4. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
+5. **T1-17 full** — Finish image-import worker migration (passes 2-3).
 
-After those 5 close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
+After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 
 - T2-3 (widen service-layer paywall gating)
 - T2-65 (central error reporter — unblocks T2-114 error boundary and lots of UX cleanup)

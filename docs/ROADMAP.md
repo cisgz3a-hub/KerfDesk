@@ -417,6 +417,8 @@ Add a `CommandClass` enum and a classifier function. UI console may allow class-
 
 **Priority:** Tier 1 (safety plus UX).
 
+**Status:** Shipped in `<HASH>` — service-layer gate added at `MachineService.sendCommand`. User-source warn / dangerous lines now require a matching `acknowledged` severity in the options bag, otherwise rejected with `COMMAND_BLOCKED` error. Internal callers bypass classification (framework owns those gates elsewhere); `ExecutionCoordinator` now sends confirmed unlock / home operations through the internal path. UI confirm flow at `ConnectionPanelMain.sendCmd` updated to pass acknowledgement through. Test: `tests/machine-service-user-sendcommand.test.ts` 29/29 (pre-existing `command-classifier.test.ts` 38/38 covers the classifier itself).
+
 ---
 
 ### T1-7 | JobLog QuotaExceededError visibility

@@ -103,18 +103,18 @@ export class ExecutionCoordinator {
     return this.deps.machineService.autoFocus();
   }
 
-  /** Unlock GRBL ($X). Caller must run danger confirmation when appropriate. */
+  /** Unlock GRBL ($X). Caller must run danger confirmation before invoking this. */
   async unlock(): Promise<void> {
     if (!this.deps.controllerRef.current) return;
     this.notifySimulator('$X');
-    await this.deps.machineService.sendCommand('$X', 'user');
+    await this.deps.machineService.sendCommand('$X', 'internal');
   }
 
-  /** Home ($H). Caller must confirm the user intends to home. */
+  /** Home ($H). Caller must confirm the user intends to home before invoking this. */
   async home(): Promise<void> {
     if (!this.deps.controllerRef.current) return;
     this.notifySimulator('$H');
-    await this.deps.machineService.sendCommand('$H', 'user');
+    await this.deps.machineService.sendCommand('$H', 'internal');
   }
 
   /** Frame without firing the laser (rapid moves only). */

@@ -31,6 +31,7 @@ import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
   classifyUserCommand as classifyUserGrbl,
   type CommandClassification,
+  type CommandSeverity,
 } from '../controllers/grbl/CommandClassifier';
 
 export interface BurnState {
@@ -717,14 +718,61 @@ export class MachineService {
   }
 
   /**
-   * Forward a line to GRBL. Gating of user-typed content is the UI’s job; `user`
-   * is passed through to the controller for call-site documentation / future
-   * audit, not to block in the service layer.
+   * Forward a line to GRBL.
+   *
+   * Internal LaserForge callers (frame, jog, autofocus, etc.) pass
+   * `source: 'internal'` and bypass classification — the framework owns
+   * those calls and they're already gated by their respective service
+   * methods.
+   *
+   * User-typed lines from the console pass `source: 'user'`. The service
+   * classifies the line via {@link classifyUserCommand} (the same
+   * classifier the UI uses to drive confirm dialogs) and rejects warn /
+   * dangerous lines that don't carry a matching `acknowledged` severity.
+   *
+   * The UI flow:
+   *   1. Call `classifyUserCommand(cmd)` → get severity.
+   *   2. If safe, call `sendCommand(cmd, 'user')`.
+   *   3. If warn or dangerous, show confirm dialog. On approval, call
+   *      `sendCommand(cmd, 'user', { acknowledged: severity })`. On
+   *      rejection, do not send.
+   *
+   * The point of the service-layer gate is defense in depth (T1-6).
+   * If a future caller — a script panel, an MCP tool, an automation,
+   * a developer console misuse — calls `sendCommand(cmd, 'user')`
+   * without going through the UI confirm flow, dangerous commands are
+   * rejected with a thrown error rather than silently executed. The UI
+   * remains the primary gate; this is the wall behind the first wall.
+   *
+   * Throws `Error` with `code: 'COMMAND_BLOCKED'` and `severity` /
+   * `reason` properties when a user line is blocked.
    */
   async sendCommand(
     command: string,
     source: 'internal' | 'user' = 'internal',
+    options: { acknowledged?: CommandSeverity } = {},
   ): Promise<void> {
+    if (source === 'user') {
+      const classification = classifyUserGrbl(command);
+      if (
+        classification.severity !== 'safe'
+        && options.acknowledged !== classification.severity
+      ) {
+        const err = new Error(
+          `Command blocked: ${classification.severity} command sent without acknowledgement. ${classification.reason}`,
+        ) as Error & {
+          code: 'COMMAND_BLOCKED';
+          severity: CommandSeverity;
+          reason: string;
+          command: string;
+        };
+        err.code = 'COMMAND_BLOCKED';
+        err.severity = classification.severity;
+        err.reason = classification.reason;
+        err.command = classification.command;
+        throw err;
+      }
+    }
     this.controllerRef.current.sendCommand(command, source);
   }
 
