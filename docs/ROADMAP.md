@@ -5979,7 +5979,7 @@ The structurally correct source — `useCompileManager.lastResult.machinePlanBou
 
 **Priority:** Tier 1 — contributes to the "Start grey for no obvious reason" report cluster; root cause for current/head mode false-positives.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `243ad0f`.
 
 ---
 
