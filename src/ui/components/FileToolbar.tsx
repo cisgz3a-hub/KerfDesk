@@ -487,7 +487,7 @@ export function FileToolbar({
     },
     toolbarBtn('📷 Camera', 'Camera alignment', () => onCamera?.(), { dimmed: easyDim }),
     toolbarBtn('⚄ Auto-Pack', 'Pack shapes to save material', () => onAutoNest?.(), { dimmed: easyDim }),
-    toolbarBtn('⊞ Box', 'Finger-joint box generator', () => onBoxGenerator?.()),
+    toolbarBtn('⊞ Box Studio', 'Open the box generator and preset library', () => onBoxGenerator?.()),
     productionMode &&
       toolbarBtn('📐 Kerf', 'Kerf & fit wizard', () => onKerfWizard?.()),
     productionMode &&

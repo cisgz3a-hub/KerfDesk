@@ -70,6 +70,7 @@ import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
+import { BoxStudioPage } from '../pages/BoxStudioPage';
 import { NestingDialog } from './NestingDialog';
 import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
@@ -197,6 +198,13 @@ export function App() {
   const [showFontCredits, setShowFontCredits] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('machine');
+  const [showBoxStudio, setShowBoxStudio] = useState(() => {
+    try {
+      return window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio';
+    } catch {
+      return false;
+    }
+  });
   const [profileRevision, setProfileRevision] = useState(0);
   const [startMode, setStartMode] = useState<StartMode>(() => {
     try {
@@ -1494,6 +1502,33 @@ export function App() {
     showAlert,
   });
 
+  useEffect(() => {
+    const handlePopState = () => {
+      setShowBoxStudio(window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio');
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  const openBoxStudio = useCallback(() => {
+    setShowBoxStudio(true);
+    if (window.location.pathname !== '/box-studio') {
+      window.history.pushState({}, '', '/box-studio');
+    }
+  }, []);
+
+  const closeBoxStudio = useCallback(() => {
+    setShowBoxStudio(false);
+    if (window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio') {
+      window.history.pushState({}, '', '/');
+    }
+  }, []);
+
+  const handleBoxStudioGenerate = useCallback((objects: SceneObject[]) => {
+    handleBoxGenerate(objects);
+    closeBoxStudio();
+  }, [closeBoxStudio, handleBoxGenerate]);
+
   const { handleMaterialTestApply } = useMaterialTestHandlers({
     scene,
     handleSceneCommit,
@@ -1661,6 +1696,14 @@ export function App() {
   );
 
   // ─── RENDER ──────────────────────────────────────────────────
+
+  if (showBoxStudio) {
+    return React.createElement(BoxStudioPage, {
+      scene,
+      onGenerate: handleBoxStudioGenerate,
+      onBack: closeBoxStudio,
+    });
+  }
 
   return React.createElement('div', {
     style: {
@@ -2067,6 +2110,7 @@ export function App() {
       scene,
       onGenerate: handleBoxGenerate,
       onClose: () => dialogs.setShowBoxGenerator(false),
+      onOpenStudio: openBoxStudio,
     }),
 
     dialogs.showSetup && React.createElement(WelcomeWizard, {
