@@ -147,7 +147,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key now uses FNV-1a 32-bit content hash via `buildDitherCacheKey` in `SceneRenderer.ts` instead of `adjustedData.length`; removes false-cache-hit class on brightness/contrast/gamma adjustments. Pinned by `tests/dither-cache-key-content-hash.test.ts` (12/12). Hardware verification of UI responsiveness still owed (Pass 1 + Pass 2). | Passes 3-4 still open: `importImageUnified` identity churn, raster compile pipeline. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key uses FNV-1a 32-bit content hash via `buildDitherCacheKey`. **Pass 3 shipped 2026-04-30 in `<TBD>`** — `importImageUnified` reads scene from a ref so its useCallback dep array is `[]`; identity stable across scene mutations. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6). Hardware verification of UI responsiveness still owed (Passes 1-3). | Pass 4 still open: defer raster compile pipeline. |
 
 ### 鉁?Confirmed open
 
@@ -319,7 +319,7 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 1. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
 2. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
-3. **T1-17 passes 3-4** — useCallback identity churn, raster compile pipeline. (Pass 1 and Pass 2 shipped 2026-04-30; the user-pain freeze and stale dither preview cache key are closed.)
+3. **T1-17 pass 4** — defer raster compile pipeline (move JobCompiler image processing into the worker). (Passes 1-3 shipped; the user-pain freeze and the cache-key + identity-churn cleanup are done.)
 4. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`. Pattern test catching UI code that bypasses MachineService. Filed as T1-19 follow-up at the time of ship; not strictly needed for runtime safety but closes the architectural-bypass class.
 5. After those four close, all of confirmed-open Tier 1 is shipped.
 

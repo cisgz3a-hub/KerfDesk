@@ -841,7 +841,9 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 **Status (pass 2):** Shipped in `0632b2b` — dither cache key now embeds an FNV-1a 32-bit content hash of `adjustedData` instead of `adjustedData.length`. `src/ui/renderers/SceneRenderer.ts` exports `fnv1a32(data)` and `buildDitherCacheKey(loadSrc, gw, gh, mode, adjustedData)`; the inline cache-key template at the image-render branch is replaced with a call to the helper. Removes the false-cache-hit class — different brightness/contrast/gamma settings produced same-length `adjustedData` → same cache key → stale dither preview. Pinned by `tests/dither-cache-key-content-hash.test.ts` (12/12) covering determinism, empty/single-byte sanity, same-length-different-content discrimination, single-byte sensitivity, order-sensitivity, and end-to-end key construction.
 
-**Passes 3, 4 remain open** — `importImageUnified` identity churn, raster compile pipeline. File new follow-up tickets (or extend this one with sub-status notes) when their turn comes.
+**Status (pass 3):** Shipped in `<TBD>` — `importImageUnified` no longer lists `scene` in its useCallback deps. `src/ui/hooks/useImport.ts` adds a `sceneRef` synced via `useEffect`, and the callback body opens with `const scene = sceneRef.current;` so every existing `scene.X` reference inside reads the live value without rebuilding the callback identity. Dep array drops to `[]`. Stops the cascade where every scene mutation re-rendered `handleImageImport` and every component depending on it. `handleDrop`'s `[scene]` dep is intentionally left in place — its SVG/DXF branches read scene at call time directly and are out of Pass 3 scope. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6) which mounts a Harness, rerenders across three distinct scenes, and asserts `handleImageImport` identity is `===` stable while `handleDrop` is intentionally not.
+
+**Pass 4 remains open** — defer raster compile (move JobCompiler image processing into the worker so brightness/contrast adjustments don't lock the UI during recompile).
 
 ---
 

@@ -1,4 +1,4 @@
-import { useCallback, type DragEvent } from 'react';
+import { useCallback, useEffect, useRef, type DragEvent } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
@@ -22,6 +22,16 @@ export interface UseImportDeps {
 export function useImport(scene: Scene, deps: UseImportDeps) {
   const { handleSceneCommit, handleNewProject, setIsDragOver, showAlert } = deps;
 
+  // T1-17 Pass 3: keep a live ref to scene so importImageUnified can read
+  // the current scene without listing it in its useCallback deps. Without
+  // this, every scene mutation minted a fresh importImageUnified identity,
+  // which cascaded into re-renders of every component that depended on
+  // the import handlers (handleImageImport, handleDrop).
+  const sceneRef = useRef(scene);
+  useEffect(() => {
+    sceneRef.current = scene;
+  }, [scene]);
+
   /**
    * Build a scene with one new image object (layer + grayscale + placement).
    * Large images go to IndexedDB; small ones stay inline data URIs.
@@ -31,6 +41,11 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
     fileName?: string,
   ): Promise<Scene | null> => {
     try {
+      // T1-17 Pass 3: read the live scene from the ref. This shadows the
+      // outer `scene` parameter for the body of this callback, so every
+      // existing `scene.X` reference below picks up the current value at
+      // call time instead of the value closed over at definition time.
+      const scene = sceneRef.current;
       let dataUri: string;
       let displayName: string;
 
@@ -183,7 +198,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       console.error('[useImport] Image import failed:', err);
       return null;
     }
-  }, [scene]);
+  }, []);
 
   const handleImageImport = useCallback(async (file: File) => {
     const newScene = await importImageUnified(file, file.name);
