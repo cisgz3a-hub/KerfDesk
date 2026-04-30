@@ -843,7 +843,11 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 **Status (pass 3):** Shipped in `b8f3dfb` — `importImageUnified` no longer lists `scene` in its useCallback deps. `src/ui/hooks/useImport.ts` adds a `sceneRef` synced via `useEffect`, and the callback body opens with `const scene = sceneRef.current;` so every existing `scene.X` reference inside reads the live value without rebuilding the callback identity. Dep array drops to `[]`. Stops the cascade where every scene mutation re-rendered `handleImageImport` and every component depending on it. `handleDrop`'s `[scene]` dep is intentionally left in place — its SVG/DXF branches read scene at call time directly and are out of Pass 3 scope. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6) which mounts a Harness, rerenders across three distinct scenes, and asserts `handleImageImport` identity is `===` stable while `handleDrop` is intentionally not.
 
-**Pass 4 remains open** — defer raster compile (move JobCompiler image processing into the worker so brightness/contrast adjustments don't lock the UI during recompile).
+**Pass 4 split into 4a/4b/4c** — making `compileJob` async would touch 19 call sites (2 production + 17 tests) for a UI-responsiveness fix. Instead, pre-process the image into a buffer that `compileJob` can consume synchronously, and run the pre-processing in a worker. Three sub-passes, each independently shippable.
+
+**Status (pass 4a):** Shipped in `<TBD>` — `src/workers/ImagePrepWorker.ts` extended with a `process` request kind that runs brightness → contrast → gamma → invert → threshold off the main thread. `src/workers/imagePrepClient.ts` exports `processImage(source, w, h, settings)` (async, worker-or-fallback) and `processImageMainThread(source, w, h, settings)` (sync, same math as the existing `src/core/image/ImageProcessing.ts` functions). Pinned by `tests/image-processing-worker-equivalence.test.ts` (12/12) covering each operation, composites, full pipeline, source-not-mutated, canonical-order, and gamma-clamp edges. **Infrastructure-only — no call sites changed yet; JobCompiler and PropertiesPanel still run inline ImageProcessing.ts as before.** Pass 4b wires JobCompiler; Pass 4c wires the UI.
+
+**Passes 4b, 4c remain open** — JobCompiler consumes pre-processed `adjustedData` when present (Pass 4b); UI pipes brightness/contrast/gamma/invert through the worker on slider drag (Pass 4c — this is where the user-visible win lands).
 
 ---
 

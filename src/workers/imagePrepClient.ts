@@ -77,18 +77,21 @@ export async function prepareImageGrayscale(
       const bitmap = await createImageBitmap(img);
       const id = ++imagePrepRequestId;
       return await new Promise<Uint8Array>((resolve, reject) => {
-        const onMessage = (ev: MessageEvent<{ id: number; grayscaleData: Uint8Array }>) => {
+        const onMessage = (ev: MessageEvent<{ kind?: 'prep' | 'process'; id: number; grayscaleData?: Uint8Array; data?: Uint8Array }>) => {
           if (ev.data.id !== id) return;
+          // Ignore process responses arriving on this listener (different id space anyway).
+          if (ev.data.kind === 'process') return;
           worker.removeEventListener('message', onMessage);
           worker.removeEventListener('error', onError);
-          if (ev.data.grayscaleData.length === 0) {
+          const grayscaleData = ev.data.grayscaleData ?? new Uint8Array(0);
+          if (grayscaleData.length === 0) {
             // Worker bounce — OffscreenCanvas 2D context unavailable.
             // Fall through to main-thread path on retry.
             workerKnownBroken = true;
             resolve(prepareImageGrayscaleMainThread(img, gsWidth, gsHeight));
             return;
           }
-          resolve(ev.data.grayscaleData);
+          resolve(grayscaleData);
         };
         const onError = (ev: ErrorEvent) => {
           worker.removeEventListener('message', onMessage);
@@ -172,4 +175,151 @@ export function rgbaToGrayscale(
     out[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
   }
   return out;
+}
+
+// ───────────────────────────────────────────────────────────
+// T1-17 Pass 4a: image processing pipeline (off-thread when possible)
+// ───────────────────────────────────────────────────────────
+
+/**
+ * Settings driving the image-processing pipeline. All five fields are
+ * required so a callsite can't accidentally drop one and silently get
+ * different output. Pass `threshold = null` to skip the threshold step.
+ */
+export interface ImageProcessSettings {
+  brightness: number;       // -100..+100, 0 = no-op
+  contrast: number;         // -100..+100, 0 = no-op
+  gamma: number;            // 0.1..5, 1 = no-op
+  invert: boolean;
+  threshold: number | null; // null = skip threshold step
+}
+
+let imageProcessRequestId = 0;
+
+/**
+ * Apply brightness → contrast → gamma → invert → (optional) threshold
+ * in the same canonical order as `src/core/image/ImageProcessing.ts`,
+ * off the main thread when the worker is available, on the main thread
+ * as a transparent fallback.
+ *
+ * Output is byte-for-byte identical between worker and fallback paths.
+ * Pinned by `tests/image-processing-worker-equivalence.test.ts`.
+ *
+ * Note: this function does NOT yet wire into JobCompiler or
+ * PropertiesPanel. Pass 4a ships the primitive only. Pass 4b wires
+ * JobCompiler; Pass 4c wires the UI.
+ */
+export async function processImage(
+  source: Uint8Array,
+  width: number,
+  height: number,
+  settings: ImageProcessSettings,
+): Promise<Uint8Array> {
+  const worker = getImagePrepWorker();
+
+  if (worker) {
+    try {
+      const id = ++imageProcessRequestId;
+      return await new Promise<Uint8Array>((resolve, reject) => {
+        const onMessage = (ev: MessageEvent<{ kind?: 'prep' | 'process'; id: number; data?: Uint8Array }>) => {
+          if (ev.data.id !== id) return;
+          if (ev.data.kind !== 'process') return; // ignore prep-channel replies
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+          if (!ev.data.data) {
+            workerKnownBroken = true;
+            resolve(processImageMainThread(source, width, height, settings));
+            return;
+          }
+          resolve(ev.data.data);
+        };
+        const onError = (ev: ErrorEvent) => {
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+          reject(new Error(`Image process worker error: ${ev.message}`));
+        };
+        worker.addEventListener('message', onMessage);
+        worker.addEventListener('error', onError);
+        // Copy `source` into a transferable buffer; we don't want to
+        // steal the caller's buffer.
+        const sourceCopy = new Uint8Array(source);
+        worker.postMessage({
+          kind: 'process',
+          id,
+          source: sourceCopy,
+          width,
+          height,
+          brightness: settings.brightness,
+          contrast: settings.contrast,
+          gamma: settings.gamma,
+          invert: settings.invert,
+          threshold: settings.threshold,
+        }, [sourceCopy.buffer]);
+      });
+    } catch (err) {
+      console.warn('[ImagePrepWorker] process dispatch failed, falling back to main thread:', err);
+      workerKnownBroken = true;
+      // fall through to main-thread path
+    }
+  }
+
+  return processImageMainThread(source, width, height, settings);
+}
+
+/**
+ * Synchronous fallback. Same five operations in the same order as the
+ * worker. Same byte-for-byte output as the existing
+ * `src/core/image/ImageProcessing.ts` functions (verified by the
+ * equivalence test).
+ *
+ * Exported so Fix #4 (Pass 4b)'s JobCompiler integration can call it
+ * directly when a synchronous answer is needed (e.g. from inside a
+ * test that doesn't have an event loop, or from a callsite where the
+ * caller has already committed to staying on the main thread).
+ */
+export function processImageMainThread(
+  source: Uint8Array,
+  _width: number,
+  _height: number,
+  settings: ImageProcessSettings,
+): Uint8Array {
+  const clampByte = (v: number): number => Math.max(0, Math.min(255, Math.round(v)));
+  let buf: Uint8Array = new Uint8Array(source);
+
+  if (settings.brightness !== 0) {
+    const delta = settings.brightness * 2.55;
+    const next = new Uint8Array(buf.length);
+    for (let i = 0; i < buf.length; i++) next[i] = clampByte(buf[i] + delta);
+    buf = next;
+  }
+  if (settings.contrast !== 0) {
+    const factor = 1 + settings.contrast / 100;
+    const next = new Uint8Array(buf.length);
+    for (let i = 0; i < buf.length; i++) next[i] = clampByte((buf[i] - 128) * factor + 128);
+    buf = next;
+  }
+  if (settings.gamma !== 1) {
+    const g = Math.max(0.1, Math.min(5, settings.gamma));
+    if (g !== 1) {
+      const invG = 1 / g;
+      const next = new Uint8Array(buf.length);
+      for (let i = 0; i < buf.length; i++) {
+        const nv = Math.pow(Math.max(0, Math.min(1, buf[i] / 255)), invG);
+        next[i] = clampByte(nv * 255);
+      }
+      buf = next;
+    }
+  }
+  if (settings.invert) {
+    const next = new Uint8Array(buf.length);
+    for (let i = 0; i < buf.length; i++) next[i] = 255 - buf[i];
+    buf = next;
+  }
+  if (settings.threshold !== null) {
+    const t = Math.max(0, Math.min(255, settings.threshold));
+    const next = new Uint8Array(buf.length);
+    for (let i = 0; i < buf.length; i++) next[i] = buf[i] < t ? 255 : 0;
+    buf = next;
+  }
+  return buf;
 }

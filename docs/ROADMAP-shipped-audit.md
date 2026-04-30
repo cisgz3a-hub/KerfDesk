@@ -147,7 +147,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key uses FNV-1a 32-bit content hash via `buildDitherCacheKey`. **Pass 3 shipped 2026-04-30 in `b8f3dfb`** — `importImageUnified` reads scene from a ref so its useCallback dep array is `[]`; identity stable across scene mutations. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6). Hardware verification of UI responsiveness still owed (Passes 1-3). | Pass 4 still open: defer raster compile pipeline. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key uses FNV-1a 32-bit content hash via `buildDitherCacheKey`. **Pass 3 shipped 2026-04-30 in `b8f3dfb`** — `importImageUnified` identity stable across scene mutations via sceneRef pattern. **Pass 4a shipped 2026-04-30 in `<TBD>`** — worker-side image processing primitives added (`processImage`, `processImageMainThread`); ImagePrepWorker extended with `process` request kind. Infrastructure-only, no call sites changed. Pinned by `tests/image-processing-worker-equivalence.test.ts` (12/12). Hardware verification of UI responsiveness still owed (Passes 1-4a). | Passes 4b, 4c still open: JobCompiler consumes pre-processed `adjustedData` (4b); UI pipes brightness/contrast/gamma/invert through worker on slider drag (4c — user-visible win). |
 
 ### 鉁?Confirmed open
 
@@ -317,11 +317,11 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-2. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
-3. **T1-17 pass 4** — defer raster compile pipeline (move JobCompiler image processing into the worker). (Passes 1-3 shipped; the user-pain freeze and the cache-key + identity-churn cleanup are done.)
-4. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`. Pattern test catching UI code that bypasses MachineService. Filed as T1-19 follow-up at the time of ship; not strictly needed for runtime safety but closes the architectural-bypass class.
-5. After those four close, all of confirmed-open Tier 1 is shipped.
+1. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present (compile stays synchronous; this is the integration step for Pass 4a's worker primitives).
+2. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through the worker on slider drag (user-visible responsiveness win).
+3. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
+4. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
+5. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`. Pattern test catching UI code that bypasses MachineService. Filed as T1-19 follow-up at the time of ship; not strictly needed for runtime safety but closes the architectural-bypass class.
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 

@@ -146,6 +146,7 @@ const files = [
   'image-prep-grayscale-equivalence.test.ts',
   'dither-cache-key-content-hash.test.ts',
   'import-callback-identity-stable.test.tsx',
+  'image-processing-worker-equivalence.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
