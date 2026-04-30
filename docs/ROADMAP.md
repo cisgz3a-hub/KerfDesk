@@ -5925,7 +5925,7 @@ The bypass is a *bandage*, not a *cure*. **T1-98 supersedes this.** Once T1-98 l
 
 **Priority:** Tier 1 — real-tester-blocker; root cause for T1-97's existence.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `b899f7b`.
 
 ---
 
