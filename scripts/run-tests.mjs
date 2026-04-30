@@ -114,6 +114,7 @@ const files = [
   'scene-transaction-app-wired.test.ts',
   'scene-commit-actions-wired.test.ts',
   'modal-confirm-with-checkbox.test.tsx',
+  'console-input.test.tsx',
   'ui-start-job-uses-ticket.test.tsx',
   'connection-panel-preflight-no-loop.test.tsx',
   'usecompilemanager-stale-no-loop.test.tsx',

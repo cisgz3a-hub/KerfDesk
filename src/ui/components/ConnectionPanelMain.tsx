@@ -1915,6 +1915,8 @@ export function ConnectionPanelMain({
         }),
         React.createElement(ConsolePanel, {
           isConnected,
+          isRunning,
+          controller: controllerRef.current,
           moreSection,
           simulatorView,
         }),
