@@ -5953,7 +5953,7 @@ A new test pins the proof: 7 contracts on `computeGcodeOffset` showing that save
 
 **Priority:** Tier 1 — affects Set Origin → Frame → Start workflow that the tester also reported.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `e3dffe0`.
 
 ---
 
