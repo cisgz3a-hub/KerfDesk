@@ -8,6 +8,7 @@ import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
+import { prepareImageGrayscale } from '../../workers/imagePrepClient';
 
 const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB - inline below, IndexedDB above
 
@@ -88,21 +89,14 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
       const gsWidth = Math.round(img.width * scale);
       const gsHeight = Math.round(img.height * scale);
-      const offscreen = document.createElement('canvas');
-      offscreen.width = gsWidth;
-      offscreen.height = gsHeight;
-      const offCtx = offscreen.getContext('2d')!;
-      offCtx.drawImage(img, 0, 0, gsWidth, gsHeight);
-      const imageData = offCtx.getImageData(0, 0, gsWidth, gsHeight);
-      const grayscaleData = new Uint8Array(gsWidth * gsHeight);
-      for (let i = 0; i < grayscaleData.length; i++) {
-        const r = imageData.data[i * 4];
-        const g = imageData.data[i * 4 + 1];
-        const b = imageData.data[i * 4 + 2];
-        const a = imageData.data[i * 4 + 3];
-        const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-        grayscaleData[i] = Math.round(lum * (a / 255) + 255 * (1 - a / 255));
-      }
+      // T1-17 pass 1: offload getImageData + grayscale luminance loop to a
+      // Web Worker. The previous inline canvas + per-pixel loop here ran
+      // tens to hundreds of ms on the main thread for any phone-camera
+      // photo, freezing the UI during import. The worker uses
+      // OffscreenCanvas + ImageBitmap; client falls back to the legacy
+      // main-thread path if any of those APIs are missing. Math is
+      // identical across both paths — see imagePrepClient.ts.
+      const grayscaleData = await prepareImageGrayscale(img, gsWidth, gsHeight);
 
       let targetScene = scene;
       let layerId: string;

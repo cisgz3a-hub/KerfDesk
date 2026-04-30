@@ -143,6 +143,7 @@ const files = [
   'calibration-analyzer.test.ts',
   'raster-with-curve.test.ts',
   'image-processing.test.ts',
+  'image-prep-grayscale-equivalence.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',

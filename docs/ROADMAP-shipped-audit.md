@@ -146,7 +146,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | `src/import/trace/trace.worker.ts` exists for tracing | Image-import grayscale loop is still on the main thread. Pass 1 ~1 session; full ~3-5 sessions. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `<HASH>`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. Main-thread fallback at `src/workers/imagePrepClient.ts:prepareImageGrayscaleMainThread`. Math equivalence pinned by `tests/image-prep-grayscale-equivalence.test.ts` (18/18). Build emits `dist/assets/ImagePrepWorker-*.js` chunk. Hardware verification of UI responsiveness still owed. | Passes 2-4 still open: dither cache key bug, `importImageUnified` identity churn, raster compile pipeline. |
 
 ### 鉁?Confirmed open
 
@@ -317,11 +317,11 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-17 pass 1** 鈥?Image import freeze: move grayscale loop to a Web Worker. ~1 session.
-2. **T1-19** 鈥?Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top 鈥?explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
-3. **T1-23** 鈥?Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-4. **T1-25** 鈥?Reconnect safe-state handshake. 1-2 sessions.
-5. **T1-17 full** 鈥?Finish image-import worker migration (passes 2-3).
+1. **T1-19** — Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top — explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
+2. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
+3. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
+4. **T1-17 passes 2-4** — Dither cache key bug, useCallback identity churn, raster compile pipeline. (Pass 1 shipped 2026-04-30; the user-pain freeze is closed.)
+5. After those four close, all of confirmed-open Tier 1 is shipped.
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 
