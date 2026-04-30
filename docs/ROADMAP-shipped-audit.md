@@ -147,6 +147,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-97 | Frame-before-start bypass override (per-session, free-user accessible) | New `frameBypass` state in `ConnectionPanelMain.tsx`; canStartJob's frame conjunct widened to `(!requireFrame \|\| hasFramed.current \|\| frameBypass)`. Engaged via More Options drawer button + confirm() dialog with risk language. Auto-disengages on `[historyVersion]` bump, `[isConnected]` reset, and browser reload. Logged on engage/disengage. **Tier 1 safety relaxation, deliberately localized: tester-blocker bandage. Underlying defect (phantom commitSceneTransaction post-frame on 6+ objects) tracked in T1-98 — supersedes this.** Pinned by `tests/frame-bypass-override.test.tsx` (6/6). Shipped 2026-04-30 in `24e5dd468a6939f679c880e0e56d15229ac6504d`. |
 | T1-98 | Frame idle timeout: dynamic from corner travel distance | Root cause of the 6-block-vs-5-block Start-grey bug. `FRAME_IDLE_TIMEOUT_MS` raised 15s → 60s; new `estimateFrameIdleTimeoutMs(corners)` returns max(30_000, ceil(expectedTravelMs * 2 + 5_000)) using 3000 mm/min conservative feed; `ConnectionPanelMain.handleFrameSafe` passes the per-frame estimate through. Initial T1-97 ticket spec misdiagnosed this as a phantom commitSceneTransaction post-frame; external review identified the actual 15s timeout cause from `grblIdlePoll.ts`. **T1-97 (bypass override) is now superseded by this fix and should be reverted or demoted to productionMode-only once tester verifies 6-box frame completes without bypass.** Pinned by `tests/frame-idle-timeout-dynamic.test.ts` (7/7). Shipped 2026-04-30 in `b899f7b`. |
 | T1-99 | savedOrigin removed from compile-invalidation dep set | `useCompileManager.ts` had `savedOriginX/Y` in three dep arrays (layout effect + 2 useCallbacks), but `computeGcodeOffset` (`src/core/output/GcodeOrigin.ts:39`) accepts savedOrigin as `_savedOrigin` (underscored, unused). For startMode='savedOrigin' the emission is byte-identical to 'current' mode; the physical origin is set by `G10 L20 P1 X0 Y0` at Set Origin click, not by recompile. Listing the value as a dep flipped gcodeStale on every Set Origin click for no content change, blocking Start via the `!gcodeStale` gate. Fix: remove from all three dep arrays and keep latest savedOrigin in a ref for explicit compile calls. Pinned by `tests/savedorigin-not-compile-invalidating.test.ts` (7/7). Shipped 2026-04-30 in `e3dffe0`. |
+| T1-100 | `machinePlanBounds` source uses `lastResult` pre-job-start | App.tsx prop changed from `activeJobTransform?.plan.bounds ?? null` (only set during job execution) to a precedence chain using `lastResult.machinePlanBounds` when fresh compile exists. Removes the pre-Start-phase null that forced preflight onto the fragile `gcodeTravelScan` text-scan fallback at `Preflight.ts:323` (which can mis-handle G91 relative moves in current/head mode and produce false bed-bounds blockers). Pinned by `tests/machine-plan-bounds-source.test.ts` (7/7). Shipped 2026-04-30 in `<TBD>`. |
 
 ### 鈼?Partial
 
@@ -322,11 +323,11 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-100** — `App.tsx machinePlanBounds={activeJobTransform?.plan.bounds ?? null}` is null pre-job-start. Replace with `!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null`.
-2. **T1-101** — `frameSafe` defaults `withCrosshair: true`; in current/head startMode the crosshair leaves the head at the design centroid. **Safety-critical.**
-3. **T1-97 retire** — once T1-98+T1-99+T1-100 verified, revert `24e5dd46` + `96616f77`, OR demote to productionMode-only.
-4. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present.
-5. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through worker on slider drag.
+1. **T1-101** — `frameSafe` defaults `withCrosshair: true`; in current/head startMode the crosshair leaves the head at design centroid. **Safety-critical, hardware-verify required.**
+2. **T1-97 retire** — once T1-98+T1-99+T1-100 verified by tester on hardware, revert `24e5dd46` + `96616f77`, OR demote to productionMode-only.
+3. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present.
+4. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through worker on slider drag.
+5. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`.
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:
 

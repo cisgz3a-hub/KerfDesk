@@ -5957,6 +5957,32 @@ A new test pins the proof: 7 contracts on `computeGcodeOffset` showing that save
 
 ---
 
+### T1-100 | `machinePlanBounds` source uses `lastResult` pre-job-start
+
+**Code reference:** `src/ui/components/App.tsx` (machinePlanBounds prop assignment); `src/ui/components/ConnectionPanelMain.tsx` (preflight consumption); `src/core/preflight/Preflight.ts` (`machinePlanBounds` vs `gcodeTravelScan` branch).
+
+**Problem:** The previous code `machinePlanBounds: activeJobTransform?.plan.bounds ?? null` returned null for the entire pre-Start phase. `activeJobTransform` is set only when `grbl.isJobRunning` flips false → true — i.e. after Start is pressed. During preflight, when bounds are most relevant, the prop was always null.
+
+That fell through to the `gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null` branch in `runPreflightSummary`, which scans raw g-code text for travel bounds. The scan is fragile: in current/head startMode, emitted g-code can use G91 relative moves, and a naive scan can wrongly interpret negative relative deltas as negative absolute coordinates — producing false bed-bounds blockers that keep Start grey even when the actual machine plan is within bed dimensions.
+
+The structurally correct source — `useCompileManager.lastResult.machinePlanBounds`, computed by `MachineTransform` — was already plumbed through as `lastGcodeCompileResult` but unused for this purpose.
+
+**Fix:** Change the prop to a precedence chain: `activeJobTransform?.plan.bounds ?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null)`. During execution, prefer activeJobTransform (pinned to the executing ticket — most authoritative). Pre-Start with a fresh compile, prefer `lastResult.machinePlanBounds`. With stale or absent compile, fall back to null (existing gcodeTravelScan behavior preserved).
+
+**Tests:** `tests/machine-plan-bounds-source.test.ts` (7 contracts) — pre-Start no-compile, pre-Start fresh-compile (the bug-fix path), pre-Start stale-compile, lingering lastResult guards, running-with-active-transform precedence, running-without-fresh-compile, running-plus-stale.
+
+**Out of scope:**
+  - Replacing the `gcodeTravelScan` fallback entirely. It's still the right path for preflight calls that pre-date a compile result.
+  - The G91 relative-vs-absolute scan bug itself. That's a real defect in `gcodeTravelScan`, but it's now triggered far less often and should be a separate ticket.
+
+**Estimate:** 30 min including tests. Shipped.
+
+**Priority:** Tier 1 — contributes to the "Start grey for no obvious reason" report cluster; root cause for current/head mode false-positives.
+
+**Status:** Shipped 2026-04-30 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

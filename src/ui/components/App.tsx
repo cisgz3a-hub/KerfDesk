@@ -1912,7 +1912,12 @@ export function App() {
       },
         bedWidth: resolvedMachineBedWidthMm,
         bedHeight: resolvedMachineBedHeightMm,
-        machinePlanBounds: activeJobTransform?.plan.bounds ?? null,
+        // T1-100: activeJobTransform is populated only after Start, so
+        // pre-Start preflight should use the current fresh compile bounds
+        // instead of falling back to fragile raw G-code text scanning.
+        machinePlanBounds:
+          activeJobTransform?.plan.bounds
+          ?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null),
         boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
         boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
         boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
