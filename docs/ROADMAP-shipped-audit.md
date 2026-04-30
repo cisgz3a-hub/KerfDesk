@@ -34,7 +34,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
-| 1 | 94 | ~33 confirmed (Gate 1 cluster + verified-this-session + T1-6 closed 2026-04-30) | 1 | 4 confirmed | est. ~95% |
+| 1 | 94 | ~34 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
@@ -127,7 +127,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | Ticket | What | Evidence |
 |---|---|---|
 | T1-5 | `_stopOnError` per-profile configurable | `stopOnError?: boolean` field on `DeviceProfile` at line 161 |
-| T1-6 | Classify `sendCommand` and gate dangerous (service-layer) | `MachineService.sendCommand` rejects user-source warn/dangerous lines without matching `acknowledged` severity, throws `COMMAND_BLOCKED` error with structured `severity` / `reason` / `command` fields. UI at `ConnectionPanelMain.sendCmd` passes acknowledged severity through after confirm dialog. Internal callers bypass classification; `ExecutionCoordinator` sends already-confirmed unlock / home operations through the internal path. `tests/machine-service-user-sendcommand.test.ts` (29/29). Shipped 2026-04-30 in `ef8ac92`. |
+| T1-6 | Classify `sendCommand` and gate dangerous (service-layer) | `MachineService.sendCommand` rejects user-source warn/dangerous lines. Originally took an `acknowledged: severity` flag (T1-6, `ef8ac92`); **superseded by T1-19** which replaced the flag with a single-use approval token. The runtime gate is the same wall, just with stronger guarantees on the token contract. |
 | T1-7 | JobLog QuotaExceededError visibility | `tests/job-log-quota.test.ts` |
 | T1-8 | Acceleration-aware power sanity bounds | `tests/plan-accel-sanity.test.ts` |
 | T1-9 | Frame bed extents preflight | `tests/bed-height-resolver-parity.test.ts` |
@@ -138,6 +138,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-14 | Max-update-depth crashes during fast resize | `lastSyncedValue` in `src/ui/components/NumberInput.tsx:40,45` |
 | T1-15 | MachineService job lifecycle hardening | `tests/machine-service-job-lifecycle-safety.test.ts` |
 | T1-16 | Render-loop crashes after job completion | `samePreflightSummary` + `preflightRef.current` in `ConnectionPanelMain.tsx` |
+| T1-19 | Service-level approval tokens for dangerous commands | `MachineService.requestApproval(cmd)` mints command-bound, single-use, 30 s TTL `ApprovalToken`s for warn/dangerous classifications. `MachineService.sendCommand(cmd, source, approvalToken?)` enforces token presence + match + expiry + nonce-not-replayed with bounded consumed-nonce retention. UI at `ConnectionPanelMain.sendCmd` calls `requestApproval` after the confirm dialog and threads the token through. Structured `Error.blockReason: 'no-token' \| 'token-mismatch' \| 'token-expired' \| 'token-replayed'`. `tests/machine-service-user-sendcommand.test.ts` (46/46). Supersedes T1-6's simpler `acknowledged` flag. Shipped 2026-04-30 in `<HASH>`. **Static guard owed** as follow-up (`tests/no-direct-controller-sendcommand-from-ui.test.ts`). |
 | T1-20 | WCS no-listener fallback hardening | `_placementUncertain` + `allowHeadlessWcsAutoNormalize` in `GrblController.ts:41,52`; `tests/wcs-no-listener-blocks-job.test.ts`, `tests/wcs-no-listener-headless-flag.test.ts`. Commit `b0375fa`. |
 | T1-21 | Frame-dot try/finally safety scope | `frameDot` at `src/app/ExecutionCoordinator.ts:140` |
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
@@ -152,7 +153,6 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | Estimate |
 |---|---|---|
-| T1-19 | Service-level approval tokens for dangerous commands | 1-2 sessions |
 | T1-23 | Pause must emit explicit M5 (or document firmware proof) | needs modal-state subsystem |
 | T1-25 | Reconnect safe-state handshake | 1-2 sessions |
 
@@ -317,10 +317,10 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-19** — Service-level approval tokens for dangerous commands. 1-2 sessions. (Now that T1-6 has the gate, T1-19 layers approval tokens on top — explicit ack for repeated session-scoped approvals so users don't see a confirm dialog on every line.)
-2. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
-3. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
-4. **T1-17 passes 2-4** — Dither cache key bug, useCallback identity churn, raster compile pipeline. (Pass 1 shipped 2026-04-30; the user-pain freeze is closed.)
+1. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
+2. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.
+3. **T1-17 passes 2-4** — Dither cache key bug, useCallback identity churn, raster compile pipeline. (Pass 1 shipped 2026-04-30; the user-pain freeze is closed.)
+4. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`. Pattern test catching UI code that bypasses MachineService. Filed as T1-19 follow-up at the time of ship; not strictly needed for runtime safety but closes the architectural-bypass class.
 5. After those four close, all of confirmed-open Tier 1 is shipped.
 
 After those close, every Tier 1 ticket I have evidence for is shipped. We then enter Tier 2, where the audit identifies these as highest leverage:

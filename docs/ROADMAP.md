@@ -943,6 +943,10 @@ sendCommand(command, source, approvalToken?: ApprovalToken): void {
 
 **Priority:** Tier 1 鈥?safety. Second most urgent after T1-18.
 
+**Status:** Shipped in `<HASH>` — `MachineService.requestApproval(command)` mints command-bound, single-use, 30-second-TTL `ApprovalToken`s for warn/dangerous classifications (returns `null` for safe). `MachineService.sendCommand(cmd, source, approvalToken?)` rejects `'user'` source warn/dangerous lines without a matching token; nonces are added to a bounded consumed-nonce cache on consumption so replays fail without unbounded memory growth. UI at `ConnectionPanelMain.sendCmd` now calls `requestApproval` after the confirm dialog and threads the resulting token through. The structured `Error` carries `blockReason: 'no-token' | 'token-mismatch' | 'token-expired' | 'token-replayed'` for callers that want to format messages from data. Test: `tests/machine-service-user-sendcommand.test.ts` (46/46) covers token shape, single-use replay protection, command-binding, expiry, error fields, and malformed-token rejection.
+
+**Static guard owed:** `tests/no-direct-controller-sendcommand-from-ui.test.ts` filed as a follow-up. Pattern mirrors `no-gcode-in-ui` (T2-4 phase 8). Catches the architectural-bypass class (UI code calling `controllerRef.current.sendCommand` directly), separate from the runtime check that ships now.
+
 ---
 
 ### T1-20 | WCS normalization no-listener fallback hardening

@@ -18,7 +18,7 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
-import { type MachineService, type LaserOutputState } from '../../app/MachineService';
+import { type MachineService, type LaserOutputState, type ApprovalToken } from '../../app/MachineService';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
@@ -607,10 +607,12 @@ export function ConnectionPanelMain({
     async (cmd: string) => {
       if (!cmd.trim()) return;
       const classification = machineService.classifyUserCommand(cmd);
-      // T1-6: pass acknowledged severity to MachineService.sendCommand so
-      // the service-layer gate accepts the call. Without it, user-source
-      // warn/dangerous lines now throw COMMAND_BLOCKED.
-      let acknowledged: typeof classification.severity | undefined;
+      // T1-19: confirm with the user, then mint a single-use approval
+      // token via the service. The service is the issuer (UI can't
+      // fabricate a valid token), command-binds the token, time-limits
+      // it (~30s), and consumes the nonce on send. Replaces T1-6's
+      // simpler `acknowledged` severity flag with single-use guarantees.
+      let approvalToken: ApprovalToken | undefined;
       if (classification.severity === 'dangerous') {
         const ok = await showConfirm(
           'Dangerous command',
@@ -620,7 +622,7 @@ export function ConnectionPanelMain({
           appendMessage(`Blocked: ${classification.command}`);
           return;
         }
-        acknowledged = 'dangerous';
+        approvalToken = machineService.requestApproval(cmd) ?? undefined;
       } else if (classification.severity === 'warn') {
         const ok = await showConfirm(
           'Machine state change',
@@ -630,11 +632,11 @@ export function ConnectionPanelMain({
           appendMessage(`Cancelled: ${classification.command}`);
           return;
         }
-        acknowledged = 'warn';
+        approvalToken = machineService.requestApproval(cmd) ?? undefined;
       }
       notifySimulatorTx(cmd);
       try {
-        await machineService.sendCommand(cmd, 'user', { acknowledged });
+        await machineService.sendCommand(cmd, 'user', approvalToken);
       } catch (err: unknown) {
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
         appendMessage(`Error: ${err instanceof Error ? err.message : String(err)}`);

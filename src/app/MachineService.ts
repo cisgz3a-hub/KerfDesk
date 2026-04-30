@@ -61,9 +61,30 @@ export interface MachineServiceState {
   messages: string[];
 }
 
+export interface ApprovalToken {
+  command: string;
+  expiresAt: number;
+  nonce: string;
+  issuedAt?: number;
+  classification?: CommandSeverity;
+}
+
+type ApprovalBlockReason = 'no-token' | 'token-mismatch' | 'token-expired' | 'token-replayed';
+
 export interface JobRecordingSink {
   appendConsoleLine: (line: string) => void;
   onReplayCompleted: (replay: JobReplay) => void;
+}
+
+const APPROVAL_TOKEN_TTL_MS = 30_000;
+const MAX_CONSUMED_APPROVAL_NONCES = 512;
+
+function createApprovalNonce(): string {
+  const cryptoLike = globalThis.crypto as Crypto | undefined;
+  if (typeof cryptoLike?.randomUUID === 'function') {
+    return cryptoLike.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
 }
 
 export class MachineService {
@@ -77,6 +98,7 @@ export class MachineService {
 
   private activeReplay: JobReplay | null = null;
   private currentJobLog: JobLog | null = null;
+  private consumedApprovalNonces = new Map<string, number>();
 
   /** Ticket currently driving the running job, if any. Set by
    *  startValidatedJob; cleared by tryFinalizeJobLog when the job
@@ -717,6 +739,62 @@ export class MachineService {
     return classifyUserGrbl(command);
   }
 
+  requestApproval(command: string): ApprovalToken | null {
+    const classification = classifyUserGrbl(command);
+    if (classification.severity === 'safe') return null;
+
+    const now = Date.now();
+    this.pruneConsumedApprovalNonces(now);
+    return {
+      command: classification.command,
+      issuedAt: now,
+      expiresAt: now + APPROVAL_TOKEN_TTL_MS,
+      classification: classification.severity,
+      nonce: createApprovalNonce(),
+    };
+  }
+
+  private pruneConsumedApprovalNonces(now = Date.now()): void {
+    for (const [nonce, expiresAt] of this.consumedApprovalNonces) {
+      if (expiresAt <= now) {
+        this.consumedApprovalNonces.delete(nonce);
+      }
+    }
+
+    while (this.consumedApprovalNonces.size > MAX_CONSUMED_APPROVAL_NONCES) {
+      const oldest = this.consumedApprovalNonces.keys().next().value;
+      if (typeof oldest !== 'string') break;
+      this.consumedApprovalNonces.delete(oldest);
+    }
+  }
+
+  private blockUserCommand(
+    classification: CommandClassification,
+    blockReason: ApprovalBlockReason,
+  ): never {
+    const reasonByBlock: Record<ApprovalBlockReason, string> = {
+      'no-token': 'approval token is required',
+      'token-mismatch': 'approval token does not match this command',
+      'token-expired': 'approval token has expired',
+      'token-replayed': 'approval token has already been used',
+    };
+    const err = new Error(
+      `Command blocked: ${classification.severity} command ${reasonByBlock[blockReason]}. ${classification.reason}`,
+    ) as Error & {
+      code: 'COMMAND_BLOCKED';
+      severity: CommandSeverity;
+      reason: string;
+      command: string;
+      blockReason: ApprovalBlockReason;
+    };
+    err.code = 'COMMAND_BLOCKED';
+    err.severity = classification.severity;
+    err.reason = classification.reason;
+    err.command = classification.command;
+    err.blockReason = blockReason;
+    throw err;
+  }
+
   /**
    * Forward a line to GRBL.
    *
@@ -728,14 +806,15 @@ export class MachineService {
    * User-typed lines from the console pass `source: 'user'`. The service
    * classifies the line via {@link classifyUserCommand} (the same
    * classifier the UI uses to drive confirm dialogs) and rejects warn /
-   * dangerous lines that don't carry a matching `acknowledged` severity.
+   * dangerous lines that don't carry a single-use approval token from
+   * {@link requestApproval}.
    *
    * The UI flow:
    *   1. Call `classifyUserCommand(cmd)` → get severity.
    *   2. If safe, call `sendCommand(cmd, 'user')`.
-   *   3. If warn or dangerous, show confirm dialog. On approval, call
-   *      `sendCommand(cmd, 'user', { acknowledged: severity })`. On
-   *      rejection, do not send.
+   *   3. If warn or dangerous, show confirm dialog. On approval, mint
+   *      `const token = requestApproval(cmd)` and call
+   *      `sendCommand(cmd, 'user', token)`. On rejection, do not send.
    *
    * The point of the service-layer gate is defense in depth (T1-6).
    * If a future caller — a script panel, an MCP tool, an automation,
@@ -744,33 +823,40 @@ export class MachineService {
    * rejected with a thrown error rather than silently executed. The UI
    * remains the primary gate; this is the wall behind the first wall.
    *
-   * Throws `Error` with `code: 'COMMAND_BLOCKED'` and `severity` /
-   * `reason` properties when a user line is blocked.
+   * Throws `Error` with `code: 'COMMAND_BLOCKED'` and structured
+   * `severity` / `reason` / `command` / `blockReason` properties when
+   * a user line is blocked.
    */
   async sendCommand(
     command: string,
     source: 'internal' | 'user' = 'internal',
-    options: { acknowledged?: CommandSeverity } = {},
+    approvalToken?: ApprovalToken,
   ): Promise<void> {
     if (source === 'user') {
       const classification = classifyUserGrbl(command);
-      if (
-        classification.severity !== 'safe'
-        && options.acknowledged !== classification.severity
-      ) {
-        const err = new Error(
-          `Command blocked: ${classification.severity} command sent without acknowledgement. ${classification.reason}`,
-        ) as Error & {
-          code: 'COMMAND_BLOCKED';
-          severity: CommandSeverity;
-          reason: string;
-          command: string;
-        };
-        err.code = 'COMMAND_BLOCKED';
-        err.severity = classification.severity;
-        err.reason = classification.reason;
-        err.command = classification.command;
-        throw err;
+      if (classification.severity !== 'safe') {
+        const now = Date.now();
+        this.pruneConsumedApprovalNonces(now);
+
+        if (!approvalToken) {
+          this.blockUserCommand(classification, 'no-token');
+        }
+        if (
+          approvalToken.command !== classification.command
+          || typeof approvalToken.nonce !== 'string'
+          || approvalToken.nonce.length === 0
+          || (approvalToken.classification != null && approvalToken.classification !== classification.severity)
+        ) {
+          this.blockUserCommand(classification, 'token-mismatch');
+        }
+        if (this.consumedApprovalNonces.has(approvalToken.nonce)) {
+          this.blockUserCommand(classification, 'token-replayed');
+        }
+        if (!Number.isFinite(approvalToken.expiresAt) || now > approvalToken.expiresAt) {
+          this.blockUserCommand(classification, 'token-expired');
+        }
+        this.consumedApprovalNonces.set(approvalToken.nonce, approvalToken.expiresAt);
+        this.pruneConsumedApprovalNonces(now);
       }
     }
     this.controllerRef.current.sendCommand(command, source);
