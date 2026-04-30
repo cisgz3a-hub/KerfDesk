@@ -147,7 +147,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `<TBD>`** — dither cache key now uses FNV-1a 32-bit content hash via `buildDitherCacheKey` in `SceneRenderer.ts` instead of `adjustedData.length`; removes false-cache-hit class on brightness/contrast/gamma adjustments. Pinned by `tests/dither-cache-key-content-hash.test.ts` (12/12). Hardware verification of UI responsiveness still owed (Pass 1 + Pass 2). | Passes 3-4 still open: `importImageUnified` identity churn, raster compile pipeline. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key now uses FNV-1a 32-bit content hash via `buildDitherCacheKey` in `SceneRenderer.ts` instead of `adjustedData.length`; removes false-cache-hit class on brightness/contrast/gamma adjustments. Pinned by `tests/dither-cache-key-content-hash.test.ts` (12/12). Hardware verification of UI responsiveness still owed (Pass 1 + Pass 2). | Passes 3-4 still open: `importImageUnified` identity churn, raster compile pipeline. |
 
 ### 鉁?Confirmed open
 
