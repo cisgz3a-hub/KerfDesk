@@ -5855,53 +5855,57 @@ Status mapping:
 
 ---
 
-### T1-97 | Frame-before-start bypass override (production-only, per-session)
+### T1-97 | Frame-before-start bypass override (per-session, free-user accessible)
 
-**Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (`hasFramed` ref at line 294; `[historyVersion]` watcher at line 422; `canStartJob` at line 1068; production-only More Options block around line 1850).
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (`hasFramed` ref line 294; `frameBypass` state added; `[historyVersion]` and `[isConnected]` watchers updated; `canStartJob` line 1068; new control in More Options drawer).
 
-**Problem:** A real tester reports that on a 6-block box scene, the Start button never enables — even after a successful Frame run that visibly traces the corners on the laser. On a 5-block scene, identical hardware/profile, Start enables normally. Diagnosis: the `[historyVersion]` watcher resets `hasFramed.current = false` whenever `setHistoryVersion` is called, and something in the 6-block compile / autosave / cache pipeline is firing a non-preview `commitSceneTransaction` post-frame that bumps `historyVersion`. The `hasFramed` flips from `true` (set by `handleFrameSafe` line 789) to `false` between Frame completion and the user clicking Start. Underlying defect (which call site fires the phantom commit) is not yet pinpointed; that diagnostic is a separate task.
+**Problem:** A real tester on the public web build (`laserforge.pages.dev`, free, no Pro license, no production mode) is blocked from completing supervised burns. On 6+ object scenes, the Start button never enables — even after a successful Frame run that visibly traces the corners. On 5-object scenes, identical machine state, Start enables normally. Diagnosis: the `[historyVersion]` watcher resets `hasFramed.current = false` whenever `setHistoryVersion` is called, and something post-frame on 6+ object scenes is firing a non-preview `commitSceneTransaction` that bumps `historyVersion`. Underlying defect (which call site) is **not yet pinpointed**; that diagnostic is filed as **T1-98** (next).
 
-This ticket is **not the underlying-defect fix.** It's an **escape hatch** for the supervised tester so the alpha can keep running while the underlying defect is diagnosed and fixed properly.
+This ticket is **not the underlying-defect fix.** It's the **escape hatch** so the supervised tester can keep running while T1-98 is diagnosed and fixed properly.
 
-**Fix:** Add a production-mode-only, Pro-license-gated, per-session `frameBypass` state to ConnectionPanelMain. When engaged via an explicit confirm dialog, it satisfies the frame conjunct in `canStartJob` even if `hasFramed.current === false`. It auto-disengages on:
-  - Scene change (same `[historyVersion]` watcher that resets `hasFramed`).
-  - Disconnect / reconnect (the existing `[isConnected]` watcher).
+**Why free-user accessible (not productionMode-only):** the only physical-hardware tester is on the free public web build. A productionMode-gated override (which would have been the conservative version) is a non-fix — it's invisible to the actual blocked user. This is documented because it is a deliberate widening of the bandage.
+
+**Fix:** Add a per-session `frameBypass` state to ConnectionPanelMain. Engaged via a button in the More Options drawer that opens a confirm() dialog with full risk language. When engaged, the `canStartJob` frame conjunct widens from `(!requireFrame || hasFramed.current)` to `(!requireFrame || hasFramed.current || frameBypass)`. Auto-disengages on:
+  - Any `historyVersion` bump (scene change).
+  - Any `[isConnected]` reset (disconnect / reconnect).
   - Browser reload (state, never localStorage).
 
-It logs:
-  - On engage: `⚠ T1-97 FRAME-BYPASS ENABLED. Wrong-origin burns will not be caught for this session. Resets on scene change or disconnect.`
-  - On scene-change-disengage: `⚠ Frame-bypass auto-disengaged: design changed since override was enabled.`
-  - On manual disengage: `Frame-bypass disengaged.`
+Logged in the messages console on engage and on each disengage path.
 
-**Why this is a Tier 1 ticket and not Tier 4:**
+**Why this is Tier 1 and not Tier 4:** This is a deliberate, localized weakening of safety invariant 3 (frame-before-start gate). It does not fit Tier 4 polish criteria. It ships because the only physical-hardware tester is blocked, T1-98 (real fix) is unsized, and the bypass is bounded by confirm() + per-session + auto-disengage + logging. Default behavior unchanged for every user not engaging the override.
 
-This is a deliberate, localized weakening of safety invariant 3 (frame-before-start gate). It doesn't fit Tier 4 polish criteria. It is shipped because:
-  - The only physical-hardware tester is blocked from completing supervised burns.
-  - The underlying defect (phantom `commitSceneTransaction` post-frame on 6+ object scenes) is not yet diagnosed and a real fix is a separate ticket of unknown size.
-  - The bypass is gated on production mode (Pro-only), confirmation dialog, and per-session lifecycle.
-  - The default behavior for every other user is unchanged.
+The bypass is a *bandage*, not a *cure*. **T1-98 supersedes this.** Once T1-98 lands, T1-97 should remain in place as a safety-net for any future regression of the same class, but its primary use case is gone.
 
-The bypass is a *bandage*, not a *cure*. The ticket for the actual cure (T1-98) supersedes this one — once T1-98 lands, T1-97 should remain as a safety-net but its primary use case is gone.
-
-**Tests:** `tests/frame-bypass-override.test.tsx` (6 contracts):
-  1. Initial state: bypass off, T1-59 enforced.
-  2. Non-production mode cannot engage bypass.
-  3. Declined acknowledgement does not engage bypass.
-  4. Engaging bypass overrides frame conjunct.
-  5. `[historyVersion]` bump auto-disengages bypass.
-  6. Disconnect clears bypass; normal frame path and `requireFrame=false` still work.
+**Tests:** `tests/frame-bypass-override.test.tsx` (6 contracts) — initial off, engaging widens conjunct, scene-change auto-disengage, disconnect auto-disengage, normal frame path still works, requireFrame=false irrelevance.
 
 **Out of scope:**
   - Diagnosing the underlying 6-vs-5 defect. T1-98 owns that.
   - Persisting the override across sessions. Explicitly forbidden.
   - Disabling other gates (preflight, machine-state, laser-state, WCS). All other gates remain active.
-  - Beginner-mode access. Production-mode-only by design.
 
-**Estimate:** ~1 hour including tests.
+**Estimate:** ~1 hour including tests. Shipped.
 
-**Priority:** Tier 1 — tester-blocker, with explicit safety-relaxation tradeoff documented.
+**Priority:** Tier 1 — tester-blocker, safety-relaxation tradeoff documented.
 
-**Status:** Shipped 2026-04-30 in `68bd79a0931754b69956ce242ed76ccfde5d002e`.
+**Status:** Shipped 2026-04-30 in `<TBD>`.
+
+---
+
+### T1-98 | Diagnose & fix underlying historyVersion-bump-post-frame defect
+
+**Code reference:** `src/ui/components/App.tsx` (`invalidate.frame` callback line 815; `commitSceneTransaction` wiring line 798); `src/ui/components/ConnectionPanelMain.tsx:422` (`[historyVersion]` watcher).
+
+**Problem:** Reported by tester 2026-04-30. On 6+ object box scenes, after a successful `handleFrameSafe` (corner-streaming completes, `hasFramed.current = true` set at line 789), the gate flips back to `false` before the user can click Start. Cause: a non-preview `commitSceneTransaction` fires post-frame, which calls `invalidate.frame()`, which bumps `historyVersion`, which resets `hasFramed`. On 5-object scenes the same path either doesn't fire or fires before Frame completes. Hypotheses (none confirmed yet):
+  - Autosave round-trip re-entering the commit path.
+  - `_bounds`/`_worldTransform` cache fill committing scene state.
+  - Compile/optimizer pipeline mutating scene post-frame.
+  - Preflight side effect mutating scene at a threshold.
+
+**Fix shape (estimated):** identify the offending call site via diagnostic logging, add `meta.invalidatesFrame: false` at that site, OR change the offending commit to `kind: 'preview'` if it's a UI-only state churn. Estimated 5-30 lines once the trigger is known.
+
+**Status:** Open. Blocked on diagnostic data from tester. Next step: instrument `invalidate.frame` to log the call site that fires post-handleFrameSafe.
+
+**Priority:** Tier 1 — supersedes T1-97 (the bandage).
 
 ---
 

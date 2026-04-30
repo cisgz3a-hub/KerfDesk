@@ -1,5 +1,5 @@
 /**
- * T1-97: Frame-before-start bypass override (production-only).
+ * T1-97: Frame-before-start bypass override (per-session, free-user accessible).
  *
  * Run: npx tsx tests/frame-bypass-override.test.tsx
  */
@@ -45,13 +45,7 @@ interface HarnessState {
 
 const captures: HarnessState[] = [];
 
-function Harness({
-  productionMode,
-  requireFrame,
-}: {
-  productionMode: boolean;
-  requireFrame: boolean;
-}): React.ReactElement {
+function Harness({ requireFrame }: { requireFrame: boolean }): React.ReactElement {
   const hasFramed = useRef(false);
   const [frameBypassState, setFrameBypassState] = useState(false);
   const frameBypassRef = useRef(false);
@@ -79,13 +73,7 @@ function Harness({
     }
   }, [historyVersion, setFrameBypass]);
 
-  useEffect(() => {
-    if (!productionMode) {
-      setFrameBypass(false);
-    }
-  }, [productionMode, setFrameBypass]);
-
-  const effectiveFrameBypass = productionMode && frameBypassState;
+  const effectiveFrameBypass = frameBypassState;
   const canStart = !requireFrame || hasFramed.current || effectiveFrameBypass;
 
   captures.push({
@@ -94,7 +82,6 @@ function Harness({
     canStart,
     messages,
     enableBypass: (ack: boolean) => {
-      if (!productionMode) return;
       if (!ack) return;
       setFrameBypass(true);
       setMessages(prev => [...prev, '⚠ T1-97 FRAME-BYPASS ENABLED.']);
@@ -111,15 +98,12 @@ function Harness({
   return React.createElement('div');
 }
 
-async function renderHarness(
-  productionMode: boolean,
-  requireFrame = true,
-): Promise<{ root: Root }> {
+async function renderHarness(requireFrame = true): Promise<{ root: Root }> {
   const container = win.document.getElementById('root')!;
   container.innerHTML = '';
   const root = createRoot(container);
   await act(async () => {
-    root.render(React.createElement(Harness, { productionMode, requireFrame }));
+    root.render(React.createElement(Harness, { requireFrame }));
   });
   return { root };
 }
@@ -129,11 +113,11 @@ async function cleanup(root: Root): Promise<void> {
 }
 
 async function run(): Promise<void> {
-  console.log('\n=== T1-97 frame-bypass override ===\n');
+  console.log('\n=== T1-97 frame-bypass override (free-user accessible) ===\n');
 
   {
     captures.length = 0;
-    const { root } = await renderHarness(true);
+    const { root } = await renderHarness();
     const last = captures[captures.length - 1]!;
     assert(!last.frameBypass && !last.hasFramed && !last.canStart, 'initial state: bypass off and T1-59 enforced');
     await cleanup(root);
@@ -141,34 +125,16 @@ async function run(): Promise<void> {
 
   {
     captures.length = 0;
-    const { root } = await renderHarness(false);
+    const { root } = await renderHarness();
     await act(async () => { captures[captures.length - 1]!.enableBypass(true); });
     const last = captures[captures.length - 1]!;
-    assert(!last.frameBypass && !last.canStart, 'non-production mode cannot engage bypass');
+    assert(last.frameBypass && !last.hasFramed && last.canStart, 'acknowledged bypass overrides frame conjunct');
     await cleanup(root);
   }
 
   {
     captures.length = 0;
-    const { root } = await renderHarness(true);
-    await act(async () => { captures[captures.length - 1]!.enableBypass(false); });
-    const last = captures[captures.length - 1]!;
-    assert(!last.frameBypass && !last.canStart, 'declined acknowledgement does not engage bypass');
-    await cleanup(root);
-  }
-
-  {
-    captures.length = 0;
-    const { root } = await renderHarness(true);
-    await act(async () => { captures[captures.length - 1]!.enableBypass(true); });
-    const last = captures[captures.length - 1]!;
-    assert(last.frameBypass && !last.hasFramed && last.canStart, 'acknowledged production bypass overrides frame conjunct');
-    await cleanup(root);
-  }
-
-  {
-    captures.length = 0;
-    const { root } = await renderHarness(true);
+    const { root } = await renderHarness();
     await act(async () => { captures[captures.length - 1]!.enableBypass(true); });
     await act(async () => { captures[captures.length - 1]!.bumpHistory(); });
     const last = captures[captures.length - 1]!;
@@ -179,7 +145,7 @@ async function run(): Promise<void> {
 
   {
     captures.length = 0;
-    const { root } = await renderHarness(true);
+    const { root } = await renderHarness();
     await act(async () => { captures[captures.length - 1]!.enableBypass(true); });
     await act(async () => { captures[captures.length - 1]!.setIsConnected(false); });
     const disconnected = captures[captures.length - 1]!;
@@ -188,10 +154,11 @@ async function run(): Promise<void> {
     await cleanup(root);
 
     captures.length = 0;
-    const noFrame = await renderHarness(true, false);
+    const noFrame = await renderHarness(false);
     const noFrameLast = captures[captures.length - 1]!;
-    assert(!disconnected.frameBypass && !disconnected.canStart && framed.canStart && noFrameLast.canStart,
-      'disconnect clears bypass; normal frame and requireFrame=false paths still pass');
+    assert(!disconnected.frameBypass && !disconnected.canStart, 'disconnect clears bypass and re-enforces the gate');
+    assert(framed.canStart, 'normal frame path still passes without bypass');
+    assert(noFrameLast.canStart, 'requireFrame=false makes bypass irrelevant');
     await cleanup(noFrame.root);
   }
 

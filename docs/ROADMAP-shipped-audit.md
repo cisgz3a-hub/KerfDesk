@@ -144,7 +144,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
 | T1-95 | `ui-start-job-uses-ticket.test.tsx` frame-wait insufficient post-T1-59 | `tests/ui-start-job-uses-ticket.test.tsx:283` `await flush(1400);` covers worst-case `frameSafe` corner-streaming + idle-poll budget. Was the "known pre-existing failure" carried as baseline through Fixes #1-#3. Shipped 2026-04-30 in `05ce7b86`, bundled with T1-17 Pass 4a (workflow rule #4 violation, retroactively documented here for bisect hygiene). |
 | T1-96 | Start-button readiness diagnostics panel | New `src/ui/components/connection/StartReadinessPanel.tsx`; structured `StartReadiness` payload built in `ConnectionPanelMain.tsx` from existing gate state; replaces single-string `startDisabledReason`. 8 gates: controllerConnected, gcodeCompiled, gcodeFresh, preflight, machineState, framing, laserState, wcsState. Collapsed = first-failing-gate headline; expanded = full list with status glyphs, action hints, preflight detail items. Pinned by `tests/start-readiness-panel.test.tsx` (6/6). Preempted T1-17 Pass 4b/4c because the only physical-hardware tester was blocked from burning. Shipped 2026-04-30 in `5e8cff96d983d30cac721b8d6717c9fbfac9d6df`. |
-| T1-97 | Frame-before-start bypass override (production-only, per-session) | New `frameBypass` state in `ConnectionPanelMain.tsx`; canStartJob's frame conjunct now `(!requireFrame \|\| hasFramed.current \|\| frameBypass)`. Bypass requires (1) production mode (Pro-license-gated by App.tsx), (2) explicit confirm dialog, (3) auto-disengages on `[historyVersion]` bump or `[isConnected]` reset. Logged on engage/disengage. **Tier 1 safety relaxation, deliberately localized: tester-blocker bandage; underlying 6-vs-5 defect tracked under T1-98.** Pinned by `tests/frame-bypass-override.test.tsx` (6/6). Shipped 2026-04-30 in `68bd79a0931754b69956ce242ed76ccfde5d002e`. |
+| T1-97 | Frame-before-start bypass override (per-session, free-user accessible) | New `frameBypass` state in `ConnectionPanelMain.tsx`; canStartJob's frame conjunct widened to `(!requireFrame \|\| hasFramed.current \|\| frameBypass)`. Engaged via More Options drawer button + confirm() dialog with risk language. Auto-disengages on `[historyVersion]` bump, `[isConnected]` reset, and browser reload. Logged on engage/disengage. **Tier 1 safety relaxation, deliberately localized: tester-blocker bandage. Underlying defect (phantom commitSceneTransaction post-frame on 6+ objects) tracked in T1-98 — supersedes this.** Pinned by `tests/frame-bypass-override.test.tsx` (6/6). Shipped 2026-04-30 in `<TBD>`. |
 
 ### 鈼?Partial
 
@@ -320,7 +320,7 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-98 (NEW)** — Diagnose and fix the underlying 6-vs-5 phantom `commitSceneTransaction` post-frame in ConnectionPanelMain. (T1-97 is the bandage; this is the real fix.)
+1. **T1-98** — Diagnose & fix underlying `historyVersion`-bump-post-frame defect (real fix; T1-97 is the bandage).
 2. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present.
 3. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through worker on slider drag.
 4. **T1-19 static guard** — `tests/no-direct-controller-sendcommand-from-ui.test.ts`.
