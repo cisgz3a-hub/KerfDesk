@@ -147,7 +147,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key uses FNV-1a 32-bit content hash via `buildDitherCacheKey`. **Pass 3 shipped 2026-04-30 in `<TBD>`** — `importImageUnified` reads scene from a ref so its useCallback dep array is `[]`; identity stable across scene mutations. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6). Hardware verification of UI responsiveness still owed (Passes 1-3). | Pass 4 still open: defer raster compile pipeline. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. **Pass 2 shipped 2026-04-30 in `0632b2b`** — dither cache key uses FNV-1a 32-bit content hash via `buildDitherCacheKey`. **Pass 3 shipped 2026-04-30 in `b8f3dfb`** — `importImageUnified` reads scene from a ref so its useCallback dep array is `[]`; identity stable across scene mutations. Pinned by `tests/import-callback-identity-stable.test.tsx` (6/6). Hardware verification of UI responsiveness still owed (Passes 1-3). | Pass 4 still open: defer raster compile pipeline. |
 
 ### 鉁?Confirmed open
 
