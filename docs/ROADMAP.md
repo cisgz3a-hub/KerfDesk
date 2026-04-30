@@ -5887,7 +5887,7 @@ The bypass is a *bandage*, not a *cure*. **T1-98 supersedes this.** Once T1-98 l
 
 **Priority:** Tier 1 — tester-blocker, safety-relaxation tradeoff documented.
 
-**Status:** Shipped 2026-04-30 in `<TBD>`.
+**Status:** Shipped 2026-04-30 in `24e5dd468a6939f679c880e0e56d15229ac6504d`.
 
 ---
 
