@@ -41,6 +41,53 @@ export interface BoxParams {
   kerf?: number;
 }
 
+/**
+ * Convert interior cavity dimensions to exterior bounding-box
+ * dimensions for our finger-joint convention.
+ *
+ * Convention (see tests/box-geometry.test.ts — Bottom.bottom finger
+ * x-positions match Front.bottom slot x-positions, so Bottom and Front
+ * share `width`): each face's outer rectangle aligns with the box
+ * exterior on its axis; walls sit flush with floor outer edges.
+ *
+ *   cavity_W = exterior_W - 2*thickness
+ *   cavity_D = exterior_D - 2*thickness
+ *   cavity_H = exterior_H - 2*thickness (closed) or - thickness (open top)
+ *
+ * Inside mode: user types cavity; we add walls to get exterior for
+ * {@link generateBoxFaces}.
+ */
+export function interiorToExterior(
+  insideW: number,
+  insideH: number,
+  insideD: number,
+  thickness: number,
+  openTop: boolean,
+): { width: number; height: number; depth: number } {
+  return {
+    width: insideW + 2 * thickness,
+    depth: insideD + 2 * thickness,
+    height: insideH + (openTop ? thickness : 2 * thickness),
+  };
+}
+
+/**
+ * Inverse of {@link interiorToExterior} — exterior → interior cavity.
+ */
+export function exteriorToInterior(
+  exteriorW: number,
+  exteriorH: number,
+  exteriorD: number,
+  thickness: number,
+  openTop: boolean,
+): { width: number; height: number; depth: number } {
+  return {
+    width: exteriorW - 2 * thickness,
+    depth: exteriorD - 2 * thickness,
+    height: exteriorH - (openTop ? thickness : 2 * thickness),
+  };
+}
+
 export function generateBoxFaces(params: BoxParams): BoxFace[] {
   const { width, height, depth, thickness: t, fingerWidth: fw, openTop, kerf = 0 } = params;
   const spacing = t * 2 + 5;

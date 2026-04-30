@@ -3,7 +3,7 @@ import { generateId } from '../../core/types';
 import { NumberInput } from './NumberInput';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
-import { generateBoxFaces } from '../../core/box/boxGeometry';
+import { generateBoxFaces, interiorToExterior, exteriorToInterior } from '../../core/box/boxGeometry';
 import { KERF_PRESETS, findPresetIdForKerf } from '../../core/box/kerfPresets';
 
 interface BoxGeneratorProps {
@@ -20,7 +20,15 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   const [fingerWidth, setFingerWidth] = useState(10);
   const [kerf, setKerf] = useState(0);
   const [openTop, setOpenTop] = useState(false);
+  const [dimensionMode, setDimensionMode] = useState<'outside' | 'inside'>('outside');
   const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const resolved = dimensionMode === 'inside'
+    ? interiorToExterior(width, height, depth, thickness, openTop)
+    : { width, height, depth };
+  const cavity = dimensionMode === 'outside'
+    ? exteriorToInterior(width, height, depth, thickness, openTop)
+    : { width, height, depth };
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -45,7 +53,15 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
     ctx.fillStyle = '#08080f';
     ctx.fillRect(0, 0, cw, ch);
 
-    const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop, kerf });
+    const faces = generateBoxFaces({
+      width: resolved.width,
+      height: resolved.height,
+      depth: resolved.depth,
+      thickness,
+      fingerWidth,
+      openTop,
+      kerf,
+    });
     if (faces.length === 0) return;
 
     let minX = Infinity;
@@ -81,15 +97,15 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
-      const cx = face.offsetX + (face.name === 'Front' || face.name === 'Back' ? width / 2 : depth / 2);
-      const cy = face.offsetY + (face.name === 'Bottom' || face.name === 'Top' ? depth / 2 : height / 2);
+      const cx = face.offsetX + (face.name === 'Front' || face.name === 'Back' ? resolved.width / 2 : resolved.depth / 2);
+      const cy = face.offsetY + (face.name === 'Bottom' || face.name === 'Top' ? resolved.depth / 2 : resolved.height / 2);
       ctx.fillStyle = '#555570';
       ctx.font = `${Math.max(8, Math.min(12, scale * 5))}px ${font}`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(face.name, cx * scale + ox, cy * scale + oy);
     }
-  }, [width, height, depth, thickness, fingerWidth, openTop, kerf]);
+  }, [width, height, depth, thickness, fingerWidth, openTop, kerf, dimensionMode]);
 
   const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -104,7 +120,9 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   };
 
   const materialAreaCm2 = Math.round(
-    ((width * height * 2) + (depth * height * 2) + (width * depth * (openTop ? 1 : 2))) / 100,
+    ((resolved.width * resolved.height * 2)
+      + (resolved.depth * resolved.height * 2)
+      + (resolved.width * resolved.depth * (openTop ? 1 : 2))) / 100,
   );
 
   return React.createElement('div', {
@@ -132,10 +150,39 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
 
       React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 } },
         React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
+          React.createElement('div', { key: 'dimMode', style: { marginBottom: 10 } },
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, 'Dimensions are'),
+            React.createElement('div', { style: { display: 'flex', gap: 4 } },
+              React.createElement('button', {
+                type: 'button',
+                onClick: () => setDimensionMode('outside'),
+                style: {
+                  flex: 1, padding: '6px', fontSize: 11,
+                  background: dimensionMode === 'outside' ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                  border: dimensionMode === 'outside' ? '1px solid #00d4ff' : '1px solid #252540',
+                  borderRadius: 6,
+                  color: dimensionMode === 'outside' ? '#00d4ff' : '#555570',
+                  cursor: 'pointer', fontFamily: font,
+                },
+              }, 'Outside'),
+              React.createElement('button', {
+                type: 'button',
+                onClick: () => setDimensionMode('inside'),
+                style: {
+                  flex: 1, padding: '6px', fontSize: 11,
+                  background: dimensionMode === 'inside' ? 'rgba(0,212,255,0.1)' : '#0a0a14',
+                  border: dimensionMode === 'inside' ? '1px solid #00d4ff' : '1px solid #252540',
+                  borderRadius: 6,
+                  color: dimensionMode === 'inside' ? '#00d4ff' : '#555570',
+                  cursor: 'pointer', fontFamily: font,
+                },
+              }, 'Inside'),
+            ),
+          ),
           ...[
-            { key: 'width', label: 'Width (mm)', value: width, set: setWidth, min: 10, max: 500, step: 1 },
-            { key: 'height', label: 'Height (mm)', value: height, set: setHeight, min: 10, max: 500, step: 1 },
-            { key: 'depth', label: 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
+            { key: 'width', label: dimensionMode === 'inside' ? 'Width inside (mm)' : 'Width (mm)', value: width, set: setWidth, min: 10, max: 500, step: 1 },
+            { key: 'height', label: dimensionMode === 'inside' ? 'Height inside (mm)' : 'Height (mm)', value: height, set: setHeight, min: 10, max: 500, step: 1 },
+            { key: 'depth', label: dimensionMode === 'inside' ? 'Depth inside (mm)' : 'Depth (mm)', value: depth, set: setDepth, min: 10, max: 500, step: 1 },
             { key: 'thickness', label: 'Material (mm)', value: thickness, set: setThickness, min: 1, max: 20, step: 0.1 },
             { key: 'fingerWidth', label: 'Finger width', value: fingerWidth, set: setFingerWidth, min: 3, max: 50, step: 1 },
           ].map(f =>
@@ -200,6 +247,10 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
           React.createElement('div', { style: { fontSize: 9, color: '#444460', lineHeight: 1.5 } },
             `${openTop ? 5 : 6} faces`, React.createElement('br'),
             `Material: ${thickness}mm`, React.createElement('br'),
+            dimensionMode === 'inside'
+              ? `Exterior: ${resolved.width}×${resolved.height}×${resolved.depth}mm`
+              : `Interior: ${cavity.width}×${cavity.height}×${cavity.depth}mm`,
+            React.createElement('br'),
             `~${materialAreaCm2}cm² material`,
           ),
         ),
@@ -217,7 +268,15 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
           onClick: () => {
             const layerId = scene.activeLayerId || scene.layers[0]?.id;
             if (!layerId) return;
-            const faces = generateBoxFaces({ width, height, depth, thickness, fingerWidth, openTop, kerf });
+            const faces = generateBoxFaces({
+              width: resolved.width,
+              height: resolved.height,
+              depth: resolved.depth,
+              thickness,
+              fingerWidth,
+              openTop,
+              kerf,
+            });
             const objects: SceneObject[] = faces.map(face => ({
               id: generateId(),
               type: 'polygon' as const,

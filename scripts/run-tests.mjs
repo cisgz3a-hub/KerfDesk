@@ -146,6 +146,7 @@ const files = [
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
+  'box-dimension-modes.test.ts',
   'kerf-presets.test.ts',
   'velocity-profile.test.ts',
   'plan-accel-sanity.test.ts',
