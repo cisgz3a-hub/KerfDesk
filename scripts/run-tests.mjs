@@ -150,6 +150,7 @@ const files = [
   'start-readiness-panel.test.tsx',
   'frame-bypass-override.test.tsx',
   'frame-idle-timeout-dynamic.test.ts',
+  'savedorigin-not-compile-invalidating.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',

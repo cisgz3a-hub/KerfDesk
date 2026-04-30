@@ -73,6 +73,10 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   const [sceneCompileTick, setSceneCompileTick] = useState(0);
   const sceneCompileTickRef = useRef(0);
   sceneCompileTickRef.current = sceneCompileTick;
+  const savedOriginRef = useRef(savedOrigin);
+  savedOriginRef.current = savedOrigin;
+  const machineBedFromControllerRef = useRef(machineBedFromController);
+  machineBedFromControllerRef.current = machineBedFromController;
 
   const lastCompiledRevisionRef = useRef<number | null>(null);
   const [gcodeStale, setGcodeStaleState] = useState(false);
@@ -85,8 +89,10 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     });
   }, []);
 
-  const savedOriginX = savedOrigin?.x ?? null;
-  const savedOriginY = savedOrigin?.y ?? null;
+  // T1-99: savedOrigin is intentionally NOT a compile-invalidation
+  // dependency. computeGcodeOffset accepts it as `_savedOrigin` and does
+  // not use the value; Set Origin changes GRBL WCS via G10 L20, while the
+  // emitted coordinate stream stays byte-identical.
   const machineBedWidth = machineBedFromController?.width ?? null;
   const machineBedHeight = machineBedFromController?.height ?? null;
 
@@ -97,8 +103,6 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   }, [
     scene,
     startMode,
-    savedOriginX,
-    savedOriginY,
     controllerMaxSpindle,
     machineBedWidth,
     machineBedHeight,
@@ -115,7 +119,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     ) {
       setGcodeStale(true);
     }
-  }, [sceneCompileTick, connectionSidebarOpen]);
+  }, [sceneCompileTick, connectionSidebarOpen, setGcodeStale]);
 
   const compileToResult = useCallback(
     (targetScene: Scene) => {
@@ -126,21 +130,17 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       return pipelineCompileGcode(
         targetScene,
         startMode,
-        savedOrigin,
+        savedOriginRef.current,
         controllerMaxSpindle,
         outputFormat,
-        machineBedFromController,
+        machineBedFromControllerRef.current,
         controllerAccelMmPerS2,
       );
     },
     [
       startMode,
-      savedOriginX,
-      savedOriginY,
       controllerMaxSpindle,
       outputFormat,
-      machineBedWidth,
-      machineBedHeight,
       controllerAccelMmPerS2,
       isJobRunning,
     ],
@@ -160,10 +160,10 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         const result = await pipelineCompileGcode(
           targetScene,
           startMode,
-          savedOrigin,
+          savedOriginRef.current,
           controllerMaxSpindle,
           outputFormat,
-          machineBedFromController,
+          machineBedFromControllerRef.current,
           controllerAccelMmPerS2,
         );
         setLastResult(result);
@@ -185,14 +185,11 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     },
     [
       startMode,
-      savedOriginX,
-      savedOriginY,
       controllerMaxSpindle,
       outputFormat,
-      machineBedWidth,
-      machineBedHeight,
       controllerAccelMmPerS2,
       isJobRunning,
+      setGcodeStale,
     ],
   );
 

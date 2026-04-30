@@ -5929,6 +5929,34 @@ The bypass is a *bandage*, not a *cure*. **T1-98 supersedes this.** Once T1-98 l
 
 ---
 
+### T1-99 | savedOrigin removed from compile-invalidation dep set
+
+**Code reference:** `src/ui/hooks/useCompileManager.ts` (dep arrays previously listing `savedOriginX/Y`); `src/core/output/GcodeOrigin.ts:39-56` (`computeGcodeOffset`, the proof that savedOrigin doesn't affect emission).
+
+**Problem:** Reported as a candidate cause of "Start still grey after jog → Set Origin → Frame" by external code review 2026-04-30. `useCompileManager` listed `savedOriginX` and `savedOriginY` as deps in three closures (compile-tick layout effect, `compileToResult`, `compileGcode`). Any change to the saved origin value flipped `gcodeStale` to true, which the `!gcodeStale` Start gate then enforced — keeping Start grey until the user hit Update.
+
+But `computeGcodeOffset` accepts savedOrigin as parameter `_savedOrigin` — underscored, unused, and never referenced inside the function body. For startMode='savedOrigin', the offset returned is `(-designBounds.minX, -designBounds.minY)`, which is byte-identical to startMode='current'. The physical origin is set by the `G10 L20 P1 X0 Y0` write at Set Origin click time, which zeros GRBL's WCS register. The emitted g-code stream is the same regardless of the saved value.
+
+So the dep was over-cautious. T1-97's bypass override doesn't help here either: bypass only widens the frame conjunct; the `!gcodeStale` gate is independent.
+
+**Fix:** Remove `savedOriginX` and `savedOriginY` from all three dep arrays. Keep the latest saved origin in a ref so explicit compile calls still receive the current value without making saved-origin changes invalidate compiled output. Add a code comment explaining why savedOrigin is not a compile-invalidation dependency.
+
+A new test pins the proof: 7 contracts on `computeGcodeOffset` showing that savedOrigin value is irrelevant to emitted offset, that 'savedOrigin' and 'current' modes produce identical offsets, and that designBounds (the legitimate compile-invalidator) still does change the offset.
+
+**Why not "trigger a clean recompile on Set Origin instead":** wrong direction — we'd be paying the cost of a recompile on every Set Origin click for no actual content change. Better to admit the dep was wrong.
+
+**Tests:** `tests/savedorigin-not-compile-invalidating.test.ts` (7 contracts).
+
+**Out of scope:** the fix doesn't touch the `G10 L20` write path (that still happens correctly on Set Origin click). It only stops the gcodeStale flag from flipping for content-irrelevant changes.
+
+**Estimate:** 30 min including tests. Shipped.
+
+**Priority:** Tier 1 — affects Set Origin → Frame → Start workflow that the tester also reported.
+
+**Status:** Shipped 2026-04-30 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
