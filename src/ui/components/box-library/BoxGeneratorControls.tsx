@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { type BoxFace, computeBoxJointMetrics, exteriorToInterior } from '../../../core/box/boxGeometry';
+import { exteriorToInterior } from '../../../core/box/boxGeometry';
+import { type BoxFace, computeBoxJointMetrics } from '../../../core/box/boxGeometryV2';
 import { KERF_PRESETS, findPresetIdForKerf } from '../../../core/box/kerfPresets';
 import { NumberInput } from '../NumberInput';
 
@@ -13,6 +14,8 @@ interface BoxGeneratorControlsProps {
   fingerWidth: number;
   kerf: number;
   fitAllowance: number;
+  tabExtraDepth: number;
+  slotExtraDepth: number;
   openTop: boolean;
   dimensionMode: DimensionMode;
   resolved: { width: number; height: number; depth: number };
@@ -25,6 +28,8 @@ interface BoxGeneratorControlsProps {
   onFingerWidthChange: (value: number) => void;
   onKerfChange: (value: number) => void;
   onFitAllowanceChange: (value: number) => void;
+  onTabExtraDepthChange: (value: number) => void;
+  onSlotExtraDepthChange: (value: number) => void;
   onOpenTopChange: (value: boolean) => void;
   onDimensionModeChange: (value: DimensionMode) => void;
   onGenerate: () => void;
@@ -39,7 +44,19 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
   const cavity = props.dimensionMode === 'outside'
     ? exteriorToInterior(props.width, props.height, props.depth, props.thickness, props.openTop)
     : { width: props.width, height: props.height, depth: props.depth };
-  const jointMetrics = computeBoxJointMetrics(props.thickness, props.kerf, props.fitAllowance);
+  const jointMetrics = computeBoxJointMetrics({
+    width: props.resolved.width,
+    height: props.resolved.height,
+    depth: props.resolved.depth,
+    thickness: props.thickness,
+    fingerWidth: props.fingerWidth,
+    openTop: props.openTop,
+    kerf: props.kerf,
+    fitAllowance: props.fitAllowance,
+    tabExtraDepth: props.tabExtraDepth,
+    slotExtraDepth: props.slotExtraDepth,
+    cornerRelief: 'micro-overcut',
+  });
   const materialAreaCm2 = Math.round(
     ((props.resolved.width * props.resolved.height * 2)
       + (props.resolved.depth * props.resolved.height * 2)
@@ -109,6 +126,10 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
         field('kerf', 'Kerf', props.kerf, props.onKerfChange, 0, 1, 0.05),
         field('fitAllowance', 'Fit allowance', props.fitAllowance, props.onFitAllowanceChange, 0, 0.5, 0.01),
       ),
+      React.createElement('div', { style: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 8 } },
+        field('tabExtraDepth', 'Tab extra depth', props.tabExtraDepth, props.onTabExtraDepthChange, 0, 1.5, 0.05),
+        field('slotExtraDepth', 'Slot extra depth', props.slotExtraDepth, props.onSlotExtraDepthChange, 0, 2, 0.05),
+      ),
     ),
     React.createElement('div', { style: statsGridStyle },
       statCard(props.dimensionMode === 'inside' ? 'Cut size' : 'Inside cavity',
@@ -116,6 +137,8 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
           ? `${props.resolved.width} × ${props.resolved.height} × ${props.resolved.depth} mm`
           : `${cavity.width} × ${cavity.height} × ${cavity.depth} mm`),
       statCard('Joint clearance', `~${jointMetrics.expectedWidthClearance.toFixed(2)} mm`),
+      statCard('Tab depth', `~${jointMetrics.physicalTabDepth.toFixed(2)} mm`),
+      statCard('Slot depth', `~${jointMetrics.physicalSlotDepth.toFixed(2)} mm`),
       statCard('Faces', `${props.openTop ? 5 : 6}`),
       statCard('Material', `${props.thickness} mm`),
       statCard('Layout area', `~${materialAreaCm2} cm²`),
@@ -142,7 +165,7 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
           })
         : activeTab === 'assembly'
           ? infoPanel('Assembly preview will use the same finger-joint layout: bottom first, side walls next, lid/top last when enabled.')
-          : infoPanel('Best results: test a calibration coupon for new material, confirm kerf with calipers, then generate the full-size box.'),
+          : infoPanel('For a new material, burn the Fit Test Coupon first. Plywood thickness and kerf vary enough to make full boxes fail. Measure the sheet with calipers and tune clearance before the full box.'),
     ),
     React.createElement('button', {
       type: 'button',
@@ -241,7 +264,7 @@ const sectionStyle: React.CSSProperties = {
 
 const statsGridStyle: React.CSSProperties = {
   display: 'grid',
-  gridTemplateColumns: 'repeat(5, minmax(0, 1fr))',
+  gridTemplateColumns: 'repeat(7, minmax(0, 1fr))',
   gap: 6,
 };
 

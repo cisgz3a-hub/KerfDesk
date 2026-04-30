@@ -155,6 +155,7 @@ const files = [
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
+  'box-joinery-v2.test.ts',
   'box-library.test.ts',
   'box-preset-preview-model.test.ts',
   'box-library-filtering.test.tsx',

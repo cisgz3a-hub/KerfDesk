@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { generateId } from '../../../core/types';
 import { type Scene } from '../../../core/scene/Scene';
 import { type SceneObject } from '../../../core/scene/SceneObject';
-import { generateBoxFaces, interiorToExterior } from '../../../core/box/boxGeometry';
+import { interiorToExterior } from '../../../core/box/boxGeometry';
+import { generateBoxFacesV2 } from '../../../core/box/boxGeometryV2';
 import { BOX_LIBRARY_PRESETS, getBoxPresetById } from '../../../core/box/boxLibrary';
 import type { BoxLibraryPreset } from '../../../core/box/boxLibraryTypes';
 import { useBoxLibraryState } from '../../hooks/useBoxLibraryState';
@@ -41,6 +42,8 @@ export function BoxStudioWorkspace({
   const [fingerWidth, setFingerWidthRaw] = useState(initialPreset.fingerWidth);
   const [kerf, setKerfRaw] = useState(() => validNumber(persistedPrefs.lastKerf, initialPreset.kerf));
   const [fitAllowance, setFitAllowanceRaw] = useState(() => validNumber(persistedPrefs.lastFitAllowance, initialPreset.fitAllowance));
+  const [tabExtraDepth, setTabExtraDepthRaw] = useState(0.2);
+  const [slotExtraDepth, setSlotExtraDepthRaw] = useState(0.35);
   const [openTop, setOpenTopRaw] = useState(initialPreset.openTop);
   const [dimensionMode, setDimensionModeRaw] = useState<DimensionMode>('outside');
   const [appliedPresetId, setAppliedPresetId] = useState<string | null>(null);
@@ -59,6 +62,8 @@ export function BoxStudioWorkspace({
   const setFingerWidth = useCallback((v: number) => { setFingerWidthRaw(v); markCustom(); }, [markCustom]);
   const setKerf = useCallback((v: number) => { setKerfRaw(v); markCustom(); }, [markCustom]);
   const setFitAllowance = useCallback((v: number) => { setFitAllowanceRaw(v); markCustom(); }, [markCustom]);
+  const setTabExtraDepth = useCallback((v: number) => { setTabExtraDepthRaw(v); markCustom(); }, [markCustom]);
+  const setSlotExtraDepth = useCallback((v: number) => { setSlotExtraDepthRaw(v); markCustom(); }, [markCustom]);
   const setOpenTop = useCallback((v: boolean) => { setOpenTopRaw(v); markCustom(); }, [markCustom]);
   const setDimensionMode = useCallback((v: DimensionMode) => { setDimensionModeRaw(v); markCustom(); }, [markCustom]);
 
@@ -75,7 +80,7 @@ export function BoxStudioWorkspace({
   const resolved = dimensionMode === 'inside'
     ? interiorToExterior(width, height, depth, thickness, openTop)
     : { width, height, depth };
-  const faces = useMemo(() => generateBoxFaces({
+  const faces = useMemo(() => generateBoxFacesV2({
     width: resolved.width,
     height: resolved.height,
     depth: resolved.depth,
@@ -84,7 +89,10 @@ export function BoxStudioWorkspace({
     openTop,
     kerf,
     fitAllowance,
-  }), [resolved.width, resolved.height, resolved.depth, thickness, fingerWidth, openTop, kerf, fitAllowance]);
+    tabExtraDepth,
+    slotExtraDepth,
+    cornerRelief: 'micro-overcut',
+  }), [resolved.width, resolved.height, resolved.depth, thickness, fingerWidth, openTop, kerf, fitAllowance, tabExtraDepth, slotExtraDepth]);
 
   const applyPreset = useCallback((preset: BoxLibraryPreset): void => {
     library.setSelectedPresetId(preset.id);
@@ -98,6 +106,8 @@ export function BoxStudioWorkspace({
     setFingerWidthRaw(preset.fingerWidth);
     setKerfRaw(preset.kerf);
     setFitAllowanceRaw(preset.fitAllowance);
+    setTabExtraDepthRaw(0.2);
+    setSlotExtraDepthRaw(0.35);
     setOpenTopRaw(preset.openTop);
   }, [library]);
 
@@ -107,7 +117,7 @@ export function BoxStudioWorkspace({
 
   const generateTestCoupon = useCallback(() => {
     const preset = getBoxPresetById('fit-test-mini-box') ?? BOX_LIBRARY_PRESETS[0]!;
-    const couponFaces = generateBoxFaces({
+    const couponFaces = generateBoxFacesV2({
       width: preset.width,
       height: preset.height,
       depth: preset.depth,
@@ -116,6 +126,9 @@ export function BoxStudioWorkspace({
       openTop: preset.openTop,
       kerf: preset.kerf,
       fitAllowance: preset.fitAllowance,
+      tabExtraDepth: 0.2,
+      slotExtraDepth: 0.35,
+      cornerRelief: 'micro-overcut',
     });
     onGenerate(buildBoxObjects(scene, couponFaces));
   }, [onGenerate, scene]);
@@ -174,6 +187,8 @@ export function BoxStudioWorkspace({
         fingerWidth,
         kerf,
         fitAllowance,
+        tabExtraDepth,
+        slotExtraDepth,
         openTop,
         dimensionMode,
         resolved,
@@ -186,6 +201,8 @@ export function BoxStudioWorkspace({
         onFingerWidthChange: setFingerWidth,
         onKerfChange: setKerf,
         onFitAllowanceChange: setFitAllowance,
+        onTabExtraDepthChange: setTabExtraDepth,
+        onSlotExtraDepthChange: setSlotExtraDepth,
         onOpenTopChange: setOpenTop,
         onDimensionModeChange: setDimensionMode,
         onGenerate: generateCurrent,
@@ -194,7 +211,7 @@ export function BoxStudioWorkspace({
   );
 }
 
-function buildBoxObjects(scene: Scene, faces: ReturnType<typeof generateBoxFaces>): SceneObject[] {
+function buildBoxObjects(scene: Scene, faces: ReturnType<typeof generateBoxFacesV2>): SceneObject[] {
   const layerId = scene.activeLayerId || scene.layers[0]?.id;
   if (!layerId) return [];
   return faces.map(face => ({
