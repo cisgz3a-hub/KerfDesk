@@ -1,4 +1,4 @@
-﻿# LaserForge Roadmap 鈥?Verified Shipped Audit
+# LaserForge Roadmap 鈥?Verified Shipped Audit
 
 **Audit date:** 2026-04-30
 **Repo state at audit:** master at `7fb7b7f` (`feat(connection): auto-detect $32=0 with one-click remediation banner`)
@@ -146,7 +146,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | What's done | What's missing |
 |---|---|---|---|
-| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `<HASH>`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. Main-thread fallback at `src/workers/imagePrepClient.ts:prepareImageGrayscaleMainThread`. Math equivalence pinned by `tests/image-prep-grayscale-equivalence.test.ts` (18/18). Build emits `dist/assets/ImagePrepWorker-*.js` chunk. Hardware verification of UI responsiveness still owed. | Passes 2-4 still open: dither cache key bug, `importImageUnified` identity churn, raster compile pipeline. |
+| T1-17 | Image import freezes the app | **Pass 1 shipped 2026-04-30 in `023a341`** — grayscale loop offloaded to `src/workers/ImagePrepWorker.ts`. Main-thread fallback at `src/workers/imagePrepClient.ts:prepareImageGrayscaleMainThread`. Math equivalence pinned by `tests/image-prep-grayscale-equivalence.test.ts` (18/18). Build emits `dist/assets/ImagePrepWorker-*.js` chunk. Hardware verification of UI responsiveness still owed. | Passes 2-4 still open: dither cache key bug, `importImageUnified` identity churn, raster compile pipeline. |
 
 ### 鉁?Confirmed open
 

@@ -1,4 +1,4 @@
-﻿> **Repo source-of-truth notice**
+> **Repo source-of-truth notice**
 >
 > This file is the authoritative roadmap for LaserForge. It pairs with `docs/ROADMAP-shipped-audit.md`, which is the verified ledger of what has been shipped against this list.
 >
@@ -837,7 +837,7 @@ Each was a variant of the same anti-pattern: useEffect dispatching state writes 
 
 **Priority:** Tier 1. Active user-facing slowdown affecting every image-engrave workflow. The user explicitly reported this; not theoretical.
 
-**Status (pass 1):** Shipped in `<HASH>` — grayscale loop and `getImageData` call moved to a Web Worker (`src/workers/ImagePrepWorker.ts`). Main-thread fallback for runtimes without `Worker` / `OffscreenCanvas` / `createImageBitmap` (`src/workers/imagePrepClient.ts:prepareImageGrayscaleMainThread`). `useImport.ts` calls `prepareImageGrayscale(img, gsWidth, gsHeight)` instead of running canvas + per-pixel loop inline. Math is byte-for-byte identical between worker and fallback paths — pinned by `tests/image-prep-grayscale-equivalence.test.ts` (18/18). Hardware verification needed: import a 4-12MP phone photo and confirm UI stays responsive throughout.
+**Status (pass 1):** Shipped in `023a341` — grayscale loop and `getImageData` call moved to a Web Worker (`src/workers/ImagePrepWorker.ts`). Main-thread fallback for runtimes without `Worker` / `OffscreenCanvas` / `createImageBitmap` (`src/workers/imagePrepClient.ts:prepareImageGrayscaleMainThread`). `useImport.ts` calls `prepareImageGrayscale(img, gsWidth, gsHeight)` instead of running canvas + per-pixel loop inline. Math is byte-for-byte identical between worker and fallback paths — pinned by `tests/image-prep-grayscale-equivalence.test.ts` (18/18). Hardware verification needed: import a 4-12MP phone photo and confirm UI stays responsive throughout.
 
 **Passes 2, 3, 4 remain open** — dither cache key bug, `importImageUnified` identity churn, raster compile pipeline. File new follow-up tickets (or extend this one with sub-status notes) when their turn comes.
 
