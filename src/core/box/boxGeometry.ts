@@ -12,6 +12,29 @@ export interface BoxFace {
   offsetY: number;
 }
 
+export interface BoxJointMetrics {
+  /** Material removed by the laser cut, full kerf width in mm. */
+  kerf: number;
+  /** Intentional looseness applied to each mating side of the joint. */
+  fitAllowance: number;
+  /** Boundary adjustment used for finger/slot width compensation. */
+  widthCompensation: number;
+  /** Drawn outward tab depth before the laser removes half-kerf at the tip. */
+  drawnTabDepth: number;
+  /** Drawn inward slot depth before the laser removes half-kerf at the pocket end. */
+  drawnSlotDepth: number;
+  /** Expected final physical tab depth after cutting. */
+  physicalTabDepth: number;
+  /** Expected final physical slot depth after cutting. */
+  physicalSlotDepth: number;
+  /** Expected physical tab-width change from nominal segment width. */
+  physicalTabWidthDelta: number;
+  /** Expected physical slot-width change from nominal segment width. */
+  physicalSlotWidthDelta: number;
+  /** Expected slot width minus tab width for a nominally matched pair. */
+  expectedWidthClearance: number;
+}
+
 export interface BoxParams {
   width: number;
   height: number;
@@ -20,35 +43,62 @@ export interface BoxParams {
   fingerWidth: number;
   openTop: boolean;
   /**
-   * Kerf width in mm — the thickness of material the laser removes
-   * along each cut path. Default 0 (no compensation).
+   * Kerf width in mm — the thickness of material the laser removes along each
+   * cut path. A real value is essential for finger-joint boxes. Measure this
+   * per material/machine/focus setup with a small test coupon.
    *
-   * With kerf=k, finger tabs are widened by k and slot openings are
-   * narrowed by k. After the laser cuts (removing k/2 on each side of
-   * each cut path), tabs and slots both end up at the nominal finger
-   * width, producing a snug joint.
-   *
-   * Typical values: 0.1mm for diode lasers on 3mm plywood, 0.15-0.2mm
-   * for CO2 lasers on 3mm acrylic. Users should measure their own
-   * kerf with a test cut and adjust until joints fit.
-   *
-   * Edge segments (the leftmost and rightmost finger of an edge)
-   * receive only half-kerf compensation on their inner side — they
-   * terminate at the rectangle boundary on the outer side and don't
-   * mate with anything beyond the corner, so no compensation is
-   * needed there.
+   * The generator treats kerf as physical beam width. Width compensation shifts
+   * internal tab/slot boundaries by kerf/2; depth compensation draws tabs
+   * kerf/2 longer and slots kerf/2 shallower so post-cut tab/slot depth lands
+   * back on material thickness.
    */
   kerf?: number;
+  /**
+   * Intentional fit looseness in mm per mating side. This is separate from
+   * kerf: kerf corrects the beam, fitAllowance controls press/glue fit.
+   *
+   * fitAllowance=0 gives a mathematically snug joint after kerf compensation.
+   * fitAllowance=0.03 makes tabs ~0.03mm narrower and slots ~0.03mm wider than
+   * nominal, for ~0.06mm total side-to-side clearance.
+   */
+  fitAllowance?: number;
+}
+
+function sanitizeNonNegative(value: number | undefined, fallback = 0): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return fallback;
+  return Math.max(0, value);
+}
+
+export function computeBoxJointMetrics(thickness: number, kerf = 0, fitAllowance = 0): BoxJointMetrics {
+  const t = sanitizeNonNegative(thickness);
+  const k = sanitizeNonNegative(kerf);
+  const allowance = sanitizeNonNegative(fitAllowance);
+  const k2 = k / 2;
+  const drawnTabDepth = t + k2;
+  const drawnSlotDepth = Math.max(0.1, t - k2);
+
+  return {
+    kerf: k,
+    fitAllowance: allowance,
+    widthCompensation: k - allowance,
+    drawnTabDepth,
+    drawnSlotDepth,
+    physicalTabDepth: drawnTabDepth - k2,
+    physicalSlotDepth: drawnSlotDepth + k2,
+    physicalTabWidthDelta: -allowance,
+    physicalSlotWidthDelta: allowance,
+    expectedWidthClearance: allowance * 2,
+  };
 }
 
 /**
- * Convert interior cavity dimensions to exterior bounding-box
- * dimensions for our finger-joint convention.
+ * Convert interior cavity dimensions to exterior bounding-box dimensions for
+ * our finger-joint convention.
  *
- * Convention (see tests/box-geometry.test.ts — Bottom.bottom finger
- * x-positions match Front.bottom slot x-positions, so Bottom and Front
- * share `width`): each face's outer rectangle aligns with the box
- * exterior on its axis; walls sit flush with floor outer edges.
+ * Convention (see tests/box-geometry.test.ts — Bottom.bottom finger x-positions
+ * match Front.bottom slot x-positions, so Bottom and Front share `width`): each
+ * face's outer rectangle aligns with the box exterior on its axis; walls sit
+ * flush with floor outer edges.
  *
  *   cavity_W = exterior_W - 2*thickness
  *   cavity_D = exterior_D - 2*thickness
@@ -89,7 +139,16 @@ export function exteriorToInterior(
 }
 
 export function generateBoxFaces(params: BoxParams): BoxFace[] {
-  const { width, height, depth, thickness: t, fingerWidth: fw, openTop, kerf = 0 } = params;
+  const {
+    width,
+    height,
+    depth,
+    thickness: t,
+    fingerWidth: fw,
+    openTop,
+    kerf = 0,
+    fitAllowance = 0,
+  } = params;
   const spacing = t * 2 + 5;
   const sidewallTop: EdgeMode = openTop ? 'flat' : 'slot';
   const row2Y = height + spacing + t;
@@ -98,31 +157,31 @@ export function generateBoxFaces(params: BoxParams): BoxFace[] {
   const faces: BoxFace[] = [
     {
       name: 'Front',
-      points: generateRectWithFingers(width, height, t, fw, sidewallTop, 'slot', 'finger', 'finger', kerf),
+      points: generateRectWithFingers(width, height, t, fw, sidewallTop, 'slot', 'finger', 'finger', kerf, fitAllowance),
       offsetX: t,
       offsetY: t,
     },
     {
       name: 'Back',
-      points: generateRectWithFingers(width, height, t, fw, sidewallTop, 'slot', 'finger', 'finger', kerf),
+      points: generateRectWithFingers(width, height, t, fw, sidewallTop, 'slot', 'finger', 'finger', kerf, fitAllowance),
       offsetX: width + spacing + t,
       offsetY: t,
     },
     {
       name: 'Left',
-      points: generateRectWithFingers(depth, height, t, fw, sidewallTop, 'slot', 'slot', 'slot', kerf),
+      points: generateRectWithFingers(depth, height, t, fw, sidewallTop, 'slot', 'slot', 'slot', kerf, fitAllowance),
       offsetX: t,
       offsetY: row2Y,
     },
     {
       name: 'Right',
-      points: generateRectWithFingers(depth, height, t, fw, sidewallTop, 'slot', 'slot', 'slot', kerf),
+      points: generateRectWithFingers(depth, height, t, fw, sidewallTop, 'slot', 'slot', 'slot', kerf, fitAllowance),
       offsetX: depth + spacing + t,
       offsetY: row2Y,
     },
     {
       name: 'Bottom',
-      points: generateRectWithFingers(width, depth, t, fw, 'finger', 'finger', 'finger', 'finger', kerf),
+      points: generateRectWithFingers(width, depth, t, fw, 'finger', 'finger', 'finger', 'finger', kerf, fitAllowance),
       offsetX: t,
       offsetY: row3Y,
     },
@@ -131,7 +190,7 @@ export function generateBoxFaces(params: BoxParams): BoxFace[] {
   if (!openTop) {
     faces.push({
       name: 'Top',
-      points: generateRectWithFingers(width, depth, t, fw, 'finger', 'finger', 'finger', 'finger', kerf),
+      points: generateRectWithFingers(width, depth, t, fw, 'finger', 'finger', 'finger', 'finger', kerf, fitAllowance),
       offsetX: width + spacing + t,
       offsetY: row3Y,
     });
@@ -144,26 +203,28 @@ export function generateBoxFaces(params: BoxParams): BoxFace[] {
  * Generate a rectangle with finger joints on each edge.
  *
  * Each edge can be 'finger' (tabs out), 'slot' (notches in), or 'flat'
- * (straight). 'finger' and 'slot' both partition the edge into the same
- * `count` segments and act on the same `i%2===0` positions, so they
- * naturally interlock when paired on the same shared edge.
+ * (straight). 'finger' and 'slot' both partition the edge into the same `count`
+ * segments and act on the same `i%2===0` positions, so they naturally interlock
+ * when paired on the same shared edge.
  *
  * Outward normals (for finger direction):
- *   top:    -y  (finger pushes up = -t, slot cuts down = +t)
- *   right:  +x  (finger pushes right = +t, slot cuts left = -t)
- *   bottom: +y  (finger pushes down = +t, slot cuts up = -t)
- *   left:   -x  (finger pushes left = -t, slot cuts right = +t)
+ *   top:    -y  (finger pushes up, slot cuts down)
+ *   right:  +x  (finger pushes right, slot cuts left)
+ *   bottom: +y  (finger pushes down, slot cuts up)
+ *   left:   -x  (finger pushes left, slot cuts right)
  *
- * Kerf compensation:
- *   When kerf > 0, fingers are widened by `kerf` and slots are
- *   narrowed by `kerf`. This is done by shifting internal segment
- *   boundaries by ±kerf/2 — left if the boundary is between a flat
- *   and a (finger or slot), right if the reverse. The first and last
- *   boundaries (at 0 and w/h) stay fixed so the overall rectangle
- *   dimensions don't change. End-segment fingers/slots receive only
- *   half-kerf compensation on their inner side, which matches the
- *   physics: end fingers terminate at the rectangle corner and don't
- *   mate with anything beyond, so no compensation is needed there.
+ * Width kerf/fit compensation:
+ *   - Tabs are widened by (kerf - fitAllowance) before cutting.
+ *   - Slots are narrowed by (kerf - fitAllowance) before cutting.
+ *   After the laser removes kerf, tabs become nominal-fitAllowance and slots
+ *   become nominal+fitAllowance.
+ *
+ * Depth kerf compensation:
+ *   - Outward tab depth is drawn as thickness + kerf/2.
+ *   - Inward slot depth is drawn as thickness - kerf/2.
+ *   After the laser removes/adds half-kerf at the far edge, both physical depths
+ *   land on material thickness. This fixes the common "fingers are too short"
+ *   failure seen when drawn depth equals material thickness.
  */
 export function generateRectWithFingers(
   w: number,
@@ -175,6 +236,7 @@ export function generateRectWithFingers(
   leftMode: EdgeMode,
   rightMode: EdgeMode,
   kerf: number = 0,
+  fitAllowance: number = 0,
 ): Array<{ x: number; y: number }> {
   const points: Array<{ x: number; y: number }> = [];
 
@@ -182,10 +244,14 @@ export function generateRectWithFingers(
   const countH = Math.max(1, Math.round(h / fw)) | 1;
   const segW = w / countW;
   const segH = h / countH;
-  const k2 = kerf / 2;
+  const metrics = computeBoxJointMetrics(t, kerf, fitAllowance);
+  const tabDepth = metrics.drawnTabDepth;
+  const slotDepth = metrics.drawnSlotDepth;
 
   function computeBoundaries(count: number, seg: number, mode: EdgeMode): number[] {
     const total = count * seg;
+    const maxHalfShift = seg * 0.45;
+    const halfComp = Math.max(-maxHalfShift, Math.min(maxHalfShift, metrics.widthCompensation / 2));
     const b: number[] = [];
     for (let i = 0; i <= count; i++) {
       if (i === 0) {
@@ -195,9 +261,9 @@ export function generateRectWithFingers(
       } else if (mode === 'flat') {
         b.push(i * seg);
       } else if (mode === 'finger') {
-        b.push(i * seg + (i % 2 === 1 ? +k2 : -k2));
+        b.push(i * seg + (i % 2 === 1 ? +halfComp : -halfComp));
       } else {
-        b.push(i * seg + (i % 2 === 1 ? -k2 : +k2));
+        b.push(i * seg + (i % 2 === 1 ? -halfComp : +halfComp));
       }
     }
     return b;
@@ -212,9 +278,9 @@ export function generateRectWithFingers(
     const x1 = topBounds[i]!;
     const x2 = topBounds[i + 1]!;
     if (topMode === 'finger' && i % 2 === 0) {
-      points.push({ x: x1, y: 0 }, { x: x1, y: -t }, { x: x2, y: -t }, { x: x2, y: 0 });
+      points.push({ x: x1, y: 0 }, { x: x1, y: -tabDepth }, { x: x2, y: -tabDepth }, { x: x2, y: 0 });
     } else if (topMode === 'slot' && i % 2 === 0) {
-      points.push({ x: x1, y: 0 }, { x: x1, y: t }, { x: x2, y: t }, { x: x2, y: 0 });
+      points.push({ x: x1, y: 0 }, { x: x1, y: slotDepth }, { x: x2, y: slotDepth }, { x: x2, y: 0 });
     } else {
       points.push({ x: x1, y: 0 }, { x: x2, y: 0 });
     }
@@ -224,9 +290,9 @@ export function generateRectWithFingers(
     const y1 = rightBounds[i]!;
     const y2 = rightBounds[i + 1]!;
     if (rightMode === 'finger' && i % 2 === 0) {
-      points.push({ x: w, y: y1 }, { x: w + t, y: y1 }, { x: w + t, y: y2 }, { x: w, y: y2 });
+      points.push({ x: w, y: y1 }, { x: w + tabDepth, y: y1 }, { x: w + tabDepth, y: y2 }, { x: w, y: y2 });
     } else if (rightMode === 'slot' && i % 2 === 0) {
-      points.push({ x: w, y: y1 }, { x: w - t, y: y1 }, { x: w - t, y: y2 }, { x: w, y: y2 });
+      points.push({ x: w, y: y1 }, { x: w - slotDepth, y: y1 }, { x: w - slotDepth, y: y2 }, { x: w, y: y2 });
     } else {
       points.push({ x: w, y: y1 }, { x: w, y: y2 });
     }
@@ -236,9 +302,9 @@ export function generateRectWithFingers(
     const x1 = bottomBounds[i]!;
     const x2 = bottomBounds[i + 1]!;
     if (bottomMode === 'finger' && i % 2 === 0) {
-      points.push({ x: x2, y: h }, { x: x2, y: h + t }, { x: x1, y: h + t }, { x: x1, y: h });
+      points.push({ x: x2, y: h }, { x: x2, y: h + tabDepth }, { x: x1, y: h + tabDepth }, { x: x1, y: h });
     } else if (bottomMode === 'slot' && i % 2 === 0) {
-      points.push({ x: x2, y: h }, { x: x2, y: h - t }, { x: x1, y: h - t }, { x: x1, y: h });
+      points.push({ x: x2, y: h }, { x: x2, y: h - slotDepth }, { x: x1, y: h - slotDepth }, { x: x1, y: h });
     } else {
       points.push({ x: x2, y: h }, { x: x1, y: h });
     }
@@ -248,9 +314,9 @@ export function generateRectWithFingers(
     const y1 = leftBounds[i]!;
     const y2 = leftBounds[i + 1]!;
     if (leftMode === 'finger' && i % 2 === 0) {
-      points.push({ x: 0, y: y2 }, { x: -t, y: y2 }, { x: -t, y: y1 }, { x: 0, y: y1 });
+      points.push({ x: 0, y: y2 }, { x: -tabDepth, y: y2 }, { x: -tabDepth, y: y1 }, { x: 0, y: y1 });
     } else if (leftMode === 'slot' && i % 2 === 0) {
-      points.push({ x: 0, y: y2 }, { x: t, y: y2 }, { x: t, y: y1 }, { x: 0, y: y1 });
+      points.push({ x: 0, y: y2 }, { x: slotDepth, y: y2 }, { x: slotDepth, y: y1 }, { x: 0, y: y1 });
     } else {
       points.push({ x: 0, y: y2 }, { x: 0, y: y1 });
     }

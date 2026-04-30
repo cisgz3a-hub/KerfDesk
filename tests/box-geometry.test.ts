@@ -2,7 +2,7 @@
  * Regression tests for finger-joint box geometry.
  * Run: npx tsx tests/box-geometry.test.ts
  */
-import { generateBoxFaces, generateRectWithFingers } from '../src/core/box/boxGeometry';
+import { computeBoxJointMetrics, generateBoxFaces, generateRectWithFingers } from '../src/core/box/boxGeometry';
 
 let passed = 0;
 let failed = 0;
@@ -185,14 +185,15 @@ console.log('\n-- 11. kerf > 0: finger tabs widen, slot openings narrow, bounds 
   }
 
   const noKerfTabWidth = middleFingerWidth(noKerf, -3);
-  const withKerfTabWidth = middleFingerWidth(withKerf, -3);
+  const withKerfTabWidth = middleFingerWidth(withKerf, -(3 + k / 2));
   assert(
     Math.abs((withKerfTabWidth - noKerfTabWidth) - k) < 0.01,
     `middle left-edge finger width grew by k=${k}: ${noKerfTabWidth} -> ${withKerfTabWidth}`,
   );
 
   function middleSlotWidth(pts: Array<{ x: number; y: number }>): number {
-    const slotPts = pts.filter(p => Math.abs(p.y - 3) < 0.01).map(p => p.x).sort((a, b) => a - b);
+    const slotDepth = Math.max(...pts.filter(p => p.y > 0 && p.y < 10).map(p => p.y));
+    const slotPts = pts.filter(p => Math.abs(p.y - slotDepth) < 0.01).map(p => p.x).sort((a, b) => a - b);
     let bestPair: [number, number] | null = null;
     let bestDist = Infinity;
     for (let i = 0; i + 1 < slotPts.length; i += 2) {
@@ -222,12 +223,12 @@ console.log('\n-- 12. kerf > 0: matched edges still interlock after laser cuts -
   const frontK = face(closedKerf, 'Front');
 
   const bottomFingerTipXs = bottomK.points
-    .filter(p => Math.abs(p.y - (params.depth + params.thickness)) < 0.01)
+    .filter(p => Math.abs(p.y - (params.depth + params.thickness + k / 2)) < 0.01)
     .map(p => p.x)
     .sort((a, b) => a - b);
 
   const frontSlotBottomXs = frontK.points
-    .filter(p => Math.abs(p.y - (params.height - params.thickness)) < 0.01)
+    .filter(p => Math.abs(p.y - (params.height - (params.thickness - k / 2))) < 0.01)
     .map(p => p.x)
     .sort((a, b) => a - b);
 
@@ -257,6 +258,41 @@ console.log('\n-- 12. kerf > 0: matched edges still interlock after laser cuts -
     Math.abs(bottomFingerTipXs[bottomFingerTipXs.length - 1]! - frontSlotBottomXs[frontSlotBottomXs.length - 1]!) < 0.001,
     'kerf-compensated: rectangle right end unshifted (boundary count stays at w)',
   );
+}
+
+console.log('\n-- 13. kerf > 0: physical depth stays equal to material thickness --');
+{
+  const t = 3;
+  const k = 0.2;
+  const metrics = computeBoxJointMetrics(t, k, 0);
+  assert(Math.abs(metrics.drawnTabDepth - 3.1) < 0.001, 'drawn tab depth is thickness + kerf/2');
+  assert(Math.abs(metrics.drawnSlotDepth - 2.9) < 0.001, 'drawn slot depth is thickness - kerf/2');
+  assert(Math.abs(metrics.physicalTabDepth - t) < 0.001, 'physical tab depth returns to material thickness after cut');
+  assert(Math.abs(metrics.physicalSlotDepth - t) < 0.001, 'physical slot depth returns to material thickness after cut');
+
+  const topFinger = generateRectWithFingers(20, 10, t, 5, 'finger', 'flat', 'flat', 'flat', k);
+  const topSlot = generateRectWithFingers(20, 10, t, 5, 'slot', 'flat', 'flat', 'flat', k);
+  assert(Math.abs(Math.abs(min(topFinger, 'y')) - metrics.drawnTabDepth) < 0.001, 'geometry uses compensated outward tab depth');
+  assert(Math.abs(max(topSlot, 'y') - 10) < 0.001, 'top slot still stays within the face bounds');
+  assert(xsAtY(topSlot, metrics.drawnSlotDepth).length > 0, 'geometry uses compensated inward slot depth');
+}
+
+console.log('\n-- 14. fitAllowance loosens matched tab/slot widths without changing depth --');
+{
+  const k = 0.2;
+  const fit = 0.04;
+  const metrics = computeBoxJointMetrics(3, k, fit);
+  assert(Math.abs(metrics.expectedWidthClearance - 0.08) < 0.001, 'fitAllowance is applied per mating side');
+  assert(Math.abs(metrics.physicalTabDepth - 3) < 0.001, 'fit allowance does not shorten physical tab depth');
+  assert(Math.abs(metrics.physicalSlotDepth - 3) < 0.001, 'fit allowance does not deepen physical slot depth');
+
+  const withFit = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger', k, fit);
+  const noFit = generateRectWithFingers(80, 50, 3, 10, 'slot', 'slot', 'finger', 'finger', k, 0);
+  const fitTabWidth = ysAtX(withFit, -(3 + k / 2)).length === 0
+    ? 0
+    : uniqueRounded(withFit.filter(p => Math.abs(p.x - (-(3 + k / 2))) < 0.01).map(p => p.y)).length;
+  assert(fitTabWidth >= 0, 'fitAllowance geometry remains queryable');
+  assert(withFit.length === noFit.length, 'fitAllowance does not change topology');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

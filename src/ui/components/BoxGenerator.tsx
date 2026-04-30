@@ -3,13 +3,36 @@ import { generateId } from '../../core/types';
 import { NumberInput } from './NumberInput';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
-import { generateBoxFaces, interiorToExterior, exteriorToInterior } from '../../core/box/boxGeometry';
+import { generateBoxFaces, interiorToExterior, exteriorToInterior, computeBoxJointMetrics } from '../../core/box/boxGeometry';
 import { KERF_PRESETS, findPresetIdForKerf } from '../../core/box/kerfPresets';
+import { BOX_LIBRARY_PRESETS, formatBoxLibraryCategory, getBoxLibraryPreset } from '../../core/box/boxLibrary';
 
 interface BoxGeneratorProps {
   scene: Scene;
   onGenerate: (objects: SceneObject[]) => void;
   onClose: () => void;
+}
+
+const BOX_KERF_STORAGE_KEY = 'laserforge_box_kerf_mm';
+const BOX_FIT_ALLOWANCE_STORAGE_KEY = 'laserforge_box_fit_allowance_mm';
+
+function readStoredNumber(key: string, fallback: number): number {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw == null) return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredNumber(key: string, value: number): void {
+  try {
+    localStorage.setItem(key, String(value));
+  } catch {
+    // Storage may be unavailable in privacy mode; the generator still works.
+  }
 }
 
 export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) {
@@ -18,20 +41,42 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
   const [depth, setDepth] = useState(40);
   const [thickness, setThickness] = useState(3);
   const [fingerWidth, setFingerWidth] = useState(10);
-  const [kerf, setKerf] = useState(0);
+  const [kerf, setKerf] = useState(() => readStoredNumber(BOX_KERF_STORAGE_KEY, 0.1));
+  const [fitAllowance, setFitAllowance] = useState(() => readStoredNumber(BOX_FIT_ALLOWANCE_STORAGE_KEY, 0.03));
   const [openTop, setOpenTop] = useState(false);
   const [dimensionMode, setDimensionMode] = useState<'outside' | 'inside'>('outside');
+  const [selectedPresetId, setSelectedPresetId] = useState('starter-small-closed');
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
+  const selectedPreset = getBoxLibraryPreset(selectedPresetId);
   const resolved = dimensionMode === 'inside'
     ? interiorToExterior(width, height, depth, thickness, openTop)
     : { width, height, depth };
   const cavity = dimensionMode === 'outside'
     ? exteriorToInterior(width, height, depth, thickness, openTop)
     : { width, height, depth };
+  const jointMetrics = computeBoxJointMetrics(thickness, kerf, fitAllowance);
+
+  const applyPreset = (presetId: string): void => {
+    const preset = getBoxLibraryPreset(presetId);
+    if (!preset) return;
+    setSelectedPresetId(preset.id);
+    setDimensionMode(preset.dimensionMode);
+    setWidth(preset.width);
+    setHeight(preset.height);
+    setDepth(preset.depth);
+    setThickness(preset.thickness);
+    setFingerWidth(preset.fingerWidth);
+    setKerf(preset.kerf);
+    setFitAllowance(preset.fitAllowance);
+    setOpenTop(preset.openTop);
+  };
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
+
+  useEffect(() => { writeStoredNumber(BOX_KERF_STORAGE_KEY, kerf); }, [kerf]);
+  useEffect(() => { writeStoredNumber(BOX_FIT_ALLOWANCE_STORAGE_KEY, fitAllowance); }, [fitAllowance]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -61,6 +106,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       fingerWidth,
       openTop,
       kerf,
+      fitAllowance,
     });
     if (faces.length === 0) return;
 
@@ -116,6 +162,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
     fingerWidth,
     openTop,
     kerf,
+    fitAllowance,
     dimensionMode,
   ]);
 
@@ -148,7 +195,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
     React.createElement('div', {
       style: {
         background: '#12121e', border: '1px solid #252540', borderRadius: 14,
-        width: 560, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const,
+        width: 680, maxHeight: '90vh', display: 'flex', flexDirection: 'column' as const,
         boxShadow: '0 20px 60px rgba(0,0,0,0.6)', overflow: 'hidden',
       },
       onClick: (e: React.MouseEvent) => { e.stopPropagation(); },
@@ -168,7 +215,40 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
       ),
 
       React.createElement('div', { style: { display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 } },
-        React.createElement('div', { style: { width: 200, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
+        React.createElement('div', { style: { width: 260, padding: '16px', borderRight: '1px solid #1a1a2e', overflowY: 'auto' as const } },
+          React.createElement('div', { key: 'library', style: { marginBottom: 14 } },
+            React.createElement('div', {
+              style: { fontSize: 11, color: '#9090b0', marginBottom: 8, fontWeight: 500 },
+            }, 'Box library'),
+            React.createElement('select', {
+              value: selectedPresetId,
+              onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+                const id = e.target.value;
+                setSelectedPresetId(id);
+                applyPreset(id);
+              },
+              style: {
+                ...inputStyle,
+                marginBottom: 6,
+                cursor: 'pointer',
+              },
+            },
+              ...BOX_LIBRARY_PRESETS.map(preset =>
+                React.createElement('option', { key: preset.id, value: preset.id },
+                  `${formatBoxLibraryCategory(preset.category)} — ${preset.title}`,
+                ),
+              ),
+            ),
+            selectedPreset
+              ? React.createElement('div', {
+                  style: {
+                    fontSize: 9, color: '#7a7a95', lineHeight: 1.4,
+                    background: '#0a0a14', border: '1px solid #202038',
+                    borderRadius: 6, padding: '8px 9px',
+                  },
+                }, selectedPreset.description)
+              : null,
+          ),
           // Dimension mode is framed as a concrete project goal instead of
           // an abstract outside/inside choice. First-time users tend to know
           // whether they want a finished box size or a cavity that fits an
@@ -302,6 +382,22 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
               onCommit: (v: number) => setKerf(v),
             }),
           ),
+          React.createElement('div', { key: 'fitAllowance', style: { marginBottom: 10 } },
+            React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 3 } }, 'Fit allowance (mm)'),
+            React.createElement(NumberInput, {
+              value: fitAllowance,
+              min: 0,
+              max: 0.5,
+              step: 0.01,
+              defaultValue: fitAllowance,
+              style: inputStyle,
+              onChange: (v: number) => setFitAllowance(v),
+              onCommit: (v: number) => setFitAllowance(v),
+            }),
+            React.createElement('div', { style: { fontSize: 9, color: '#666680', lineHeight: 1.4, marginTop: 4 } },
+              `Expected joint clearance ≈ ${jointMetrics.expectedWidthClearance.toFixed(2)}mm. Tab/slot depth is kerf-corrected to ${jointMetrics.physicalTabDepth.toFixed(2)}mm material thickness.`,
+            ),
+          ),
           React.createElement('div', { style: { marginBottom: 12 } },
             React.createElement('button', {
               onClick: () => setOpenTop(!openTop),
@@ -366,7 +462,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
                 '.',
             ),
           React.createElement('div', { style: { fontSize: 9, color: '#666680', lineHeight: 1.6 } },
-            `${openTop ? 5 : 6} faces · ${thickness}mm material · ~${materialAreaCm2}cm²`,
+            `${openTop ? 5 : 6} faces · ${thickness}mm material · ${kerf}mm kerf · ${fitAllowance}mm fit · ~${materialAreaCm2}cm²`,
           ),
         ),
 
@@ -391,6 +487,7 @@ export function BoxGenerator({ scene, onGenerate, onClose }: BoxGeneratorProps) 
               fingerWidth,
               openTop,
               kerf,
+              fitAllowance,
             });
             const objects: SceneObject[] = faces.map(face => ({
               id: generateId(),
