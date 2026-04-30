@@ -5891,21 +5891,41 @@ The bypass is a *bandage*, not a *cure*. **T1-98 supersedes this.** Once T1-98 l
 
 ---
 
-### T1-98 | Diagnose & fix underlying historyVersion-bump-post-frame defect
+### T1-98 | Frame idle timeout: dynamic from corner travel distance
 
-**Code reference:** `src/ui/components/App.tsx` (`invalidate.frame` callback line 815; `commitSceneTransaction` wiring line 798); `src/ui/components/ConnectionPanelMain.tsx:422` (`[historyVersion]` watcher).
+**Code reference:** `src/app/grblIdlePoll.ts` (`FRAME_IDLE_TIMEOUT_MS`, new `estimateFrameIdleTimeoutMs`); `src/ui/components/ConnectionPanelMain.tsx` (handleFrameSafe; new `idleTimeoutMs` argument).
 
-**Problem:** Reported by tester 2026-04-30. On 6+ object box scenes, after a successful `handleFrameSafe` (corner-streaming completes, `hasFramed.current = true` set at line 789), the gate flips back to `false` before the user can click Start. Cause: a non-preview `commitSceneTransaction` fires post-frame, which calls `invalidate.frame()`, which bumps `historyVersion`, which resets `hasFramed`. On 5-object scenes the same path either doesn't fire or fires before Frame completes. Hypotheses (none confirmed yet):
-  - Autosave round-trip re-entering the commit path.
-  - `_bounds`/`_worldTransform` cache fill committing scene state.
-  - Compile/optimizer pipeline mutating scene post-frame.
-  - Preflight side effect mutating scene at a threshold.
+**Problem:** Reported by tester 2026-04-30. On 6+ object box scenes (~200×240mm layout sheet) the Start button never enabled even after a successful Frame run. Initial T1-97 spec misdiagnosed this as a phantom `commitSceneTransaction` post-frame; the actual cause was the fixed 15-second idle deadline in `waitForGrblIdle`.
 
-**Fix shape (estimated):** identify the offending call site via diagnostic logging, add `meta.invalidatesFrame: false` at that site, OR change the offending commit to `kind: 'preview'` if it's a UI-only state churn. Estimated 5-30 lines once the trigger is known.
+`frameSafe` calls `waitForGrblIdle(ctrl, args.idleTimeoutMs)`. For a closed rectangular frame around a 200×240mm box layout (880mm travel), the physical frame trace can take more than 15 seconds before GRBL reports idle. The timer expired mid-frame, `frameSafe` returned `{ok:false, reason:'idle-timeout'}`, `ConnectionPanelMain.handleFrameSafe` early-returned, and `hasFramed.current = true` never executed. The Start gate stayed false even though the laser had physically completed framing.
 
-**Status:** Open. Blocked on diagnostic data from tester. Next step: instrument `invalidate.frame` to log the call site that fires post-handleFrameSafe.
+5-object scenes had a smaller layout sheet; their corner travel completed inside 15s; frame was reported successful; Start unlocked.
 
-**Priority:** Tier 1 — supersedes T1-97 (the bandage).
+**Fix:** Replace the fixed 15s timeout with a dynamic estimator based on actual corner travel distance, with a 30s floor and a 2× safety margin plus 5s GRBL settling floor.
+
+  - `estimateFrameIdleTimeoutMs(corners)` = max(30_000, ceil(expectedTravelMs * 2 + 5_000)), where expectedTravelMs uses a conservative 3000 mm/min feed assumption.
+  - `FRAME_IDLE_TIMEOUT_MS` constant raised from 15_000 → 60_000 for non-frame paths and as the back-compat floor.
+  - `ConnectionPanelMain.handleFrameSafe` now passes `idleTimeoutMs: estimateFrameIdleTimeoutMs(corners)` to `frameSafe`.
+  - User-facing message ("did not reach idle within 15s") now reflects the actual timeout used.
+
+**Why dynamic over a flat 60s constant:** the constant is sufficient for current testers but anchors the wrong behavior. Future larger-bed machines may travel 1500-2000mm on a single full-bed frame at conservative G0 — that's 30-40s expected, 65-85s with margin. The dynamic estimator scales correctly without future tuning.
+
+**T1-97 supersession:** this fix removes the underlying cause T1-97 was working around. Once the tester verifies the 6-box frame now completes and unlocks Start without the bypass, T1-97 should be reverted or demoted to productionMode-only as a defensive net for future timeout misfires.
+
+**Tests:** `tests/frame-idle-timeout-dynamic.test.ts` (7 contracts):
+  1. Empty / single-point inputs return the 30s floor.
+  2. Tiny paths return the floor.
+  3. 100×80 design returns the floor (small frame, fast traverse).
+  4. 200×240 design (the 6-box repro case) returns ~40s — above the old 15s and above the floor.
+  5. Old 15s constant would have been insufficient for the 200×240 case.
+  6. New `FRAME_IDLE_TIMEOUT_MS` constant is 60_000.
+  7. Monotonicity: larger frame → larger estimate above floor.
+
+**Estimate:** 30 min including tests. Shipped.
+
+**Priority:** Tier 1 — real-tester-blocker; root cause for T1-97's existence.
+
+**Status:** Shipped 2026-04-30 in `<TBD>`.
 
 ---
 

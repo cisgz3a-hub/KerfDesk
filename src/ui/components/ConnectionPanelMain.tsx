@@ -22,6 +22,7 @@ import { type MachineService, type LaserOutputState, type ApprovalToken } from '
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
+import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { SimulatorView } from './SimulatorView';
@@ -811,15 +812,21 @@ export function ConnectionPanelMain({
     const yLo = Math.min(...ys);
     const yHi = Math.max(...ys);
 
+    // T1-98: estimate idle timeout from corner travel distance instead
+    // of using a fixed 15s deadline that can expire mid-frame.
+    const idleTimeoutMs = estimateFrameIdleTimeoutMs(corners);
+
     setMessages(prev => [...prev,
       `Framing (safe): machine X${corners[0]!.x.toFixed(0)}-${corners[1]!.x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts });
+    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs });
 
     if (!result.ok) {
       if (result.reason === 'idle-timeout') {
-        setMessages(prev => [...prev, '⚠ Frame (Safe): machine did not reach idle within 15s — check machine state']);
+        setMessages(prev => [...prev,
+          `⚠ Frame (Safe): machine did not reach idle within ${Math.round(idleTimeoutMs / 1000)}s — check machine state`,
+        ]);
       }
       return;
     }

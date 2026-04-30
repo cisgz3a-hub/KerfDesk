@@ -149,6 +149,7 @@ const files = [
   'image-processing-worker-equivalence.test.ts',
   'start-readiness-panel.test.tsx',
   'frame-bypass-override.test.tsx',
+  'frame-idle-timeout-dynamic.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
