@@ -34,7 +34,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
-| 1 | 94 | ~35 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
+| 1 | 94 | ~36 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 1 | 3 confirmed | est. ~96% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
 | 3 | 89 | **2** | 0 | **87** | ~2% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
@@ -143,6 +143,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 | T1-21 | Frame-dot try/finally safety scope | `frameDot` at `src/app/ExecutionCoordinator.ts:140` |
 | T1-24 | Error/alarm handlers send laser-off | `_handleError` at `GrblController.ts:1127` and `_handleAlarm` at line 1214, both with T1-24 markers and `safetyOff` calls; `tests/error-handler-sends-safety-off.test.ts`. Commit `2600666`. |
 | T1-95 | `ui-start-job-uses-ticket.test.tsx` frame-wait insufficient post-T1-59 | `tests/ui-start-job-uses-ticket.test.tsx:283` `await flush(1400);` covers worst-case `frameSafe` corner-streaming + idle-poll budget. Was the "known pre-existing failure" carried as baseline through Fixes #1-#3. Shipped 2026-04-30 in `05ce7b86`, bundled with T1-17 Pass 4a (workflow rule #4 violation, retroactively documented here for bisect hygiene). |
+| T1-96 | Start-button readiness diagnostics panel | New `src/ui/components/connection/StartReadinessPanel.tsx`; structured `StartReadiness` payload built in `ConnectionPanelMain.tsx` from existing gate state; replaces single-string `startDisabledReason`. 8 gates: controllerConnected, gcodeCompiled, gcodeFresh, preflight, machineState, framing, laserState, wcsState. Collapsed = first-failing-gate headline; expanded = full list with status glyphs, action hints, preflight detail items. Pinned by `tests/start-readiness-panel.test.tsx` (6/6). Preempted T1-17 Pass 4b/4c because the only physical-hardware tester was blocked from burning. Shipped 2026-04-30 in `<TBD>`. |
 
 ### 鈼?Partial
 
@@ -318,7 +319,9 @@ After the inside-vs-outside ship, all subsequent commits follow the strict roadm
 
 ## Next 5 tickets in strict roadmap order
 
-1. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present (compile stays synchronous; this is the integration step for Pass 4a's worker primitives).
+T1-96 shipped — preempted Pass 4b for tester-unblocker reasons.
+
+1. **T1-17 pass 4b** — JobCompiler consumes pre-processed `adjustedData` when present (resumes after T1-96 unblocked the tester).
 2. **T1-17 pass 4c** — UI pipes brightness/contrast/gamma/invert through the worker on slider drag (user-visible responsiveness win).
 3. **T1-23** — Pause must emit explicit M5. Needs modal-state subsystem. 1-2 sessions.
 4. **T1-25** — Reconnect safe-state handshake. 1-2 sessions.

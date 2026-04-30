@@ -1,4 +1,5 @@
 import React from 'react';
+import { StartReadinessPanel, type StartReadiness } from './StartReadinessPanel';
 
 interface ControlsProps {
   canFrame: boolean;
@@ -6,7 +7,13 @@ interface ControlsProps {
   isSimulator: boolean;
   isRunning: boolean;
   displayPaused: boolean;
-  startDisabledReason: string | null;
+  /**
+   * T1-96: structured readiness state replaces the single-string
+   * `startDisabledReason`. The panel renders nothing when
+   * `readiness.ready === true`, otherwise shows a collapsible per-gate
+   * list with details and actions.
+   */
+  startReadiness: StartReadiness;
   onFrame: () => void;
   onStartJob: () => void;
   onPauseResume: () => void;
@@ -21,7 +28,7 @@ export function Controls({
   isSimulator,
   isRunning,
   displayPaused,
-  startDisabledReason,
+  startReadiness,
   onFrame,
   onStartJob,
   onPauseResume,
@@ -69,18 +76,7 @@ export function Controls({
           },
         }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
       ),
-      startDisabledReason && React.createElement('div', {
-        style: {
-          fontSize: 10,
-          color: '#ffd444',
-          textAlign: 'center' as const,
-          padding: '4px 8px',
-          background: 'rgba(255,212,68,0.06)',
-          border: '1px solid rgba(255,212,68,0.2)',
-          borderRadius: 6,
-          fontFamily: font,
-        },
-      }, startDisabledReason),
+      React.createElement(StartReadinessPanel, { readiness: startReadiness }),
     ),
     (isRunning || displayPaused) && React.createElement('div', {
       style: { display: 'flex', gap: 6 },

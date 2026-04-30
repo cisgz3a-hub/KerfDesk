@@ -5810,6 +5810,51 @@ This was the test that memory and the audit listed as "known pre-existing failur
 
 ---
 
+### T1-96 | Start-button readiness diagnostics panel
+
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx:1077-1096` (one-line `startDisabledReason` IIFE), `src/ui/components/connection/Controls.tsx:72-83` (yellow-text rendering).
+
+**Problem:** When the Start button is disabled, the only feedback is a single yellow line under the button. Real testers don't read it (or don't realize it's the answer to "why won't this start"), and even when they do, it can't surface compound failure: a single line can't show "preflight has 3 blockers AND framing was reset by your last edit AND your saved origin is outside the bed." The user is left guessing, or asking for help. Identified by tester reporting "Start button doesn't light up" with a console log carrying no diagnostic content — the reason was visible in the UI but not noticed.
+
+**Fix:** Replace the single string with a structured `StartReadiness` payload of eight named gates (one per `canStartJob` conjunct, plus controller-connected). Render with a new component `StartReadinessPanel`:
+
+  - **Collapsed state:** the always-visible row shows the headline of the first failing gate (same information density as today's yellow line, but with a clickable disclosure).
+  - **Expanded state:** every gate is listed with a status glyph (✓ / ✗ / …), label, and — for failing gates — the action hint and (preflight only) up to 5 detail items extracted from `PreflightSummary.issues`.
+
+Status mapping:
+
+  - `controllerConnected`: `isConnected`
+  - `gcodeCompiled`: `gcode != null`
+  - `gcodeFresh`: `!gcodeStale` (pending if `!gcode`)
+  - `preflight`: `preflight?.canStart`
+  - `machineState`: `!machineBlocksJobStart` (pending if disconnected or simulator)
+  - `framing`: `!requireFrame || hasFramed.current`
+  - `laserState`: `laserOutputState !== 'unknown'`
+  - `wcsState`: `!placementUncertain`
+
+**Why this preempts T1-17:** T1-17 Pass 4 split (4a/4b/4c) is mid-flight. The strict-rules order says T1-17 finishes before adjacent T1-X. This ticket preempts because it unblocks the only physical-hardware tester from using the app, the same way a safety-critical regression would. T1-17 Pass 4b/4c resume immediately after.
+
+**Tests:** `tests/start-readiness-panel.test.tsx` (6 contracts):
+  1. Ready state renders nothing.
+  2. Failing state shows first-failing-gate headline by default.
+  3. Expanding shows all eight gates.
+  4. Failing preflight surfaces detail items (blockers and warnings, distinct styling).
+  5. Passing gate row does not render an action hint.
+  6. With multiple failures, the first one wins the collapsed headline (canonical order: controller → gcode → fresh → preflight → machine → framing → laser → wcs).
+
+**Out of scope:**
+- Action affordances (clicking a gate doesn't auto-fix anything). Read-only v1 by design — ship truth-telling first, take action later.
+- Surfaces for non-Start workflows (Frame button, Pause, Stop). One intent per surface.
+- Fold-in with T4-3 Inline coaching. T4-3 is a richer treatment of the same problem space and may eventually supersede this; that's a future call.
+
+**Estimate:** ~1 session including tests. Pure UI surface — not safety-critical.
+
+**Priority:** Tier 1 — real-tester unblocker.
+
+**Status:** Shipped 2026-04-30 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

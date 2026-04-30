@@ -36,6 +36,7 @@ import { Issues } from './connection/Issues';
 import { Progress } from './connection/Progress';
 import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
+import type { StartReadiness, StartReadinessGate } from './connection/StartReadinessPanel';
 import { Workflow } from './connection/Workflow';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
@@ -320,7 +321,7 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessages([]);
     setShowSimulator(false);
-  }, []);
+  }, [setMessages]);
 
   useEffect(() => {
     isTestFiringRef.current = isTestFiring;
@@ -381,11 +382,13 @@ export function ConnectionPanelMain({
   }, [
     scene,
     gcode,
+    machineState,
     preflightMachinePresent,
     preflightMachineStatus,
     preflightMachineAlarm,
     bedWidth,
     bedHeight,
+    machinePlanBounds,
     preflightPlanMinX,
     preflightPlanMinY,
     preflightPlanMaxX,
@@ -599,7 +602,7 @@ export function ConnectionPanelMain({
     setShowSimulator(false);
     clearMessages();
     onDisconnect?.();
-  }, [stopTestFire, notifySimulatorTx, onDisconnect, machineService, clearMessages]);
+  }, [stopTestFire, onDisconnect, machineService, clearMessages, portRef]);
 
   // ─── Machine control ────────────────────────────────────
 
@@ -789,7 +792,7 @@ export function ConnectionPanelMain({
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator]);
+  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -843,7 +846,7 @@ export function ConnectionPanelMain({
     hasFramed.current = true;
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator]);
+  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
@@ -1014,6 +1017,7 @@ export function ConnectionPanelMain({
   );
 
   const estimatedRemaining = useMemo(() => {
+    void elapsedSeconds; // tick once per second while the job is active
     if (!jobProgress || jobStartTime == null || jobProgress.linesAcknowledged < 2 || !jobProgress.totalLines) {
       return null;
     }
@@ -1074,25 +1078,105 @@ export function ConnectionPanelMain({
     (!requireFrame || hasFramed.current) &&
     laserOutputState !== 'unknown' &&
     !placementUncertain;
-  /** Human-readable reason the Start button is disabled, or null if ready. */
-  const startDisabledReason: string | null = (() => {
-    if (isRunning) return null; // button is replaced with Pause/Stop; not relevant
-    if (!gcode) return 'Click G-code in the toolbar to compile this design';
-    if (gcodeStale) return 'Design changed - click ↻ Update above';
-    if (!preflight?.canStart) return 'Fix the issues listed below first';
-    if (machineBlocksJobStart) {
-      return `Machine is "${machineStatus}" — wait for idle (stop or reset on the controller if needed)`;
+  /**
+   * T1-96: structured Start-button readiness for the diagnostics panel.
+   *
+   * Each gate corresponds 1:1 with a conjunct in `canStartJob` above.
+   * `blockingGate` is the first failing gate; it drives the collapsed
+   * headline. When `canStartJob` is true, `ready` is true and the panel
+   * renders nothing.
+   */
+  const startReadiness: StartReadiness = (() => {
+    const blockerCount = preflight?.blockers ?? 0;
+    const warningCount = preflight?.warnings ?? 0;
+    const preflightDetails = (preflight?.issues ?? [])
+      .filter(i => i.severity === 'blocker' || i.severity === 'warning')
+      .slice(0, 5)
+      .map(i => ({
+        severity: i.severity as 'blocker' | 'warning',
+        text: i.title,
+      }));
+
+    const gates: StartReadinessGate[] = [
+      {
+        id: 'controllerConnected',
+        label: 'Controller connected',
+        status: isConnected ? 'ok' : 'fail',
+        failHeadline: 'No controller connection',
+        failAction: 'Connect to the laser using the Connect button above',
+      },
+      {
+        id: 'gcodeCompiled',
+        label: 'G-code compiled',
+        status: gcode ? 'ok' : 'fail',
+        failHeadline: 'No G-code yet',
+        failAction: 'Click G-code in the toolbar to compile this design',
+      },
+      {
+        id: 'gcodeFresh',
+        label: 'G-code matches current design',
+        status: !gcode ? 'pending' : (gcodeStale ? 'fail' : 'ok'),
+        failHeadline: 'Design changed since last compile',
+        failAction: 'Click ↻ Update above to recompile',
+      },
+      {
+        id: 'preflight',
+        label: 'Design preflight checks',
+        status: preflight == null
+          ? 'pending'
+          : (preflight.canStart ? 'ok' : 'fail'),
+        failHeadline: blockerCount > 0
+          ? `${blockerCount} blocker${blockerCount === 1 ? '' : 's'}${warningCount > 0 ? ` and ${warningCount} warning${warningCount === 1 ? '' : 's'}` : ''}`
+          : 'Preflight blocked',
+        failDetails: preflightDetails,
+        failAction: 'Open the Issues panel above to see and fix each one',
+      },
+      {
+        id: 'machineState',
+        label: 'Machine idle',
+        status: !isConnected || isSimulator
+          ? 'pending'
+          : (machineBlocksJobStart ? 'fail' : 'ok'),
+        failHeadline: machineStatus
+          ? `Machine is "${machineStatus}"`
+          : 'Machine not in idle state',
+        failAction: 'Wait for idle, or stop/reset on the controller if it is stuck',
+      },
+      {
+        id: 'framing',
+        label: 'Job framed',
+        status: !requireFrame
+          ? 'ok'
+          : (hasFramed.current ? 'ok' : 'fail'),
+        failHeadline: 'Frame not done since last design change',
+        failAction: 'Click Frame to confirm where the laser will burn (resets when you edit the design)',
+      },
+      {
+        id: 'laserState',
+        label: 'Laser-safety state known',
+        status: laserOutputState === 'unknown' ? 'fail' : 'ok',
+        failHeadline: 'Laser-safety state unknown',
+        failAction: 'A previous laser-off write failed — disconnect and reconnect to clear',
+      },
+      {
+        id: 'wcsState',
+        label: 'Work-coordinate state confirmed',
+        status: placementUncertain ? 'fail' : 'ok',
+        failHeadline: 'Work-coordinate state could not be confirmed',
+        failAction: 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry',
+      },
+    ];
+
+    if (isRunning) {
+      return { ready: true, blockingGate: null, gates };
     }
-    if (requireFrame && !hasFramed.current) {
-      return 'Frame the job first (use Frame button) — this confirms where the laser will burn';
-    }
-    if (laserOutputState === 'unknown') {
-      return 'Laser-safety state is unknown after a previous laser-off failure — reconnect to clear';
-    }
-    if (placementUncertain) {
-      return 'Machine work-coordinate state could not be confirmed (no consent prompt was shown). Disconnect and reconnect to retry.';
-    }
-    return null; // ready to start
+
+    const blockingGate = gates.find(g => g.status === 'fail') ?? null;
+    return {
+      ready: canStartJob,
+      blockingGate,
+      gates,
+    };
   })();
   void workflowVersion;
 
@@ -1725,7 +1809,7 @@ export function ConnectionPanelMain({
     isSimulator,
     isRunning,
     displayPaused,
-    startDisabledReason,
+    startReadiness,
     onFrame: () => { void handleFrameSafe(); },
     onStartJob: () => { void handleStartJob(); },
     onPauseResume: () => { void handlePauseResume(); },
