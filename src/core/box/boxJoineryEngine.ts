@@ -18,36 +18,6 @@ function round(value: number): number {
   return Math.round(value * 1000) / 1000;
 }
 
-
-function isBetween(value: number, a: number, b: number): boolean {
-  return value >= Math.min(a, b) - EPS && value <= Math.max(a, b) + EPS;
-}
-
-function simplifyOrthogonalPath(points: Point2D[]): Point2D[] {
-  if (points.length < 3) return points;
-  let changed = true;
-  let out = points.slice();
-  while (changed) {
-    changed = false;
-    const next: Point2D[] = [];
-    for (let i = 0; i < out.length; i++) {
-      const prev = out[(i - 1 + out.length) % out.length]!;
-      const cur = out[i]!;
-      const nxt = out[(i + 1) % out.length]!;
-      const sameHorizontal = Math.abs(prev.y - cur.y) <= EPS && Math.abs(cur.y - nxt.y) <= EPS && isBetween(cur.x, prev.x, nxt.x);
-      const sameVertical = Math.abs(prev.x - cur.x) <= EPS && Math.abs(cur.x - nxt.x) <= EPS && isBetween(cur.y, prev.y, nxt.y);
-      if (sameHorizontal || sameVertical) {
-        changed = true;
-        continue;
-      }
-      next.push(cur);
-    }
-    out = next;
-    if (out.length < 3) break;
-  }
-  return out;
-}
-
 function pushPoint(points: Point2D[], point: Point2D): void {
   const rounded = { x: round(point.x), y: round(point.y) };
   const prev = points[points.length - 1];
@@ -262,12 +232,10 @@ export function renderBoxJoineryFaces(model: BoxJoineryModel): BoxFace[] {
     }
 
     closeContourAxisAligned(points);
-    const simplifiedPoints = simplifyOrthogonalPath(points);
-    closeContourAxisAligned(simplifiedPoints);
 
     faces.push({
       name,
-      points: simplifiedPoints,
+      points,
       offsetX: layoutOffsetX(name, panel.width, spacing, model),
       offsetY: layoutOffsetY(name, panel.height, spacing, model),
       debugEdges: edgeDebugs,
