@@ -91,7 +91,7 @@ export function BoxStudioWorkspace({
     fitAllowance,
     tabExtraDepth,
     slotExtraDepth,
-    cornerRelief: 'micro-overcut',
+    cornerRelief: 'none',
   }), [resolved.width, resolved.height, resolved.depth, thickness, fingerWidth, openTop, kerf, fitAllowance, tabExtraDepth, slotExtraDepth]);
 
   const applyPreset = useCallback((preset: BoxLibraryPreset): void => {
@@ -128,7 +128,7 @@ export function BoxStudioWorkspace({
       fitAllowance: preset.fitAllowance,
       tabExtraDepth: 0.2,
       slotExtraDepth: 0.35,
-      cornerRelief: 'micro-overcut',
+      cornerRelief: 'none',
     });
     onGenerate(buildBoxObjects(scene, couponFaces));
   }, [onGenerate, scene]);

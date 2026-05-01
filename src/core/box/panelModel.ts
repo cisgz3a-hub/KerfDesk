@@ -1,4 +1,4 @@
-import type { BoxJoineryModel, BoxJoineryParams, BoxPanelName, EdgeSpec, JointSpec, PanelSpec } from './joineryTypes';
+import type { BoxJoineryModel, BoxJoineryParams, BoxPanelName, EdgeSpec, JointEndpoint, JointSpec, PanelSpec } from './joineryTypes';
 import { computeBoxJointMetricsV2, createJointPattern } from './jointPattern';
 
 function finitePositive(value: number, fallback: number): number {
@@ -11,9 +11,13 @@ function edgeLengthForPanelEdge(panels: PanelSpec[], panel: BoxPanelName, edge: 
   return edge === 'top' || edge === 'bottom' ? spec.width : spec.height;
 }
 
-function roleForEdge(joint: JointSpec, panel: BoxPanelName, edge: 'top' | 'right' | 'bottom' | 'left'): 'primary' | 'secondary' | null {
-  if (joint.primary.panel === panel && joint.primary.edge === edge) return 'primary';
-  if (joint.secondary.panel === panel && joint.secondary.edge === edge) return 'secondary';
+function endpointForEdge(
+  joint: JointSpec,
+  panel: BoxPanelName,
+  edge: 'top' | 'right' | 'bottom' | 'left',
+): { role: 'primary' | 'secondary'; endpoint: JointEndpoint } | null {
+  if (joint.primary.panel === panel && joint.primary.edge === edge) return { role: 'primary', endpoint: joint.primary };
+  if (joint.secondary.panel === panel && joint.secondary.edge === edge) return { role: 'secondary', endpoint: joint.secondary };
   return null;
 }
 
@@ -22,14 +26,14 @@ export function createBoxJoineryModel(params: BoxJoineryParams): BoxJoineryModel
   const height = finitePositive(params.height, 50);
   const depth = finitePositive(params.depth, 40);
   const thickness = finitePositive(params.thickness, 3);
-  const fingerWidth = finitePositive(params.fingerWidth, 10);
+  const fingerWidth = finitePositive(params.fingerWidth, Math.max(thickness * 2, 6));
   const metrics = computeBoxJointMetricsV2(
     thickness,
     params.kerf,
     params.fitAllowance,
     params.tabExtraDepth,
     params.slotExtraDepth,
-    params.cornerRelief,
+    params.cornerRelief ?? 'none',
   );
 
   const panels: PanelSpec[] = [
@@ -41,12 +45,21 @@ export function createBoxJoineryModel(params: BoxJoineryParams): BoxJoineryModel
   ];
   if (!params.openTop) panels.push({ name: 'Top', width, height: depth });
 
+  // Verified OpenSCAD topology: depth-running floor/lid joints are not full
+  // depth. They start after one material thickness and span depth - 2*t so the
+  // side/bottom/top joints do not collide with front/back vertical corner joints.
+  const depthJointLength = Math.max(thickness, depth - 2 * thickness);
+  const depthJointStart = depthJointLength < depth ? thickness : 0;
+
+  // Primary = direct cuts. Secondary = inverse cuts.
+  // This reproduces the proven cuts()/invcuts() relationship without copying code.
   const joints: JointSpec[] = [
     // Bottom-to-wall joints.
-    { id: 'bottom-front', length: width, primary: { panel: 'Bottom', edge: 'top' }, secondary: { panel: 'Front', edge: 'bottom' } },
-    { id: 'bottom-back', length: width, primary: { panel: 'Bottom', edge: 'bottom' }, secondary: { panel: 'Back', edge: 'bottom' } },
-    { id: 'bottom-left', length: depth, primary: { panel: 'Bottom', edge: 'left' }, secondary: { panel: 'Left', edge: 'bottom' } },
-    { id: 'bottom-right', length: depth, primary: { panel: 'Bottom', edge: 'right' }, secondary: { panel: 'Right', edge: 'bottom' } },
+    { id: 'bottom-front', length: width, primary: { panel: 'Front', edge: 'bottom' }, secondary: { panel: 'Bottom', edge: 'top' } },
+    { id: 'bottom-back', length: width, primary: { panel: 'Back', edge: 'bottom' }, secondary: { panel: 'Bottom', edge: 'bottom' } },
+    { id: 'bottom-left', length: depthJointLength, primary: { panel: 'Left', edge: 'bottom', start: depthJointStart }, secondary: { panel: 'Bottom', edge: 'left', start: depthJointStart } },
+    { id: 'bottom-right', length: depthJointLength, primary: { panel: 'Right', edge: 'bottom', start: depthJointStart }, secondary: { panel: 'Bottom', edge: 'right', start: depthJointStart } },
+
     // Wall-to-wall vertical corners.
     { id: 'front-left', length: height, primary: { panel: 'Front', edge: 'left' }, secondary: { panel: 'Left', edge: 'right' } },
     { id: 'front-right', length: height, primary: { panel: 'Front', edge: 'right' }, secondary: { panel: 'Right', edge: 'left' } },
@@ -56,25 +69,31 @@ export function createBoxJoineryModel(params: BoxJoineryParams): BoxJoineryModel
 
   if (!params.openTop) {
     joints.push(
-      { id: 'top-front', length: width, primary: { panel: 'Top', edge: 'top' }, secondary: { panel: 'Front', edge: 'top' } },
-      { id: 'top-back', length: width, primary: { panel: 'Top', edge: 'bottom' }, secondary: { panel: 'Back', edge: 'top' } },
-      { id: 'top-left', length: depth, primary: { panel: 'Top', edge: 'left' }, secondary: { panel: 'Left', edge: 'top' } },
-      { id: 'top-right', length: depth, primary: { panel: 'Top', edge: 'right' }, secondary: { panel: 'Right', edge: 'top' } },
+      { id: 'top-front', length: width, primary: { panel: 'Front', edge: 'top' }, secondary: { panel: 'Top', edge: 'top' } },
+      { id: 'top-back', length: width, primary: { panel: 'Back', edge: 'top' }, secondary: { panel: 'Top', edge: 'bottom' } },
+      { id: 'top-left', length: depthJointLength, primary: { panel: 'Left', edge: 'top', start: depthJointStart }, secondary: { panel: 'Top', edge: 'left', start: depthJointStart } },
+      { id: 'top-right', length: depthJointLength, primary: { panel: 'Right', edge: 'top', start: depthJointStart }, secondary: { panel: 'Top', edge: 'right', start: depthJointStart } },
     );
   }
 
-  const patterns = joints.map((joint, index) => createJointPattern(joint.id, joint.length, fingerWidth, index % 2 === 0 ? 0 : 1));
+  const patterns = joints.map(joint => createJointPattern(joint.id, joint.length, fingerWidth, thickness, 0));
   const edgeSpecs: EdgeSpec[] = [];
+
   for (const panel of panels) {
     for (const edge of ['top', 'right', 'bottom', 'left'] as const) {
-      const joint = joints.find(j => roleForEdge(j, panel.name, edge));
-      const role = joint ? roleForEdge(joint, panel.name, edge)! : 'flat';
+      const match = joints
+        .map(joint => ({ joint, endpoint: endpointForEdge(joint, panel.name, edge) }))
+        .find(entry => entry.endpoint);
+      const length = edgeLengthForPanelEdge(panels, panel.name, edge);
+
       edgeSpecs.push({
         panel: panel.name,
         edge,
-        jointId: joint?.id,
-        role,
-        length: edgeLengthForPanelEdge(panels, panel.name, edge),
+        jointId: match?.joint.id,
+        role: match?.endpoint?.role ?? 'flat',
+        length,
+        jointStart: match?.endpoint?.endpoint.start ?? 0,
+        jointLength: match?.joint.length ?? length,
       });
     }
   }
