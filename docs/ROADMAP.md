@@ -6184,7 +6184,7 @@ A layer can have `visible: true` (drawn on canvas) but `output: false` (excluded
 
 **Priority:** Tier 1 — corrects two preflight error-severity gates that produce false positives. The bed-bounds false-positive in particular blocks Start for legitimate jobs with guide layers.
 
-**Status:** Shipped 2026-05-02 in `<TBD>`.
+**Status:** Shipped 2026-05-02 in `95911e3`.
 
 ---
 
