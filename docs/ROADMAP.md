@@ -5983,6 +5983,41 @@ The structurally correct source — `useCompileManager.lastResult.machinePlanBou
 
 ---
 
+### T1-106 | Reset GRBL WCS when switching away from Origin mode
+
+**Code reference:** `src/app/sendResetWcsCommand.ts` (new helper); `src/ui/components/App.tsx` (mode-switch handler integration).
+
+**Problem:** When a user clicks Set Origin while in `savedOrigin` mode, `sendSetOriginWcsCommand` writes `G10 L20 P1 X0 Y0` to GRBL — relative WCS-to-current-head-position. The WCS register on the controller now has an offset baked in. If the user then switches to Bed mode (which assumes WCS == machine coords) or Head mode (which is G91-relative but users expect the X/Y display to match machine coords), the stale WCS offset persists. Subsequent burns fire from physically wrong coordinates that the user has no way to anticipate. The X/Y readout in the UI shows machine coords, but the GRBL controller is still applying the WCS offset internally.
+
+**Fix:** Add a `sendResetWcsCommand` helper that sends `G10 L2 P1 X0 Y0 Z0` — absolute WCS-to-machine-origin — and call it from the mode-switch handler in `App.tsx` whenever the new mode is *not* `savedOrigin`. The savedOrigin path is preserved as-is because the user will Set Origin manually after switching to that mode.
+
+The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intentional inverses:
+
+- `G10 L20 P1 X0 Y0` (Set Origin): "make WCS = current head position." Used when the user marks a workpiece origin.
+- `G10 L2 P1 X0 Y0 Z0` (Reset): "make WCS = machine origin." Used when leaving the savedOrigin workflow.
+
+**Tests:** `tests/start-mode-wcs-reset.test.ts` (3 contracts):
+  1. Sends `G10 L2 P1 X0 Y0 Z0` on success path.
+  2. No-op when controller is `null` or `undefined`.
+  3. Swallows `sendCommand` errors without throwing.
+
+**Out of scope:**
+  - Verifying the WCS reset actually succeeded on the controller. The helper currently swallows `sendCommand` errors (matching `sendSetOriginWcsCommand` and other WCS helpers in the codebase). This is a known limitation tracked under the broader "UI state updates before hardware success is proven" pattern from external code review. Fixing it requires changing the function signature to return success/failure and updating all WCS helpers consistently — separate ticket, larger scope.
+  - Integration test for the conditional firing logic. The conditional (`if (mode !== 'savedOrigin')`) is simple enough that a focused integration test is diminishing returns; the helper test plus manual smoke is sufficient for v1.
+
+**Provenance:** authored on `fix/start-mode-clears-wcs` branch as commit `b7f8bc0` between sessions. Cherry-picked to `box-joinery-v5-2-corner-preserve` on 2026-05-02 with three conflict resolutions:
+  1. Helper path: `src/ui/origin/sendResetWcsCommand.ts` (original) → `src/app/sendResetWcsCommand.ts` (current branch organization; matches `sendSetOriginWcsCommand` location).
+  2. Test import path updated accordingly.
+  3. `handleSceneCommit(..., 'start-position')` action metadata kept from current branch (the original commit pre-dated the action-metadata refactor).
+
+**Estimate:** ~30 min (mostly conflict resolution).
+
+**Priority:** Tier 1 — fixes a real burn-placement bug for users who switch between Origin mode and Bed/Head modes.
+
+**Status:** Shipped 2026-05-02 in `d3b12b2`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
