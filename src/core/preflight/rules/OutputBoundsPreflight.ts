@@ -127,18 +127,21 @@ export function runBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): 
     return;
   }
 
-  const visibleObjects = scene.objects.filter(obj => {
+  // T1-107: bed-bounds checks must ignore guide-layer objects. Layers
+  // with output:false are visible on canvas but explicitly excluded
+  // from the burn output.
+  const outputObjects = scene.objects.filter(obj => {
     if (!obj.visible) return false;
     const layer = scene.layers.find(l => l.id === obj.layerId);
-    return !!layer && layer.visible !== false;
+    return !!layer && layer.visible !== false && layer.output !== false;
   });
-  if (visibleObjects.length === 0) return;
+  if (outputObjects.length === 0) return;
 
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
-  for (const obj of visibleObjects) {
+  for (const obj of outputObjects) {
     const b = computeObjectBounds(obj);
     if (!Number.isFinite(b.minX) || !Number.isFinite(b.maxX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxY)) continue;
     minX = Math.min(minX, b.minX);

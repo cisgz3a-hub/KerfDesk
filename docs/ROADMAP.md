@@ -6154,6 +6154,40 @@ Five surfaces tightened in this commit:
 
 ---
 
+### T1-107 | Preflight bed-bounds + visible-layer-for-output checks must filter by `layer.output`
+
+**Code reference:** `src/core/preflight/rules/OutputBoundsPreflight.ts` (`runBoundsChecks`); `src/core/preflight/rules/ScenePreflight.ts` (`runSceneChecks`).
+
+**Problem:** Two preflight checks filtered objects by `(obj.visible && layer.visible)` without considering `layer.output`. From ChatGPT 14-item analysis #8.
+
+A layer can have `visible: true` (drawn on canvas) but `output: false` (excluded from compile output) — this is the standard guide-layer / reference-layer pattern, used for placement aids that should not burn. Other preflight rules (`OptimizationPreflight`, `LayerSettingsPreflight`, `RasterPreflight`) and the scene helper `Scene.ts` correctly gate on `layer.output !== false`. Two rules did not:
+
+  1. **`runBoundsChecks`** (OutputBoundsPreflight): bed-bounds error fired for guide-layer content beyond the bed even though it would not burn there. Severity: error -> blocks Start.
+  2. **`runSceneChecks`** (ScenePreflight): the `NO_VISIBLE_LAYERS` check only required at least one visible layer with content. A scene with all `output: false` layers but visible-on-canvas content passed this check, even though the job would produce no output.
+
+**Fix:** Both filters now require `layer.output !== false` in addition to existing visibility checks. Variable rename from `visibleObjects` to `outputObjects` (`OutputBoundsPreflight`) and `hasVisibleObjects` to `hasOutputObjects` (`ScenePreflight`) for self-documenting code.
+
+**Tests:** `tests/preflight-output-layer-filter.test.ts` (7 contracts):
+  1. `output: true` + beyond bed -> `OUT_OF_BOUNDS_MAX` fires (regression check).
+  2. `output: false` + beyond bed -> no error (bug fix).
+  3. Mixed scene, only guide-layer beyond bed -> no error.
+  4. Mixed scene, output-layer beyond bed -> error fires.
+  5. All `output: false` with content -> `NO_VISIBLE_LAYERS` fires.
+  6. At least one `output: true` with content -> no `NO_VISIBLE_LAYERS`.
+  7. Invisible (even if `output: true`) -> `NO_VISIBLE_LAYERS` still fires.
+
+**Out of scope:**
+  - Updating the `NO_VISIBLE_LAYERS` error message text. Currently says "No visible layers contain objects. Enable a layer with content." which is not strictly accurate post-fix (could be all-visible-but-output-disabled). Existing message still points the user toward the layer panel.
+  - Other preflight rules. Audited `src/core/preflight/`, `src/core/scene/`, `src/core/job/` — only the two sites fixed in this commit had the bug. `OptimizationPreflight`, `LayerSettingsPreflight`, `RasterPreflight`, and the scene output-layer helpers were already correct.
+
+**Estimate:** 20 min including tests.
+
+**Priority:** Tier 1 — corrects two preflight error-severity gates that produce false positives. The bed-bounds false-positive in particular blocks Start for legitimate jobs with guide layers.
+
+**Status:** Shipped 2026-05-02 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

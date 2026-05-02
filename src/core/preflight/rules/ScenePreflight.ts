@@ -217,12 +217,15 @@ export function runSceneChecks(ctx: PreflightContext, out: PreflightResult[]): v
     return;
   }
 
-  const hasVisibleObjects = ctx.scene.objects.some(obj => {
+  // T1-107: this is an output-for-job check, not just canvas visibility.
+  // Guide layers (output:false) should not satisfy it because they will
+  // not produce burn output.
+  const hasOutputObjects = ctx.scene.objects.some(obj => {
     if (!obj.visible) return false;
     const layer = ctx.scene.layers.find(l => l.id === obj.layerId);
-    return !!layer && layer.visible !== false;
+    return !!layer && layer.visible !== false && layer.output !== false;
   });
-  if (!hasVisibleObjects) {
+  if (!hasOutputObjects) {
     out.push({
       severity: 'error',
       code: PREFLIGHT_CODES.NO_VISIBLE_LAYERS,

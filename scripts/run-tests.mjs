@@ -153,6 +153,7 @@ const files = [
   'machine-plan-bounds-source.test.ts',
   'run-frame-fail-fast-on-blocked-command.test.ts',
   'exact-idle-gates.test.ts',
+  'preflight-output-layer-filter.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
