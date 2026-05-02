@@ -6046,7 +6046,7 @@ The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intent
 
 **Lesson recorded:** when a feature branch carries off-roadmap iteration (box-joinery had v2/v3/v4/v5-1/v5-verified before the v5-2-corner-preserve final), the audit doc should pick up the work at the point it lands on the active branch, not at the point each iteration shipped. T1-101 covers all five v5-2 commits as one umbrella because they ship together as a coherent feature. Future iterations of the box library should get their own ticket if scope is comparable, or extend T1-101 if the work is incremental.
 
-**Status:** Filed retroactively 2026-05-02 in `<TBD>`.
+**Status:** Filed retroactively 2026-05-02 in `fe9d5e0`.
 
 ---
 
