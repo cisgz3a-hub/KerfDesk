@@ -806,6 +806,15 @@ export function ConnectionPanelMain({
         setMessages(prev => [...prev,
           `⚠ Frame (Safe): machine did not reach idle within ${Math.round(idleTimeoutMs / 1000)}s — check machine state`,
         ]);
+      } else if (result.reason === 'command-blocked') {
+        // T1-103: a command threw partway through corner streaming. The
+        // frame is incomplete, so hasFramed must not be set.
+        const lineNum = (result.blockedAtLine ?? 0) + 1;
+        setMessages(prev => [...prev,
+          `⚠ Frame (Safe): command blocked at line ${lineNum} — ${result.blockedError ?? 'unknown reason'}. Frame incomplete; retry after resolving controller state.`,
+        ]);
+      } else if (result.reason === 'no-controller') {
+        setMessages(prev => [...prev, '⚠ Frame (Safe): no controller connection']);
       }
       return;
     }
@@ -859,7 +868,14 @@ export function ConnectionPanelMain({
 
     if (!result.ok) {
       if (result.reason === 'idle-timeout') {
-        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle within 15s — check machine state']);
+        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle in time — check machine state']);
+      } else if (result.reason === 'command-blocked') {
+        const lineNum = (result.blockedAtLine ?? 0) + 1;
+        setMessages(prev => [...prev,
+          `⚠ Frame (Laser Dot): command blocked at line ${lineNum} — ${result.blockedError ?? 'unknown reason'}. Retry after resolving controller state.`,
+        ]);
+      } else if (result.reason === 'no-controller') {
+        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): no controller connection']);
       }
       return;
     }

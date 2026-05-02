@@ -30,7 +30,26 @@ export interface ExecutionCoordinatorDeps {
 
 export interface FrameResult {
   ok: boolean;
-  reason?: 'no-controller' | 'idle-timeout';
+  /**
+   * When `ok` is false, the reason the frame did not complete cleanly.
+   *
+   * - 'no-controller': no controller connection at the moment frameSafe was called.
+   * - 'idle-timeout': GRBL did not report idle within the timeout.
+   * - 'command-blocked': ctrl.sendCommand() threw partway through corner streaming.
+   *   A subset of frame commands may have physically executed; the rest did not.
+   */
+  reason?: 'no-controller' | 'idle-timeout' | 'command-blocked';
+  /**
+   * T1-103: when `reason === 'command-blocked'`, the original error message
+   * surfaced to the UI for the messages console. Empty string if no message
+   * could be extracted.
+   */
+  blockedError?: string;
+  /**
+   * T1-103: when `reason === 'command-blocked'`, the zero-indexed
+   * corner-stream line that threw.
+   */
+  blockedAtLine?: number;
 }
 
 /**
@@ -174,12 +193,24 @@ export class ExecutionCoordinator {
       crosshairAfterFrame: withCrosshair,
     });
 
-    for (const line of lines) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i]!;
       this.notifySimulator(line);
+      // T1-103: if any frame command throws, fail the entire frame.
+      // The previous behavior (catch + console.warn + continue) could
+      // return ok=true after a partial trace if GRBL reported idle at
+      // the end. Partial framing is not enough to satisfy T1-59.
       try {
         ctrl.sendCommand(line, 'internal');
       } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn('[Command blocked]', msg);
+        return {
+          ok: false,
+          reason: 'command-blocked',
+          blockedError: msg,
+          blockedAtLine: i,
+        };
       }
       await new Promise(r => setTimeout(r, 50));
     }

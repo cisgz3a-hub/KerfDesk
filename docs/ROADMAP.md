@@ -6050,6 +6050,53 @@ The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intent
 
 ---
 
+### T1-102 | Frame crosshair safety in current/head startMode — investigated, no bug
+
+**Code reference:** `src/app/frameGcode.ts` (`buildFrameGcode` with `crosshairAfterFrame` parameter); `src/app/ExecutionCoordinator.ts` `runFrame` (consumes `withCrosshair`).
+
+**Hypothesis (from ChatGPT 14-item analysis #9):** in current/head startMode, `frameSafe` defaults `withCrosshair: true`. The frame g-code uses G91 relative movement. After framing the rectangle, the crosshair movement leaves the head at the design centroid, not the original jog point. Subsequent Start would burn from the wrong physical reference.
+
+**Investigation 2026-05-02:** Tester reports hardware behavior is correct: frame draws the design rectangle and a center crosshair, then Start burns correctly from the design's top-left reference. The crosshair is a visible center-alignment aid; it does not affect burn-start position.
+
+**Conclusion:** No bug. ChatGPT's analysis was a code-level hypothesis that didn't survive hardware verification. Closing without code change.
+
+**Lesson recorded:** ChatGPT's hardware-behavior claims need physical verification before tickets get implemented. Code-level claims (T1-98 timeout, T1-99 compile dep, T1-100 bounds source) are reliable because the code reads the same way for everyone. Hardware-level claims are weaker — they require knowing what the controller actually does in response to specific g-code sequences, which the code alone doesn't tell you.
+
+**Status:** Closed without ship hash 2026-05-02. No code changes.
+
+---
+
+### T1-103 | `runFrame` must fail if any frame command is blocked
+
+**Code reference:** `src/app/ExecutionCoordinator.ts` (`runFrame` corner-streaming loop); `src/ui/components/ConnectionPanelMain.tsx` (`handleFrameSafe` and `handleFrameDot` error handling).
+
+**Problem:** Reported by ChatGPT 14-item analysis #1 (must-fix family). `runFrame` corner-streaming loop catches errors thrown by `ctrl.sendCommand(line, 'internal')`, logs via `console.warn`, and continues to the next line. At the end of the loop, it polls for idle and returns `{ok: true}` if GRBL reports idle. Because rejected commands produce no movement (rejected = not executed = head stays still), GRBL reports idle very quickly when commands are being rejected — the timeout doesn't fire. `frameSafe` returns `ok=true` even though the laser physically traced only a fragment of the rectangle (or nothing at all). The UI then sets `hasFramed.current = true` and the T1-59 frame-before-start gate passes. The user clicks Start expecting the laser to burn within the framed rectangle — the actual frame coverage is unknown.
+
+**Fix:** First throw inside the corner-streaming loop returns `{ok: false, reason: 'command-blocked', blockedError, blockedAtLine}`. The `FrameResult` type is widened to include the new reason and two diagnostic fields. `handleFrameSafe` and `handleFrameDot` both add a `command-blocked` branch that surfaces the error message and the line number to the messages console. `hasFramed.current` is NOT set on failure paths — same as the existing `idle-timeout` handling.
+
+**Why fail-fast over best-effort:** silent best-effort is exactly the "UI state updates before hardware success is proven" pattern ChatGPT identified. `runFrame` should obey the same contract as `beginTestFire` (which also catches sendCommand throws and returns false on the first one) — partial success is failure for safety-critical operations.
+
+**Tests:** `tests/run-frame-fail-fast-on-blocked-command.test.ts` (5 contracts):
+  1. Successful frame returns ok=true, all commands sent.
+  2. Throw at index 0: ok=false, reason='command-blocked', blockedAtLine=0, zero commands sent.
+  3. Throw at index 1: ok=false, blockedAtLine=1, only first command sent before fail.
+  4. blockedError surfaces the thrown error message.
+  5. No controller: reason='no-controller', not confused with 'command-blocked'.
+
+**Out of scope:**
+  - Same-shape fix for `beginTestFire` (already correct — fails on first throw).
+  - Same-shape fix for the autofocus path (separate ticket, ChatGPT item #14).
+  - Retry-on-blocked logic. Out of scope: retries belong at a higher level (user clicks Frame again), not inside `runFrame`.
+  - Side cleanup in `handleFrameDot`: the literal "15s" message string was a residual T1-98 cleanup miss; replaced with "in time" in the same patch since the area was being touched.
+
+**Estimate:** 30 min including tests. Shipped.
+
+**Priority:** Tier 1 — closes a "UI state updates before hardware success" hole in the frame path, which is the safety-critical entry point to T1-59 frame-before-start.
+
+**Status:** Shipped 2026-05-02 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
