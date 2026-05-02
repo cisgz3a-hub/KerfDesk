@@ -6150,7 +6150,7 @@ Five surfaces tightened in this commit:
 
 **Priority:** Tier 1 — closes a class of "UI permits unsafe action" issue across 5 surfaces.
 
-**Status:** Shipped 2026-05-02 in `<TBD>`.
+**Status:** Shipped 2026-05-02 in `e346c55`.
 
 ---
 
