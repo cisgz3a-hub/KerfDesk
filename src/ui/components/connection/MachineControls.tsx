@@ -11,6 +11,11 @@ interface MachineControlsProps {
   isFaulted: boolean;
   isRunning: boolean;
   canFrame: boolean;
+  /**
+   * T1-104: exact-idle gate from the parent. True when the controller
+   * is connected, not running, and machineState.status === 'idle'.
+   */
+  canFire: boolean;
   isTestFiring: boolean;
   onUnlock: () => void;
   /**
@@ -31,6 +36,7 @@ export function MachineControls({
   isFaulted,
   isRunning,
   canFrame,
+  canFire,
   isTestFiring,
   onUnlock,
   onAcknowledgeFault,
@@ -38,10 +44,9 @@ export function MachineControls({
   onTestFireEnd,
   onFrameDot,
 }: MachineControlsProps) {
-  // T2-12 part 2: test-fire is gated by either halt-state. Both
-  // alarm and faulted indicate the laser path may be in a state we
-  // shouldn't fire from until cleared.
-  const testFireDisabled = isAlarm || isFaulted || isRunning;
+  // T1-104: positive idle gate replaces the previous negative blocklist.
+  // isAlarm/isFaulted are still used for Unlock and Acknowledge fault.
+  const testFireDisabled = !canFire || isRunning;
 
   return React.createElement('div', {
     style: { flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 6, minWidth: 0 },

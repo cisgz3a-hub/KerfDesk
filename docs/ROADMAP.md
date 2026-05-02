@@ -6097,6 +6097,63 @@ The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intent
 
 ---
 
+### T1-104 | Exact-idle gate cluster (Frame, Frame Dot, Test Fire, Jog, Set Origin)
+
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (`canFrame`, `handleJog`, `beginTestFire`); `src/ui/components/connection/MachineControls.tsx` (`testFireDisabled`); `src/ui/components/App.tsx` (`handleSaveOrigin`).
+
+**Problem:** Multiple machine-control surfaces had permissive gates that allowed actions during machine states from which the action is either unsafe or undefined. From ChatGPT 14-item analysis (items #2, #6, #10):
+
+  - **Frame / Frame Dot:** `canFrame = isConnected && !isRunning` allowed clicks during alarm, hold, homing, check, door, unknown, connecting. T1-103 made `runFrame` fail fast on blocked commands; this gates before the click reaches `runFrame`.
+  - **Test Fire:** `testFireDisabled = isAlarm || isFaulted || isRunning` blocked alarm and faulted but allowed hold, homing, check, door, unknown, connecting. The `beginTestFire` callback had redundant alarm/faulted checks but did not catch the other states.
+  - **Jog:** No idle gate at all. The handler set `hasJogged.current = true` before `executionCoordinator.jog()` was even attempted.
+  - **Set Origin:** No idle gate at all. The handler called `setSavedOrigin(origin)`, wrote to localStorage, then fired-and-forgot `setOriginAtCurrentPosition()`. The G10 L20 command can be silently rejected by `sendSetOriginWcsCommand`; the UI would still believe the origin was saved.
+
+**Fix:** Replace each gate with a positive idle check. The reference shape comes from the existing `canAutoFocus`:
+
+```ts
+const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
+```
+
+Five surfaces tightened in this commit:
+
+  1. `canFrame` consumers (Frame button, Frame Dot button) — positive idle gate.
+  2. `beginTestFire` early-return — replaces alarm/faulted ad-hoc denials with `machineState?.status !== 'idle'`.
+  3. `MachineControls.testFireDisabled` — replaces `isAlarm || isFaulted || isRunning` with `!canFire || isRunning`. New `canFire` prop is driven by the parent's exact-idle check.
+  4. `handleJog` — adds early-return idle gate; surfaces a console message ("⚠ Jog declined: machine is X, must be idle") instead of silently succeeding to hasJogged=true.
+  5. `handleSaveOrigin` (App.tsx) — adds early-return idle gate. No console message in v1 because the handler doesn't have access to `setMessages`; T1-105 will fix the larger Set-Origin contract issue and can add the message there.
+
+**Why match `canAutoFocus`'s shape (no simulator exception):** consistency. `canAutoFocus` has been working correctly since T2-12 and doesn't need a simulator exception in practice (test environments simulate the controller status as idle). Adding a separate "is the machine real or simulated" pathway just for these gates would multiply the surface area without solving a known problem.
+
+**Why split T1-104 (gates) from T1-105 (state-after-confirm):**
+  - T1-104 is pure UI gating. Low risk. Reverting it just removes restrictions; doesn't introduce a new mechanism.
+  - T1-105 changes return-type contracts for Jog and Set Origin success/failure. Higher risk. Hardware verification recommended.
+  - Two atomic commits are easier to bisect than one combined.
+
+**Tests:** `tests/exact-idle-gates.test.ts` pins the gate shape:
+  1. Happy path: `canFrame` true with idle + connected + not-running.
+  2. Every non-idle state blocks (run, hold, homing, check, door, alarm, faulted, unknown, connecting).
+  3. Undefined machineStatus blocks.
+  4. Disconnected blocks.
+  5. isRunning blocks (defensive).
+  6. Jog gate: non-idle declined, idle accepted.
+  7. Set Origin gate: same shape as Jog.
+  8. Bug-fix proof: hold state was allowed by old `canFrame`, blocked by new.
+  9. Bug-fix proof: homing state was allowed by old Test Fire gate, blocked by new.
+
+**Out of scope:**
+  - The "UI state updates before hardware success" pattern at the handler level (Jog setting hasJogged before knowing jog succeeded; Set Origin setting savedOrigin before G10 confirmed). That's T1-105.
+  - Surfacing rejection reasons in the messages console for Set Origin. T1-105 will add this when it changes the function signature.
+  - The `executionCoordinator.jog()` return-value tightening. Currently `void`; T1-105 will widen.
+  - Simulator-mode considerations. Not addressed because `canAutoFocus` precedent doesn't need them.
+
+**Estimate:** 30 min including tests.
+
+**Priority:** Tier 1 — closes a class of "UI permits unsafe action" issue across 5 surfaces.
+
+**Status:** Shipped 2026-05-02 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

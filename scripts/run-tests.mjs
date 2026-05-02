@@ -152,6 +152,7 @@ const files = [
   'savedorigin-not-compile-invalidating.test.ts',
   'machine-plan-bounds-source.test.ts',
   'run-frame-fail-fast-on-blocked-command.test.ts',
+  'exact-idle-gates.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',

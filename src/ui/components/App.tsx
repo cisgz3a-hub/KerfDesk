@@ -577,6 +577,9 @@ export function App() {
   }, [machineUi.executionCoordinator]);
 
   const handleSaveOrigin = useCallback(() => {
+    // T1-104: exact-idle gate. T1-105 will additionally move savedOrigin
+    // and localStorage updates behind confirmed G10 acceptance.
+    if (grbl.machineState?.status !== 'idle') return;
     const pos = grbl.machineState?.position;
     if (!pos) return;
     const origin = { x: pos.x, y: pos.y };

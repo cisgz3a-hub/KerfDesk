@@ -542,7 +542,10 @@ export function ConnectionPanelMain({
     };
   }, [startMode, savedOrigin, sceneBounds.minX, sceneBounds.minY, sceneBounds.maxX, sceneBounds.maxY]);
 
-  const canFrame = isConnected && !isRunning;
+  // T1-104: exact-idle gate. Frame, Frame Dot, and other Frame-derived
+  // surfaces require the controller to actually be idle, not merely
+  // "not running."
+  const canFrame = isConnected && !isRunning && machineState?.status === 'idle';
 
   const fmtMm = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '—');
 
@@ -665,6 +668,14 @@ export function ConnectionPanelMain({
 
   const handleJog = useCallback(
     (axis: 'X' | 'Y', distance: number) => {
+      // T1-104: Jog requires exact idle. T1-105 will additionally tighten
+      // this so hasJogged flips only after the command is accepted.
+      if (machineState?.status !== 'idle') {
+        setMessages(prev => [...prev,
+          `⚠ Jog declined: machine is "${machineState?.status ?? 'unknown'}", must be idle`,
+        ]);
+        return;
+      }
       hasJogged.current = true;
       setWorkflowVersion(v => v + 1);
       try {
@@ -673,7 +684,7 @@ export function ConnectionPanelMain({
         console.warn('[Command blocked]', err instanceof Error ? err.message : err);
       }
     },
-    [executionCoordinator],
+    [executionCoordinator, machineState?.status, setMessages],
   );
 
   const handleStartJob = async () => {
@@ -982,9 +993,8 @@ export function ConnectionPanelMain({
       if (e.button !== 0) return;
       const ctrl = controllerRef.current;
       if (!ctrl || isTestFiringRef.current) return;
-      if (machineState?.status === 'alarm') return;
-      // T2-12 part 2: faulted is a halt-state too — don't fire from it.
-      if (machineState?.status === 'faulted_requires_inspection') return;
+      // T1-104: positive idle check replaces ad-hoc per-state denials.
+      if (machineState?.status !== 'idle') return;
 
       const acknowledged = localStorage.getItem('laserforge_testfire_acknowledged');
       if (!acknowledged) {
@@ -1393,6 +1403,10 @@ export function ConnectionPanelMain({
       isFaulted: machineState?.status === 'faulted_requires_inspection',
       isRunning,
       canFrame,
+      // T1-104: exact-idle gate for Test Fire. Same current logic as
+      // canFrame, kept as a separate prop so future fire-specific gates
+      // can diverge without re-plumbing MachineControls.
+      canFire: canFrame,
       isTestFiring,
       onUnlock: handleUnlock,
       onAcknowledgeFault: () => { void handleAcknowledgeFault(); },
