@@ -6093,7 +6093,7 @@ The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intent
 
 **Priority:** Tier 1 — closes a "UI state updates before hardware success" hole in the frame path, which is the safety-critical entry point to T1-59 frame-before-start.
 
-**Status:** Shipped 2026-05-02 in `<TBD>`.
+**Status:** Shipped 2026-05-02 in `8cb3faa`.
 
 ---
 
