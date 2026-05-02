@@ -6018,6 +6018,38 @@ The two helpers (`sendSetOriginWcsCommand` and `sendResetWcsCommand`) are intent
 
 ---
 
+### T1-101 | Box Library + Joinery v5 (umbrella retroactive paper trail)
+
+**Code reference:** `src/core/box/boxLibrary.ts` (new, 526 LOC, 21 presets across 7 categories); `src/core/box/boxLibraryTypes.ts` + `boxPreviewModel.ts` (new); `src/core/box/boxGeometry.ts` (rewritten, 335 LOC, ~5x pre-cluster size); `src/ui/components/box-library/` (new directory, 9 components, ~1100 LOC); `src/ui/pages/BoxStudioPage.tsx` (new, 97 LOC); `src/ui/hooks/useBoxLibraryState.ts` + `usePersistentBoxPreferences.ts` (new); `src/ui/components/BoxGenerator.tsx` (restructured 432 -> 116 LOC as a thin "Box Studio launcher").
+
+**Problem this ticket solves:** workflow rule #4 hygiene — five commits shipped between Fix #8 (T1-100) and the 2026-05-02 audit without ticket numbers in the commit messages. The work itself is good, tested, and on the active branch; the violation is paper-trail-only. Without retroactive filing, the audit doc would say "where did all this box-library code come from?" and a future bisect on a box-related regression would have no ticket to anchor the change set.
+
+**Scope:** see audit row for full LOC breakdown. The cluster delivers a complete box-library product with preset selection, kerf-aware joinery geometry, full-page workspace, and persistent user preferences. Replaces the prior thin BoxGenerator.tsx (432 LOC monolith) with a layered architecture: pure geometry in `core/box/`, UI components in `ui/components/box-library/`, page-level workspace in `ui/pages/`, state management in `ui/hooks/`.
+
+**Cluster commits (chronological, on `box-joinery-v5-2-corner-preserve`):**
+  1. `6d74fb1` — pro-grade box generator fit controls (foundation: fit allowance / kerf / dimension mode plumbing)
+  2. `19779bc` — full-page Box Studio workspace (UI: BoxStudioPage + box-library/ components)
+  3. `d584dce` — clean-room joinery v2 engine (engine rewrite of boxGeometry.ts with kerf math)
+  4. `669ab60` — clean verified joinery contours (geometry refinement)
+  5. `58b3fce` — preserve joinery panel corners (geometry refinement)
+
+**Tests added in the cluster (all passing as of 2026-05-02):**
+  - `tests/box-library.test.ts` (preset catalog integrity)
+  - `tests/box-library-filtering.test.tsx` (category/search UI)
+  - `tests/box-preset-preview-model.test.ts` (preview rendering math)
+  - `tests/box-generator-library-integration.test.tsx` (end-to-end generator path)
+  - `tests/box-geometry.test.ts` expanded ~3x to cover joinery v5 kerf math, fit allowance, tab/slot depth math.
+
+**Tier classification:** Tier 1 — flagship product feature. Box generation is a primary differentiator on the landing page. Not Tier 4 polish.
+
+**Workflow rule violation acknowledgement:** five commits without ticket numbers, shipped while emergency safety work (T1-95 through T1-100, T1-106) was the foreground concern. Same shape as T1-95. Future box-library work must reference this ticket or a successor.
+
+**Lesson recorded:** when a feature branch carries off-roadmap iteration (box-joinery had v2/v3/v4/v5-1/v5-verified before the v5-2-corner-preserve final), the audit doc should pick up the work at the point it lands on the active branch, not at the point each iteration shipped. T1-101 covers all five v5-2 commits as one umbrella because they ship together as a coherent feature. Future iterations of the box library should get their own ticket if scope is comparable, or extend T1-101 if the work is incremental.
+
+**Status:** Filed retroactively 2026-05-02 in `<TBD>`.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
