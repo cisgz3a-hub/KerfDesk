@@ -14,7 +14,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 **Update rules:**
 
 1. Every commit that ships a roadmap ticket must update this file in the same commit.
-2. Add the ticket to the appropriate "Shipped" section with the actual commit hash. Use `b629293` in the editor; substitute after `git commit` reports the hash.
+2. Add the ticket to the appropriate "Shipped" section with the actual commit hash. Use `<TBD>` in the editor; substitute after `git commit` reports the hash.
 3. If a ticket was *partial* and the new commit completes it, move the row from "Partial" to "Shipped" and update the evidence column.
 4. If a ticket was open and the new commit completes it, move the row from "Open" to "Shipped."
 5. **Do not** delete rows. The history is part of the value.
