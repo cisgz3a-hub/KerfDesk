@@ -148,7 +148,6 @@ const files = [
   'import-callback-identity-stable.test.tsx',
   'image-processing-worker-equivalence.test.ts',
   'start-readiness-panel.test.tsx',
-  'frame-bypass-override.test.tsx',
   'frame-idle-timeout-dynamic.test.ts',
   'savedorigin-not-compile-invalidating.test.ts',
   'machine-plan-bounds-source.test.ts',

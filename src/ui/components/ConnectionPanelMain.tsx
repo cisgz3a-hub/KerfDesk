@@ -299,21 +299,12 @@ export function ConnectionPanelMain({
   const jobStoppedByUserRef = useRef(false);
   const hasFramed = useRef(false);
 
-  /**
-   * T1-97: frame-before-start bypass override.
-   *
-   * Per-session only — never persisted. Available from More Options in
-   * the public web build because the blocked hardware tester is on the
-   * free build. Resets on disconnect, scene change, and browser reload.
-   * The default T1-59 frame-before-start invariant remains unchanged
-   * for anyone who has not explicitly accepted the warning this session.
-   */
-  const [frameBypass, setFrameBypassState] = useState<boolean>(false);
-  const frameBypassRef = useRef(false);
-  const setFrameBypass = useCallback((next: boolean) => {
-    frameBypassRef.current = next;
-    setFrameBypassState(next);
-  }, []);
+  // T1-97 retire (2026-05-02): frame-before-start bypass override removed.
+  // The underlying defect that made it necessary was structurally fixed by
+  // T1-98 (dynamic frame idle timeout) + T1-99 (savedOrigin no longer
+  // compile-invalidating) + T1-100 (machinePlanBounds source uses
+  // lastResult). See docs/ROADMAP-shipped-audit.md T1-97 row for the
+  // historical record.
 
   const hasJogged = useRef(false);
   const hasSetOrigin = useRef(false);
@@ -428,15 +419,13 @@ export function ConnectionPanelMain({
   const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
 
   useEffect(() => {
-    // T1-97: connection cycle resets bypass — required, never sticky.
-    setFrameBypass(false);
     if (isConnected) {
       hasFramed.current = false;
       hasJogged.current = false;
       hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
     }
-  }, [isConnected, setFrameBypass]);
+  }, [isConnected]);
 
   // T1-75 (origin) + T2-76 step 3 (extension): historyVersion bumps on
   // any scene mutation App.tsx commits — both undo/redo via
@@ -450,18 +439,8 @@ export function ConnectionPanelMain({
   // is already false.
   useEffect(() => {
     hasFramed.current = false;
-    // T1-97: scene change re-arms the safety gate even when bypass was
-    // on. This is a one-shot override per connection/design state, not
-    // a global off-switch.
-    if (frameBypassRef.current) {
-      setFrameBypass(false);
-      setMessagesRef.current(prev => [
-        ...prev,
-        '⚠ Frame-bypass auto-disengaged: design changed since override was enabled.',
-      ]);
-    }
     setWorkflowVersion(v => v + 1);
-  }, [historyVersion, setFrameBypass]);
+  }, [historyVersion]);
 
   jobProgressRef.current = jobProgress;
 
@@ -1086,7 +1065,6 @@ export function ConnectionPanelMain({
   // default = require frame. Prevents wrong-position-burn on confused
   // origin/saved-origin/mirror configurations.
   const requireFrame = true;
-  const effectiveFrameBypass = frameBypass;
   // T1-22: read laser-output safety state for the start-job gate.
   // T2-12 part 1: subscribed instead of polled. The previous polled
   // getter at this site relied on workflowVersion bumps to refresh on
@@ -1118,9 +1096,7 @@ export function ConnectionPanelMain({
     !!preflight?.canStart &&
     !gcodeStale &&
     !machineBlocksJobStart &&
-    // T1-97: bypass is per-session and explicit-acknowledgement only.
-    // T1-59 remains the default for everyone else.
-    (!requireFrame || hasFramed.current || effectiveFrameBypass) &&
+    (!requireFrame || hasFramed.current) &&
     laserOutputState !== 'unknown' &&
     !placementUncertain;
   /**
@@ -1189,12 +1165,12 @@ export function ConnectionPanelMain({
       },
       {
         id: 'framing',
-        label: effectiveFrameBypass ? 'Job framed (bypass active)' : 'Job framed',
-        status: !requireFrame || effectiveFrameBypass
+        label: 'Job framed',
+        status: !requireFrame
           ? 'ok'
           : (hasFramed.current ? 'ok' : 'fail'),
         failHeadline: 'Frame not done since last design change',
-        failAction: 'Click Frame, OR open More Options ▼ and use Bypass frame check (advanced)',
+        failAction: 'Click Frame to confirm where the laser will burn (resets when you edit the design)',
       },
       {
         id: 'laserState',
@@ -1357,23 +1333,7 @@ export function ConnectionPanelMain({
             : 'Prepare job';
   const estimatedTimeFormatted = gcode ? estimateJobTime(gcode).formatted : null;
 
-  const frameBypassBanner = isConnected && effectiveFrameBypass && React.createElement('div', {
-    'data-testid': 'frame-bypass-active-banner',
-    style: {
-      margin: '10px 16px 0',
-      padding: '8px 10px',
-      background: 'rgba(255,68,102,0.08)',
-      border: '1px solid rgba(255,68,102,0.4)',
-      borderRadius: 6,
-      color: '#ff8ca0',
-      fontSize: 10,
-      lineHeight: 1.4,
-      flexShrink: 0,
-    },
-  }, '⚠ Frame-before-start bypass is active. Verify origin and placement manually before Start.');
-
   const workflowSection = isConnected && React.createElement(React.Fragment, null,
-    frameBypassBanner,
     React.createElement(Workflow, {
       startMode,
       onSelectMode,
@@ -1918,81 +1878,6 @@ export function ConnectionPanelMain({
         onLoadLog: (entries: string[]) => setMessages(entries),
         showConfirm,
       }),
-      React.createElement('div', {
-        style: {
-          padding: '8px 10px',
-          background: frameBypass ? 'rgba(255,68,102,0.08)' : 'rgba(80,80,110,0.04)',
-          border: `1px solid ${frameBypass ? 'rgba(255,68,102,0.4)' : '#252540'}`,
-          borderRadius: 6,
-          display: 'flex',
-          flexDirection: 'column' as const,
-          gap: 4,
-        },
-        'data-testid': 'frame-bypass-control',
-      },
-        React.createElement('div', {
-          style: {
-            display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 600,
-            color: frameBypass ? '#ff8ca0' : '#c0c0d0',
-          },
-        },
-          React.createElement('span', { style: { flex: 1 } },
-            frameBypass
-              ? '⚠ Frame check: BYPASSED for this session'
-              : 'Frame check: enforced (default)',
-          ),
-          React.createElement('button', {
-            type: 'button',
-            'data-testid': 'frame-bypass-toggle',
-            onClick: () => {
-              if (frameBypass) {
-                setFrameBypass(false);
-                setMessages(prev => [
-                  ...prev,
-                  'Frame-bypass disengaged. Frame-before-start safety check re-armed.',
-                ]);
-                return;
-              }
-              const ack = confirm(
-                '⚠ DISABLE FRAME-BEFORE-START SAFETY CHECK?\n\n' +
-                'Frame-before-start exists to catch wrong-origin, mirror, and saved-origin mistakes BEFORE the laser fires. ' +
-                'Disabling it means the next Start will fire the laser at the configured origin without confirming the design footprint.\n\n' +
-                'This override:\n' +
-                '  • Is per-session only (resets on disconnect, scene change, or reload).\n' +
-                '  • Does not save your acknowledgement.\n' +
-                '  • Is logged for diagnosis.\n' +
-                '  • Is not a substitute for verifying your origin and design placement.\n\n' +
-                'Continue?',
-              );
-              if (!ack) return;
-              setFrameBypass(true);
-              setMessages(prev => [
-                ...prev,
-                '⚠ T1-97 FRAME-BYPASS ENABLED. Wrong-origin burns will not be caught for this session. Resets on scene change or disconnect.',
-              ]);
-            },
-            style: {
-              padding: '4px 10px', fontSize: 10, fontWeight: 600,
-              borderRadius: 4, cursor: 'pointer', fontFamily: font,
-              background: frameBypass ? 'rgba(255,68,102,0.15)' : 'transparent',
-              border: `1px solid ${frameBypass ? 'rgba(255,68,102,0.5)' : '#444466'}`,
-              color: frameBypass ? '#ff8ca0' : '#c0c0d0',
-            },
-          }, frameBypass ? 'Disable bypass' : 'Bypass frame check (advanced)'),
-        ),
-        frameBypass && React.createElement('div', {
-          style: { fontSize: 9, color: '#ff8ca0', lineHeight: 1.4 },
-        },
-          'Active for this session only. Resets on disconnect, scene edit, or reload. ',
-          'Verify the laser path manually before each burn.',
-        ),
-        !frameBypass && React.createElement('div', {
-          style: { fontSize: 9, color: '#888899', lineHeight: 1.4 },
-        },
-          'Default safety. Use only if Frame is misbehaving and you have manually verified ',
-          'the origin (head position vs design footprint).',
-        ),
-      ),
       productionMode && React.createElement('div', {
         ref: logRef,
         style: {
@@ -2191,7 +2076,6 @@ export function ConnectionPanelMain({
             void machineService.disconnect().catch(() => { /* idempotent with controller.disconnect */ });
             portRef.current = null;
             setIsPaused(false);
-            setFrameBypass(false);
             setMessages(prev => [...prev, '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.']);
           },
           style: {
