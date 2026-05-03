@@ -156,6 +156,7 @@ const files = [
   'preflight-output-layer-filter.test.ts',
   'pause-emits-m5-after-feed-hold.test.ts',
   'no-electron-sendgcode-export.test.ts',
+  'frame-dot-finally-emits-m5.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',

@@ -193,32 +193,45 @@ export class ExecutionCoordinator {
       crosshairAfterFrame: withCrosshair,
     });
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i]!;
-      this.notifySimulator(line);
-      // T1-103: if any frame command throws, fail the entire frame.
-      // The previous behavior (catch + console.warn + continue) could
-      // return ok=true after a partial trace if GRBL reported idle at
-      // the end. Partial framing is not enough to satisfy T1-59.
-      try {
-        ctrl.sendCommand(line, 'internal');
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn('[Command blocked]', msg);
-        return {
-          ok: false,
-          reason: 'command-blocked',
-          blockedError: msg,
-          blockedAtLine: i,
-        };
+    // T1-21: frame-dot emits M4 before the final M5. If the streaming
+    // sequence returns early (T1-103 command-blocked) or throws before
+    // the trailing M5, force the laser modal state off before returning.
+    try {
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        this.notifySimulator(line);
+        // T1-103: if any frame command throws, fail the entire frame.
+        // The previous behavior (catch + console.warn + continue) could
+        // return ok=true after a partial trace if GRBL reported idle at
+        // the end. Partial framing is not enough to satisfy T1-59.
+        try {
+          ctrl.sendCommand(line, 'internal');
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn('[Command blocked]', msg);
+          return {
+            ok: false,
+            reason: 'command-blocked',
+            blockedError: msg,
+            blockedAtLine: i,
+          };
+        }
+        await new Promise(r => setTimeout(r, 50));
       }
-      await new Promise(r => setTimeout(r, 50));
+
+      const idleOk = await waitForGrblIdle(ctrl, args.idleTimeoutMs);
+      if (!idleOk) return { ok: false, reason: 'idle-timeout' };
+
+      return { ok: true };
+    } finally {
+      if (laserMode === 'dot') {
+        try {
+          await this.emergencyLaserOff();
+        } catch (err) {
+          console.warn('[FrameDot] emergencyLaserOff in finally failed:', err instanceof Error ? err.message : err);
+        }
+      }
     }
-
-    const idleOk = await waitForGrblIdle(ctrl, args.idleTimeoutMs);
-    if (!idleOk) return { ok: false, reason: 'idle-timeout' };
-
-    return { ok: true };
   }
 
   /**

@@ -1032,6 +1032,8 @@ async runFrame(opts: FrameOptions): Promise<void> {
 
 **Priority:** Tier 1 鈥?safety. Note: realistic trigger window is narrower than audit framing suggests. Most "interruption" scenarios (port error, app crash, browser exit) are crash-level events where a try/finally wouldn't necessarily execute anyway. Still defensible as defense-in-depth 鈥?covers the cases where exception is recoverable enough that the finally block runs.
 
+**Status:** Shipped 2026-05-02 in `<TBD>`. Implementation: `runFrame` corner-streaming loop + idle wait wrapped in `try { ... } finally { if (laserMode === 'dot') await this.emergencyLaserOff(); }`. The finally fires whether the loop completed cleanly, returned early via T1-103's command-blocked path, or threw. Only triggers for `laserMode === 'dot'` because frame-safe (laser-off) mode never emits M4 at all — `buildFrameGcode` emits `M5 S0` in those positions instead. The finally has its own try/catch around `emergencyLaserOff` so a transport failure during safety-off doesn't mask the original return value. Combined with T1-22's two-stage `safetyOff` (M5 critical-write -> soft reset on fail) and T1-103's fail-fast return, this closes the modal-laser-on hole that previously existed between an accepted M4 and the trailing M5. Pinned by `tests/frame-dot-finally-emits-m5.test.ts` (5 contracts: frame-safe doesn't fire; frame-dot success fires; frame-dot interrupted fires; frame-dot blocked-at-index-0 still fires; safetyOff throwing in finally is logged but doesn't mask original return). Composes with T1-103: T1-103 makes the failure path explicit and observable; T1-21 makes it safe.
+
 ---
 
 ### T1-22 | Critical write awaitability for safety commands
