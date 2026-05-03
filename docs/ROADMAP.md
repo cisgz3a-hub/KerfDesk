@@ -1294,7 +1294,7 @@ Cross-check confirmed: `grep -rn "sendGcode\|electronAPI\.sendGcode" src/` retur
 
 **Priority:** Tier 1 鈥?safety. Highest value-to-effort ratio of any safety item: zero functional impact (nothing calls it), critical bypass closed, ~15 min work. Should ship before any other Tier 1 safety item because it's free.
 
-**Status:** Shipped 2026-05-02 in `<TBD>`. Three deletions (preload export, IPC handler, type declaration) plus a static guard test. Removal-explanation comments left at each site so future maintainers find the rationale via grep. Pinned by `tests/no-electron-sendgcode-export.test.ts` (4 contracts checking the three sites plus a defense-in-depth scan of `src/` for any reintroduction). Pattern mirrors T2-2 / T2-4 / T2-3 static guards.
+**Status:** Shipped 2026-05-02 in `757f2c3`. Three deletions (preload export, IPC handler, type declaration) plus a static guard test. Removal-explanation comments left at each site so future maintainers find the rationale via grep. Pinned by `tests/no-electron-sendgcode-export.test.ts` (4 contracts checking the three sites plus a defense-in-depth scan of `src/` for any reintroduction). Pattern mirrors T2-2 / T2-4 / T2-3 static guards.
 
 ---
 
