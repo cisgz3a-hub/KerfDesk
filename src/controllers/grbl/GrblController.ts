@@ -33,6 +33,7 @@ const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 interface PendingLine {
   text: string;
   byteCount: number;
+  system?: boolean;
 }
 
 /**
@@ -139,6 +140,12 @@ export class GrblController implements LaserController {
   private readonly _grblSettings = new Map<number, string>();
   private _homingDir = 0;
   private _laserMode = false;
+  /**
+   * T1-23: last observed modal spindle/laser mode. Pause sends M5 as
+   * defense-in-depth, and resume reasserts this mode with S0 before
+   * cycle-start so motion continues with the gcode stream's expected mode.
+   */
+  private _lastSpindleMode: 'M3' | 'M4' | null = null;
   private _bedWidth = 0;
   private _bedHeight = 0;
   private _maxFeedX = 0;
@@ -595,7 +602,18 @@ export class GrblController implements LaserController {
       this._resumeRequested = false;
       this._state.status = 'hold';
     }
+    // T1-23: feed-hold halts motion first, then M5 clears modal laser
+    // state as belt-and-suspenders for $32=0 or non-spec GRBL forks.
     this._sendRealtime(REALTIME_FEED_HOLD);
+    if (this._port?.isOpen) {
+      void this._writeCriticalSystemLine('M5 S0', { trackSpindleMode: false }).catch(
+        (err: unknown) =>
+          console.warn(
+            '[GrblController] T1-23 pause: M5 writeCritical failed; relying on feed-hold firmware contract:',
+            err instanceof Error ? err.message : String(err),
+          ),
+      );
+    }
   }
 
   /**
@@ -604,6 +622,19 @@ export class GrblController implements LaserController {
   resume(): void {
     if (!this._port?.isOpen) return;
     if (this._state.status !== 'hold' && !this._pausePending) return;
+    // T1-23: pause() emitted M5. Reassert the captured modal spindle
+    // mode with S0 before cycle-start so the resumed stream has the
+    // expected M3/M4 mode without firing before motion resumes.
+    if (this._lastSpindleMode && this._port?.isOpen) {
+      const mode = this._lastSpindleMode;
+      void this._writeCriticalSystemLine(`${mode} S0`, { trackSpindleMode: false }).catch(
+        (err: unknown) =>
+          console.warn(
+            '[GrblController] T1-23 resume: spindle-mode reassert writeCritical failed:',
+            err instanceof Error ? err.message : String(err),
+          ),
+      );
+    }
     // Realtime `~` releases GRBL feed-hold; only continues streaming when a job is active.
     console.info('[GrblController] feed-hold release (~ / cycle-start)');
     this._sendRealtime(REALTIME_CYCLE_START);
@@ -1110,9 +1141,11 @@ export class GrblController implements LaserController {
 
     const oldest = this._pending.shift()!;
     this._bufferAvailable += oldest.byteCount;
-    this._linesAcknowledged++;
-    this._recordAckTimestamp();
-    this._emitProgress();
+    if (!oldest.system) {
+      this._linesAcknowledged++;
+      this._recordAckTimestamp();
+      this._emitProgress();
+    }
 
     if (this._isJobRunning &&
         this._queueIndex >= this._jobLines.length &&
@@ -1137,8 +1170,10 @@ export class GrblController implements LaserController {
     if (this._pending.length > 0) {
       const oldest = this._pending.shift()!;
       this._bufferAvailable += oldest.byteCount;
-      this._linesAcknowledged++;
-      this._recordAckTimestamp();
+      if (!oldest.system) {
+        this._linesAcknowledged++;
+        this._recordAckTimestamp();
+      }
 
       for (const cb of this._errorListeners) {
         cb(code, `GRBL error ${code} on line: ${oldest.text}`);
@@ -1404,6 +1439,7 @@ export class GrblController implements LaserController {
     if (!this._port?.isOpen) return;
     this._port.write(line + '\n');
     this._emitRawLine(line, 'tx', 'user');
+    this._trackSpindleMode(line);
   }
 
   /**
@@ -1415,6 +1451,57 @@ export class GrblController implements LaserController {
     if (!this._port?.isOpen) return;
     this._port.write(line + '\n');
     this._emitRawLine(line, 'tx', 'system');
+    this._trackSpindleMode(line);
+  }
+
+  /**
+   * Write an internal planner-buffered command while preserving job ack
+   * accounting. GRBL will still return `ok` for these lines; when a job is
+   * active, enqueue a zero-byte system sentinel so that `ok` is not counted
+   * as an acknowledged job gcode line. T1-23 uses this for pause/resume
+   * M5/M3/M4 belt-and-suspenders commands.
+   */
+  private async _writeCriticalSystemLine(
+    line: string,
+    options: { trackSpindleMode?: boolean } = {},
+  ): Promise<void> {
+    if (!this._port?.isOpen) throw new Error('Not connected');
+    const pending: PendingLine | null = this._isJobRunning
+      ? { text: line, byteCount: 0, system: true }
+      : null;
+    if (pending) this._pending.push(pending);
+    try {
+      await this._port.writeCritical(line + '\n');
+    } catch (err) {
+      if (pending) {
+        const idx = this._pending.indexOf(pending);
+        if (idx >= 0) this._pending.splice(idx, 1);
+      }
+      throw err;
+    }
+    this._emitRawLine(line, 'tx', 'system');
+    if (options.trackSpindleMode !== false) {
+      this._trackSpindleMode(line);
+    }
+  }
+
+  /**
+   * T1-23: track modal spindle/laser mode from outgoing gcode. Parenthesized
+   * comments are stripped so an M5 mention in a comment does not clear state.
+   */
+  private _trackSpindleMode(line: string): void {
+    const codePart = line.split('(')[0]!;
+    if (codePart.includes('M5')) {
+      this._lastSpindleMode = null;
+      return;
+    }
+    if (codePart.includes('M4')) {
+      this._lastSpindleMode = 'M4';
+      return;
+    }
+    if (codePart.includes('M3')) {
+      this._lastSpindleMode = 'M3';
+    }
   }
 
   private _sendRealtime(byte: number): void {

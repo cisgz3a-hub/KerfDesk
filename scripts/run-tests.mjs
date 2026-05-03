@@ -154,6 +154,7 @@ const files = [
   'run-frame-fail-fast-on-blocked-command.test.ts',
   'exact-idle-gates.test.ts',
   'preflight-output-layer-filter.test.ts',
+  'pause-emits-m5-after-feed-hold.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
