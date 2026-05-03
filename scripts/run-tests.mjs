@@ -191,6 +191,8 @@ const files = [
   'frame-gcode-pure.test.ts',
   'frame-gcode-crosshair.test.ts',
   'frame-required-before-start.test.ts',
+  'simulator-view-ymirror.test.ts',
+  'runner-registration-coverage.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',
