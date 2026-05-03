@@ -3853,6 +3853,8 @@ For T1-66, the simpler `appendMessage` form ships first.
 
 **Cross-check note (audit 4C):** Audit's Silent 1. Verified at ConnectionPanelMain.tsx:626-630.
 
+**Status:** Closed 2026-05-02 — superseded by T1-105 (`4b1af8a`). T1-105 widened `executionCoordinator.jog()` from `void` to `{ ok, reason? }` and updated `handleJog` in `ConnectionPanelMain.tsx` to surface `"⚠ Jog failed: {reason}. Check connection and machine state."` to the messages console on `ok: false`. The user-visible behavior T1-66 specified — failure surfaced to the message log instead of silent — is delivered. Implementation differs from the T1-66 proposal: T1-105 routes through the return value rather than the original try/catch, so the failure path is type-checked rather than catch-block-dependent. The original T1-66 try/catch in `handleJog` was removed by T1-105 because `executionCoordinator.jog` no longer throws — failures return `ok: false` instead. **Closed without separate ship hash; the work is in `4b1af8a`.** No future T1-66 work needed unless we want the richer central-error-reporter form (`reportError`) that the original T1-66 spec mentioned as a follow-up after T2-65 lands; that becomes a T2-65 follow-up if anyone wants it, not a T1-66 reopen.
+
 ---
 
 ### T1-67 | Ticket hash mismatch messages 鈥?hide hashes from user, expose under "Advanced details"
