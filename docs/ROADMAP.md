@@ -348,6 +348,8 @@ In the Falcon factory profiles (serial and WiFi), set `allowsNegativeWorkspace: 
 
 **Priority:** Tier 1.
 
+**Status:** Shipped pre-2026-05-02 — implementation hash not recorded at the time, formalized 2026-05-03. Verified at write-time: `DeviceProfile` includes `allowsNegativeWorkspace?: boolean` at `src/core/devices/DeviceProfile.ts:153`. Default factory profiles set `allowsNegativeWorkspace: false` at `:436` and `:471`. Severity comes from `negativeCoordPreflightSeverity` in `src/core/preflight/rules/sharedHelpers.ts:6–10` (`'warning'` when `profile?.allowsNegativeWorkspace === true`, else `'error'`). Recovery hint string `NEGATIVE_COORD_SETTINGS_HINT` at `sharedHelpers.ts:3–4` appends the actionable line: *enable 'Allow negative workspace coordinates' in Machine settings.* Preflight rules compose this helper so negative-side policy stays centralized. Pinned by `tests/preflight-negative-coords.test.ts` (registered in `scripts/run-tests.mjs`); file header cites T1-3 directly. **Implementation hash not recorded** — predates the 2026-05-02 audit-cleanup session. Same close-out shape as T1-68, T1-69, T1-20.
+
 ---
 
 ### T1-4 | `emergencyStop` should also disconnect
