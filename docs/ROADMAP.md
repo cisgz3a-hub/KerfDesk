@@ -3807,6 +3807,8 @@ Do not start the job until framing completes successfully.
 
 **Cross-check note (audit 4C):** Audit's Silent 4 + Critical 3 + Priority 8. Verified at ExecutionCoordinator.ts:141-154.
 
+**Status:** Closed 2026-05-02 — superseded by T1-103 (`8cb3faa`). T1-103 widened `FrameResult.reason` from `'no-controller' | 'idle-timeout'` to also include `'command-blocked'` with full error context (`blockedError: string`, `blockedAtLine: number`). The behavior T1-65 specified — abort on first command failure rather than continuing partial frame — is delivered: `runFrame` returns early with `{ ok: false, reason: 'command-blocked', ... }` on the first throw from `ctrl.sendCommand()`. Naming difference: T1-103 used `'command-blocked'` rather than T1-65's proposed `'command-failed'`. Functionally identical (`sendCommand` threw; frame aborted); name preserved as `command-blocked` because T1-103 did the work. Documented in `src/app/ExecutionCoordinator.ts:36-43` (reason union docstring). Pinned by `tests/run-frame-fail-fast-on-blocked-command.test.ts` (registered). Companion to T1-21 (frame-dot try/finally — finally calls `emergencyLaserOff` in the same code path) — both shipped 2026-05-02. Same close-out shape as T1-66 (superseded by T1-105) and T1-73 (superseded by T2-76). **Closed without separate ship hash; the work is in `8cb3faa`.**
+
 ---
 
 ### T1-66 | Jog catch must surface "command blocked" to user
@@ -19321,7 +19323,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-62 `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs (filed; UX correctness, ~30 min - 1 hour)
 - [ ] T1-63 Warning confirmation includes detail/fix per warning, not just titles (filed; UX safety, ~15 min)
 - [ ] T1-64 Pause/Resume/Stop catch blocks must surface errors to user, not just `console.warn` (filed; safety defect, ~30 min)
-- [ ] T1-65 Frame inner loop must abort on first command failure, not continue partial frame (filed; safety defect, ~30 min)
+- [x] T1-65 Frame inner loop must abort on first command failure, not continue partial frame (closed 2026-05-02; superseded by T1-103 in `8cb3faa`)
 - [x] T1-66 Jog catch must surface "command blocked" to user (closed 2026-05-02; superseded by T1-105 in `4b1af8a`)
 - [x] T1-67 Ticket hash mismatch messages — hide hashes from user (shipped 2026-05-02 in `f0e8d41`)
 - [x] T1-68 Autosave must await write before clearing dirty flag (shipped pre-session; close-out 2026-05-02 in `201394b`)
