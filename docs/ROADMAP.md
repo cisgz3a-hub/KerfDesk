@@ -3935,6 +3935,8 @@ Same treatment for the profile-hash mismatch and other validation failures.
 
 **Cross-check note (audit 4C):** Audit's Weak 3 + Critical 7 + Priority 6. Verified at MachineService.ts:330-346.
 
+**Status:** Shipped 2026-05-02 in `<TBD>`. **Implementation differs from spec — Option B (cosmetic) shipped, not Option A (structural).** Spec proposed adding a `details: { cause, ticketSceneHash, currentSceneHash }` field to the validation result type and rendering it under an "Advanced details" expander in the UI. The expander UI does not exist; shipping the structured field with no consumer is YAGNI. **What shipped instead:** the 3 hash-leaking reason strings were rewritten as plain-English action text, e.g. "The design changed after this G-code was created. Update G-code, then frame again before starting." Hashes are preserved in `console.warn` calls for support diagnosis — added warns for the profile-hash and controller-type sites that did not have them before, mirroring the existing scene-hash warn. The user no longer sees hex; support can still recover the bookkeeping from logs. **Future:** if a richer error UI gets built later, reintroducing the structured `details` field is a follow-up. Pinned by `tests/ticket-validation-message-translation.test.ts` (source-level contracts: no `${...Hash}` interpolation in any validation reason; each mismatch has expected action phrasing; all three diagnostic `console.warn` sites are preserved). Existing behavioral stale-ticket assertions in `tests/validated-job-ticket-mismatch.test.ts` were updated to the new wording and to assert no hash text reaches the thrown message.
+
 ---
 
 ### T1-68 | Autosave must await write before clearing dirty flag 鈥?critical data-loss bug

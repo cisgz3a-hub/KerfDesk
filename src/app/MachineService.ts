@@ -381,6 +381,7 @@ export class MachineService {
   ): { ok: true } | { ok: false; reason: string } {
     const currentSceneHash = hashSceneForTicket(scene);
     if (currentSceneHash !== ticket.sceneHash) {
+      // T1-67: hashes stay in diagnostics, not in user-facing modal text.
       console.warn('[ticket] scene hash mismatch', {
         ticketHash: ticket.sceneHash,
         currentHash: currentSceneHash,
@@ -389,8 +390,8 @@ export class MachineService {
       return {
         ok: false,
         reason:
-          'Scene has changed since this job was compiled. Recompile to continue. '
-          + `(ticket scene hash ${ticket.sceneHash}, current ${currentSceneHash})`,
+          'The design changed after this G-code was created. '
+          + 'Update G-code, then frame again before starting.',
       };
     }
 
@@ -399,21 +400,29 @@ export class MachineService {
       ? hashObject(currentProfile)
       : hashString('no-profile');
     if (currentProfileHash !== ticket.profileHash) {
+      console.warn('[ticket] profile hash mismatch', {
+        ticketHash: ticket.profileHash,
+        currentHash: currentProfileHash,
+      });
       return {
         ok: false,
         reason:
-          'Device profile has changed since this job was compiled. Recompile to continue. '
-          + `(ticket profile hash ${ticket.profileHash}, current ${currentProfileHash})`,
+          'The device profile changed after this G-code was created. '
+          + 'Update G-code before starting.',
       };
     }
 
     const currentControllerType: ControllerId = 'grbl';
     if (currentControllerType !== ticket.controllerType) {
+      console.warn('[ticket] controller type mismatch', {
+        ticketControllerType: ticket.controllerType,
+        currentControllerType,
+      });
       return {
         ok: false,
         reason:
-          'Controller type has changed since this job was compiled. '
-          + `(ticket ${ticket.controllerType}, current ${currentControllerType})`,
+          'The controller type changed after this G-code was created. '
+          + 'Update G-code before starting.',
       };
     }
 

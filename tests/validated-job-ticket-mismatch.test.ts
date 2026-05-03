@@ -140,7 +140,11 @@ async function run(): Promise<void> {
       errMsg = err instanceof Error ? err.message : String(err);
     }
 
-    assert(errMsg.includes('Scene has changed since this job was compiled'), 'scene mismatch rejected');
+    assert(
+      errMsg.includes('The design changed after this G-code was created'),
+      'scene mismatch rejected',
+    );
+    assert(!errMsg.includes('hash'), 'scene mismatch: user-facing message hides hash details');
     assert(sendCalls.length === 0, 'scene mismatch: sendJob not called');
     assert(svc.getActiveTicket() === null, 'scene mismatch: activeTicket remains null');
   }
@@ -171,7 +175,11 @@ async function run(): Promise<void> {
       errMsg = err instanceof Error ? err.message : String(err);
     }
 
-    assert(errMsg.includes('Device profile has changed since this job was compiled'), 'profile mismatch rejected');
+    assert(
+      errMsg.includes('The device profile changed after this G-code was created'),
+      'profile mismatch rejected',
+    );
+    assert(!errMsg.includes('hash'), 'profile mismatch: user-facing message hides hash details');
     assert(sendCalls.length === 0, 'profile mismatch: sendJob not called');
     assert(svc.getActiveTicket() === null, 'profile mismatch: activeTicket remains null');
   }
