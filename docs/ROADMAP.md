@@ -478,6 +478,8 @@ try {
 
 **Priority:** Tier 1.
 
+**Status:** Shipped 2026-05-02 in `<TBD>` (audit close-out). Bug fix landed earlier in `e427a0a` (Frame-vs-Burn divergence corrected to use `resolveBedHeightMm` instead of `scene.canvas.height`); this commit closes the audit follow-up by adding the static-guard test the spec requested. Verified at write-time: zero `scene.canvas.width|height` references exist in `src/core`, `src/app`, `src/controllers`, or `src/communication` directories. The codebase is clean for machine-coordinate paths; the guard locks that in. Pinned by `tests/no-scene-canvas-in-machine-coord.test.ts` — recursive walk of all four machine-coordinate directories, comment-stripped scan with line-level violation reporting. Pattern matches T1-27 `no-electron-sendgcode-export`, T2-2 `no-localstorage-in-core`, T2-4 `no-gcode-in-ui`. Composes with existing `tests/bed-height-resolver-parity.test.ts` (which pins the resolver function's behavior): parity test says "the resolver is correct"; T1-9 guard says "machine-coordinate callers use it instead of `scene.canvas`."
+
 ---
 
 ### T1-10 | Wake lock: prevent OS suspend during active jobs

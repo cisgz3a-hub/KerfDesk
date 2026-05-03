@@ -158,6 +158,7 @@ const files = [
   'no-electron-sendgcode-export.test.ts',
   'frame-dot-finally-emits-m5.test.ts',
   'footer-m5-appended-at-send.test.ts',
+  'no-scene-canvas-in-machine-coord.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',
