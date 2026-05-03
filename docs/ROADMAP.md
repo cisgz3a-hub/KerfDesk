@@ -989,6 +989,8 @@ Tests that need the auto-apply behavior pass this flag explicitly.
 
 **Priority:** Tier 1 鈥?trust. Lower urgency than T1-18/T1-19 since the actual exploit window is narrow (UI subscription race), but still real.
 
+**Status:** Shipped pre-2026-05-02 in **`b0375fa`** — formalized 2026-05-03. Verified at write-time: `src/controllers/grbl/GrblController.ts` declares `allowHeadlessWcsAutoNormalize?: boolean` on `GrblControllerOptions` (**52-54**) with an opening **T1-20** doc block (**39-50**). Runtime state: **`_placementUncertain`** (**175**) and **`_allowHeadlessWcsAutoNormalize`** (**181**); **`getPlacementUncertain()`** (**213-215**) exposes the gate. **`_emitWcsPayload`** (**1034-1073**): zero listeners without the opt-in → refuse auto-apply, set **`_placementUncertain = true`**, notify state listeners (**1039-1067**, warn cites T1-20); with **`allowHeadlessWcsAutoNormalize: true`** → preserved pre-T1-20 auto-apply for tests (**1052-1059**). UI / service layer refuses job start while placement is uncertain. **Audit row at `docs/ROADMAP-shipped-audit.md` already cites `b0375fa`.** Same close-out shape as T1-68/T1-69 — ROADMAP Status lagged — except the ship hash **is** recoverable. Pinned by `tests/wcs-no-listener-blocks-job.test.ts` and `tests/wcs-no-listener-headless-flag.test.ts`.
+
 ---
 
 ### T1-21 | Frame-dot try/finally safety scope
