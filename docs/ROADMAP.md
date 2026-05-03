@@ -6188,7 +6188,7 @@ Five surfaces tightened in this commit:
 
 **Priority:** Tier 1 — closes the remaining "UI state updates before transport accept" hole on Jog and Set Origin.
 
-**Status:** Shipped 2026-05-02 in `<TBD>`.
+**Status:** Shipped 2026-05-02 in `4b1af8a`.
 
 ---
 
