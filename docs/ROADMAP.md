@@ -4325,6 +4325,8 @@ Audit it the same way audit 4E itself did this cross-check: grep for any other `
 
 **Cross-check note (audit 4E):** Audit's Critical failure 2 + Priority 2. Verified at App.tsx:1147-1153.
 
+**Status:** Closed 2026-05-02 — superseded by T2-76 step 4 (unified mutation routing). Verified at write-time: `handleDelete` in `src/ui/components/App.tsx` now calls `commitSceneTransaction(newScene, { kind: 'edit', action: 'delete' }, { selectionAfter: new Set() })`. `commitSceneTransaction` in `src/ui/scene/SceneTransaction.ts` calls `deps.notifyDirty(true)` for `kind: 'edit'`, which is exactly the dirty-flag marking T1-73 specified. T2-76's unified routing is more comprehensive than T1-73's local patch: every mutation now flows through the same dirty-firing function, not just delete. The data-loss path described in T1-73 (autosave skipping a delete-only edit because dirty was not set) is structurally closed for mutations that use the unified path. **An in-source comment in `App.tsx` already noted T1-73's concern was satisfied** by the routing change, but no close-out doc entry was written until now. Closed without separate ship hash; the work landed in T2-76 commits. No future T1-73 work needed unless a new mutation path bypasses `commitSceneTransaction`.
+
 ---
 
 ### T1-74 | Text sidebar `patchTextGeometry` must commit history, not just preview
