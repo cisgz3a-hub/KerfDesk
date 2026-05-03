@@ -24,7 +24,8 @@ import { defaultLaserSettings, type LaserSettings, type LayerMode } from '../cor
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
-const APP_VERSION = '0.1.0';
+const APP_VERSION: string =
+  typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0-tsx-fallback';
 
 interface SceneFile {
   format: 'laserforge';

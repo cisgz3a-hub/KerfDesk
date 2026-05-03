@@ -194,6 +194,7 @@ const files = [
   'simulator-view-ymirror.test.ts',
   'runner-registration-coverage.test.ts',
   'connection-panel-offset-button-disabled.test.ts',
+  'app-version-from-package.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',
