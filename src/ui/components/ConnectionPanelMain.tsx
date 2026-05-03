@@ -1456,16 +1456,23 @@ export function ConnectionPanelMain({
         },
           ...([
             { mode: 'line' as const, label: 'Line fill' },
-            { mode: 'offset' as const, label: 'Offset' },
+            { mode: 'offset' as const, label: 'Offset (coming soon)' },
             { mode: 'cross-hatch' as const, label: 'Cross-hatch' },
           ]).map(f =>
             React.createElement('button', {
               type: 'button',
               key: f.mode,
-              onClick: () => { onUpdateLayerFillMode(layer.id, f.mode); },
+              disabled: f.mode === 'offset',
+              onClick: () => {
+                if (f.mode === 'offset') return;
+                onUpdateLayerFillMode(layer.id, f.mode);
+              },
+              title: f.mode === 'offset' ? 'Offset fill not yet implemented' : undefined,
               style: {
                 flex: 1, padding: '3px', fontSize: 9, borderRadius: 3,
-                cursor: 'pointer', fontFamily: font,
+                cursor: f.mode === 'offset' ? 'not-allowed' : 'pointer',
+                opacity: f.mode === 'offset' ? 0.5 : 1,
+                fontFamily: font,
                 background: layer.settings.fill.mode === f.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
                 border: layer.settings.fill.mode === f.mode ? '1px solid #00d4ff' : '1px solid #1a1a2e',
                 color: layer.settings.fill.mode === f.mode ? '#00d4ff' : '#555570',
