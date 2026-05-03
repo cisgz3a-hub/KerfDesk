@@ -157,6 +157,7 @@ const files = [
   'pause-emits-m5-after-feed-hold.test.ts',
   'no-electron-sendgcode-export.test.ts',
   'frame-dot-finally-emits-m5.test.ts',
+  'footer-m5-appended-at-send.test.ts',
   'operation-ordering.test.ts',
   'test-grid-generator.test.ts',
   'box-geometry.test.ts',

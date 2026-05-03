@@ -175,6 +175,17 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         lines.push(footerLines[i]);
       }
 
+      // T1-26: defense-in-depth laser-off at the final gcode boundary.
+      // The strict FOOTER_MISSING_M5 validator blocks malformed custom
+      // footers before job start, but this keeps every encoded artifact
+      // safe even if a future path bypasses that validator.
+      const tailNonEmpty = lines
+        .filter(l => l.trim().length > 0)
+        .slice(-5);
+      if (!/\bM5\b/i.test(tailNonEmpty.join('\n'))) {
+        lines.push('M5 S0 ; T1-26 defense-in-depth laser-off');
+      }
+
       const text = lines.filter(l => l !== undefined).join('\n');
 
       return {
