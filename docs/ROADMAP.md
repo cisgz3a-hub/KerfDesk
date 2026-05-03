@@ -19342,7 +19342,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-83 Strip Electron source maps from production builds (filed; commercial security, ~30 min)
 - [ ] T1-84 Restrict `storage:clear` IPC 鈥?remove or scope (filed; data protection, ~1 hour)
 - [ ] T1-85 Remove `--dev` arg escape hatch in packaged builds (filed; commercial posture, ~15 min)
-- [x] T1-86 `npmRebuild` decision — verify or enable native module rebuild (shipped pre-session; close-out 2026-05-02 in `420945d`)
+- [x] T1-86 `npmRebuild` decision — verify or enable native module rebuild (shipped pre-session; close-out 2026-05-03 in `420945d`)
 - [ ] T1-87 Persist failed-start as job log entry, don't silently nullify (filed; diagnostic recovery, ~30 min)
 - [ ] T1-88 Make diagnostic trace capture free, not Pro-gated (filed; support fairness, ~30 min)
 - [ ] T1-89 Enable Electron `sandbox: true` for the renderer (filed; defense-in-depth, ~1-2 sessions)
