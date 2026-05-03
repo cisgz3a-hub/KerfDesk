@@ -5268,6 +5268,8 @@ And update CI to install platform build tools (windows-build-tools / Xcode CLT /
 
 **Cross-check note (audit 5B):** Audit's Critical 3. Verified at package.json:27.
 
+**Status:** Shipped pre-2026-05-02 — implementation hash not recorded at the time, formalized 2026-05-03. **Path B** shipped (document why `npmRebuild: false` is acceptable) versus enabling rebuild (`npmRebuild: true`). `package.json` carries `_npmRebuildRationale` tying the decision to **T1-86**, N-API, prebuilt `.node` layout, **node-gyp-build**, and **electron-builder**/asar unpack assumptions. **`tests/native-deps-prebuild-check.test.ts`** (203 lines, registered in **`scripts/run-tests.mjs`**) asserts the structural chain (production dep, **`@serialport/bindings-cpp`** prebuilds, N-API / **node-addon-api** markers, **node-gyp-build** resolver) at sandbox time; the file header spells out prerequisites (1)–(4) and delegates **packaged-app `SerialPort.list()` CI** to **T3-86**. If a **`serialport`** upgrade drops prebuilds or moves off N-API, the regression test fails and forces **`npmRebuild` / packaging** to be re-evaluated. **Implementation exceeds the roadmap spec** — which suggested a rationale comment alone — via this structural guard. Same close-out shape as T1-68/T1-69/T1-20/T1-3. **T3-86 remains open** for the packaged-binary runtime smoke.
+
 ---
 
 ### T1-87 | Persist failed-start as a job log entry, don't silently nullify
