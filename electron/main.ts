@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { listSerialPorts, openSerial, closeSerial, safeCloseSerial, writeSerialLine } from './serial';
+import { listSerialPorts, openSerial, closeSerial, safeCloseSerial } from './serial';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
 import { storageGet, storageSet, storageRemove, storageList } from './storage';
 
@@ -396,12 +396,9 @@ ipcMain.handle('serial:disconnect', async () => {
   await closeSerial();
 });
 
-ipcMain.handle('serial:send', async (_event, line: unknown) => {
-  if (typeof line !== 'string') return;
-  if (line.length === 0 || line.length > 127) return;
-  if (/[\r\n]/.test(line)) return;
-  await writeSerialLine(line);
-});
+// T1-27: serial:send IPC handler removed. It wrote raw renderer-provided
+// lines via writeSerialLine, bypassing MachineService / ExecutionCoordinator /
+// GrblController and all semantic safety gates.
 
 ipcMain.handle('app:quit', () => {
   app.quit();

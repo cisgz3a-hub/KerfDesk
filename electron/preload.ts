@@ -12,7 +12,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   connectPort: (portPath: string, baudRate: number) =>
     ipcRenderer.invoke('serial:connect', portPath, baudRate) as Promise<boolean>,
   disconnectPort: () => ipcRenderer.invoke('serial:disconnect') as Promise<void>,
-  sendGcode: (cmd: string) => ipcRenderer.invoke('serial:send', cmd) as Promise<void>,
+  // T1-27: sendGcode IPC export removed. It routed raw renderer gcode
+  // through serial:send, bypassing MachineService / ExecutionCoordinator /
+  // GrblController. No application code called it at removal time.
   quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
   storageGet: (key: string) => ipcRenderer.invoke('storage:get', key) as Promise<string | null>,
   storageSet: (key: string, value: string) =>

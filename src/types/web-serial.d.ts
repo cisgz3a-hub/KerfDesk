@@ -11,7 +11,7 @@ declare global {
     listPorts?: () => Promise<{ path: string; manufacturer?: string }[]>;
     connectPort?: (portPath: string, baudRate: number) => Promise<boolean>;
     disconnectPort?: () => Promise<void>;
-    sendGcode?: (cmd: string) => Promise<void>;
+    // T1-27: sendGcode declaration removed with the preload export and IPC handler.
     quit?: () => Promise<void>;
     storageGet?: (key: string) => Promise<string | null>;
     storageSet?: (key: string, value: string) => Promise<void>;
