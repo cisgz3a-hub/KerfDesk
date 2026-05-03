@@ -196,6 +196,7 @@ const files = [
   'connection-panel-offset-button-disabled.test.ts',
   'app-version-from-package.test.ts',
   'ticket-validation-message-translation.test.ts',
+  'output-deterministic-with-clock-injection.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',

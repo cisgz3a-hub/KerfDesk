@@ -25,6 +25,11 @@ export interface GcodeGenerateOptions {
   gcodeFooterTemplate?: string;
   /** Template context values for header/footer substitution. */
   gcodeTemplateContext?: GcodeTemplateContext;
+  /**
+   * Deterministic clock injection for generated Output metadata and default
+   * header date comments. Production omits this and uses wall time.
+   */
+  clock?: () => string;
 }
 
 export function designMinFromJob(job: Job): { minX: number; minY: number } {
