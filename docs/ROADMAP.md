@@ -6164,6 +6164,34 @@ Five surfaces tightened in this commit:
 
 ---
 
+### T1-105 | Jog + Set Origin: state-after-confirm pattern
+
+**Code reference:** `src/app/MachineService.ts` (`jog`), `src/app/ExecutionCoordinator.ts` (`jog`, `setOriginAtCurrentPosition`), `src/app/sendSetOriginWcsCommand.ts`, `src/ui/components/ConnectionPanelMain.tsx` (`handleJog`), `src/ui/components/App.tsx` (`handleSaveOrigin`).
+
+**Problem:** Companion follow-up to T1-104. T1-104 added exact-idle gates so Jog and Set Origin clicks during non-idle states no longer reach the action. But both handlers still updated UI state before the command send was accepted: Jog set `hasJogged.current = true`, and Set Origin wrote `savedOrigin` plus localStorage before the G10 command path returned. If the controller rejected the line, the UI was ahead of hardware.
+
+**Fix:** Return success/failure from the primitives and update UI state only on `ok: true`.
+
+**Signature changes:**
+  - `MachineService.jog(...)`: `void` -> `{ ok: boolean; reason?: string }`
+  - `ExecutionCoordinator.jog(...)`: `void` -> `{ ok: boolean; reason?: string }`
+  - `ExecutionCoordinator.setOriginAtCurrentPosition()`: `Promise<void>` -> `Promise<{ ok: boolean; reason?: string }>`
+  - `sendSetOriginWcsCommand(...)`: `void` -> `{ ok: boolean; reason?: string }`
+
+**Success semantics:** controller exists and `sendCommand` did not throw. This is transport acceptance, not GRBL ack-correlation. True "firmware parsed and applied it" confirmation is out of scope because it requires rx-buffer correlation infrastructure.
+
+**UI behavior:** `handleJog` sets `hasJogged` only on `ok: true`; failures surface in the messages console. `handleSaveOrigin` sends G10 first, then updates `savedOrigin` and localStorage only on success; failures surface via `showAlert` because App does not own the messages console and Set Origin failure deserves visible feedback.
+
+**Tests:** `tests/jog-and-setorigin-state-after-confirm.test.ts` plus widened assertions in `tests/origin-mode-wcs-zero.test.ts`, `tests/execution-coordinator-testfire-setorigin.test.ts`, and `tests/execution-coordinator.test.ts`.
+
+**Estimate:** ~60 min including tests and callsite updates.
+
+**Priority:** Tier 1 — closes the remaining "UI state updates before transport accept" hole on Jog and Set Origin.
+
+**Status:** Shipped 2026-05-02 in `<TBD>`.
+
+---
+
 ### T1-107 | Preflight bed-bounds + visible-layer-for-output checks must filter by `layer.output`
 
 **Code reference:** `src/core/preflight/rules/OutputBoundsPreflight.ts` (`runBoundsChecks`); `src/core/preflight/rules/ScenePreflight.ts` (`runSceneChecks`).

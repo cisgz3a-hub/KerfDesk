@@ -74,10 +74,11 @@ void (async () => {
     notifySimulatorRef: notifyRef,
   });
 
-  coord.jog('X', 1.5, 2400);
+  const jogResult = coord.jog('X', 1.5, 2400);
 
   assert(simLines.length === 1 && simLines[0]?.includes('$J=') && simLines[0]?.includes('X1.5'), 'simulator sees $J line');
   assert(jogCalls.length === 1 && jogCalls[0]?.axis === 'X' && jogCalls[0]?.d === 1.5 && jogCalls[0]?.f === 2400, 'controller receives jog');
+  assert(jogResult.ok === true, 'jog returns ok=true when accepted');
 
   jogCalls = [];
   const sim2: string[] = [];
@@ -87,8 +88,9 @@ void (async () => {
     controllerRef: { current: null },
     notifySimulatorRef: nr2,
   });
-  coordNoCtrl.jog('Y', 10, 3000);
+  const noCtrlResult = coordNoCtrl.jog('Y', 10, 3000);
   assert(jogCalls.length === 0 && sim2.length === 0, 'no controller → jog is a no-op');
+  assert(noCtrlResult.ok === false && noCtrlResult.reason === 'no-controller', 'no controller → jog returns no-controller result');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);

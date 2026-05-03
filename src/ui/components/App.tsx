@@ -576,19 +576,26 @@ export function App() {
     return () => window.removeEventListener('beforeunload', handler);
   }, [machineUi.executionCoordinator]);
 
-  const handleSaveOrigin = useCallback(() => {
-    // T1-104: exact-idle gate. T1-105 will additionally move savedOrigin
-    // and localStorage updates behind confirmed G10 acceptance.
+  const handleSaveOrigin = useCallback(async () => {
+    // T1-104: exact-idle gate. T1-105: state and storage update only
+    // after the G10 command is accepted by the transport.
     if (grbl.machineState?.status !== 'idle') return;
     const pos = grbl.machineState?.position;
     if (!pos) return;
     const origin = { x: pos.x, y: pos.y };
+    const result = await machineUi.executionCoordinator.setOriginAtCurrentPosition();
+    if (!result.ok) {
+      void showAlert(
+        'Set Origin failed',
+        `The Set Origin command was not accepted by the controller (${result.reason ?? 'unknown reason'}). The saved origin was not updated; verify connection and try again.`,
+      );
+      return;
+    }
     setSavedOrigin(origin);
     try {
       localStorage.setItem('laserforge_saved_origin', JSON.stringify(origin));
     } catch { /* ignore */ }
-    void machineUi.executionCoordinator.setOriginAtCurrentPosition();
-  }, [grbl.machineState, machineUi.executionCoordinator]);
+  }, [grbl.machineState, machineUi.executionCoordinator, showAlert]);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5

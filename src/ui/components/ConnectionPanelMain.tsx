@@ -668,21 +668,23 @@ export function ConnectionPanelMain({
 
   const handleJog = useCallback(
     (axis: 'X' | 'Y', distance: number) => {
-      // T1-104: Jog requires exact idle. T1-105 will additionally tighten
-      // this so hasJogged flips only after the command is accepted.
+      // T1-104: Jog requires exact idle. T1-105: hasJogged flips only
+      // after the command is accepted by the transport.
       if (machineState?.status !== 'idle') {
         setMessages(prev => [...prev,
           `⚠ Jog declined: machine is "${machineState?.status ?? 'unknown'}", must be idle`,
         ]);
         return;
       }
+      const result = executionCoordinator.jog(axis, distance, 3000);
+      if (!result.ok) {
+        setMessages(prev => [...prev,
+          `⚠ Jog failed: ${result.reason ?? 'unknown'}. Check connection and machine state.`,
+        ]);
+        return;
+      }
       hasJogged.current = true;
       setWorkflowVersion(v => v + 1);
-      try {
-        executionCoordinator.jog(axis, distance, 3000);
-      } catch (err: unknown) {
-        console.warn('[Command blocked]', err instanceof Error ? err.message : err);
-      }
     },
     [executionCoordinator, machineState?.status, setMessages],
   );

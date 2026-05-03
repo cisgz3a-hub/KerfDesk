@@ -28,19 +28,24 @@ console.log('\n=== origin-mode-wcs-zero ===');
 {
   const sent: string[] = [];
   const ctrl = { sendCommand: (s: string) => { sent.push(s); } };
-  sendSetOriginWcsCommand(ctrl);
+  const result = sendSetOriginWcsCommand(ctrl);
   assert(sent.length === 1 && sent[0] === 'G10 L20 P1 X0 Y0', 'sendSetOriginWcsCommand emits G10 L20 P1 X0 Y0');
+  assert(result.ok === true, 'sendSetOriginWcsCommand success returns ok=true');
 }
 
 {
   let throws = false;
+  let nullResult: ReturnType<typeof sendSetOriginWcsCommand> | null = null;
+  let undefinedResult: ReturnType<typeof sendSetOriginWcsCommand> | null = null;
   try {
-    sendSetOriginWcsCommand(null);
-    sendSetOriginWcsCommand(undefined);
+    nullResult = sendSetOriginWcsCommand(null);
+    undefinedResult = sendSetOriginWcsCommand(undefined);
   } catch {
     throws = true;
   }
   assert(!throws, 'sendSetOriginWcsCommand(null/undefined) does not throw');
+  assert(nullResult?.ok === false && nullResult.reason === 'no-controller', 'null controller returns no-controller result');
+  assert(undefinedResult?.ok === false && undefinedResult.reason === 'no-controller', 'undefined controller returns no-controller result');
 }
 
 {

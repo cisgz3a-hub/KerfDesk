@@ -90,11 +90,11 @@ export class ExecutionCoordinator {
     this.deps.notifySimulatorRef.current(line);
   }
 
-  jog(axis: 'X' | 'Y', distance: number, feedRate: number): void {
-    if (!this.deps.controllerRef.current) return;
+  jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
+    if (!this.deps.controllerRef.current) return { ok: false, reason: 'no-controller' };
     const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
     this.notifySimulator(cmd);
-    this.deps.machineService.jog(axis, distance, feedRate);
+    return this.deps.machineService.jog(axis, distance, feedRate);
   }
 
   async startValidatedJob(args: {
@@ -364,10 +364,10 @@ export class ExecutionCoordinator {
    * Set machine origin: zero the G54 work coordinate at the current physical head position.
    * Caller must have verified the head is at the intended position.
    */
-  async setOriginAtCurrentPosition(): Promise<void> {
+  async setOriginAtCurrentPosition(): Promise<{ ok: boolean; reason?: string }> {
     const ctrl = this.deps.controllerRef.current;
-    if (!ctrl) return;
+    if (!ctrl) return { ok: false, reason: 'no-controller' };
     this.notifySimulator('G10 L20 P1 X0 Y0');
-    sendSetOriginWcsCommand(ctrl);
+    return sendSetOriginWcsCommand(ctrl);
   }
 }

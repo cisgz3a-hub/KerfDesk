@@ -310,11 +310,12 @@ void (async () => {
       controllerRef,
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
-    await coord.setOriginAtCurrentPosition();
+    const result = await coord.setOriginAtCurrentPosition();
     assert(
       sent.length === 1 && sent[0] === 'G10 L20 P1 X0 Y0',
       'setOriginAtCurrentPosition sends G10 L20 P1 X0 Y0',
     );
+    assert(result.ok === true, 'setOriginAtCurrentPosition returns ok=true on success');
     assert(sim.length === 1 && sim[0] === 'G10 L20 P1 X0 Y0', 'setOrigin notifies simulator');
   }
 
@@ -328,8 +329,9 @@ void (async () => {
       controllerRef,
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
-    await coord.setOriginAtCurrentPosition();
+    const result = await coord.setOriginAtCurrentPosition();
     assert(sim.length === 0, 'no controller → setOrigin no simulator G10 (early return)');
+    assert(result.ok === false && result.reason === 'no-controller', 'no controller → setOrigin returns no-controller result');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

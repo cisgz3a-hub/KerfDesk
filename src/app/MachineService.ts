@@ -893,9 +893,15 @@ export class MachineService {
     }
   }
 
-  jog(axis: 'X' | 'Y', distance: number, feedRate: number): void {
+  jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
+    const ctrl = this.controllerRef.current;
+    if (!ctrl) return { ok: false, reason: 'no-controller' };
     const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
-    this.controllerRef.current.sendCommand(cmd, 'internal');
+    try {
+      ctrl.sendCommand(cmd, 'internal');
+    } catch (err: unknown) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
     setTimeout(() => {
       try {
         this.controllerRef.current.requestStatusReport();
@@ -903,6 +909,7 @@ export class MachineService {
         /* ignore */
       }
     }, 100);
+    return { ok: true };
   }
 
   /** Pause the currently running job (feed-hold). */
