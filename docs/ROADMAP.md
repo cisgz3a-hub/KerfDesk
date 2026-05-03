@@ -2353,6 +2353,8 @@ The reassert in (1) is defense-in-depth even if validator misses something. Vali
 
 **Cross-check note (audit 2D):** Audit's Finding 2D-11. Verified at exact lines. Audit's recommendation matches the proposal. Note: T2-14 (non-removable safety wrapper) restructures the header generation more thoroughly. T1-43 is the bounded fix that ships independently; T2-14 absorbs it into the broader safety-wrapper architecture.
 
+**Status:** Shipped 2026-05-03 in **`TBD`** (substituted in follow-up docs commit). Defense-in-depth: (1) **`GcodeTemplateValidator`** widens **`TEMPLATE_G91_IN_HEADER`** from header-only to **`header` + `customStart`**, and adds **`TEMPLATE_G90_IN_HEADER`** for **`G90`** in those sources. **Naming deviation:** kept **`TEMPLATE_G91_IN_HEADER`** (not the spec's `..._OR_CUSTOMSTART`) to preserve the existing **`gcode-template-validator.test.ts`** pin — messages name the real source. **(2) `Output.encodeHeader`** appends a **`G90`** or **`G91`** reassert line (T1-43 comment) after non-empty custom-start lines — no-op when modes already match, backstop if preflight is bypassed. Pinned by **`tests/customstart-mode-reassertion.test.ts`** (five Output contracts) and **`tests/gcode-template-validator.test.ts`** (four new validator contracts). **T3-86** packaged **`SerialPort.list()`** CI remains separate. **T2-14** is the umbrella header-wrapper follow-up.
+
 ---
 
 ### T1-44 | Controller `_checkJobBounds` simulates G91 from known starting position

@@ -207,11 +207,24 @@ function validateResolvedText(
       }
     }
 
-    if (/^G91(?![0-9])/i.test(line) && source === 'header') {
+    // T1-43: G91 / G90 in header or customStart conflict with LaserForge mode
+    // management. G91 keeps code TEMPLATE_G91_IN_HEADER (existing test pin);
+    // messages name the actual source when customStart.
+    if (/^G91(?![0-9])/i.test(line) && (source === 'header' || source === 'customStart')) {
+      const where = source === 'customStart' ? 'a custom start g-code block' : 'a header';
       push(
         'error',
         'TEMPLATE_G91_IN_HEADER',
-        'G91 (relative mode) in a header conflicts with LaserForge mode management. Remove G91 from the header template.',
+        `G91 (relative mode) in ${where} conflicts with LaserForge mode management. Remove G91; LaserForge sets positioning mode from the job's start-mode setting.`,
+      );
+      continue;
+    }
+    if (/^G90(?![0-9])/i.test(line) && (source === 'header' || source === 'customStart')) {
+      const where = source === 'customStart' ? 'a custom start g-code block' : 'a header';
+      push(
+        'error',
+        'TEMPLATE_G90_IN_HEADER',
+        `G90 (absolute mode) in ${where} conflicts with LaserForge mode management. Remove G90; LaserForge sets positioning mode from the job's start-mode setting.`,
       );
       continue;
     }

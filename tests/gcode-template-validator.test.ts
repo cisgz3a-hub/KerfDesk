@@ -82,6 +82,22 @@ console.log('\n=== gcode-template-validator ===\n');
   assert(!codes(f).has('TEMPLATE_G91_IN_HEADER'), 'G91 in footer is not TEMPLATE_G91_IN_HEADER');
 }
 {
+  const f = validateGcodeTemplates(baseInput({ customStart: 'G91' }));
+  assert(codes(f).has('TEMPLATE_G91_IN_HEADER'), 'T1-43 TEMPLATE_G91_IN_HEADER fires for customStart');
+}
+{
+  const f = validateGcodeTemplates(baseInput({ headerTemplate: 'G90' }));
+  assert(codes(f).has('TEMPLATE_G90_IN_HEADER'), 'T1-43 TEMPLATE_G90_IN_HEADER for G90 in header');
+}
+{
+  const f = validateGcodeTemplates(baseInput({ customStart: 'G90' }));
+  assert(codes(f).has('TEMPLATE_G90_IN_HEADER'), 'T1-43 TEMPLATE_G90_IN_HEADER for G90 in customStart');
+}
+{
+  const f = validateGcodeTemplates(baseInput({ footerTemplate: 'G90' }));
+  assert(!codes(f).has('TEMPLATE_G90_IN_HEADER'), 'T1-43 G90 in footer not flagged');
+}
+{
   const f = validateGcodeTemplates(baseInput({ headerTemplate: 'g92 X0' }));
   assert(codes(f).has('TEMPLATE_G92'), 'TEMPLATE_G92 lowercase g92');
 }

@@ -198,6 +198,7 @@ const files = [
   'ticket-validation-message-translation.test.ts',
   'output-deterministic-with-clock-injection.test.ts',
   'no-live-pro-flag-writes.test.ts',
+  'customstart-mode-reassertion.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',

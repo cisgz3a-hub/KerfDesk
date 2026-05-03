@@ -237,7 +237,15 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     const extra = options?.customStartGcode?.trim();
     if (!extra) return base;
     const lines = extra.split(/\r?\n/).map(l => l.trimEnd()).filter(l => l.length > 0);
-    return lines.length ? [base, ...lines].join('\n') : base;
+    if (lines.length === 0) return base;
+    // T1-43: reassert the correct positioning mode after the custom-start
+    // block. If customStart contained G90 or G91, preflight should block job
+    // start — this is runtime defense-in-depth for any bypass path (profile
+    // import, future template escapes, validator regressions).
+    const reassertMode = useRelative
+      ? 'G91 ; LaserForge: reassert relative mode after customStartGcode (T1-43)'
+      : 'G90 ; LaserForge: reassert absolute mode after customStartGcode (T1-43)';
+    return [base, ...lines, reassertMode].join('\n');
   }
 
   encodeRapid(to: { x: number; y: number }): string {
