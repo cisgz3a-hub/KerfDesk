@@ -4992,6 +4992,8 @@ The migration code at lines 102-115 also reads `PRO_FLAG_KEY`; once writes are r
 
 **Cross-check note (audit 5A):** Audit's Storage findings. Verified at EntitlementService.ts:60-61.
 
+**Status:** Shipped 2026-05-03 in **`TBD`** (docs hash substitution commit follows main ship commit). Audit + repo-wide grep for `laserforge_pro` and `PRO_FLAG_KEY` found readers only in `EntitlementService` (migration, `deactivate`, constant) and `tests/entitlement-storage-migration.test.ts`. **`App.tsx`** only matches `'laserforge_production_mode'` — a different key, not a legacy flag reader. **Decision:** delete live writes — `setState` no longer writes `PRO_FLAG_KEY`; comment at the callsite documents why. **`PRO_FLAG_KEY` constant retained** (`laserforge_pro`) because `migrateFromLocalStorage` and `deactivate` still reference it; migration keeps one-time legacy localStorage lift into the storage adapter until removed. **Foot-gun closed:** nothing in `setState` maintains the shadow boolean. **Pinned** by `tests/no-live-pro-flag-writes.test.ts` (`skipToFreeSession` and privileged `setState({ hasPro: true })` produce no `PRO_FLAG_KEY` storage ops; state still updates). `tests/entitlement-storage-migration.test.ts` unchanged. **Future:** drop migration once legacy localStorage state has aged out.
+
 ---
 
 ### T1-83 | Strip Electron source maps from production builds

@@ -75,12 +75,15 @@ export class EntitlementService {
 
   private setState(next: EntitlementState): void {
     this.state = next;
-    const write = next.hasPro
-      ? getStorage().set(PRO_FLAG_KEY, 'true')
-      : getStorage().remove(PRO_FLAG_KEY);
-    write.catch(() => {
-      /* ignore */
-    });
+    // T1-82: legacy PRO_FLAG_KEY ('laserforge_pro') write removed. The key
+    // had no readers in src/, electron/, or any production code path —
+    // verified at write-time via repo-wide grep (only EntitlementService
+    // migration/deactivate references and tests/). Live writes were a foot-gun:
+    // a future path reading localStorage.getItem('laserforge_pro') could see a
+    // "current" value and bypass EntitlementService. Migration read path
+    // (migrateFromLocalStorage) is preserved for very old upgrades; deactivate()
+    // still removes the key explicitly. Future cleanup can drop migration once
+    // legacy localStorage state has aged out.
     this.emit();
   }
 
@@ -118,6 +121,10 @@ export class EntitlementService {
   private async migrateFromLocalStorage(): Promise<void> {
     if (typeof localStorage === 'undefined') return;
     const storage = getStorage();
+    // T1-82: PRO_FLAG_KEY stays in this list as a one-time read for users who
+    // still have the legacy localStorage slot. Live setState writes to this key
+    // were removed. Migrated values may persist in the adapter until
+    // deactivate(); nothing reads PRO_FLAG_KEY for authority — hasPro is canonical.
     const migrationKeys = [STORAGE_KEY, PRO_FLAG_KEY, LICENSE_CACHE_KEY];
 
     for (const key of migrationKeys) {

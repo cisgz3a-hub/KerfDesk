@@ -197,6 +197,7 @@ const files = [
   'app-version-from-package.test.ts',
   'ticket-validation-message-translation.test.ts',
   'output-deterministic-with-clock-injection.test.ts',
+  'no-live-pro-flag-writes.test.ts',
 
   // E2E snapshot tests
   'e2e/rectangle-cut.test.ts',
