@@ -74,7 +74,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 
 | Ticket | What | Evidence |
 |---|---|---|
-| T1-68 | Autosave awaits write before clearing dirty | `writeAutosaveAsync` in `src/app/autosavePersistence.ts`; `App.tsx:1247` uses `void writeAutosaveAsync(json).then(success 鈫?clear dirty, fail 鈫?leave dirty)`; `tests/autosave-dirty-flag-on-failure.test.ts` |
+| T1-68 | Autosave awaits write before clearing dirty | `writeAutosaveAsync` at `src/app/autosavePersistence.ts:45` (`Promise<void>` via `persistAutosave`). Autosave interval in `src/ui/components/App.tsx:1252–1287`: `void writeAutosaveAsync(json).then(…)` clears dirty only after write resolves (1274–1278); failure preserves dirty (comment 1281–1282). Same-content short-circuit 1265–1267. Test `tests/autosave-dirty-flag-on-failure.test.ts` (not spec filename `autosave-awaits-write.test.ts`). **Ship hash:** not recorded — see `docs/ROADMAP.md` T1-68 Status. |
 | T1-69 | Manual save needs acknowledgement | `src/ui/hooks/useFileHandlers.ts:57-66` shows "File saved?" confirm dialog; dirty stays true until ack; `tests/manual-save-needs-acknowledgement.test.ts` |
 | T1-73 | Delete marks dirty | `tests/delete-marks-dirty.test.ts`; `App.tsx:handleDelete` routed through canonical `handleSceneCommit` |
 | T1-74 | Text `patchTextGeometry` commits history | `tests/text-property-edits-undoable.test.ts`; `PropertiesPanel.tsx:patchTextGeometry` calls `onSceneCommit` directly |

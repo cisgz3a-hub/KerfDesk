@@ -4018,6 +4018,8 @@ If write fails, dirty stays true, so the next 30-second tick retries. After T2-6
 
 **Cross-check note (audit 4D):** Audit's Critical failure 1 + Priority 1. Verified at autosavePersistence.ts:34-38 + App.tsx:1094-1096.
 
+**Status:** Shipped pre-2026-05-02 — implementation hash not recorded at the time, formalized in this session (2026-05-03). Verified at write-time: `writeAutosaveAsync` is exported from `src/app/autosavePersistence.ts:45`, returning `Promise<void>` backed by awaited `persistAutosave`. The autosave timer in `src/ui/components/App.tsx:1252–1287` still short-circuits when `serializeForAutosave` fails (dirty remains true so the next tick retries) and when `json === lastSavedSceneRef.current` (clears dirty without writing because the persisted payload is unchanged — correct). Otherwise it runs `void writeAutosaveAsync(json).then(success path clears dirty and advances lastSavedSceneRef at 1274–1278, failure handler at 1279–1283 leaves dirty and preserves lastSavedSceneRef with explicit comment: *\"Intentionally do NOT clear sceneIsDirtyRef and do NOT advance lastSavedSceneRef\"*). Pinned by `tests/autosave-dirty-flag-on-failure.test.ts` (different filename than the spec's suggestion `autosave-awaits-write.test.ts`). **`docs/ROADMAP-shipped-audit.md` already listed this as shipped in the Dirty-state cluster table but without a ship hash —** intentional: no reliable single commit attribution surfaced in this audit pass. Future regressions typically re-introduce optimism by clearing dirty before awaited storage settles; guarded by the failure-path test and code review.
+
 ---
 
 ### T1-69 | Manual save must not mark scene clean before download write confirmation
