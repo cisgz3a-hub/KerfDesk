@@ -4075,6 +4075,8 @@ For T1-69's first ship, the minimum is: don't unconditionally call `syncAutosave
 
 **Cross-check note (audit 4D):** Audit's Critical failure 2 + Priority 4. Verified at useFileHandlers.ts:36-43 + FileIO.ts:50-70.
 
+**Status:** Shipped pre-2026-05-02 — implementation hash not recorded at the time, formalized 2026-05-03. Verified at write-time: `handleKeyboardSave` in `src/ui/hooks/useFileHandlers.ts:45-67` awaits `saveSceneToFile(scene)`, then awaits `showConfirm('File saved?', …)` with explanatory text ("Make sure your browser saved the file. The app cannot confirm browser downloads."), and **only calls `syncAutosaveAfterFileSave()` when the user returns `ok: true`**. On `ok: false`, the dirty flag stays true and the user can retry Save. In-source comment at lines **52-56** references T1-69 directly: `saveSceneToFile` resolves on `a.click()` dispatch, not disk write; blockers and disk errors are invisible until a File System Access API / Electron path exists. This matches the explicit-acknowledge model from the spec (vs. "never claim browser downloads are confirmed"). Pinned by `tests/manual-save-needs-acknowledgement.test.ts`. **Audit doc row already noted shipped status but lacked a commit hash;** formalizing here with explicit "hash not recorded" rather than fabricating one. **Future:** a confirmed-write path (see T3-1) can clear dirty without this modal; browser-download mode would still need acknowledgement until better primitives exist. Same close-out shape as T1-68.
+
 ---
 
 ### T1-70 | Recovery failure must alert user, not just console.error
