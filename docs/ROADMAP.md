@@ -2694,6 +2694,8 @@ return {
 
 ### T1-49 | `MachineService.connectRealLaser` cleanup on partial-failure
 
+**Status:** Shipped 2026-05-04 in `<TBD>`. `connectRealLaser` rewritten with the audit's recommended try/catch shape: `portRef.current = ws` is now assigned only after `controller.connect` succeeds. On any failure path (`requestAndOpen` permission denied / port busy / writer-or-reader failure, or `controller.connect` handshake timeout / wrong-device / baud mismatch), the half-open WebSerialPort is closed (sync today, async after T2-31), `portRef.current` is nulled if it ended up pointing at the failed port, and `controller.disconnect()` is best-effort called to release any partial-connect state. The original error then rethrows so the UI's catch surfaces it. Pinned by `tests/connect-cleanup-on-partial-failure.test.ts` (16 contracts: requestAndOpen-throws cleanup path, controller-connect-throws cleanup path, happy-path no-op-cleanup, unsupported-browser early throw before any port allocation). The test stubs `WebSerialPort.isSupported`/`prototype.requestAndOpen`/`prototype.close` so the failure paths can run under jsdom where `navigator.serial` doesn't exist. **Hardware verification: not required (UI plumbing for previously-swallowed async failures, no g-code or machine-state change).**
+
 **Code reference:** `src/app/MachineService.ts:494-503` (current implementation).
 
 **Problem:** Cross-check verified the exact failure mode. Current code:
@@ -19343,7 +19345,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-46 notifySimulatorTx per-line loop blocks job start (filed; UX, ~30 min)
 - [x] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (shipped 2026-05-02 in `037bfdd`)
 - [x] T1-48 Remove `new Date()` from Output.createdAt for determinism (shipped 2026-05-02 in `69f1221`)
-- [ ] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (filed; defect fix, ~30 min)
+- [x] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (shipped 2026-05-04 in `<TBD>`)
 - [ ] T1-50 Connect button mutex / abortable connect — Part A (UI mutex) shipped 2026-05-04 in `<TBD>`; Part B (abortable connect, AbortSignal through MachineService) open
 - [ ] T1-51 Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome (filed; defect fix, ~30 min)
 - [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `41310f4` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)

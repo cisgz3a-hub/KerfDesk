@@ -713,14 +713,48 @@ export class MachineService {
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
     }
-    const ws = createSerialPort('web') as WebSerialPort;
-    this.portRef.current = ws;
-    await ws.requestAndOpen(baudRate);
-    await this.controllerRef.current.connect(ws);
-    this.state.isSimulator = false;
-    // T1-22: fresh connection clears any stale unknown laser-safety state
-    // from a previous session.
-    this._setLaserOutputState('off');
+    // T1-49: previously `portRef.current = ws` was assigned BEFORE the
+    // open + handshake calls, so a thrown `requestAndOpen` (permission
+    // denied, port busy, getWriter/getReader failure) or a thrown
+    // `controller.connect` (handshake timeout, wrong-device, baud
+    // mismatch) left the half-open `WebSerialPort` instance pinned on
+    // portRef. Subsequent `portRef.current != null` checks treated the
+    // app as connected; reconnection often failed until app reload.
+    //
+    // Now: only assign portRef on full success. On any failure path,
+    // close the half-open port (sync today, async after T2-31), null
+    // portRef if it ended up pointing at the failed port, attempt a
+    // controller disconnect to release any partial connect state, and
+    // rethrow so the UI's catch sees the original error.
+    let ws: WebSerialPort | null = null;
+    try {
+      ws = createSerialPort('web') as WebSerialPort;
+      await ws.requestAndOpen(baudRate);
+      await this.controllerRef.current.connect(ws);
+      this.portRef.current = ws;
+      this.state.isSimulator = false;
+      // T1-22: fresh connection clears any stale unknown laser-safety state
+      // from a previous session.
+      this._setLaserOutputState('off');
+    } catch (err) {
+      if (ws) {
+        try {
+          ws.close();
+        } catch {
+          /* close itself can fail if the port never opened; ignore so the
+             original error reaches the caller */
+        }
+      }
+      if (this.portRef.current === ws) {
+        this.portRef.current = null;
+      }
+      try {
+        await this.controllerRef.current.disconnect();
+      } catch {
+        /* the controller may not be in a disconnectable state — fine */
+      }
+      throw err;
+    }
   }
 
   async disconnect(): Promise<void> {
