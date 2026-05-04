@@ -364,6 +364,8 @@ In the Falcon factory profiles (serial and WiFi), set `allowsNegativeWorkspace: 
 
 ### T1-4 | `emergencyStop` should also disconnect
 
+**Status:** Closed 2026-05-04 — **shipped pre-session in `86cbe02`** (`fix(grbl): emergencyStop severs the command path`). Verified at write-time: `GrblController.emergencyStop()` at `src/controllers/grbl/GrblController.ts:681` sends `REALTIME_RESET`, aborts the job, emits progress, then calls `void this.disconnect().catch(...)` to sever the command path. The UI button at `ConnectionPanelMain.tsx:2271` calls `emergencyStop()`, shows a user-facing alert ("The machine was reset and the connection was closed. Reconnect when it is safe to continue."), best-effort calls `machineService.disconnect()` to keep service-side state consistent, and surfaces "⚠ EMERGENCY STOP — disconnected. Reconnect when safe." in the messages console. Pinned by `tests/controller-stop-safety.test.ts` (19 contracts, including: emergencyStop sends 0x18, aborts job state, closes port, no `$X` auto-unlock, sendCommand throws "Not connected" after emergencyStop). Same close-out shape as T1-2 (also shipped pre-session).
+
 **Code reference:** `src/controllers/grbl/GrblController.ts:478-484`
 
 ```ts
@@ -19312,7 +19314,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-1 WCS mutation consent prompt
 - [x] T1-2 Controller-layer bounds + fresh-status recheck (shipped pre-session in `3d3dfdd`; close-out 2026-05-04)
 - [x] T1-3 Profile-dependent negative-coord severity (shipped pre-session; close-out 2026-05-03)
-- [ ] T1-4 `emergencyStop` also disconnects
+- [x] T1-4 `emergencyStop` also disconnects (shipped pre-session in `86cbe02`; close-out 2026-05-04)
 - [x] T1-5 Per-profile `stopOnError` override (closed pre-session — `stopOnError?: boolean` on DeviceProfile.ts:161)
 - [x] T1-6 Classify `sendCommand` inputs (shipped pre-session in `ef8ac92`)
 - [x] T1-7 JobLog QuotaExceededError visibility (closed pre-session — pinned by tests/job-log-quota.test.ts)
