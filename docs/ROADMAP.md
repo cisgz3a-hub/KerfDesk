@@ -19348,7 +19348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-39 Frame skips first relative move on front-origin machines — code shipped 2026-05-04 in `df5763e`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-40 Right-origin X mirror support — code shipped 2026-05-04 in `18b1755`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-41 Saved-origin verification — code shipped 2026-05-04 in `49a3c55` (snapshot + start-time verify + disconnect-clears; frame-time verify and proactive G10/G92 invalidation deferred), awaiting hardware verification on Falcon A1 Pro
-- [ ] T1-42 Frame bounds confirmation uses buildFrameCorners — code shipped 2026-05-04 in `<TBD>` (workFrame replaced + off-bed hard-block), awaiting hardware verification on Falcon A1 Pro
+- [ ] T1-42 Frame bounds confirmation uses buildFrameCorners — code shipped 2026-05-04 in `3ef9f84` (workFrame replaced + off-bed hard-block), awaiting hardware verification on Falcon A1 Pro
 - [x] T1-43 Reassert G90/G91 after customStartGcode + reject mode flips (shipped 2026-05-02 in `6eb006b`)
 - [ ] T1-44 Controller _checkJobBounds simulates G91 from known starting position (filed; defense-in-depth)
 - [ ] T1-45 Compile complexity gate 鈥?warn/block on huge jobs (filed; UX safety)
