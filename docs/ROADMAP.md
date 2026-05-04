@@ -173,6 +173,8 @@ This has been broken for the entire duration of the burn-progress feature. Tests
 
 **Priority:** Tier 0.
 
+**Status:** Closed pre-session 2026-05-04 — comment-stripping filter is gone from `src/ui/components/ConnectionPanelMain.tsx` (zero `startsWith(';')` matches in the file). `handleStartJob` (current location: line 692) passes `ticket.gcodeLines` straight through to `executionCoordinator.startValidatedJob()`; the compile/ticket pipeline already trims and drops empty lines but does not strip `;` comments. `; OBJ ids=...` markers survive the UI path and drive `onObjectLifecycle` (burn-progress halos) as the spec required. Pinned by `tests/ui-start-job-preserves-markers.test.ts` (registered in `scripts/run-tests.mjs:185`); regression test mirrors the production line-split filter (`l.length > 0` only, no `startsWith(';')`). The audit doc's `:578` line reference is stale — the function was refactored since the audit was written; the fix persists. **Closed without ship hash; pre-session.** Same close-out shape as T1-3, T1-86.
+
 ---
 
 ### T0-2 | Fix three unsafe built-in gcode templates
@@ -19253,7 +19255,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 ## Tracking 鈥?summary checklist
 
 ### Tier 0 (Today)
-- [ ] T0-1 Delete comment-stripping in start-job path
+- [x] T0-1 Delete comment-stripping in start-job path (closed pre-session 2026-05-04 — filter removed)
 - [ ] T0-2 Fix three unsafe built-in gcode templates
 - [ ] T0-3 Split `pauseResume` into `pause` and `resume`
 - [ ] T0-4 Remove Wainlux bridge code
