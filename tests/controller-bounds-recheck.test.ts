@@ -153,25 +153,24 @@ console.log('\n=== sendJob — bounds precheck ===');
   await ctrl.disconnect();
 }
 
+// T1-44: relative-mode bounds simulation. Pre-T1-44 these two G0 X9999
+// jobs were silently accepted because `_checkJobBounds` skipped relative
+// lines entirely. Now the cursor is seeded from the controller's last
+// confirmed position (here {0,0,0} from the welcome status report) and
+// the simulated +9999 from origin → off-bed → reject.
 {
   const port = portWithSettingsBed(400, 300);
   port.open();
   const ctrl = new GrblController();
   await ctrl.connect(port);
   await flush(30);
-  let threw = false;
+  let err: string | null = null;
   try {
     await ctrl.sendJob(['G90', 'G91', 'G0 X9999', 'M2']);
-  } catch {
-    threw = true;
+  } catch (e: unknown) {
+    err = e instanceof Error ? e.message : String(e);
   }
-  assert(!threw, 'G90 then G91: relative G0 not validated as absolute');
-  if (ctrl.isJobRunning) {
-    while (ctrl.isJobRunning) {
-      port.injectResponse('ok');
-      await flush(2);
-    }
-  }
+  assert(err != null, 'T1-44: G90 then G91 G0 X9999 → reject (relative move accumulates off-bed)');
   await ctrl.disconnect();
 }
 
@@ -181,19 +180,13 @@ console.log('\n=== sendJob — bounds precheck ===');
   const ctrl = new GrblController();
   await ctrl.connect(port);
   await flush(30);
-  let threw = false;
+  let err: string | null = null;
   try {
     await ctrl.sendJob(['G91', 'G0 X9999', 'M2']);
-  } catch {
-    threw = true;
+  } catch (e: unknown) {
+    err = e instanceof Error ? e.message : String(e);
   }
-  assert(!threw, 'G91 at start: relative G0 not validated');
-  if (ctrl.isJobRunning) {
-    while (ctrl.isJobRunning) {
-      port.injectResponse('ok');
-      await flush(2);
-    }
-  }
+  assert(err != null, 'T1-44: G91 at start + G0 X9999 → reject (relative simulation from origin)');
   await ctrl.disconnect();
 }
 

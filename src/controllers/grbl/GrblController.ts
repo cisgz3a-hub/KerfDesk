@@ -187,6 +187,15 @@ export class GrblController implements LaserController {
   private _errorListeners: Set<ErrorCallback> = new Set();
   private _rawLineListeners: Set<RawLineCallback> = new Set();
 
+  /**
+   * T1-44: tracks whether `_state.position` has been populated by an actual
+   * status report (wPos or mPos parsed) at any point since connect. The
+   * default `{x:0, y:0, z:0}` from the constructor is indistinguishable from
+   * "actually at origin" — the flag lets `_checkJobBounds` refuse relative-mode
+   * jobs when we genuinely don't know where the head is. Cleared on disconnect.
+   */
+  private _positionConfirmed = false;
+
   constructor(options?: GrblControllerOptions) {
     this._allowHeadlessWcsAutoNormalize = options?.allowHeadlessWcsAutoNormalize === true;
     this._state = {
@@ -242,6 +251,9 @@ export class GrblController implements LaserController {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._resetMachineSettingsCache();
+    // T1-44: clear position-confirmed at connect; the welcome handshake's first
+    // status report sets it back to true.
+    this._positionConfirmed = false;
 
     this._port = port;
     this._updateStatus('connecting');
@@ -436,6 +448,9 @@ export class GrblController implements LaserController {
     this._currentG54 = null;
     // T1-20: nothing to be uncertain about when not connected.
     this._placementUncertain = false;
+    // T1-44: position is no longer trustworthy after disconnect; relative-mode
+    // bounds checks must wait for a fresh status report before accepting jobs.
+    this._positionConfirmed = false;
     this._grblSettings.clear();
     this._resetMachineSettingsCache();
     this._updateStatus('disconnected');
@@ -515,10 +530,21 @@ export class GrblController implements LaserController {
   }
 
   /**
-   * Scan job lines for absolute-mode G0/G1 X/Y moves that exceed the controller's
-   * known bed extents. Returns null on pass, error string on fail. Skips when
-   * relative mode (G91) is active and no G90 has been seen yet for re-enabling
-   * absolute checks — only the first 500 **lines** are considered (O(n) cap).
+   * Scan job lines for G0/G1 X/Y moves that exceed the controller's known bed
+   * extents. Returns null on pass, error string on fail. Only the first 500
+   * lines are considered (O(n) cap).
+   *
+   * T1-44: relative-mode (G91) lines are simulated from the controller's
+   * current head position (`_state.position`) instead of being skipped.
+   * Pre-T1-44 the relative branch was a no-op — current/head-mode jobs got
+   * zero bounds protection at the controller layer. Now both modes accumulate
+   * a simulated cursor and check it against `_bedWidth` / `_bedHeight`.
+   *
+   * If a relative move is encountered before any status report has populated
+   * `_state.position` (`_positionConfirmed === false`), the job is refused —
+   * the (0,0,0) constructor default is indistinguishable from "actually at
+   * origin," and a wrong assumption can place the head off-bed. The user is
+   * told to reconnect.
    */
   private _checkJobBounds(lines: string[]): string | null {
     const bedW = this._bedWidth;
@@ -531,6 +557,11 @@ export class GrblController implements LaserController {
     let relative = false;
     const MAX_LINES = 500;
 
+    // T1-44: simulated cursor for relative-mode tracking. Seeded from the last
+    // confirmed status report; only consulted when a relative move is reached.
+    let curX = this._state.position.x;
+    let curY = this._state.position.y;
+
     for (let i = 0; i < lines.length && i < MAX_LINES; i++) {
       const line = lines[i];
       if (/^G91\b/i.test(line)) {
@@ -541,7 +572,6 @@ export class GrblController implements LaserController {
         relative = false;
         continue;
       }
-      if (relative) continue;
 
       if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
 
@@ -549,23 +579,32 @@ export class GrblController implements LaserController {
       const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
       if (!xMatch && !yMatch) continue;
 
-      if (xMatch) {
-        const x = parseFloat(xMatch[1]);
-        if (Number.isFinite(x) && (x < -EPS || x > bedW + EPS)) {
+      if (relative) {
+        // T1-44: refuse the job if we don't actually know where the head is.
+        if (!this._positionConfirmed) {
           return (
-            `Job out of bounds: line contains X=${x.toFixed(3)} but machine bed is ` +
-            `${bedW.toFixed(0)}mm wide. Recompile against the current profile.`
+            'Cannot accept relative-mode job: current head position is unknown. ' +
+            'Reconnect to refresh status, then try again.'
           );
         }
+        if (xMatch) curX += parseFloat(xMatch[1]);
+        if (yMatch) curY += parseFloat(yMatch[1]);
+      } else {
+        if (xMatch) curX = parseFloat(xMatch[1]);
+        if (yMatch) curY = parseFloat(yMatch[1]);
       }
-      if (yMatch) {
-        const y = parseFloat(yMatch[1]);
-        if (Number.isFinite(y) && (y < -EPS || y > bedH + EPS)) {
-          return (
-            `Job out of bounds: line contains Y=${y.toFixed(3)} but machine bed is ` +
-            `${bedH.toFixed(0)}mm tall. Recompile against the current profile.`
-          );
-        }
+
+      if (Number.isFinite(curX) && (curX < -EPS || curX > bedW + EPS)) {
+        return (
+          `Job out of bounds: position would reach X=${curX.toFixed(3)} but machine bed is ` +
+          `${bedW.toFixed(0)}mm wide. Recompile against the current profile or move the head.`
+        );
+      }
+      if (Number.isFinite(curY) && (curY < -EPS || curY > bedH + EPS)) {
+        return (
+          `Job out of bounds: position would reach Y=${curY.toFixed(3)} but machine bed is ` +
+          `${bedH.toFixed(0)}mm tall. Recompile against the current profile or move the head.`
+        );
       }
     }
     return null;
@@ -1433,8 +1472,10 @@ export class GrblController implements LaserController {
 
     if (wPos) {
       this._state.position = wPos;
+      this._positionConfirmed = true; // T1-44
     } else if (mPos) {
       this._state.position = mPos;
+      this._positionConfirmed = true; // T1-44
     }
 
     for (const cb of this._stateListeners) {
