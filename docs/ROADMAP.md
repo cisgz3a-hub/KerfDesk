@@ -290,6 +290,8 @@ Update all callers to pick the right one based on their `currentlyPaused` state.
 
 ### T1-1 | Gate silent WCS + status-mask mutation behind consent
 
+**Status:** Shipped 2026-05-04 close-out — primary work in `0310007` (`fix(grbl): prompt before overwriting user's WCS and status mask`) plus T1-20 hardening in `b0375fa` (`feat(safety): T1-20 - WCS no-listener fallback marks placement-uncertain`). At write-time verification: `GrblController._maybeNormalizeWcs` reads G54 via `$#` and the status mask via `$$ → $10`; if both are zero, `applyWcsNormalization` runs unconditionally (no-op consent, the user's machine is already at baseline). If either is non-zero, `_emitWcsPayload` fires the `onWcsConsentNeeded` event with `{ g54, statusMask }` to UI listeners. T1-20 hardened the no-listener fallback: pre-T1-20 it silently auto-applied (`b0375fa` removed that path); now refusing-without-consent marks the controller `_placementUncertain = true` and the UI gates job start until the user disconnects, attaches a listener, and reconnects. `allowHeadlessWcsAutoNormalize: true` constructor opt-in is the test/headless escape hatch. UI side: `App.tsx:370-410` registers `onWcsConsentNeeded`, surfaces `showConfirmWithCheckbox('Normalize machine settings?', ...)` with both G54 and `$10` values rendered, plus a "Don't ask again for this profile" suppression toggle (writes `profile.suppressWcsConsent = true` on accept). Accept calls `ctrl.applyWcsNormalization`; decline calls `ctrl.skipWcsNormalization`. Pinned by `tests/wcs-mutation-consent.test.ts` (12 contracts: zero-G54-zero-mask auto-applies; non-zero G54 fires consent event; consent payload carries G54 + statusMask; decline path honored; no-listener default refuses + marks placement-uncertain; headless flag opt-in restores auto-apply for tests). **Out of scope (deferred):** the spec's `stashedWcsState` profile field that would store the user's previous G54/$10 values for restore-on-disconnect or manual-restore action. The safety contract — don't silently mutate WCS without consent — is delivered; the restore-the-old-values feature is a quality-of-life enhancement filed as a future T1-1 follow-up if requested. Master checklist `[x]`.
+
 **Code reference:** `src/controllers/grbl/GrblController.ts:1055-1078`
 
 ```ts
@@ -19331,7 +19333,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T0-4 Remove Wainlux bridge code (closed pre-session 2026-05-04 — bridge gone; one comment-only ref retained)
 
 ### Tier 1 (This week)
-- [ ] T1-1 WCS mutation consent prompt
+- [x] T1-1 WCS mutation consent prompt (shipped pre-session in `0310007` + T1-20 hardening in `b0375fa`; restore-on-disconnect deferred as future follow-up)
 - [x] T1-2 Controller-layer bounds + fresh-status recheck (shipped pre-session in `3d3dfdd`; close-out 2026-05-04)
 - [x] T1-3 Profile-dependent negative-coord severity (shipped pre-session; close-out 2026-05-03)
 - [x] T1-4 `emergencyStop` also disconnects (shipped pre-session in `86cbe02`; close-out 2026-05-04)
