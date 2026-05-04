@@ -82,4 +82,36 @@ export function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]):
       });
     }
   }
+
+  // T1-55: refuse to fire the laser when connected to a controller that
+  // hasn't yet reported $30. Three scenarios collapse into the same
+  // controller.maxSpindle === null state today: (1) `$$` query failed,
+  // (2) `$$` parse rejected the line, (3) connect raced ahead of the
+  // post-handshake `_queryMachineSettings` path. In all three cases the
+  // S-scale used by output / preview / test-fire is a guess (profile
+  // value or hardcoded 1000) — for laser CAM, "unknown" must be treated
+  // as unsafe. The user is told to wait for settings detection or
+  // reconnect; PipelineService's profile-fallback path keeps offline
+  // compile / simulator mode unaffected.
+  //
+  // Skipped when:
+  //   - disconnected (connectedToMachine !== true): offline / export
+  //     path; profile fallback is the correct behavior.
+  //   - controller has reported $30 (liveMachineInfo.maxSpindle is
+  //     a positive number): T1-33 mismatch rule covers profile-vs-
+  //     controller divergence; this rule is only for "no value at all."
+  //   - hasGcode is false: no laser-on yet, nothing to refuse. Frame
+  //     dot / test fire surface the same gate at the UI layer (future
+  //     T1-55 follow-up); the preflight blocker is the structural
+  //     guarantee.
+  if (ctx.connectedToMachine === true && ctx.hasGcode === true && ctrlMax == null) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_MAXSPINDLE_UNKNOWN,
+      message:
+        'Connected to a controller that has not reported max spindle ($30). ' +
+        'Power scaling cannot be verified — refusing job start. Wait for ' +
+        'settings detection to complete, or disconnect and reconnect.',
+    });
+  }
 }

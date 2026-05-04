@@ -63,6 +63,8 @@ export const PREFLIGHT_CODES = {
   MACHINE_LASER_MODE_DISABLED: 'MACHINE_LASER_MODE_DISABLED',
   /** T1-33: profile.maxSpindle disagrees with controller $30 by more than 5% — over-power risk. */
   MACHINE_MAXSPINDLE_MISMATCH: 'MACHINE_MAXSPINDLE_MISMATCH',
+  /** T1-55: connected to a controller that has not yet reported $30 — laser-on operations refuse. */
+  MACHINE_MAXSPINDLE_UNKNOWN: 'MACHINE_MAXSPINDLE_UNKNOWN',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
