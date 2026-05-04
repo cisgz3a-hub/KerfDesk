@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { createLayer, type Layer } from '../../core/scene/Layer';
-import { requireFeature } from '../../entitlements';
+import { assertFeature } from '../../entitlements';
 
 export interface UseMaterialTestHandlersParams {
   scene: Scene;
@@ -25,9 +25,8 @@ export function useMaterialTestHandlers(params: UseMaterialTestHandlersParams): 
     layerSettings: Array<{ power: number; speed: number }>,
     testMode: 'cut' | 'engrave',
   ) => {
-    if (!requireFeature('material_test')) {
-      throw new Error('Material test requires a Pro license');
-    }
+    // T1-78 Phase 2b: enforcement → assertFeature (throws EntitlementError).
+    assertFeature('material_test');
     const baseOrder = scene.layers.length;
     const newLayers: Layer[] = layerSettings.map((ls, i) => {
       const layer = createLayer(baseOrder + i, testMode, `Test P${ls.power} S${ls.speed}`);

@@ -6,7 +6,7 @@ import { type Template } from '../../templates/TemplateLibrary';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { generateId } from '../../core/types';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
-import { requireFeature } from '../../entitlements';
+import { assertFeature } from '../../entitlements';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface UseGeneratorHandlersParams {
@@ -120,9 +120,8 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
     [commitGeneratedObjects],
   );
   const handleVariableTextGenerate = useCallback((objects: SceneObject[]) => {
-    if (!requireFeature('variable_text')) {
-      throw new Error('Variable text requires a Pro license');
-    }
+    // T1-78 Phase 2b: enforcement → assertFeature (throws EntitlementError).
+    assertFeature('variable_text');
     commitGeneratedObjects(objects, 'var-text-generate');
   }, [commitGeneratedObjects]);
 

@@ -3,7 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { IDENTITY_MATRIX } from '../../core/types';
 import { offsetObject } from '../../geometry/OffsetPath';
-import { requireFeature } from '../../entitlements';
+import { assertFeature } from '../../entitlements';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface UseKerfHandlersParams {
@@ -22,9 +22,8 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   const { scene, handleSceneCommit, showAlert } = params;
 
   const handleKerfGenerateTest = useCallback((objects: SceneObject[]) => {
-    if (!requireFeature('kerf_wizard')) {
-      throw new Error('Kerf wizard requires a Pro license');
-    }
+    // T1-78 Phase 2b: enforcement → assertFeature (throws EntitlementError).
+    assertFeature('kerf_wizard');
     handleSceneCommit({
       ...scene,
       objects: [...scene.objects, ...objects],
@@ -32,9 +31,8 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   }, [scene, handleSceneCommit]);
 
   const handleKerfApply = useCallback(async (offsetMm: number, objectIds: string[]) => {
-    if (!requireFeature('kerf_wizard')) {
-      throw new Error('Kerf wizard requires a Pro license');
-    }
+    // T1-78 Phase 2b: see handleKerfGenerateTest above.
+    assertFeature('kerf_wizard');
     const idsSet = new Set(objectIds);
     const next: SceneObject[] = [];
     let changed = 0;
@@ -71,9 +69,8 @@ export function useKerfHandlers(params: UseKerfHandlersParams): KerfHandlers {
   }, [scene, handleSceneCommit, showAlert]);
 
   const handleKerfSaveToPreset = useCallback((kerfMm: number) => {
-    if (!requireFeature('kerf_wizard')) {
-      throw new Error('Kerf wizard requires a Pro license');
-    }
+    // T1-78 Phase 2b: see handleKerfGenerateTest above.
+    assertFeature('kerf_wizard');
     try {
       localStorage.setItem('laserforge_kerf', String(kerfMm));
     } catch { /* ignore */ }

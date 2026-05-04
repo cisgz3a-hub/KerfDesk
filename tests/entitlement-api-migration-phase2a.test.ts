@@ -83,18 +83,10 @@ console.log('\n=== T1-78 Phase 2a migration ===\n');
     'entitlements/index.ts still exports requireFeature for unmigrated UI-hook callers');
 }
 
-// UI-hook caller files (out of scope for Phase 2a) still use
-// requireFeature — the alias path is the load-bearing migration step.
-for (const file of [
-  'src/ui/hooks/useSceneOperations.ts',
-  'src/ui/hooks/useGeneratorHandlers.ts',
-  'src/ui/hooks/useMaterialTestHandlers.ts',
-  'src/ui/hooks/useKerfHandlers.ts',
-]) {
-  const src = read(file);
-  assert(/\brequireFeature\b/.test(src),
-    `${file} still uses requireFeature (Phase 2b will migrate)`);
-}
+// UI-hook callers are migrated in Phase 2b — see
+// `tests/entitlement-api-migration-phase2b.test.ts` for the
+// post-2b shape assertions. This test continues to pin only the
+// service-layer files Phase 2a touched.
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

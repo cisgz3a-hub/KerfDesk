@@ -6,7 +6,7 @@ import { booleanOperation, type BooleanOp } from '../../geometry/BooleanOps';
 import { textGeometryToPath } from '../../geometry/TextToPath';
 import { offsetObject } from '../../geometry/OffsetPath';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
-import { requireFeature } from '../../entitlements';
+import { assertFeature } from '../../entitlements';
 
 export function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignment: string): Scene {
   const selected = scn.objects.filter(o => selIds.has(o.id));
@@ -262,9 +262,8 @@ export function useSceneOperations({
   );
 
   const textToPath = useCallback(async () => {
-    if (!requireFeature('text_to_path')) {
-      throw new Error('Text-to-path requires a Pro license');
-    }
+    // T1-78 Phase 2b: enforcement → assertFeature (throws EntitlementError).
+    assertFeature('text_to_path');
     const textObjs = scene.objects.filter(
       o => selectedIds.has(o.id) && o.geometry.type === 'text',
     );
