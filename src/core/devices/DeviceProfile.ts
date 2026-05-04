@@ -15,6 +15,7 @@ import {
   LEGACY_FOOTER_BODY__WITH_BEEP,
 } from '../plan/GcodeTemplates';
 import { getStorage } from '../storage/storage';
+import { validateProfile, type ProfileValidationIssue } from './validateProfile';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
@@ -265,8 +266,34 @@ export function getDeviceProfiles(): DeviceProfile[] {
   return [...cachedProfiles];
 }
 
-/** Save a profile (create or update) */
+/**
+ * Save a profile (create or update).
+ *
+ * T2-39: validates the profile via `validateProfile` before persisting.
+ * Hard-error issues (`severity: 'error'`) throw `ProfileValidationError`
+ * naming the failing field, code, and message — caller's UI surface
+ * must catch and render. Warnings (`severity: 'warning'`) are
+ * `console.warn`'d but allowed through so legacy profiles imported with
+ * marginal values (e.g. watts = 0 from an old export) don't deadlock
+ * the save.
+ *
+ * The backfill / timestamp bump still runs after validation so a
+ * rejected save doesn't mutate `updatedAt` on an in-memory profile that
+ * was never persisted.
+ */
 export function saveDeviceProfile(profile: DeviceProfile): void {
+  const validation = validateProfile(profile);
+  if (!validation.ok) {
+    const errors = validation.issues.filter(i => i.severity === 'error');
+    throw new ProfileValidationError(
+      `Cannot save profile: ${errors.length} validation error(s).`,
+      validation.issues,
+    );
+  }
+  for (const w of validation.issues.filter(i => i.severity === 'warning')) {
+    console.warn(`[T2-39] Profile "${profile.name}" save warning: ${w.field} - ${w.message}`);
+  }
+
   const existingIdx = cachedProfiles.findIndex(p => p.id === profile.id);
   const nextProfile = applyProfileBackfills({
     ...profile,
@@ -280,6 +307,20 @@ export function saveDeviceProfile(profile: DeviceProfile): void {
     cachedProfiles.push(nextProfile);
   }
   void persistProfiles();
+}
+
+/**
+ * T2-39: thrown by {@link saveDeviceProfile} when the profile fails
+ * `validateProfile`. The `issues` array is the raw validator output
+ * so a UI surface can render per-field errors.
+ */
+export class ProfileValidationError extends Error {
+  readonly issues: ProfileValidationIssue[];
+  constructor(message: string, issues: ProfileValidationIssue[]) {
+    super(message);
+    this.name = 'ProfileValidationError';
+    this.issues = issues;
+  }
 }
 
 /** Delete a profile by ID */
