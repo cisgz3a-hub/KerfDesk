@@ -5,6 +5,13 @@ interface ConnectWizardProps {
   webSerialSupported: boolean;
   onConnectUsb: () => void;
   onConnectSimulator: () => void;
+  /**
+   * T1-50 Part A: when true, both buttons are disabled and labeled
+   * "Connecting…" so a rapid double-click cannot start a second
+   * concurrent connect that races on the WebSerialPort + controller
+   * resources. Defaults to false for safety if a parent doesn't pass it.
+   */
+  connecting?: boolean;
 }
 
 const font = "'DM Sans', system-ui, sans-serif";
@@ -13,6 +20,7 @@ export function ConnectWizard({
   webSerialSupported,
   onConnectUsb,
   onConnectSimulator,
+  connecting = false,
 }: ConnectWizardProps) {
   return React.createElement('div', {
     style: {
@@ -24,13 +32,16 @@ export function ConnectWizard({
     React.createElement('div', { style: { fontSize: 14, color: '#8888aa', marginBottom: 16 } }, 'Connect your laser to get started'),
     webSerialSupported && React.createElement('button', {
       type: 'button',
-      onClick: () => { onConnectUsb(); },
+      onClick: () => { if (!connecting) onConnectUsb(); },
+      disabled: connecting,
+      title: connecting ? 'Connecting…' : undefined,
       style: {
         width: '100%', maxWidth: 280, padding: '14px', fontSize: 13, fontWeight: 600,
-        borderRadius: 10, cursor: 'pointer', fontFamily: font,
+        borderRadius: 10, cursor: connecting ? 'wait' : 'pointer', fontFamily: font,
         background: 'rgba(0,212,255,0.08)', border: '1px solid #00d4ff', color: '#00d4ff',
+        opacity: connecting ? 0.5 : 1,
       },
-    }, '🔌 Connect via USB'),
+    }, connecting ? 'Connecting…' : '🔌 Connect via USB'),
     !webSerialSupported && React.createElement('div', {
       style: {
         width: '100%', maxWidth: 280, padding: '10px 12px',
@@ -44,12 +55,15 @@ export function ConnectWizard({
     // }),
     React.createElement('button', {
       type: 'button',
-      onClick: () => { onConnectSimulator(); },
+      onClick: () => { if (!connecting) onConnectSimulator(); },
+      disabled: connecting,
+      title: connecting ? 'Connecting…' : undefined,
       style: {
         width: '100%', maxWidth: 280, padding: '12px', fontSize: 12,
-        borderRadius: 10, cursor: 'pointer', fontFamily: font,
+        borderRadius: 10, cursor: connecting ? 'wait' : 'pointer', fontFamily: font,
         background: '#0a0a14', border: '1px solid #252540', color: '#555570',
+        opacity: connecting ? 0.5 : 1,
       },
-    }, '🖥 Use Simulator'),
+    }, connecting ? 'Connecting…' : '🖥 Use Simulator'),
   );
 }

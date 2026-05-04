@@ -2770,6 +2770,8 @@ async connectRealLaser(baudRate: number): Promise<void> {
 
 ### T1-50 | Connect button mutex / abortable connect
 
+**Status:** Part A shipped 2026-05-04 in `<TBD>`. Part B (AbortSignal plumbing through `MachineService.connectRealLaser` → `WebSerialPort.requestAndOpen` → `GrblController.connect`) remains open and is on the safety-path skip-rule list. **Part A delivers the rapid-double-click protection:** `connecting` state added to `ConnectionPanelMain` and gating both `connectRealLaser` and `connectSimulator` (same race-shape with a MockSerialPort). Each handler short-circuits if `connecting === true` and uses try/finally to release the flag. `ConnectWizard` accepts an optional `connecting?: boolean` prop and renders both buttons as `disabled` with `'Connecting…'` label, `cursor: wait`, `opacity: 0.5`, and a defensive `onClick` that re-checks `connecting`. Defaults to `false` when omitted so any future caller without the prop stays in the safe (enabled) default. Pinned by `tests/connect-button-mutex.test.tsx` (18 behavioral contracts via JSDOM + React act: idle render, idle clicks fire, connecting render disables both buttons + swaps labels, connecting clicks no-op, prop omitted defaults to enabled). **Part B follow-up scope:** AbortSignal plumbing for cancel-mid-connect; safe-disconnect during `connecting` state. That work touches `src/app/MachineService.ts` and `src/communication/WebSerialPort.ts` and is the safety-path component of T1-50.
+
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:542-555` (`connectRealLaser` UI handler 鈥?no mutex), `src/ui/components/connection/ConnectWizard.tsx:25-33` (Connect button 鈥?no `connecting` state).
 
 **Problem:** Cross-check verified: UI Connect button has no mutex. Two rapid clicks each call `machineService.connectRealLaser()`, each creating a new `WebSerialPort` and each calling `requestAndOpen`. The first one to finish handshake succeeds (controller assigns `_port`); the second one's controller connect rejects with "Already connected. Disconnect first." But the second's `WebSerialPort` instance is already opened and not closed.
@@ -19342,7 +19344,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (shipped 2026-05-02 in `037bfdd`)
 - [x] T1-48 Remove `new Date()` from Output.createdAt for determinism (shipped 2026-05-02 in `69f1221`)
 - [ ] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (filed; defect fix, ~30 min)
-- [ ] T1-50 Connect button mutex / abortable connect (filed; defect fix, ~1 session)
+- [ ] T1-50 Connect button mutex / abortable connect — Part A (UI mutex) shipped 2026-05-04 in `<TBD>`; Part B (abortable connect, AbortSignal through MachineService) open
 - [ ] T1-51 Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome (filed; defect fix, ~30 min)
 - [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `41310f4` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)
 - [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)

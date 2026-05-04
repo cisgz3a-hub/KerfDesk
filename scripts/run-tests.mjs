@@ -70,6 +70,7 @@ const files = [
   'auto-detect-includes-max-spindle.test.ts',
   'entitlement-api-migration-phase2a.test.ts',
   'entitlement-api-migration-phase2b.test.ts',
+  'connect-button-mutex.test.tsx',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

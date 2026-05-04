@@ -1,0 +1,167 @@
+/**
+ * T1-50 Part A: ConnectWizard's Connect-via-USB button (and Use
+ * Simulator button) must be disabled while a connect is already in
+ * flight. Without this UI mutex, two rapid clicks each call into
+ * `machineService.connectRealLaser`, each constructing a new
+ * WebSerialPort and racing on `requestAndOpen` / `controller.connect`.
+ *
+ * Behavioral test on ConnectWizard via JSDOM + React. Mounts the
+ * component with `connecting={true}` / `connecting={false}` and asserts:
+ *
+ *   - When connecting, the button is `disabled` and shows "Connecting…"
+ *   - Clicking a disabled button does not invoke onConnectUsb / onConnectSimulator
+ *   - When not connecting, the button shows the regular label and clicks fire
+ *
+ * Run: npx tsx tests/connect-button-mutex.test.tsx
+ */
+import { JSDOM } from 'jsdom';
+import React, { act } from 'react';
+import { createRoot, type Root } from 'react-dom/client';
+import { ConnectWizard } from '../src/ui/components/connection/ConnectWizard';
+
+const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { url: 'http://localhost' });
+const win = dom.window;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).window = win;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).document = win.document;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+
+let passed = 0;
+let failed = 0;
+function assert(c: boolean, m: string): void {
+  if (c) {
+    passed++;
+    console.log(`  ✓ ${m}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${m}`);
+  }
+}
+
+let root: Root | null = null;
+
+interface Counters {
+  usb: number;
+  sim: number;
+}
+
+async function renderWizard(connecting: boolean): Promise<{ counters: Counters; container: HTMLDivElement }> {
+  const container = win.document.getElementById('root') as HTMLDivElement;
+  if (root) {
+    await act(async () => { root!.unmount(); });
+  }
+  root = createRoot(container);
+  const counters: Counters = { usb: 0, sim: 0 };
+  await act(async () => {
+    root!.render(
+      React.createElement(ConnectWizard, {
+        webSerialSupported: true,
+        onConnectUsb: () => { counters.usb += 1; },
+        onConnectSimulator: () => { counters.sim += 1; },
+        connecting,
+      }),
+    );
+  });
+  return { counters, container };
+}
+
+function findUsbButton(container: HTMLElement): HTMLButtonElement | null {
+  return Array.from(container.querySelectorAll('button')).find(b =>
+    /Connect via USB/i.test(b.textContent ?? '') || /Connecting/i.test(b.textContent ?? ''),
+  ) as HTMLButtonElement | undefined ?? null;
+}
+function findSimButton(container: HTMLElement): HTMLButtonElement | null {
+  return Array.from(container.querySelectorAll('button')).find(b =>
+    /Use Simulator/i.test(b.textContent ?? '')
+    || (b !== findUsbButton(container) && /Connecting/i.test(b.textContent ?? '')),
+  ) as HTMLButtonElement | undefined ?? null;
+}
+
+async function run(): Promise<void> {
+  console.log('\n=== T1-50 Part A connect-button-mutex ===\n');
+
+  try {
+    // --- connecting=false: regular labels, clicks fire ---
+    {
+      const { counters, container } = await renderWizard(false);
+      const usb = findUsbButton(container);
+      const sim = findSimButton(container);
+      assert(usb !== null, 'idle: USB button rendered');
+      assert(sim !== null, 'idle: Simulator button rendered');
+      assert(usb!.disabled === false, 'idle: USB button is enabled');
+      assert(sim!.disabled === false, 'idle: Simulator button is enabled');
+      assert(/Connect via USB/.test(usb!.textContent ?? ''),
+        'idle: USB button shows "Connect via USB" label');
+      assert(/Use Simulator/.test(sim!.textContent ?? ''),
+        'idle: Simulator button shows "Use Simulator" label');
+
+      await act(async () => { usb!.click(); });
+      assert(counters.usb === 1, 'idle: clicking USB fires onConnectUsb once');
+      await act(async () => { sim!.click(); });
+      assert(counters.sim === 1, 'idle: clicking Simulator fires onConnectSimulator once');
+    }
+
+    // --- connecting=true: buttons disabled, label changed, clicks no-op ---
+    {
+      const { counters, container } = await renderWizard(true);
+      const usb = findUsbButton(container);
+      const sim = findSimButton(container);
+      assert(usb !== null, 'connecting: USB button still rendered');
+      assert(sim !== null, 'connecting: Simulator button still rendered');
+      assert(usb!.disabled === true, 'connecting: USB button is disabled');
+      assert(sim!.disabled === true, 'connecting: Simulator button is disabled');
+      assert(/Connecting/.test(usb!.textContent ?? ''),
+        'connecting: USB button label is "Connecting…"');
+      assert(/Connecting/.test(sim!.textContent ?? ''),
+        'connecting: Simulator button label is "Connecting…"');
+
+      // The mutex is enforced two ways:
+      //   1. `disabled: true` — the browser ignores the click event.
+      //   2. The onClick handler short-circuits if `connecting` is true,
+      //      so even synthetic .click() during `connecting=true` is a
+      //      defense-in-depth no-op.
+      await act(async () => { usb!.click(); });
+      await act(async () => { sim!.click(); });
+      assert(counters.usb === 0, 'connecting: USB click does not invoke onConnectUsb');
+      assert(counters.sim === 0, 'connecting: Simulator click does not invoke onConnectSimulator');
+    }
+
+    // --- connecting prop omitted: defaults to false (safe default) ---
+    {
+      const container = win.document.getElementById('root') as HTMLDivElement;
+      if (root) await act(async () => { root!.unmount(); });
+      root = createRoot(container);
+      let usbCount = 0;
+      await act(async () => {
+        root!.render(
+          React.createElement(ConnectWizard, {
+            webSerialSupported: true,
+            onConnectUsb: () => { usbCount += 1; },
+            onConnectSimulator: () => { /* noop */ },
+          }),
+        );
+      });
+      const usb = findUsbButton(container);
+      assert(usb !== null && usb.disabled === false,
+        'connecting prop omitted: defaults to enabled (safe default)');
+      await act(async () => { usb!.click(); });
+      assert(usbCount === 1,
+        'connecting prop omitted: button click fires through to onConnectUsb');
+    }
+  } finally {
+    if (root) {
+      await act(async () => { root!.unmount(); });
+      root = null;
+    }
+  }
+
+  console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
+  process.exit(failed > 0 ? 1 : 0);
+}
+
+void run().catch((e: unknown) => {
+  console.error(e);
+  process.exit(1);
+});

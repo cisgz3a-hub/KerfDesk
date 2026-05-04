@@ -277,6 +277,15 @@ export function ConnectionPanelMain({
   const [isAutoFocusing, setIsAutoFocusing] = useState(false);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
+  // T1-50 Part A: UI mutex on Connect button. Without this, two
+  // rapid clicks each call into `machineService.connectRealLaser()`,
+  // each constructing a new WebSerialPort and racing on
+  // `requestAndOpen` / `controller.connect`. The first wins; the
+  // second's port stays opened and unowned. Mutex disables the
+  // button while a connect is in flight; UI shows "Connecting…".
+  // (Part B — abortable connect via AbortSignal through MachineService
+  // — remains the future safety-path work.)
+  const [connecting, setConnecting] = useState(false);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -567,16 +576,22 @@ export function ConnectionPanelMain({
   const connectSimulator = async () => {
     const ctrl = controllerRef.current;
     if (!ctrl) return;
-
-    const mock = createSerialPort('simulator', { bedWidth, bedHeight }) as MockSerialPort;
-    portRef.current = mock;
-    mock.open();
+    // T1-50 Part A: rapid-double-click protection. The mutex covers
+    // simulator connect too — same WebSerialPort/controller race
+    // shape, just with a MockSerialPort instead.
+    if (connecting) return;
+    setConnecting(true);
     try {
+      const mock = createSerialPort('simulator', { bedWidth, bedHeight }) as MockSerialPort;
+      portRef.current = mock;
+      mock.open();
       await ctrl.connect(mock);
       setSimulator(true);
       appendMessage('✓ Simulator connected');
     } catch (e: any) {
       appendMessage(`Connection failed: ${e.message}`);
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -585,6 +600,9 @@ export function ConnectionPanelMain({
       appendMessage('ERROR: Web Serial not supported in this browser');
       return;
     }
+    // T1-50 Part A: see comment on the `connecting` state above.
+    if (connecting) return;
+    setConnecting(true);
     try {
       appendMessage('Port opened, waiting for GRBL welcome...');
       await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200);
@@ -592,6 +610,8 @@ export function ConnectionPanelMain({
       appendMessage('✓ Real laser connected via USB');
     } catch (e: any) {
       appendMessage(`Connection failed: ${e.message}`);
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -1348,6 +1368,7 @@ export function ConnectionPanelMain({
     webSerialSupported: WebSerialPort.isSupported(),
     onConnectUsb: () => { void connectRealLaser(); },
     onConnectSimulator: () => { void connectSimulator(); },
+    connecting,
   });
 
   const startJobDesc = canStartJob
