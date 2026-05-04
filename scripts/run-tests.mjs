@@ -176,6 +176,7 @@ const files = [
   'exact-idle-gates.test.ts',
   'preflight-output-layer-filter.test.ts',
   'preflight-rejects-m4-without-laser-mode.test.ts',
+  'maxspindle-precedence-and-mismatch.test.ts',
   'pause-emits-m5-after-feed-hold.test.ts',
   'no-electron-sendgcode-export.test.ts',
   'frame-dot-finally-emits-m5.test.ts',

@@ -128,10 +128,20 @@ export async function compileGcode(
   const bedWidthMm = resolveBedWidthMm(profile, machineBedFromController);
   const bedHeightMm = resolveBedHeightMm(profile, machineBedFromController);
 
+  // T1-33: when the controller reports a positive $30, controller value wins
+  // over profile.maxSpindle. Profile is fallback only. Reason: profile defaults
+  // to 1000 for most entries, but Falcon firmware ships with $30=255 (newer)
+  // and other controllers vary. If profile=1000 and $30=255, generating S=500
+  // for "50% power" lets firmware clamp internally to 255 — actual output is
+  // 100% (255/255), not 50%. Over-power is a fire hazard on flammable
+  // materials. The mismatch detection (T1-33 Part 2) raises a blocking
+  // preflight error so the user explicitly reconciles the values; this
+  // precedence flip is the runtime guard if they bypass preflight or run
+  // through a code path that doesn't call it.
   const maxSpindle =
-    profile?.maxSpindle
-    ?? (controllerMaxSpindle != null && controllerMaxSpindle > 0 ? controllerMaxSpindle : null)
-    ?? 1000;
+    (controllerMaxSpindle != null && controllerMaxSpindle > 0)
+      ? controllerMaxSpindle
+      : (profile?.maxSpindle ?? 1000);
 
   // Machine-space data for output. T1-40: bedWidthMm is required when
   // originCorner is front-right or rear-right; we always pass it so

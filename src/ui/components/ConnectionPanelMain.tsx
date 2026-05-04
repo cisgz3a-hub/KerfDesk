@@ -393,6 +393,7 @@ export function ConnectionPanelMain({
   const preflightGcodeHeaderTemplate = activeProfile?.gcodeHeaderTemplate ?? null;
 
   useEffect(() => {
+    const ctrlMaxSpindle = controllerRef.current?.maxSpindle;
     const result = runPreflightSummary(
       scene,
       gcode,
@@ -402,6 +403,7 @@ export function ConnectionPanelMain({
       machinePlanBounds,
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
       controllerRef.current?.getFirmwareLaserModeEnabled?.(),
+      typeof ctrlMaxSpindle === 'number' && ctrlMaxSpindle > 0 ? ctrlMaxSpindle : undefined,
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;

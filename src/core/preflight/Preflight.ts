@@ -61,6 +61,8 @@ export const PREFLIGHT_CODES = {
   ACCEL_AWARE_NO_ACCEL_PARAM: 'ACCEL_AWARE_NO_ACCEL_PARAM',
   /** T1-32: M4 dynamic-mode job emitted against a controller reporting $32=0 (CNC/spindle mode). */
   MACHINE_LASER_MODE_DISABLED: 'MACHINE_LASER_MODE_DISABLED',
+  /** T1-33: profile.maxSpindle disagrees with controller $30 by more than 5% — over-power risk. */
+  MACHINE_MAXSPINDLE_MISMATCH: 'MACHINE_MAXSPINDLE_MISMATCH',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -312,6 +314,12 @@ export function runPreflightSummary(
    * false = CNC/spindle mode). Drives the MACHINE_LASER_MODE_DISABLED check.
    */
   firmwareLaserModeFromMachine?: boolean,
+  /**
+   * T1-33: when set, GRBL $30 from the connected controller (controller-reported max
+   * spindle / PWM ceiling). Drives the MACHINE_MAXSPINDLE_MISMATCH check that catches
+   * profile-vs-controller divergence (over-power risk).
+   */
+  firmwareMaxSpindleFromMachine?: number,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
@@ -343,6 +351,9 @@ export function runPreflightSummary(
       bedHeightMm: bedHeight > 0 ? bedHeight : undefined,
       ...(typeof firmwareHomingFromMachine === 'boolean' ? { homingEnabled: firmwareHomingFromMachine } : {}),
       ...(typeof firmwareLaserModeFromMachine === 'boolean' ? { laserMode: firmwareLaserModeFromMachine } : {}),
+      ...(typeof firmwareMaxSpindleFromMachine === 'number' && firmwareMaxSpindleFromMachine > 0
+        ? { maxSpindle: firmwareMaxSpindleFromMachine }
+        : {}),
     },
   };
 
