@@ -3450,6 +3450,8 @@ When connected and a profile is active, the header shows the four most critical 
 
 ### T1-61 | Start mode labels rewritten with full sentences + tooltips
 
+**Status:** Shipped 2026-05-04 in `<TBD>`. Workflow.tsx's `modes` array shape widened from `{ mode, label }` to `{ mode, short, long, tooltip }`. Buttons render `short` (e.g. `'Bed coordinates'`, `'From laser head'`, `'From saved origin'` — the legacy single-word emoji labels are gone) and surface `tooltip` via the HTML-native `title` attribute so hovering shows the audit-recommended when-to-use guidance. The selected mode's `long` description renders below the button row in a small accent panel so the user always sees what their current selection means in plain language. Full-fidelity per-mode diagrams remain T3-70 (out of scope here). Pinned by `tests/start-mode-labels.test.ts` (17 source-level contracts: each mode's short/long/tooltip text, button rendering shape, selected-mode-only long display, legacy emoji labels removed, T1-61 marker present).
+
 **Code reference:** `src/ui/components/connection/Workflow.tsx:95-99`. Cross-check verified the cryptic labels.
 
 **Problem:** Cross-check confirmed at exact lines:
@@ -19343,7 +19345,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
-- [ ] T1-61 Start mode labels rewritten with full sentences + tooltips (filed; UX clarity, ~30 min)
+- [x] T1-61 Start mode labels rewritten with full sentences + tooltips (shipped 2026-05-04 in `<TBD>`)
 - [ ] T1-62 `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs (filed; UX correctness, ~30 min - 1 hour)
 - [ ] T1-63 Warning confirmation includes detail/fix per warning, not just titles (filed; UX safety, ~15 min)
 - [ ] T1-64 Pause/Resume/Stop catch blocks must surface errors to user, not just `console.warn` (filed; safety defect, ~30 min)

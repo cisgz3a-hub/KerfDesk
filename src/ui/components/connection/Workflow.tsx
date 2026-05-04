@@ -92,11 +92,42 @@ export function Workflow(props: WorkflowProps) {
 
   const steps = buildSteps(props);
 
-  const modes: Array<{ mode: GcodeStartMode; label: string }> = [
-    { mode: 'absolute', label: '📍 Bed' },
-    { mode: 'current', label: '🎯 Head' },
-    { mode: 'savedOrigin', label: '⚑ Origin' },
+  // T1-61: previous labels were emoji + a single word (Bed / Head /
+  // Origin), with no signal about what each mode actually does. For
+  // the most safety-relevant decision in the run flow (where will
+  // the laser burn relative to the machine?), beginners could not
+  // predict the burn location from the labels. Replaced with full
+  // sentences: `short` = button label, `long` = detail line shown
+  // for the selected mode, `tooltip` = hover hint with when-to-use
+  // guidance. The richer "diagram per mode" surface is T3-70; T1-61
+  // ships the textual clarity fix.
+  const modes: Array<{
+    mode: GcodeStartMode;
+    short: string;
+    long: string;
+    tooltip: string;
+  }> = [
+    {
+      mode: 'absolute',
+      short: 'Bed coordinates',
+      long: 'Use absolute machine coordinates. Job position is fixed in machine space.',
+      tooltip: 'Best for: repeating jobs at fixed bed positions. Requires homed machine and a known bed origin.',
+    },
+    {
+      mode: 'current',
+      short: 'From laser head',
+      long: 'Use the current laser head position as the job origin. The job starts where the head is right now.',
+      tooltip: 'Best for: one-off jobs on placed material. Jog the laser to the desired start corner first.',
+    },
+    {
+      mode: 'savedOrigin',
+      short: 'From saved origin',
+      long: 'Use the saved origin point. Job is offset from a previously marked machine position.',
+      tooltip: 'Best for: repeating jobs in a known fixture position. Save the origin once, then frame and run from it.',
+    },
   ];
+
+  const selectedMode = modes.find(m => m.mode === startMode);
 
   return React.createElement('div', {
     style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
@@ -111,16 +142,21 @@ export function Workflow(props: WorkflowProps) {
           key: m.mode,
           onClick: () => onSelectMode(m.mode),
           disabled: m.mode === 'current' && !machinePositionKnown,
+          title: m.tooltip,
           style: {
-            flex: 1, padding: '5px', fontSize: 10, borderRadius: 4, cursor: 'pointer', fontFamily: font,
+            flex: 1, padding: '5px 4px', fontSize: 10, borderRadius: 4, cursor: 'pointer', fontFamily: font,
             background: startMode === m.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
             border: startMode === m.mode ? '1px solid #00d4ff' : '1px solid #252540',
             color: startMode === m.mode ? '#00d4ff' : '#555570',
             opacity: m.mode === 'current' && !machinePositionKnown ? 0.4 : 1,
+            lineHeight: 1.2,
           },
-        }, m.label),
+        }, m.short),
       ),
     ),
+    selectedMode && React.createElement('div', {
+      style: { fontSize: 10, color: '#00d4ff', lineHeight: 1.3, marginBottom: 6, padding: '4px 6px', background: 'rgba(0,212,255,0.04)', borderRadius: 3 },
+    }, selectedMode.long),
     React.createElement('div', {
       style: { fontSize: 9, color: '#555570', lineHeight: 1.25, marginBottom: 10 },
     }, startPositionStatus),

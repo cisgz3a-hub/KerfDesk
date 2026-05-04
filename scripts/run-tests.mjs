@@ -64,6 +64,7 @@ const files = [
   'recovery-failure-alerts.test.tsx',
   'recovery-eligibility-non-empty-cases.test.ts',
   'active-layer-history-consistent.test.ts',
+  'start-mode-labels.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',
