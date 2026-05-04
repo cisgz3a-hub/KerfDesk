@@ -4099,7 +4099,7 @@ For T1-69's first ship, the minimum is: don't unconditionally call `syncAutosave
 
 ### T1-70 | Recovery failure must alert user, not just console.error
 
-**Status:** Shipped 2026-05-04 in `<TBD>`. `useWizardHandlers.handleRecover` rewritten so the user sees the failure instead of a vanishing prompt. Three branches:
+**Status:** Shipped 2026-05-04 in `bdedd58`. `useWizardHandlers.handleRecover` rewritten so the user sees the failure instead of a vanishing prompt. Three branches:
 
 1. **Empty/missing autosave** (`readAutosave` resolves null) → `showAlert('Recovery unavailable', …)` then `setShowRecover(false)` + clear time label. The user is told no data was found rather than seeing the dialog disappear.
 2. **Corrupt scene JSON** (`deserializeScene` throws) → `showAlert('Recovery failed', …)` with the error message embedded; **prompt is NOT hidden** so the user can retry, send-for-support (T2-70 follow-up), or discard. `console.error` still logs the original exception for support diagnosis.
@@ -19348,7 +19348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-67 Ticket hash mismatch messages — hide hashes from user (shipped 2026-05-02 in `f0e8d41`)
 - [x] T1-68 Autosave must await write before clearing dirty flag (shipped pre-session; close-out 2026-05-02 in `201394b`)
 - [x] T1-69 Manual save must not mark scene clean before download write confirmation (shipped pre-session; close-out 2026-05-03 in `7b08b0f`)
-- [x] T1-70 Recovery failure must alert user, not just `console.error` (shipped 2026-05-04 in `<TBD>`)
+- [x] T1-70 Recovery failure must alert user, not just `console.error` (shipped 2026-05-04 in `bdedd58`)
 - [ ] T1-71 Recovery offered for non-empty autosave, not only object-having scenes (filed; UX, ~15 min)
 - [x] T1-72 `APP_VERSION` wired to package.json / build constant (shipped 2026-05-02 in `41bfa06`)
 - [x] T1-73 Delete action must mark scene dirty (closed 2026-05-02 in `7e4e340`; superseded by T2-76 unified routing)
