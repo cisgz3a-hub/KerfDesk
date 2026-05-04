@@ -25,6 +25,7 @@ const files = [
   'controller-bounds-checks-g91.test.ts',
   'connect-safe-state-handshake.test.ts',
   'unsafe-prior-state-persistence.test.ts',
+  'operation-mutex-prevents-overlap.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',

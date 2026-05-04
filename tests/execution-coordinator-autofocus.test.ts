@@ -31,8 +31,19 @@ function makeCoordinator(machineService: MachineService): ExecutionCoordinator {
 void (async () => {
   console.log('\n=== execution-coordinator autofocus facade ===\n');
 
+  // T2-11: ExecutionCoordinator.autoFocus now acquires/releases the
+  // operation mutex around the delegated call. Mocks need to expose
+  // tryAcquireOperation + releaseOperation; the simplest stub returns
+  // true unconditionally + no-op release, preserving the pre-T2-11
+  // pass-through semantics for these tests.
+  const muStub = {
+    tryAcquireOperation: () => true,
+    releaseOperation: () => {},
+  };
+
   {
     const machineService = {
+      ...muStub,
       autoFocus: async () => ({ ok: true as const }),
     } as unknown as MachineService;
     const coord = makeCoordinator(machineService);
@@ -42,6 +53,7 @@ void (async () => {
 
   {
     const machineService = {
+      ...muStub,
       autoFocus: async () => ({ ok: false as const, error: 'x' }),
     } as unknown as MachineService;
     const coord = makeCoordinator(machineService);
@@ -51,6 +63,7 @@ void (async () => {
 
   {
     const machineService = {
+      ...muStub,
       autoFocus: async () => {
         throw new Error('boom');
       },

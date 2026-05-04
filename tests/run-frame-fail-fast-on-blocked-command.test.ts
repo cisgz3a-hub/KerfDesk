@@ -56,9 +56,13 @@ function makeController(throwOnIndex: number | null = null): MockController {
 function makeCoordinator(ctrl: MockController | null): ExecutionCoordinator {
   return new ExecutionCoordinator({
     controllerRef: { current: ctrl as unknown as LaserController | null },
-    // runFrame only needs the coordinator deps below for construction and
-    // simulator notification; MachineService methods are not called.
-    machineService: {} as never,
+    // T2-11: runFrame now acquires/releases the operation mutex. Provide
+    // a permissive stub so existing frame-flow tests aren't blocked by
+    // a missing mutex; tryAcquireOperation always returns true, releaseOperation no-ops.
+    machineService: {
+      tryAcquireOperation: () => true,
+      releaseOperation: () => {},
+    } as never,
     notifySimulatorRef: { current: () => {} },
   });
 }

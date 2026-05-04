@@ -78,8 +78,13 @@ function makeController(opts: {
 function makeCoordinator(ctrl: LaserController): ExecutionCoordinator {
   return new ExecutionCoordinator({
     controllerRef: { current: ctrl },
+    // T2-11: runFrame acquires/releases the operation mutex. Permissive
+    // stub keeps the frame-dot finally semantics under test isolated
+    // from the mutex layer (covered by tests/operation-mutex-prevents-overlap.test.ts).
     machineService: {
       notifyLaserSafetyOutcome: () => {},
+      tryAcquireOperation: () => true,
+      releaseOperation: () => {},
     } as never,
     notifySimulatorRef: { current: () => {} },
   });

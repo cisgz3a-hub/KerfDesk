@@ -1,5 +1,5 @@
 import { type MutableRefObject } from 'react';
-import { type MachineService } from './MachineService';
+import { type MachineService, type ActiveOperationKind } from './MachineService';
 import { type LaserController } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
 import { type MachineState } from '../controllers/ControllerInterface';
@@ -37,8 +37,11 @@ export interface FrameResult {
    * - 'idle-timeout': GRBL did not report idle within the timeout.
    * - 'command-blocked': ctrl.sendCommand() threw partway through corner streaming.
    *   A subset of frame commands may have physically executed; the rest did not.
+   * - 'operation-busy' (T2-11): another machine operation (test-fire, autofocus,
+   *   set-origin, jog, or another frame) holds the service-layer mutex. Caller
+   *   should wait for that operation to complete and retry.
    */
-  reason?: 'no-controller' | 'idle-timeout' | 'command-blocked';
+  reason?: 'no-controller' | 'idle-timeout' | 'command-blocked' | 'operation-busy';
   /**
    * T1-103: when `reason === 'command-blocked'`, the original error message
    * surfaced to the UI for the messages console. Empty string if no message
@@ -92,9 +95,22 @@ export class ExecutionCoordinator {
 
   jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
     if (!this.deps.controllerRef.current) return { ok: false, reason: 'no-controller' };
-    const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
-    this.notifySimulator(cmd);
-    return this.deps.machineService.jog(axis, distance, feedRate);
+    // T2-11: jog acquires the operation mutex for the duration of the
+    // synchronous send. Sequential jogs (arrow-key spam) acquire and
+    // release per call — no contention. The mutex prevents jog from
+    // interleaving with test-fire / frame-dot / autoFocus, which
+    // matters because all of those issue motion + modal-state commands
+    // that would race on GRBL's command queue.
+    if (!this.deps.machineService.tryAcquireOperation('jog')) {
+      return { ok: false, reason: 'operation-busy' };
+    }
+    try {
+      const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
+      this.notifySimulator(cmd);
+      return this.deps.machineService.jog(axis, distance, feedRate);
+    } finally {
+      this.deps.machineService.releaseOperation('jog');
+    }
   }
 
   async startValidatedJob(args: {
@@ -119,7 +135,18 @@ export class ExecutionCoordinator {
    * calling — the coordinator executes only; it does not enforce pre-conditions.
    */
   async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
-    return this.deps.machineService.autoFocus();
+    // T2-11: acquire the mutex for the autoFocus duration. The
+    // controller's runAutoFocus uses a probe-pin sequence that conflicts
+    // with any other modal-state mutation (test-fire's M3, frame-dot's
+    // M4, set-origin's G10). The mutex prevents those from racing.
+    if (!this.deps.machineService.tryAcquireOperation('autoFocus')) {
+      return { ok: false, error: 'Another machine operation is in progress.' };
+    }
+    try {
+      return await this.deps.machineService.autoFocus();
+    } finally {
+      this.deps.machineService.releaseOperation('autoFocus');
+    }
   }
 
   /** Unlock GRBL ($X). Caller must run danger confirmation before invoking this. */
@@ -184,6 +211,17 @@ export class ExecutionCoordinator {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
 
+    // T2-11: acquire the mutex BEFORE any side-effect (notifySimulator,
+    // sendCommand, motion). frame-off and frame-dot use distinct kinds
+    // because the spec lists them separately and the gate semantics
+    // differ (frame-off doesn't fire the laser; frame-dot does at low
+    // power). Mutex held across the entire corner-stream + idle-wait
+    // span, plus across the laser-off finally for frame-dot.
+    const opKind: ActiveOperationKind = args.laserMode === 'dot' ? 'frameDot' : 'frame';
+    if (!this.deps.machineService.tryAcquireOperation(opKind)) {
+      return { ok: false, reason: 'operation-busy' };
+    }
+
     const { sceneBounds, transformOpts, laserMode, maxSpindle = 1000, withCrosshair = false } = args;
     const corners = buildFrameCorners(sceneBounds, transformOpts);
     const lines = buildFrameGcode(corners, {
@@ -231,6 +269,11 @@ export class ExecutionCoordinator {
           console.warn('[FrameDot] emergencyLaserOff in finally failed:', err instanceof Error ? err.message : err);
         }
       }
+      // T2-11: release after the laser-off finally so the mutex stays
+      // held across the entire frame operation including its safety
+      // teardown. Releasing earlier would let another operation begin
+      // before emergencyLaserOff finishes.
+      this.deps.machineService.releaseOperation(opKind);
     }
   }
 
@@ -246,6 +289,14 @@ export class ExecutionCoordinator {
   async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
+    // T2-11: acquire the mutex before issuing the M3 + arming the deadman.
+    // Re-entry: same-kind acquire returns true (preserves the existing
+    // "second beginTestFire resets the timer" semantics — the spec
+    // already wanted that behavior). Different-kind acquire fails;
+    // beginTestFire returns false same as no-controller.
+    if (!this.deps.machineService.tryAcquireOperation('testFire')) {
+      return false;
+    }
     const sVal = Math.max(0, Math.round((TEST_FIRE_POWER_PERCENT / 100) * args.maxSpindle));
     const cmd = `${TEST_FIRE_LASER_ON_WORD} S${sVal}`;
     this.notifySimulator(cmd);
@@ -253,6 +304,9 @@ export class ExecutionCoordinator {
       ctrl.sendCommand(cmd, 'internal');
     } catch (err) {
       console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
+      // T2-11: release on failed start. The mutex is only useful if it's
+      // actually freed when the operation didn't begin.
+      this.deps.machineService.releaseOperation('testFire');
       return false;
     }
     // T1-22: notify the service that the laser is intentionally on so
@@ -275,7 +329,13 @@ export class ExecutionCoordinator {
       // laser-output-state transitions back to 'off' (or 'unknown' if the
       // safetyOff path took the soft-reset fallback).
       this.deps.machineService.notifyTestFire('end');
-      void this.emergencyLaserOff();
+      // T2-11: deadman release pairs with beginTestFire's acquire. The
+      // .finally chain ensures release fires whether emergencyLaserOff
+      // resolves or rejects. releaseOperation is idempotent in case
+      // endTestFire raced ahead of the deadman.
+      void this.emergencyLaserOff().finally(() => {
+        this.deps.machineService.releaseOperation('testFire');
+      });
     }, deadmanMs);
     return true;
   }
@@ -329,7 +389,16 @@ export class ExecutionCoordinator {
     // The subsequent emergencyLaserOff will further refine the state via
     // notifyLaserSafetyOutcome (M5 → 'off', soft-reset/failed → 'unknown').
     this.deps.machineService.notifyTestFire('end');
-    await this.emergencyLaserOff();
+    try {
+      await this.emergencyLaserOff();
+    } finally {
+      // T2-11: release after the laser-off attempt regardless of outcome.
+      // releaseOperation is idempotent — if the deadman raced ahead and
+      // already released, this is a no-op. Holding the mutex through
+      // emergencyLaserOff prevents another operation from starting
+      // while M5 / soft-reset is still in flight.
+      this.deps.machineService.releaseOperation('testFire');
+    }
   }
 
   /**
@@ -367,7 +436,19 @@ export class ExecutionCoordinator {
   async setOriginAtCurrentPosition(): Promise<{ ok: boolean; reason?: string }> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
-    this.notifySimulator('G10 L20 P1 X0 Y0');
-    return sendSetOriginWcsCommand(ctrl);
+    // T2-11: acquire the mutex around set-origin. The G10 L20 modal-state
+    // mutation must not race with frame-dot's M4, test-fire's M3, or
+    // autoFocus's probe sequence — any of those could land between the
+    // simulator notify and the actual sendCommand and corrupt the
+    // resulting WCS state.
+    if (!this.deps.machineService.tryAcquireOperation('setOrigin')) {
+      return { ok: false, reason: 'operation-busy' };
+    }
+    try {
+      this.notifySimulator('G10 L20 P1 X0 Y0');
+      return await sendSetOriginWcsCommand(ctrl);
+    } finally {
+      this.deps.machineService.releaseOperation('setOrigin');
+    }
   }
 }

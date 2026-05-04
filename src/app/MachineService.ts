@@ -50,6 +50,36 @@ export type BurnStateListener = (state: BurnState) => void;
 export type LaserOutputState = 'off' | 'on' | 'unknown';
 export type LaserOutputStateListener = (state: LaserOutputState) => void;
 
+/**
+ * T2-11: kinds of temporary machine operations protected by the
+ * service-layer mutex. Each value names a distinct entry point in
+ * {@link ExecutionCoordinator}; the mutex prevents two of these
+ * from overlapping. The streaming-job state is NOT in this enum —
+ * GrblController's `_isJobRunning` already gates manual sendCommand
+ * during a streaming job, and the operation mutex is the layer above
+ * it that gates the temporary-laser-on operations against each other.
+ */
+export type ActiveOperationKind =
+  | 'jog'
+  | 'frame'
+  | 'frameDot'
+  | 'testFire'
+  | 'autoFocus'
+  | 'setOrigin';
+
+/**
+ * T2-11: snapshot of the active operation. `null` means no operation is
+ * currently held; T1-30's gate map will read this via
+ * {@link MachineService.getActiveOperation} as the `opState === 'none'`
+ * source. `sessionId` is a monotonically increasing counter so callers
+ * can detect "operation was released and re-acquired" across awaits.
+ */
+export interface ActiveOperationState {
+  kind: ActiveOperationKind;
+  startedAt: number;
+  sessionId: number;
+}
+
 function emptyBurnState(): BurnState {
   return {
     activeIds: new Set<string>(),
@@ -156,6 +186,24 @@ export class MachineService {
 
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
+
+  /**
+   * T2-11: service-layer mutex for temporary-laser-on operations. Single
+   * field, single owner. Set by {@link tryAcquireOperation} when no
+   * operation is active; cleared by {@link releaseOperation}. The
+   * existing `_isJobRunning` controller-level lock stays — it gates
+   * sendCommand against the streaming-job state. The operation mutex
+   * is a layer above it: it gates beginTestFire / runFrame /
+   * autoFocus / setOriginAtCurrentPosition / jog against each other.
+   *
+   * Re-entry policy: same-kind acquire returns true without changing
+   * `startedAt` / `sessionId` so the existing test-fire deadman re-entry
+   * pattern (`if (this._testFireTimerHandle !== null) clearTimeout` then
+   * re-arm) keeps working. Different-kind acquire returns false. Release
+   * is idempotent and only clears when the held kind matches.
+   */
+  private _activeOperation: ActiveOperationState | null = null;
+  private _operationSessionCounter = 0;
 
   constructor(
     private readonly controllerRef: MutableRefObject<LaserController>,
@@ -676,6 +724,67 @@ export class MachineService {
    */
   getLaserOutputState(): LaserOutputState {
     return this._laserOutputState;
+  }
+
+  /**
+   * T2-11: try to acquire the operation mutex for `kind`. Returns true on
+   * success (caller now holds the mutex), false if another kind is
+   * already active. Same-kind re-acquire returns true without changing
+   * `startedAt` / `sessionId` — preserves the test-fire deadman re-entry
+   * pattern where a second `beginTestFire` cancels the existing timer
+   * and re-arms it without bouncing through release/acquire.
+   *
+   * Failure modes returned as `false`:
+   *   - A different operation is currently active (e.g. test-fire is
+   *     held; caller asked for frame-dot).
+   *
+   * Caller MUST pair every successful acquire with exactly one
+   * {@link releaseOperation} call (try/finally is the right shape for
+   * synchronous and async operations alike). Same-kind re-acquire still
+   * counts as one acquire — release once is sufficient.
+   */
+  tryAcquireOperation(kind: ActiveOperationKind): boolean {
+    if (this._activeOperation == null) {
+      this._activeOperation = {
+        kind,
+        startedAt: Date.now(),
+        sessionId: ++this._operationSessionCounter,
+      };
+      return true;
+    }
+    if (this._activeOperation.kind === kind) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * T2-11: release the operation mutex if currently held by `kind`.
+   * Idempotent — calling release for a kind that's not held is a no-op
+   * and does NOT disturb a different kind that may be active. A warn is
+   * emitted on a kind-mismatch (caller is releasing the wrong kind),
+   * because that almost certainly means a try/finally pair is wrong.
+   */
+  releaseOperation(kind: ActiveOperationKind): void {
+    if (this._activeOperation == null) return;
+    if (this._activeOperation.kind !== kind) {
+      console.warn(
+        `[T2-11] releaseOperation('${kind}') called while '${this._activeOperation.kind}' is active; ignoring`,
+      );
+      return;
+    }
+    this._activeOperation = null;
+  }
+
+  /**
+   * T2-11: read-only snapshot of the active operation. `null` when no
+   * operation is held. Returns a defensive copy. Consumed by T1-30's
+   * (future) computeCommandGates as the `opState === 'none'` source so
+   * UI gates can refuse frame / jog / test-fire while another operation
+   * is in flight.
+   */
+  getActiveOperation(): ActiveOperationState | null {
+    return this._activeOperation == null ? null : { ...this._activeOperation };
   }
 
   /**
