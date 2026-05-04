@@ -174,9 +174,13 @@ async function run(): Promise<void> {
       sentBatches[0]?.join('\n') === [...ticket.gcodeLines].join('\n'),
       'sendJob receives ticket gcodeLines',
     );
+    // T1-46: notifySimulatorTx is now deferred-and-chunked so sendJob can
+    // start streaming first. Wait for the chunked fan-out to drain before
+    // asserting that all lines were eventually delivered.
+    await waitUntil(() => simLines.length === ticket.gcodeLines.length, 1000);
     assert(
       simLines.join('\n') === [...ticket.gcodeLines].join('\n'),
-      'notifySimulatorTx sees each ticket line',
+      'notifySimulatorTx sees each ticket line (after T1-46 deferred fan-out)',
     );
     assert(
       svc.getActiveTicket()?.ticketId === ticket.ticketId,

@@ -541,8 +541,22 @@ export class MachineService {
         estimate ? estimate.totalSeconds * 1000 : null,
       );
 
-      for (const line of lines) notifySimulatorTx(line);
-      await this.controllerRef.current.sendJob(lines);
+      // T1-46: kick off sendJob FIRST so the controller starts streaming
+      // immediately; defer the simulator-fan-out loop to a chunked
+      // setTimeout. notifySimulatorTx fans out to UI listeners (progress
+      // overlays, replay capture mirror); doing 2M synchronous calls
+      // before sendJob meant the controller didn't see byte 1 until
+      // after the entire fan-out completed — multi-second freeze right
+      // when the user expects "click Start → laser begins" within
+      // ~100ms. Chunking yields between batches so the browser can
+      // repaint and the controller's streaming continues uninterrupted.
+      // Errors from individual notify callbacks are swallowed (matches
+      // the existing per-callback try/catch in notifySimulatorTx) — a
+      // broken listener mustn't take down job start. sendJob's own
+      // promise carries the streaming/transport error contract.
+      const sendPromise = this.controllerRef.current.sendJob(lines);
+      this._notifySimulatorChunked(lines, notifySimulatorTx);
+      await sendPromise;
     } catch (err) {
       if (this.activeJobSessionId === sessionId) {
         // T1-87: persist the partial log/replay before clearing refs so
@@ -661,6 +675,46 @@ export class MachineService {
     for (const cb of this._laserOutputStateListeners) {
       cb(next);
     }
+  }
+
+  /**
+   * T1-46: deferred, chunked simulator-tx fan-out. Walks `lines` in
+   * NOTIFY_CHUNK-sized batches, invoking `notify` synchronously inside
+   * each batch and yielding to the macrotask queue between batches via
+   * `setTimeout(..., 0)`. The first batch is also deferred so `sendJob`
+   * (called immediately before this) is on the event loop ahead of the
+   * notification work.
+   *
+   * Per-call errors are swallowed (matches the existing per-listener
+   * try/catch shape in `notifySimulatorTx` callers) — a broken listener
+   * must not break job start. Tests pin both the deferred-first-call
+   * contract and the all-lines-eventually-delivered contract.
+   *
+   * NOTIFY_CHUNK is tuned for "yield often enough to repaint, batch
+   * large enough that fan-out finishes within seconds for million-line
+   * jobs." 1000 lines per chunk × ~16ms paint cadence ≈ 60k lines/sec
+   * sustained while remaining responsive.
+   */
+  private _notifySimulatorChunked(
+    lines: string[],
+    notify: (line: string) => void,
+  ): void {
+    const NOTIFY_CHUNK = 1000;
+    let idx = 0;
+    const tick = (): void => {
+      const end = Math.min(idx + NOTIFY_CHUNK, lines.length);
+      for (; idx < end; idx++) {
+        try {
+          notify(lines[idx]);
+        } catch {
+          /* ignore — broken listener must not break the chunked loop */
+        }
+      }
+      if (idx < lines.length) {
+        setTimeout(tick, 0);
+      }
+    };
+    setTimeout(tick, 0);
   }
 
   /**

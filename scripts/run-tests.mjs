@@ -179,6 +179,7 @@ const files = [
   'preflight-rejects-m4-without-laser-mode.test.ts',
   'maxspindle-precedence-and-mismatch.test.ts',
   'preflight-warning-confirm-includes-detail.test.ts',
+  'job-start-deferred-simulator-fanout.test.ts',
   'pause-emits-m5-after-feed-hold.test.ts',
   'no-electron-sendgcode-export.test.ts',
   'frame-dot-finally-emits-m5.test.ts',
