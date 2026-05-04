@@ -24,6 +24,7 @@ const files = [
   'controller-bounds-recheck.test.ts',
   'controller-bounds-checks-g91.test.ts',
   'connect-safe-state-handshake.test.ts',
+  'unsafe-prior-state-persistence.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',

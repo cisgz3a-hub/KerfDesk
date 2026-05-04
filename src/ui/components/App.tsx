@@ -62,6 +62,7 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
+import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -705,6 +706,42 @@ export function App() {
       cancelled = true;
     };
   }, []);
+
+  // T1-29: surface the unsafe-prior-state recovery dialog at startup. The
+  // flag was set by MachineService.startValidatedJob and is cleared on
+  // every clean shutdown path (job completion, service disconnect,
+  // failed-start cleanup). A non-null payload here means the previous
+  // session reached "job started" but never reached any of those clean
+  // exits — renderer crash, browser kill, cable pull, OS crash. The
+  // workpiece may be partially burnt and the head may be in a dangerous
+  // position. T1-25's connect-time getUnsafeAtConnect covers the
+  // orthogonal case where firmware still reports a non-safe state at
+  // next connect; T1-29 covers the "firmware finished cleanly while
+  // we were dead" case where T1-25 alone cannot detect the prior burn.
+  //
+  // The alert is a modal overlay — the rest of the UI (including the
+  // connect button) is unreachable until the user acknowledges. After
+  // dismissal the flag is cleared so the dialog doesn't reappear on
+  // subsequent restarts unless a new job triggers it again.
+  useEffect(() => {
+    const unsafe = getUnsafePriorState();
+    if (unsafe == null) return;
+    const startedLabel = (() => {
+      try { return new Date(unsafe.startedAt).toLocaleString(); }
+      catch { return new Date(unsafe.startedAt).toString(); }
+    })();
+    void showAlert(
+      'Previous session ended unexpectedly',
+      'A job was running when the previous session ended. The machine ' +
+      'state may be unsafe — laser, head position, and workpiece may ' +
+      'all have unexpected values. Inspect the machine and the ' +
+      'workpiece BEFORE reconnecting.\n\n' +
+      `Job started: ${startedLabel}` +
+      (unsafe.ticketId ? `\nTicket: ${unsafe.ticketId}` : ''),
+    ).finally(() => {
+      clearUnsafePriorState();
+    });
+  }, [showAlert]);
   const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
   const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
   const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);

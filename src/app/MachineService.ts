@@ -26,6 +26,7 @@ import { estimateJobTime } from '../core/output/TimeEstimator';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
+import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
 import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
@@ -370,6 +371,13 @@ export class MachineService {
       this.activeReplay = null;
     }
     void this.releaseWakeLock();
+    // T1-29: clear unsafe-prior-state flag on terminal job status. Any of
+    // 'completed' / 'stopped' / 'failed' counts as a clean transition out
+    // of the job-running state — the user observed the outcome and the
+    // service finalized the log. The flag's role is to detect "we
+    // started a job and never made it here," so any path that reaches
+    // here is by definition not unsafe.
+    clearUnsafePriorState();
     this.currentJobLog = null;
     this.activeTicket = null;
     this.activeJobCanvasContext = null;
@@ -486,6 +494,20 @@ export class MachineService {
 
     await this.acquireWakeLock();
     const sessionId = this.nextJobSessionId++;
+    // T1-29: persist unsafe-prior-state flag at job-begin. The flag is
+    // cleared on every clean shutdown path (job completion, service
+    // disconnect, recovery acknowledgement). If the renderer dies
+    // mid-burn or the cable is pulled, the flag survives in
+    // localStorage and the next app launch surfaces a recovery
+    // dialog before allowing connect — covers the case where firmware
+    // reports clean idle on next connect (T1-25's getUnsafeAtConnect
+    // returns null) but the user lost their session in the middle of
+    // a burn and the workpiece may be partially burnt.
+    setUnsafePriorState({
+      kind: 'job-running',
+      ticketId: ticket.ticketId ?? null,
+      startedAt: Date.now(),
+    });
     try {
       this.jobObservedRunning = false;
       this.activeJobSessionId = sessionId;
@@ -606,6 +628,14 @@ export class MachineService {
         this.jobObservedRunning = false;
         this.activeJobSessionId = null;
         void this.releaseWakeLock();
+        // T1-29: a failed-start counts as a clean shutdown for the
+        // unsafe-prior-state flag — the job never reached "running" so
+        // there's no in-flight burn to recover from. The error already
+        // surfaced to the caller; the recovery dialog on next launch
+        // would be a confusing duplicate. T2-67's job log/replay
+        // capture + 'failed_to_start' status carries the diagnostic
+        // record forward.
+        clearUnsafePriorState();
       }
       throw err;
     }
@@ -853,6 +883,13 @@ export class MachineService {
       // the previous session is no longer trustworthy — force a fresh
       // Set Origin before any saved-origin job.
       this._savedOriginG54Snapshot = null;
+      // T1-29: user-initiated disconnect is a clean shutdown path.
+      // Service ran M5 S0 + controller disconnect above; the job, if
+      // any was active, is being intentionally stopped. Clear the
+      // flag so the next launch doesn't surface the recovery dialog.
+      // Disconnect-while-job-runs IS the user explicitly halting the
+      // burn; that's qualitatively different from a renderer crash.
+      clearUnsafePriorState();
     }
   }
 
