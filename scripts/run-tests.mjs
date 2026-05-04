@@ -75,6 +75,7 @@ const files = [
   'connect-cleanup-on-partial-failure.test.ts',
   'connect-abort-signal.test.ts',
   'pause-resume-stop-surface-errors.test.ts',
+  'frame-current-mode-emits-first-move.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

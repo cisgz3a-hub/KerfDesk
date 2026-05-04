@@ -52,8 +52,26 @@ export function buildFrameGcode(
   if (startMode === 'current') {
     const out: string[] = ['G91', 'G21'];
     out.push(laserMode === 'dot' ? `M4 S${frameDotS}` : 'M5 S0');
-    let prev = corners[0]!;
-    for (let i = 1; i < corners.length; i++) {
+    // T1-39: previously the loop initialized `prev = corners[0]` and
+    // started at `i = 1`, which silently skipped the first relative
+    // move (from the head's current position to corners[0]). On
+    // front-origin diode lasers (Falcon, SCULPFUN, Atomstack — the
+    // common consumer machines), corners[0] in machine space is
+    // `(0, jobHeight)` after Y-flip, so the actual job's first move
+    // is `(0, jobHeight)`. The old frame skipped this and traced
+    // the design vertically shifted by `jobHeight` — the frame's
+    // whole purpose (verify burn area before committing) was
+    // defeated. On rear-origin machines `corners[0]` typically maps
+    // to `(0, 0)` so the missing move was zero-length and the bug
+    // was invisible — that's why this hasn't been caught yet.
+    //
+    // Fix: initialize prev to (0, 0) and start the loop at i = 0.
+    // The first emitted delta is now corners[0] - (0, 0), matching
+    // the actual job's first move. Rear-origin machines still
+    // work because the zero-length first delta is skipped by the
+    // eps check below.
+    let prev = { x: 0, y: 0 };
+    for (let i = 0; i < corners.length; i++) {
       const c = corners[i]!;
       const dx = c.x - prev.x;
       const dy = c.y - prev.y;
@@ -88,6 +106,21 @@ export function buildFrameGcode(
         out.push(`G0 X${(0).toFixed(3)} Y${H.toFixed(3)}`);
       }
       out.push('M5 S0');
+    }
+    // T1-39 (cont.): return the head to its physical starting
+    // position so burn-after-frame produces the same first move as
+    // burn-without-frame. With the loop fix above, after the corner
+    // traversal the head is at `corners[0]` machine-relative; with
+    // the crosshair branch, it's at `centroid`. Without this final
+    // negated G0 the head ends offset by that amount, and the
+    // subsequent job's relative moves are doubly offset — i.e. the
+    // burn lands at design-position + corners[0] (frame ≠ burn,
+    // exactly what the loop fix was supposed to close). The eps
+    // guard skips the move on rear-origin machines where corners[0]
+    // is already (0, 0).
+    const endPos = (crosshairAfterFrame && centroid) ? centroid : corners[0]!;
+    if (Math.abs(endPos.x) >= eps || Math.abs(endPos.y) >= eps) {
+      out.push(`G0 X${(-endPos.x).toFixed(3)} Y${(-endPos.y).toFixed(3)}`);
     }
     out.push('G90');
     return out;

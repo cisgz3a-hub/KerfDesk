@@ -2021,6 +2021,8 @@ Performance impact: tighter tolerance produces more points. Worst case for a com
 
 ### T1-39 | Frame skips first relative move on front-origin machines (current/head mode)
 
+**Status:** Code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification. **Hardware verification needed — Falcon A1 Pro front-origin burn test.** Master checklist remains `[ ]` until tester confirms frame == burn area on a front-left design. The current-mode branch in `buildFrameGcode` now (a) starts the corner loop at `i = 0` with `prev = (0, 0)` so the first emitted delta is `corners[0] - (0, 0)` (matching the actual job's first move), and (b) emits a final negated-`endPos` G0 at the end so the head returns to the physical starting position, preventing burn-after-frame from being doubly offset by `corners[0]`. The crosshair branch's existing math is now correct (it always assumed head was at `corners[0]` for the right-tip delta calculation; pre-fix, the head was at `(0, 0)` so the crosshair was also off by the same amount). Pinned by `tests/frame-current-mode-emits-first-move.test.ts` (13 contracts: front-origin first move = `(0, 50)`, deltas sum to zero, return-to-origin matches negated `corners[0]`, rear-origin still works via eps-skipped first delta, dot-mode + saved-origin coverage). Existing golden tests in `frame-gcode-pure.test.ts` and `frame-gcode-crosshair.test.ts` updated with T1-39 markers documenting the new first-move and return-to-origin lines. **Not user-checklist-flippable until hardware confirms.**
+
 **Code reference:** `src/app/frameGcode.ts:38-58` (`buildFrameGcode`, current-mode branch), specifically lines 41-42 where `prev = corners[0]` and the loop starts at `i = 1`.
 
 **Problem:** Cross-check confirmed at frameGcode.ts:41-42:
@@ -19337,7 +19339,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-36 Offset-with-holes for kerf compensation (filed; geometry correctness 鈥?real product bug)
 - [x] T1-37 Hide offset fill UI option until implemented (shipped 2026-05-02 in `bfb1a6b`)
 - [ ] T1-38 Operation-aware default flattening tolerance (filed; output quality)
-- [ ] T1-39 Frame skips first relative move on front-origin machines (filed; SAFETY 鈥?frame 鈮?burn)
+- [ ] T1-39 Frame skips first relative move on front-origin machines — code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-40 Right-origin X mirror support (filed; SAFETY 鈥?shippable wrong behavior; band-aid first)
 - [ ] T1-41 Saved-origin verification 鈥?query $# at frame/start (filed; SAFETY)
 - [ ] T1-42 Frame bounds confirmation uses buildFrameCorners not workFrame (filed; SAFETY, depends T1-40)

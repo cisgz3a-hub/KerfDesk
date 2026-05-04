@@ -67,14 +67,21 @@ console.log('\n=== frame-gcode pure (golden) ===\n');
       'G91',
       'G21',
       'M5 S0',
+      // T1-39: first delta is now `(0,0) → corners[0] = (0, 100)`, the
+      // move the OLD loop silently skipped. On front-origin machines
+      // this is the burn's actual first move.
+      'G0 X0.000 Y100.000',
       'G0 X100.000 Y0.000',
       'G0 X0.000 Y-100.000',
       'G0 X-100.000 Y0.000',
       'G0 X0.000 Y100.000',
       'M5 S0',
+      // T1-39: return-to-origin so burn-after-frame is not doubly
+      // offset by `corners[0]` (head ends back at physical start).
+      'G0 X0.000 Y-100.000',
       'G90',
     ],
-    'frame safe current mode — byte match to pre-refactor ConnectionPanelMain',
+    'frame safe current mode — T1-39 first move + return-to-origin',
   );
 
   const dot = buildFrameGcode(corners, {
@@ -88,14 +95,21 @@ console.log('\n=== frame-gcode pure (golden) ===\n');
       'G91',
       'G21',
       'M4 S5',
+      // T1-39: first move now fires at the laser-dot power, tracing
+      // the previously-skipped (0,0) → corners[0] segment that the
+      // burn's first move uses too.
+      'G1 X0.000 Y100.000 F3000',
       'G1 X100.000 Y0.000 F3000',
       'G1 X0.000 Y-100.000 F3000',
       'G1 X-100.000 Y0.000 F3000',
       'G1 X0.000 Y100.000 F3000',
       'M5 S0',
+      // T1-39: return-to-origin runs with laser off (M5 already
+      // emitted above) — the negated `corners[0]` move.
+      'G0 X0.000 Y-100.000',
       'G90',
     ],
-    'frame dot current mode — M4 S5, G1 F3000 segments',
+    'frame dot current mode — T1-39 first move + return-to-origin',
   );
 }
 
