@@ -115,6 +115,7 @@ const files = [
   'error-handler-faults-active-job.test.ts',
   'machine-settings-stop-on-error-toggle.test.ts',
   'autofocus.test.ts',
+  'autofocus-timeout-issues-safety-off.test.ts',
   'machine-service-pause-resume.test.ts',
   'machine-service-start-validated-job.test.ts',
   'machine-service-job-lifecycle-safety.test.ts',

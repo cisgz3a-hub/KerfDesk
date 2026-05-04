@@ -867,9 +867,23 @@ export class GrblController implements LaserController {
     return await new Promise<void>((resolve, reject) => {
       let completed = false;
       let sawActiveState = false;
+      // T1-28: timeout and alarm paths must trigger safety-off before
+      // rejecting. Autofocus moves the Z-axis against a probe; if the
+      // firmware hangs (probe pin floating, Z-stage stuck, mechanical
+      // interference) or alarms mid-probe, the head may be pressing
+      // into the workpiece while the laser is in M3/M4 modal state
+      // from a previous operation. Rejecting without firing M5 / soft
+      // reset leaves the machine in an undefined state. T1-22's
+      // safetyOff handles M5-then-soft-reset fallback.
+      //
+      // Defense-in-depth: if safetyOff itself rejects (transport
+      // failure, port closed), the catch swallows it so the original
+      // timeout / alarm error reaches the caller — masking the
+      // primary cause is worse than the secondary failure.
       const timer = setTimeout(() => {
         cleanup();
-        reject(new Error('Auto-focus timed out'));
+        void this.safetyOff().catch(() => { /* logged inside safetyOff */ });
+        reject(new Error('Auto-focus timed out — safety-off attempted'));
       }, timeoutMs);
 
       const cleanup = (): void => {
@@ -883,7 +897,9 @@ export class GrblController implements LaserController {
       const unsubState = this.onStateChange((next) => {
         if (next.status === 'alarm') {
           cleanup();
-          reject(new Error(`Auto-focus alarm: ALARM:${next.alarmCode ?? 'unknown'}`));
+          // T1-28: alarm during autofocus → safety-off before reject.
+          void this.safetyOff().catch(() => { /* logged inside safetyOff */ });
+          reject(new Error(`Auto-focus alarm: ALARM:${next.alarmCode ?? 'unknown'} — safety-off attempted`));
           return;
         }
         if (next.status === 'homing' || next.status === 'run') {
