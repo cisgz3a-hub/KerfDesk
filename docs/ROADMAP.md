@@ -4180,7 +4180,7 @@ For T1-70's first ship, just adding the alert + not hiding the prompt on failure
 
 ### T1-71 | Recovery offered for non-empty autosave, not only object-having scenes
 
-**Status:** Shipped 2026-05-04 in `<TBD>`. Eligibility predicate extracted to a pure function `evaluateRecoveryEligibility(json)` in new `src/app/recoveryEligibility.ts`; the App's startup `useEffect` calls it instead of the inline `objects.length > 0` check. Recovery now fires for any of: objects placed, custom layers (more than the single default `Cut`), populated material block, or populated machine block. The default-only scene (one default layer, null material, null machine, no objects) still doesn't fire — opening the app and doing nothing won't surface a stale recovery prompt. Malformed/empty/non-scene JSON also returns `shouldOffer:false` because there's nothing meaningful to restore; the user-initiated failure path is T1-70's responsibility. The predicate also returns a `reasons` array for future "what's recoverable" UI surfaces (T2-69 / T2-70 follow-ups). Pinned by `tests/recovery-eligibility-non-empty-cases.test.ts` (16 contracts: each positive cause individually, multiple-cause aggregation, default-only negative, three malformed inputs).
+**Status:** Shipped 2026-05-04 in `02b9706`. Eligibility predicate extracted to a pure function `evaluateRecoveryEligibility(json)` in new `src/app/recoveryEligibility.ts`; the App's startup `useEffect` calls it instead of the inline `objects.length > 0` check. Recovery now fires for any of: objects placed, custom layers (more than the single default `Cut`), populated material block, or populated machine block. The default-only scene (one default layer, null material, null machine, no objects) still doesn't fire — opening the app and doing nothing won't surface a stale recovery prompt. Malformed/empty/non-scene JSON also returns `shouldOffer:false` because there's nothing meaningful to restore; the user-initiated failure path is T1-70's responsibility. The predicate also returns a `reasons` array for future "what's recoverable" UI surfaces (T2-69 / T2-70 follow-ups). Pinned by `tests/recovery-eligibility-non-empty-cases.test.ts` (16 contracts: each positive cause individually, multiple-cause aggregation, default-only negative, three malformed inputs).
 
 **Code reference:** `src/ui/components/App.tsx:608`. Cross-check verified.
 
@@ -19351,7 +19351,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-68 Autosave must await write before clearing dirty flag (shipped pre-session; close-out 2026-05-02 in `201394b`)
 - [x] T1-69 Manual save must not mark scene clean before download write confirmation (shipped pre-session; close-out 2026-05-03 in `7b08b0f`)
 - [x] T1-70 Recovery failure must alert user, not just `console.error` (shipped 2026-05-04 in `bdedd58`)
-- [x] T1-71 Recovery offered for non-empty autosave (shipped 2026-05-04 in `<TBD>`)
+- [x] T1-71 Recovery offered for non-empty autosave (shipped 2026-05-04 in `02b9706`)
 - [x] T1-72 `APP_VERSION` wired to package.json / build constant (shipped 2026-05-02 in `41bfa06`)
 - [x] T1-73 Delete action must mark scene dirty (closed 2026-05-02 in `7e4e340`; superseded by T2-76 unified routing)
 - [x] T1-74 Text sidebar `patchTextGeometry` must commit history, not preview-only (shipped pre-session)
