@@ -22,6 +22,10 @@ import { type MachineService, type LaserOutputState, type ApprovalToken } from '
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
+import {
+  verifySavedOriginG54,
+  describeSavedOriginDrift,
+} from '../../app/savedOriginVerify';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
@@ -720,6 +724,36 @@ export function ConnectionPanelMain({
 
     setIsPaused(false);
     setJobCompleted(false);
+
+    // T1-41: verify saved-origin G54 hasn't drifted since Set Origin.
+    // The work coordinate system anchors saved-origin jobs to the
+    // physical workpiece corner; if it's been zeroed (reconnect's
+    // applyWcsNormalization, console G10/G92, custom-start templates,
+    // firmware power loss), the burn would land in the wrong place.
+    // We block before preflight so the user fixes the cause before
+    // dealing with whatever else preflight has to say.
+    if (startMode === 'savedOrigin') {
+      const expectedG54 = machineService.getSavedOriginG54Snapshot();
+      const currentG54 = await machineService.requestWorkOffsets();
+      const verified = verifySavedOriginG54(expectedG54, currentG54);
+      if (!verified.ok) {
+        let title = 'Saved origin not verified';
+        let body: string;
+        if (verified.reason === 'no-snapshot') {
+          body = 'Saved origin has no recorded G54 snapshot — Set Origin again on the workpiece, or switch to absolute / from-laser-head mode.';
+        } else if (verified.reason === 'no-current-g54') {
+          body = 'The controller did not respond to the work-offset query in time. Verify the connection is healthy and try again, or switch to absolute / from-laser-head mode.';
+        } else if (verified.reason === 'drift' && verified.drift) {
+          title = 'Saved origin no longer valid';
+          body = describeSavedOriginDrift(verified.drift);
+        } else {
+          body = 'Saved origin could not be verified — switch start mode or re-set origin.';
+        }
+        setMessages(prev => [...prev, `⚠ ${title}: ${body}`]);
+        await showAlert(title, body);
+        return;
+      }
+    }
 
     const preflightResult = await confirmPreflightForJobStart(
       preflight,

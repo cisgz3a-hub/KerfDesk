@@ -167,6 +167,13 @@ export interface LaserController {
    */
   getCurrentWcsState?(): { g54: { x: number; y: number; z: number } | null; statusMask: number | null };
   /**
+   * T1-41: GRBL: query `$#` and resolve with the freshly-parsed G54 work
+   * offset, or `null` if the controller is disconnected or the response
+   * did not arrive within the timeout. Used by saved-origin verification
+   * to detect WCS drift between Set Origin and job start.
+   */
+  requestWorkOffsets?(timeoutMs?: number): Promise<{ x: number; y: number; z: number } | null>;
+  /**
    * GRBL: Fired when connect-time normalization would change G54 and/or $10. Call
    * `applyWcsNormalization` to apply the baseline, or `skipWcsNormalization` to leave
    * firmware as-is. Not all controllers implement this.

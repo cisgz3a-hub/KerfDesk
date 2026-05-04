@@ -77,6 +77,7 @@ const files = [
   'pause-resume-stop-surface-errors.test.ts',
   'frame-current-mode-emits-first-move.test.ts',
   'right-origin-x-flip.test.ts',
+  'saved-origin-verifies-wcs.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

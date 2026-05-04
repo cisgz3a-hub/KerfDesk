@@ -993,6 +993,39 @@ export class GrblController implements LaserController {
     }
   }
 
+  /**
+   * T1-41: query GRBL for work-coordinate offsets via `$#` and resolve
+   * with the freshly-parsed G54. Used by saved-origin verification at
+   * Set Origin (snapshot) and at job start (compare). Returns `null`
+   * if the controller is disconnected or the response did not parse
+   * within the timeout.
+   *
+   * Implementation: clear `_currentG54` (tombstone), send `$#`, then
+   * poll for `_currentG54` to repopulate when the next `[G54:x,y,z]`
+   * line arrives. The timeout defaults to 1 second — generous for any
+   * real GRBL response, short enough to avoid hanging the UI.
+   */
+  async requestWorkOffsets(timeoutMs = 1000): Promise<{ x: number; y: number; z: number } | null> {
+    if (!this._port?.isOpen) return null;
+    this._currentG54 = null;
+    this._writeSystemLine('$#');
+    const start = Date.now();
+    return new Promise<{ x: number; y: number; z: number } | null>((resolve) => {
+      const tick = (): void => {
+        if (this._currentG54) {
+          resolve(this._currentG54);
+          return;
+        }
+        if (Date.now() - start >= timeoutMs) {
+          resolve(null);
+          return;
+        }
+        setTimeout(tick, 20);
+      };
+      tick();
+    });
+  }
+
   private _onSettingsDollarOk(): void {
     if (!this._awaitingSettingsOk) return;
     this._awaitingSettingsOk = false;

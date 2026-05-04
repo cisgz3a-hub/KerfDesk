@@ -614,7 +614,23 @@ export function App() {
     try {
       localStorage.setItem('laserforge_saved_origin', JSON.stringify(origin));
     } catch { /* ignore */ }
-  }, [grbl.machineState, machineUi.executionCoordinator, showAlert]);
+    // T1-41: snapshot G54 *after* the Set Origin G10 command was
+    // accepted, so any subsequent saved-origin job can verify the
+    // work coordinate system hasn't drifted (user typing G10 in the
+    // console, custom-start template containing G10/G92, reconnect,
+    // firmware power loss). The snapshot is best-effort — if `$#`
+    // doesn't respond inside the timeout (1s default) the snapshot
+    // is null and the verify path will block subsequent saved-origin
+    // jobs until the user re-runs Set Origin.
+    const g54 = await machineUi.service.requestWorkOffsets();
+    machineUi.service.setSavedOriginG54Snapshot(g54);
+    if (!g54) {
+      void showAlert(
+        'Saved origin partial',
+        'Set Origin succeeded, but the controller did not respond to the work-offset query. Saved-origin jobs will be blocked until you Set Origin again with a responsive controller. (T1-41)',
+      );
+    }
+  }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, showAlert]);
   const sceneIsDirtyRef = useRef(false);
   const lastSavedSceneRef = useRef('');
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5

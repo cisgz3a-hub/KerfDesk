@@ -147,6 +147,11 @@ export class MachineService {
    * (and only on transitions - no-op writes are skipped).
    */
   private _laserOutputState: LaserOutputState = 'off';
+  // T1-41: G54 work offset captured at the time the user clicked Set Origin.
+  // The verify path (`verifySavedOrigin`) compares this to a freshly-queried
+  // value at job start. `null` means Set Origin was never run this session
+  // (or the snapshot was invalidated, e.g. by disconnect).
+  private _savedOriginG54Snapshot: { x: number; y: number; z: number } | null = null;
 
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
@@ -788,7 +793,39 @@ export class MachineService {
     } finally {
       this.portRef.current = null;
       this.clearJobSession();
+      // T1-41: invalidate saved-origin G54 snapshot on disconnect.
+      // Firmware can lose G54 across power cycles, and a reconnect may
+      // run `applyWcsNormalization` which zeros G54. The snapshot from
+      // the previous session is no longer trustworthy — force a fresh
+      // Set Origin before any saved-origin job.
+      this._savedOriginG54Snapshot = null;
     }
+  }
+
+  // T1-41: snapshot G54 captured at Set Origin time. Caller is App.tsx's
+  // handleSaveOrigin, which fetches the live G54 via the controller and
+  // stores it here. Setting `null` invalidates the snapshot — the verify
+  // path will then block any saved-origin job until the user re-runs
+  // Set Origin.
+  setSavedOriginG54Snapshot(g54: { x: number; y: number; z: number } | null): void {
+    this._savedOriginG54Snapshot = g54;
+  }
+
+  // T1-41: read the snapshot for diagnostics / UI display. The verify
+  // path compares this to a freshly-queried G54 at job-start time.
+  getSavedOriginG54Snapshot(): { x: number; y: number; z: number } | null {
+    return this._savedOriginG54Snapshot;
+  }
+
+  // T1-41: query the controller's `$#` and resolve with the freshly-parsed
+  // G54 work offset. Used at Set Origin (capture) and job start (verify).
+  // Returns `null` if the controller isn't connected or doesn't implement
+  // `requestWorkOffsets` (non-GRBL controllers — when those land, they'll
+  // need their own equivalent).
+  async requestWorkOffsets(timeoutMs?: number): Promise<{ x: number; y: number; z: number } | null> {
+    const ctrl = this.controllerRef.current;
+    if (!ctrl || typeof ctrl.requestWorkOffsets !== 'function') return null;
+    return ctrl.requestWorkOffsets(timeoutMs);
   }
 
   /**
