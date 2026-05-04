@@ -61,6 +61,7 @@ import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
+import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -649,21 +650,22 @@ export function App() {
     let cancelled = false;
     void readAutosave().then(payload => {
       if (cancelled || !payload) return;
+      // T1-71: recovery should fire on any meaningful change, not only
+      // scenes with placed objects. A user who configured machine,
+      // material, and custom layers but didn't place an object yet still
+      // had real work in autosave; the previous "objects > 0" gate threw
+      // it away.
+      const eligibility = evaluateRecoveryEligibility(payload.json);
+      if (!eligibility.shouldOffer) return;
+      setShowRecover(true);
       try {
-        const parsed = JSON.parse(payload.json) as { scene?: { objects?: unknown[] } };
-        const objs = parsed.scene?.objects;
-        if (Array.isArray(objs) && objs.length > 0) {
-          setShowRecover(true);
-          try {
-            const d = new Date(payload.timestamp);
-            setRecoverAutosaveTimeLabel(
-              d.toLocaleDateString() + ' ' + d.toLocaleTimeString(),
-            );
-          } catch {
-            setRecoverAutosaveTimeLabel(null);
-          }
-        }
-      } catch { /* ignore */ }
+        const d = new Date(payload.timestamp);
+        setRecoverAutosaveTimeLabel(
+          d.toLocaleDateString() + ' ' + d.toLocaleTimeString(),
+        );
+      } catch {
+        setRecoverAutosaveTimeLabel(null);
+      }
     });
     return () => {
       cancelled = true;
