@@ -178,6 +178,7 @@ const files = [
   'preflight-output-layer-filter.test.ts',
   'preflight-rejects-m4-without-laser-mode.test.ts',
   'preflight-blocks-when-maxspindle-unknown.test.ts',
+  'pipeline-compile-accepts-profile-snapshot.test.ts',
   'maxspindle-precedence-and-mismatch.test.ts',
   'preflight-warning-confirm-includes-detail.test.ts',
   'job-start-deferred-simulator-fanout.test.ts',

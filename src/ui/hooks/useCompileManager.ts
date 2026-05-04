@@ -14,6 +14,7 @@ import {
   compileToolpath as pipelineCompileToolpath,
   type CompileGcodeResult,
 } from '../../app/PipelineService';
+import { getActiveProfile } from '../../core/devices/DeviceProfile';
 
 export type { CompileGcodeResult };
 
@@ -135,6 +136,11 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         console.warn('[useCompileManager] compileToResult suppressed: job is running');
         return Promise.resolve(null);
       }
+      // T1-58: snapshot the active profile at compile entry so the pipeline
+      // is pure w.r.t. profile state. If the active profile changes mid-
+      // compile (programmatic update, import, cross-tab event), we still
+      // produce a result for the profile the user thought was active.
+      const profileSnapshot = getActiveProfile();
       return pipelineCompileGcode(
         targetScene,
         startMode,
@@ -143,6 +149,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         outputFormat,
         machineBedFromControllerRef.current,
         controllerAccelMmPerS2,
+        profileSnapshot,
       );
     },
     [
@@ -172,6 +179,9 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       // against the newer tick.
       const requestId = ++compileRequestIdRef.current;
       const sceneTickAtStart = sceneCompileTickRef.current;
+      // T1-58: profile snapshot taken alongside the request-id and scene-tick
+      // snapshots so the entire compile attempt sees a consistent triple.
+      const profileSnapshot = getActiveProfile();
       setIsCompiling(true);
       try {
         const result = await pipelineCompileGcode(
@@ -182,6 +192,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           outputFormat,
           machineBedFromControllerRef.current,
           controllerAccelMmPerS2,
+          profileSnapshot,
         );
         if (requestId !== compileRequestIdRef.current) {
           console.info('[useCompileManager] dropping stale compile result (request superseded)');
@@ -224,7 +235,9 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       return null;
     }
     try {
-      const result = await pipelineCompileToolpath(targetScene, controllerAccelMmPerS2);
+      // T1-58: profile snapshot for compileToolpath as well.
+      const profileSnapshot = getActiveProfile();
+      const result = await pipelineCompileToolpath(targetScene, controllerAccelMmPerS2, profileSnapshot);
       if (!result) return null;
       return result.moves;
     } catch (err) {

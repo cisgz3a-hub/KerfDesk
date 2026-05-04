@@ -18,7 +18,7 @@ import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
 import '../core/output/GrblStrategy';
-import { getActiveProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
+import { getActiveProfile, type DeviceProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
 import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
@@ -97,6 +97,20 @@ export async function compileGcode(
   machineBedFromController: { width: number; height: number } | null = null,
   /** GRBL $120/$121 (min); raster acceleration-aware power. */
   controllerAccelMmPerS2: number | null = null,
+  /**
+   * T1-58: profile snapshot taken by the caller at compile-entry. Required.
+   * Pre-T1-58 the pipeline read `getActiveProfile()` internally — a global
+   * read mid-compile that, if the active profile flipped between caller's
+   * decision-to-compile and the read (programmatic profile change, import,
+   * cross-tab storage event), produced a result computed against a profile
+   * the UI didn't know was active. Snapshotting at the call site (and
+   * passing the snapshot here) makes the compile pure w.r.t. profile state
+   * and lets the caller detect race-condition staleness via hash compare
+   * after await. `null` is allowed for the no-profile case (offline export
+   * with no settings ever configured); fallbacks below preserve the
+   * pre-T1-58 default behavior in that branch.
+   */
+  profile: DeviceProfile | null = null,
 ): Promise<CompileGcodeResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
   const strategy = getOutputStrategy(outputFormat);
@@ -114,8 +128,8 @@ export async function compileGcode(
   });
   if (job.operations.length === 0) return null;
 
-  const profile = getActiveProfile();
-
+  // T1-58: `profile` parameter is the caller's snapshot. The pre-T1-58
+  // `getActiveProfile()` global read is gone from this function.
   const plan = optimizePlan(job, {
     maxRapidSpeed: profile?.maxFeedRate ?? 6000,
   });
@@ -222,6 +236,13 @@ export async function compileGcode(
 export async function compileToolpath(
   scene: Scene,
   controllerAccelMmPerS2: number | null = null,
+  /**
+   * T1-58: profile snapshot for `maxFeedRate` resolution (only profile
+   * field this path reads). Same reasoning as `compileGcode`: pure w.r.t.
+   * profile state. `null` is allowed; fallback to 6000 mm/min preserves
+   * pre-T1-58 behavior.
+   */
+  profile: DeviceProfile | null = null,
 ): Promise<CompileToolpathResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
   const strategy = getOutputStrategy('grbl');
@@ -238,7 +259,8 @@ export async function compileToolpath(
   });
   if (job.operations.length === 0) return null;
 
-  const profile = getActiveProfile();
+  // T1-58: `profile` parameter is the caller's snapshot. The pre-T1-58
+  // `getActiveProfile()` global read is gone from this function.
   const plan = optimizePlan(job, {
     maxRapidSpeed: profile?.maxFeedRate ?? 6000,
   });

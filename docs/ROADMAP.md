@@ -3371,9 +3371,7 @@ T2-51 (CompiledJobState) consumes the now-known scene/profile hash pair to drive
 
 **Cross-check note (audit 4A):** Audit's Coupling 3 + Race 5 + Required Fix (Pipeline). Verified at PipelineService.ts:117, 228.
 
----
-
-### T1-59 | Frame-before-start gate 鈥?`canStartJob` must require `hasFramed`
+**Status:** Shipped in `<TBD>`. Pure software contract — no hardware verification needed (compile is a pure function once profile is supplied; no g-code emission shape change in production paths because `useCompileManager` already uses `getActiveProfile()` at compile entry — T1-58 just makes the read explicit and pinned at the call site instead of hidden inside the pipeline). **Smaller-than-spec scope shipped:** the spec proposed an options-object signature; T1-58 instead adds `profile: DeviceProfile | null = null` as a new positional parameter (8th on `compileGcode`, 3rd on `compileToolpath`) and removes the internal `getActiveProfile()` calls. Same semantic guarantee (pipeline is pure w.r.t. profile state), much smaller blast radius — only `useCompileManager` (the sole caller of `pipelineCompileGcode` / `pipelineCompileToolpath`) updates. The options-object cleanup is a future T1-58 follow-up if 8 positional parameters become unwieldy. **`useCompileManager` updated** to snapshot `profileSnapshot = getActiveProfile()` alongside the existing `requestId` and `sceneTickAtStart` snapshots at compile entry, then pass the snapshot through to all three call sites (compileToResult, compileGcode, compileToolpath). The race window is now bounded to the synchronous block that takes the snapshot — any active-profile flip after that snapshot is invisible to the in-flight compile. T1-57's request-id guard catches the case where a newer compile started against a different profile overtakes an older compile. Pinned by `tests/pipeline-compile-accepts-profile-snapshot.test.ts` (18 contracts: distinct profile snapshots produce distinct gcode (S-scale differs because maxSpindle differs); T1-33 controller-vs-profile precedence still holds with explicit profile snapshot; profile=null fallback path produces output for both compileGcode and compileToolpath; source-level pins for T1-58 markers in PipelineService and useCompileManager, internal `const profile = getActiveProfile()` removed from both function bodies, signature declares `profile: DeviceProfile | null` parameter, useCompileManager snapshots profile and forwards `profileSnapshot` to all call sites). Existing `tests/pipeline.test.ts` (98/98) passing — backward-compatible default `profile = null` keeps any external consumers unbroken. Master checklist `[x]`.
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:288` (`hasFramed = useRef(false)`), `:402, 763, 817` (set/reset call sites), `:985-990` (`canStartJob` definition 鈥?does NOT check hasFramed).
 
@@ -19388,7 +19386,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-55 Block laser-on operations when `$30` unknown and connected (preflight scope shipped 2026-05-04 in `df7fca7`; UI button-disable scope filed as future T1-55 follow-up)
 - [x] T1-56 Preflight machinePlanBounds reads wrong source — closed 2026-05-04; superseded by T1-100 in `243ad0f`
 - [x] T1-57 Compile manager request-id guard (shipped 2026-05-04 in `d28a57f`)
-- [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
+- [x] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (shipped 2026-05-04 in `<TBD>`)
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
 - [x] T1-61 Start mode labels rewritten with full sentences + tooltips (shipped 2026-05-04 in `a5a6af9`)
