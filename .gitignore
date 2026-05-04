@@ -6,3 +6,11 @@ build/
 release/
 *.log
 licenses-report.csv
+
+# Claude Code per-machine state
+.claude/settings.local.json
+.claude/settings.json
+
+# Future-friendly: leave room to commit .claude/skills/ or
+# .claude/agents/ explicitly later. To share something from
+# .claude/, force-add it: git add -f .claude/skills/
