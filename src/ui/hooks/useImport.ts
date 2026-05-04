@@ -100,10 +100,29 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       const cx = centerX - finalWidth / 2;
       const cy = centerY - finalHeight / 2;
 
-      const maxDim = 1000;
-      const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      // T1-35: image import max-dim cap raised from 1000 → 4000.
+      // Pre-T1-35 every image with longest dimension > 1000 px was silently
+      // downscaled at import. A 4000×3000 phone photo (12 MP) became
+      // 1000×750 (0.75 MP) before processing — for 200×150 mm engraves at
+      // 254 DPI the user lost half the available resolution to the cap and
+      // never knew. T1-17 Pass 1 moved the grayscale loop to a Web Worker
+      // (see prepareImageGrayscale below), so larger source bitmaps no
+      // longer block the UI on import; raising the cap is now safe.
+      // 4000 px supports 400×300 mm prints at 254 DPI without downscale.
+      // When a downscale still happens, console.warn surfaces it for
+      // support diagnosis. Per-user override via Settings is filed as a
+      // future T1-35 follow-up.
+      const IMAGE_IMPORT_MAX_DIM = 4000;
+      const scale = Math.min(1, IMAGE_IMPORT_MAX_DIM / Math.max(img.width, img.height));
       const gsWidth = Math.round(img.width * scale);
       const gsHeight = Math.round(img.height * scale);
+      if (scale < 1) {
+        console.warn(
+          `[LaserForge T1-35] Imported image ${img.width}×${img.height} downscaled to ` +
+          `${gsWidth}×${gsHeight} (cap = ${IMAGE_IMPORT_MAX_DIM}px). ` +
+          'Detail beyond the cap is lost; raise the limit if needed.',
+        );
+      }
       // T1-17 pass 1: offload getImageData + grayscale luminance loop to a
       // Web Worker. The previous inline canvas + per-pixel loop here ran
       // tens to hundreds of ms on the main thread for any phone-camera

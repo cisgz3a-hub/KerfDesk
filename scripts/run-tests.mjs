@@ -181,6 +181,7 @@ const files = [
   'pipeline-compile-accepts-profile-snapshot.test.ts',
   'profile-selector-pinned-to-header.test.ts',
   'flattening-tolerance-by-operation.test.ts',
+  'image-import-max-dim-cap.test.ts',
   'maxspindle-precedence-and-mismatch.test.ts',
   'preflight-warning-confirm-includes-detail.test.ts',
   'job-start-deferred-simulator-fanout.test.ts',
