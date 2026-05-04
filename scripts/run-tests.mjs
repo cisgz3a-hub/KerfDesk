@@ -74,6 +74,7 @@ const files = [
   'entitlement-api-no-deprecated-export.test.ts',
   'connect-cleanup-on-partial-failure.test.ts',
   'connect-abort-signal.test.ts',
+  'pause-resume-stop-surface-errors.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

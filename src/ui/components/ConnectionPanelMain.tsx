@@ -995,9 +995,25 @@ export function ConnectionPanelMain({
       }
       setIsPaused(!held);
     } catch (err: unknown) {
-      console.warn('[Pause/Resume]', err instanceof Error ? err.message : err);
+      // T1-64: previously this catch logged to console only. For
+      // safety-critical machine controls the user MUST know if their
+      // pause/resume request didn't reach the machine — silent failure
+      // could leave the user thinking the laser was paused when the
+      // job is still running. Surface to the messages console for the
+      // mild case (resume failed → user can retry) and a modal for
+      // the dangerous case (pause failed → job may still be running).
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[Pause/Resume]', msg);
+      appendMessage(`⚠ ${held ? 'Resume' : 'Pause'} command not accepted: ${msg}`);
+      if (!held) {
+        void showAlert(
+          'Pause failed',
+          `The pause command was not accepted by the machine. The job may still be running.\n\n`
+          + `Use Stop to halt the job, or use the machine's physical pause/stop control.`,
+        );
+      }
     }
-  }, [isPaused, machineState?.status, machineService]);
+  }, [appendMessage, isPaused, machineState?.status, machineService, showAlert]);
 
   const handleStop = useCallback(async () => {
     jobStoppedByUserRef.current = true;
@@ -1007,9 +1023,25 @@ export function ConnectionPanelMain({
       // so operator can inspect before unlocking manually
       setIsPaused(false);
     } catch (err: unknown) {
-      console.warn('[Stop]', err instanceof Error ? err.message : err);
+      // T1-64: stop is the most safety-critical control. A silent stop
+      // failure means the user clicked Stop, the job potentially keeps
+      // running, and the UI gives no indication anything went wrong.
+      // Surface as both a console message AND a modal alert so the
+      // user is forced to acknowledge before doing anything else.
+      // The job's still-running state means we cannot quietly clear
+      // isPaused — leave it alone so the UI's pause indication
+      // reflects the last known machine state.
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn('[Stop]', msg);
+      appendMessage(`⚠ Stop command not accepted: ${msg}. The job may still be running.`);
+      void showAlert(
+        'Stop failed',
+        `The stop command was not accepted by the machine. The job may still be running.\n\n`
+        + `Take immediate action: use the machine's physical E-stop / power switch, or disconnect to terminate communication.\n\n`
+        + `Error: ${msg}`,
+      );
     }
-  }, [notifySimulatorTx, machineService]);
+  }, [appendMessage, notifySimulatorTx, machineService, showAlert]);
 
   /** Deadman: laser is on only while primary pointer is held on the button. */
   const beginTestFire = useCallback(
