@@ -630,7 +630,7 @@ function compileGeometry(
 
   for (const obj of objects) {
     if (!obj.visible) continue;
-    const flatPaths = flattenObject(obj, entitlementPolicy);
+    const flatPaths = flattenObject(obj, type, entitlementPolicy);
     for (let i = 0; i < flatPaths.length; i++) {
       paths.push(flatPaths[i]);
     }
@@ -648,9 +648,16 @@ function compileGeometry(
 /**
  * Converts a SceneObject (with transform) into FlatPath(s)
  * in world coordinates. Strips away all scene graph overhead.
+ *
+ * T1-38: `operationType` selects the flattening tolerance for SVG-imported
+ * paths. Default 0.5mm was visibly faceted on small / curve-heavy work.
  */
-function flattenObject(obj: SceneObject, entitlementPolicy: EntitlementPolicy): FlatPath[] {
-  const points = geometryToPoints(obj.geometry);
+function flattenObject(
+  obj: SceneObject,
+  operationType: OperationType,
+  entitlementPolicy: EntitlementPolicy,
+): FlatPath[] {
+  const points = geometryToPoints(obj.geometry, operationType);
   if (points.length === 0) return [];
 
   // Apply object transform to all points
@@ -695,7 +702,34 @@ export interface PointGroup {
   closed: boolean;
 }
 
-export function geometryToPoints(geom: Geometry): PointGroup[] {
+/**
+ * T1-38: operation-aware flattening tolerance for SVG-imported paths.
+ *
+ *   cut    : 0.05mm — visible workpiece edge; faceting telegraphs as bumps.
+ *   score  : 0.05mm — visible engraved line; same constraint as cut.
+ *   engrave: 0.03mm — fills hug the boundary; faceting compounds via stripe-end
+ *            offsets and shows up as ringing on curved fills.
+ *   raster : 0.5mm — never reached on this code path (raster geometry doesn't
+ *            flow through subPathToPoints), but defined for completeness so a
+ *            future raster-vector merge doesn't silently regress.
+ *
+ * Text uses a separate constant (TEXT_FLATNESS_MM = 0.05mm at the call site)
+ * because the loop knows it's text and the value is correct already.
+ *
+ * Per-layer override (LayerSettings.flatteningTolerance) is filed as a future
+ * T1-38 follow-up if user-tunable tolerance becomes necessary.
+ */
+export const FLATTEN_TOLERANCE_BY_OPERATION: Record<OperationType, number> = {
+  cut: 0.05,
+  score: 0.05,
+  engrave: 0.03,
+  raster: 0.5,
+};
+
+export function geometryToPoints(
+  geom: Geometry,
+  operationType: OperationType = 'cut',
+): PointGroup[] {
   switch (geom.type) {
     case 'rect': {
       const { x, y, width, height, cornerRadius } = geom;
@@ -789,9 +823,12 @@ export function geometryToPoints(geom: Geometry): PointGroup[] {
       }];
     }
     case 'path': {
-      // SVG-imported paths: default 0.5mm tolerance is fine for typical cutting at 100+ mm scale.
+      // T1-38: operation-aware tolerance — was hardcoded 0.5mm which produced
+      // visibly faceted curves on small / detailed work (~16 segments on a
+      // 20mm circle). Cut / score / engrave each get a tighter default.
+      const tolerance = FLATTEN_TOLERANCE_BY_OPERATION[operationType];
       return geom.subPaths.map(sub => ({
-        points: subPathToPoints(sub.segments),
+        points: subPathToPoints(sub.segments, tolerance),
         closed: sub.closed,
       }));
     }
