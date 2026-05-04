@@ -547,15 +547,52 @@ export function ConnectionPanelMain({
     [boundsMinX, boundsMinY, boundsMaxX, boundsMaxY],
   );
 
-  const workFrame = useMemo(() => {
-    const o = computeGcodeOffset(startMode, { minX: sceneBounds.minX, minY: sceneBounds.minY }, savedOrigin);
-    return {
-      minX: sceneBounds.minX + o.x,
-      minY: sceneBounds.minY + o.y,
-      maxX: sceneBounds.maxX + o.x,
-      maxY: sceneBounds.maxY + o.y,
+  // T1-42: previously `workFrame` used `computeGcodeOffset` directly,
+  // which only handles the absolute / current / saved-origin offset
+  // shift — it did NOT apply the front-origin Y-flip or the (now-
+  // shipped, T1-40) right-origin X-flip. The displayed bounds and
+  // the bed-bounds confirmation diverged from what `buildFrameCorners`
+  // actually traces, so on front-origin machines (most consumer
+  // diodes) the warning could say "inside bed" while the actual
+  // frame motion went off-bed (or vice versa).
+  //
+  // Now `frameMachineBounds` derives directly from the same
+  // `buildFrameCorners` that frame execution uses — single source of
+  // truth for "where will the frame motion go." `confirmFrameBounds`
+  // reads this for both the warning text and the off-bed block.
+  const frameMachineBounds = useMemo(() => {
+    const transformOpts = {
+      startMode,
+      savedOrigin,
+      originCorner,
+      bedHeightMm: bedHeight,
+      bedWidthMm: bedWidth,
     };
-  }, [startMode, savedOrigin, sceneBounds.minX, sceneBounds.minY, sceneBounds.maxX, sceneBounds.maxY]);
+    const corners = buildFrameCorners(sceneBounds, transformOpts);
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const c of corners) {
+      if (c.x < minX) minX = c.x;
+      if (c.x > maxX) maxX = c.x;
+      if (c.y < minY) minY = c.y;
+      if (c.y > maxY) maxY = c.y;
+    }
+    if (!Number.isFinite(minX)) {
+      // Empty corners (degenerate scene) — fall back to zero so the
+      // confirm path's checks don't trigger spurious warnings.
+      return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+    }
+    return { minX, minY, maxX, maxY };
+  }, [
+    startMode,
+    savedOrigin,
+    originCorner,
+    bedHeight,
+    bedWidth,
+    sceneBounds.minX,
+    sceneBounds.minY,
+    sceneBounds.maxX,
+    sceneBounds.maxY,
+  ]);
 
   // T1-104: exact-idle gate. Frame, Frame Dot, and other Frame-derived
   // surfaces require the controller to actually be idle, not merely
@@ -819,28 +856,54 @@ export function ConnectionPanelMain({
   };
 
   const confirmFrameBounds = useCallback(async (): Promise<boolean> => {
-    const x1 = workFrame.minX;
-    const y1 = workFrame.minY;
-    const x2 = workFrame.maxX;
-    const y2 = workFrame.maxY;
+    // T1-42: derive bounds from buildFrameCorners (via the
+    // frameMachineBounds memo) so the bed-bounds check sees the same
+    // post-transform machine-space corners that the frame motion
+    // actually traces. Pre-T1-42, this read the un-flipped workFrame
+    // and could disagree with reality on front-origin machines.
+    const x1 = frameMachineBounds.minX;
+    const y1 = frameMachineBounds.minY;
+    const x2 = frameMachineBounds.maxX;
+    const y2 = frameMachineBounds.maxY;
 
+    // T1-42 + audit Finding 2D-09: hard-block off-bed motion. Frame
+    // is the user's chance to verify burn area before committing —
+    // the laser can hit a limit switch (mechanical damage) or, on
+    // frame-dot mode, fire low-power outside the workpiece. The
+    // previous code lumped this with size warnings under a single
+    // confirm dialog. Off-bed motion is now its own modal alert and
+    // returns false without offering "frame anyway."
+    const offBedReasons: string[] = [];
+    if (x1 < 0) offBedReasons.push(`min X = ${x1.toFixed(1)} (off the LEFT edge of the bed)`);
+    if (y1 < 0) offBedReasons.push(`min Y = ${y1.toFixed(1)} (off the FRONT edge of the bed)`);
+    if (x2 > bedWidth) offBedReasons.push(`max X = ${x2.toFixed(1)} > bed width ${bedWidth} (off the RIGHT edge)`);
+    if (y2 > bedHeight) offBedReasons.push(`max Y = ${y2.toFixed(1)} > bed height ${bedHeight} (off the REAR edge)`);
+    if (offBedReasons.length > 0) {
+      await showAlert(
+        'Frame would go off the bed',
+        `Frame motion is blocked because the machine-space bounds extend past the physical bed:\n\n`
+        + offBedReasons.map(r => `  • ${r}`).join('\n')
+        + `\n\nMove the design so it fits inside the bed, or change the start mode (current/saved-origin offsets shift the design relative to the head).`,
+      );
+      return false;
+    }
+
+    // Coverage warning is a quality concern, not a safety failure —
+    // keep as a confirm-and-proceed dialog.
     const warnings: string[] = [];
-    if (x1 < 0 || y1 < 0) warnings.push('Design has negative coordinates — laser may hit limit switches');
-    if (x2 > bedWidth || y2 > bedHeight) warnings.push('Design extends beyond bed size');
     if ((x2 - x1) > bedWidth * 0.9 || (y2 - y1) > bedHeight * 0.9) {
       warnings.push('Frame covers most of the bed — make sure the laser has room');
     }
-
     if (warnings.length > 0) {
       const ok = await showConfirm(
         'Frame',
-        'The design may extend beyond safe limits or the bed. Frame the boundary anyway?',
+        'Frame the boundary anyway?',
         warnings.join('\n'),
       );
       return ok;
     }
     return true;
-  }, [workFrame, bedWidth, bedHeight, showConfirm]);
+  }, [frameMachineBounds, bedWidth, bedHeight, showAlert, showConfirm]);
 
   const handleFrameSafe = useCallback(async () => {
     if (!canFrame) return;

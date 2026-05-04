@@ -2231,6 +2231,8 @@ The proactive invalidation is the cheap safeguard. The pre-start verification is
 
 ### T1-42 | Frame bounds confirmation uses `buildFrameCorners`, not `workFrame`
 
+**Status:** Code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification. **Hardware verification needed — Falcon A1 Pro front-origin burn test.** Master checklist `[ ]` until tester confirms confirmFrameBounds correctly blocks an off-bed design on the Falcon. Replaced ConnectionPanelMain's `workFrame` useMemo with `frameMachineBounds`, derived directly from `buildFrameCorners(sceneBounds, transformOpts)` with both `bedHeightMm` and `bedWidthMm` (the latter for T1-40 right-origin support). Single source of truth: the bounds the user sees in the warning dialog are now the same machine-space corners frame motion actually traces. **Hardening per audit Finding 2D-09:** off-bed bounds now hard-block via `showAlert` instead of warn-and-continue. Coverage-only warning (frame > 90% of bed) stays as `showConfirm`. `confirmFrameBounds` returns `false` on off-bed without offering a "frame anyway" — frame is the safety check before the burn, and laser-dot frame motion at low power could mark the wrong area or hit a limit switch. Pinned by `tests/frame-confirm-uses-machine-corners.test.ts` (17 contracts: behavioral pin showing front-origin Y-flip applied to derived bounds + diverging from pre-T1-42 raw-scene-bounds shape; source-level pin on ConnectionPanelMain showing workFrame removed, frameMachineBounds calls buildFrameCorners with bedWidthMm, confirmFrameBounds reads frameMachineBounds.minX/maxY, off-bed path uses showAlert + returns false, coverage warning still uses showConfirm).
+
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:499-507` (`workFrame` computation), `src/ui/components/ConnectionPanelMain.tsx:737-746` (`confirmFrameBounds`), `src/app/frameGcode.ts:10-21` (`buildFrameCorners` 鈥?used by actual framing).
 
 **Problem:** Cross-check confirmed at ConnectionPanelMain.tsx:499-507:
@@ -19346,7 +19348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-39 Frame skips first relative move on front-origin machines — code shipped 2026-05-04 in `df5763e`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-40 Right-origin X mirror support — code shipped 2026-05-04 in `18b1755`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-41 Saved-origin verification — code shipped 2026-05-04 in `49a3c55` (snapshot + start-time verify + disconnect-clears; frame-time verify and proactive G10/G92 invalidation deferred), awaiting hardware verification on Falcon A1 Pro
-- [ ] T1-42 Frame bounds confirmation uses buildFrameCorners not workFrame (filed; SAFETY, depends T1-40)
+- [ ] T1-42 Frame bounds confirmation uses buildFrameCorners — code shipped 2026-05-04 in `<TBD>` (workFrame replaced + off-bed hard-block), awaiting hardware verification on Falcon A1 Pro
 - [x] T1-43 Reassert G90/G91 after customStartGcode + reject mode flips (shipped 2026-05-02 in `6eb006b`)
 - [ ] T1-44 Controller _checkJobBounds simulates G91 from known starting position (filed; defense-in-depth)
 - [ ] T1-45 Compile complexity gate 鈥?warn/block on huge jobs (filed; UX safety)

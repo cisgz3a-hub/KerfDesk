@@ -78,6 +78,7 @@ const files = [
   'frame-current-mode-emits-first-move.test.ts',
   'right-origin-x-flip.test.ts',
   'saved-origin-verifies-wcs.test.ts',
+  'frame-confirm-uses-machine-corners.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',
