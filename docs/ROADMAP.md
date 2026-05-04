@@ -3648,6 +3648,8 @@ They don't see what "high cut power" means, what value triggered it, or what to 
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Finding 7.4 + Section 14.
 
+**Status:** Shipped in `<TBD>`. Pure software contract — no hardware verification needed. The warning branch in `confirmPreflightForJobStart.ts` now mirrors the blocker dialog format: `▲ <title>` followed by an indented detail line (skipped when detail equals title — preflight rules sometimes pass `detail` as the title for short messages, no need to print twice) and an indented `→ <fix>` line when fix is present. Warnings are separated by blank lines (`\n\n`) for readability instead of single-`\n` runs that turned multi-warning dialogs into walls of text. The OLD `.map(i => \`▲ \${i.title}\`)` single-line shape is gone — pinned by the test. Pinned by `tests/preflight-warning-confirm-includes-detail.test.ts` (19 contracts: full title + detail + fix rendered with ▲ marker and arrow prefix; detail-equal-to-title de-duplication; missing-fix branch produces no arrow; missing-detail-distinct-from-title still renders correctly; multi-warning blank-line separation; cancel path preserved; no-warnings short-circuit preserved; T1-63 marker + de-dup logic + arrow-prefix shape + OLD shape gone source-level pins). Master checklist `[x]`.
+
 **Fix:** Include detail and fix in the warning dialog, matching the blocker dialog format:
 
 ```ts
@@ -19387,7 +19389,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
 - [x] T1-61 Start mode labels rewritten with full sentences + tooltips (shipped 2026-05-04 in `a5a6af9`)
 - [x] T1-62 `jobModeLabel` shows operation order — static plan summary shipped 2026-05-04 in `04a4e66` (live-line tracking deferred to T2-63)
-- [ ] T1-63 Warning confirmation includes detail/fix per warning, not just titles (filed; UX safety, ~15 min)
+- [x] T1-63 Warning confirmation includes detail/fix per warning, not just titles (shipped 2026-05-04 in `<TBD>`)
 - [x] T1-64 Pause/Resume/Stop catch blocks must surface errors (shipped 2026-05-04 in `cb601c1`)
 - [x] T1-65 Frame inner loop must abort on first command failure, not continue partial frame (closed 2026-05-02; superseded by T1-103 in `8cb3faa`)
 - [x] T1-66 Jog catch must surface "command blocked" to user (closed 2026-05-02; superseded by T1-105 in `4b1af8a`)

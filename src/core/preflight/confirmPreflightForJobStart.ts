@@ -35,13 +35,23 @@ export async function confirmPreflightForJobStart(
   }
 
   if (preflight && preflight.warnings > 0) {
+    // T1-63: warnings include detail + fix in the confirmation dialog, matching
+    // the blocker dialog above. Pre-T1-63 the user saw "\u25B2 High cut power" with
+    // no value, no consequence, and no remediation \u2014 pressed Start because the
+    // title didn't sound serious. Showing detail and fix lets the user make an
+    // informed acknowledge-and-continue decision.
     const proceed = await showConfirm(
       'Start job?',
       `${preflight.warnings} warning(s):\n\n` +
         preflight.issues
           .filter(i => i.severity === 'warning')
-          .map(i => `\u25B2 ${i.title}`)
-          .join('\n') +
+          .map(i => {
+            let line = `\u25B2 ${i.title}`;
+            if (i.detail && i.detail !== i.title) line += `\n  ${i.detail}`;
+            if (i.fix) line += `\n  \u2192 ${i.fix}`;
+            return line;
+          })
+          .join('\n\n') +
         '\n\nStart job anyway?',
     );
     if (!proceed) {
