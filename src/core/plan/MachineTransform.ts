@@ -24,6 +24,15 @@ export interface MachineTransformOptions {
    * Use scene / profile / controller-reported height (see PipelineService resolution order).
    */
   bedHeightMm: number;
+  /**
+   * T1-40: physical bed width (mm) for right-origin X mapping:
+   * machineX = bedWidthMm - canvasX. **Required when `originCorner` is
+   * `'front-right'` or `'rear-right'`** — both transform entry points
+   * throw at runtime if the value is missing for a right-origin
+   * configuration. Optional for left-origin machines (the
+   * majority case) so existing call sites remain compatible.
+   */
+  bedWidthMm?: number;
 }
 
 export interface MachineTransformResult {
@@ -44,6 +53,16 @@ export interface MachineTransformResult {
 
 export function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean {
   return originCorner === 'front-left' || originCorner === 'front-right';
+}
+
+// T1-40: right-origin X mirror. Front-right and rear-right machines
+// have their physical zero on the right side of the bed; positive
+// canvas X (which we treat as "right of design origin") corresponds
+// to NEGATIVE machine X relative to the right-edge zero. Mirror via
+// machineX = bedWidthMm - canvasX (+ offset). Symmetric to
+// useFrontOriginYFlip's bedHeightMm-based Y mapping.
+export function useRightOriginXFlip(originCorner: MachineOriginCorner): boolean {
+  return originCorner === 'front-right' || originCorner === 'rear-right';
 }
 
 /**
@@ -69,14 +88,25 @@ export function applyMachineTransform(
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
   const flipY = useFrontOriginYFlip(options.originCorner);
+  const flipX = useRightOriginXFlip(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
       : DEFAULT_BED_HEIGHT_MM;
+  // T1-40: right-origin requires bedWidthMm to compute the X mirror
+  // reference. For left-origin machines (the majority), flipX is
+  // false and bedWidthMm is unused.
+  if (flipX && !(Number.isFinite(options.bedWidthMm) && (options.bedWidthMm as number) > 0)) {
+    throw new Error(
+      `applyMachineTransform: right-origin (${options.originCorner}) requires bedWidthMm > 0 for X mirroring`,
+    );
+  }
+  const bedW = options.bedWidthMm ?? 0;
   const flipReferenceY = flipY ? bedH : maxY;
+  const flipReferenceX = flipX ? bedW : maxX;
 
   const offsetDesignMin = {
-    minX,
+    minX: flipX ? bedW - maxX : minX,
     minY: flipY ? bedH - maxY : minY,
   };
 
@@ -88,7 +118,7 @@ export function applyMachineTransform(
 
   const transformedOps: PlannedOperation[] = plan.operations.map(op => ({
     ...op,
-    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, flipReferenceY, flipY)),
+    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, flipReferenceX, flipReferenceY, flipX, flipY)),
   }));
 
   let newBounds = emptyAABB();
@@ -130,15 +160,19 @@ function transformMove(
   move: Move,
   offsetX: number,
   offsetY: number,
+  flipReferenceX: number,
   flipReferenceY: number,
+  flipX: boolean,
   flipY: boolean,
 ): Move {
+  // T1-40: X mirror for right-origin (front-right / rear-right) is
+  // symmetric to the long-standing Y mirror for front-origin.
   switch (move.type) {
     case 'rapid':
       return {
         ...move,
         to: {
-          x: move.to.x + offsetX,
+          x: flipX ? flipReferenceX - move.to.x + offsetX : move.to.x + offsetX,
           y: flipY ? flipReferenceY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
@@ -146,7 +180,7 @@ function transformMove(
       return {
         ...move,
         to: {
-          x: move.to.x + offsetX,
+          x: flipX ? flipReferenceX - move.to.x + offsetX : move.to.x + offsetX,
           y: flipY ? flipReferenceY - move.to.y + offsetY : move.to.y + offsetY,
         },
       };
@@ -169,14 +203,22 @@ export function transformPointToMachine(
   options: MachineTransformOptions,
 ): { x: number; y: number } {
   const flipY = useFrontOriginYFlip(options.originCorner);
+  const flipX = useRightOriginXFlip(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
       : DEFAULT_BED_HEIGHT_MM;
+  if (flipX && !(Number.isFinite(options.bedWidthMm) && (options.bedWidthMm as number) > 0)) {
+    throw new Error(
+      `transformPointToMachine: right-origin (${options.originCorner}) requires bedWidthMm > 0 for X mirroring`,
+    );
+  }
+  const bedW = options.bedWidthMm ?? 0;
   const flipReferenceY = flipY ? bedH : sceneBounds.maxY;
+  const flipReferenceX = flipX ? bedW : sceneBounds.maxX;
 
   const offsetDesignMin = {
-    minX: sceneBounds.minX,
+    minX: flipX ? bedW - sceneBounds.maxX : sceneBounds.minX,
     minY: flipY ? bedH - sceneBounds.maxY : sceneBounds.minY,
   };
 
@@ -187,7 +229,7 @@ export function transformPointToMachine(
   );
 
   return {
-    x: point.x + offset.x,
+    x: flipX ? flipReferenceX - point.x + offset.x : point.x + offset.x,
     y: flipY ? flipReferenceY - point.y + offset.y : point.y + offset.y,
   };
 }

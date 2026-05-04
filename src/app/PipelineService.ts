@@ -133,12 +133,15 @@ export async function compileGcode(
     ?? (controllerMaxSpindle != null && controllerMaxSpindle > 0 ? controllerMaxSpindle : null)
     ?? 1000;
 
-  // Machine-space data for output
+  // Machine-space data for output. T1-40: bedWidthMm is required when
+  // originCorner is front-right or rear-right; we always pass it so
+  // the transform can mirror X for those configurations.
   const machineTransform = applyMachineTransform(plan, {
     startMode,
     savedOrigin,
     originCorner,
     bedHeightMm,
+    bedWidthMm,
   });
 
   const output = strategy.generate(machineTransform.plan, job, {

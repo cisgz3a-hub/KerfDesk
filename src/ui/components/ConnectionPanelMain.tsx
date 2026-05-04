@@ -818,6 +818,10 @@ export function ConnectionPanelMain({
       savedOrigin,
       originCorner,
       bedHeightMm: bedHeight,
+      // T1-40: required for front-right / rear-right configurations
+      // so the transform can mirror X. Harmless for left-origin
+      // configurations.
+      bedWidthMm: bedWidth,
     };
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
@@ -881,6 +885,10 @@ export function ConnectionPanelMain({
       savedOrigin,
       originCorner,
       bedHeightMm: bedHeight,
+      // T1-40: required for front-right / rear-right configurations
+      // so the transform can mirror X. Harmless for left-origin
+      // configurations.
+      bedWidthMm: bedWidth,
     };
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
