@@ -79,6 +79,14 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   machineBedFromControllerRef.current = machineBedFromController;
 
   const lastCompiledRevisionRef = useRef<number | null>(null);
+  // T1-57: monotonic request id so an older compile cannot commit its
+  // result on top of a newer one. Each `compileGcode` call captures
+  // its id at start; if the id no longer matches at completion time
+  // (because a later compile incremented the ref), the result and
+  // its `setLastResult` / `setGcodeStale` / `setIsCompiling` updates
+  // are dropped. Closes the race where the user edits the scene
+  // mid-compile and the older, stale result wins lastWriteWins.
+  const compileRequestIdRef = useRef(0);
   const [gcodeStale, setGcodeStaleState] = useState(false);
   const gcodeStaleRef = useRef(false);
   const setGcodeStale = useCallback<React.Dispatch<React.SetStateAction<boolean>>>((next) => {
@@ -155,6 +163,15 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         console.warn('[useCompileManager] compileGcode suppressed: job is running');
         return null;
       }
+      // T1-57: capture this compile's request id and the scene tick
+      // it actually compiled against. If a newer compile overtakes this
+      // one before await resolves, drop our result. The tick captured
+      // here (not at completion) is what `lastCompiledRevisionRef`
+      // gets set to — otherwise an older compile finishing after a
+      // scene edit would falsely mark its older result as fresh
+      // against the newer tick.
+      const requestId = ++compileRequestIdRef.current;
+      const sceneTickAtStart = sceneCompileTickRef.current;
       setIsCompiling(true);
       try {
         const result = await pipelineCompileGcode(
@@ -166,21 +183,29 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           machineBedFromControllerRef.current,
           controllerAccelMmPerS2,
         );
+        if (requestId !== compileRequestIdRef.current) {
+          console.info('[useCompileManager] dropping stale compile result (request superseded)');
+          return null;
+        }
         setLastResult(result);
         // Match previous App behavior: any finished compile attempt (including empty job)
         // clears the sidebar stale flag; thrown errors skip this in `catch` below.
-        lastCompiledRevisionRef.current = sceneCompileTickRef.current;
+        lastCompiledRevisionRef.current = sceneTickAtStart;
         setGcodeStale(false);
         if (!result) {
           return null;
         }
         return result.gcode;
       } catch (err) {
-        console.error('G-code compilation failed:', err);
-        setLastResult(null);
+        if (requestId === compileRequestIdRef.current) {
+          console.error('G-code compilation failed:', err);
+          setLastResult(null);
+        }
         return null;
       } finally {
-        setIsCompiling(false);
+        if (requestId === compileRequestIdRef.current) {
+          setIsCompiling(false);
+        }
       }
     },
     [

@@ -3173,6 +3173,8 @@ machinePlanBounds: lastResult?.machinePlanBounds ?? null,
 
 ### T1-57 | Compile manager has no request-id guard 鈥?async results can commit out of order
 
+**Status:** Shipped 2026-05-04 in `<TBD>`. `useCompileManager.ts` gains a monotonic `compileRequestIdRef` (`useRef(0)`). Each `compileGcode` invocation increments and captures its id, plus the `sceneCompileTickRef.current` value at compile START (not completion). After `await`, if the captured id no longer matches `compileRequestIdRef.current` (because a later compile bumped it), the result is dropped — no `setLastResult`, no `setGcodeStale`, no `setIsCompiling(false)`. The catch and finally paths are likewise gated, so an older compile's failure cannot wipe out a newer compile's success. `lastCompiledRevisionRef.current = sceneTickAtStart` (not the completion-time tick) closes audit 4A's Race 1: an older compile finishing after a scene edit no longer falsely marks its result as fresh against the newer tick. Pinned by `tests/compile-race-guard.test.ts` (12 source-level contracts: ref declared, increment at start, sceneTickAtStart capture, requestId !== current drop with diagnostic log, lastCompiledRevisionRef written from the captured tick (not from `sceneCompileTickRef.current`), catch/finally gating). Source-level pin rather than behavioral race-test because the `pipelineCompileGcode` import is a static ESM binding without a test-only setter, and inducing a controlled out-of-order resolution would need module mocking that the tsx runner doesn't have. The structural pin guarantees the guard surface is in place; future infrastructure can add the behavioral integration test on top.
+
 **Code reference:** `src/ui/hooks/useCompileManager.ts:155-184`. Cross-check verified the missing guard at line 172.
 
 **Problem:** Cross-check verified. The current commit logic at line 172:
@@ -19345,7 +19347,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
 - [ ] T1-55 Block laser-on operations when `$30` unknown and connected (filed; defect fix, ~1 hour)
 - [x] T1-56 Preflight machinePlanBounds reads wrong source — closed 2026-05-04; superseded by T1-100 in `243ad0f`
-- [ ] T1-57 Compile manager has no request-id guard 鈥?async results can commit out of order (filed; defect fix, ~30 min)
+- [x] T1-57 Compile manager request-id guard (shipped 2026-05-04 in `<TBD>`)
 - [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
