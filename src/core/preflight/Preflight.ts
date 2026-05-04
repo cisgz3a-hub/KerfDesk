@@ -65,6 +65,8 @@ export const PREFLIGHT_CODES = {
   MACHINE_MAXSPINDLE_MISMATCH: 'MACHINE_MAXSPINDLE_MISMATCH',
   /** T1-55: connected to a controller that has not yet reported $30 — laser-on operations refuse. */
   MACHINE_MAXSPINDLE_UNKNOWN: 'MACHINE_MAXSPINDLE_UNKNOWN',
+  /** T1-25: connect-time safe-state handshake reported a non-safe controller state. */
+  MACHINE_UNSAFE_AT_CONNECT: 'MACHINE_UNSAFE_AT_CONNECT',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -120,6 +122,19 @@ export interface PreflightContext {
     homingEnabled?: boolean;
     /** GRBL $32: laser mode. true = dynamic ($32=1), false = CNC ($32=0), undefined = not read. */
     laserMode?: boolean;
+    /**
+     * T1-25: connect-time safe-state verdict. `null` = handshake passed
+     * (idle + FS 0,0); a non-null string is the failure reason that the
+     * preflight rule renders as a blocker until the user reconnects.
+     */
+    unsafeAtConnect?:
+      | 'alarm'
+      | 'run'
+      | 'hold'
+      | 'check'
+      | 'no-status-response'
+      | 'unsafe-residual-spindle'
+      | null;
   };
   gcodeHeaderPreview?: string;
   /** When set, GRBL-style machine status for job-start guardrails. */
@@ -322,6 +337,21 @@ export function runPreflightSummary(
    * profile-vs-controller divergence (over-power risk).
    */
   firmwareMaxSpindleFromMachine?: number,
+  /**
+   * T1-25: when set, the controller's connect-time safe-state verdict. A
+   * non-null reason raises `MACHINE_UNSAFE_AT_CONNECT` as a blocking
+   * preflight error so the user can't start a job against a controller
+   * that was in alarm / run / hold / check, had residual spindle, or
+   * never reported status at all.
+   */
+  firmwareUnsafeAtConnect?:
+    | 'alarm'
+    | 'run'
+    | 'hold'
+    | 'check'
+    | 'no-status-response'
+    | 'unsafe-residual-spindle'
+    | null,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
@@ -356,6 +386,7 @@ export function runPreflightSummary(
       ...(typeof firmwareMaxSpindleFromMachine === 'number' && firmwareMaxSpindleFromMachine > 0
         ? { maxSpindle: firmwareMaxSpindleFromMachine }
         : {}),
+      ...(firmwareUnsafeAtConnect !== undefined ? { unsafeAtConnect: firmwareUnsafeAtConnect } : {}),
     },
   };
 

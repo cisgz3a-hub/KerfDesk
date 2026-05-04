@@ -82,6 +82,38 @@ function machineStatusFromGrblReportToken(token: string): MachineStatus | null {
   return null;
 }
 
+/**
+ * T1-25: reasons a controller can be reported as unsafe-at-connect. Each
+ * value maps to a distinct UI message that names the recovery action. The
+ * `'no-status-response'` reason fires when the watchdog elapses without any
+ * `<...>` status reaching the parser — typically a wedged firmware or a
+ * non-responsive cable.
+ */
+export type UnsafeAtConnectReason =
+  | 'alarm'
+  | 'run'
+  | 'hold'
+  | 'check'
+  | 'no-status-response'
+  | 'unsafe-residual-spindle';
+
+/**
+ * T1-25: snapshot of the controller's state captured at the first status
+ * report after connect (or at watchdog timeout). A null value from
+ * `getUnsafeAtConnect()` means the safe-state handshake passed (idle + FS
+ * 0,0). A non-null value means job start, frame, jog, and test-fire must
+ * be refused by the UI / preflight layer until the user acknowledges and
+ * reconnects (the spec's "machineControlAllowed: false" semantic).
+ */
+export interface UnsafeAtConnectState {
+  reason: UnsafeAtConnectReason;
+  capturedAt: number;
+  status: MachineStatus;
+  alarmCode: number | null;
+  feedRate: number;
+  spindleSpeed: number;
+}
+
 /** Parsed machine limits from GRBL $$ (defaults until first successful dump). */
 export interface GrblMachineInfo {
   bedWidth: number;
@@ -196,6 +228,17 @@ export class GrblController implements LaserController {
    */
   private _positionConfirmed = false;
 
+  /**
+   * T1-25: armed at connect-welcome time, fires once on the first status
+   * report received afterward. The first-status callback computes
+   * `_unsafeAtConnect` from the parsed state (status, FS field, alarm code)
+   * and disarms the flag. A watchdog timer fires after 5s if no status
+   * arrives and records `reason: 'no-status-response'`. Cleared on disconnect.
+   */
+  private _safeStateCheckArmed = false;
+  private _safeStateWatchdog: ReturnType<typeof setTimeout> | null = null;
+  private _unsafeAtConnect: UnsafeAtConnectState | null = null;
+
   constructor(options?: GrblControllerOptions) {
     this._allowHeadlessWcsAutoNormalize = options?.allowHeadlessWcsAutoNormalize === true;
     this._state = {
@@ -254,6 +297,16 @@ export class GrblController implements LaserController {
     // T1-44: clear position-confirmed at connect; the welcome handshake's first
     // status report sets it back to true.
     this._positionConfirmed = false;
+    // T1-25: clear safe-state tracking at connect entry. _armSafeStateCheck
+    // re-initializes _unsafeAtConnect to null and starts the watchdog at
+    // welcome-time; clearing here covers the case where a previous connect
+    // partially failed without going through disconnect.
+    this._safeStateCheckArmed = false;
+    if (this._safeStateWatchdog !== null) {
+      clearTimeout(this._safeStateWatchdog);
+      this._safeStateWatchdog = null;
+    }
+    this._unsafeAtConnect = null;
 
     this._port = port;
     this._updateStatus('connecting');
@@ -318,6 +371,15 @@ export class GrblController implements LaserController {
           clearProbeTimers();
           // Never claim idle if the controller is already in motion (avoids overlapping streams).
           this._updateStatus(statusWelcome ?? 'idle');
+          // T1-25: arm the safe-state handshake. The next status report
+          // (either a re-process of the welcome status line via the
+          // microtask below, or the first periodic poll) will compute
+          // `_unsafeAtConnect` from the parsed state. A 5-second
+          // watchdog catches the `'no-status-response'` case where
+          // status never arrives (wedged firmware, dead cable). The
+          // hook clears the watchdog when it fires, so under normal
+          // conditions there's no surplus timer cost.
+          this._armSafeStateCheck();
           this._startStatusPolling();
           resolve();
           queueMicrotask(() => {
@@ -451,6 +513,14 @@ export class GrblController implements LaserController {
     // T1-44: position is no longer trustworthy after disconnect; relative-mode
     // bounds checks must wait for a fresh status report before accepting jobs.
     this._positionConfirmed = false;
+    // T1-25: clear safe-state-at-connect tracking. The next connect re-arms
+    // the watchdog and re-runs the first-status verdict from scratch.
+    this._safeStateCheckArmed = false;
+    if (this._safeStateWatchdog !== null) {
+      clearTimeout(this._safeStateWatchdog);
+      this._safeStateWatchdog = null;
+    }
+    this._unsafeAtConnect = null;
     this._grblSettings.clear();
     this._resetMachineSettingsCache();
     this._updateStatus('disconnected');
@@ -1478,6 +1548,31 @@ export class GrblController implements LaserController {
       this._positionConfirmed = true; // T1-44
     }
 
+    // T1-25: first status report after connect — compute the safe-state
+    // verdict from the now-current `_state.status`, FS field, and alarm
+    // code, then disarm. Subsequent status reports during the session
+    // do not retrigger this — the contract is a connect-time check, not
+    // a continuous monitor. (Mid-session alarm / hold transitions are
+    // handled by their own listeners — T1-24 / safetyOff / pause.)
+    if (this._safeStateCheckArmed) {
+      this._safeStateCheckArmed = false;
+      if (this._safeStateWatchdog !== null) {
+        clearTimeout(this._safeStateWatchdog);
+        this._safeStateWatchdog = null;
+      }
+      const reason = this._classifySafeStateReason();
+      if (reason !== null) {
+        this._unsafeAtConnect = {
+          reason,
+          capturedAt: Date.now(),
+          status: this._state.status,
+          alarmCode: this._state.alarmCode,
+          feedRate: this._state.feedRate,
+          spindleSpeed: this._state.spindleSpeed,
+        };
+      }
+    }
+
     for (const cb of this._stateListeners) {
       cb({ ...this._state });
     }
@@ -1775,6 +1870,80 @@ export class GrblController implements LaserController {
         break;
     }
     return true;
+  }
+
+  /**
+   * T1-25: returns the safe-state verdict captured at connect, or null when
+   * the handshake passed (idle + FS 0,0). Cleared by `disconnect()` and
+   * re-armed by the next `connect()` welcome. Read by the preflight blocker
+   * `MACHINE_UNSAFE_AT_CONNECT` and any UI surface that needs to refuse
+   * machine control until the user acknowledges.
+   */
+  getUnsafeAtConnect(): UnsafeAtConnectState | null {
+    return this._unsafeAtConnect;
+  }
+
+  /**
+   * T1-25: arm the safe-state-at-connect check. Called from the welcome
+   * handler. The first subsequent status report fires the verdict. A 5-
+   * second watchdog catches the `'no-status-response'` case (wedged
+   * firmware, dead cable, port silent after `<Hold|...>` welcome with no
+   * follow-up poll response). 5 s is conservative — the existing
+   * `STATUS_POLL_INTERVAL` is much shorter, so a healthy controller fires
+   * the hook within milliseconds.
+   */
+  private _armSafeStateCheck(): void {
+    this._safeStateCheckArmed = true;
+    this._unsafeAtConnect = null;
+    if (this._safeStateWatchdog !== null) {
+      clearTimeout(this._safeStateWatchdog);
+    }
+    this._safeStateWatchdog = setTimeout(() => {
+      if (!this._safeStateCheckArmed) return;
+      this._safeStateCheckArmed = false;
+      this._safeStateWatchdog = null;
+      this._unsafeAtConnect = {
+        reason: 'no-status-response',
+        capturedAt: Date.now(),
+        status: this._state.status,
+        alarmCode: this._state.alarmCode,
+        feedRate: this._state.feedRate,
+        spindleSpeed: this._state.spindleSpeed,
+      };
+    }, 5000);
+  }
+
+  /**
+   * T1-25: classify the current `_state` into an UnsafeAtConnectReason, or
+   * null if the controller is in a known-safe configuration (idle + FS 0,0).
+   *   - alarm    → previous session ended in alarm; user must inspect.
+   *   - run/hold → firmware thinks a job is active; user must inspect.
+   *   - check    → check-mode is on; not a burning state but unexpected.
+   *   - door     → safety door open / triggered.
+   *   - unsafe-residual-spindle → idle but FS reports non-zero spindle,
+   *     meaning the laser is still in modal M3/M4 from a prior operation.
+   */
+  private _classifySafeStateReason(): UnsafeAtConnectReason | null {
+    const status = this._state.status;
+    if (status === 'alarm') return 'alarm';
+    if (status === 'run') return 'run';
+    if (status === 'hold') return 'hold';
+    if (status === 'check') return 'check';
+    if (status === 'idle') {
+      if (this._state.spindleSpeed !== 0 || this._state.feedRate !== 0) {
+        return 'unsafe-residual-spindle';
+      }
+      return null;
+    }
+    // The 'door' GRBL status is intentionally not classified here: the
+    // controller's status-map parser (in _handleStatusReport) doesn't
+    // recognize the `<Door|...>` token today, so _state.status never
+    // becomes 'door' even when the firmware reports it. If door support
+    // is added to the parser, this classifier should also raise a
+    // distinct reason. homing / connecting / disconnected / faulted →
+    // no verdict (homing is a user-initiated startup cycle; faulted is
+    // T2-12 territory and has its own gate).
+    return null;
   }
 
   /**

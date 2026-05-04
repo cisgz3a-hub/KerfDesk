@@ -114,4 +114,44 @@ export function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]):
         'settings detection to complete, or disconnect and reconnect.',
     });
   }
+
+  // T1-25: refuse to start a job when the connect-time safe-state handshake
+  // recorded a non-safe controller state. Six reasons map to six distinct
+  // user-actionable messages — vague "unsafe state" telegraphs as a generic
+  // gate, but each reason has a different recovery path:
+  //
+  //   alarm                   → previous session ended in alarm; clear via $X.
+  //   run / hold              → firmware thinks a job is active; soft-reset.
+  //   check                   → check-mode is on; toggle off via $C.
+  //   no-status-response      → wedged firmware or dead cable; power-cycle.
+  //   unsafe-residual-spindle → idle but FS spindle != 0; modal M3/M4
+  //                              from a prior operation; M5 then reconnect.
+  //
+  // The verdict is set by GrblController at the first status report after
+  // connect (or by the 5s watchdog for the no-status case). Cleared by
+  // disconnect. Recovery is: disconnect, address the underlying state,
+  // reconnect — at which point the next first-status verdict is null.
+  const unsafe = ctx.liveMachineInfo?.unsafeAtConnect;
+  if (ctx.connectedToMachine === true && unsafe != null) {
+    const messageByReason: Record<string, string> = {
+      alarm:
+        'Controller is in alarm state from the previous session. Clear via $X (or homing if $22=1) before starting a job.',
+      run:
+        'Controller appears to be running a job from before this session. Soft-reset (Ctrl-X / 0x18) and reconnect.',
+      hold:
+        'Controller is in feed-hold from the previous session. Cycle-start (~) or soft-reset, then reconnect.',
+      check:
+        'Controller is in check mode ($C). Toggle check mode off, then reconnect.',
+      'no-status-response':
+        'Cannot determine controller state — no status response after connect. Power-cycle the controller and reconnect.',
+      'unsafe-residual-spindle':
+        'Controller reports idle but spindle / feed is non-zero (laser may still be in modal M3/M4). Send M5 and reconnect.',
+    };
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_UNSAFE_AT_CONNECT,
+      message: messageByReason[unsafe] ??
+        `Controller in non-safe state at connect (${unsafe}). Disconnect, inspect machine, and reconnect.`,
+    });
+  }
 }

@@ -394,6 +394,7 @@ export function ConnectionPanelMain({
 
   useEffect(() => {
     const ctrlMaxSpindle = controllerRef.current?.maxSpindle;
+    const unsafeAtConnect = controllerRef.current?.getUnsafeAtConnect?.();
     const result = runPreflightSummary(
       scene,
       gcode,
@@ -404,6 +405,7 @@ export function ConnectionPanelMain({
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
       controllerRef.current?.getFirmwareLaserModeEnabled?.(),
       typeof ctrlMaxSpindle === 'number' && ctrlMaxSpindle > 0 ? ctrlMaxSpindle : undefined,
+      unsafeAtConnect != null ? unsafeAtConnect.reason : null,
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;

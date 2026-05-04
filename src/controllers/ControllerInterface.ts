@@ -168,6 +168,21 @@ export interface LaserController {
    */
   getFirmwareLaserModeEnabled?(): boolean | undefined;
   /**
+   * T1-25: safe-state verdict captured at connect (first status report after
+   * the welcome handshake, or null if the handshake passed: idle + FS 0,0).
+   * Non-null means the controller was in alarm / run / hold / check / had
+   * residual spindle, or never reported status at all — UI / preflight must
+   * refuse machine control until the user reconnects from a known-safe state.
+   */
+  getUnsafeAtConnect?(): {
+    reason: 'alarm' | 'run' | 'hold' | 'check' | 'no-status-response' | 'unsafe-residual-spindle';
+    capturedAt: number;
+    status: MachineStatus;
+    alarmCode: number | null;
+    feedRate: number;
+    spindleSpeed: number;
+  } | null;
+  /**
    * GRBL: G54 (from the last $#) and $10 (from the last $$). Nulls until a successful dump
    * during the current connect handshake.
    */

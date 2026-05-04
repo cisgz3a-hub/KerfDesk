@@ -23,6 +23,7 @@ const files = [
   'controller-fresh-status-recheck.test.ts',
   'controller-bounds-recheck.test.ts',
   'controller-bounds-checks-g91.test.ts',
+  'connect-safe-state-handshake.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',
