@@ -3038,6 +3038,8 @@ When NOT connected (`controllerMaxSpindle == null`), profile wins as it does tod
 
 **Cross-check note (audit 3C):** Audit's Finding 4.2 + Critical 2 + Priority 2. Verified at exact lines.
 
+**Status:** Closed 2026-05-04 — superseded by T1-33 (`a5dbe91`). Same fix delivered: PipelineService precedence flipped so live `controllerMaxSpindle` wins when present; `MACHINE_MAXSPINDLE_MISMATCH` blocking preflight rule with 5% symmetric tolerance. T1-53's spec called for two resolution paths in the blocker dialog (Update profile / Continue with live value); T1-33 shipped the simpler form — the user reconciles via Settings or `$30=N`. The two-path UI is filed as a future T1-33 follow-up if the blocker turns out to be friction-heavy in practice. Closed without separate ship hash; work is in `a5dbe91`. Same close-out shape as T1-65 (superseded by T1-103), T1-66 (T1-105), T1-73 (T2-76), T1-56 (T1-100).
+
 ---
 
 ### T1-54 | Block job start if GRBL output uses M4 and `$32 鈮?1`
@@ -3098,6 +3100,8 @@ Optional UX improvement: in the blocker dialog, offer a one-click "Enable laser 
 **Priority:** Tier 1 鈥?real defect with silent-miscalibration consequences.
 
 **Cross-check note (audit 3C):** Audit's Finding 4.4 + Critical 4 + Priority 4. Verified at lines 1281 (parsing), 778 (logging only), GrblStrategy.ts:25-27 (unconditional M4).
+
+**Status:** Closed 2026-05-04 — primarily superseded by T1-32 (`8bc2f3a`). T1-32 ships the `MACHINE_LASER_MODE_DISABLED` blocking preflight rule that fires when `liveLaserMode === false && outputUsesM4`. **Scope difference:** T1-54's spec also called for an error when `laserMode === undefined` (connected but `$32` not yet read). T1-32 deliberately skipped that branch because `$$` is queried during connect handshake and parsed before the user can start a job; a connected-but-no-$32 state is rare and the `MACHINE_DISCONNECTED` preflight covers the disconnected case. If the rare "connected with malformed $$ response" path turns out to matter in practice, the tightening is a 5-line extension to the T1-32 rule (filed as a future T1-32 follow-up). T1-54's optional one-click "Enable laser mode ($32=1)" UX button is a separate future enhancement, not part of the headline contract. Closed without separate ship hash; primary work is in `8bc2f3a`.
 
 ---
 
@@ -19373,8 +19377,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-50 Connect button mutex / abortable connect — Part A in `d4e3e35`, Part B (interface stub) in `1f135d9`. Full abort propagation through WebSerialPort/GrblController is T2-32/T2-33 future work.
 - [ ] T1-51 Strengthen GRBL handshake proof — reject raw `ok` as welcome — code shipped 2026-05-04 in `5b72000`, awaiting hardware verification on Falcon A1 Pro
 - [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `41310f4` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)
-- [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)
-- [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
+- [x] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (closed 2026-05-04 as superseded by T1-33 in `a5dbe91`)
+- [x] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (closed 2026-05-04 as superseded by T1-32 in `8bc2f3a`)
 - [ ] T1-55 Block laser-on operations when `$30` unknown and connected (filed; defect fix, ~1 hour)
 - [x] T1-56 Preflight machinePlanBounds reads wrong source — closed 2026-05-04; superseded by T1-100 in `243ad0f`
 - [x] T1-57 Compile manager request-id guard (shipped 2026-05-04 in `d28a57f`)
