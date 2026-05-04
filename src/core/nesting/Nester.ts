@@ -9,7 +9,7 @@
 
 import { type SceneObject } from '../scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
-import { requireFeature } from '../../entitlements';
+import { assertFeature } from '../../entitlements';
 
 export interface NestingOptions {
   binWidth: number; // Material width in mm
@@ -62,9 +62,10 @@ export function nestShapes(
   objects: SceneObject[],
   options: NestingOptions,
 ): NestingResult {
-  if (!requireFeature('nesting')) {
-    throw new Error('Nesting requires a Pro license');
-  }
+  // T1-78 Phase 2a: enforcement-style call site → assertFeature.
+  // Throws EntitlementError carrying the feature name; previous
+  // ad-hoc `new Error('Nesting requires a Pro license')` is gone.
+  assertFeature('nesting');
   const {
     binWidth,
     binHeight,
@@ -272,9 +273,8 @@ export function applyNesting(
   objects: SceneObject[],
   result: NestingResult,
 ): SceneObject[] {
-  if (!requireFeature('nesting')) {
-    throw new Error('Nesting requires a Pro license');
-  }
+  // T1-78 Phase 2a: see nestShapes above.
+  assertFeature('nesting');
   const updates = new Map<string, NestedItem>();
   for (const item of result.items) {
     updates.set(item.objectId, item);

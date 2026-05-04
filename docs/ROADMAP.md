@@ -4654,7 +4654,7 @@ For T1-77's first ship, the stopgap closes the immediate hole. T2-89 / T2-90 shi
 
 ### T1-78 | Split `requireFeature` into `canUseFeature` (boolean) and `assertFeature` (throws)
 
-**Status:** Phase 1 shipped in `bad81ab` (2026-05-04). New API surface (`canUseFeature`, `assertFeature`, `EntitlementError`) added in `src/entitlements/index.ts` alongside a `@deprecated` `requireFeature` alias that preserves the old behavior. Pinned by `tests/entitlement-api-split.test.ts` (13/13). **Phase 2 open** — migration of the 8 remaining caller files (`src/core/nesting/Nester.ts`, `src/geometry/BooleanOps.ts`, `src/core/job/JobCompiler.ts`, `src/ui/hooks/useSceneOperations.ts`, `src/ui/hooks/useGeneratorHandlers.ts`, `src/ui/hooks/useMaterialTestHandlers.ts`, `src/ui/hooks/useKerfHandlers.ts`, `src/core/nesting/Nester.ts`) from `requireFeature` → `canUseFeature`/`assertFeature` to follow as a separate ticket(s) so each caller's intent (boolean gate vs enforcement) is reviewed individually. Master checklist remains `[ ]` until Phase 2 lands.
+**Status:** Phase 1 shipped in `bad81ab` (2026-05-04). Phase 2a shipped in `<TBD>` (2026-05-04). Phase 2b open. New API surface (`canUseFeature`, `assertFeature`, `EntitlementError`) added in `src/entitlements/index.ts` in Phase 1 alongside a `@deprecated` `requireFeature` alias that preserves the old behavior. **Phase 2a (this commit):** service-layer call sites migrated — `src/core/nesting/Nester.ts` (2 sites → `assertFeature('nesting')`), `src/geometry/BooleanOps.ts` (1 site → `assertFeature('boolean_ops')`), `src/core/job/JobCompiler.ts` (6 flag-builder sites → `canUseFeature('<flag>')`). The legacy ad-hoc `throw new Error('… requires a Pro license')` paths in Nester/BooleanOps are gone — `assertFeature` throws `EntitlementError` carrying the feature name, so callers can format messages from data (T2-65 follow-up). Pinned by `tests/entitlement-api-migration-phase2a.test.ts` (22 contracts) plus the form-agnostic update to `tests/service-layer-pro-gate-coverage.test.ts`. **Phase 2b open:** the four UI-hook callers (`src/ui/hooks/useSceneOperations.ts`, `useGeneratorHandlers.ts`, `useMaterialTestHandlers.ts`, `useKerfHandlers.ts`, totalling 6 sites) still use `requireFeature` and will migrate next. Master checklist remains `[ ]` until 2b lands.
 
 **Code reference:** `src/entitlements/index.ts:21-23`. Cross-check verified.
 
@@ -19370,7 +19370,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-75 Undo/redo must mark dirty + invalidate compile/frame state (shipped pre-session)
 - [x] T1-76 Active layer change unified path (Option B — project state, shipped 2026-05-04 in `4e5643a`)
 - [x] T1-77 Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle (shipped pre-session)
-- [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` — Phase 1 shipped in `bad81ab` (new API + deprecated alias); Phase 2 (migrating 8 callers) open
+- [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` — Phase 1 shipped in `bad81ab` (new API + deprecated alias); Phase 2a shipped in `<TBD>` (service-layer callers migrated); Phase 2b open (4 UI hooks, 6 sites)
 - [x] T1-79 Box generator service-level entitlement check — closed 2026-05-04; obsolete (box_generator is no longer a Pro feature)
 - [ ] T1-80 Validation failure shows user-facing state, not silent downgrade (filed; customer trust, ~1-2 sessions)
 - [x] T1-81 CI check — production builds must NOT contain dev-mode auto-unlock (shipped pre-session in `de3fbc7`)

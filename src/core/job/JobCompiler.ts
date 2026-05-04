@@ -43,7 +43,7 @@ import { getActiveProfile } from '../devices/DeviceProfile';
 import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { computeSmartOverscan } from '../plan/SmartOverscan';
 import { getPresetById } from '../materials/MaterialLibrary';
-import { requireFeature } from '../../entitlements';
+import { canUseFeature } from '../../entitlements';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -72,13 +72,17 @@ interface EntitlementPolicy {
 }
 
 function createEntitlementPolicy(): EntitlementPolicy {
+  // T1-78 Phase 2a: flag-builder call sites → canUseFeature (boolean
+  // semantics). These six values feed `allow*` flags consumed
+  // downstream; no enforcement happens here, so the explicit boolean
+  // form is the right idiom.
   return {
-    allowTabs: requireFeature('tabs'),
-    allowOvercut: requireFeature('overcut'),
-    allowLeadIn: requireFeature('lead_in'),
-    allowCrossHatch: requireFeature('cross_hatch'),
-    allowPowerScale: requireFeature('power_scale'),
-    allowCutStartPoint: requireFeature('cut_start_point'),
+    allowTabs: canUseFeature('tabs'),
+    allowOvercut: canUseFeature('overcut'),
+    allowLeadIn: canUseFeature('lead_in'),
+    allowCrossHatch: canUseFeature('cross_hatch'),
+    allowPowerScale: canUseFeature('power_scale'),
+    allowCutStartPoint: canUseFeature('cut_start_point'),
     droppedFeatures: new Set<string>(),
   };
 }
