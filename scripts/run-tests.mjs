@@ -29,6 +29,7 @@ const files = [
   'command-gates-honor-safety-state.test.ts',
   'preflight-duplicate-geometry.test.ts',
   'profile-validation.test.ts',
+  'frame-freshness-invalidation.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',

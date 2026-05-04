@@ -21,6 +21,7 @@ import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifi
 import { type MachineService, type LaserOutputState, type ApprovalToken } from '../../app/MachineService';
 import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
+import { computeFrameFreshnessKey } from '../../app/computeFrameFreshnessKey';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
@@ -493,6 +494,45 @@ export function ConnectionPanelMain({
     hasFramed.current = false;
     setWorkflowVersion(v => v + 1);
   }, [historyVersion]);
+
+  // T2-60: frame freshness invalidation. The previous-frame motion no
+  // longer represents what the laser will burn when ANY of these
+  // change: startMode, savedOrigin numeric values, active profile
+  // (different originCorner / bed size), bed dimensions (live $130/
+  // $131 from auto-detect), originCorner toggle, or compiledTicketId
+  // (a fresh compile may move bounds). historyVersion above already
+  // covers scene mutations; isConnected covers connect/disconnect;
+  // this effect closes the remaining gates the audit (4B Section 8.3)
+  // identified.
+  //
+  // The freshness key is computed from a pure helper so the input set
+  // is testable in isolation. The useEffect dep array carries the
+  // individual values rather than the key string itself — React's
+  // shallow-equality dep comparison fires per individual change,
+  // preserving "no extra render when nothing changed."
+  const compiledTicketIdForFreshness = compiledJobTicket?.ticketId ?? null;
+  const profileIdForFreshness = activeProfile?.id ?? null;
+  const frameFreshnessKey = computeFrameFreshnessKey({
+    startMode,
+    savedOriginX: savedOrigin?.x ?? null,
+    savedOriginY: savedOrigin?.y ?? null,
+    profileId: profileIdForFreshness,
+    bedWidth,
+    bedHeight,
+    originCorner,
+    compiledTicketId: compiledTicketIdForFreshness,
+  });
+  const lastFrameKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    // Invalidate only when the key actually changes from the last
+    // observed value. Mount-time fire sets the ref but doesn't reset
+    // hasFramed (it was already false at mount).
+    if (lastFrameKeyRef.current !== null && lastFrameKeyRef.current !== frameFreshnessKey) {
+      hasFramed.current = false;
+      setWorkflowVersion(v => v + 1);
+    }
+    lastFrameKeyRef.current = frameFreshnessKey;
+  }, [frameFreshnessKey]);
 
   jobProgressRef.current = jobProgress;
 
