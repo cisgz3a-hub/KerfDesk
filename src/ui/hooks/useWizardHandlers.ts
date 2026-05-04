@@ -52,6 +52,8 @@ export interface UseWizardHandlersParams {
   viewportActionsRef: RefObject<ViewportActions | null>;
   /** Bump so `getActiveProfile()` / device list re-read after wizard creates a profile. */
   refreshProfiles: () => void;
+  /** T1-70: surface recovery failures to the user instead of swallowing into console. */
+  showAlert: (title: string, message: string) => Promise<unknown>;
 }
 
 export interface WizardHandlers {
@@ -70,21 +72,43 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     setRecoverAutosaveTimeLabel,
     viewportActionsRef,
     refreshProfiles,
+    showAlert,
   } = params;
 
+  // T1-70: previously the catch logged to console only and the prompt
+  // was unconditionally hidden — a user who clicked Recover on a corrupt
+  // or unreadable autosave saw the dialog vanish and concluded their work
+  // was gone. Now: surface the failure with a user-facing alert. On
+  // deserialize failure the prompt stays visible so retry /
+  // download-for-support affordances (T2-70 follow-ups) can hang off the
+  // same dialog. `readAutosave` already swallows storage errors and
+  // resolves null, so the empty-payload branch surfaces an "unavailable"
+  // alert instead of the silent disappear.
   const handleRecover = useCallback(async () => {
-    try {
-      const payload = await readAutosave();
-      if (payload?.json) {
-        const recovered = deserializeScene(payload.json);
-        handleNewProject(recovered, 'autosave');
-      }
-    } catch (e) {
-      console.error('Recovery failed:', e);
+    const payload = await readAutosave();
+    if (!payload?.json) {
+      await showAlert(
+        'Recovery unavailable',
+        'No autosave data was found. Your browser may have cleared its storage, or the autosave was already discarded.',
+      );
+      setShowRecover(false);
+      setRecoverAutosaveTimeLabel?.(null);
+      return;
     }
-    setShowRecover(false);
-    setRecoverAutosaveTimeLabel?.(null);
-  }, [handleNewProject, setShowRecover, setRecoverAutosaveTimeLabel]);
+    try {
+      const recovered = deserializeScene(payload.json);
+      handleNewProject(recovered, 'autosave');
+      setShowRecover(false);
+      setRecoverAutosaveTimeLabel?.(null);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error('Recovery failed:', e);
+      await showAlert(
+        'Recovery failed',
+        `Could not restore the autosaved project.\n\n${msg}\n\nThe autosave data may be corrupted or use a newer file format. The recovery prompt has been kept open so you can try again or discard.`,
+      );
+    }
+  }, [handleNewProject, setShowRecover, setRecoverAutosaveTimeLabel, showAlert]);
 
   const handleWizardComplete = useCallback((result: WizardResult) => {
     setShowSetup(false);

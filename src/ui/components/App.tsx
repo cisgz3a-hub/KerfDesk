@@ -1247,6 +1247,7 @@ export function App() {
     setRecoverAutosaveTimeLabel,
     viewportActionsRef,
     refreshProfiles,
+    showAlert,
   });
 
   useEffect(() => {

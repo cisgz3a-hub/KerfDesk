@@ -61,6 +61,7 @@ const files = [
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
   'entitlement-api-split.test.ts',
+  'recovery-failure-alerts.test.tsx',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',
