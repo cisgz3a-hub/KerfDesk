@@ -277,12 +277,28 @@ export class GrblController implements LaserController {
         const statusWelcome = statusToken != null ? machineStatusFromGrblReportToken(statusToken) : null;
         const isGrblStatusWelcome = statusWelcome != null;
 
+        // T1-51: removed `line === 'ok'` from the welcome predicate. A
+        // bare `ok` is too weak — many non-GRBL devices respond `ok` to
+        // newlines (modems, industrial controllers, serial loopbacks),
+        // stale lines from previous sessions can still be in the
+        // kernel/browser buffer at connect time, and a malfunctioning
+        // device can spoof the handshake by responding `ok` to any
+        // input. The remaining clauses each require GRBL-specific
+        // shape: `grbl` banner substring, `$I` version/option blocks,
+        // `[MSG:...]` GRBL message, or a `<State|MPos:...>` realtime
+        // status line. `[OPT:...]` is added for the same reason —
+        // it's the second half of the `$I` response and is unique to
+        // GRBL. If a device responds only with `ok` to probes and
+        // never produces one of these, the existing overall timeout
+        // fires and connect fails with the standard "no welcome"
+        // path — far better than the false-positive that produced a
+        // "Connected" UI on a non-GRBL port.
         const isWelcome =
           line.toLowerCase().includes('grbl') ||
           line.startsWith('[VER:') ||
+          line.startsWith('[OPT:') ||
           line.startsWith('[MSG:') ||
-          isGrblStatusWelcome ||
-          line === 'ok';
+          isGrblStatusWelcome;
 
         if (!welcomeReceived && isWelcome) {
           welcomeReceived = true;

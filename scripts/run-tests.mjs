@@ -79,6 +79,7 @@ const files = [
   'right-origin-x-flip.test.ts',
   'saved-origin-verifies-wcs.test.ts',
   'frame-confirm-uses-machine-corners.test.ts',
+  'grbl-handshake-rejects-bare-ok.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

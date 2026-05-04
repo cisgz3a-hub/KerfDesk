@@ -2859,6 +2859,8 @@ Part B is more invasive 鈥?it requires AbortSignal propagation through `WebSeri
 
 ### T1-51 | Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome
 
+**Status:** Code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification. **Hardware verification needed — Falcon A1 Pro front-origin burn test** (the Falcon is a known-good GRBL device; verify connect still succeeds. The non-GRBL false-positive is observation-only — verify by attempting to connect to a non-laser USB-serial device and observing connect fails rather than producing "Connected"). The welcome predicate at `GrblController.ts:280-285` no longer accepts a bare `line === 'ok'`. The remaining clauses each require GRBL-specific shape: `grbl` banner substring, `[VER:]`/`[OPT:]`/`[MSG:]` blocks, or a parseable `<State|MPos:...>` realtime status. `[OPT:]` was added for symmetry with `[VER:]` (both are halves of the `$I` response). If a device responds only with `ok` to probes and never produces one of these, the existing 10s overall timeout fires and connect fails — far better than the false-positive that produced a "Connected" UI on a non-GRBL port. Post-handshake `ok` handling for `$$` / `$#` termination and streaming acks is intentionally untouched (those are GRBL's protocol acknowledgment shape and depend on `ok`). Pinned by `tests/grbl-handshake-rejects-bare-ok.test.ts` (10 source-level contracts: predicate body shape, removed bare-ok clause, all four GRBL-shaped clauses still present, `[OPT:]` added, T1-51 marker, post-handshake bare-ok ack handling preserved at ≥3 sites).
+
 **Code reference:** `src/controllers/grbl/GrblController.ts:223-228` (welcome predicate including `line === 'ok'`).
 
 **Problem:** Cross-check confirmed at exact line. Welcome predicate currently accepts:
@@ -19361,7 +19363,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-48 Remove `new Date()` from Output.createdAt for determinism (shipped 2026-05-02 in `69f1221`)
 - [x] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (shipped 2026-05-04 in `7cce3f0`)
 - [ ] T1-50 Connect button mutex / abortable connect — Part A in `d4e3e35`, Part B (interface stub) in `1f135d9`. Full abort propagation through WebSerialPort/GrblController is T2-32/T2-33 future work.
-- [ ] T1-51 Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome (filed; defect fix, ~30 min)
+- [ ] T1-51 Strengthen GRBL handshake proof — reject raw `ok` as welcome — code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification on Falcon A1 Pro
 - [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `41310f4` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)
 - [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)
 - [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
