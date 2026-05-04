@@ -11,6 +11,7 @@ import { type SerialPortLike } from '../src/communication/SerialPort';
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import {
   createBlankProfile,
+  getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
 } from '../src/core/devices/DeviceProfile';
@@ -107,7 +108,8 @@ void (async () => {
 
   const s0 = createScene(400, 300, 'C');
   let scene = addObject(s0, createRect(s0.layers[0].id, 1, 1, 10, 10));
-  const first = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null);
+  // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+  const first = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null, getActiveProfile());
   assert(first != null, 'first compile');
   if (!first) {
     process.exit(1);
@@ -141,7 +143,8 @@ void (async () => {
 
   // Simulate user editing scene and recompiling (new array identities)
   scene = addObject(scene, createRect(scene.layers[0].id, 200, 200, 5, 5));
-  const second = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null);
+  // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+  const second = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null, getActiveProfile());
   assert(second != null && second.canvasMoves !== movesA, 'recompile produces new move array');
   const during2 = svc.getActiveJobCanvasContext();
   assert(

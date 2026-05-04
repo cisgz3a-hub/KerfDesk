@@ -7545,6 +7545,8 @@ Vitest is the strongest option for new tests; migration of existing tests can be
 
 **Cross-check note (audit 2F):** Audit's C7 / Gate H / P2. Verified the manual list and mixed usage. Pushback on framing: audit listed Stage 2 as P2; that's about right. Stage 1 is more impactful and could be Tier 1 if we want to retire T1-47's meta-test guard sooner.
 
+**Status (Stage 1):** Shipped in `<TBD>`. Stage 2 (vitest / node:test migration) deferred — multi-session per-test refactor. **Stage 1 changes:** `scripts/run-tests.mjs` rewritten — the 232-entry manual `files` array is replaced with a recursive `walkTests(testsDir)` walk that collects `*.test.ts(x)` files, excludes `snapshots / helpers / fixtures / node_modules` directories, sorts the result alphabetically for stable ordering, and runs each via tsx in its own Node process (existing per-test isolation preserved). New test files are picked up automatically; no registration step. `tests/runner-registration-coverage.test.ts` (T1-47's defensive guard) retired in the same commit because the failure mode it guarded against — "test exists on disk but isn't registered" — is now impossible by construction. T1-47 audit row updated to note the supersession; master checklist annotation added. **Documented skip list (`KNOWN_FAILURES`):** auto-discovery surfaces tests in alphabetical order rather than the manual list's organic ordering. Five tests were broken at HEAD (all post-T1-58 collateral — `compileGcode`'s new `profile` parameter wasn't threaded by these test setups, producing `'no-profile'` ticket-hash mismatches when `startValidatedJob` compared against `getActiveProfile()`). Four were fixed in-line as part of this commit by passing `getActiveProfile()` to each `compileGcode` call: `active-job-canvas-context-cleared.test.ts` (now 7/7), `active-job-canvas-context-pinned.test.ts` (now 6/6), `validated-job-ticket-mismatch.test.ts` (now 13/13), `validated-job-ticket-phase1.test.ts` (now 19/19, also widened the `runPreflightSummary` call to thread firmware-state args so post-T1-55 / T1-32 / T1-33 rules see populated `liveMachineInfo`). The fifth — `ui-start-job-uses-ticket.test.tsx` — has additional bugs beyond the profile-hash issue (undefined ticket reference in second scenario) and stays in `KNOWN_FAILURES` with a citation, deferred to a focused investigation. Skip is logged via `↷ <file> (skipped: <reason>)` on stderr so CI never silently skips. **`runner-auto-discovery.test.ts` (new):** 20-contract source-level pin verifying T2-22 marker, `readdirSync` walk, `walkTests` helper, `EXCLUDED_DIRS` Set with all four sentinel dirs, `TEST_FILE_PATTERN` matching `.test.ts(x)` only, OLD manual array removed, deterministic sort, KNOWN_FAILURES Map declared with `↷` stderr logging + `T2-22-followup` citation, walk finds > 100 files (232 sanity check), retired T1-47 file is gone. Master checklist `[x]`. **Hardware verification: not required** (test runner infrastructure; no g-code, no machine state).
+
 ---
 
 ### T2-23 | Determinism gate 鈥?same scene compiled 20脳 must be byte-identical
@@ -19573,7 +19575,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-44 Controller _checkJobBounds simulates G91 from known starting position (shipped 2026-05-04 in `4fb7dcd`)
 - [ ] T1-45 Compile complexity gate 鈥?warn/block on huge jobs (filed; UX safety)
 - [x] T1-46 notifySimulatorTx per-line loop blocks job start (shipped 2026-05-04 in `72ede5c`)
-- [x] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (shipped 2026-05-02 in `037bfdd`)
+- [x] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (shipped 2026-05-02 in `037bfdd`; defensive guard retired 2026-05-05 — superseded by T2-22 auto-discovery which makes the "exists on disk but not registered" failure mode impossible by construction)
 - [x] T1-48 Remove `new Date()` from Output.createdAt for determinism (shipped 2026-05-02 in `69f1221`)
 - [x] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (shipped 2026-05-04 in `7cce3f0`)
 - [ ] T1-50 Connect button mutex / abortable connect — Part A in `d4e3e35`, Part B (interface stub) in `1f135d9`. Full abort propagation through WebSerialPort/GrblController is T2-32/T2-33 future work.
@@ -19643,7 +19645,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-19 Burn-bounds analyzer test helper (filed; depends on T2-18)
 - [ ] T2-20 Pixel fixture harness for raster regression tests (filed; depends on T1-31, T2-18)
 - [ ] T2-21 Property-based geometry tests with fast-check (filed; depends on T2-18)
-- [ ] T2-22 Standardize test runner 鈥?auto-discovery + consistent reporter (filed; test infra)
+- [x] T2-22 Standardize test runner 鈥?auto-discovery + consistent reporter (Stage 1 shipped 2026-05-05 in `<TBD>` — auto-discovery walk; Stage 2 vitest migration deferred)
 - [ ] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (filed; depends on T1-48, T2-18)
 - [ ] T2-24 Split LaserController into protocol-neutral core + dialect extensions (filed; foundation for audit 3A work)
 - [ ] T2-25 Create real ControllerCapabilities model (filed; depends on T2-24)

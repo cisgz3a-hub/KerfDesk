@@ -5,6 +5,7 @@
 import { compileGcode } from '../src/app/PipelineService';
 import {
   createBlankProfile,
+  getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
 } from '../src/core/devices/DeviceProfile';
@@ -96,7 +97,8 @@ void (async () => {
 
   const s0 = createScene(400, 300, 'T');
   const scene = addObject(s0, createRect(s0.layers[0].id, 20, 20, 40, 30));
-  const result = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null);
+  // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+  const result = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null, getActiveProfile());
   assert(result != null && result.ticket != null, 'compileGcode returns ticket');
   if (result) {
     assert(result.ticket.ticketId.length > 0, 'ticketId non-empty');
@@ -113,11 +115,22 @@ void (async () => {
 
   const s2 = createScene(400, 300, 'T2');
   const scene2 = addObject(s2, createRect(s2.layers[0].id, 5, 5, 20, 20));
-  const r2 = await compileGcode(scene2, 'current', { x: 1, y: 2 }, null, 'grbl', null, null);
+  // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+  const r2 = await compileGcode(scene2, 'current', { x: 1, y: 2 }, null, 'grbl', null, null, getActiveProfile());
   assert(r2?.ticket.startMode === 'current', 'ticket.startMode current');
   assert(r2?.ticket.savedOrigin?.x === 1 && r2.ticket.savedOrigin?.y === 2, 'ticket.savedOrigin');
 
-  const preflight = runPreflightSummary(scene2, r2?.gcode ?? null, idle, 400, 300, r2?.machinePlanBounds ?? null);
+  // T2-22-followup: pass firmware homing / laser-mode / maxSpindle so the
+  // T1-32 / T1-33 / T1-55 preflight rules see a fully populated
+  // liveMachineInfo and don't flag the test scene as "connected with
+  // missing $30" / "$32 unknown" etc. Pre-T1-55 these args were absent.
+  const preflight = runPreflightSummary(
+    scene2, r2?.gcode ?? null, idle, 400, 300, r2?.machinePlanBounds ?? null,
+    /* firmwareHomingFromMachine */ false,
+    /* firmwareLaserModeFromMachine */ true,
+    /* firmwareMaxSpindleFromMachine */ 1000,
+    /* firmwareUnsafeAtConnect */ null,
+  );
   assert(preflight.canStart, 'preflight can start for compile scene');
 
   const ticket = r2!.ticket;

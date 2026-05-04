@@ -17,6 +17,7 @@ import {
   createBlankProfile,
   saveDeviceProfile,
   setActiveProfileId,
+  getActiveProfile,
 } from '../src/core/devices/DeviceProfile';
 
 function activeJobContextFromCompile(c: CompileGcodeResult): ActiveJobCanvasContext {
@@ -153,7 +154,8 @@ async function run(): Promise<void> {
     sendCalls.length = 0;
     setActiveProfileId(profileA.id);
     const scene = makeScene('ProfileMismatch', 40);
-    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null);
+    // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null, getActiveProfile());
     if (!compiled) throw new Error('Expected compile result for profile mismatch scene');
 
     const profileB = createBlankProfile('Mismatch B');
@@ -193,7 +195,8 @@ async function run(): Promise<void> {
     setActiveProfileId(profileClean.id);
 
     const scene = makeScene('CleanPath', 60);
-    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null);
+    // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null, getActiveProfile());
     if (!compiled) throw new Error('Expected compile result for clean path');
 
     await svc.startValidatedJob({
@@ -218,7 +221,8 @@ async function run(): Promise<void> {
     setActiveProfileId(profileTamper.id);
 
     const scene = makeScene('GcodeCorrupt', 80);
-    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null);
+    // T2-22-followup: pass profile snapshot for post-T1-58 ticket-hash matching.
+    const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null, getActiveProfile());
     if (!compiled) throw new Error('Expected compile result for gcode tamper');
 
     const tamperedTicket = {

@@ -9,6 +9,7 @@ import { type SerialPortLike } from '../src/communication/SerialPort';
 import { type LaserController, type JobProgress, type MachineState } from '../src/controllers/ControllerInterface';
 import {
   createBlankProfile,
+  getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
 } from '../src/core/devices/DeviceProfile';
@@ -74,7 +75,11 @@ void (async () => {
 
   const s0 = createScene(400, 300, 'X');
   const scene = addObject(s0, createRect(s0.layers[0].id, 1, 1, 5, 5));
-  const compiled = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null);
+  // T2-22-followup: pass profile snapshot so the ticket's profileHash
+  // matches the active profile at startValidatedJob time. Pre-T1-58
+  // compileGcode read getActiveProfile() internally; post-T1-58 the
+  // caller must thread the profile explicitly.
+  const compiled = await compileGcode(scene, 'absolute', null, null, 'grbl', null, null, getActiveProfile());
   assert(compiled != null, 'compile');
   if (!compiled) process.exit(1);
   const cctx: ActiveJobCanvasContext = {
