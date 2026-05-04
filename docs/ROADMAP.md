@@ -229,6 +229,8 @@ GRBL does not implement `M300`. The inline comment even says "(Marlin)". On GRBL
 
 **Priority:** Tier 0.
 
+**Status:** Closed pre-session 2026-05-04 — all three sub-fixes shipped: **(a)** "Park at max bed" template renamed to "Park near far corner" at `src/core/plan/GcodeTemplates.ts:172`, with G0 at `:174` using `{BED_WIDTH_MINUS_5}` / `{BED_HEIGHT_MINUS_5}` substitutions defined at `:113` (5mm inset from limits, no edge crash). **(b)** `HOMING_REQUESTED_BUT_DISABLED` preflight code at `src/core/preflight/Preflight.ts:98` (constant) and `:210` (handler), wired via `src/core/preflight/rules/TemplatePreflight.ts:72` — blocks job start when `$H` is in the resolved header but live `$22=0`. **(c)** M300 footer demoted to migration-only `LEGACY_FOOTER_BODY__WITH_BEEP` at `src/core/plan/GcodeTemplates.ts:214`; only referenced from `src/core/devices/DeviceProfile.ts` for legacy-profile migration, not in the default footer list. Pinned by `tests/gcode-templates-safety.test.ts` (registered). **Closed without ship hash; pre-session.** Same close-out shape as T1-3, T1-86, T0-1.
+
 ---
 
 ### T0-3 | `MachineService.pauseResume` inverted-toggle signature
@@ -19256,7 +19258,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 
 ### Tier 0 (Today)
 - [x] T0-1 Delete comment-stripping in start-job path (closed pre-session 2026-05-04 — filter removed)
-- [ ] T0-2 Fix three unsafe built-in gcode templates
+- [x] T0-2 Fix three unsafe built-in gcode templates (closed pre-session 2026-05-04 — all 3 sub-fixes shipped)
 - [ ] T0-3 Split `pauseResume` into `pause` and `resume`
 - [ ] T0-4 Remove Wainlux bridge code
 
