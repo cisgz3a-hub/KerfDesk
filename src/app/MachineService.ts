@@ -709,7 +709,20 @@ export class MachineService {
 
   // ─── CONNECTION ─────────────────────────────────────────
 
-  async connectRealLaser(baudRate: number): Promise<void> {
+  async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
+    // T1-50 Part B: accept an optional AbortSignal. The spec's full
+    // shape — propagating the signal through `WebSerialPort.requestAndOpen`
+    // and `GrblController.connect` so an in-flight open or handshake
+    // can be cancelled mid-air — needs API changes inside those classes
+    // and is filed as T2-32 / T2-33. For T1-50 we ship the interface
+    // stub plus `throwIfAborted` hooks at every await point: a caller
+    // that already aborted before calling, or that aborts during one
+    // of the underlying async steps, observes the throw at the next
+    // await boundary and triggers the T1-49 cleanup path. No
+    // production caller passes a signal yet, so this has zero
+    // behavioral effect today; future ConnectionManager work (T2-32)
+    // will plumb a real signal through.
+    signal?.throwIfAborted();
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
     }
@@ -725,12 +738,16 @@ export class MachineService {
     // close the half-open port (sync today, async after T2-31), null
     // portRef if it ended up pointing at the failed port, attempt a
     // controller disconnect to release any partial connect state, and
-    // rethrow so the UI's catch sees the original error.
+    // rethrow so the UI's catch sees the original error. T1-50 Part B
+    // adds `signal?.throwIfAborted()` at each await point so an
+    // aborted signal routes through the same cleanup path.
     let ws: WebSerialPort | null = null;
     try {
       ws = createSerialPort('web') as WebSerialPort;
       await ws.requestAndOpen(baudRate);
+      signal?.throwIfAborted();
       await this.controllerRef.current.connect(ws);
+      signal?.throwIfAborted();
       this.portRef.current = ws;
       this.state.isSimulator = false;
       // T1-22: fresh connection clears any stale unknown laser-safety state

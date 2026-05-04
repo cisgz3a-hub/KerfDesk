@@ -73,6 +73,7 @@ const files = [
   'connect-button-mutex.test.tsx',
   'entitlement-api-no-deprecated-export.test.ts',
   'connect-cleanup-on-partial-failure.test.ts',
+  'connect-abort-signal.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',
