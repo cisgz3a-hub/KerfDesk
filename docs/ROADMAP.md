@@ -322,6 +322,8 @@ Store the previous WCS/mask on the profile in a new `stashedWcsState` field. Off
 
 ### T1-2 | Controller-layer bounds re-check on `sendJob`
 
+**Status:** Closed 2026-05-04 — **shipped pre-session in `3d3dfdd`** (`fix(grbl): fresh-status + bounds recheck before accepting job`). Verified at write-time: `GrblController.sendJob` at `src/controllers/grbl/GrblController.ts:434` calls `_queryFreshStatus()` and throws `Cannot start job — machine is "<status>" (wait for idle, then try again)` if the machine is not idle. Line 443 calls `_checkJobBounds(jobLines)` which scans the first N lines for absolute-mode `G0/G1 X/Y` values exceeding `_bedWidth`/`_bedHeight` from `$130`/`$131`. G91 / G90+G91 / G91-only lines are skipped from bounds validation (deltas can't be validated without execution simulation). Pinned by `tests/controller-bounds-recheck.test.ts` (13 contracts including the relative-mode skip cases) and `tests/controller-fresh-status-recheck.test.ts` (7 contracts including alarm/run/timeout rejection).
+
 **Code reference:** `src/controllers/grbl/GrblController.ts:359-420` (`startJob`)
 
 **Problem:** Preflight validates bounds at compile time. But `sendJob` accepts raw `lines: string[]` 鈥?if they're stale, hand-edited, or the user compiled for a 400脳400 bed and then switched to a 300脳300 profile without recompiling, the controller streams whatever it's given.
@@ -19308,7 +19310,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 
 ### Tier 1 (This week)
 - [ ] T1-1 WCS mutation consent prompt
-- [ ] T1-2 Controller-layer bounds + fresh-status recheck
+- [x] T1-2 Controller-layer bounds + fresh-status recheck (shipped pre-session in `3d3dfdd`; close-out 2026-05-04)
 - [x] T1-3 Profile-dependent negative-coord severity (shipped pre-session; close-out 2026-05-03)
 - [ ] T1-4 `emergencyStop` also disconnects
 - [x] T1-5 Per-profile `stopOnError` override (closed pre-session — `stopOnError?: boolean` on DeviceProfile.ts:161)
