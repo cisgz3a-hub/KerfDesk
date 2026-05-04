@@ -26,6 +26,7 @@ const files = [
   'connect-safe-state-handshake.test.ts',
   'unsafe-prior-state-persistence.test.ts',
   'operation-mutex-prevents-overlap.test.ts',
+  'command-gates-honor-safety-state.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',

@@ -19,6 +19,8 @@ import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState, type ApprovalToken } from '../../app/MachineService';
+import { computeCommandGates } from '../../app/computeCommandGates';
+import { getUnsafePriorState } from '../../app/unsafePriorState';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
@@ -436,7 +438,37 @@ export function ConnectionPanelMain({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
-  const canAutoFocus = isConnected && !isRunning && machineState?.status === 'idle';
+
+  // T1-30: centralized command-gate computation. Replaces ~ten ad-hoc
+  // `isConnected && !isRunning && status === 'idle'` checks scattered
+  // across this component with reads from a single helper. Each gate
+  // AND-combines five state inputs:
+  //   - machineState.status === 'idle' (T1-22)
+  //   - laserOutputState === 'off' (T1-22, alarm/run blocks too)
+  //   - activeOperation === null (T2-11 mutex layer)
+  //   - state.errorCode == null (T1-24)
+  //   - !recoveryPending (T1-29 unsafe-prior-state flag dismissed)
+  //
+  // The mutex (T2-11) is the safety net — even if the gate reads stale
+  // because activeOperation transitioned between renders, the mutex
+  // layer refuses the actual operation. Gates are the UX surface that
+  // prevents the user from clicking buttons that would just bounce off
+  // the mutex anyway.
+  //
+  // `activeOperation` and `recoveryPending` are read inline (not from
+  // React state) because their transitions are driven by machineState
+  // changes (which already trigger re-renders) or by long-lived modals
+  // that block UI input directly. Future work may add an explicit
+  // subscription if non-modal recovery surfaces (T3-91) need it.
+  const gates = machineState
+    ? computeCommandGates({
+        state: machineState,
+        laserOutput: machineService.getLaserOutputState(),
+        activeOperation: machineService.getActiveOperation(),
+        recoveryPending: getUnsafePriorState() != null,
+      })
+    : null;
+  const canAutoFocus = gates?.baseSafe ?? false;
 
   useEffect(() => {
     if (isConnected) {
@@ -599,10 +631,12 @@ export function ConnectionPanelMain({
     sceneBounds.maxY,
   ]);
 
-  // T1-104: exact-idle gate. Frame, Frame Dot, and other Frame-derived
-  // surfaces require the controller to actually be idle, not merely
-  // "not running."
-  const canFrame = isConnected && !isRunning && machineState?.status === 'idle';
+  // T1-104 + T1-30: exact-idle gate via the centralized helper. Frame,
+  // Frame Dot, and other Frame-derived surfaces all read from the same
+  // gates map; previously each surface re-derived `isConnected &&
+  // !isRunning && status === 'idle'` independently and missed gates
+  // like laserOutputState !== 'off' (laser still on from prior op).
+  const canFrame = gates?.canFrameSafe ?? false;
 
   const fmtMm = (n: number) => (Number.isFinite(n) ? n.toFixed(1) : '—');
 
@@ -1282,6 +1316,17 @@ export function ConnectionPanelMain({
   // controllers that don't implement it.
   const placementUncertain =
     controllerRef.current?.getPlacementUncertain?.() ?? false;
+  // T1-30: canStartJob keeps its existing product-level conjuncts
+  // (gcode exists / fresh / framed / preflight passed / not running /
+  // machine bounds OK / laser output not unknown / WCS not uncertain)
+  // and adds `gates.baseSafe` as a defense-in-depth conjunct. baseSafe
+  // collapses status === 'idle', laserOutput === 'off', no active
+  // operation, no error code, and no pending recovery into one check;
+  // each of those was already implied by some upstream gate
+  // (preflight covers status; laser-output covers itself via
+  // laserOutputState !== 'unknown'; machineBlocksJobStart covers
+  // errorCode/alarm), but consolidating here makes the safety story
+  // legible and prevents drift if any upstream gate weakens.
   const canStartJob =
     !!gcode &&
     !isRunning &&
@@ -1290,7 +1335,8 @@ export function ConnectionPanelMain({
     !machineBlocksJobStart &&
     (!requireFrame || hasFramed.current) &&
     laserOutputState !== 'unknown' &&
-    !placementUncertain;
+    !placementUncertain &&
+    (gates?.baseSafe ?? false);
   /**
    * T1-96: structured Start-button readiness for the diagnostics panel.
    *
@@ -1570,10 +1616,12 @@ export function ConnectionPanelMain({
       isFaulted: machineState?.status === 'faulted_requires_inspection',
       isRunning,
       canFrame,
-      // T1-104: exact-idle gate for Test Fire. Same current logic as
-      // canFrame, kept as a separate prop so future fire-specific gates
-      // can diverge without re-plumbing MachineControls.
-      canFire: canFrame,
+      // T1-30: test-fire gate now reads from the centralized helper
+      // (canTestFire). Pre-T1-30 it aliased canFrame; pre-T1-104 it
+      // didn't even gate on idle state. Identical to canFrameSafe today
+      // but kept as a separate gate so per-operation refinements don't
+      // touch the MachineControls prop shape.
+      canFire: gates?.canTestFire ?? false,
       isTestFiring,
       onUnlock: handleUnlock,
       onAcknowledgeFault: () => { void handleAcknowledgeFault(); },
