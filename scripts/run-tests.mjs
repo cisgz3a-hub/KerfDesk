@@ -63,6 +63,7 @@ const files = [
   'entitlement-api-split.test.ts',
   'recovery-failure-alerts.test.tsx',
   'recovery-eligibility-non-empty-cases.test.ts',
+  'active-layer-history-consistent.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

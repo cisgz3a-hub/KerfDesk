@@ -4514,6 +4514,8 @@ T2-76 (single transaction path) generalizes this 鈥?but T1-75 ships the immedia
 
 ### T1-76 | Active layer change 鈥?unify path (UI-state OR project-state, not both)
 
+**Status:** Shipped 2026-05-04 in `<TBD>` (Option B — project state, both call sites use commit). `App.tsx`'s `handleActivateLayer` (canvas-click-to-activate path) now routes through `handleSceneCommit` with the new `'activate-layer'` action label, matching the long-standing `LayerPanel.tsx:157` `onSceneCommit({ ...scene, activeLayerId })` policy. Same conceptual action, same history policy, undo/redo affects active layer either way. Inline comment cites T1-76 + the audit's Critical 9 framing. Schema-level "active layer is UI state" (Option A) is left for the future T2-71/T2-73 path. Pinned by `tests/active-layer-history-consistent.test.ts` (8 source-level contracts: handleActivateLayer routes through commit, not change; uses `'activate-layer'` action; carries T1-76 marker; SceneCommitAction union includes the new label; LayerPanel's onSceneCommit shape unchanged).
+
 **Code reference:** `src/ui/components/App.tsx:920` (handleSceneChange 鈥?no history) vs `src/ui/components/LayerPanel.tsx:157` (onSceneCommit 鈥?history). Cross-check verified 鈥?same conceptual action takes two different paths depending on UI surface.
 
 **Problem:** The audit identified active layer history as inconsistent. Cross-check confirmed:
@@ -19356,7 +19358,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-73 Delete action must mark scene dirty (closed 2026-05-02 in `7e4e340`; superseded by T2-76 unified routing)
 - [x] T1-74 Text sidebar `patchTextGeometry` must commit history, not preview-only (shipped pre-session)
 - [x] T1-75 Undo/redo must mark dirty + invalidate compile/frame state (shipped pre-session)
-- [ ] T1-76 Active layer change unified path 鈥?UI-state OR project-state consistently (filed; consistency, ~30 min)
+- [x] T1-76 Active layer change unified path (Option B — project state, shipped 2026-05-04 in `<TBD>`)
 - [x] T1-77 Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle (shipped pre-session)
 - [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` — Phase 1 shipped in `bad81ab` (new API + deprecated alias); Phase 2 (migrating 8 callers) open
 - [ ] T1-79 Box generator service-level entitlement check (filed; only Pro feature missing one, ~15 min after T1-78)

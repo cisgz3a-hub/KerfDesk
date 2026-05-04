@@ -46,6 +46,7 @@ export type SceneCommitAction =
   | 'text-edit'
   | 'text-add'
   | 'mode-select'
+  | 'activate-layer'
   | 'start-position'
   | 'camera-position'
   | 'calibration-grid'

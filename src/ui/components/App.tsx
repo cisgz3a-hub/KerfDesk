@@ -1064,9 +1064,15 @@ export function App() {
   const handleActivateLayer = useCallback((layerId: string) => {
     const prev = sceneRef.current;
     if (prev.activeLayerId === layerId) return;
-    // View-state change, no history entry — use handleSceneChange, not handleSceneCommit.
-  handleSceneChange({ ...prev, activeLayerId: layerId });
-}, [handleSceneChange]);
+    // T1-76: route through handleSceneCommit so canvas-click-to-activate
+    // and LayerPanel click both produce a history entry. Previously this
+    // was handleSceneChange (no history) while LayerPanel.tsx:157 used
+    // onSceneCommit — same conceptual action, two policies, audit 4E
+    // Critical 9. Active layer is now consistently project state; undo
+    // restores it. (Schema-level "active layer is UI state" is the
+    // future T2-71/T2-73 path; T1-76 ships the consistency fix today.)
+    handleSceneCommit({ ...prev, activeLayerId: layerId }, 'activate-layer');
+  }, [handleSceneCommit]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
