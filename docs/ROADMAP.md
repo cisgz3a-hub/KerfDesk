@@ -19342,7 +19342,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-37 Hide offset fill UI option until implemented (shipped 2026-05-02 in `bfb1a6b`)
 - [ ] T1-38 Operation-aware default flattening tolerance (filed; output quality)
 - [ ] T1-39 Frame skips first relative move on front-origin machines — code shipped 2026-05-04 in `df5763e`, awaiting hardware verification on Falcon A1 Pro
-- [ ] T1-40 Right-origin X mirror support — code shipped 2026-05-04 in `<TBD>`, awaiting hardware verification on Falcon A1 Pro
+- [ ] T1-40 Right-origin X mirror support — code shipped 2026-05-04 in `18b1755`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-41 Saved-origin verification 鈥?query $# at frame/start (filed; SAFETY)
 - [ ] T1-42 Frame bounds confirmation uses buildFrameCorners not workFrame (filed; SAFETY, depends T1-40)
 - [x] T1-43 Reassert G90/G91 after customStartGcode + reject mode flips (shipped 2026-05-02 in `6eb006b`)
