@@ -4756,6 +4756,8 @@ Migration scope: 13 existing `requireFeature(...)` callers (per the cross-check 
 
 ### T1-79 | Box generator service-level entitlement check 鈥?only Pro feature missing one
 
+**Status:** Closed 2026-05-04 — **obsolete**: `box_generator` is no longer a Pro feature. `src/entitlements/types.ts:2-3` carries the inline comment *"`box_generator` moved to free: finger-joint box generation is beginner-friendly and belongs in easy mode without a pro gate."* The `PRO_FEATURES` tuple no longer contains `'box_generator'`. T1-79 was filed against the assumption that box_generator was Pro-gated and missing a service-layer assertion; once the gate was lifted entirely, the assertion became unnecessary. No service-level `assertFeature('box_generator')` call is shipped because the feature does not require entitlement at all. **Closed without ship hash.** If a future commercial decision re-introduces the gate, the work would re-open as a fresh ticket; the T1-78 Phase 1 API (`assertFeature`, `EntitlementError`) is in place to make that ~5-line change.
+
 **Code reference:** `src/ui/components/BoxGenerator.tsx` 鈥?no `requireFeature`/`canUse`/`assertFeature` import (cross-check confirmed via grep). Button gate at App.tsx:1521-1523 uses `gatedFeature('box_generator')` but the dialog and underlying `generateBoxFaces()` (BoxGenerator.tsx:26) have no entitlement check.
 
 **Problem:** Cross-check verified 鈥?of all 13 features in `PRO_FEATURES`, **box_generator is the only one without a service-level gate**. Every other feature has at least one of: compile-time stripping (tabs, overcut, lead_in, cross_hatch, power_scale, cut_start_point), service-level throw (nesting, boolean_ops, variable_text, text_to_path, kerf_wizard, material_test), or soft-gate save (job_replay).
@@ -19365,7 +19367,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-76 Active layer change unified path (Option B — project state, shipped 2026-05-04 in `4e5643a`)
 - [x] T1-77 Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle (shipped pre-session)
 - [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` — Phase 1 shipped in `bad81ab` (new API + deprecated alias); Phase 2 (migrating 8 callers) open
-- [ ] T1-79 Box generator service-level entitlement check (filed; only Pro feature missing one, ~15 min after T1-78)
+- [x] T1-79 Box generator service-level entitlement check — closed 2026-05-04; obsolete (box_generator is no longer a Pro feature)
 - [ ] T1-80 Validation failure shows user-facing state, not silent downgrade (filed; customer trust, ~1-2 sessions)
 - [x] T1-81 CI check — production builds must NOT contain dev-mode auto-unlock (shipped pre-session in `de3fbc7`)
 - [x] T1-82 Remove `PRO_FLAG_KEY` legacy local boolean or document its purpose (shipped 2026-05-02 in `b3266a4`)
