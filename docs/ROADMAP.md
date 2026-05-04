@@ -19271,10 +19271,10 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-2 Controller-layer bounds + fresh-status recheck
 - [x] T1-3 Profile-dependent negative-coord severity (shipped pre-session; close-out 2026-05-03)
 - [ ] T1-4 `emergencyStop` also disconnects
-- [ ] T1-5 Per-profile `stopOnError` override
+- [x] T1-5 Per-profile `stopOnError` override (closed pre-session — `stopOnError?: boolean` on DeviceProfile.ts:161)
 - [x] T1-6 Classify `sendCommand` inputs (shipped pre-session in `ef8ac92`)
-- [ ] T1-7 JobLog QuotaExceededError visibility
-- [ ] T1-8 Acceleration-aware power sanity bounds
+- [x] T1-7 JobLog QuotaExceededError visibility (closed pre-session — pinned by tests/job-log-quota.test.ts)
+- [x] T1-8 Acceleration-aware power sanity bounds (closed pre-session — pinned by tests/plan-accel-sanity.test.ts)
 - [x] T1-9 Bed-dim resolver sweep / test (shipped 2026-05-02 in `e4fc24b`)
 - [x] T1-10 Wake lock during active jobs (prevent OS suspend) (shipped pre-session)
 - [x] T1-11 Canvas 鈫?machine coordinate mismatch during active job (shipped + hardware-verified)
@@ -19285,7 +19285,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-16 Three render-loop crashes on load-another-job-after-complete (shipped + hardware-verified)
 - [ ] T1-17 Image import freezes the app — Passes 1-4a shipped 2026-04-30 (`023a341` + `0632b2b` + `b8f3dfb` + `05ce7b86`); Passes 4b/4c open
 - [x] T1-18 Service-level test-fire deadman timeout — highest urgency safety (shipped pre-session)
-- [ ] T1-19 Service-level approval tokens for dangerous commands (filed; safety)
+- [x] T1-19 Service-level approval tokens for dangerous commands (shipped 2026-04-30 in `1a78fdf`)
 - [x] T1-20 WCS normalization no-listener fallback hardening (shipped in `b0375fa`; close-out 2026-05-03)
 - [x] T1-21 Frame-dot try/finally safety scope (shipped 2026-05-02 in `ba903a9`)
 - [x] T1-22 Critical write awaitability for safety commands — biggest defense-in-depth gain (shipped pre-session)
@@ -19325,7 +19325,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-56 Preflight machinePlanBounds reads wrong source 鈥?`activeJobTransform` always null pre-Start (filed; defect fix, ~15 min 鈥?one-line + tests)
 - [ ] T1-57 Compile manager has no request-id guard 鈥?async results can commit out of order (filed; defect fix, ~30 min)
 - [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
-- [ ] T1-59 Frame-before-start gate 鈥?`canStartJob` must require `hasFramed` (filed; UX/safety gap, ~30 min)
+- [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
 - [ ] T1-61 Start mode labels rewritten with full sentences + tooltips (filed; UX clarity, ~30 min)
 - [ ] T1-62 `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs (filed; UX correctness, ~30 min - 1 hour)
@@ -19369,8 +19369,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-4 Split ConnectionPanelMain (8 phases shipped; sub-component extraction folded into T2-6)
 - [ ] T2-5 Gcode template validator
 - [ ] T2-6 Zustand stores, split App.tsx
-- [ ] T2-7 Controller abstraction real, Marlin stub
-- [ ] T2-8 Split Preflight into rule modules
+- [x] T2-7 Controller abstraction real, Marlin stub (closed pre-session — abstraction shipped; Marlin stub deferred to T2-24 / T4-7)
+- [x] T2-8 Split Preflight into rule modules (closed pre-session — 8 modules in src/core/preflight/rules/)
 - [ ] T2-10 Establish single MachineCommandGateway choke point (filed; multi-pass architectural)
 - [ ] T2-11 Service-layer operation mutex for laser-on operations (filed; defense-in-depth)
 - [ ] T2-12 Unified MachineSafetyState type 鈥?consolidation of safety fields (filed; ships AFTER T1-22/25/29/30, T2-11)
@@ -19428,7 +19428,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
 - [ ] T2-65 Central error reporter 鈥?`reportError({domain, severity, recovery, developerDetails})` (filed; refines T2-57)
 - [ ] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (filed; refines T2-44)
-- [ ] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (filed; refines T2-56)
+- [x] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (shipped 2026-04-25 in `a1bb80f`)
 - [ ] T2-68 Critical error history preserved across `clearMessages()` and disconnect (filed; depends on T2-65)
 - [ ] T2-69 Atomic autosave record 鈥?single key with checksum + scene metadata (filed; depends on T1-68)
 - [ ] T2-70 Previous autosave backup slot 鈥?recovery offers latest + previous (filed; depends on T2-69)
@@ -19437,11 +19437,11 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-73 Formal migration pipeline 鈥?version bumps with explicit migrations (filed; required before T2-71/T2-72 schema additions)
 - [ ] T2-74 Surface load repair report to user 鈥?`deserializeSceneWithReport` (filed; closes silent-repair UX gap)
 - [ ] T2-75 Deep geometry/settings validation on load (filed; pairs with T2-74)
-- [ ] T2-76 Single mutation transaction path 鈥?`commitSceneTransaction({scene, reason, meta})` (filed; foundation, refines T2-51 / T2-55 / T2-57)
+- [x] T2-76 Single mutation transaction path — `commitSceneTransaction({scene, reason, meta})` (closed pre-session — unified path in SceneTransaction.ts; pinned by tests/scene-transaction-unified.test.ts)
 - [ ] T2-77 Async revision guards on trace + image import (filed; data-loss prevention, pairs with T1-57)
-- [ ] T2-78 History entries with action metadata (filed; foundation for T2-79 / T2-80)
-- [ ] T2-79 Selection restore on undo/redo (filed; depends on T2-78)
-- [ ] T2-80 History coalescing for sliders 鈥?begin/preview/commit (filed; refines T1-74)
+- [x] T2-78 History entries with action metadata (closed pre-session — selectionBefore/After + invalidatesOutput in SceneTransaction.ts)
+- [x] T2-79 Selection restore on undo/redo (closed pre-session — pinned by tests/selection-restore-on-history.test.ts)
+- [x] T2-80 History coalescing for sliders — begin/preview/commit (shipped 2026-04-25 in `e6874af`)
 - [ ] T2-81 Raster buffers stored outside history (filed; raster-heavy memory)
 - [ ] T2-82 History memory budget 鈥?count + bytes (filed; pairs with T2-81)
 - [ ] T2-83 Block undo/redo while job running (filed; safety, pairs with T2-53)
@@ -19492,7 +19492,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
 
 ### Tier 3 (This quarter)
-- [ ] T3-1 Autosave to IndexedDB/fs (via T2-2)
+- [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
 - [ ] T3-2 Write the 5 critical missing tests
 - [ ] T3-3 Delete or auto-generate PROJECT_MAP
 - [ ] T3-4 Code-signed installer
@@ -19573,7 +19573,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
-- [ ] T3-82 Production bundle smoke tests 鈥?no tester secret, no dev unlock, no mock entitlements (filed; refines T1-81)
+- [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)
 - [ ] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
 - [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
 - [ ] T3-85 Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
