@@ -18,12 +18,13 @@ export function canUse(feature: ProFeature): boolean {
   return entitlementService.canUse(feature);
 }
 
-// T1-78: split entitlement API into a boolean check (canUseFeature) and an
-// enforcement guard (assertFeature). The previous `requireFeature` name read
-// as enforcement but only returned a boolean — a naming hazard since the
-// next-naive caller might write `requireFeature(x); doProThing();` and skip
-// the gate. The explicit split removes the foot-gun. `requireFeature` stays
-// as a deprecated alias so existing callers keep working until they migrate.
+// T1-78: entitlement API split into a boolean check (canUseFeature) and an
+// enforcement guard (assertFeature). The previous single function returned
+// a boolean despite its enforcement-sounding name — a naming hazard, since
+// the next-naive caller might pair the call with the gated work and skip
+// the gate entirely. Phase 1 added the new functions alongside a
+// transitional alias; Phase 2 migrated all internal callers; Phase 3
+// removed the alias.
 export function canUseFeature(feature: ProFeature): boolean {
   return entitlementService.canUse(feature);
 }
@@ -39,9 +40,4 @@ export function assertFeature(feature: ProFeature): void {
   if (!entitlementService.canUse(feature)) {
     throw new EntitlementError(feature);
   }
-}
-
-/** @deprecated T1-78: use `canUseFeature()` for boolean checks or `assertFeature()` for enforcement. */
-export function requireFeature(feature: ProFeature): boolean {
-  return entitlementService.canUse(feature);
 }

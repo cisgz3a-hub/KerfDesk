@@ -74,19 +74,16 @@ console.log('\n=== T1-78 Phase 2a migration ===\n');
   }
 }
 
-// Deprecated alias still in the barrel so Phase 2b's UI-hook callers
-// keep working.
-{
-  const src = read('src/entitlements/index.ts');
-  assert(/@deprecated/.test(src), 'entitlements/index.ts marks the deprecated alias');
-  assert(/export function requireFeature\(/.test(src),
-    'entitlements/index.ts still exports requireFeature for unmigrated UI-hook callers');
-}
-
+// Phase 3 (post-`<TBD>`) removed the deprecated requireFeature alias from
+// entitlements/index.ts. Earlier versions of this test asserted the alias
+// was still exported (Phase 2a's contract); after Phase 3 the alias is
+// gone. The "alias removed" regression guard lives in
+// `tests/entitlement-api-no-deprecated-export.test.ts`.
+//
 // UI-hook callers are migrated in Phase 2b — see
-// `tests/entitlement-api-migration-phase2b.test.ts` for the
-// post-2b shape assertions. This test continues to pin only the
-// service-layer files Phase 2a touched.
+// `tests/entitlement-api-migration-phase2b.test.ts` for the post-2b
+// shape assertions. This test continues to pin only the service-layer
+// files Phase 2a touched.
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

@@ -1,7 +1,14 @@
 /**
  * T1-78: split `requireFeature` into `canUseFeature` (boolean) and
- * `assertFeature` (throws). Verify the new API contract and that the
- * deprecated `requireFeature` alias still works for unmigrated callers.
+ * `assertFeature` (throws). Verify the new API contract.
+ *
+ * Phase 3 (`<TBD>`) removed the deprecated `requireFeature` alias. The
+ * historical "deprecated alias still works" assertions are gone — the
+ * alias-removed regression guard lives in
+ * `tests/entitlement-api-migration-phase2b.test.ts` (the global
+ * "no internal caller of requireFeature" sweep) plus
+ * `tests/entitlement-api-no-deprecated-export.test.ts` (Phase 3
+ * regression guard on the exported barrel).
  *
  * Run: npx tsx tests/entitlement-api-split.test.ts
  */
@@ -10,7 +17,6 @@ import {
   canUseFeature,
   EntitlementError,
   entitlementService,
-  requireFeature,
 } from '../src/entitlements';
 import type { ProFeature } from '../src/entitlements';
 
@@ -84,12 +90,6 @@ const direct = new EntitlementError('cross_hatch', 'custom message');
 assert(direct.feature === 'cross_hatch', 'EntitlementError preserves feature on direct construction');
 assert(direct.message === 'custom message', 'EntitlementError accepts a custom message');
 assert(direct instanceof Error, 'EntitlementError extends Error');
-
-// Deprecated alias still works — unmigrated callers keep working.
-withCanUse((f) => f === 'tabs', () => {
-  assert(requireFeature('tabs') === true, 'requireFeature deprecated alias returns true when entitled');
-  assert(requireFeature('overcut') === false, 'requireFeature deprecated alias returns false when not');
-});
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);

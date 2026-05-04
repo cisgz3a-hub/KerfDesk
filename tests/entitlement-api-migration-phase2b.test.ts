@@ -61,18 +61,12 @@ for (const { file, feature, siteCount } of HOOKS) {
     `${file}: legacy ad-hoc \`throw new Error('… requires a Pro license')\` is gone`);
 }
 
-// The deprecated alias remains exported so external consumers and
-// source-pin tests don't break — its absence is not the contract,
-// only the absence of internal callers is.
-{
-  const src = read('src/entitlements/index.ts');
-  assert(/@deprecated/.test(src), 'entitlements/index.ts marks the deprecated alias');
-  assert(/export function requireFeature\(/.test(src),
-    'entitlements/index.ts still exports requireFeature (alias retained)');
-}
-
-// After Phase 2b, no production caller in src/ outside the
-// entitlements barrel itself uses requireFeature.
+// Phase 3 (post-`<TBD>`) removed the deprecated alias from
+// entitlements/index.ts entirely; the "alias removed" regression
+// guard lives in `tests/entitlement-api-no-deprecated-export.test.ts`.
+//
+// After Phase 2b plus Phase 3, no production caller in src/ uses
+// requireFeature — the alias doesn't exist to call.
 {
   const filesToCheck = [
     'src/core/nesting/Nester.ts',
