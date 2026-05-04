@@ -35,6 +35,7 @@ import { StatusBar } from './connection/StatusBar';
 import { Jog } from './connection/Jog';
 import { Issues } from './connection/Issues';
 import { Progress } from './connection/Progress';
+import { jobModePlanSummary } from './connection/jobModePlanSummary';
 import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
 import type { StartReadiness, StartReadinessGate } from './connection/StartReadinessPanel';
@@ -63,6 +64,7 @@ function jobModeLabel(scene: Scene): string {
     default: return 'Running';
   }
 }
+
 
 type StartMode = GcodeStartMode;
 
@@ -1862,6 +1864,7 @@ export function ConnectionPanelMain({
       elapsedSeconds,
       estimatedRemaining,
       activeLabel: jobModeLabel(scene),
+      planSummary: jobModePlanSummary(scene),
     }),
   );
 

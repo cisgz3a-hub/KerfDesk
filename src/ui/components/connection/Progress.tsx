@@ -13,6 +13,8 @@ interface ProgressProps {
   estimatedRemaining: number | null;
   /** Verb shown while running: "Cutting" / "Engraving" / "Scoring" / "Running". */
   activeLabel?: string;
+  /** T1-62: for multi-mode jobs, planned operation order, e.g. "Engrave → Cut". */
+  planSummary?: string | null;
 }
 
 const mono = "'JetBrains Mono', monospace";
@@ -30,6 +32,7 @@ export function Progress({
   elapsedSeconds,
   estimatedRemaining,
   activeLabel = 'Running',
+  planSummary,
 }: ProgressProps) {
   return React.createElement('div', {
     style: { padding: '16px', display: 'flex', flexDirection: 'column' as const, gap: 12, flexShrink: 0 },
@@ -38,6 +41,12 @@ export function Progress({
       React.createElement('div', {
         style: { fontSize: 16, fontWeight: 700, color: displayPaused ? '#ffd444' : '#2dd4a0' },
       }, displayPaused ? '⏸ Paused' : `▶ ${activeLabel}...`),
+      // T1-62: planned operation order (e.g. "Plan: Engrave → Cut")
+      // shown under the active label for multi-mode jobs so the user
+      // knows what's coming during a 12+ minute mixed run.
+      !displayPaused && planSummary && React.createElement('div', {
+        style: { fontSize: 11, color: '#888aaa', marginTop: 4, fontFamily: mono },
+      }, `Plan: ${planSummary}`),
     ),
     React.createElement('div', null,
       React.createElement('div', {

@@ -3526,6 +3526,8 @@ T3-70 covers the diagrams more fully; T1-61 adds the labels and tooltips as the 
 
 ### T1-62 | `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs
 
+**Status:** Shipped 2026-05-04 in `<TBD>` (static plan-summary version per the spec's recommended path; live-current-operation tracking via compile metadata remains the future T2-63 path). New helper `jobModePlanSummary(scene): string | null` in `src/ui/components/connection/jobModePlanSummary.ts` returns the canonical PlanOptimizer order (engrave/score → cut, image dedupes to engrave) for multi-mode jobs and `null` for single-mode / no-objects (where the existing `activeLabel` already names the operation). Result is rendered as a `Plan: Engrave → Cut` subtitle under the active label in `Progress.tsx` while the job runs and isn't paused. The progress UI now distinguishes "we're 6 minutes into a 12-minute job and the next phase is Cut" without needing live-line tracking. Pinned by `tests/job-mode-plan-summary.test.ts` (13 contracts: each mode combination, planner-order independence from layer order, image+engrave dedup, hidden/output:false/no-object layers all correctly excluded). Behavioral test on the pure helper (rather than React-mount integration on Progress.tsx) since the contract is the helper's mode-mapping logic; the Progress wiring is one prop forwarded.
+
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:42-62, 1558`. Cross-check verified at line 52 鈥?collapses to 'Running' when `modes.size > 1`.
 
 **Problem:** Cross-check confirmed. When a job has multiple operation modes (mixed engrave + cut, the most common multi-layer case), `jobModeLabel` returns `'Running'` (line 52) 鈥?exactly the same as a job with no objects (line 49). The progress UI shows "Running" with no indication of what operation is currently active.
@@ -19346,7 +19348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
 - [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
 - [x] T1-61 Start mode labels rewritten with full sentences + tooltips (shipped 2026-05-04 in `a5a6af9`)
-- [ ] T1-62 `jobModeLabel` shows operation order, not generic "Running" for multi-mode jobs (filed; UX correctness, ~30 min - 1 hour)
+- [x] T1-62 `jobModeLabel` shows operation order — static plan summary shipped 2026-05-04 in `<TBD>` (live-line tracking deferred to T2-63)
 - [ ] T1-63 Warning confirmation includes detail/fix per warning, not just titles (filed; UX safety, ~15 min)
 - [ ] T1-64 Pause/Resume/Stop catch blocks must surface errors to user, not just `console.warn` (filed; safety defect, ~30 min)
 - [x] T1-65 Frame inner loop must abort on first command failure, not continue partial frame (closed 2026-05-02; superseded by T1-103 in `8cb3faa`)
