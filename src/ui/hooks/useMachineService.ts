@@ -9,10 +9,19 @@ import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 interface UseMachineServiceArgs {
   controllerRef: MutableRefObject<LaserController | null>;
   portRef: MutableRefObject<WebSerialPort | MockSerialPort | null>;
+  /**
+   * T2-56: signals when the controller has been created and assigned
+   * to `controllerRef.current`. The auto-finalize listener attaches
+   * exactly once when this transitions to true. Pre-T2-56 finalization
+   * was driven by a `useEffect` inside `ConnectionPanel.tsx`; if the
+   * panel was unmounted at the moment of the run→idle transition, the
+   * effect didn't fire and finalization was missed.
+   */
+  controllerReady: boolean;
 }
 
 export function useMachineService(args: UseMachineServiceArgs) {
-  const { controllerRef, portRef } = args;
+  const { controllerRef, portRef, controllerReady } = args;
   const service = useMemo(
     () => new MachineService(controllerRef, portRef),
     [controllerRef, portRef],
@@ -37,6 +46,15 @@ export function useMachineService(args: UseMachineServiceArgs) {
     setBurnState(service.getBurnState());
     return service.onBurnStateChange(setBurnState);
   }, [service]);
+
+  // T2-56: attach the auto-finalize listener once the controller is
+  // ready. Cleanup unsubscribes on unmount or controller change.
+  useEffect(() => {
+    if (!controllerReady) return;
+    const ctrl = controllerRef.current;
+    if (!ctrl) return;
+    return service.attachAutoFinalize(ctrl);
+  }, [service, controllerRef, controllerReady]);
 
   const appendMessage = (message: string) => {
     service.appendMessage(message);

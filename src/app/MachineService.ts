@@ -366,6 +366,45 @@ export class MachineService {
   }
 
   /**
+   * T2-56: subscribe to controller state + progress events so job-log
+   * finalization runs whether or not the connection panel is mounted.
+   * Pre-T2-56 finalization was driven by a `useEffect` inside
+   * `ConnectionPanel.tsx` — if the panel was unmounted (sidebar closed,
+   * route change) at the moment the controller transitioned from
+   * `'run'` to `'idle'`, the effect didn't fire and finalization was
+   * delayed until the panel remounted (or missed entirely if the user
+   * never re-opened it).
+   *
+   * Returns an unsubscribe function that the caller (typically a
+   * `useEffect` in `useMachineService`) wires to component teardown.
+   * Subscribing twice is safe — each call returns its own unsub, and
+   * `tryFinalizeJobLog`'s existing `log.status !== 'running'` early-
+   * return makes double-call idempotent.
+   *
+   * The default `appendMessage` sink writes to `console.info`. UI
+   * surfaces that want to display the finalize message can still call
+   * `tryFinalizeJobLog` directly with their own appendMessage — the
+   * existing `currentJobLog` guard prevents double-finalize.
+   */
+  attachAutoFinalize(ctrl: LaserController): () => void {
+    let lastProgress: JobProgress | null = null;
+    const sink = (msg: string): void => {
+      console.info('[T2-56 auto-finalize]', msg);
+    };
+    const unsubState = ctrl.onStateChange((state) => {
+      void this.tryFinalizeJobLog(state, lastProgress, ctrl.isJobRunning, sink);
+    });
+    const unsubProgress = ctrl.onProgress((progress) => {
+      lastProgress = progress;
+      void this.tryFinalizeJobLog(ctrl.state, progress, ctrl.isJobRunning, sink);
+    });
+    return () => {
+      unsubState();
+      unsubProgress();
+    };
+  }
+
+  /**
    * When the machine returns idle after a running job, persist the job log.
    */
   async tryFinalizeJobLog(

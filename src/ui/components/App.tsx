@@ -260,6 +260,11 @@ export function App() {
   const machineUi = useMachineService({
     controllerRef: grbl.controllerRef,
     portRef: grbl.portRef,
+    // T2-56: signals when the controller is ready so the service can
+    // attach its auto-finalize listener (formerly a useEffect inside
+    // ConnectionPanel that missed the run→idle transition if the
+    // panel was unmounted).
+    controllerReady: grbl.controllerReady,
   });
   const wasJobRunningRef = useRef(false);
 
