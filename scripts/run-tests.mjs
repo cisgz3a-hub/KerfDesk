@@ -67,6 +67,7 @@ const files = [
   'start-mode-labels.test.ts',
   'job-mode-plan-summary.test.ts',
   'compile-race-guard.test.ts',
+  'auto-detect-includes-max-spindle.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

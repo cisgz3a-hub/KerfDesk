@@ -482,6 +482,24 @@ export function App() {
           ? Math.min(grblMachineInfo.maxAccelX, grblMachineInfo.maxAccelY)
           : (grblMachineInfo.maxAccelX > 0 ? grblMachineInfo.maxAccelX
             : (grblMachineInfo.maxAccelY > 0 ? grblMachineInfo.maxAccelY : current.maxAccelMmPerS2)),
+      // T1-52: copy live `$30` (maxSpindle) into the active profile
+      // when Auto-Detect runs. Previously the safety-most-relevant
+      // power-scaling value silently did NOT update — a controller
+      // reporting `$30=255` paired with the createBlankProfile default
+      // `maxSpindle: 1000` made `encodePowerValue(50)` emit `S500`,
+      // which the controller clamped to its `$30` ceiling and
+      // delivered as 100% power. Now the profile mirrors the live
+      // value when the controller reports a positive number; the
+      // current value is preserved when `$30` is unknown
+      // (controllerMaxSpindle null/non-positive). Separate audit-
+      // extended fields (`$32` laser mode, `$22` homing, `$20` soft
+      // limits, `$23` origin direction) are deliberately out of scope
+      // — `$23` requires safe semantics mapping (audit P3 explicit
+      // caveat), and the others would need a new `laserModeEnabled`
+      // profile field. Filed as a follow-up if/when prioritized.
+      maxSpindle: grblMachineInfo.maxSpindle > 0
+        ? grblMachineInfo.maxSpindle
+        : current.maxSpindle,
     });
   }, [grblMachineInfo, updateActiveProfile]);
 

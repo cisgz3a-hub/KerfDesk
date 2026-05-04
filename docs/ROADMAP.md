@@ -2896,6 +2896,8 @@ Probe sequence already includes `$I` (line 223 area). After `ok` is received, if
 
 ### T1-52 | Auto-detect machine settings must include `$30 鈫?maxSpindle`
 
+**Status:** Shipped 2026-05-04 in `<TBD>` (minimum scope: maxSpindle copy only). `handleAutoDetectMachine` in App.tsx now copies `grblMachineInfo.maxSpindle` into the active profile when the controller-reported value is positive, falling back to the current profile's `maxSpindle` when the live value is unknown (null/zero) so a controller without a parsed `$30` cannot zero the profile by accident. Closes the silent-miscalibration path: a controller with `$30=255` and a `createBlankProfile`-default `maxSpindle: 1000` previously made `encodePowerValue(50)` emit `S500` which the controller silently clamped to its `$30` ceiling and delivered as 100% power. **Out of scope for this ship:** the audit-extended `$32` (laser mode), `$22` (homing enabled), `$20` (soft limits), and `$23` (origin direction). `$23` requires safe semantics mapping per audit P3's explicit caveat; the others would need a new `laserModeEnabled` profile field. Filed as a follow-up if/when prioritized — the headline T1-52 contract ("$30 → maxSpindle") is delivered. Pinned by `tests/auto-detect-includes-max-spindle.test.ts` (12 source-level contracts: maxSpindle copy with positive-value guard, fallback to current value, all existing copies still present, T1-52 marker for grep). Source-level pin because mounting App.tsx with stubbed grblMachineInfo + spying on updateActiveProfile would need the full App dependency tree; the structural pin guarantees the line cannot be silently dropped again.
+
 **Code reference:** `src/ui/components/App.tsx:440-457` (`handleAutoDetectMachine`).
 
 **Problem:** Cross-check verified exactly. Auto-detect copies bed size, max rates, and acceleration from `grblMachineInfo` into the active profile, but **does NOT copy `maxSpindle`**, despite `grblMachineInfo.maxSpindle` being available (the controller parses `$30` correctly per audit's positive findings).
@@ -19342,7 +19344,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (filed; defect fix, ~30 min)
 - [ ] T1-50 Connect button mutex / abortable connect (filed; defect fix, ~1 session)
 - [ ] T1-51 Strengthen GRBL handshake proof 鈥?reject raw `ok` as welcome (filed; defect fix, ~30 min)
-- [ ] T1-52 Auto-detect must include `$30 鈫?maxSpindle` (filed; defect fix, ~30 min)
+- [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `<TBD>` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)
 - [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)
 - [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
 - [ ] T1-55 Block laser-on operations when `$30` unknown and connected (filed; defect fix, ~1 hour)
