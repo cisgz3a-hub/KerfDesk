@@ -20,6 +20,7 @@ import {
 } from './rules/TemplatePreflight';
 import { runRasterChecks } from './rules/RasterPreflight';
 import { runOptimizationChecks } from './rules/OptimizationPreflight';
+import { runDuplicateGeometryChecks } from './rules/DuplicateGeometryPreflight';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -67,6 +68,8 @@ export const PREFLIGHT_CODES = {
   MACHINE_MAXSPINDLE_UNKNOWN: 'MACHINE_MAXSPINDLE_UNKNOWN',
   /** T1-25: connect-time safe-state handshake reported a non-safe controller state. */
   MACHINE_UNSAFE_AT_CONNECT: 'MACHINE_UNSAFE_AT_CONNECT',
+  /** T2-16: two or more objects with identical transform + geometry signature — likely stacked duplicates. */
+  GEOMETRY_DUPLICATE: 'GEOMETRY_DUPLICATE',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -177,6 +180,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runGcodeTemplateSemanticValidation(ctx, results);
   runRasterChecks(ctx, results);
   runOptimizationChecks(ctx, results);
+  runDuplicateGeometryChecks(ctx, results);
   ensureNoCompiledOutputIssue(ctx, results);
   return sortBySeverity(results);
 }

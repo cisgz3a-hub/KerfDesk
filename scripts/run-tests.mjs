@@ -27,6 +27,7 @@ const files = [
   'unsafe-prior-state-persistence.test.ts',
   'operation-mutex-prevents-overlap.test.ts',
   'command-gates-honor-safety-state.test.ts',
+  'preflight-duplicate-geometry.test.ts',
   'simulation.test.ts',
   'viewport.test.ts',
   'wake-lock.test.ts',
