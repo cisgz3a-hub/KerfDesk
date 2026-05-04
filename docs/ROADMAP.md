@@ -3482,6 +3482,8 @@ When connected and a profile is active, the header shows the four most critical 
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 3 + Priority 3. Verified at ConnectionPanelMain.tsx:1575-1599.
 
+**Status:** Shipped in `<TBD>` (minimum-viable scope). Pure software contract — no hardware verification needed (UI relocation only; no g-code, no machine state, no preflight semantic change). **Scope:** lifted the `DeviceProfileSelector` mount out of the `moreSection` collapsed `showMore && (...)` block and into a new `profileSection` rendered as a sibling of `MoveControls` inside the panel body — always visible when connected, no clicks needed. The selector itself is unchanged; only its render position moved. Subtle accent background (`rgba(0, 212, 255, 0.02)`) marks it visually as a structural panel section. The richer header treatment from the spec — collapsed summary card showing "Bed: 400 × 400 mm · Origin: front-left · Max spindle: 1000 · Homing: off" with click-to-open modal — is filed as a future T1-60 follow-up; the safety contract (user always sees which profile is active without clicking through More options) is delivered by the always-visible selector. Pinned by `tests/profile-selector-pinned-to-header.test.ts` (10 source-level contracts: T1-60 marker present; `profileSection` gated on `isConnected`; mounts `DeviceProfileSelector`; renders before `MoveControls`; OLD location inside `moreSection` is empty of the selector mount; marker comment cites the rationale; profileSection is a sibling of MoveControls in the scrollable panel body). Source-level pin chosen because mounting `ConnectionPanelMain` requires the full machine-service / controller / preflight tree — disproportionate for a contract that targets the panel structure. Master checklist `[x]`.
+
 ---
 
 ### T1-61 | Start mode labels rewritten with full sentences + tooltips
@@ -19388,7 +19390,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-57 Compile manager request-id guard (shipped 2026-05-04 in `d28a57f`)
 - [x] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (shipped 2026-05-04 in `91d0873`)
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
-- [ ] T1-60 Pin device profile selector to header 鈥?out of "More options" (filed; UX safety, ~30 min - 1 hour)
+- [x] T1-60 Pin device profile selector to header 鈥?out of "More options" (shipped 2026-05-04 in `<TBD>` — minimum-viable; richer header summary card filed as future follow-up)
 - [x] T1-61 Start mode labels rewritten with full sentences + tooltips (shipped 2026-05-04 in `a5a6af9`)
 - [x] T1-62 `jobModeLabel` shows operation order — static plan summary shipped 2026-05-04 in `04a4e66` (live-line tracking deferred to T2-63)
 - [x] T1-63 Warning confirmation includes detail/fix per warning, not just titles (shipped 2026-05-04 in `b0b4827`)

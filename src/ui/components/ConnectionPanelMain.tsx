@@ -2042,6 +2042,30 @@ export function ConnectionPanelMain({
     onStop: () => { void handleStop(); },
   });
 
+  // T1-60: device profile selector pinned to the panel — always visible
+  // when connected, never buried under "More options." The active profile
+  // governs the most safety-critical settings (bed dimensions, origin
+  // corner, max spindle, homing, header/footer templates); a wrong
+  // profile makes every other setting wrong. Audit 4B Critical UX
+  // failure 3 framed the pre-T1-60 location ("More options" collapse) as
+  // a top-tier "wrong place to burn" cause for beginners. The selector
+  // is now always rendered just above the workflow body.
+  const profileSection = isConnected && React.createElement('div', {
+    style: {
+      padding: '8px 16px',
+      borderTop: '1px solid #1a1a2e',
+      flexShrink: 0,
+      background: 'rgba(0, 212, 255, 0.02)',
+    },
+  },
+    React.createElement(DeviceProfileSelector, {
+      scene,
+      onSceneCommit,
+      onMessage: (msg: string) => setMessages(prev => [...prev, msg]),
+      onOpenSettings,
+    }),
+  );
+
   const moreSection = isConnected && React.createElement('div', {
     style: { borderTop: '1px solid #1a1a2e', flexShrink: 0 },
   },
@@ -2061,12 +2085,6 @@ export function ConnectionPanelMain({
     showMore && React.createElement('div', {
       style: { padding: '8px 16px 12px', display: 'flex', flexDirection: 'column' as const, gap: 6, maxHeight: 200, overflowY: 'auto' as const },
     },
-      React.createElement(DeviceProfileSelector, {
-        scene,
-        onSceneCommit,
-        onMessage: (msg: string) => setMessages(prev => [...prev, msg]),
-        onOpenSettings,
-      }),
       isSimulator && React.createElement('button', {
         type: 'button',
         onClick: () => setShowSimulator(v => !v),
@@ -2234,6 +2252,7 @@ export function ConnectionPanelMain({
           flexDirection: 'column' as const,
         },
       },
+        profileSection,
         React.createElement(MoveControls, {
           isConnected,
           isRunning,
