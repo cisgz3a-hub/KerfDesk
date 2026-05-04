@@ -259,6 +259,8 @@ Update all callers to pick the right one based on their `currentlyPaused` state.
 
 **Priority:** Tier 0.
 
+**Status:** Closed pre-session 2026-05-04 — `pauseResume(paused: boolean)` is gone; replaced by separate `pause(): void` at `src/app/MachineService.ts:925` and `resume(): void` at `:930`. Callers in `src/ui/components/ConnectionPanelMain.tsx:970` (`machineService.resume()`) and `:972` (`machineService.pause()`) call the split methods directly based on the local paused-state. The inverted-toggle hazard is structurally eliminated. Pinned by `tests/machine-service-pause-resume.test.ts` (registered). Audit doc's `:775,780` and `:909,911` line references are stale — the files have grown since the audit was written; the fix persists. **Closed without ship hash; pre-session.** Touches a documented safety-method contract per CLAUDE.md ("pause/resume" is in the heightened-bar list); contract verified preserved (split into two methods makes the pause/resume contract more explicit, not less). Same close-out shape as T1-3, T1-86, T0-1, T0-2 (this batch).
+
 ---
 
 ### T0-4 | Remove Wainlux bridge code
@@ -19259,7 +19261,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 ### Tier 0 (Today)
 - [x] T0-1 Delete comment-stripping in start-job path (closed pre-session 2026-05-04 — filter removed)
 - [x] T0-2 Fix three unsafe built-in gcode templates (closed pre-session 2026-05-04 — all 3 sub-fixes shipped)
-- [ ] T0-3 Split `pauseResume` into `pause` and `resume`
+- [x] T0-3 Split `pauseResume` into `pause` and `resume` (closed pre-session 2026-05-04 — split shipped; callers updated)
 - [ ] T0-4 Remove Wainlux bridge code
 
 ### Tier 1 (This week)
