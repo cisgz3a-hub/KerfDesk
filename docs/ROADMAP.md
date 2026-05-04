@@ -3126,6 +3126,8 @@ When DISCONNECTED, profile-based fallback continues to work as today (offline co
 
 ### T1-56 | Preflight `machinePlanBounds` reads wrong source 鈥?`activeJobTransform?.plan.bounds` is always null before Start
 
+**Status:** Closed 2026-05-04 — **superseded by T1-100** (`243ad0f`, shipped 2026-04-30). At write-time verification: `src/ui/components/App.tsx:1980-1982` reads `machinePlanBounds: activeJobTransform?.plan.bounds ?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null)`. The exact precedence chain T1-56 specified is in place — `lastResult.machinePlanBounds` wins pre-Start when a fresh compile exists; `activeJobTransform.plan.bounds` only takes precedence once Start has populated it. T1-56's required preflight-source-correctness fix is delivered. Inline comment at App.tsx:1977-1979 cites T1-100. Pinned by `tests/machine-plan-bounds-source.test.ts` (T1-100, 7/7). **Closed without separate ship hash; work is in `243ad0f`.** Same close-out shape as T1-65 (superseded by T1-103), T1-66 (superseded by T1-105), T1-73 (superseded by T2-76).
+
 **Code reference:** `src/ui/components/App.tsx:1719`. Cross-check verified at exact line.
 
 **Problem:** Most important Phase 4A failure per audit 4A. Cross-check confirmed:
@@ -19324,7 +19326,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (filed; defect fix, ~1 session)
 - [ ] T1-54 Block job start if GRBL output uses M4 and `$32 鈮?1` (filed; defect fix, ~1 hour)
 - [ ] T1-55 Block laser-on operations when `$30` unknown and connected (filed; defect fix, ~1 hour)
-- [ ] T1-56 Preflight machinePlanBounds reads wrong source 鈥?`activeJobTransform` always null pre-Start (filed; defect fix, ~15 min 鈥?one-line + tests)
+- [x] T1-56 Preflight machinePlanBounds reads wrong source — closed 2026-05-04; superseded by T1-100 in `243ad0f`
 - [ ] T1-57 Compile manager has no request-id guard 鈥?async results can commit out of order (filed; defect fix, ~30 min)
 - [ ] T1-58 PipelineService.compileGcode must accept profile snapshot, not read getActiveProfile globally (filed; defect fix, ~1 hour)
 - [x] T1-59 Frame-before-start gate — `canStartJob` must require `hasFramed` (shipped pre-session — `hasFramed` ref + Workflow.tsx gate)
