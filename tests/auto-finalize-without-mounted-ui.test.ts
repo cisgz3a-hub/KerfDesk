@@ -60,9 +60,16 @@ interface MockCtrl extends LaserController {
 function makeMockController(): MockCtrl {
   const stateListeners: ((s: MachineState) => void)[] = [];
   const progressListeners: ((p: JobProgress) => void)[] = [];
-  const ctrl = {
+  // Mutable closure-state lets `this`-style fire methods avoid TS
+  // self-typing pain. The MockCtrl cast is safe because we exhaustively
+  // cover the surface that attachAutoFinalize touches.
+  const innerState: { state: MachineState; isJobRunning: boolean } = {
     state: idle,
     isJobRunning: false,
+  };
+  const ctrl = {
+    get state() { return innerState.state; },
+    get isJobRunning() { return innerState.isJobRunning; },
     maxSpindle: 1000,
     connect: async () => {},
     disconnect: async () => {},
@@ -90,15 +97,15 @@ function makeMockController(): MockCtrl {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-    fireStateChange(state: MachineState) {
-      this.state = state;
+    fireStateChange(state: MachineState): void {
+      innerState.state = state;
       for (const cb of stateListeners) cb(state);
     },
-    fireProgress(progress: JobProgress) {
+    fireProgress(progress: JobProgress): void {
       for (const cb of progressListeners) cb(progress);
     },
-    setIsJobRunning(v: boolean) {
-      this.isJobRunning = v;
+    setIsJobRunning(v: boolean): void {
+      innerState.isJobRunning = v;
     },
   } as unknown as MockCtrl;
   return ctrl;
