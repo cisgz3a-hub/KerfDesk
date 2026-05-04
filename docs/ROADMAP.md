@@ -15254,6 +15254,85 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 ---
 
+### T2-129 | Destructive `forceSafeState()` primitive — operator-initiated force-safe-state recovery + T1-29 acknowledgement integration
+
+**Code reference:** `src/controllers/grbl/GrblController.ts` (new method); `src/app/MachineService.ts` (caller from a future operator-button + T1-29 recovery flow); `src/ui/components/App.tsx:680-740` (T1-29 recovery dialog as the integration consumer).
+
+**Upstream context:** T1-25 (`797319c`, shipped 2026-05-04) ships the *non-destructive* connect-time safe-state check via `GrblController.getUnsafeAtConnect()` plus the `MACHINE_UNSAFE_AT_CONNECT` preflight blocker. T1-29 (`67e1da2`, shipped 2026-05-04) ships the persisted-unsafe-prior-state recovery dialog. Both close the structural exposure ("user cannot start a job against an unsafe controller") via *observation* and *gating*, but neither *recovers* the controller from an alarm/run/hold state. The user has to power-cycle or manually send `$X` / soft-reset / cycle-start before reconnecting.
+
+**Problem:** Audit 1D originally framed this as a required fix. Once T1-25 + T1-29 ship the observation+gating layer, the remaining gap is *recovery convenience*: the user knows the controller is in alarm state (T1-25 surfaces it, the preflight blocker refuses the job), but they have no in-app affordance to reset it. They must:
+- Switch to the GRBL console, type `$X` (or whatever the reason indicates).
+- Or disconnect, power-cycle the controller, reconnect.
+
+For a beginner who hits an alarm at end-of-job, this is friction. For T1-29's recovery flow specifically, the spec wanted "after acknowledgement, `connect()` automatically invokes `forceSafeState()` to verify firmware is in clean state" — currently the post-acknowledgement path just runs the regular T1-25 check, which observes but doesn't recover.
+
+**Identified by:** Audit 1D (2026-04-25, ChatGPT) — full primitive specced. T1-25 ships the observation half; T2-129 is the recovery half.
+
+**Fix:** New destructive primitive on `GrblController`:
+
+```ts
+async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
+  ok: true;
+  state: MachineStatus;
+} | {
+  ok: false;
+  reason:
+    | 'no-banner-response'
+    | 'no-status-response'
+    | 'fs-not-zero'
+    | 'still-non-idle';
+  actual?: { feedRate: number; spindleSpeed: number; status: MachineStatus };
+}> {
+  const timeoutMs = opts.timeoutMs ?? 3000;
+  // 1. Send realtime soft reset (0x18) via writeByteCritical
+  await this.port.writeByteCritical(REALTIME_RESET);
+  // 2. Wait for GRBL banner response (firmware sends "Grbl 1.1h [...]" on reset)
+  const banner = await this.waitForGrblBanner(timeoutMs);
+  if (!banner) return { ok: false, reason: 'no-banner-response' };
+  // 3. Query status
+  this.port.writeByte(0x3F); // '?'
+  const status = await this.waitForStatusReport(timeoutMs);
+  if (!status) return { ok: false, reason: 'no-status-response' };
+  // 4. Verify FS field is 0,0
+  if (status.feedRate !== 0 || status.spindleSpeed !== 0) {
+    return { ok: false, reason: 'fs-not-zero', actual: status };
+  }
+  // 5. Verify status is idle (post-reset; alarm needs explicit $X)
+  if (status.status !== 'idle') {
+    return { ok: false, reason: 'still-non-idle', actual: status };
+  }
+  return { ok: true, state: status.status };
+}
+```
+
+**Read sources for callers:**
+- `GrblController.getUnsafeAtConnect()` — non-null verdict means `forceSafeState()` is the recovery action.
+- T1-29's recovery dialog at `App.tsx` — currently clears the unsafe-prior-state flag on dismissal; after T2-129 lands, can offer a "Force safe state" button on the dialog that calls `controller.forceSafeState()` and then clears.
+
+**Caller integrations:**
+
+(1) **T1-29 recovery flow (highest-value caller):** when the user dismisses the recovery dialog, optionally call `forceSafeState()` to bring the controller to a known-safe baseline before allowing connect. Currently the dialog is informational-only — the user must manually inspect and reconnect. With T2-129 the dialog can offer "Reset machine to safe state" which actually does the soft-reset + status-verify cycle.
+
+(2) **Operator-initiated UI button:** new "Force safe state" button next to Stop in the connection panel (gated to alarm/hold/run states). Calls `forceSafeState()` and surfaces the result via toast or alert. For users who hit an alarm and don't want to power-cycle.
+
+(3) **`getUnsafeAtConnect()` consumer:** when the connect-time verdict is non-null and the user clicks "Recover" in the (future) inline UI from T3-91, that path calls `forceSafeState()`.
+
+**Tests:** `tests/force-safe-state-primitive.test.ts`:
+- Mock controller responds with banner + idle + FS:0,0 → `{ ok: true, state: 'idle' }`.
+- Mock no banner response within timeout → `{ ok: false, reason: 'no-banner-response' }`.
+- Mock banner + no status response → `{ ok: false, reason: 'no-status-response' }`.
+- Mock banner + idle + FS:1500,500 → `{ ok: false, reason: 'fs-not-zero', actual }`.
+- Mock banner + alarm → `{ ok: false, reason: 'still-non-idle' }` (alarm requires `$X`, not soft-reset).
+- `forceSafeState` is destructive — running it during a streaming job aborts the job. Test the abort path.
+
+**Estimate:** ~1 session for the primitive + tests. UI integration (button + T1-29 dialog widening) is a separate ~30 min - 1 hour follow-up.
+
+**Priority:** Tier 2. T1-25 + T1-29 close the structural safety exposure; T2-129 is recovery-flow ergonomics on top of that. Useful, not urgent. Safety-touching code path (`writeByteCritical(REALTIME_RESET)`) so the heightened-bar review applies.
+
+**Cross-check note:** This was originally Audit 1D's required fix #7, folded into T1-25's spec. T1-25 shipped the non-destructive half; the destructive half needed its own UX design (it mutates controller state, can abort active jobs, requires a confirmation dialog) and is filed separately here.
+
+---
+
 ## Tier 3 鈥?This quarter
 
 ### T3-1 | Autosave to IndexedDB / filesystem
@@ -19258,6 +19337,103 @@ The check list grows as security tickets land 鈥?when T1-89 (sandbox) ships, th
 
 ---
 
+### T3-90 | Profile opt-in: auto-send M5 S0 after T1-25 safe-state handshake passes
+
+**Code reference:** `src/controllers/grbl/GrblController.ts:connect` (welcome handler; `_armSafeStateCheck` + first-status hook), `src/core/devices/DeviceProfile.ts` (new opt-in field).
+
+**Upstream context:** T1-25 (`797319c`, shipped 2026-05-04) introduced the connect-time safe-state handshake. Spec's optional step 5 was: "send `M5 S0` after Idle confirmation (defense-in-depth, ensures laser-off regardless of how the previous session ended). Should be opt-in via profile setting since some users may have valid reasons to preserve modal state across reconnects." T1-25 deferred this opt-in step.
+
+**Problem:** Even when T1-25's safe-state check passes (idle + FS:0,0), the controller's *modal* M-state may still be M3/M4 from a previous session. FS:0,0 reports current spindle output, not the modal command — a controller can be in M4 modal mode with S=0, FS shows 0, T1-25 reports null verdict, and the next G1 command starts firing at whatever the gcode's `S` value is. T1-23 (pause emits explicit M5) + T1-26 (footer enforce-M5-at-send) cover the run-time cases, but the *connect-time* modal state is unobserved.
+
+For most users the spec correctly notes this is paranoia (the burn's gcode emits its own M3/M4 at the start). But for some workflows — repeated short bursts, custom job-start sequences, manual console operation — the user may want a safety net that resets modal state on every connect.
+
+**Identified by:** T1-25 spec optional step 5. Filed as separate ticket because the UX shape (per-profile opt-in + Settings UI surface) is non-trivial vs. the simple "do it always" alternative (which would surprise users who deliberately preserve modal state).
+
+**Fix:** Add `DeviceProfile.autoM5OnConnect?: boolean` field, default `false`. When true, after `_handleStatusReport` records a null verdict from the connect-time safe-state check, queue `M5 S0` via `_writeSystemLine`. The check itself runs first; M5 only fires if the controller is already in a known-safe baseline (no point sending M5 to an alarm-state controller — needs `$X` first, which is T2-129 territory).
+
+```ts
+// In _handleStatusReport, after the T1-25 verdict-recording block:
+if (this._safeStateCheckArmed === false && this._unsafeAtConnect === null) {
+  // Just-cleared the arm flag with a null verdict. Optionally fire M5.
+  const profile = this._activeProfileSnapshot;  // T1-58: passed in by caller
+  if (profile?.autoM5OnConnect === true) {
+    this._writeSystemLine('M5 S0');
+  }
+}
+```
+
+The profile snapshot has to be plumbed to `GrblController` somehow — currently `GrblController` doesn't read profiles directly (T1-58 made `PipelineService` profile-pure, but `GrblController` still doesn't take a profile reference). Two implementation options:
+
+**Option A — pass profile to connect:** `connect(port, opts: { autoM5OnConnect?: boolean } = {})`. Caller (`MachineService.connectRealLaser`) reads the active profile at connect time and passes the flag. Simple but couples `GrblController` to per-connect options.
+
+**Option B — service-level wrapper:** `MachineService` listens for state changes; when the controller transitions out of `'connecting'` to `'idle'` for the first time AND the active profile has `autoM5OnConnect`, send `M5 S0` via `controller.sendCommand('M5 S0', 'internal')`. Decouples controller from profile, matches the existing service-layer pattern.
+
+Option B is cleaner. Implementation goes in `MachineService.connectRealLaser` post-resolve.
+
+Plus a Settings UI surface in the device-profile editor: "Send M5 on connect" checkbox with explanatory text ("Enable for diode lasers; disable if your workflow relies on preserved modal state").
+
+**Tests:** `tests/profile-auto-m5-on-connect.test.ts`:
+- `autoM5OnConnect: true` profile + connect with idle/FS:0,0 → `M5 S0` written via sendCommand.
+- `autoM5OnConnect: false` (default) profile + connect → no M5.
+- `autoM5OnConnect: true` + connect with alarm state → no M5 fired (T1-25's verdict is non-null, the auto-M5 path doesn't run; alarm requires explicit recovery via T2-129 / `$X`).
+- Settings UI source-pin: checkbox renders + writes the field.
+
+**Estimate:** ~1 hour. Profile field + service wiring + Settings UI surface + tests.
+
+**Priority:** Tier 3. Defense-in-depth on top of T1-22 (`safetyOff()`) + T1-23 (pause/resume M-state assertion) + T1-26 (footer M5) which already cover the run-time cases. The connect-time gap is small and opt-in. Quality-of-life hardening for diode users who want belt-and-suspenders.
+
+**Cross-check note:** T1-25 spec optional step 5. Default-off so the contract doesn't surprise users who preserve modal state intentionally; opt-in lets diode users pin connect-time behavior to "always start with laser off."
+
+---
+
+### T3-91 | Inline UI for unsafe-at-connect reason in connection panel header
+
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (header / status section), `src/controllers/grbl/GrblController.ts:getUnsafeAtConnect` (read source from T1-25).
+
+**Upstream context:** T1-25 (`797319c`, shipped 2026-05-04) added the connect-time safe-state verdict + `MACHINE_UNSAFE_AT_CONNECT` preflight blocker. Today the user only learns the verdict when they click Start — the preflight rule fires and surfaces the recovery message in the start-job confirmation dialog.
+
+**Problem:** Discovery-lossy UX. The preflight blocker is the *load-bearing safety net* — refusing job start when the controller is in a non-safe state — but it's invisible until the user tries to use the machine. A better experience: surface the verdict inline in the connection panel right after connect, separate from the start-job preflight, so the user knows immediately what state the controller is in and what to do about it.
+
+Concrete scenario: user connects, sees green "Connected" status in the panel, clicks Frame to verify placement → frame button refuses (T1-25 verdict blocks frame too once T1-30 lands; today only Start is blocked). Without inline UI the user is left wondering why nothing works.
+
+**Identified by:** T1-25 spec called for "Refuse machine control. Surface to UI: 'Controller in alarm state from previous session. Inspect machine, then click Clear Alarm to proceed.'" T1-25 shipped the *refuse* half via the preflight blocker; the *surface to UI* half (inline header treatment) is filed here.
+
+**Fix:** New banner / status section in the connection panel that reads `controllerRef.current?.getUnsafeAtConnect?.()` reactively (already available — added by T1-25). When non-null, render a yellow-warning banner above the workflow body with:
+
+- Reason headline (e.g. "Controller in alarm state from previous session").
+- Recovery action button — for `alarm`, `hold`, `run`, `check` reasons, the button says "Reset machine" and (once T2-129 ships) calls `forceSafeState()`. For `no-status-response` it says "Reconnect" (forces a disconnect / reconnect cycle). For `unsafe-residual-spindle` it says "Send M5" (calls `sendCommand('M5 S0', 'internal')`).
+- Dismiss link ("I've inspected manually") that hides the banner without changing state — the underlying preflight blocker still fires until the user reconnects with a clean verdict.
+
+Banner is rendered between the status section (`Connected via USB`) and the workflow body, alongside the existing alarm / faulted banners.
+
+The reason → message mapping mirrors the preflight blocker text (single source of truth). Worth extracting to a shared helper:
+
+```ts
+// src/ui/components/connection/unsafeAtConnectMessages.ts
+export function describeUnsafeAtConnect(reason: UnsafeAtConnectReason): {
+  headline: string;
+  detail: string;
+  actionLabel: string;
+  actionKind: 'reset' | 'reconnect' | 'm5';
+} { ... }
+```
+
+Both the preflight rule (`MachinePreflight.ts`) and the new inline banner read from this helper. Avoids drift between the two surfaces.
+
+**Tests:** `tests/connection-panel-unsafe-at-connect-banner.test.tsx`:
+- Mock controller with `getUnsafeAtConnect()` returning `'alarm'` → banner renders with "alarm state" headline + "Reset machine" action.
+- Banner dismiss → banner hidden, preflight blocker still fires on Start click.
+- Verdict transitions to null (post-recovery reconnect) → banner unmounts.
+- Reason → action mapping covered for all six reasons.
+
+**Estimate:** ~30 min - 1 hour. Banner component + reason-to-message helper + integration in panel header + tests.
+
+**Priority:** Tier 3. Pure UX polish on an existing safety contract; T1-25's preflight blocker is the load-bearing safety net. The discovery-loss is real but bounded — a user clicking Start hits the same recovery message via the preflight dialog. Tier 3 fits.
+
+**Cross-check note:** T1-25 spec step 2-4 included the "Surface to UI" prose. T1-25 shipped the refuse half; T3-91 ships the inline-surface half. Pairs naturally with T2-129's "Reset machine" button (the action target).
+
+---
+
 ## Tier 4 鈥?Later
 
 ### T4-1 | Starter material preset library
@@ -19564,6 +19740,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-126 Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary (filed; pairs with T1-94)
 - [ ] T2-127 Storage value size limits per-key (filed; pairs with T2-120)
 - [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
+- [ ] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (filed; T1-25 follow-up; reads `getUnsafeAtConnect()` + T1-29 recovery flow)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
@@ -19655,6 +19832,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-87 Log retention policy 鈥?per-domain caps, failed-job pinning, compression (filed; pairs with T2-108/116)
 - [ ] T3-88 IPC fuzz test suite 鈥?every handler tested with malformed inputs (filed; recurring CI quality gate)
 - [ ] T3-89 Production security build CI checks (filed; extends T1-81)
+- [ ] T3-90 Profile opt-in: auto-send M5 S0 after T1-25 safe-state handshake passes (filed; T1-25 follow-up)
+- [ ] T3-91 Inline UI for unsafe-at-connect reason in connection panel header (filed; T1-25 follow-up; pairs with T2-129)
 
 ### Tier 4 (Later)
 - [ ] T4-1 through T4-9 鈥?see above
