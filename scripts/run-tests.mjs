@@ -60,6 +60,7 @@ const files = [
   'security-deps-pinned.test.ts',
   'storage-singleton.test.ts',
   'entitlement-storage-migration.test.ts',
+  'entitlement-api-split.test.ts',
   'tester-verification-no-secret.test.ts',
   'tester-secret-not-in-source.test.ts',
   'dev-build-self-check.test.ts',

@@ -4632,6 +4632,8 @@ For T1-77's first ship, the stopgap closes the immediate hole. T2-89 / T2-90 shi
 
 ### T1-78 | Split `requireFeature` into `canUseFeature` (boolean) and `assertFeature` (throws)
 
+**Status:** Phase 1 shipped in `<TBD>` (2026-05-04). New API surface (`canUseFeature`, `assertFeature`, `EntitlementError`) added in `src/entitlements/index.ts` alongside a `@deprecated` `requireFeature` alias that preserves the old behavior. Pinned by `tests/entitlement-api-split.test.ts` (13/13). **Phase 2 open** — migration of the 8 remaining caller files (`src/core/nesting/Nester.ts`, `src/geometry/BooleanOps.ts`, `src/core/job/JobCompiler.ts`, `src/ui/hooks/useSceneOperations.ts`, `src/ui/hooks/useGeneratorHandlers.ts`, `src/ui/hooks/useMaterialTestHandlers.ts`, `src/ui/hooks/useKerfHandlers.ts`, `src/core/nesting/Nester.ts`) from `requireFeature` → `canUseFeature`/`assertFeature` to follow as a separate ticket(s) so each caller's intent (boolean gate vs enforcement) is reviewed individually. Master checklist remains `[ ]` until Phase 2 lands.
+
 **Code reference:** `src/entitlements/index.ts:21-23`. Cross-check verified.
 
 **Problem:** Cross-check confirmed:
@@ -19344,7 +19346,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-75 Undo/redo must mark dirty + invalidate compile/frame state (shipped pre-session)
 - [ ] T1-76 Active layer change unified path 鈥?UI-state OR project-state consistently (filed; consistency, ~30 min)
 - [x] T1-77 Remove `DEFAULT_TESTER_HMAC_SECRET` from client bundle (shipped pre-session)
-- [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` (filed; API hygiene, ~1 hour)
+- [ ] T1-78 Split `requireFeature` into `canUseFeature` + `assertFeature` — Phase 1 shipped in `<TBD>` (new API + deprecated alias); Phase 2 (migrating 8 callers) open
 - [ ] T1-79 Box generator service-level entitlement check (filed; only Pro feature missing one, ~15 min after T1-78)
 - [ ] T1-80 Validation failure shows user-facing state, not silent downgrade (filed; customer trust, ~1-2 sessions)
 - [x] T1-81 CI check — production builds must NOT contain dev-mode auto-unlock (shipped pre-session in `de3fbc7`)
