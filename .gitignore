@@ -5,6 +5,7 @@ dist-electron/
 build/
 release/
 *.log
+*.zip
 licenses-report.csv
 
 # Claude Code per-machine state
