@@ -282,6 +282,8 @@ Update all callers to pick the right one based on their `currentlyPaused` state.
 
 **Priority:** Tier 0.
 
+**Status:** Closed pre-session 2026-05-04 — all Wainlux bridge code is gone. `scripts/wainlux-bridge.mjs` no longer exists; `scripts/wifi-bridge.mjs` is a generic Falcon WiFi bridge (`import net from 'node:net'` + WebSocketServer; no Wainlux-specific logic). One comment-only reference remains in `src/core/devices/DeviceProfile.ts` ("e.g. Wainlux $23=3") describing front-left origin convention — non-functional, kept as a documentation hint. R2-1 (unauthenticated localhost WebSocket) and R2-2 (unvalidated IP IPC) audit findings are removed by virtue of the bridge code being gone. **Closed without ship hash; pre-session.** Same close-out shape as T1-3, T1-86, T0-1, T0-2, T0-3 (this batch).
+
 ---
 
 ## Tier 1 鈥?This week
@@ -19262,7 +19264,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T0-1 Delete comment-stripping in start-job path (closed pre-session 2026-05-04 — filter removed)
 - [x] T0-2 Fix three unsafe built-in gcode templates (closed pre-session 2026-05-04 — all 3 sub-fixes shipped)
 - [x] T0-3 Split `pauseResume` into `pause` and `resume` (closed pre-session 2026-05-04 — split shipped; callers updated)
-- [ ] T0-4 Remove Wainlux bridge code
+- [x] T0-4 Remove Wainlux bridge code (closed pre-session 2026-05-04 — bridge gone; one comment-only ref retained)
 
 ### Tier 1 (This week)
 - [ ] T1-1 WCS mutation consent prompt
