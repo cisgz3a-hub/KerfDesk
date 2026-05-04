@@ -162,6 +162,12 @@ export interface LaserController {
    */
   getFirmwareHomingCycleEnabled?(): boolean | undefined;
   /**
+   * GRBL: $32 laser mode. `true` = $32=1 (laser dynamic mode), `false` = $32=0 (CNC/spindle mode),
+   * `undefined` if not read yet. T1-32: jobs that emit M4 must verify $32=1; in CNC mode M4 keeps
+   * the laser on at full power between motion commands which is dangerous for diode lasers.
+   */
+  getFirmwareLaserModeEnabled?(): boolean | undefined;
+  /**
    * GRBL: G54 (from the last $#) and $10 (from the last $$). Nulls until a successful dump
    * during the current connect handshake.
    */

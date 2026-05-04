@@ -1746,4 +1746,19 @@ export class GrblController implements LaserController {
     if (Number.isNaN(n)) return undefined;
     return n !== 0;
   }
+
+  /**
+   * GRBL $32: laser mode. `true` if $32=1 (laser dynamic mode), `false` if $32=0 (CNC/spindle mode),
+   * `undefined` if not in $$ cache. T1-32: surfaces the live firmware value so preflight can refuse
+   * M4 jobs against a CNC-mode controller where M4 keeps the laser on at full power between moves.
+   * Reads the cached $$ dump rather than `_laserMode` directly so the source matches the
+   * `getFirmwareHomingCycleEnabled` shape (cache-or-undefined, not zero-value-as-default).
+   */
+  getFirmwareLaserModeEnabled(): boolean | undefined {
+    if (!this._grblSettings.has(32)) return undefined;
+    const v = this._grblSettings.get(32)!.trim();
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return undefined;
+    return n !== 0;
+  }
 }

@@ -401,6 +401,7 @@ export function ConnectionPanelMain({
       bedHeight,
       machinePlanBounds,
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
+      controllerRef.current?.getFirmwareLaserModeEnabled?.(),
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;

@@ -59,6 +59,8 @@ export const PREFLIGHT_CODES = {
   OVERSCAN_EXCEEDS_BED: 'OVERSCAN_EXCEEDS_BED',
   HOMING_ENABLED_NO_H: 'HOMING_ENABLED_NO_H',
   ACCEL_AWARE_NO_ACCEL_PARAM: 'ACCEL_AWARE_NO_ACCEL_PARAM',
+  /** T1-32: M4 dynamic-mode job emitted against a controller reporting $32=0 (CNC/spindle mode). */
+  MACHINE_LASER_MODE_DISABLED: 'MACHINE_LASER_MODE_DISABLED',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -112,6 +114,8 @@ export interface PreflightContext {
     maxAccelX?: number;
     maxAccelY?: number;
     homingEnabled?: boolean;
+    /** GRBL $32: laser mode. true = dynamic ($32=1), false = CNC ($32=0), undefined = not read. */
+    laserMode?: boolean;
   };
   gcodeHeaderPreview?: string;
   /** When set, GRBL-style machine status for job-start guardrails. */
@@ -126,6 +130,12 @@ export interface PreflightContext {
   connectedToMachine?: boolean;
   /** When `machinePlanBounds` is absent, optional G-code text for travel XY bounds scan only. */
   gcodeTravelScan?: string | null;
+  /**
+   * T1-32: precomputed flag for "the compiled output emits M4 dynamic-power somewhere."
+   * Set at the runPreflightSummary boundary by scanning the gcode once. Drives the
+   * MACHINE_LASER_MODE_DISABLED check without the rule having to re-scan.
+   */
+  outputUsesM4?: boolean;
   /**
    * Design vs machine bed (mm) for "outside bed" design checks. Same source as
    * `resolveBedWidthMm` / `resolveBedHeightMm` at the `runPreflightSummary` call site.
@@ -297,6 +307,11 @@ export function runPreflightSummary(
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null,
   /** When set, GRBL $22 from the connected controller (homing cycle enabled in firmware). */
   firmwareHomingFromMachine?: boolean,
+  /**
+   * T1-32: when set, GRBL $32 from the connected controller (true = laser dynamic mode,
+   * false = CNC/spindle mode). Drives the MACHINE_LASER_MODE_DISABLED check.
+   */
+  firmwareLaserModeFromMachine?: boolean,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
@@ -321,11 +336,13 @@ export function runPreflightSummary(
     hasGcode: gcode != null && gcode.length > 0,
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
+    outputUsesM4: gcode != null && /\bM4\b/i.test(gcode),
     gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {
       bedWidthMm: bedWidth > 0 ? bedWidth : undefined,
       bedHeightMm: bedHeight > 0 ? bedHeight : undefined,
       ...(typeof firmwareHomingFromMachine === 'boolean' ? { homingEnabled: firmwareHomingFromMachine } : {}),
+      ...(typeof firmwareLaserModeFromMachine === 'boolean' ? { laserMode: firmwareLaserModeFromMachine } : {}),
     },
   };
 
