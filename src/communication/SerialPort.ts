@@ -24,7 +24,25 @@ export interface SerialPortLike {
   onData(callback: (line: string) => void): void;
   onError(callback: (error: Error) => void): void;
   onClose(callback: () => void): void;
-  close(): void;
+  /**
+   * T2-31: close the underlying transport. Returns a promise that resolves
+   * after the browser / OS has actually released the port. Pre-T2-31 this
+   * was sync — `WebSerialPort.close` set `isOpen = false` synchronously
+   * but the underlying `port.close().then(...)` ran un-awaited, so a
+   * caller could believe the port was fully closed while the browser
+   * was still releasing it; rapid reconnect could race the still-closing
+   * handle. Now `close()` resolves only after the browser-level close
+   * completes (and `forget()` if available). `isOpen` flips to `false`
+   * synchronously at entry so the new contract is back-compat: any
+   * `if (!port.isOpen)` guard fires immediately, awaiting close is
+   * optional but recommended for reconnect safety.
+   *
+   * Failure modes: rejects when the underlying browser close throws
+   * something not caught by the existing `forget` fallback. Callers in
+   * cleanup paths (connect-failure rollback, disconnect) should chain
+   * `.catch(() => {})` if they don't want to surface the error.
+   */
+  close(): Promise<void>;
   readonly isOpen: boolean;
 }
 
@@ -154,7 +172,11 @@ export class MockSerialPort implements SerialPortLike {
   onError(callback: (error: Error) => void): void { this._errorCallback = callback; }
   onClose(callback: () => void): void { this._closeCallback = callback; }
 
-  close(): void {
+  // T2-31: async close. The mock has nothing to await — the in-memory
+  // state flips synchronously and the close callback fires immediately,
+  // matching the WebSerialPort.close shape so tests exercising both
+  // implementations see the same await-then-isOpen-false guarantee.
+  async close(): Promise<void> {
     this._isOpen = false;
     this._closeCallback?.();
   }

@@ -111,7 +111,9 @@ void (async () => {
   }).requestAndOpen = function (this: WebSerialPort, b: number): Promise<void> {
     return currentRequestAndOpenImpl.call(this, b);
   };
-  WebSerialPort.prototype.close = function (this: WebSerialPort): void {
+  // T2-31: close is now async on the SerialPortLike interface; the test
+  // stub mirrors that signature so the prototype patch type-checks.
+  WebSerialPort.prototype.close = async function (this: WebSerialPort): Promise<void> {
     if (lastPortSpy) lastPortSpy.closeCalls += 1;
     // Don't call origClose — it touches navigator.serial internals that
     // aren't present here. We're only testing the cleanup CALL itself.

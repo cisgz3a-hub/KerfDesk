@@ -468,7 +468,13 @@ export class GrblController implements LaserController {
           clearProbeTimers();
           this._stopStatusPolling();
           if (this._port) {
-            try { this._port.close(); } catch { /* ignore */ }
+            // T2-31: close() is now async. setTimeout cannot await; chain
+            // .catch to swallow the close-failure (best-effort cleanup,
+            // matching the pre-T2-31 try/catch shape). The reject below
+            // races the close — that's intentional: the connection-
+            // timeout error is the load-bearing signal, not the close
+            // outcome.
+            void this._port.close().catch(() => { /* ignore */ });
             this._port = null;
           }
           this._updateStatus('disconnected');
@@ -495,7 +501,11 @@ export class GrblController implements LaserController {
       }
       await new Promise(r => setTimeout(r, 80));
       try {
-        this._port.close();
+        // T2-31: close() is now async. Await so disconnect resolves only
+        // after the browser has released the port — eliminates the race
+        // where a fast reconnect-after-disconnect saw the old handle
+        // still being closed.
+        await this._port.close();
       } catch {
         // Port may have closed from the other side
       }

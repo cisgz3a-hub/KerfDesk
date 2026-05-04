@@ -132,6 +132,9 @@ void (async () => {
 
   const during = svc.getActiveJobCanvasContext();
   assert(during != null, 'context set during job');
+  if (during == null) {
+    process.exit(1);
+  }
   assert(
     during.canvasMoves === movesA,
     'getActiveJobCanvasContext.canvasMoves same array ref as at job start',

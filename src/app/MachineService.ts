@@ -954,7 +954,13 @@ export class MachineService {
     } catch (err) {
       if (ws) {
         try {
-          ws.close();
+          // T2-31: ws.close() is now async; await to ensure the browser
+          // has actually released the handle before we let the original
+          // error reach the caller. Pre-T2-31 this returned void with a
+          // detached promise — the caller could see "connect failed"
+          // and immediately retry while the browser was still releasing
+          // the prior port, racing the new permission request.
+          await ws.close();
         } catch {
           /* close itself can fail if the port never opened; ignore so the
              original error reaches the caller */

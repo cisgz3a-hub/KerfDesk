@@ -89,51 +89,63 @@ export class WebSerialPort implements SerialPortLike {
     this._closeCallback = callback;
   }
 
-  close(): void {
+  // T2-31: async close. `isOpen` flips to false synchronously at entry
+  // so existing `if (!port.isOpen)` guards fire immediately; the
+  // returned promise resolves after the browser-level `port.close()`
+  // (and best-effort `forget()`) actually completes. Pre-T2-31 the
+  // browser-close ran un-awaited; a caller could believe the port was
+  // fully closed while the browser was still releasing it, and rapid
+  // reconnect could race the still-closing handle.
+  async close(): Promise<void> {
     this._readLoopActive = false;
     this._isOpen = false;
 
     const port = this._port;
 
-    try {
-      if (this._reader) {
-        this._reader.cancel().catch(() => {});
+    if (this._reader) {
+      // cancel() may reject if reader is already released; swallow.
+      try {
+        await this._reader.cancel();
+      } catch {
+        /* ignore */
+      }
+      try {
         this._reader.releaseLock();
-        this._reader = null;
+      } catch {
+        /* ignore */
       }
-      if (this._writer) {
+      this._reader = null;
+    }
+    if (this._writer) {
+      try {
         this._writer.releaseLock();
-        this._writer = null;
+      } catch {
+        /* ignore */
       }
-      if (port) {
-        // Chain: close the handle, THEN revoke the permission grant.
-        // forget() is best-effort — browsers may reject it if the
-        // permission was granted by administrator policy, which we
-        // ignore. Not all browsers support forget() (Chrome 103+),
-        // so feature-detect. Electron ships Chromium new enough to
-        // have it, but guard for safety.
-        port
-          .close()
-          .then(() => {
-            if (typeof (port as any).forget === 'function') {
-              return (port as any).forget().catch(() => {
-                /* forget failed — e.g. policy-granted permission */
-              });
-            }
-          })
-          .catch(() => {
-            // close() failed — port likely already closed from the
-            // other side. Still try forget() to release the grant.
-            if (typeof (port as any).forget === 'function') {
-              (port as any).forget().catch(() => {
-                /* ignore */
-              });
-            }
-          });
-        this._port = null;
+      this._writer = null;
+    }
+    if (port) {
+      // Chain: close the handle, THEN revoke the permission grant.
+      // forget() is best-effort — browsers may reject it if the
+      // permission was granted by administrator policy, which we
+      // ignore. Not all browsers support forget() (Chrome 103+),
+      // so feature-detect. Electron ships Chromium new enough to
+      // have it, but guard for safety.
+      try {
+        await port.close();
+      } catch {
+        // close() failed — port likely already closed from the
+        // other side. Still try forget() to release the grant.
       }
-    } catch {
-      // Port may already be closed
+      const portWithForget = port as unknown as { forget?: () => Promise<void> };
+      if (typeof portWithForget.forget === 'function') {
+        try {
+          await portWithForget.forget();
+        } catch {
+          /* forget failed — e.g. policy-granted permission */
+        }
+      }
+      this._port = null;
     }
 
     this._closeCallback?.();
