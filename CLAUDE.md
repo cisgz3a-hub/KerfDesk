@@ -102,13 +102,16 @@ Use `<TBD>` as the hash placeholder while editing; substitute the real hash afte
 
 **PowerShell + multi-line commit messages.** The user's environment is Windows PowerShell 5.x. Multi-line commit messages via `git commit -m "..."` will get mangled by the shell's quoting rules. Use the `-F` file pattern instead:
 
+Do not use `Out-File -Encoding utf8` on PowerShell 5.x — it writes a BOM that ends up as `\uFEFF` in the commit subject. Use `[IO.File]::WriteAllText` for raw-bytes UTF-8.
+
 ```powershell
-@'
+$msg = @'
 fix(scope): T<N>-<M> — summary
 
 body line 1
 body line 2
-'@ | Out-File commit-msg-temp.txt -Encoding utf8
+'@
+[IO.File]::WriteAllText("$PWD\commit-msg-temp.txt", $msg)
 git commit -F commit-msg-temp.txt
 Remove-Item commit-msg-temp.txt
 ```
