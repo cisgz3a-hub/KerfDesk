@@ -13574,6 +13574,8 @@ This calls a scoped clear (T1-84) for settings but preserves project files saved
 
 **Cross-check note (audit 5B):** Audit's Critical 9 + Priority 13.
 
+**Status:** Shipped in <TBD> (focused MVP — pure crash-loop detector + safe-mode predicate + log-line formatter; Electron-side wiring deferred). Note: a separate T2-105 ("Hidden source maps in production") shipped earlier in `b6a56ed`; the duplicate ticket numbering is a pre-existing artefact of the roadmap. New `src/diagnostics/CrashLoopDetector.ts` exports `StartupAttempt` interface (startedAt / outcome=`success`/`crash`/`in-progress` / reason?), `CrashLoopState`, `CrashLoopDetectorOptions` (safeModeThreshold / maxHistory), `DEFAULT_OPTIONS` (threshold=3 per audit), `emptyCrashLoopState()`, `recordStartupAttempt(state, now, opts)` (appends in-progress; trims oldest beyond maxHistory), `recordSuccessfulStart(state)` (latest → success), `recordCrash(state, reason)` (latest → crash), `reconcileOnBoot(state)` (any leftover `in-progress` from a prior boot is upgraded to `crash` with reason "host died before recording success" — covers the silent-crash case where the renderer process dies before sending the ready ack), `consecutiveCrashCount(state)` (counts trailing crashes back to most recent success or reset barrier), `shouldEnterSafeMode(state, opts)` (count >= threshold), `clearCrashLoop(state, now)` (sets reset barrier — user-explicit "I fixed it"), `formatStartupLogLine` (ISO-prefixed, level-tagged, trailing newline for append-mode log). Pinned by `tests/startup-diagnostics.test.ts` (41 contracts: empty state; record + success/crash transitions; reconcileOnBoot for stale in-progress; consecutiveCrashCount with 0/3/success-resets; threshold-1 vs threshold; clearCrashLoop barrier + post-clear crashes; maxHistory eviction order; e2e silent-crash flow with reconcile counting; log-line ISO format; source-level pin verifying threshold=3). **Out of scope (T2-105-followup):** wiring `process.on('uncaughtException')` / `app.on('render-process-gone')` / `unhandledRejection` in `electron/main.ts`, persisting state to `userData/startup-state.json`, IPC `safe-mode:enter` to renderer, Reset-to-defaults UI. **Hardware verification: not required** (pure logic).
+
 ---
 
 ### T2-106 | Dependency security scanning in CI
@@ -19806,7 +19808,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
 - [ ] T2-103 Release artifact integrity 鈥?SHA256 + SBOM + signed checksum (filed; depends on T2-98)
 - [ ] T2-104 Versioned user-data migration framework (filed; broader scope than T2-73)
-- [ ] T2-105 Startup diagnostics + safe mode + crash-loop recovery (filed; pairs with T2-102)
+- [x] T2-105 Startup diagnostics + safe mode + crash-loop recovery (Shipped — pure crash-loop detector with reconcileOnBoot for "host died silently"; Electron `electron/main.ts` wiring deferred as T2-105-followup; pairs with T2-102)
 - [ ] T2-106 Dependency security scanning in CI 鈥?`npm audit` + Dependabot (filed; pairs with license-check)
 - [ ] T2-107 Tighten production CSP 鈥?remove `unsafe-eval`, then `unsafe-inline` (filed; security debt)
 - [ ] T2-108 Support bundle exporter 鈥?`Help 鈫?Export Diagnostic Bundle` (filed; **highest-value supportability feature**)
