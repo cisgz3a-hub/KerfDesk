@@ -10603,6 +10603,8 @@ UI consequences:
 
 **Cross-check note (audit 4C):** Audit's Priority 9 + Misleading state 4. Refines T2-44.
 
+**Status:** Shipped in <TBD> (focused MVP — type + transition + start-gate predicate; MachineState wiring deferred as T2-66-followup). New `src/app/PositionTrust.ts` exports `PositionTrust` discriminated union (`{trusted: true}` | `{trusted: false; reason; lostAt}`), `PositionTrustLostReason` (6 reasons: never-homed / soft-reset / emergency-stop / disconnect / manual-command / frame-failed), `PositionTrustEvent` (10 kinds: home-success/cancel, soft-reset, emergency-stop, disconnect, manual-command, frame-success/fail, unlock, save-origin), `initialPositionTrust()` (app-start = never-homed), `transitionPositionTrust(current, event, now)` (pure function), `positionTrustMessage(t)` (per-reason user-facing string, null when trusted), `canStartJobUnderTrust(trust, mode)` (trusted = allow all; untrusted + savedOrigin = blocked because saved-origin was set BEFORE trust was lost; untrusted + absolute/current = allowed because user is asserting current head position). Audit's "Misleading state 3" is honoured: `unlock` ($X) does NOT restore trust ($X clears alarm but does not move the head to a known position). Pinned by `tests/position-trust-transitions.test.ts` (51 contracts: every event's transition; reason+lostAt populated; unlock leaves trust unchanged; manual-command idempotent when already untrusted; trusted state covers all 3 start modes; savedOrigin blocked under untrust + reason mentions trust; e2e flow home → soft-reset → blocked → save-origin → allowed; 10 declared event kinds; 6 distinct user-facing messages; source-level pin). **Out of scope (T2-66-followup):** wiring `positionTrust` into `MachineState`, `canStartJob` chain, and a UI banner. **Hardware verification: not required** (declarative type + pure transition; safety effect lands when wired into `MachineService` in the followup ticket).
+
 ---
 
 ### T2-67 | Job failure outcome enum (8 distinct outcomes) and finalization on every termination path
@@ -19761,7 +19763,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-63 Operation order preview with order warning (filed; depends on T2-58)
 - [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
 - [ ] T2-65 Central error reporter 鈥?`reportError({domain, severity, recovery, developerDetails})` (filed; refines T2-57)
-- [ ] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (filed; refines T2-44)
+- [x] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (Shipped — type + transition + canStart predicate; MachineState wiring deferred as T2-66-followup; refines T2-44)
 - [x] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (shipped 2026-04-25 in `a1bb80f`)
 - [ ] T2-68 Critical error history preserved across `clearMessages()` and disconnect (filed; depends on T2-65)
 - [x] T2-69 Atomic autosave record 鈥?single key with checksum + scene metadata (shipped 2026-05-05 in `9f11fce`; legacy-key cleanup deferred to T2-69-followup)
