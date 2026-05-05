@@ -57,6 +57,15 @@ export interface EntitlementState {
    *  hand-build `EntitlementState` literals haven't been updated; service code always
    *  populates it. UI components should treat undefined as 'free'. */
   status?: LicenseStatus;
+  /**
+   * T2-93: discriminated `LicenseStatusDetail` union. Layered alongside
+   * the T1-80 flat `status` string for backward-compat with existing
+   * UI consumers; new consumers should switch on `statusDetail.kind`
+   * instead so the compiler enforces exhaustive coverage and the
+   * per-kind metadata (lastVerifiedAt, graceUntil, lastError,
+   * testerSlug, revokedReason) is bundled with the kind that owns it.
+   */
+  statusDetail?: import('./LicenseStatus').LicenseStatusDetail;
   label?: string;
   code?: string;
   /** T1-80: epoch ms of last successful Gumroad verification. */

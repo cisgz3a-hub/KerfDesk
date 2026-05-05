@@ -1,5 +1,6 @@
 import type { EntitlementState, EntitlementTier, LicenseStatus, ProFeature, StoredLicenseCacheEntry } from './types';
 import { PRO_FEATURES } from './types';
+import { buildStatusDetail } from './LicenseStatus';
 import { parseTesterCode, verifyTesterCode } from './testerKey';
 import { getStorage } from '../core/storage/storage';
 
@@ -85,7 +86,14 @@ export class EntitlementService {
   }
 
   private setState(next: EntitlementState): void {
-    this.state = next;
+    // T2-93: derive `statusDetail` from the T1-80 flat `status` field +
+    // sibling metadata (lastVerifiedAt, graceUntil, lastError, label,
+    // tier) at the single setState boundary. Existing call sites keep
+    // setting the flat `status` string; the discriminated union is
+    // populated automatically so all UI consumers can switch over
+    // without touching the service.
+    const statusDetail = next.statusDetail ?? deriveStatusDetail(next);
+    this.state = { ...next, statusDetail };
     // T1-82: legacy PRO_FLAG_KEY ('laserforge_pro') write removed. The key
     // had no readers in src/, electron/, or any production code path —
     // verified at write-time via repo-wide grep (only EntitlementService
@@ -485,6 +493,30 @@ export class EntitlementService {
       return null;
     }
   }
+}
+
+/**
+ * T2-93: bridge from flat-`status` + sibling fields to the
+ * discriminated `LicenseStatusDetail` union. Falls back to `'free'`
+ * when status is undefined (back-compat for legacy callers that
+ * predate T1-80 and only set tier/hasPro).
+ */
+function deriveStatusDetail(state: EntitlementState): import('./LicenseStatus').LicenseStatusDetail {
+  const s = state.status;
+  if (s == null) {
+    if (state.tier === 'developer') return { kind: 'developer' };
+    if (state.tier === 'tester_permanent') {
+      return { kind: 'tester', testerSlug: state.label ?? 'unknown' };
+    }
+    return { kind: 'free' };
+  }
+  return buildStatusDetail({
+    status: s,
+    lastVerifiedAt: state.lastVerifiedAt,
+    graceUntil: state.graceUntil,
+    lastError: state.lastError,
+    testerSlug: s === 'tester' ? state.label : undefined,
+  });
 }
 
 export const entitlementService = new EntitlementService();
