@@ -11841,7 +11841,7 @@ This is a fuller solution but requires the job session state machine (T2-53) to 
 
 **Cross-check note (audit 4E):** Audit's Priority 13. Pairs with T2-53.
 
-**Status:** Shipped in `<TBD>` (Option A — block; Option B separate-undo-lane filed under T2-53). `App.handleUndo` and `App.handleRedo` early-return before any history pop when `grbl.isJobRunning === true`, surfacing `showAlert('Undo blocked', 'A job is running. Stop the job before editing the design.')` (and the symmetric "Redo blocked" message). Guard runs BEFORE `historyRef.current.undoEntry()` / `redoEntry()` so history state is not popped on a refused action — the next valid undo after the job stops still has the same stack. Dep arrays widened to include `grbl.isJobRunning` + `showAlert` so the React closure sees current values. Pinned by `tests/undo-during-job.test.ts` (11 contracts, source-level since App.tsx is too heavy to mount in a unit test): T2-83 marker; both handlers check isJobRunning; both invoke showAlert with the right title text; both guard runs BEFORE the history pop call (proves we don't lose entries on refused actions); dep arrays widened correctly; user-facing recovery message names the action ("Stop the job before editing the design"). **TS error count:** 43 (baseline holds). **Hardware verification: not required** (UI guard; refusing to mutate the visible scene during a stream is intrinsically safe).
+**Status:** Shipped in `a16f7d1` (Option A — block; Option B separate-undo-lane filed under T2-53). `App.handleUndo` and `App.handleRedo` early-return before any history pop when `grbl.isJobRunning === true`, surfacing `showAlert('Undo blocked', 'A job is running. Stop the job before editing the design.')` (and the symmetric "Redo blocked" message). Guard runs BEFORE `historyRef.current.undoEntry()` / `redoEntry()` so history state is not popped on a refused action — the next valid undo after the job stops still has the same stack. Dep arrays widened to include `grbl.isJobRunning` + `showAlert` so the React closure sees current values. Pinned by `tests/undo-during-job.test.ts` (11 contracts, source-level since App.tsx is too heavy to mount in a unit test): T2-83 marker; both handlers check isJobRunning; both invoke showAlert with the right title text; both guard runs BEFORE the history pop call (proves we don't lose entries on refused actions); dep arrays widened correctly; user-facing recovery message names the action ("Stop the job before editing the design"). **TS error count:** 43 (baseline holds). **Hardware verification: not required** (UI guard; refusing to mutate the visible scene during a stream is intrinsically safe).
 
 ---
 
@@ -19744,7 +19744,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-80 History coalescing for sliders — begin/preview/commit (shipped 2026-04-25 in `e6874af`)
 - [ ] T2-81 Raster buffers stored outside history (filed; raster-heavy memory)
 - [ ] T2-82 History memory budget 鈥?count + bytes (filed; pairs with T2-81)
-- [x] T2-83 Block undo/redo while job running (Option A shipped 2026-05-05 in `<TBD>`; Option B separate-undo-lane filed under T2-53)
+- [x] T2-83 Block undo/redo while job running (Option A shipped 2026-05-05 in `a16f7d1`; Option B separate-undo-lane filed under T2-53)
 - [ ] T2-84 System-level `RuntimeState` meta-container (filed; foundation, composes T2-44/51/53/86/87)
 - [ ] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (filed; pairs with T2-25)
 - [ ] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (filed; pairs with T2-85)
