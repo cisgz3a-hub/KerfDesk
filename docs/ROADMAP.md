@@ -15090,6 +15090,8 @@ For maximum safety, future T-ticket: replace `createImageBitmap` probe with a he
 
 **Cross-check note (audit 5D):** Audit's Critical 8 + Priority 8. Verified at useImport.ts:38-53.
 
+**Status:** Shipped in <TBD> (focused MVP — limits + typed error + check helpers; useImport.ts wiring deferred as T2-124-followup). New `src/import/image/ImageImportLimits.ts` exports `IMAGE_LIMITS` (MAX_FILE_BYTES=50MB, MAX_PIXELS=50 megapixels, MAX_DIMENSION=16384), `ImageLimitKey` type, `ImageImportLimitError` (carries `limit` / `observed` / `maximum` / optional `width` + `height` for dimension/pixel violations), `checkImageFileSize(bytes)` (stage 1 — runs before any read), `checkImageDimensions(width, height)` (stage 2 — runs after a header probe, BEFORE the full decode; rejects per-axis OR area violations + NaN/negative/Infinity guards), `checkImageBeforeDecode(args)` (combined pipeline that runs file-size first then dimensions and returns metadata), `imageLimitErrorMessage(err)` (per-limit user-facing string with formatted MB / "10000×6000 = 60.0M pixels. Maximum: 50 megapixels." / "side of 50,000 pixels exceeds 16,384" — mirrors the audit's example wording; safe fallback for unknown errors). Pinned by `tests/image-decompression-bomb.test.ts` (42 contracts: every limit's value pinned; file-size at-limit / over-limit / 5GB BMP case; dimensions 5k×5k pass / 7071×7071 ~50M pass; the audit's headline 50000×50000 case rejected at MAX_DIMENSION; per-axis violation isolated; area-only violation (10000×6000 = 60M) rejected on MAX_PIXELS; NaN/negative/Infinity rejected; checkImageBeforeDecode pipeline ordering (file-size first); error class shape + extras; per-limit messages with formatted numbers; non-limit fallback; null/undefined safe; source-level pin). **Out of scope (T2-124-followup):** wiring `checkImageFileSize` + `checkImageDimensions` into `useImport.ts` so the import order becomes file-size → header probe via `createImageBitmap` → pixel-cap check → full decode. **Hardware verification: not required** (pure import-side guards).
+
 ---
 
 ### T2-125 | Compiler/output layer enforces template validation (defense in depth)
@@ -19829,7 +19831,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-121 Main-process serial command classification enforcement (filed; pairs with T2-122)
 - [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
 - [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers; SvgParser/PathParser wiring deferred as T2-123-followup; pairs with T1-92)
-- [ ] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (filed; pairs with T1-92)
+- [x] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (Shipped — limits + typed error + check helpers; useImport.ts wiring deferred as T2-124-followup; pairs with T1-92)
 - [ ] T2-125 Compiler/output layer enforces template validation (filed; defense in depth for T1-91)
 - [ ] T2-126 Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary (filed; pairs with T1-94)
 - [ ] T2-127 Storage value size limits per-key (filed; pairs with T2-120)
