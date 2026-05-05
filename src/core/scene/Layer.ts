@@ -127,6 +127,18 @@ export interface LaserSettings {
    * OPTIONAL.
    */
   materialPresetId?: string;
+  /**
+   * T2-72: snapshot of the material preset's compile-relevant fields
+   * at the moment the preset was applied. Pre-T2-72 a layer kept only
+   * `materialPresetId`; if the user updated the preset library after
+   * save (changed power/speed values), reloading the project compiled
+   * the layer against the NEW preset values silently. The snapshot
+   * captures the as-applied values so the load-time mismatch detector
+   * (`checkPresetSnapshot`) can offer the user a choice. Optional —
+   * legacy projects ride forward via the `no-snapshot` path. Mirror
+   * of T2-71's `Scene.metadata.deviceProfileSnapshot` pattern.
+   */
+  materialPresetSnapshot?: import('../materials/MaterialPresetSnapshot').MaterialPresetSnapshot;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────
