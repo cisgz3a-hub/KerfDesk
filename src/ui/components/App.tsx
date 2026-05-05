@@ -1426,19 +1426,41 @@ export function App() {
     [commitSceneTransaction],
   );
 
+  // T2-83: undo / redo are blocked while a job is streaming. Pre-T2-83
+  // the user could undo design changes mid-burn, leaving the visible
+  // scene desynced from what the controller was actually executing —
+  // the active job context was already pinned (T2-53 work) but the
+  // scene display drifted. Refusing the keystroke is the simplest
+  // safety: the user must stop the job before editing the design.
+  // Option B (separate "design state" undo lane while job continues)
+  // is filed under T2-53's full implementation.
   const handleUndo = useCallback(() => {
+    if (grbl.isJobRunning) {
+      void showAlert(
+        'Undo blocked',
+        'A job is running. Stop the job before editing the design.',
+      );
+      return;
+    }
     const entry = historyRef.current.undoEntry();
     if (!entry) return;
     const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
     applyHistoryScene(entry.scene, 'undo', validSelection);
-  }, [applyHistoryScene]);
+  }, [applyHistoryScene, grbl.isJobRunning, showAlert]);
 
   const handleRedo = useCallback(() => {
+    if (grbl.isJobRunning) {
+      void showAlert(
+        'Redo blocked',
+        'A job is running. Stop the job before editing the design.',
+      );
+      return;
+    }
     const entry = historyRef.current.redoEntry();
     if (!entry) return;
     const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
     applyHistoryScene(entry.scene, 'redo', validSelection);
-  }, [applyHistoryScene]);
+  }, [applyHistoryScene, grbl.isJobRunning, showAlert]);
 
   const handleSelectAll = useCallback(() => {
     const allIds = new Set(scene.objects.filter(o => o.visible && !o.locked).map(o => o.id));
