@@ -1,4 +1,4 @@
-import type { EntitlementState, EntitlementTier, ProFeature, StoredLicenseCacheEntry } from './types';
+import type { EntitlementState, EntitlementTier, LicenseStatus, ProFeature, StoredLicenseCacheEntry } from './types';
 import { PRO_FEATURES } from './types';
 import { parseTesterCode, verifyTesterCode } from './testerKey';
 import { getStorage } from '../core/storage/storage';
@@ -40,8 +40,19 @@ export interface ActivateResult {
   error?: string;
 }
 
+/**
+ * T1-80: outcome of validating a stored license code. The caller (runInitialize)
+ * maps each kind to a distinct EntitlementState so the UI can render the right
+ * message instead of "you're free, no idea why".
+ */
+type StoredCodeValidation =
+  | { kind: 'verified'; tier: 'paid' | 'tester_permanent'; label: string }
+  | { kind: 'offline_grace'; label: string; graceUntil: number }
+  | { kind: 'verification_failed'; error: string }
+  | { kind: 'revoked' };
+
 export class EntitlementService {
-  private state: EntitlementState = { tier: 'free', hasPro: false };
+  private state: EntitlementState = { tier: 'free', hasPro: false, status: 'free' };
   private listeners = new Set<() => void>();
   private initPromise: Promise<void> | null = null;
 
@@ -100,6 +111,7 @@ export class EntitlementService {
       this.setState({
         tier: 'developer',
         hasPro: true,
+        status: 'developer',
         label: 'Developer build',
       });
       return;
@@ -107,14 +119,61 @@ export class EntitlementService {
 
     const saved = await getStorage().get(STORAGE_KEY);
     if (!saved) {
-      this.setState({ tier: 'free', hasPro: false });
+      this.setState({ tier: 'free', hasPro: false, status: 'free' });
       return;
     }
 
-    const applied = await this.validateAndApplyStoredCode(saved);
-    if (!applied) {
-      await getStorage().remove(STORAGE_KEY);
-      this.setState({ tier: 'free', hasPro: false });
+    // T1-80: distinguish "verified", "offline_grace" (Pro stays active),
+    // "verification_failed" (Pro off but code preserved for retry), and
+    // "revoked" (Pro off, code preserved so the UI can say "contact
+    // support"). Pre-T1-80 every non-verified outcome silently deleted
+    // the stored license and rendered as "Free" — a paid user opening
+    // the app during a Gumroad outage saw their Pro features locked
+    // without explanation.
+    const upper = saved.toUpperCase().trim();
+    const result = await this.validateAndApplyStoredCode(saved);
+    switch (result.kind) {
+      case 'verified':
+        this.setState({
+          tier: result.tier,
+          hasPro: true,
+          status: result.tier === 'paid' ? 'verified' : 'tester',
+          label: result.label,
+          code: upper,
+          lastVerifiedAt: Date.now(),
+        });
+        return;
+      case 'offline_grace':
+        this.setState({
+          tier: 'paid',
+          hasPro: true,
+          status: 'offline_grace',
+          label: result.label,
+          code: upper,
+          graceUntil: result.graceUntil,
+        });
+        return;
+      case 'revoked':
+        // Code preserved (not removed) so the UI can show "License
+        // revoked — contact support" rather than a silent downgrade.
+        this.setState({
+          tier: 'free',
+          hasPro: false,
+          status: 'revoked',
+          code: upper,
+        });
+        return;
+      case 'verification_failed':
+        // Code preserved (not removed) so the user can retry without
+        // re-entering. Pre-T1-80 the storage was wiped here.
+        this.setState({
+          tier: 'free',
+          hasPro: false,
+          status: 'verification_failed',
+          code: upper,
+          lastError: result.error,
+        });
+        return;
     }
   }
 
@@ -144,10 +203,13 @@ export class EntitlementService {
   /** Session-only free tier (no license in storage); matches legacy TrialGuard behavior. */
   skipToFreeSession(): void {
     if (isDevBuild()) return;
-    this.setState({ tier: 'free', hasPro: false, label: 'Free User' });
+    this.setState({ tier: 'free', hasPro: false, status: 'free', label: 'Free User' });
   }
 
   deactivate(): void {
+    // T1-80: explicit deactivate is the only path that removes the stored
+    // code. runInitialize's verification_failed / revoked paths preserve
+    // the code so the user can retry / contact support without re-entering.
     Promise.all([
       getStorage().remove(STORAGE_KEY),
       getStorage().remove(PRO_FLAG_KEY),
@@ -158,10 +220,11 @@ export class EntitlementService {
       this.setState({
         tier: 'developer',
         hasPro: true,
+        status: 'developer',
         label: 'Developer build',
       });
     } else {
-      this.setState({ tier: 'free', hasPro: false });
+      this.setState({ tier: 'free', hasPro: false, status: 'free' });
     }
   }
 
@@ -188,6 +251,7 @@ export class EntitlementService {
         const next: EntitlementState = {
           tier: 'tester_permanent',
           hasPro: true,
+          status: 'tester',
           label: slug,
           code: upper,
         };
@@ -210,43 +274,38 @@ export class EntitlementService {
     const next: EntitlementState = {
       tier: 'paid',
       hasPro: true,
+      status: 'verified',
       label: gum.name,
       code: upper,
+      lastVerifiedAt: Date.now(),
     };
     this.setState(next);
     return { ok: true, state: next };
   }
 
-  private async validateAndApplyStoredCode(saved: string): Promise<boolean> {
+  /**
+   * T1-80: returns a structured outcome instead of boolean. The caller
+   * (runInitialize) decides what state to set; this function no longer
+   * sets state directly so the four distinct outcomes (verified /
+   * offline_grace / verification_failed / revoked) can be surfaced
+   * with their own UI message instead of collapsing into "Free".
+   */
+  private async validateAndApplyStoredCode(saved: string): Promise<StoredCodeValidation> {
     const upper = saved.toUpperCase().trim();
 
     if (parseTesterCode(saved)) {
       const ok = await verifyTesterCode(saved);
       if (ok) {
         const slug = parseTesterCode(saved)!.slug;
-        this.setState({
-          tier: 'tester_permanent',
-          hasPro: true,
-          label: slug,
-          code: upper,
-        });
-        return true;
+        return { kind: 'verified', tier: 'tester_permanent', label: slug };
       }
-      return false;
+      // Tester key parse OK but verification failed — could be revoked
+      // (key deleted from issuer) or transient. Without a richer signal
+      // from verifyTesterCode we treat as revoked.
+      return { kind: 'revoked' };
     }
 
-    const gum = await this.verifyGumroad(upper);
-    if (gum) {
-      this.setState({
-        tier: 'paid',
-        hasPro: true,
-        label: gum.name,
-        code: upper,
-      });
-      return true;
-    }
-
-    return false;
+    return await this.verifyGumroadStructured(upper);
   }
 
   private async getCachedLicense(code: string): Promise<StoredLicenseCacheEntry | null> {
@@ -272,6 +331,96 @@ export class EntitlementService {
       await getStorage().set(LICENSE_CACHE_KEY, JSON.stringify(entry));
     } catch {
       /* ignore */
+    }
+  }
+
+  /**
+   * T1-80: structured variant of `verifyGumroad`. Distinguishes the four
+   * outcomes the audit calls out:
+   *  - `verified`: server confirmed valid + not refunded/chargebacked
+   *  - `offline_grace`: network error, but cache is valid + within grace
+   *  - `revoked`: server confirmed refunded / chargebacked / disputed
+   *  - `verification_failed`: anything else (server says invalid OR
+   *     network error with no usable cache)
+   *
+   * The legacy `verifyGumroad()` (returns name|null) stays for `activate()`
+   * which has its own UX and doesn't need the four-outcome distinction.
+   */
+  private async verifyGumroadStructured(upper: string): Promise<StoredCodeValidation> {
+    const cached = await this.getCachedLicense(upper);
+    if (cached && cached.valid) {
+      const age = Date.now() - cached.validatedAt;
+      if (age < LICENSE_CACHE_MAX_AGE) {
+        return { kind: 'verified', tier: 'paid', label: cached.name };
+      }
+    }
+
+    try {
+      const formData = new FormData();
+      formData.append('product_id', GUMROAD_PRODUCT_ID);
+      formData.append('license_key', upper);
+      formData.append('increment_uses_count', 'false');
+
+      const response = await fetch('https://api.gumroad.com/v2/licenses/verify', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        await this.setCachedLicense(upper, '', false);
+        // HTTP error from server side — Gumroad says "we don't know this
+        // key" or there was an upstream issue. Treat as verification
+        // failed (could be transient or genuinely invalid; user can
+        // retry).
+        return {
+          kind: 'verification_failed',
+          error: `Gumroad responded with HTTP ${response.status}.`,
+        };
+      }
+
+      const data = (await response.json()) as {
+        success?: boolean;
+        purchase?: {
+          email?: string;
+          refunded?: boolean;
+          chargebacked?: boolean;
+          disputed?: boolean;
+        };
+      };
+
+      if (!data.success || !data.purchase) {
+        await this.setCachedLicense(upper, '', false);
+        return {
+          kind: 'verification_failed',
+          error: 'Gumroad reported the license could not be verified.',
+        };
+      }
+
+      if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
+        await this.setCachedLicense(upper, '', false);
+        return { kind: 'revoked' };
+      }
+
+      const name = data.purchase.email || 'PRO User';
+      await this.setCachedLicense(upper, name, true);
+      return { kind: 'verified', tier: 'paid', label: name };
+    } catch (err) {
+      console.warn('[EntitlementService] Network error during license check:', err);
+
+      if (cached && cached.valid) {
+        const age = Date.now() - cached.validatedAt;
+        if (age < LICENSE_OFFLINE_GRACE) {
+          return {
+            kind: 'offline_grace',
+            label: cached.name,
+            graceUntil: cached.validatedAt + LICENSE_OFFLINE_GRACE,
+          };
+        }
+      }
+      return {
+        kind: 'verification_failed',
+        error: err instanceof Error ? err.message : 'Network error during license check.',
+      };
     }
   }
 
