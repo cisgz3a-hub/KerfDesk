@@ -19770,7 +19770,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-82 History memory budget 鈥?count + bytes (shipped 2026-05-05 in `08b65f9`; UI "Project size warning" surface deferred to T2-82-followup)
 - [x] T2-83 Block undo/redo while job running (Option A shipped 2026-05-05 in `a16f7d1`; Option B separate-undo-lane filed under T2-53)
 - [ ] T2-84 System-level `RuntimeState` meta-container (filed; foundation, composes T2-44/51/53/86/87)
-- [ ] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (filed; pairs with T2-25)
+- [x] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (type + builder + diff helpers shipped 2026-05-05 in `<TBD>`; ValidatedJobTicket migration filed as T2-85-followup)
 - [x] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (type + helpers shipped 2026-05-05 in `b4769f0`; ConnectionPanelMain migration filed as T2-86-followup)
 - [ ] T2-87 Explicit `RecoveryState` state machine (filed; composes T2-62/66/67)
 - [ ] T2-88 Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; 17-site call-site migration filed as T2-88-followup)
