@@ -11293,6 +11293,8 @@ Default mode is auto-repair (most failures are recoverable); user can opt into s
 
 **Cross-check note (audit 4D):** Audit's Priority 9.
 
+**Status:** Shipped in <TBD> (focused MVP — per-shape validators + layer-settings validator + auto-repair/strict modes; deserializer integration deferred as T2-75-followup). New `src/io/validation/geometryValidation.ts` exports `GeometryValidationIssueKind` (15 kinds), `GeometryValidationIssue` (kind / field / observed / repaired / message), `ValidationResult<T>`, `ValidationMode` (`auto-repair` | `strict`), `GeometryValidationError` (carries the issue list for strict-mode rejection at the load site), and per-shape validators: `validateRectGeometry` (width/height>0; x/y finite; cornerRadius≥0), `validateEllipseGeometry` (rx/ry>0; finite center), `validateLineGeometry` (all 4 endpoints finite), `validatePolygonGeometry` (≥2 points or default; per-point finite repair preserving order), `validateTextGeometry` (fontSize>0; text is string), `validateImageGeometry` (originalWidth/Height>0; cropX/Y≥0 + cropWidth/Height>0 — invalid crop reset to full image), `validateLayerSettings` (power.min/max with min≤max; speed>0; passes positive integer; fill interval>0). `applyValidationMode(result, mode)` chooses behaviour: `auto-repair` returns the repaired value with issues for the T2-74 repair report; `strict` throws when any issue is present. Pinned by `tests/geometry-deep-validation.test.ts` (74 contracts: clean shapes pass; NaN/Infinity/negative/zero per geometry kind triggers correct issue + correct repair value; polygon empty + per-point individual repair; text fontSize/non-string repair; image dimensions + crop reset; all 4 layer-settings validations; clean settings preserve exact values; strict-mode throws + auto-repair returns; issue shape always populated; source-level pin). **Out of scope (T2-75-followup):** wiring the validators into `deserializeScene` (T2-74's repairs collector). **Hardware verification: not required** (load-side validation, no machine effect).
+
 ---
 
 ### T2-76 | Single mutation transaction path 鈥?`commitSceneTransaction({ scene, reason, meta })`
@@ -19786,7 +19788,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-72 Embed material preset snapshot per layer (schema + diff + checker shipped 2026-05-05 in `7e85ca4`; load-time dialog deferred to T2-72-followup)
 - [ ] T2-73 Formal migration pipeline 鈥?version bumps with explicit migrations (filed; required before T2-71/T2-72 schema additions)
 - [x] T2-74 Surface load repair report to user 鈥?`deserializeSceneWithReport` (helper shipped 2026-05-05 in `bf6ea72`; load-time dialog UI deferred to T2-74-followup)
-- [ ] T2-75 Deep geometry/settings validation on load (filed; pairs with T2-74)
+- [x] T2-75 Deep geometry/settings validation on load (Shipped — per-shape validators + layer-settings validator + auto-repair/strict modes; deserializer wiring deferred as T2-75-followup; pairs with T2-74)
 - [x] T2-76 Single mutation transaction path — `commitSceneTransaction({scene, reason, meta})` (closed pre-session — unified path in SceneTransaction.ts; pinned by tests/scene-transaction-unified.test.ts)
 - [ ] T2-77 Async revision guards on trace + image import (trace shipped 2026-05-05 in `1387bd1`; image-import + conflict-dialog deferred to T2-77-followup)
 - [x] T2-78 History entries with action metadata (closed pre-session — selectionBefore/After + invalidatesOutput in SceneTransaction.ts)
