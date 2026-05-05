@@ -15002,6 +15002,8 @@ curves before exporting. Try exporting with curve simplification enabled.
 
 **Cross-check note (audit 5D):** Audit's Critical 7 + Priority 7. Verified at SvgParser.ts:204-212.
 
+**Status:** Shipped in <TBD> (focused MVP — limits + typed error + bump-and-assert helpers; parser wiring deferred as T2-123-followup). New `src/import/svg/SvgComplexityLimits.ts` exports `SVG_LIMITS` (8 caps matching audit recommendations: MAX_BYTES=25MB, MAX_NODES=50k, MAX_DEPTH=100, MAX_RENDERABLE=10k, MAX_PATH_TOKENS=200k, MAX_PATH_SEGMENTS=100k, MAX_POLYGON_POINTS=100k, MAX_TRANSFORM_DEPTH=50), `SvgLimitKey` type, `SvgImportLimitError` (carries `limit` + `observed` + `maximum` for UI messaging), `assertSvgLimit(limit, observed)` (strict `>` so equality passes), `SvgParseContext` (4-counter shape: nodeCount / renderableCount / depth / transformDepth), `emptyParseContext()`, `bumpAndAssert(value, limit)` (increment-then-assert convenience), `svgLimitErrorMessage(err)` (per-limit-kind user-facing string with formatted observed/maximum like "1,247,000" — mirrors the audit's example wording; safe fallback for non-limit errors). Pinned by `tests/svg-complexity-limits.test.ts` (54 contracts: every limit's value pinned; assertSvgLimit equality-passes / over-throws; error chain + name; bumpAndAssert returns + throws; emptyParseContext shape; 8 distinct user messages with formatted numbers; non-limit error fallback; null/undefined safe; e2e deep-nesting simulation; source-level pin). **Out of scope (T2-123-followup):** wiring `assertSvgLimit` / `bumpAndAssert` calls into `SvgParser.ts` (traverse depth + node + renderable counters) and `PathParser.ts` (token + segment caps). **Hardware verification: not required** (pure import-side guards).
+
 ---
 
 ### T2-124 | Image pre-decode size + pixel limits (decompression bomb protection)
@@ -19826,7 +19828,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
 - [ ] T2-121 Main-process serial command classification enforcement (filed; pairs with T2-122)
 - [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
-- [ ] T2-123 SVG complexity limits 鈥?node count, depth, path tokens, segments (filed; pairs with T1-92)
+- [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers; SvgParser/PathParser wiring deferred as T2-123-followup; pairs with T1-92)
 - [ ] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (filed; pairs with T1-92)
 - [ ] T2-125 Compiler/output layer enforces template validation (filed; defense in depth for T1-91)
 - [ ] T2-126 Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary (filed; pairs with T1-94)
