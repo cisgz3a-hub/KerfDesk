@@ -21,6 +21,7 @@ import {
   invertImage,
 } from '../../core/image/ImageProcessing';
 import { warmProcessedImageCache } from '../hooks/useImageCacheWarmer';
+import { captureSceneRevision, isSceneStale } from '../hooks/asyncSceneGuard';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { FontPicker } from './common/FontPicker';
@@ -210,6 +211,14 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       if (!proceed) return;
     }
 
+    // T2-77: capture scene revision at start of async work. After the
+    // trace completes (potentially seconds later), reject the commit
+    // if the user edited the scene in the meantime — those edits would
+    // otherwise be silently erased by the closure-captured stale
+    // `scene` at commit time. Conflict-resolution dialog (apply-to-
+    // current vs discard) is filed as T2-77-followup.
+    const revisionAtStart = captureSceneRevision(sceneRef.current);
+
     setIsTracing(true);
     await new Promise<void>(resolve => {
       requestAnimationFrame(() => resolve());
@@ -253,6 +262,16 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
 
       if (!traced) {
         await showAlert('Trace', 'No contours found. Try adjusting the threshold.');
+        return;
+      }
+
+      // T2-77: stale-scene guard. If the user edited the scene during
+      // the trace, refuse to commit so we don't erase their edits.
+      if (isSceneStale(revisionAtStart, sceneRef.current)) {
+        await showAlert(
+          'Trace',
+          'The scene changed while the trace was running. Please run the trace again.',
+        );
         return;
       }
 
