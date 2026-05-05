@@ -587,14 +587,20 @@ function planFillOperation(
 /**
  * Convert a raster operation's bitmap into scanline moves.
  *
- * For each non-empty row of pixels, generates burn segments:
- *   1. rapid   → move to segment start
- *   2. laserOn → at segment's power level
- *   3. linear  → scan to segment end
- *   4. laserOff
+ * T1-31: Modal-M4 raster strategy. ONE `laserOn` at the start of the
+ * operation and ONE `laserOff` at the end — not per segment. Between
+ * scanlines a `rapid` (G0) moves to the next row's start; in M4
+ * dynamic-power mode the laser auto-extinguishes during G0 motion.
+ * Within a scanline, multiple burn segments are stitched with
+ * power=0 linear moves bridging the gaps. Each burn segment still
+ * runs through `appendRasterBurnMoves` for velocity-aware power
+ * splits during accel/decel.
  *
- * Empty rows are skipped. Bidirectional mode alternates direction.
- * 8-bit mode produces variable power per segment.
+ * Pre-T1-31 each segment was wrapped in its own M4/M5 pair —
+ * thousands of modal cycles per pass for a photo engrave, causing
+ * planner stutter, fat/weak segment boundaries, and saturated buffer
+ * bandwidth. The fill strategy (`planFillOperation`) already used
+ * the modal pattern; this brings raster to parity.
  */
 function planRasterOperation(
   bitmap: import('../job/Job').ProcessedBitmap,
@@ -621,42 +627,67 @@ function planRasterOperation(
 
   const scanTable = settings.scanningOffsets;
 
+  // T1-31: single M4 covers the whole raster operation. M4 dynamic
+  // power mode means the laser auto-cuts during G0 between scanlines
+  // and follows S inline during G1.
+  moves.push({ type: 'laserOn', power: 0 });
+
   for (const scanline of scanlines) {
-    for (const segment of scanline.segments) {
-      let burnStartX = segment.startX;
-      let burnEndX = segment.endX;
+    if (scanline.segments.length === 0) continue;
+
+    // Apply per-speed scanning offset to every segment in this row up
+    // front so the gap-bridge logic below uses the adjusted endpoints
+    // (not the raw segment.startX/endX which may not align after offset).
+    const adjusted: Array<{ startX: number; endX: number; power: number; y: number }> = [];
+    for (const seg of scanline.segments) {
+      let s = seg.startX;
+      let e = seg.endX;
       if (scanTable.length > 0) {
         const off = interpolateOffset(scanTable, speed);
-        const adj = applyScanOffset(segment.startX, segment.endX, off);
-        burnStartX = adj.startX;
-        burnEndX = adj.endX;
+        const a = applyScanOffset(seg.startX, seg.endX, off);
+        s = a.startX;
+        e = a.endX;
       }
+      adjusted.push({ startX: s, endX: e, power: seg.power, y: seg.y });
+    }
 
-      moves.push({
-        type: 'rapid',
-        to: { x: burnStartX, y: segment.y },
-      });
+    // Rapid to the first segment's burn-start. In M4 mode G0 leaves
+    // the laser off, so this transition between scanlines is safe.
+    moves.push({ type: 'rapid', to: { x: adjusted[0].startX, y: adjusted[0].y } });
 
-      moves.push({
-        type: 'laserOn',
-        power: segment.power,
-      });
+    let prevEndX = adjusted[0].startX;
+    for (let i = 0; i < adjusted.length; i++) {
+      const seg = adjusted[i];
+      // Bridge the gap from the previous segment's end to this
+      // segment's start with a power=0 linear move. Same direction
+      // as the burn (LTR or RTL); the sign of the X-delta carries
+      // direction. Skipped on the first iteration (prevEndX ===
+      // first segment's startX) and skipped when two segments abut.
+      if (i > 0 && Math.abs(seg.startX - prevEndX) > 1e-4) {
+        moves.push({
+          type: 'linear',
+          to: { x: seg.startX, y: seg.y },
+          power: 0,
+          speed,
+        });
+      }
 
       appendRasterBurnMoves(
         moves,
-        burnStartX,
-        burnEndX,
-        segment.y,
-        segment.power,
+        seg.startX,
+        seg.endX,
+        seg.y,
+        seg.power,
         speed,
         useAccel,
         maxAccel,
         minRatio,
       );
-
-      moves.push({ type: 'laserOff' });
+      prevEndX = seg.endX;
     }
   }
+
+  moves.push({ type: 'laserOff' });
 
   return moves;
 }

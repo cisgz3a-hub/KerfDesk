@@ -502,14 +502,28 @@ const rasterLaserOffs = rasterMoves.filter(m => m.type === 'laserOff');
 // Row 7: 3 segments
 // Row 8: 0 (empty)
 // Row 9: 1 segment
-// Total: 1+1+1+1+3+3+1 = 11 segments
-assert(rasterLinears.length === 11, `Raster: 11 burn segments (got ${rasterLinears.length})`);
-assert(rasterLaserOns.length === 11, `Raster: 11 laserOn events`);
-assert(rasterLaserOffs.length === 11, `Raster: 11 laserOff events`);
+// Total: 1+1+1+1+3+3+1 = 11 burn segments
+// T1-31: modal-M4 strategy emits power>0 burn linears = segment count, plus
+// power=0 gap-bridge linears between segments within the same scanline.
+// Row 6 has 3 segments → 2 gaps; row 7 has 3 segments → 2 gaps. 4 bridges.
+const rasterBurnLinears = rasterLinears.filter(m => m.type === 'linear' && m.power > 0);
+const rasterGapBridges = rasterLinears.filter(m => m.type === 'linear' && m.power === 0);
+assert(rasterBurnLinears.length === 11,
+  `Raster: 11 burn segments (got ${rasterBurnLinears.length})`);
+assert(rasterGapBridges.length === 4,
+  `Raster: 4 gap-bridge linears (rows 6 + 7 each have 2 gaps; got ${rasterGapBridges.length})`);
+// T1-31: ONE laserOn at start, ONE laserOff at end — modal-M4 covers the
+// whole raster operation.
+assert(rasterLaserOns.length === 1, `Raster: 1 laserOn (modal-M4 start, got ${rasterLaserOns.length})`);
+assert(rasterLaserOffs.length === 1, `Raster: 1 laserOff (end, got ${rasterLaserOffs.length})`);
 
-// Verify power = powerMax for 1-bit mode (all ON pixels use max power)
+// T1-31: laserOn carries power=0 (M4 S0 modal start). The 80% powerMax
+// is carried inline on each burn linear, not on the laserOn.
 const rasterFirstOn = rasterLaserOns[0];
-assert(rasterFirstOn.type === 'laserOn' && rasterFirstOn.power === 80, 'Raster 1-bit: laserOn power = 80%');
+assert(rasterFirstOn.type === 'laserOn' && rasterFirstOn.power === 0,
+  `Raster 1-bit: laserOn power = 0 (modal start; got ${rasterFirstOn.type === 'laserOn' ? rasterFirstOn.power : 'n/a'})`);
+assert(rasterBurnLinears.every(m => m.type === 'linear' && m.power === 80),
+  `Raster 1-bit: all burn linears carry 80% (got powers ${rasterBurnLinears.map(m => m.type === 'linear' ? m.power : 'n/a').join(',')})`);
 
 // Verify empty rows were skipped (no moves at rows 4, 5, 8 Y-coordinates)
 const rasterRapids = rasterMoves.filter(m => m.type === 'rapid');
@@ -564,13 +578,21 @@ const gradientMoves = gradientPlan.operations[0].moves;
 const gradientLinears = gradientMoves.filter(m => m.type === 'linear');
 const gradientLaserOns = gradientMoves.filter(m => m.type === 'laserOn');
 
-assert(gradientLinears.length === 5, `grayscale: 5 burn segments (one per distinct S)`);
-assert(gradientLaserOns.length === 5, 'grayscale: 5 laserOn events for gradient');
+// T1-31: in modal-M4 mode the 5 distinct power values are carried on the
+// burn linears (not on per-segment laserOn). Adjacent grayscale pixels
+// in the gradient have different S values so they don't merge — 5 burns.
+const gradientBurnLinears = gradientLinears.filter(m => m.type === 'linear' && m.power > 0);
+assert(gradientBurnLinears.length === 5,
+  `grayscale: 5 burn linears (one per distinct S; got ${gradientBurnLinears.length})`);
+assert(gradientLaserOns.length === 1,
+  `grayscale: 1 laserOn (modal-M4 start; got ${gradientLaserOns.length})`);
 
-const gp = gradientLaserOns.map(m => (m.type === 'laserOn' ? m.power : -1));
-assert(gp[0] > gp[1] && gp[1] > gp[2] && gp[2] > gp[3] && gp[3] > gp[4],
-  'grayscale: laser power decreases left→right (dark→light)');
-assert(gp[0] === 100 && gp[4] === 10, 'grayscale: endpoints map to powerMax / powerMin');
+const gpFromLinears = gradientBurnLinears.map(m => m.type === 'linear' ? m.power : -1);
+assert(gpFromLinears[0] > gpFromLinears[1] && gpFromLinears[1] > gpFromLinears[2] &&
+  gpFromLinears[2] > gpFromLinears[3] && gpFromLinears[3] > gpFromLinears[4],
+  'grayscale: burn power decreases left→right (dark→light)');
+assert(gpFromLinears[0] === 100 && gpFromLinears[4] === 10,
+  'grayscale: endpoint linears map to powerMax / powerMin');
 
 console.log(`  ℹ Grayscale segments: ${gradientLinears.length}`);
 
