@@ -143,9 +143,13 @@ async function run(): Promise<void> {
       lastSavedSceneRef.current === newJson,
       'successful autosave advances lastSavedSceneRef to the persisted JSON',
     );
+    // T2-69: JSON now lives inside the atomic record at
+    // 'laserforge_autosave_record'; legacy key is no longer written.
+    const persistedRecord = await adapter.get('laserforge_autosave_record');
+    const parsedRecord = persistedRecord ? JSON.parse(persistedRecord) : null;
     assert(
-      (await adapter.get('laserforge_autosave')) === newJson,
-      'persisted JSON is in storage',
+      parsedRecord?.json === newJson,
+      'persisted JSON is in storage (T2-69 atomic record)',
     );
   }
 
@@ -174,9 +178,12 @@ async function run(): Promise<void> {
       lastSavedSceneRef.current === json,
       'second tick advances lastSavedSceneRef',
     );
+    // T2-69: JSON now lives inside the atomic record.
+    const persistedRecord2 = await working.get('laserforge_autosave_record');
+    const parsedRecord2 = persistedRecord2 ? JSON.parse(persistedRecord2) : null;
     assert(
-      (await working.get('laserforge_autosave')) === json,
-      'second tick actually persists the JSON',
+      parsedRecord2?.json === json,
+      'second tick actually persists the JSON (T2-69 atomic record)',
     );
   }
 
