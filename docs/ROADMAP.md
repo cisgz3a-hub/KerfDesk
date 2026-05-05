@@ -8331,6 +8331,8 @@ Plus AbortSignal acceptance for T1-50 Part B.
 
 **Priority:** Tier 2 鈥?depends on T2-31 (async close infrastructure). Pairs naturally with T1-49 (MachineService cleanup) 鈥?both are partial-failure correctness.
 
+**Status:** Shipped in `<TBD>`. `WebSerialPort.requestAndOpen` rewritten to track each acquisition step in local variables (`port`, `portOpened` flag, `writer`, `reader`) and only commit to instance fields after ALL succeed. On any failure the catch block unwinds in reverse: cancel + release-lock the reader (best-effort, swallowing each), release-lock the writer, close the port (only if `portOpened` — pre-open failures don't have a port to close), then null out instance fields and re-throw with the preserved error message. T1-50 Part B integration: `requestAndOpen(baudRate, signal?)` accepts an optional `AbortSignal`; `signal?.throwIfAborted()` fires before `requestPort`, after `requestPort`, after `port.open()`, and after each lock acquisition. Aborted signal surfaces as `"Connection aborted by user"` so UI gates can distinguish user-cancel from transport failure. Pinned by `tests/web-serial-partial-open-cleanup.test.ts` (38 contracts): happy-path (no cleanup); `port.open()` throws → no port.close() (open never succeeded); writer-acquisition fails → port.close() called, no lock-release calls; reader-acquisition fails → writer.releaseLock + port.close called; `port.writable === null` → "writer lock" error + port.close; `port.readable === null` → "reader lock" error + writer.releaseLock + port.close; AbortSignal pre-aborted → "Connection aborted by user" + port.open never called; AbortSignal aborted between open and getWriter → port.close called for cleanup; source-level pins for T2-33 marker, all three local-tracking variables, throwIfAborted call, portOpened flag in cleanup. Regression: `connect-abort-signal` (21/21), `connect-cleanup-on-partial-failure` (16/16), `connect-safe-state-handshake` (43/43), `serial-port-close-async` (18/18), `fault-injecting-serial-port` (52/52). **TS error count:** 43 (baseline holds). **Hardware verification: not required** (transport-layer cleanup; refusing to leave a half-open port is intrinsically safe).
+
 **Cross-check note (audit 3B):** Audit's section 3.3 + scenarios 7.3, 7.4 + P0 fix #4.
 
 ---
@@ -19688,7 +19690,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)
 - [x] T2-31 Make `SerialPortLike.close()` async (shipped 2026-05-05 in `898b510` — unblocks T2-32 / T2-33)
 - [ ] T2-32 Connection lifecycle state machine 鈥?ConnectionManager (filed; depends on T2-24, T2-31)
-- [ ] T2-33 Partial-open cleanup in `WebSerialPort.requestAndOpen` (filed; depends on T2-31)
+- [x] T2-33 Partial-open cleanup in `WebSerialPort.requestAndOpen` (shipped 2026-05-05 in `<TBD>`)
 - [ ] T2-34 Connection generation guard 鈥?token tagged on transport callbacks (filed; depends on T2-32)
 - [ ] T2-35 Electron serial subsystem decision 鈥?complete it OR remove it (filed; supersedes T1-27 partial fix)
 - [ ] T2-36 Subscription-based transport callbacks (filed; pairs with T2-34)

@@ -24,20 +24,76 @@ export class WebSerialPort implements SerialPortLike {
     return 'serial' in navigator;
   }
 
-  /** Prompt user to select a serial port */
-  async requestAndOpen(baudRate: number = 115200): Promise<void> {
+  /**
+   * Prompt user to select a serial port and acquire a writer + reader.
+   *
+   * T2-33: partial-open cleanup. Pre-T2-33 the catch block did NOT
+   * release locks, cancel the reader, or close the port if the
+   * failure happened AFTER `port.open()` succeeded. The next reconnect
+   * could find the port still held by the (failed) previous attempt
+   * and reject with "port busy" — a hardware-lifecycle leak. The
+   * fix: track every acquisition step in locals, only commit to
+   * instance fields after ALL succeed, and unwind in reverse on any
+   * failure.
+   *
+   * T1-50 Part B: optional AbortSignal — caller can cancel a slow
+   * `requestPort` / `open` and the unwind path runs identically to
+   * a thrown error. The AbortError surfaces with a stable message so
+   * UI gates can distinguish user-cancel from transport failure.
+   */
+  async requestAndOpen(baudRate: number = 115200, signal?: AbortSignal): Promise<void> {
+    let port: SerialPort | null = null;
+    let portOpened = false;
+    let writer: WritableStreamDefaultWriter | null = null;
+    let reader: ReadableStreamDefaultReader | null = null;
+
     try {
-      this._port = await (navigator as any).serial.requestPort();
-      await this._port!.open({ baudRate });
+      signal?.throwIfAborted();
+      port = await (navigator as unknown as {
+        serial: { requestPort: () => Promise<SerialPort> };
+      }).serial.requestPort();
+      signal?.throwIfAborted();
 
-      this._writer = this._port!.writable?.getWriter() || null;
-      this._reader = this._port!.readable?.getReader() || null;
+      await port.open({ baudRate });
+      portOpened = true;
+      signal?.throwIfAborted();
+
+      writer = port.writable?.getWriter() ?? null;
+      if (!writer) throw new Error('Failed to acquire writer lock');
+      signal?.throwIfAborted();
+
+      reader = port.readable?.getReader() ?? null;
+      if (!reader) throw new Error('Failed to acquire reader lock');
+
+      // All acquisitions succeeded — commit to instance fields.
+      this._port = port;
+      this._writer = writer;
+      this._reader = reader;
       this._isOpen = true;
-
       this._startReadLoop();
-    } catch (e: any) {
+    } catch (e) {
+      // Unwind in reverse order. Each unwind step is best-effort; we
+      // don't want one failing cleanup to mask the original error.
+      if (reader) {
+        try { await reader.cancel(); } catch { /* ignore */ }
+        try { reader.releaseLock(); } catch { /* ignore */ }
+      }
+      if (writer) {
+        try { writer.releaseLock(); } catch { /* ignore */ }
+      }
+      if (portOpened && port) {
+        try { await port.close(); } catch { /* ignore */ }
+      }
       this._isOpen = false;
-      throw new Error(`Failed to open serial port: ${e.message}`);
+      this._port = null;
+      this._reader = null;
+      this._writer = null;
+
+      if (signal?.aborted) {
+        throw new Error('Connection aborted by user');
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Failed to open serial port: ${msg}`);
     }
   }
 
