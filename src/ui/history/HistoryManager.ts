@@ -23,6 +23,7 @@
 
 import { type Scene } from '../../core/scene/Scene';
 import { stripRegenerableImageCaches } from './stripRegenerableCaches';
+import { estimateSceneBytes } from './estimateSceneBytes';
 
 // ─── TYPES ───────────────────────────────────────────────────────
 
@@ -98,10 +99,20 @@ function buildEntry(scene: Scene, meta: HistoryEntryMeta | undefined): HistoryEn
 
 // ─── HISTORY MANAGER ─────────────────────────────────────────────
 
+/** T2-82: default history byte budget. 100MB matches the audit's
+ *  recommendation; image-heavy projects after T2-81's strip stay
+ *  under this for hundreds of entries, raster-only catastrophic
+ *  cases evict before browser slowdown territory. */
+const DEFAULT_MAX_BYTES = 100 * 1024 * 1024;
+
 export class HistoryManager {
   private _stack: HistoryEntry[] = [];
   private _cursor = -1;            // Index of current entry
   private _maxSize: number;
+  private _maxBytes: number;
+  /** T2-82: index-aligned with `_stack`; cached at push time so
+   *  `totalBytes()` is O(stack.length). */
+  private _entryBytes: number[] = [];
   private _listeners = new Set<HistoryChangeCallback>();
   // T2-81: tracks the most recently push()'d scene's PRE-strip
   // reference. The no-op-commit guard (mouseUp without movement
@@ -111,8 +122,9 @@ export class HistoryManager {
   // observable scene is unchanged.
   private _lastPushedScene: Scene | null = null;
 
-  constructor(maxSize: number = 100) {
+  constructor(maxSize: number = 100, maxBytes: number = DEFAULT_MAX_BYTES) {
     this._maxSize = Math.max(1, maxSize);
+    this._maxBytes = Math.max(1024, maxBytes);
   }
 
   // ─── CURRENT STATE ───────────────────────────────────────────
@@ -188,19 +200,53 @@ export class HistoryManager {
 
     // Truncate redo history — everything after cursor is discarded
     this._stack.length = this._cursor + 1;
+    this._entryBytes.length = this._cursor + 1;
 
     // Add the new entry
     this._stack.push(entry);
+    this._entryBytes.push(estimateSceneBytes(entry.scene));
     this._cursor = this._stack.length - 1;
     this._lastPushedScene = scene;
 
-    // Enforce max size — evict from the front
-    while (this._stack.length > this._maxSize) {
+    // T2-82: evict by either count OR byte budget. Always retain at
+    // least one entry — eviction stops when the stack would drop to
+    // a single entry, even if that one entry is over budget.
+    let evictedCount = 0;
+    let evictedBytes = 0;
+    while (
+      this._stack.length > 1 &&
+      (this._stack.length > this._maxSize || this._totalBytesUnsafe() > this._maxBytes)
+    ) {
       this._stack.shift();
+      const removed = this._entryBytes.shift() ?? 0;
       this._cursor--;
+      evictedCount++;
+      evictedBytes += removed;
+    }
+    if (evictedBytes > 0 && evictedCount > 0) {
+      console.warn(
+        `[HistoryManager] T2-82: evicted ${evictedCount} entr${evictedCount === 1 ? 'y' : 'ies'} ` +
+        `(~${(evictedBytes / 1024 / 1024).toFixed(1)} MB) to stay under ` +
+        `${(this._maxBytes / 1024 / 1024).toFixed(0)}MB / ${this._maxSize} entries.`,
+      );
     }
 
     this._notify();
+  }
+
+  private _totalBytesUnsafe(): number {
+    let total = 0;
+    for (const n of this._entryBytes) total += n;
+    return total;
+  }
+
+  /**
+   * T2-82: approximate bytes used by all entries currently in the
+   * stack. Computed from the cached per-entry estimates; constant-
+   * time per entry. Useful for tests and debug overlays.
+   */
+  totalBytes(): number {
+    return this._totalBytesUnsafe();
   }
 
   /**
@@ -251,7 +297,9 @@ export class HistoryManager {
    * Clear all history and start fresh with an initial scene.
    */
   reset(initialScene: Scene, meta?: HistoryEntryMeta): void {
-    this._stack = [buildEntry(initialScene, meta)];
+    const entry = buildEntry(initialScene, meta);
+    this._stack = [entry];
+    this._entryBytes = [estimateSceneBytes(entry.scene)];
     this._cursor = 0;
     this._lastPushedScene = initialScene;
     this._notify();
@@ -262,6 +310,7 @@ export class HistoryManager {
    */
   clear(): void {
     this._stack = [];
+    this._entryBytes = [];
     this._cursor = -1;
     this._lastPushedScene = null;
     this._notify();
