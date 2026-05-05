@@ -163,17 +163,34 @@ function ditherErrorDiffusion(
 
   const out = new Uint8Array(width * height);
 
+  // T1-34: serpentine scanning. Even rows scan left→right and propagate
+  // error rightward (kernel as defined). Odd rows scan right→left and
+  // propagate leftward (kernel.dx mirrored). Breaks the directional
+  // coherence that produces the diagonal "worm" patterns visible on
+  // mid-tone gradients pre-T1-34, especially on bidirectional engraves
+  // where the always-LTR dither and alternating burn-direction compound
+  // each other's artifacts. Kernel definitions are unchanged; only the
+  // scan order and kernel-dx sign flip per row.
   for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+    const reverse = (y & 1) === 1;
+    const xStart = reverse ? width - 1 : 0;
+    const xEnd = reverse ? -1 : width;
+    const xStep = reverse ? -1 : 1;
+
+    for (let x = xStart; x !== xEnd; x += xStep) {
       const i = y * width + x;
       const oldVal = buf[i];
       const newVal = oldVal < threshold ? 0 : 255;
       out[i] = newVal === 0 ? 255 : 0; // Invert: dark pixel = burn (255)
       const error = oldVal - newVal;
 
-      // Distribute error to neighbors
+      // Distribute error to neighbors. On reverse rows we mirror dx so
+      // the error still flows in the same direction RELATIVE to the
+      // scan (i.e. ahead of the cursor + downward), not in the same
+      // absolute direction.
       for (const [dx, dy, weight] of kernel.offsets) {
-        const nx = x + dx;
+        const effectiveDx = reverse ? -dx : dx;
+        const nx = x + effectiveDx;
         const ny = y + dy;
         if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
           buf[ny * width + nx] += (error * weight) / kernel.divisor;

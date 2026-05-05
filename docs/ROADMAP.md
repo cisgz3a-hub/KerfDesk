@@ -1790,6 +1790,8 @@ The kernel definitions stay the same. Only the scan order changes. All error-dif
 
 **Cross-check note (audit 2B):** Audit identified this as one of the dithering weaknesses. Verified at code level. Audit's other dithering concerns (no blue-noise, "random" mode is crude) are real but less impactful 鈥?blue-noise would be a separate medium-effort feature; "random" mode quality is bounded and users who care pick error-diffusion modes anyway.
 
+**Status:** Shipped in `<TBD>`. `ditherErrorDiffusion` in `src/import/Dithering.ts` rewrites the inner row loop to alternate scan direction per row: even rows scan left→right with the kernel as defined; odd rows scan right→left with `kernel.dx` mirrored so error still propagates "ahead of the cursor + downward" relative to the scan, never relative to absolute X. Kernel definitions (Floyd-Steinberg, Jarvis, Stucki, Atkinson, Burkes, Sierra3/2/Lite) are unchanged. Ordered (Bayer) and random modes are intentionally untouched — they have no error propagation to alternate. Mid-tone gradients now distribute the dither error symmetrically across both diagonals; the pre-T1-34 directional "worm" pattern that compounded with bidirectional engraving is broken at the source. Pinned by `tests/dither-serpentine.test.ts` (29 contracts: floyd-steinberg uniform mid-tone has diagonal autocorrelations balanced (ratio < 1.5; measured 1.01 on a 100×100 mid-tone @ value=128); adjacent rows do not share an identical leading-edge dither pattern; all 8 error-diffusion modes still produce strict 0/255 outputs of the expected dimensions; jarvis is deterministic across calls; pure black/white inputs round-trip correctly; ordered mode unchanged; single-row and two-row edge cases hit the alternation boundary; source-level pins for T1-34 marker, serpentine docstring, mirrored-dx logic, reverse-row start-at-width-1). Regression: `raster-output-uses-modal-m4` (16/16), `raster-m4-no-software-splitting` (6/6), `pipeline` (100/100) green. **TS error count:** 43 (baseline holds). **Hardware verification owed** — burn a uniform mid-tone (128) photo with Floyd-Steinberg pre/post-T1-34 and visually compare. Pre-T1-34 should show diagonal "worms"; post should show isotropic noise.
+
 ---
 
 ### T1-35 | Configurable image import resolution cap
@@ -19578,7 +19580,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T1-31 Raster image strategy 鈥?single M4 per pass with inline S modulation (code shipped 2026-05-05 in `315565a`; awaiting hardware verification on Falcon A1 Pro — calibration-grid photo at 100mm/s)
 - [x] T1-32 $32 laser-mode verification before M4 emission (shipped 2026-05-04 in `8bc2f3a`)
 - [x] T1-33 Live $30 controller value should win over profile maxSpindle (shipped 2026-05-04 in `a5dbe91`)
-- [ ] T1-34 Serpentine error-diffusion dithering (filed; output quality)
+- [ ] T1-34 Serpentine error-diffusion dithering (code shipped 2026-05-05 in `<TBD>`; awaiting hardware verification — uniform mid-tone burn comparison pre/post)
 - [x] T1-35 Configurable image import resolution cap (shipped 2026-05-04 in `1ed3aaf` — minimum-viable: cap raised 1000 → 4000 + downscale warn; user-tunable preference filed as future follow-up)
 - [ ] T1-36 Offset-with-holes for kerf compensation (filed; geometry correctness 鈥?real product bug)
 - [x] T1-37 Hide offset fill UI option until implemented (shipped 2026-05-02 in `bfb1a6b`)
