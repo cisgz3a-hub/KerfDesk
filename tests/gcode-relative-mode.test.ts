@@ -142,7 +142,7 @@ function rectangleJobAndPlan(withSpeedChange: boolean): { job: Job; plan: Plan }
   const { job, plan } = rectangleJobAndPlan(false);
   const text = strategy!.generate(plan, job, { startMode: 'absolute', returnPosition: null }).text ?? '';
   const headerLines = text.split('\n').slice(0, 12).join('\n');
-  assert(/G90 ; absolute positioning/i.test(headerLines), 'Bed: header G90 absolute');
+  assert(/G90 ; (T2-14 safety baseline: )?absolute positioning/i.test(headerLines), 'Bed: header G90 absolute');
   assert(!/\bG91\b.*relative positioning/i.test(headerLines), 'Bed: header has no G91 relative line');
   assert(text.includes('G1 X30.000 Y0.000'), 'Bed: G1 uses absolute X Y pair');
 }
@@ -156,7 +156,7 @@ function rectangleJobAndPlan(withSpeedChange: boolean): { job: Job; plan: Plan }
     returnPosition: null,
   }).text ?? '';
   const headerLines = text.split('\n').slice(0, 12).join('\n');
-  assert(/G90 ; absolute positioning/i.test(headerLines), 'savedOrigin: header G90 absolute');
+  assert(/G90 ; (T2-14 safety baseline: )?absolute positioning/i.test(headerLines), 'savedOrigin: header G90 absolute');
   assert(!/\bG91\b.*relative positioning/i.test(headerLines), 'savedOrigin: header has no G91 relative line');
 }
 
