@@ -14241,6 +14241,8 @@ A small middleware/hook that records the user's last meaningful action (button c
 
 **Cross-check note (audit 5C):** Audit's Critical 2 + Priority 8.
 
+**Status:** Shipped in <TBD> (focused MVP — boundary + global handlers + sink injection; full crash-screen UX + last-user-action tracker + reportError wiring deferred). Two new files: `src/diagnostics/AppErrorBoundary.tsx` exports `CrashReport` interface, `AppErrorBoundary` class with `getDerivedStateFromError` + `componentDidCatch` lifecycle, props `onCrash` (sink) / `onRecover` / `fallback` (override). Sink failures are swallowed (broken reporter must not turn into a render loop on top of the original crash). Default fallback is plain DOM (no design-system dependency so the crash UI works even when the styling layer threw). `src/diagnostics/installGlobalErrorHandlers.ts` exports `GlobalErrorReport` interface (kind / message / stack / filename / lineno / colno / capturedAt), `installGlobalErrorHandlers({onReport, target})` (returns `uninstall()`); attaches both `error` and `unhandledrejection` listeners; reasons are extracted as message + stack with type-aware coercion (Error → message+stack; string → as-is; object → JSON.stringify; null → "Unhandled rejection (no reason)"); sink failures are swallowed. Pinned by `tests/error-boundary.test.ts` (30 contracts: getDerivedStateFromError happy path + ISO capturedAt; componentDidCatch invokes sink with componentStack; sink errors don't re-throw; handleRecover resets state + invokes onRecover + tolerates throwing onRecover; install — error event with all location fields preserved; unhandledrejection with Error/string/object/null reasons; uninstall detaches both; sink errors swallowed; stack extraction conditional on Error reason; source-level pin verifies both listener types). **Out of scope (T2-114-followup):** wiring `onCrash` to `reportError` (T2-65), full CrashScreen UX with "Export support bundle" wired to T2-108, last-user-action tracker. **Hardware verification: not required** (renderer diagnostic plumbing).
+
 ---
 
 ### T2-115 | Privacy redaction layer for diagnostic exports
@@ -19813,7 +19815,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-111 Persist partial job log during running job 鈥?every N seconds (filed; pairs with T2-67/T2-105)
 - [ ] T2-112 Improved RX/TX retention 鈥?event-window strategy (filed; refines T2-67)
 - [ ] T2-113 Structured RX/TX events 鈥?line numbers, buffer state, classification (filed; refines T3-74)
-- [ ] T2-114 React error boundary + window error/rejection persistence (filed; refines T2-105)
+- [x] T2-114 React error boundary + window error/rejection persistence (Shipped — `AppErrorBoundary` + `installGlobalErrorHandlers` with sink injection; full reportError wiring deferred to T2-65; refines T2-105)
 - [x] T2-115 Privacy redaction layer for diagnostic exports (Shipped — central `src/diagnostics/Redaction.ts` with patterns + recursive redactObject; required by T2-108)
 - [ ] T2-116 Storage health and quota reporting (filed; pairs with T2-118)
 - [x] T2-117 Correlation IDs across systems (Shipped — type + generator + snapshot helpers in `src/diagnostics/CorrelationIds.ts`; subsystem propagation deferred as T2-117-followup)
