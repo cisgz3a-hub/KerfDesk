@@ -7628,6 +7628,8 @@ When this test fails, the failure points at exactly which non-determinism source
 
 **Cross-check note (audit 2F):** Audit's section 7. Verified determinism is asserted only narrowly (`deterministic-ids.test.ts` covers IDs; nothing covers full output).
 
+**Status:** Shipped in `<TBD>`. New `tests/determinism-gate.test.ts` (8 contracts) compiles a non-trivial scene (cut rects + engrave ellipse + engrave line + 1-bit raster across three layers, IDs derived from a seeded T2-21 PRNG) 20× through `PipelineService.compileGcode` with `LASERFORGE_DETERMINISTIC_IDS=1` (set by the test runner), normalizes away the wall-clock `; Date:` line, and asserts byte-identical output across all 20 runs (4130 chars, identical). Companion contracts: 5 random Fisher-Yates shuffles of `scene.objects` produce the same gcode (proves the planner / optimizer establishes a canonical order before emission and doesn't leak the user-facing object list ordering into output); two same-seed regenerated scenes compile identically (rules out the seed plumbing as a source of flake); `findFirstDiff(a, b)` self-tested for line + content reporting on a synthetic mismatch + null on equal strings (the diagnostic the test prints when a future regression breaks determinism); source-level pin that `Output.ts` retains the T1-48 `options?.clock` injection (the foundation T2-23 builds on). **Out of scope (filed as T2-23-followup):** threading `clock` through `PipelineService.compileGcode` so the determinism test could compare unstripped gcode byte-for-byte (currently the `; Date:` line uses wall-clock and gets normalized out — the contract holds for everything except that one line). The headline determinism guarantee — "the same scene produces the same output across 20 compiles and across object-order shuffles" — is delivered. Regression: `parse-gcode-helper` (39/39) and `analyze-burn-bounds` (35/35) green; e2e snapshots unchanged. **TS error count:** 43 (baseline holds). **Hardware verification: not required** (test infrastructure; no g-code emission change). Master checklist `[x]`.
+
 ---
 
 ### T2-24 | Split LaserController into protocol-neutral core + dialect extensions
@@ -19676,7 +19678,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-20 Pixel fixture harness for raster regression tests (filed; depends on T1-31, T2-18)
 - [x] T2-21 Property-based geometry tests (in-house mini-framework, no fast-check dep) (shipped 2026-05-05 in `be90a91`)
 - [x] T2-22 Standardize test runner 鈥?auto-discovery + consistent reporter (Stage 1 shipped 2026-05-05 in `0b33d3d` — auto-discovery walk; Stage 2 vitest migration deferred)
-- [ ] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (filed; depends on T1-48, T2-18)
+- [x] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (shipped 2026-05-05 in `<TBD>`)
 - [ ] T2-24 Split LaserController into protocol-neutral core + dialect extensions (filed; foundation for audit 3A work)
 - [ ] T2-25 Create real ControllerCapabilities model (filed; depends on T2-24)
 - [ ] T2-26 Move GRBL command construction out of generic layers (filed; 6-pass migration, depends on T2-24/25)
