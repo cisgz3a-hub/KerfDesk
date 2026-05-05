@@ -12530,6 +12530,8 @@ The test suite then catches future regressions: if someone adds a Pro feature to
 
 **Cross-check note (audit 5A):** Audit's Priority 5.
 
+**Status:** Shipped in <TBD>. New `src/entitlements/FeatureMatrix.ts` exports `EnforcementLayer` literal union (`ui` / `service` / `compiler` / `export`), `FeatureDefinition` interface (id / label / tier / enforcement / description), `FEATURE_MATRIX` (12 entries — every Pro feature in `PRO_FEATURES`, with their declared enforcement layers), `getFeatureDefinition(id)` lookup, `featuresEnforcedAt(layer)` filter, `compilerAllowFlagName(id)` (snake_case → `allow${PascalCase}` convention used by JobCompiler). Pinned by `tests/feature-matrix-enforcement.test.ts` (99 contracts) which source-scans the repo: every `PRO_FEATURES` entry has a matrix row; every matrix row is a `PRO_FEATURES` entry; every feature claiming `service` enforcement has at least one `assertFeature('${id}')` callsite outside the entitlements module; every feature claiming `compiler` enforcement has the corresponding `allow${Camel}: canUseFeature("${id}")` line in JobCompiler.ts; non-empty enforcement; at-least-one non-UI layer; helper round-trip; source-level pins. Adding a Pro feature to the matrix without wiring its gates fails CI. **Hardware verification: not required** (declarative + test-time enforcement, no runtime change).
+
 ---
 
 ### T2-92 | Per-feature granular `canUse` 鈥?replace single `hasPro` boolean
@@ -19780,7 +19782,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-88 Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; 17-site call-site migration filed as T2-88-followup)
 - [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
 - [ ] T2-90 Signed local entitlement token with public-key verification (filed; depends on T2-89)
-- [ ] T2-91 Feature enforcement registry 鈥?`FEATURE_MATRIX` per-feature `enforce` declarations (filed; foundation, pairs with T1-78)
+- [x] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (Shipped — `src/entitlements/FeatureMatrix.ts` + source-scanning enforcement test; foundation, pairs with T1-78)
 - [ ] T2-92 Per-feature granular `canUse` 鈥?replace single `hasPro` boolean (filed; pairs with T2-89/T2-91)
 - [x] T2-93 License status enum 鈥?`LicenseStatus` first-class state machine (additive layer shipped 2026-05-05 in `e18e204`; legacy flat-`status` removal deferred to T2-93-followup)
 - [ ] T2-94 Clock-tamper detection for offline grace (filed; depends on T2-89/T2-90)
