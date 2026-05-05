@@ -82,6 +82,72 @@ export interface CompileToolpathResult {
 // ─── COMPILE G-CODE ────────────────────────────────────────────
 
 /**
+ * T2-17: optional cooperative-cancel + progress hooks for compileGcode.
+ * Pre-T2-17 the compile was uncancellable internally — once started,
+ * every loop ran to completion. The phase-boundary hooks here let the
+ * UI surface a Cancel button + progress bar without waiting for the
+ * deep-loop instrumentation in JobCompiler / PlanOptimizer / Output
+ * (filed as T2-17-followup). Aborting at a phase boundary throws an
+ * AbortError; pre-existing callers that don't pass `opts` see no
+ * behavior change.
+ */
+export interface CompileOptions {
+  signal?: AbortSignal;
+  onProgress?: (event: CompileProgress) => void;
+}
+
+export interface CompileProgress {
+  phase: 'text-expansion' | 'compile-job' | 'plan' | 'transform' | 'output';
+  /** 0..1 within the current phase. MVP fires at boundaries (0 entering,
+   *  1 finishing); deep-loop instrumentation in T2-17-followup will
+   *  emit intermediate values. */
+  fraction: number;
+  /** 0..1 across the whole compile. Monotonically non-decreasing. */
+  overallFraction: number;
+  detail?: string;
+}
+
+const PHASE_BUDGETS: Record<CompileProgress['phase'], number> = {
+  'text-expansion': 0.10,
+  'compile-job':    0.30,
+  'plan':           0.30,
+  'transform':      0.10,
+  'output':         0.20,
+};
+
+function phaseStartFraction(phase: CompileProgress['phase']): number {
+  let acc = 0;
+  for (const p of ['text-expansion', 'compile-job', 'plan', 'transform', 'output'] as const) {
+    if (p === phase) return acc;
+    acc += PHASE_BUDGETS[p];
+  }
+  return acc;
+}
+
+/**
+ * Throws an AbortError-shaped DOMException when the signal is aborted,
+ * otherwise returns. Matches the contract `AbortSignal.throwIfAborted()`
+ * but works on older Node where the helper isn't available.
+ */
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
+function reportPhase(
+  opts: CompileOptions | undefined,
+  phase: CompileProgress['phase'],
+  fraction: number,
+  detail?: string,
+): void {
+  if (!opts?.onProgress) return;
+  const start = phaseStartFraction(phase);
+  const overall = start + PHASE_BUDGETS[phase] * Math.max(0, Math.min(1, fraction));
+  opts.onProgress({ phase, fraction, overallFraction: overall, detail });
+}
+
+/**
  * Full pipeline: Scene → G-code string + all intermediate data.
  *
  * Returns null if the scene produces no operations (empty/hidden layers).
@@ -111,8 +177,19 @@ export async function compileGcode(
    * pre-T1-58 default behavior in that branch.
    */
   profile: DeviceProfile | null = null,
+  /**
+   * T2-17: optional AbortSignal + progress callback. Phase-boundary
+   * checkpoints ship now; deep-loop instrumentation is T2-17-followup.
+   * Defaults to `{}` so existing callers see no behavior change.
+   */
+  opts: CompileOptions = {},
 ): Promise<CompileGcodeResult | null> {
+  // T2-17: phase 1 — text expansion.
+  throwIfAborted(opts.signal);
+  reportPhase(opts, 'text-expansion', 0, 'Expanding text outlines');
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
+  reportPhase(opts, 'text-expansion', 1);
+
   const strategy = getOutputStrategy(outputFormat);
   if (!strategy) return null;
 
@@ -122,17 +199,25 @@ export async function compileGcode(
     );
   }
 
+  // T2-17: phase 2 — JobCompiler.
+  throwIfAborted(opts.signal);
+  reportPhase(opts, 'compile-job', 0, 'Compiling job operations');
   const job = compileJob(sceneForJob, {
     machineAccelMmPerS2: controllerAccelMmPerS2,
     strategySupportsDynamicLaserPower: strategy.supportsDynamicLaserPower ?? false,
   });
+  reportPhase(opts, 'compile-job', 1);
   if (job.operations.length === 0) return null;
 
   // T1-58: `profile` parameter is the caller's snapshot. The pre-T1-58
   // `getActiveProfile()` global read is gone from this function.
+  // T2-17: phase 3 — PlanOptimizer.
+  throwIfAborted(opts.signal);
+  reportPhase(opts, 'plan', 0, 'Optimizing toolpath');
   const plan = optimizePlan(job, {
     maxRapidSpeed: profile?.maxFeedRate ?? 6000,
   });
+  reportPhase(opts, 'plan', 1);
 
   // Canvas-space data for preview
   const canvasMoves = plan.operations.flatMap(op => op.moves);
@@ -160,6 +245,9 @@ export async function compileGcode(
   // Machine-space data for output. T1-40: bedWidthMm is required when
   // originCorner is front-right or rear-right; we always pass it so
   // the transform can mirror X for those configurations.
+  // T2-17: phase 4 — machine-space transform.
+  throwIfAborted(opts.signal);
+  reportPhase(opts, 'transform', 0, 'Applying machine transform');
   const machineTransform = applyMachineTransform(plan, {
     startMode,
     savedOrigin,
@@ -167,7 +255,11 @@ export async function compileGcode(
     bedHeightMm,
     bedWidthMm,
   });
+  reportPhase(opts, 'transform', 1);
 
+  // T2-17: phase 5 — Output (g-code emission).
+  throwIfAborted(opts.signal);
+  reportPhase(opts, 'output', 0, 'Emitting G-code');
   const output = strategy.generate(machineTransform.plan, job, {
     startMode,
     savedOrigin,
@@ -198,6 +290,7 @@ export async function compileGcode(
     maxSpindle,
   });
   if (!output.text) return null;
+  reportPhase(opts, 'output', 1);
 
   const gcode = output.text;
   const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
