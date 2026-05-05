@@ -21,6 +21,7 @@ import {
 import { runRasterChecks } from './rules/RasterPreflight';
 import { runOptimizationChecks } from './rules/OptimizationPreflight';
 import { runDuplicateGeometryChecks } from './rules/DuplicateGeometryPreflight';
+import { runCompileComplexityChecks } from './rules/CompileComplexityPreflight';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -70,6 +71,10 @@ export const PREFLIGHT_CODES = {
   MACHINE_UNSAFE_AT_CONNECT: 'MACHINE_UNSAFE_AT_CONNECT',
   /** T2-16: two or more objects with identical transform + geometry signature — likely stacked duplicates. */
   GEOMETRY_DUPLICATE: 'GEOMETRY_DUPLICATE',
+  /** T1-45: compile complexity gate — info / warning / blocker depending on estimated G-code line count + memory footprint. */
+  COMPILE_COMPLEXITY_INFO: 'COMPILE_COMPLEXITY_INFO',
+  COMPILE_COMPLEXITY_WARN: 'COMPILE_COMPLEXITY_WARN',
+  COMPILE_COMPLEXITY_BLOCK: 'COMPILE_COMPLEXITY_BLOCK',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -181,6 +186,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runRasterChecks(ctx, results);
   runOptimizationChecks(ctx, results);
   runDuplicateGeometryChecks(ctx, results);
+  runCompileComplexityChecks(ctx, results);
   ensureNoCompiledOutputIssue(ctx, results);
   return sortBySeverity(results);
 }
