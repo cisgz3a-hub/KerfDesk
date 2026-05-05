@@ -13374,6 +13374,8 @@ GitHub Provenance / SLSA attestation is a richer alternative; for v1, signed SHA
 
 **Cross-check note (audit 5B):** Audit's Critical 6 + Priority 9.
 
+**Status:** Shipped in <TBD> (focused MVP — SHA256 checksum format helpers + generator script; SBOM tooling + GPG signing CI integration deferred as T2-103-followup). New `src/release/checksumFormat.ts` exports `computeSha256Hex(data: Buffer | Uint8Array | string)` (NIST-canonical-verified — empty string + 'abc' both match the published test vectors), `formatChecksumLine(hashHex, filename)` (standard `<64-char-lowercase-hex>  <filename>` format that `sha256sum -c` accepts; rejects bad hex, empty filename, embedded newlines), `formatChecksumsFile(lines)` (alphabetical sort by filename + trailing newline POSIX convention), `parseChecksumsFile(text)` (round-trip parser; tolerates blank lines + sha256sum binary-mode `*name` syntax + silently skips malformed lines), `matchesAnyPattern(name, patterns)` (simple `*` glob — sufficient for `*.exe` / `*.dmg`). New `scripts/generate-checksums.mjs` orchestrates: walks the release dir, hashes each match against patterns (defaults: `*.exe,*.dmg,*.zip,*.AppImage,*.deb,*.rpm`), writes `SHA256SUMS` with one line per artifact. Pinned by `tests/release-artifact-integrity.test.ts` (34 contracts: NIST canonical empty + 'abc'; Buffer ↔ string parity; 64-char lowercase hex output; format with two-space separator; rejects short/uppercase/63-char hex + empty + newline filenames; alphabetical sort + trailing newline; parse round-trip with binary-mode `*` strip + blank-line tolerance + malformed-line skip; pattern matching with proper dot-anchoring; e2e hash → format → parse → re-verify; source-level pin for both helper module and script). **Out of scope (T2-103-followup):** GitHub release workflow YAML wiring (gpg --detach-sign + softprops/action-gh-release upload of artifacts + SHA256SUMS + SHA256SUMS.asc + sbom.json); `npx @cyclonedx/cyclonedx-npm` SBOM step. Both depend on T2-98 (release workflow) and CI secrets that aren't provisioned yet. **Hardware verification: not required** (build-time + verify-time tooling).
+
 ---
 
 ### T2-104 | Versioned user-data migration framework
@@ -19816,7 +19818,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
 - [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
 - [ ] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
-- [ ] T2-103 Release artifact integrity 鈥?SHA256 + SBOM + signed checksum (filed; depends on T2-98)
+- [x] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (Shipped — checksum-format helpers + generator script; SBOM tooling + GPG signing wiring deferred as T2-103-followup; depends on T2-98)
 - [ ] T2-104 Versioned user-data migration framework (filed; broader scope than T2-73)
 - [x] T2-105 Startup diagnostics + safe mode + crash-loop recovery (Shipped — pure crash-loop detector with reconcileOnBoot for "host died silently"; Electron `electron/main.ts` wiring deferred as T2-105-followup; pairs with T2-102)
 - [ ] T2-106 Dependency security scanning in CI 鈥?`npm audit` + Dependabot (filed; pairs with license-check)
