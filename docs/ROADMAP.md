@@ -14311,6 +14311,8 @@ Special cases:
 
 **Cross-check note (audit 5C):** Audit's Critical 9 + Priority 10.
 
+**Status:** Shipped in <TBD>. New `src/diagnostics/Redaction.ts` exports `RedactionOptions` (7-flag interface), `defaultRedactionOptions()` (license/path/email/IP on; project/gcode/image off — conservative for the unknown context), `redactString(text, options)`, `redactObject<T>(value, options)` (recursive; immutable — input never mutated), `redactDefault<T>(value)` (convenience for the support bundle path). Patterns: license-key UUID-shape (`[A-F0-9]{8}-...-{12}`), email, IPv4, file paths (`C:\Users\...` and `/Users/...` and `/home/...` user dirs). **Defence-in-depth:** license-key redaction runs unconditionally regardless of `options.redactLicenseKeys` (the field is kept for explicitness; the contract is that bundles never leak a license). G-code lines (G0/G1/M3/M5 etc) preserved when `redactGcode=false` so a user opting in to share G-code keeps a useful artifact — but license keys in G-code comments are still redacted. Image-buffer-shaped values (Uint8Array under known keys like `data` / `pixels` / `grayscaleData`) replaced with `[REDACTED:BINARY:Nb]` size summary. Project-name keys (`projectName` / `sceneName` / `fileName` / `name`) redacted when `redactProjectNames=true`. Pinned by `tests/redaction.test.ts` (55 contracts: license always-on; per-option toggles; recursive object; input not mutated; project-name keys; G-code preserved with license still redacted; typed-array under image keys; numbers/booleans/null/bigint preserved; multiple license keys in one string; defaults shape; redactDefault wiring; empty/edge cases; source pin including the always-on documentation contract). **Out of scope (T2-115-followup):** wiring redactDefault into reportError, JobLog export, and the support bundle (T2-108). **Hardware verification: not required** (diagnostic plumbing).
+
 ---
 
 ### T2-116 | Storage health and quota reporting
@@ -19802,7 +19804,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-112 Improved RX/TX retention 鈥?event-window strategy (filed; refines T2-67)
 - [ ] T2-113 Structured RX/TX events 鈥?line numbers, buffer state, classification (filed; refines T3-74)
 - [ ] T2-114 React error boundary + window error/rejection persistence (filed; refines T2-105)
-- [ ] T2-115 Privacy redaction layer for diagnostic exports (filed; required by T2-108)
+- [x] T2-115 Privacy redaction layer for diagnostic exports (Shipped — central `src/diagnostics/Redaction.ts` with patterns + recursive redactObject; required by T2-108)
 - [ ] T2-116 Storage health and quota reporting (filed; pairs with T2-118)
 - [x] T2-117 Correlation IDs across systems (Shipped — type + generator + snapshot helpers in `src/diagnostics/CorrelationIds.ts`; subsystem propagation deferred as T2-117-followup)
 - [ ] T2-118 Troubleshooting panel 鈥?`Help 鈫?Diagnostics` (filed; user-facing surface, depends on T2-108/65/116/117)
