@@ -13645,6 +13645,8 @@ OSV scans all known vulnerability databases (not just npm advisories) and produc
 
 **Cross-check note (audit 5B):** Audit's Priority 10.
 
+**Status:** Shipped in <TBD> (focused MVP — Layers 1 + 2; Layer 3 OSV scanner deferred as T2-106-followup). `.github/workflows/ci.yml` gains an `npm audit --omit=dev --audit-level=moderate` step that runs BEFORE `npm run build` (fast-fail on bad dep bumps; `--omit=dev` excludes vitest/eslint/tsx where dev-only CVEs don't ship to users; `--audit-level=moderate` fails CI on moderate-or-higher production-dependency CVEs). Verified clean at ship time: `npm audit --omit=dev --audit-level=moderate` returned "found 0 vulnerabilities". New `.github/dependabot.yml` opens weekly PRs for the npm ecosystem with a `production-security` group (applies-to: security-updates) and a separate `dev-deps` group for @types/eslint/tsx so a flurry of routine version bumps doesn't bury security PRs that matter; github-actions ecosystem also tracked monthly so workflow files stay current. Pinned by `tests/dependency-security-scan.test.ts` (20 contracts: ci.yml exists; `npm audit` runs with --omit=dev + --audit-level=moderate; T2-106 marker; audit step runs BEFORE build; dependabot.yml exists with version=2 + npm ecosystem + weekly schedule + production-security group + applies-to=security-updates + github-actions ecosystem + exclude-patterns for dev deps; license-check.yml still exists alongside). **Out of scope (T2-106-followup):** Layer 3 — OSV scanner action (broader CVE database coverage beyond npm advisories; SARIF report). **Hardware verification: not required** (CI configuration).
+
 ---
 
 ### T2-107 | Tighten production CSP 鈥?remove `unsafe-eval` minimum, then `unsafe-inline`
@@ -19821,7 +19823,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (Shipped — checksum-format helpers + generator script; SBOM tooling + GPG signing wiring deferred as T2-103-followup; depends on T2-98)
 - [ ] T2-104 Versioned user-data migration framework (filed; broader scope than T2-73)
 - [x] T2-105 Startup diagnostics + safe mode + crash-loop recovery (Shipped — pure crash-loop detector with reconcileOnBoot for "host died silently"; Electron `electron/main.ts` wiring deferred as T2-105-followup; pairs with T2-102)
-- [ ] T2-106 Dependency security scanning in CI 鈥?`npm audit` + Dependabot (filed; pairs with license-check)
+- [x] T2-106 Dependency security scanning in CI — `npm audit` + Dependabot (Shipped — `npm audit --omit=dev --audit-level=moderate` step in ci.yml + Dependabot weekly schedule with security-update group; OSV scanner deferred as T2-106-followup; pairs with license-check)
 - [ ] T2-107 Tighten production CSP 鈥?remove `unsafe-eval`, then `unsafe-inline` (filed; security debt)
 - [ ] T2-108 Support bundle exporter 鈥?`Help 鈫?Export Diagnostic Bundle` (filed; **highest-value supportability feature**)
 - [ ] T2-109 Reconstruction-grade JobLog 鈥?embed app/system/profile/controller/preflight/fingerprint snapshots (filed; foundation for T2-108)

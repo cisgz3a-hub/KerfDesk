@@ -1,0 +1,40 @@
+# T2-106: Dependabot security update automation. Audit 5B Priority 10:
+# the existing license-check workflow catches GPL/AGPL contamination but
+# does not catch known CVEs. The CI `npm audit --omit=dev` step (T2-106
+# layer 1) fails the build on moderate-or-higher production CVEs;
+# Dependabot (this file, layer 2) opens PRs WHEN security advisories
+# land, so the maintainer doesn't have to poll.
+#
+# Patterns split production from dev so a flurry of weekly @types/* /
+# eslint / vitest bumps doesn't bury security PRs that matter.
+
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    groups:
+      production-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@types/*"
+          - "eslint*"
+          - "tsx"
+          - "concurrently"
+          - "@cyclonedx/*"
+      dev-deps:
+        applies-to: version-updates
+        patterns:
+          - "@types/*"
+          - "eslint*"
+          - "tsx"
+          - "concurrently"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

@@ -15,5 +15,11 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - run: npm ci
+      # T2-106: dependency security scan. --omit=dev skips vitest/eslint/etc.
+      # where dev-only CVEs don't ship to users; --audit-level=moderate fails
+      # CI on moderate-or-higher production-dependency CVEs. Verified clean
+      # at ship time (2026-05-05): `npm audit --omit=dev --audit-level=moderate`
+      # → "found 0 vulnerabilities".
+      - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run build
       - run: npm test
