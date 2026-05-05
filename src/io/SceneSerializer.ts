@@ -277,6 +277,12 @@ function buildSceneFromParsedEnvelope(parsed: any): Scene {
       author: s.metadata?.author || '',
       notes: s.metadata?.notes || '',
       deviceProfileId: s.metadata?.deviceProfileId ?? null,
+      // T2-71: pass through if present in the saved JSON. Optional —
+      // legacy projects saved before T2-71 omit it and load fine via
+      // the no-snapshot path in checkProfileSnapshot.
+      ...(s.metadata?.deviceProfileSnapshot
+        ? { deviceProfileSnapshot: s.metadata.deviceProfileSnapshot }
+        : {}),
       materialPresetId: s.metadata?.materialPresetId ?? null,
     },
   };

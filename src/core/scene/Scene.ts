@@ -74,6 +74,21 @@ export interface Scene {
     author: string;
     notes: string;
     deviceProfileId: string | null;
+    /**
+     * T2-71: snapshot of the device profile at save time. Pre-T2-71
+     * the project stored only `deviceProfileId`; if the user edited
+     * the referenced profile after save (e.g. changed `maxSpindle`
+     * to match a hardware update), reloading the project compiled
+     * against the NEW profile values — silently producing different
+     * output than the saved version. The snapshot is the source of
+     * truth for what was saved; load-time logic compares it against
+     * the current profile and offers the user a choice when they
+     * differ. Optional only because legacy projects saved before
+     * T2-71 ride forward — `checkProfileSnapshot` returns
+     * `'no-snapshot'` for those and the caller falls back to the
+     * pre-T2-71 ID-only behavior.
+     */
+    deviceProfileSnapshot?: import('../devices/DeviceProfile').DeviceProfile;
     materialPresetId: string | null;
   };
 }
