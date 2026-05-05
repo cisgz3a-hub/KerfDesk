@@ -12860,6 +12860,8 @@ Plus a static-analysis test that scans safety-critical files for entitlement imp
 
 **Cross-check note (audit 5A):** Audit's Priority 9 + User trust.
 
+**Status:** Shipped in `<TBD>`. Two-part deliverable per the spec. **Part 1 — documented guarantee:** new `docs/SAFETY_GUARANTEES.md` lists the 6 controller methods that must complete regardless of entitlement state (`MachineService.stopAndEnsureLaserOff`, `pause`, `resume`, `disconnect`; `GrblController.emergencyStop`, `safetyOff`) plus connection wizard, $X unlock path, and job log save/view. The doc cites the audit reference, names each method explicitly, and reserves an Allow-list section (currently empty) for future exceptions that need explicit rationale. **Part 2 — enforcement:** `tests/safety-controls-bypass-entitlement.test.ts` (27 contracts). **Behavioral:** exercises each safety method via a freshly-instantiated MachineService + mock controller against two distinct "no Pro" entitlement states (`free` via `skipToFreeSession()`, `free` via `deactivate()`); each method must complete without throwing AND increment the controller-side counter exactly once. **Static guard:** scans 5 safety-critical files (`MachineService.ts`, `ExecutionCoordinator.ts`, `GrblController.ts`, `SerialPort.ts`, `WebSerialPort.ts`) for forbidden patterns — `import from '...entitlements...'`, `requireFeature(`, `assertFeature(`, `canUseFeature(`, `hasPro(`. Comment-stripping precedes pattern matching so legitimate doc-comments (e.g. T1-88's "requireFeature import removed") don't false-positive. Each violation prints `file:line` for review. **Doc pin:** SAFETY_GUARANTEES.md exists, cites audit 5A, names each guaranteed method, has an Allow-list section. T1-88 already removed the only pre-existing entitlement consumer in safety code (the `requireFeature` import in MachineService); T2-97 makes the guarantee permanent — any future commit that adds an entitlement check to a safety file fails the static guard with a `file:line` pointer for review. **Out of scope:** verification_failed and revoked entitlement states require Gumroad-flow mocking; the static guard catches any code path that consults entitlement at all, so the behavioral coverage of `hasPro=false` via free-session is sufficient for the contract. **TS error count:** 43 (baseline holds). **Hardware verification: not required** (documentation + static guard + behavioral test).
+
 ---
 
 ### T2-98 | CI builds installers on Windows + macOS runners
@@ -19760,7 +19762,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-94 Clock-tamper detection for offline grace (filed; depends on T2-89/T2-90)
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)
 - [ ] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (filed; depends on T2-89)
-- [ ] T2-97 Entitlement checks must never block safety controls (filed; documented guarantee + tests)
+- [x] T2-97 Entitlement checks must never block safety controls (shipped 2026-05-05 in `<TBD>` — `docs/SAFETY_GUARANTEES.md` + behavioral + static-guard tests)
 - [ ] T2-98 CI builds installers on Windows + macOS runners (filed; release-engineering foundation)
 - [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
