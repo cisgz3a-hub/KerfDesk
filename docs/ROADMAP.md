@@ -8981,6 +8981,8 @@ T2-40 (CapabilityGate) consults these capabilities for safety operations. T2-46 
 
 **Cross-check note (audit 3D):** Audit's P0 safety capability gating.
 
+**Status:** Shipped in <TBD> (focused MVP — type + GRBL declaration + refusal helpers; controller-interface wiring deferred as T2-43-followup). New `src/controllers/ControllerSafetyCapabilities.ts` exports: `EmergencyStopMethod` (`soft-reset` / `kill-firmware` / `native-stop` / `unsupported`), `LaserOffMethod` (`gcode-m5` / `native` / `pwm-zero` / `unsupported`), `PauseLatencyClass` (`realtime` / `queued` / `unknown`), `ExecutionModel` (`lineStream` / `uploadedFile` / `realtimeApi` / `unknown`), `SafetyTristate` (`boolean | 'unknown'` — explicit "we don't know" so safety code takes the conservative path), `ControllerSafetyCapabilities` (18-field interface covering e-stop, pause/resume, laser-off, test fire, side-effects of stop/disconnect, and execution model), `grblSafetyCapabilities` (the GRBL 1.1 declaration grounded in the spec + observed Falcon A1 Pro behaviour: e-stop=soft-reset @50ms, pauseStopsLaserOutput='unknown' because $32-dependent, resumeSupportedAfterError=false because alarm requires re-home, laserOffCanBeVerified=false because no readback, disconnectStopsJob=true because host-streamed, stopInvalidatesPosition=true + stopRequiresRehome=true because soft-reset, executionModel='lineStream'), refusal-reason helpers `reasonEmergencyStopRefused` / `reasonPauseRefused` / `reasonResumeAfterErrorRefused` / `reasonTestFireRefused` returning a user-facing string when the operation is refused or null when permitted. Pinned by `tests/controller-safety-capabilities.test.ts` (60 contracts: every GRBL field's value pinned with rationale; each refusal helper allows GRBL by default; each refusal helper produces a useful message under a hypothetical capability constraint; over-cap test fire names both numbers; SafetyTristate accepts 'unknown'; hypothetical Wi-Fi controller (`uploadedFile` + `disconnectStopsJob: false`) typechecks; source-level pin for every export). **Out of scope (T2-43-followup):** wiring `capabilities.safety` into `ControllerInterface` and consuming it in `ExecutionCoordinator` / safety service — touches every controller implementation in one focused pass. **Hardware verification: not required** (declarative type + helper layer; hardware change deferred to wiring ticket).
+
 ---
 
 ### T2-44 | Extended safety state machine 鈥?refine T2-12 with audit 3D's states
@@ -19736,7 +19738,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-40 Central operation-gating authority (filed; refines T2-26 + T3-47)
 - [ ] T2-41 `SafetyActionResult` typed return for safety methods (type + stopAndEnsureLaserOff migration shipped 2026-05-05 in `6fa502a`; pause/resume/disconnect/emergencyStop migrations filed as T2-41-followup)
 - [ ] T2-42 `ControllerSafetyOps` separate contract (filed; refines T2-26)
-- [ ] T2-43 `ControllerSafetyCapabilities` typed declarations (filed; refines T2-25)
+- [x] T2-43 `ControllerSafetyCapabilities` typed declarations (Shipped — type + GRBL declaration + refusal-reason helpers; controller-interface wiring deferred as T2-43-followup)
 - [ ] T2-44 Extended safety state machine (filed; refines T2-12 with audit 3D's 10-state set)
 - [ ] T2-45 `JobExecutionSession` with safety methods on the session handle (filed; refines T2-27)
 - [ ] T2-46 User-facing safety outcome messages + Activity Log (filed; depends on T2-41)
