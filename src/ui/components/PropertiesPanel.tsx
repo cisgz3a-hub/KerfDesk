@@ -20,6 +20,7 @@ import {
   adjustGamma,
   invertImage,
 } from '../../core/image/ImageProcessing';
+import { warmProcessedImageCache } from '../hooks/useImageCacheWarmer';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { FontPicker } from './common/FontPicker';
@@ -157,8 +158,21 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         }),
       };
       onSceneCommit(newScene);
+
+      // T1-17 Pass 4c: warm the JobCompiler image-pipeline cache off-thread.
+      // Fire-and-forget; the helper re-checks the fingerprint at write time
+      // so a second commit before this resolves correctly discards the
+      // stale buffer.
+      if (onSceneChange) {
+        void warmProcessedImageCache(
+          objId,
+          { brightness, contrast, gamma, invert },
+          () => sceneRef.current,
+          onSceneChange,
+        );
+      }
     },
-    [onSceneCommit],
+    [onSceneCommit, onSceneChange],
   );
 
   const [traceThreshold, setTraceThreshold] = React.useState(DEFAULT_TRACE_OPTIONS.threshold);
