@@ -9357,6 +9357,8 @@ Plus migration of representative tests (e.g. `tests/streaming-health.test.ts`, `
 
 **Cross-check note (audit 3E):** Audit's Finding 6 + P1 virtual time.
 
+**Status:** Shipped in <TBD> (focused MVP — scheduler + RealScheduler adapter; per-test migration deferred). New `tests/helpers/VirtualScheduler.ts` (lives under helpers/ → T2-22 EXCLUDED_DIRS sentinel so auto-discovery does not run it as a test) exports `TimerHandle`, `SchedulerLike` interface (setTimeout / setInterval / clearTimeout / clearInterval / now), `VirtualScheduler` class (advanceBy(ms) — fires every task whose fireAt is at or before new time; advanceUntilIdle(safetyLimit=100k) — drains queue with runaway-loop guard; pendingCount introspection; tasks scheduled inside callbacks fire when due within the same advance window; recurring re-enqueues at `fireAt + interval` per setInterval semantics — no compounded missed intervals; tie-break by enqueue order on equal fireAt; negative ms throws; cleared handles are no-ops on fired tasks), `RealScheduler` class (production default — wraps host setTimeout/setInterval). Pinned by `tests/virtual-scheduler.test.ts` (34 contracts: initial now=0; setTimeout fires at exact due time, not before; three-callback advanceBy(15) fires only first; setInterval 100ms × 450ms = 4 fires; clearTimeout/clearInterval cancel; advanceBy(0) no-op; negative throws; advanceUntilIdle drains in order with now-at-latest; nested setTimeout from inside callback fires; recurring task counts to 10/1000ms; clearTimeout on already-fired no-op; tie-breaking by enqueue order; safety-limit catches runaway self-rescheduling; RealScheduler surface; source-level pin). **Out of scope (T2-49-followup):** migration of representative tests (`streaming-health`, `controller-fresh-status-recheck`, etc) to inject the VirtualScheduler. **Hardware verification: not required** (test infrastructure helper).
+
 ---
 
 ### T2-50 | Scenario-driven failure injection API 鈥?typed `injectFault({type, ...})`
@@ -19756,7 +19758,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-46 User-facing safety outcome messages + Activity Log (filed; depends on T2-41)
 - [ ] T2-47 Realistic GRBL firmware simulator 鈥?planner queue, RX buffer, modal state, alarm lock (filed; refines T2-13)
 - [ ] T2-48 Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface (filed; refines T3-43)
-- [ ] T2-49 Virtual time / deterministic scheduler for tests (filed; refines T2-22)
+- [x] T2-49 Virtual time / deterministic scheduler for tests (Shipped — `tests/helpers/VirtualScheduler.ts` + RealScheduler with shared SchedulerLike interface; per-test migration deferred as T2-49-followup; refines T2-22)
 - [ ] T2-50 Scenario-driven failure injection API 鈥?typed `injectFault({type,...})` (filed; refines T2-13)
 - [ ] T2-51 `CompiledJobState` atomic state shape (filed; closes T1-56/57/58 structurally)
 - [x] T2-52 Centralized active-profile store via `useSyncExternalStore` (foundation shipped 2026-05-05 in `f1af7a6`; consumer migration filed as T2-52-followup)
