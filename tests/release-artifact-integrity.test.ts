@@ -12,7 +12,7 @@ import {
   formatChecksumsFile,
   parseChecksumsFile,
   matchesAnyPattern,
-} from '../src/release/checksumFormat';
+} from '../src/integrity/checksumFormat';
 
 let passed = 0;
 let failed = 0;
@@ -188,7 +188,7 @@ void (async () => {
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
   const repoRoot = path.resolve(here, '..');
-  const src = fs.readFileSync(path.resolve(repoRoot, 'src/release/checksumFormat.ts'), 'utf-8');
+  const src = fs.readFileSync(path.resolve(repoRoot, 'src/integrity/checksumFormat.ts'), 'utf-8');
   assert(/T2-103/.test(src), 'T2-103 marker in checksumFormat.ts');
   for (const id of [
     'computeSha256Hex', 'formatChecksumLine', 'formatChecksumsFile',

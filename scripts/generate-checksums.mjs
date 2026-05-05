@@ -35,7 +35,7 @@ import {
   formatChecksumLine,
   formatChecksumsFile,
   matchesAnyPattern,
-} from '../src/release/checksumFormat.js';
+} from '../src/integrity/checksumFormat.js';
 
 function parseArgs(argv) {
   let dir = null;
