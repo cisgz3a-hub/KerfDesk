@@ -48,6 +48,97 @@ function flattenQuadraticBezier(
 }
 
 /**
+ * T1-36: ray-cast point-in-ring (even-odd fill rule). The ring is a
+ * closed Coord[] where the last point equals the first; we ignore the
+ * duplicate. Robust enough for the containment-tree we only consult
+ * once per ring at offset/clip time.
+ */
+function pointInRing(p: Coord, ring: Ring): boolean {
+  let inside = false;
+  const n = ring.length - 1; // last point duplicates the first
+  if (n < 3) return false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersect = (yi > p[1]) !== (yj > p[1]) &&
+      p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function ringSignedArea(ring: Ring): number {
+  let area = 0;
+  for (let i = 0, n = ring.length - 1; i < n; i++) {
+    area += ring[i][0] * ring[i + 1][1] - ring[i + 1][0] * ring[i][1];
+  }
+  return area / 2;
+}
+
+/**
+ * T1-36: group flat list of rings into a MultiPolygon by even-odd
+ * containment depth. Depth-0 rings are outers of new polygons. Depth-1
+ * rings are attached as holes to the depth-0 ring that contains them.
+ * Depth ≥ 2 rings (islands inside holes) start new polygons whose own
+ * holes are picked up at depth + 1 = 3, etc.
+ *
+ * Pre-T1-36 each subpath became its own single-ring polygon, so a
+ * compound-path donut lost its hole at offset / boolean time.
+ */
+function groupRingsByContainment(rings: Ring[]): MultiPolygon {
+  const depths = rings.map(r => {
+    const sample = r[0];
+    let d = 0;
+    for (let j = 0; j < rings.length; j++) {
+      if (rings[j] === r) continue;
+      if (pointInRing(sample, rings[j])) d++;
+    }
+    return d;
+  });
+
+  // For each ring whose depth is even, find its immediate parent (the
+  // smallest ring that contains it, exclusive) — null for depth 0.
+  // Holes (odd depth) attach to the nearest enclosing even-depth ring.
+  const result: MultiPolygon = [];
+  // Map each even-depth ring (an outer/island) to the index of its
+  // entry in `result`.
+  const outerIndex = new Map<number, number>();
+  for (let i = 0; i < rings.length; i++) {
+    if (depths[i] % 2 === 0) {
+      outerIndex.set(i, result.length);
+      result.push([rings[i]]);
+    }
+  }
+  for (let i = 0; i < rings.length; i++) {
+    if (depths[i] % 2 === 1) {
+      // Hole — find the smallest containing even-depth ring (i.e. the
+      // one with the largest depth that is still less than this ring's
+      // depth and contains the sample point).
+      let bestIdx = -1;
+      let bestDepth = -1;
+      const sample = rings[i][0];
+      for (let j = 0; j < rings.length; j++) {
+        if (j === i) continue;
+        if (depths[j] !== depths[i] - 1) continue;
+        if (depths[j] <= bestDepth) continue;
+        if (!pointInRing(sample, rings[j])) continue;
+        bestIdx = j;
+        bestDepth = depths[j];
+      }
+      if (bestIdx >= 0) {
+        const targetPolyIdx = outerIndex.get(bestIdx);
+        if (targetPolyIdx != null) result[targetPolyIdx].push(rings[i]);
+      } else {
+        // Orphan hole (no containing outer found) — fall back to treating
+        // it as its own outer so geometry isn't lost.
+        result.push([rings[i]]);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Convert a SceneObject to polygon-clipping geometry (Polygon or MultiPolygon).
  * Applies the object's transform to all points.
  */
@@ -93,7 +184,13 @@ export function objectToPolygon(obj: SceneObject): MultiPolygon | null {
   }
 
   if (geom.type === 'path') {
-    const multi: MultiPolygon = [];
+    // T1-36: collect every subpath's ring up front, then group by
+    // containment depth so outer + hole subpaths end up in the same
+    // polygon (instead of each becoming a separate single-ring polygon
+    // and dropping their hole semantics). One level of nesting is the
+    // common case (donut, gear teeth, lettering with closed loops);
+    // depth-2+ become island outers per even-odd nesting.
+    const rawRings: Ring[] = [];
     for (const sp of geom.subPaths || []) {
       const ring: Ring = [];
       let cx = 0;
@@ -129,11 +226,12 @@ export function objectToPolygon(obj: SceneObject): MultiPolygon | null {
         if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
           ring.push([ring[0][0], ring[0][1]]);
         }
-        multi.push([ring]);
+        rawRings.push(ring);
       }
     }
 
-    return multi.length > 0 ? multi : null;
+    if (rawRings.length === 0) return null;
+    return groupRingsByContainment(rawRings);
   }
 
   if (geom.type === 'polygon') {
