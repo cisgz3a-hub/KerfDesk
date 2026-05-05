@@ -23,6 +23,7 @@ import {
 } from '../core/job/JobLog';
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
+import { type SafetyActionResult, makeSoftResetStopResult } from './SafetyActionResult';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -1264,11 +1265,23 @@ export class MachineService {
     this.controllerRef.current.resume();
   }
 
-  async stopAndEnsureLaserOff(sendTx?: (line: string) => void): Promise<void> {
+  /**
+   * T2-41: returns a structured `SafetyActionResult` describing the
+   * outcome — for audit trail (T2-46), recovery-dialog gating (e.g.
+   * `requiresRehome: true` disables Start until $H runs), and
+   * future state-machine integration (T2-44). Pre-T2-41 the return
+   * was `Promise<void>` so callers couldn't tell whether stop was
+   * accepted, whether position was invalidated, or what to surface
+   * to the user. GRBL's `stop()` sends a realtime soft-reset; the
+   * shape `makeSoftResetStopResult()` describes the semantics:
+   * laser commandedOff, position lost, rehome required.
+   */
+  async stopAndEnsureLaserOff(sendTx?: (line: string) => void): Promise<SafetyActionResult> {
     this.controllerRef.current.stop();
     // Soft reset handles laser-off as part of GRBL's reset sequence.
     // M5 via sendCommand would race the reset and usually throw
     // 'Not connected' anyway. Intentionally no follow-up writes here.
     void sendTx;
+    return makeSoftResetStopResult();
   }
 }

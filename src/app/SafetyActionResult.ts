@@ -1,0 +1,113 @@
+/**
+ * T2-41: typed result for safety method invocations.
+ *
+ * Pre-T2-41 every safety method on the controller (pause / resume /
+ * stop / emergencyStop) returned `void`. Callers couldn't tell
+ * whether the command was sent, whether the port was open, whether
+ * laser-off was attempted, whether motion was confirmed stopped,
+ * whether position was invalidated, whether reconnect / rehome was
+ * required, or whether the user must inspect the machine. The
+ * audit's framing (3D Critical 1 + 6 + Required P0): "controller-
+ * specific safety contract — for an audit trail / incident log /
+ * post-mortem analysis, the void return loses information the
+ * caller could meaningfully use."
+ *
+ * This commit ships the **type + a focused MVP migration** for
+ * `MachineService.stopAndEnsureLaserOff`. The other safety methods
+ * (pause / resume / disconnect / emergencyStop) stay void for now;
+ * each migration is an interface change that touches every caller,
+ * and the audit's blast radius is too large for a single commit.
+ * T2-41-followup migrates the remaining methods one-by-one with
+ * paired tests.
+ */
+
+export type SafetyAction =
+  | 'laserOff'
+  | 'pause'
+  | 'resume'
+  | 'abortJob'
+  | 'emergencyStop'
+  | 'disconnectSafe'
+  | 'beginTestFire'
+  | 'endTestFire';
+
+export type MotionState = 'stopped' | 'paused' | 'running' | 'unknown';
+export type LaserOffState = 'off' | 'commandedOff' | 'unknown';
+export type Tristate = boolean | 'unknown';
+
+/**
+ * Structured outcome of a safety operation. Fields are populated by
+ * what the controller can actually know — GRBL knows it sent
+ * `0x18` for soft-reset, knows that flips its internal abort state,
+ * but doesn't get a per-byte ack so `laserState` is `commandedOff`,
+ * not `off`. Higher-protocol controllers (Ruida, Trocen) might
+ * verify and report `off`. The type is shared; the per-controller
+ * implementation populates accurately.
+ */
+export interface SafetyActionResult {
+  action: SafetyAction;
+  /** True when the command was sent without throwing AND the
+   *  controller-side preconditions (e.g. port open) held. */
+  accepted: boolean;
+  motionState: MotionState;
+  laserState: LaserOffState;
+  /** Position trust: `false` after a soft reset (GRBL spec); `true`
+   *  if motion was halted via feed-hold without a position-clearing
+   *  side-effect; `'unknown'` when the controller can't tell. */
+  positionTrusted: Tristate;
+  /** True when GRBL's soft reset cleared the position so the user
+   *  must `$H` before the next job. */
+  requiresRehome: Tristate;
+  /** True when the port had to be closed or is in a state that
+   *  needs reopening before further commands. */
+  requiresReconnect: boolean;
+  /** True when the user should physically inspect the machine
+   *  (workpiece, head position, safety interlocks) before further
+   *  commands. Reserved for emergency-stop and limit-switch hits. */
+  requiresInspection: boolean;
+  /** Optional human-readable summary; safe to surface in a job-log
+   *  audit trail or a recovery dialog. */
+  message?: string;
+  /** Epoch ms; included for audit-trail use. */
+  timestamp: number;
+}
+
+/**
+ * Outcome shape for a successful GRBL soft-reset stop. Captures the
+ * GRBL-spec semantics: 0x18 forces laser off but we can't observe
+ * per-byte completion (commandedOff, not verified off); position is
+ * lost; rehome required; reconnect not required (port stays open).
+ */
+export function makeSoftResetStopResult(message?: string): SafetyActionResult {
+  return {
+    action: 'abortJob',
+    accepted: true,
+    motionState: 'stopped',
+    laserState: 'commandedOff',
+    positionTrusted: false,
+    requiresRehome: true,
+    requiresReconnect: false,
+    requiresInspection: false,
+    message: message ?? 'GRBL soft reset sent. Position lost; rehome required.',
+    timestamp: Date.now(),
+  };
+}
+
+/**
+ * Outcome shape when a safety method runs against a port that's
+ * already closed. Caller must reconnect before further commands.
+ */
+export function makeNotConnectedResult(action: SafetyAction): SafetyActionResult {
+  return {
+    action,
+    accepted: false,
+    motionState: 'unknown',
+    laserState: 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: true,
+    requiresInspection: false,
+    message: 'Port not connected.',
+    timestamp: Date.now(),
+  };
+}
