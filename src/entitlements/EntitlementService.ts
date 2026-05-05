@@ -65,8 +65,25 @@ export class EntitlementService {
     return this.state.hasPro;
   }
 
+  /**
+   * T2-92: per-feature entitlement check. Pre-T2-92 this method
+   * ignored its argument and returned `state.hasPro` for every
+   * feature. Now:
+   *   1. developer / tester_permanent tiers act as wildcards (current
+   *      behaviour preserved — internal builds keep all features),
+   *   2. when `state.features` is populated (T2-89 server tokens), it
+   *      is consulted as a membership check,
+   *   3. when `state.features` is undefined, falls back to
+   *      `state.hasPro` so callers that hand-build EntitlementState
+   *      literals (or any path that hasn't migrated to per-feature
+   *      tokens yet) keep working.
+   */
   canUse(feature: ProFeature): boolean {
-    void feature;
+    if (this.state.tier === 'developer') return true;
+    if (this.state.tier === 'tester_permanent') return true;
+    if (this.state.features) {
+      return this.state.features.includes(feature);
+    }
     return this.state.hasPro;
   }
 

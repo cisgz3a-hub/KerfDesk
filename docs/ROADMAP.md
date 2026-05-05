@@ -12592,6 +12592,8 @@ The `features` array is populated from:
 
 **Cross-check note (audit 5A):** Audit's Critical 9 + indirect from Priority 11.
 
+**Status:** Shipped in <TBD>. `EntitlementService.canUse(feature)` rewritten to consume its argument: developer + tester_permanent tiers act as wildcards (current behaviour preserved); when `state.features` is populated (T2-89 server-token path) it is consulted as a membership check; when undefined, falls back to `state.hasPro` so callers that hand-build `EntitlementState` literals (or any path that hasn't migrated to per-feature tokens yet) keep working unchanged. New optional `EntitlementState.features?: ReadonlyArray<ProFeature>` field. The legacy `void feature; return this.state.hasPro` body is gone — surgical revocation, plan-aware logic ("Pro Lite" with subset), and per-feature trials all become expressible. Pinned by `tests/per-feature-granularity.test.ts` (99 contracts: token with one feature gates the others; multi-feature token; empty features array → all false even when hasPro=true (explicit empty token signal); developer wildcard; tester_permanent wildcard; free; legacy-undefined back-compat for both hasPro=true and hasPro=false; trial with feature subset; surgical revocation (paid user minus boolean_ops); source-level pin verifies the new logic + back-compat removal). Regression: `entitlement-api-split` (11/11), `license-status-states` (37/37). **Out of scope (T2-92-followup):** wiring T2-89 server tokens to populate `features`; today the field is opt-in for tests + future production paths. **Hardware verification: not required**.
+
 ---
 
 ### T2-93 | License status enum 鈥?`LicenseStatus` first-class
@@ -19783,7 +19785,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
 - [ ] T2-90 Signed local entitlement token with public-key verification (filed; depends on T2-89)
 - [x] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (Shipped — `src/entitlements/FeatureMatrix.ts` + source-scanning enforcement test; foundation, pairs with T1-78)
-- [ ] T2-92 Per-feature granular `canUse` 鈥?replace single `hasPro` boolean (filed; pairs with T2-89/T2-91)
+- [x] T2-92 Per-feature granular `canUse` — replace single `hasPro` boolean (Shipped — `EntitlementService.canUse` consumes its argument; new `EntitlementState.features?` field; legacy back-compat preserved; pairs with T2-89/T2-91)
 - [x] T2-93 License status enum 鈥?`LicenseStatus` first-class state machine (additive layer shipped 2026-05-05 in `e18e204`; legacy flat-`status` removal deferred to T2-93-followup)
 - [ ] T2-94 Clock-tamper detection for offline grace (filed; depends on T2-89/T2-90)
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)

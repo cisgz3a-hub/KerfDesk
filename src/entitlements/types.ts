@@ -76,6 +76,16 @@ export interface EntitlementState {
   lastError?: string;
   daysLeft?: number;
   expired?: boolean;
+  /**
+   * T2-92: explicit per-feature entitlement set. When present,
+   * `EntitlementService.canUse(feature)` returns
+   * `features.includes(feature)` (modulo developer/tester_permanent
+   * wildcards). Optional for backward-compat — when omitted, canUse
+   * falls back to the pre-T2-92 hasPro boolean. Server tokens (T2-89)
+   * will populate this field; the legacy `hasPro: true` path treats
+   * it as "all features".
+   */
+  features?: ReadonlyArray<ProFeature>;
 }
 
 /** Persisted Gumroad-side cache shape (localStorage JSON). */
