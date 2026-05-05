@@ -566,11 +566,31 @@ function compileGeometry(
       if (pixelData && geom.grayscaleWidth && geom.grayscaleHeight) {
         bitmapWidth = geom.grayscaleWidth;
         bitmapHeight = geom.grayscaleHeight;
-        let gray = new Uint8Array(pixelData);
-        if (brightness !== 0) gray = adjustBrightness(gray, brightness);
-        if (contrast !== 0) gray = adjustContrast(gray, contrast);
-        if (gamma !== 1) gray = adjustGamma(gray, gamma);
-        if (inverted) gray = invertImage(gray);
+        // T1-17 Pass 4b: if the UI has pre-computed the post-pipeline
+        // grayscale via the worker (Pass 4c) and the cached fingerprint
+        // matches the layer's current brightness/contrast/gamma/invert,
+        // reuse it and skip the four legacy ImageProcessing.ts loops.
+        // Mismatch or absence falls back to the existing path —
+        // recompiles without the cache stay byte-for-byte unchanged.
+        const ps = geom.processedSettings;
+        const canReuseProcessed =
+          geom.processedData != null &&
+          geom.processedData.length === pixelData.length &&
+          ps != null &&
+          ps.brightness === brightness &&
+          ps.contrast === contrast &&
+          ps.gamma === gamma &&
+          ps.invert === inverted;
+        let gray: Uint8Array;
+        if (canReuseProcessed && geom.processedData) {
+          gray = new Uint8Array(geom.processedData);
+        } else {
+          gray = new Uint8Array(pixelData);
+          if (brightness !== 0) gray = adjustBrightness(gray, brightness);
+          if (contrast !== 0) gray = adjustContrast(gray, contrast);
+          if (gamma !== 1) gray = adjustGamma(gray, gamma);
+          if (inverted) gray = invertImage(gray);
+        }
 
         if (imageMode === 'grayscale') {
           data = gray;

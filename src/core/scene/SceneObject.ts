@@ -86,6 +86,21 @@ export interface TextGeometry {
   outlineSubPaths?: SubPath[];
 }
 
+/**
+ * T1-17 Pass 4b: fingerprint of the brightness/contrast/gamma/invert
+ * settings that produced `processedData`. JobCompiler reads this and the
+ * current layer settings; if they match field-for-field the cached
+ * processed buffer is reused instead of running ImageProcessing.ts again.
+ * Pass 4c populates `processedData` + `processedSettings` from the worker
+ * on slider drag.
+ */
+export interface ProcessedImageSettings {
+  brightness: number;
+  contrast: number;
+  gamma: number;
+  invert: boolean;
+}
+
 export interface ImageGeometry {
   type: 'image';
   src: string;           // File path or data URI
@@ -105,6 +120,16 @@ export interface ImageGeometry {
   adjustedData?: Uint8Array;
   /** Set when applying dithering from the properties panel */
   ditherMode?: import('../../import/Dithering').DitherMode;
+  /**
+   * T1-17 Pass 4b: post-brightness/contrast/gamma/invert grayscale buffer
+   * pre-computed off-thread by Pass 4c, consumed synchronously by
+   * JobCompiler. When present AND `processedSettings` matches the layer's
+   * current settings, JobCompiler uses this directly instead of running
+   * the legacy ImageProcessing.ts pipeline. When absent or stale, the
+   * legacy fallback runs unchanged.
+   */
+  processedData?: Uint8Array;
+  processedSettings?: ProcessedImageSettings;
 }
 
 export type Geometry =
