@@ -9440,6 +9440,8 @@ This makes failure scenarios first-class, reusable across test files, and discov
 
 **Cross-check note (audit 3E):** Audit's Critical 6 + section 4 + P0 failure scenario engine.
 
+**Status:** Shipped in <TBD> (focused MVP — type union + queue dispatcher + chaos RNG; simulator integration deferred). New `tests/helpers/ControllerFault.ts` (lives under helpers/ → T2-22 EXCLUDED_DIRS sentinel) exports `ControllerFault` 13-variant discriminated union (drop-ok / slow-ack / inject-error / enter-alarm / malformed-status / disconnect / buffer-overflow / partial-write / baud-mismatch / corrupt-settings-dump / stale-response-after-reconnect / reader-throws-mid-loop / writer-rejects-after-close — every named scenario from the audit), `ControllerFaultType`, `SimulationContext` (lineNumber / command / nowMs / bytesSent / realtimeByte / emittingStatus), `faultMatches(fault, ctx)` predicate per variant, `FaultQueue` class (inject returns id; consume(id) marks one-shot consumed; clear; pending getter; match(ctx) returns array of matching pending faults; matchOfType<K>(ctx, type) typed filter so the consumer gets `Extract<ControllerFault, { type: K }>` narrowing), `makeChaosRng(seed)` (Mulberry32 PRNG returning values in [0,1) for the seeded chaos-mode layered on top by T2-47 wiring). Pinned by `tests/fault-injection-scenarios.test.ts` (64 contracts: inject/consume/clear/pending; faultMatches per variant — line trigger, string command, regex command, after-ms, on-realtime-byte, multi-trigger disconnect, byte-threshold, lifecycle unconditional, malformed-status emittingStatus gate; queue.match returns only matchers; matchOfType type-narrows; consumed faults excluded; e2e composed-fault scenario at 2400/2500/3000ms; chaos RNG deterministic-per-seed + distinct-per-seed + always-in-range; 13-variant catalog count; source-level pin verifying every fault type literal). **Out of scope (T2-50-followup):** wiring the queue into the controller-level `GrblSimulator` (T2-47) so tests can `simulator.injectFault({...})` and have the firmware state machine react. **Hardware verification: not required** (test infrastructure model + helpers).
+
 ---
 
 ### T2-51 | `CompiledJobState` 鈥?atomic state shape replacing 5+ scattered compile state values
@@ -19759,7 +19761,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-47 Realistic GRBL firmware simulator 鈥?planner queue, RX buffer, modal state, alarm lock (filed; refines T2-13)
 - [ ] T2-48 Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface (filed; refines T3-43)
 - [x] T2-49 Virtual time / deterministic scheduler for tests (Shipped — `tests/helpers/VirtualScheduler.ts` + RealScheduler with shared SchedulerLike interface; per-test migration deferred as T2-49-followup; refines T2-22)
-- [ ] T2-50 Scenario-driven failure injection API 鈥?typed `injectFault({type,...})` (filed; refines T2-13)
+- [x] T2-50 Scenario-driven failure injection API — typed `injectFault({type,...})` (Shipped — `tests/helpers/ControllerFault.ts` 13-variant union + FaultQueue dispatcher + chaos-RNG; T2-47 GrblSimulator integration deferred as T2-50-followup; refines T2-13)
 - [ ] T2-51 `CompiledJobState` atomic state shape (filed; closes T1-56/57/58 structurally)
 - [x] T2-52 Centralized active-profile store via `useSyncExternalStore` (foundation shipped 2026-05-05 in `f1af7a6`; consumer migration filed as T2-52-followup)
 - [ ] T2-53 Job session state machine 鈥?`JobPhase` (filed; depends on T2-41, related to T2-44)
