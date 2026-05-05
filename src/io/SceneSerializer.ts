@@ -170,6 +170,74 @@ export function deserializeScene(json: string): Scene {
   return buildSceneFromParsedEnvelope(parsed);
 }
 
+/**
+ * T2-74: discriminated kind of repair the deserializer made when
+ * loading a project. Each repair is a silent modification the
+ * pre-T2-74 path made without telling the user.
+ */
+export type ProjectRepairKind =
+  | 'orphan-objects-relocated'    // object.layerId pointed to a missing layer
+  | 'duplicate-objects-removed'   // ≥2 objects shared the same id
+  | 'broken-parent-cleared'       // object.parentId pointed to a missing object
+  | 'invalid-active-layer';       // scene.activeLayerId pointed to a missing layer
+
+export interface ProjectRepair {
+  kind: ProjectRepairKind;
+  count: number;
+  details?: string;
+}
+
+export interface ProjectLoadReport {
+  scene: Scene;
+  repairs: ProjectRepair[];
+}
+
+/**
+ * T2-74: variant of `deserializeScene` that returns the loaded
+ * scene plus a report of every silent repair the deserializer made.
+ * Pre-T2-74 these repairs were silent (or `console.warn` only); a
+ * user loading their own project could discover that grouping was
+ * dropped or objects were relocated without any signal.
+ *
+ * The repaired scene is the same shape `deserializeScene` returns —
+ * existing callers can keep using `deserializeScene` for the
+ * fire-and-forget path; UI consumers that want to show the user
+ * what happened call this variant and surface the repair list.
+ */
+export function deserializeSceneWithReport(json: string): ProjectLoadReport {
+  // Reuses the existing deserializer's parse / envelope checks.
+  // The build helper now accepts a `repairs` collector that captures
+  // each repair as it happens; legacy `deserializeScene` passes
+  // undefined and the collector is a no-op.
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch (e) {
+    throw new Error(`Invalid JSON: ${(e as Error).message}`);
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error('Invalid file: expected a JSON object');
+  }
+  const envelope = parsed as Record<string, unknown>;
+  if (envelope.format !== 'laserforge') {
+    throw new Error(`Unknown file format: '${envelope.format}' (expected 'laserforge')`);
+  }
+  const major = fileFormatMajor(envelope.version);
+  if (!Number.isFinite(major) || major < 1) {
+    throw new Error('Invalid file: format version is missing or not recognized (expected major version 1)');
+  }
+  if (major > 1) {
+    const raw = envelope.version == null || envelope.version === '' ? '(unknown)' : String(envelope.version);
+    throw new Error(
+      `This project file uses format version ${raw}, which is not supported by this version of LaserForge. Please update the app to open it.`,
+    );
+  }
+
+  const repairs: ProjectRepair[] = [];
+  const scene = buildSceneFromParsedEnvelope(parsed, repairs);
+  return { scene, repairs };
+}
+
 // ─── VALIDATION HELPERS ──────────────────────────────────────────
 
 function validateRequired(obj: any, field: string, expectedType: string): void {
@@ -213,7 +281,7 @@ function fileFormatMajor(version: unknown): number {
 }
 
 /** Shared load path after envelope checks (format laserforge, major version 1). */
-function buildSceneFromParsedEnvelope(parsed: any): Scene {
+function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): Scene {
   const s = parsed.scene;
   if (!s || typeof s !== 'object') {
     throw new Error('Invalid file: missing scene data');
@@ -289,8 +357,16 @@ function buildSceneFromParsedEnvelope(parsed: any): Scene {
 
   const layerIds = new Set(scene.layers.map(l => l.id));
 
+  // T2-74: track each repair so deserializeSceneWithReport can
+  // surface the list to the user.
   if (!layerIds.has(scene.activeLayerId)) {
+    const oldId = scene.activeLayerId;
     scene.activeLayerId = scene.layers[0].id;
+    repairs?.push({
+      kind: 'invalid-active-layer',
+      count: 1,
+      details: `Active layer "${oldId}" not found; reset to first layer "${scene.layers[0].id}".`,
+    });
   }
 
   let orphanCount = 0;
@@ -300,20 +376,47 @@ function buildSceneFromParsedEnvelope(parsed: any): Scene {
       orphanCount++;
     }
   }
+  if (orphanCount > 0) {
+    repairs?.push({
+      kind: 'orphan-objects-relocated',
+      count: orphanCount,
+      details: `${orphanCount} object(s) referenced layers that no longer exist. They were moved to the default layer.`,
+    });
+  }
 
   const objectIds = new Set(scene.objects.map(o => o.id));
+  let brokenParentCount = 0;
   for (const obj of scene.objects) {
     if (obj.parentId && !objectIds.has(obj.parentId)) {
       obj.parentId = null;
+      brokenParentCount++;
     }
+  }
+  if (brokenParentCount > 0) {
+    repairs?.push({
+      kind: 'broken-parent-cleared',
+      count: brokenParentCount,
+      details: `${brokenParentCount} object(s) referenced a parent group that was removed.`,
+    });
   }
 
   const seenIds = new Set<string>();
+  let duplicateCount = 0;
   scene.objects = scene.objects.filter(o => {
-    if (seenIds.has(o.id)) return false;
+    if (seenIds.has(o.id)) {
+      duplicateCount++;
+      return false;
+    }
     seenIds.add(o.id);
     return true;
   });
+  if (duplicateCount > 0) {
+    repairs?.push({
+      kind: 'duplicate-objects-removed',
+      count: duplicateCount,
+      details: `${duplicateCount} object(s) shared an ID with another object; later duplicates were removed.`,
+    });
+  }
 
   if (orphanCount > 0) {
     console.warn(`[LaserForge] Repaired ${orphanCount} object(s) with invalid layer references`);
