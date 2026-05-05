@@ -22,6 +22,7 @@
  */
 
 import { type Scene } from '../../core/scene/Scene';
+import { stripRegenerableImageCaches } from './stripRegenerableCaches';
 
 // ─── TYPES ───────────────────────────────────────────────────────
 
@@ -80,8 +81,14 @@ export interface HistoryEntryMeta {
 const DEFAULT_ACTION = 'edit';
 
 function buildEntry(scene: Scene, meta: HistoryEntryMeta | undefined): HistoryEntry {
+  // T2-81: strip regenerable per-object caches before snapshotting.
+  // `processedData` (T1-17 Pass 4b/4c JobCompiler cache) is per-
+  // slider-commit and dominates history memory for image-heavy
+  // workflows; it can be re-derived from grayscaleData + settings
+  // so dropping it from snapshots is safe.
+  const sceneForHistory = stripRegenerableImageCaches(scene);
   return {
-    scene,
+    scene: sceneForHistory,
     action: meta?.action ?? DEFAULT_ACTION,
     timestamp: meta?.timestamp ?? Date.now(),
     selectionBefore: new Set(meta?.selectionBefore ?? []),
@@ -96,6 +103,13 @@ export class HistoryManager {
   private _cursor = -1;            // Index of current entry
   private _maxSize: number;
   private _listeners = new Set<HistoryChangeCallback>();
+  // T2-81: tracks the most recently push()'d scene's PRE-strip
+  // reference. The no-op-commit guard (mouseUp without movement
+  // calls push with the same Scene object) compares incoming scene
+  // identity to this, not to the stored stripped scene — stripping
+  // the cache produces a different object even when the user-
+  // observable scene is unchanged.
+  private _lastPushedScene: Scene | null = null;
 
   constructor(maxSize: number = 100) {
     this._maxSize = Math.max(1, maxSize);
@@ -164,7 +178,11 @@ export class HistoryManager {
     // from no-op commits like mouseUp without movement). Compare scene
     // reference only - metadata can legitimately differ between two
     // calls that produce the same scene.
-    if (this._cursor >= 0 && this._stack[this._cursor].scene === scene) return;
+    // T2-81: compare to the PRE-strip reference, not the stored entry's
+    // scene. Stripping returns a new object for image-cache cases, so
+    // the stored entry would never equal the incoming scene by identity
+    // and the guard would silently fail to detect the no-op commit.
+    if (this._lastPushedScene === scene) return;
 
     const entry = buildEntry(scene, meta);
 
@@ -174,6 +192,7 @@ export class HistoryManager {
     // Add the new entry
     this._stack.push(entry);
     this._cursor = this._stack.length - 1;
+    this._lastPushedScene = scene;
 
     // Enforce max size — evict from the front
     while (this._stack.length > this._maxSize) {
@@ -234,6 +253,7 @@ export class HistoryManager {
   reset(initialScene: Scene, meta?: HistoryEntryMeta): void {
     this._stack = [buildEntry(initialScene, meta)];
     this._cursor = 0;
+    this._lastPushedScene = initialScene;
     this._notify();
   }
 
@@ -243,6 +263,7 @@ export class HistoryManager {
   clear(): void {
     this._stack = [];
     this._cursor = -1;
+    this._lastPushedScene = null;
     this._notify();
   }
 
