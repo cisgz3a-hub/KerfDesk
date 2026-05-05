@@ -14459,6 +14459,8 @@ When a support engineer reads a bundle:
 
 **Cross-check note (audit 5C):** Audit's Priority 14.
 
+**Status:** Shipped in <TBD> (focused MVP — type + generator + helpers; subsystem propagation deferred as T2-117-followup). New `src/diagnostics/CorrelationIds.ts` exports `CorrelationIds` interface (sessionId / projectId / compileId / preflightId / frameId / jobId / supportBundleId), `CorrelationIdPrefix` literal union, `generateCorrelationId(prefix)` (honours `LASERFORGE_DETERMINISTIC_IDS=1` for tests; format `${prefix}_${unixMs}_${6chars}` so support engineers get near-chronological sort by ID), `emptyCorrelationIds()` (fresh sessionId, all others null), `withCorrelationId(ids, field, value)` (immutable single-field update), `snapshotCorrelationIds(ids)` (structural copy for embedding in log entry / error report / JobLog), `isCorrelationId(value)` (regex recogniser used by support bundle pretty-printer), `resetCorrelationIdCounters()` (test hook). Per-prefix deterministic counters so each kind has its own sequence. Pinned by `tests/correlation-ids.test.ts` (63 contracts: deterministic-mode sequencing; per-prefix independent counters; all 7 prefix kinds; emptyCorrelationIds shape; withCorrelationId immutability + sessionId preservation; project-load + compile flows preserve parents; snapshotCorrelationIds value-equal + reference-distinct; isCorrelationId positive cases for all 7 generated kinds + negative cases (random string, core/types `det-000001`, empty string, null, undefined, number, malformed); 7-field declared shape; e2e session→project→compile→preflight→frame→job flow; source-level pins). **Out of scope (T2-117-followup):** threading `correlationIds` through `reportError`, `JobLog`, crash reports, and `support-bundle/correlation-ids.json`. Each is an already-shipped contract; the helper is consumable incrementally. **Hardware verification: not required** (diagnostic plumbing).
+
 ---
 
 ### T2-118 | Troubleshooting panel 鈥?`Help 鈫?Diagnostics`
@@ -19802,7 +19804,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-114 React error boundary + window error/rejection persistence (filed; refines T2-105)
 - [ ] T2-115 Privacy redaction layer for diagnostic exports (filed; required by T2-108)
 - [ ] T2-116 Storage health and quota reporting (filed; pairs with T2-118)
-- [ ] T2-117 Correlation IDs across systems (filed; foundation for T2-108)
+- [x] T2-117 Correlation IDs across systems (Shipped — type + generator + snapshot helpers in `src/diagnostics/CorrelationIds.ts`; subsystem propagation deferred as T2-117-followup)
 - [ ] T2-118 Troubleshooting panel 鈥?`Help 鈫?Diagnostics` (filed; user-facing surface, depends on T2-108/65/116/117)
 - [ ] T2-119 IPC sender verification 鈥?`assertTrustedSender` in every handler (filed; pairs with T1-89)
 - [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
