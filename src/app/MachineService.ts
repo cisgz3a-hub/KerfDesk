@@ -32,9 +32,12 @@ import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHa
 import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
   classifyUserCommand as classifyUserGrbl,
-  type CommandClassification,
   type CommandSeverity,
 } from '../controllers/grbl/CommandClassifier';
+import {
+  MachineCommandGateway,
+  type ApprovalToken,
+} from './MachineCommandGateway';
 
 export interface BurnState {
   readonly activeIds: ReadonlySet<string>;
@@ -92,16 +95,6 @@ export interface MachineServiceState {
   isSimulator: boolean;
   messages: string[];
 }
-
-export interface ApprovalToken {
-  command: string;
-  expiresAt: number;
-  nonce: string;
-  issuedAt?: number;
-  classification?: CommandSeverity;
-}
-
-type ApprovalBlockReason = 'no-token' | 'token-mismatch' | 'token-expired' | 'token-replayed';
 
 export interface JobRecordingSink {
   appendConsoleLine: (line: string) => void;
@@ -1111,33 +1104,6 @@ export class MachineService {
     }
   }
 
-  private blockUserCommand(
-    classification: CommandClassification,
-    blockReason: ApprovalBlockReason,
-  ): never {
-    const reasonByBlock: Record<ApprovalBlockReason, string> = {
-      'no-token': 'approval token is required',
-      'token-mismatch': 'approval token does not match this command',
-      'token-expired': 'approval token has expired',
-      'token-replayed': 'approval token has already been used',
-    };
-    const err = new Error(
-      `Command blocked: ${classification.severity} command ${reasonByBlock[blockReason]}. ${classification.reason}`,
-    ) as Error & {
-      code: 'COMMAND_BLOCKED';
-      severity: CommandSeverity;
-      reason: string;
-      command: string;
-      blockReason: ApprovalBlockReason;
-    };
-    err.code = 'COMMAND_BLOCKED';
-    err.severity = classification.severity;
-    err.reason = classification.reason;
-    err.command = classification.command;
-    err.blockReason = blockReason;
-    throw err;
-  }
-
   /**
    * Forward a line to GRBL.
    *
@@ -1175,34 +1141,10 @@ export class MachineService {
     source: 'internal' | 'user' = 'internal',
     approvalToken?: ApprovalToken,
   ): Promise<void> {
-    if (source === 'user') {
-      const classification = classifyUserGrbl(command);
-      if (classification.severity !== 'safe') {
-        const now = Date.now();
-        this.pruneConsumedApprovalNonces(now);
-
-        if (!approvalToken) {
-          this.blockUserCommand(classification, 'no-token');
-        }
-        if (
-          approvalToken.command !== classification.command
-          || typeof approvalToken.nonce !== 'string'
-          || approvalToken.nonce.length === 0
-          || (approvalToken.classification != null && approvalToken.classification !== classification.severity)
-        ) {
-          this.blockUserCommand(classification, 'token-mismatch');
-        }
-        if (this.consumedApprovalNonces.has(approvalToken.nonce)) {
-          this.blockUserCommand(classification, 'token-replayed');
-        }
-        if (!Number.isFinite(approvalToken.expiresAt) || now > approvalToken.expiresAt) {
-          this.blockUserCommand(classification, 'token-expired');
-        }
-        this.consumedApprovalNonces.set(approvalToken.nonce, approvalToken.expiresAt);
-        this.pruneConsumedApprovalNonces(now);
-      }
-    }
-    this.controllerRef.current.sendCommand(command, source);
+    new MachineCommandGateway(this.controllerRef.current).sendCommand(command, source, approvalToken, {
+      consumedApprovalNonces: this.consumedApprovalNonces,
+      pruneConsumedApprovalNonces: (now: number) => this.pruneConsumedApprovalNonces(now),
+    });
   }
 
   async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
