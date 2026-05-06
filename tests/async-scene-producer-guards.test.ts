@@ -124,8 +124,14 @@ void (async () => {
   );
   // Image import is intentionally NOT yet wired (T2-77-followup) —
   // pin that the helper isn't half-applied there.
-  assert(!/captureSceneRevision/.test(importSrc),
-    'useImport.ts does NOT yet use captureSceneRevision (filed as T2-77-followup)');
+  assert(/captureSceneRevision/.test(importSrc) && /isSceneStale/.test(importSrc),
+    'useImport.ts imports and uses the async scene guard helpers');
+  assert(/const revisionAtStart = captureSceneRevision\(scene\)/.test(importSrc),
+    'importImageUnified captures scene revision at import start');
+  assert(/isSceneStale\(revisionAtStart, sceneRef\.current\)/.test(importSrc),
+    'importImageUnified checks live scene before returning a commit scene');
+  assert(/scene changed while the image was importing/i.test(importSrc),
+    'stale image import path surfaces a clear retry message');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

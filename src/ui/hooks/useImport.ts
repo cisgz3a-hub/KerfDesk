@@ -9,8 +9,14 @@ import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { prepareImageGrayscale } from '../../workers/imagePrepClient';
+import { captureSceneRevision, isSceneStale } from './asyncSceneGuard';
 
 const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB - inline below, IndexedDB above
+
+type ImageImportResult =
+  | { kind: 'ok'; scene: Scene }
+  | { kind: 'stale' }
+  | { kind: 'failed' };
 
 export interface UseImportDeps {
   handleSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
@@ -31,6 +37,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
   useEffect(() => {
     sceneRef.current = scene;
   }, [scene]);
+  const showAlertRef = useRef(showAlert);
+  useEffect(() => {
+    showAlertRef.current = showAlert;
+  }, [showAlert]);
 
   /**
    * Build a scene with one new image object (layer + grayscale + placement).
@@ -39,13 +49,14 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
   const importImageUnified = useCallback(async (
     source: File | string,
     fileName?: string,
-  ): Promise<Scene | null> => {
+  ): Promise<ImageImportResult> => {
     try {
       // T1-17 Pass 3: read the live scene from the ref. This shadows the
       // outer `scene` parameter for the body of this callback, so every
       // existing `scene.X` reference below picks up the current value at
       // call time instead of the value closed over at definition time.
       const scene = sceneRef.current;
+      const revisionAtStart = captureSceneRevision(scene);
       let dataUri: string;
       let displayName: string;
 
@@ -132,6 +143,18 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       // identical across both paths — see imagePrepClient.ts.
       const grayscaleData = await prepareImageGrayscale(img, gsWidth, gsHeight);
 
+      // T2-77: image import is a long-running async scene producer. If
+      // the scene changed while file read / decode / grayscale prep was
+      // running, refuse to return a stale scene built from the old
+      // snapshot; otherwise the later commit would erase the user's edits.
+      if (isSceneStale(revisionAtStart, sceneRef.current)) {
+        await showAlertRef.current(
+          'Import Skipped',
+          'The scene changed while the image was importing. Please import the image again.',
+        );
+        return { kind: 'stale' };
+      }
+
       let targetScene = scene;
       let layerId: string;
 
@@ -212,20 +235,21 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         activeLayerId: layerId,
       };
 
-      return newScene;
+      return { kind: 'ok', scene: newScene };
     } catch (err) {
       console.error('[useImport] Image import failed:', err);
-      return null;
+      return { kind: 'failed' };
     }
   }, []);
 
   const handleImageImport = useCallback(async (file: File) => {
-    const newScene = await importImageUnified(file, file.name);
-    if (!newScene) {
+    const result = await importImageUnified(file, file.name);
+    if (result.kind === 'stale') return;
+    if (result.kind === 'failed') {
       await showAlert('Import Failed', 'Could not import the image file.');
       return;
     }
-    handleSceneCommit(newScene, 'image-import');
+    handleSceneCommit(result.scene, 'image-import');
   }, [importImageUnified, handleSceneCommit, showAlert]);
 
   const handleDragOver = useCallback((e: DragEvent) => {
@@ -283,9 +307,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
           const updated = importDxfIntoScene(text, scene);
           handleSceneCommit(updated, 'dxf-import');
         } else if (file.type.startsWith('image/')) {
-          const newScene = await importImageUnified(file, file.name);
-          if (newScene) {
-            handleSceneCommit(newScene, 'image-import');
+          const result = await importImageUnified(file, file.name);
+          if (result.kind === 'ok') {
+            handleSceneCommit(result.scene, 'image-import');
           }
         }
       } catch (err) {
