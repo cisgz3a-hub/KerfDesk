@@ -110,6 +110,7 @@ import {
   getActiveProfileId,
   getDeviceProfiles,
   initializeDeviceProfiles,
+  applyProfileToScene,
   profileFromScene,
   saveDeviceProfile,
   setActiveProfileId,
