@@ -1589,6 +1589,7 @@ export function ConnectionPanelMain({
     controller: controllerRef.current,
     isOperational,
     showConfirm,
+    sendUserCommand: sendCmd,
     appendMessage: appendBannerMessage,
   });
 
@@ -2358,6 +2359,7 @@ export function ConnectionPanelMain({
           isConnected,
           isRunning,
           controller: controllerRef.current,
+          sendUserCommand: sendCmd,
           moreSection,
           simulatorView,
         }),

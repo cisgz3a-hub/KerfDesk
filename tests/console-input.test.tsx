@@ -86,6 +86,7 @@ async function renderConsole(props: {
   controller: LaserController | null;
   isConnected: boolean;
   isRunning: boolean;
+  sendUserCommand?: (cmd: string) => void | Promise<void>;
 }): Promise<void> {
   if (root) {
     root.unmount();
@@ -98,6 +99,7 @@ async function renderConsole(props: {
         controller: props.controller,
         isConnected: props.isConnected,
         isRunning: props.isRunning,
+        sendUserCommand: props.sendUserCommand ?? ((cmd: string) => props.controller?.sendCommand(cmd, 'user')),
       }),
     );
   });

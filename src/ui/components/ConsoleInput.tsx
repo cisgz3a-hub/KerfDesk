@@ -17,9 +17,9 @@ import { type LaserController, type RawLineCallback } from '../../controllers/Co
  *     sendCommand also enforces these guards, but disabling the UI
  *     gives the user clearer feedback than a thrown error after
  *     pressing Send.
- *   - On Send: calls controller.sendCommand(text, 'user'). Errors
- *     (empty input, 127-byte cap, multi-line) bubble up and are
- *     surfaced in the log.
+ *   - On Send: calls the service-owned user command sender. Errors
+ *     (empty input, 127-byte cap, multi-line, approval denial) bubble
+ *     up and are surfaced in the log.
  *   - Subscribes to controller.onRawLine to populate the log.
  *     Capped at LOG_CAP entries to bound memory.
  *   - Quick-command buttons for the most common diagnostic
@@ -34,6 +34,7 @@ interface ConsoleInputProps {
   controller: LaserController | null;
   isConnected: boolean;
   isRunning: boolean;
+  sendUserCommand: (cmd: string) => void | Promise<void>;
 }
 
 interface LogEntry {
@@ -45,7 +46,7 @@ interface LogEntry {
 
 let nextLogId = 1;
 
-export function ConsoleInput({ controller, isConnected, isRunning }: ConsoleInputProps) {
+export function ConsoleInput({ controller, isConnected, isRunning, sendUserCommand }: ConsoleInputProps) {
   const [input, setInput] = useState('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const logScrollRef = useRef<HTMLDivElement>(null);
@@ -71,12 +72,11 @@ export function ConsoleInput({ controller, isConnected, isRunning }: ConsoleInpu
   }, [log]);
 
   const send = useCallback(
-    (cmd: string) => {
-      if (!controller) return;
+    async (cmd: string) => {
       const trimmed = cmd.trim();
       if (!trimmed) return;
       try {
-        controller.sendCommand(trimmed, 'user');
+        await sendUserCommand(trimmed);
         setInput('');
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -86,14 +86,14 @@ export function ConsoleInput({ controller, isConnected, isRunning }: ConsoleInpu
         });
       }
     },
-    [controller],
+    [sendUserCommand],
   );
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        send(input);
+        void send(input);
       }
     },
     [input, send],

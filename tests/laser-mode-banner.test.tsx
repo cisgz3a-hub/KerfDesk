@@ -76,6 +76,7 @@ async function renderBanner(props: {
   controller: LaserController | null;
   isOperational: boolean;
   showConfirm: () => Promise<boolean>;
+  sendUserCommand?: (cmd: string) => void | Promise<void>;
   appendMessage?: (msg: string) => void;
 }): Promise<void> {
   if (root) {
@@ -91,6 +92,7 @@ async function renderBanner(props: {
         controller: props.controller,
         isOperational: props.isOperational,
         showConfirm: props.showConfirm,
+        sendUserCommand: props.sendUserCommand ?? ((cmd: string) => props.controller?.sendCommand(cmd, 'user')),
         appendMessage: props.appendMessage,
       }),
     );

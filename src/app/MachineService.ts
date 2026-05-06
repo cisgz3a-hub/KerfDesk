@@ -1016,7 +1016,7 @@ export class MachineService {
     try {
       if (ctrl) {
         try {
-          ctrl.sendCommand('M5 S0', 'internal');
+          new MachineCommandGateway(ctrl).sendInternalCommand('M5 S0');
         } catch {
           /* not connected, buffer full, or port already gone */
         }
@@ -1181,9 +1181,8 @@ export class MachineService {
   jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
     const ctrl = this.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
-    const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
     try {
-      ctrl.sendCommand(cmd, 'internal');
+      new MachineCommandGateway(ctrl).jog(axis, distance, feedRate);
     } catch (err: unknown) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }

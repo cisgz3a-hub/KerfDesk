@@ -6,6 +6,7 @@ interface ConsolePanelProps {
   isConnected: boolean;
   isRunning: boolean;
   controller: LaserController | null;
+  sendUserCommand: (cmd: string) => void | Promise<void>;
   moreSection: React.ReactNode;
   simulatorView: React.ReactNode;
 }
@@ -14,6 +15,7 @@ export function ConsolePanel({
   isConnected,
   isRunning,
   controller,
+  sendUserCommand,
   moreSection,
   simulatorView,
 }: ConsolePanelProps) {
@@ -23,6 +25,6 @@ export function ConsolePanel({
     null,
     moreSection,
     simulatorView,
-    React.createElement(ConsoleInput, { controller, isConnected, isRunning }),
+    React.createElement(ConsoleInput, { controller, isConnected, isRunning, sendUserCommand }),
   );
 }

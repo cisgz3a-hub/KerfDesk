@@ -22,7 +22,7 @@ import { type LaserController } from '../../controllers/ControllerInterface';
  *   - Hides when laserMode=true, when not yet connected/operational,
  *     or once dismissed for the session.
  *   - "Enable laser mode" button: confirms, then sends $32=1 via
- *     controller.sendCommand. The optimistic local snapshot flips
+ *     the service-owned user command sender. The optimistic local snapshot flips
  *     to 'on' on success so the banner hides immediately. (The
  *     controller's $32 parse path doesn't currently fire a state
  *     listener, so without the optimistic flip the banner would
@@ -48,6 +48,8 @@ interface LaserModeBannerProps {
   isOperational: boolean;
   /** Confirmation dialog from useModal. Returns true if user confirms. */
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
+  /** Service-owned user command sender; handles approval-token policy. */
+  sendUserCommand: (cmd: string) => void | Promise<void>;
   /** Optional logging hook to surface success/failure into the message log. */
   appendMessage?: (msg: string) => void;
 }
@@ -58,6 +60,7 @@ export function LaserModeBanner({
   controller,
   isOperational,
   showConfirm,
+  sendUserCommand,
   appendMessage,
 }: LaserModeBannerProps) {
   const [snapshot, setSnapshot] = useState<LaserModeSnapshot>('unknown');
@@ -88,14 +91,14 @@ export function LaserModeBanner({
     );
     if (!ok) return;
     try {
-      controller.sendCommand('$32=1', 'user');
+      await sendUserCommand('$32=1');
       setSnapshot('on');
       appendMessage?.('Laser mode enabled ($32=1 sent).');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       appendMessage?.(`Failed to enable laser mode: ${msg}`);
     }
-  }, [controller, showConfirm, appendMessage]);
+  }, [controller, showConfirm, sendUserCommand, appendMessage]);
 
   const handleDismiss = useCallback(() => {
     setDismissed(true);
