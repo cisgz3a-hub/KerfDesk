@@ -8541,6 +8541,8 @@ When blocked, UI offers: "Machine settings have changed since this G-code was co
 
 **Cross-check note (audit 3C):** Audit's Finding 7.2 + Priority 5. Existing T2-1 covers profileHash; T2-37 extends with capability snapshot hashes.
 
+**Status:** Shipped in <TBD> (focused MVP — snapshot type + mismatch detector with ordered reason kinds; ValidatedJobTicket migration deferred as T2-37-followup). New `src/core/job/TicketCapabilitySnapshot.ts` exports `TicketCapabilitySnapshot` interface (capabilitySnapshotHash + settingsHash + controllerIdentityHash + capabilitiesUsed), `CapabilityMismatchKind` (7 — capabilities-changed / controller-settings-changed / controller-identity-changed / max-spindle-changed / bed-dimensions-changed / laser-mode-changed / execution-model-changed), `CapabilityMismatchReason` (kind + message + optional detail with field/before/after), `buildTicketCapabilitySnapshot({capabilities, settingsRaw?, identityRaw?})` (FNV-1a hex; null/whitespace raw → null hash), `hashCapabilitiesValue(value)` (key-order stable; null→'none'), `CurrentMachineState`, `detectCapabilityMismatch(snapshot, current)` (ordered: identity → settings → high-impact-per-field → catch-all hash; per-field check fires BEFORE the catch-all so the user gets "$30 1000→255" rather than "capabilities changed"; returns null on match), `ticketStillValid(snapshot, current)` boolean convenience. Pinned by `tests/ticket-capability-snapshot-validation.test.ts` (39 contracts: snapshot shape; null/empty raw produces null hash; hashCapabilitiesValue key-order stable + null→'none'; identical → null; ticketStillValid match/mismatch; identity-change / settings-change / max-spindle-change / bed-change / laser-mode-change / execution-model-change each produce the right kind; catch-all when only ackModel changes; ordering — identity reported before settings; settings reported before per-field check; source-level pin). **Out of scope (T2-37-followup):** extending the actual `ValidatedJobTicket` interface with the snapshot field + threading buildTicketCapabilitySnapshot into `compileGcode` + threading detectCapabilityMismatch into `MachineService.startValidatedJob`. **Hardware verification: not required** (declarative snapshot + pure detection).
+
 ---
 
 ### T2-38 | `CapabilityValue<T>` model with source / confidence / verifiedAt
@@ -19762,7 +19764,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-34 Connection generation guard 鈥?token tagged on transport callbacks (filed; depends on T2-32)
 - [ ] T2-35 Electron serial subsystem decision 鈥?complete it OR remove it (filed; supersedes T1-27 partial fix)
 - [ ] T2-36 Subscription-based transport callbacks (filed; pairs with T2-34)
-- [ ] T2-37 Capability snapshot in ValidatedJobTicket (filed; refines T2-1, T2-29)
+- [x] T2-37 Capability snapshot in ValidatedJobTicket (Shipped — TicketCapabilitySnapshot type + 7-kind mismatch reasons + ordered detector; ValidatedJobTicket migration deferred as T2-37-followup; refines T2-1, T2-29)
 - [ ] T2-38 `CapabilityValue<T>` model with source/confidence/verifiedAt (filed; refines T2-25)
 - [x] T2-39 Strict profile validation on save (shipped 2026-05-05 in `b87e59b` — validator + save-side rejection; Settings UI rendering deferred)
 - [ ] T2-40 Central operation-gating authority (filed; refines T2-26 + T3-47)
