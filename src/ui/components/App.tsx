@@ -40,10 +40,9 @@ import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
 import { useKerfHandlers } from '../hooks/useKerfHandlers';
 import { useMaterialTestHandlers } from '../hooks/useMaterialTestHandlers';
-import { type MachineTransformResult } from '../../core/plan/MachineTransform';
-import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
+import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
 import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useEditorStore } from '../stores/editorStore';
@@ -243,14 +242,11 @@ export function App() {
   const bedTabLayout = useViewportStore(s => s.bedTabLayout);
   const handleViewportLayout = useViewportStore(s => s.setBedTabLayout);
 
-  const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
-  const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
-    minX: number;
-    minY: number;
-    maxX: number;
-    maxY: number;
-  } | null>(null);
-  const [activeJobTransform, setActiveJobTransform] = useState<MachineTransformResult | null>(null);
+  const activeJobMoves = useActiveJobCanvasStore(s => s.activeJobMoves);
+  const activeJobPlanBounds = useActiveJobCanvasStore(s => s.activeJobPlanBounds);
+  const activeJobTransform = useActiveJobCanvasStore(s => s.activeJobTransform);
+  const setActiveJobCanvasContext = useActiveJobCanvasStore(s => s.setActiveJobCanvasContext);
+  const clearActiveJobCanvasContext = useActiveJobCanvasStore(s => s.clearActiveJobCanvasContext);
   const grbl = useControllerConnection('grbl');
   const machineUi = useMachineService({
     controllerRef: grbl.controllerRef,
@@ -530,24 +526,22 @@ export function App() {
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
       const ctx = machineUi.service.getActiveJobCanvasContext();
       if (ctx) {
-        setActiveJobMoves(ctx.canvasMoves);
-        setActiveJobPlanBounds(ctx.canvasPlanBounds);
-        setActiveJobTransform(ctx.machineTransform);
+        setActiveJobCanvasContext({
+          moves: ctx.canvasMoves,
+          planBounds: ctx.canvasPlanBounds,
+          transform: ctx.machineTransform,
+        });
       } else {
         console.warn(
           '[App] Job running but no active job canvas context — clearing active job canvas state',
         );
-        setActiveJobMoves(null);
-        setActiveJobPlanBounds(null);
-        setActiveJobTransform(null);
+        clearActiveJobCanvasContext();
       }
     } else if (!grbl.isJobRunning && wasJobRunningRef.current) {
-      setActiveJobMoves(null);
-      setActiveJobPlanBounds(null);
-      setActiveJobTransform(null);
+      clearActiveJobCanvasContext();
     }
     wasJobRunningRef.current = grbl.isJobRunning;
-  }, [grbl.isJobRunning, machineUi.service]);
+  }, [grbl.isJobRunning, machineUi.service, setActiveJobCanvasContext, clearActiveJobCanvasContext]);
 
   const connectionSidebarWidth = connectionSidebarOpen
     ? Math.min(500, Math.floor(canvasSize.width * 0.45))
