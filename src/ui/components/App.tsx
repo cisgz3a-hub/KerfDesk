@@ -79,6 +79,7 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
+import { buildAppConnectionPanelProps } from './appConnectionPanelProps';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
 import { BoxStudioPage } from '../pages/BoxStudioPage';
@@ -1663,7 +1664,7 @@ export function App() {
           }),
         ),
       ),
-      connectionSidebarOpen && React.createElement(ConnectionPanel, {
+      connectionSidebarOpen && React.createElement(ConnectionPanel, buildAppConnectionPanelProps({
         controller: grbl.controller!,
         portRef: grbl.portRef,
         machineState: grbl.machineState,
@@ -1711,7 +1712,7 @@ export function App() {
         onUpdateLayerFillBidirectional: handleConnectionUpdateLayerFillBidirectional,
         onUpdateLayerSetting: handleConnectionUpdateLayerSetting,
         machineUi,
-      }),
+      })),
       !connectionSidebarOpen && React.createElement('div', {
         style: {
           width: 240,
