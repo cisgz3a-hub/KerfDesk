@@ -32,6 +32,12 @@ import {
   makeResumeResult,
   makeSoftResetStopResult,
 } from './SafetyActionResult';
+import {
+  safetyStateInitial,
+  transitionFromSafetyResult,
+  type SafetyResultLike,
+  type SafetyState,
+} from './SafetyStateMachine';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -61,6 +67,7 @@ export type BurnStateListener = (state: BurnState) => void;
  */
 export type LaserOutputState = 'off' | 'on' | 'unknown';
 export type LaserOutputStateListener = (state: LaserOutputState) => void;
+export type SafetyStateListener = (state: SafetyState) => void;
 
 /**
  * T2-11: kinds of temporary machine operations protected by the
@@ -111,6 +118,33 @@ export interface JobRecordingSink {
 
 const APPROVAL_TOKEN_TTL_MS = 30_000;
 const MAX_CONSUMED_APPROVAL_NONCES = 512;
+
+function safetyResultForStateMachine(result: SafetyActionResult): SafetyResultLike {
+  const action: SafetyResultLike['action'] =
+    result.action === 'abortJob' ? 'stop' : result.action;
+  const motionState: SafetyResultLike['motionState'] =
+    result.motionState === 'running' ? 'moving' : result.motionState;
+  const laserState: SafetyResultLike['laserState'] =
+    result.laserState === 'off'
+      ? 'confirmed'
+      : result.laserState === 'commandedOff' ? 'commanded' : 'unknown';
+
+  return {
+    action,
+    accepted: result.accepted,
+    motionState,
+    laserState,
+    positionTrusted: result.positionTrusted,
+    requiresRehome: result.requiresRehome,
+    requiresReconnect: result.requiresReconnect,
+    requiresInspection: result.requiresInspection,
+    message: result.message,
+  };
+}
+
+function safetyStatesEqual(a: SafetyState, b: SafetyState): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
 
 function createApprovalNonce(): string {
   const cryptoLike = globalThis.crypto as Crypto | undefined;
@@ -180,6 +214,7 @@ export class MachineService {
    * (and only on transitions - no-op writes are skipped).
    */
   private _laserOutputState: LaserOutputState = 'off';
+  private _safetyState: SafetyState = safetyStateInitial;
   // T1-41: G54 work offset captured at the time the user clicked Set Origin.
   // The verify path (`verifySavedOrigin`) compares this to a freshly-queried
   // value at job start. `null` means Set Origin was never run this session
@@ -188,6 +223,7 @@ export class MachineService {
 
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
+  private _safetyStateListeners: Set<SafetyStateListener> = new Set();
 
   /**
    * T2-11: service-layer mutex for temporary-laser-on operations. Single
@@ -768,6 +804,14 @@ export class MachineService {
   }
 
   /**
+   * T2-44: read the canonical safety-operation state derived from
+   * SafetyActionResult outcomes.
+   */
+  getSafetyState(): SafetyState {
+    return this._safetyState;
+  }
+
+  /**
    * T2-11: try to acquire the operation mutex for `kind`. Returns true on
    * success (caller now holds the mutex), false if another kind is
    * already active. Same-kind re-acquire returns true without changing
@@ -845,6 +889,16 @@ export class MachineService {
   }
 
   /**
+   * T2-44: subscribe to safety-state transitions driven by pause/resume/
+   * stop/emergency-stop outcomes. Consumers can use this for recovery
+   * cards and command gating without re-interpreting controller calls.
+   */
+  onSafetyStateChange(cb: SafetyStateListener): () => void {
+    this._safetyStateListeners.add(cb);
+    return () => this._safetyStateListeners.delete(cb);
+  }
+
+  /**
    * T2-12 part 1: canonical writer for {@link _laserOutputState}.
    * No-op writes (next === current) skip the notify so subscribers
    * only see real transitions.
@@ -855,6 +909,23 @@ export class MachineService {
     for (const cb of this._laserOutputStateListeners) {
       cb(next);
     }
+  }
+
+  private _setSafetyState(next: SafetyState): void {
+    if (safetyStatesEqual(this._safetyState, next)) return;
+    this._safetyState = next;
+    for (const cb of this._safetyStateListeners) {
+      cb(next);
+    }
+  }
+
+  private _recordSafetyResult(result: SafetyActionResult): SafetyActionResult {
+    this._setSafetyState(transitionFromSafetyResult(
+      this._safetyState,
+      safetyResultForStateMachine(result),
+      Date.now(),
+    ));
+    return result;
   }
 
   /**
@@ -1057,7 +1128,7 @@ export class MachineService {
       // burn; that's qualitatively different from a renderer crash.
       clearUnsafePriorState();
     }
-    return result;
+    return this._recordSafetyResult(result);
   }
 
   emergencyStop(): SafetyActionResult {
@@ -1080,7 +1151,7 @@ export class MachineService {
       this._savedOriginG54Snapshot = null;
       clearUnsafePriorState();
     }
-    return result;
+    return this._recordSafetyResult(result);
   }
 
   // T1-41: snapshot G54 captured at Set Origin time. Caller is App.tsx's
@@ -1241,32 +1312,32 @@ export class MachineService {
   /** Pause the currently running job (feed-hold). */
   pause(): SafetyActionResult {
     const ctrl = this.controllerRef.current;
-    if (!ctrl) return makeNotConnectedResult('pause');
+    if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('pause'));
     try {
       ctrl.pause();
-      return makePauseResult();
+      return this._recordSafetyResult(makePauseResult());
     } catch (err: unknown) {
-      return {
+      return this._recordSafetyResult({
         ...makeNotConnectedResult('pause'),
         requiresReconnect: false,
         message: err instanceof Error ? err.message : String(err),
-      };
+      });
     }
   }
 
   /** Resume a paused job. */
   resume(): SafetyActionResult {
     const ctrl = this.controllerRef.current;
-    if (!ctrl) return makeNotConnectedResult('resume');
+    if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('resume'));
     try {
       ctrl.resume();
-      return makeResumeResult();
+      return this._recordSafetyResult(makeResumeResult());
     } catch (err: unknown) {
-      return {
+      return this._recordSafetyResult({
         ...makeNotConnectedResult('resume'),
         requiresReconnect: false,
         message: err instanceof Error ? err.message : String(err),
-      };
+      });
     }
   }
 
@@ -1287,6 +1358,6 @@ export class MachineService {
     // M5 via sendCommand would race the reset and usually throw
     // 'Not connected' anyway. Intentionally no follow-up writes here.
     void sendTx;
-    return makeSoftResetStopResult();
+    return this._recordSafetyResult(makeSoftResetStopResult());
   }
 }
