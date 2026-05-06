@@ -27,6 +27,7 @@ import {
   type SafetyActionResult,
   makeNotConnectedResult,
   makeDisconnectResult,
+  makeEmergencyStopResult,
   makePauseResult,
   makeResumeResult,
   makeSoftResetStopResult,
@@ -1054,6 +1055,29 @@ export class MachineService {
       // flag so the next launch doesn't surface the recovery dialog.
       // Disconnect-while-job-runs IS the user explicitly halting the
       // burn; that's qualitatively different from a renderer crash.
+      clearUnsafePriorState();
+    }
+    return result;
+  }
+
+  emergencyStop(): SafetyActionResult {
+    const ctrl = this.controllerRef.current;
+    let result = makeEmergencyStopResult();
+    try {
+      if (ctrl) {
+        ctrl.emergencyStop();
+      } else {
+        result = makeNotConnectedResult('emergencyStop');
+      }
+    } catch (err: unknown) {
+      result = makeEmergencyStopResult({
+        accepted: false,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      this.portRef.current = null;
+      this.clearJobSession();
+      this._savedOriginG54Snapshot = null;
       clearUnsafePriorState();
     }
     return result;

@@ -164,3 +164,26 @@ export function makeDisconnectResult(args?: {
     timestamp: Date.now(),
   };
 }
+
+export function makeEmergencyStopResult(args?: {
+  accepted?: boolean;
+  message?: string;
+}): SafetyActionResult {
+  const accepted = args?.accepted ?? true;
+  return {
+    action: 'emergencyStop',
+    accepted,
+    motionState: accepted ? 'stopped' : 'unknown',
+    laserState: accepted ? 'commandedOff' : 'unknown',
+    positionTrusted: false,
+    requiresRehome: true,
+    requiresReconnect: true,
+    requiresInspection: true,
+    message: args?.message ?? (
+      accepted
+        ? 'Emergency stop sent. GRBL soft reset issued; inspect the machine, reconnect, and re-home before the next job.'
+        : 'Emergency stop could not be confirmed. Inspect the machine before reconnecting.'
+    ),
+    timestamp: Date.now(),
+  };
+}
