@@ -316,7 +316,7 @@ function rectangleJobAndPlan(withSpeedChange: boolean): { job: Job; plan: Plan }
   const text = strategy!.generate(plan, job, {
     startMode: 'current',
     returnPosition: null,
-    gcodeHeaderTemplate: 'G21\nG90\nM5 S0',
+    gcodeHeaderTemplate: '; user header\nM5 S0',
   }).text ?? '';
   assert(text.includes('G91 ; LaserForge: Head mode requires relative positioning'), 'Head + template: injected G91 hint after template');
 }

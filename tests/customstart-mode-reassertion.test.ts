@@ -60,14 +60,14 @@ console.log('\n=== T1-43 customStart mode reassertion ===\n');
 {
   const out = gen({
     startMode: 'absolute',
-    customStartGcode: 'G90 ; user-supplied',
+    customStartGcode: 'M8 ; user-supplied',
     maxSpindle: 1000,
   });
   const headerLines = out.text!.split('\n');
   const lastReassertIdx = headerLines.findIndex(l =>
     l.includes('reassert absolute mode after customStartGcode (T1-43)'),
   );
-  assert(lastReassertIdx > -1, 'absolute + G90 in customStart: reassert marker present');
+  assert(lastReassertIdx > -1, 'absolute + customStart: reassert marker present');
   const customStartIdx = headerLines.findIndex(l => l.includes('user-supplied'));
   assert(customStartIdx > -1 && customStartIdx < lastReassertIdx, 'custom-start line precedes reassert');
 }
@@ -75,33 +75,33 @@ console.log('\n=== T1-43 customStart mode reassertion ===\n');
 {
   const out = gen({
     startMode: 'absolute',
-    customStartGcode: 'G91 ; user wrote relative',
+    customStartGcode: 'M8 ; user wrote custom start',
     maxSpindle: 1000,
   });
   const headerLines = out.text!.split('\n');
   const reassertIdx = headerLines.findIndex(l =>
     l.includes('reassert absolute mode after customStartGcode (T1-43)'),
   );
-  const userG91Idx = headerLines.findIndex(l => l.includes('user wrote relative'));
-  assert(reassertIdx > -1, 'absolute + G91 in customStart: reassert emitted');
-  assert(userG91Idx > -1, 'user G91 line retained');
-  assert(userG91Idx < reassertIdx, 'reassert follows user G91');
+  const userCustomIdx = headerLines.findIndex(l => l.includes('user wrote custom start'));
+  assert(reassertIdx > -1, 'absolute + customStart: reassert emitted');
+  assert(userCustomIdx > -1, 'user customStart line retained');
+  assert(userCustomIdx < reassertIdx, 'reassert follows user customStart');
   assert(/^G90\b/.test(headerLines[reassertIdx]!.trim()), 'reassert is G90');
 }
 
 {
   const out = gen({
     startMode: 'current',
-    customStartGcode: 'G90 ; user wrote absolute',
+    customStartGcode: 'M8 ; user wrote custom start',
     maxSpindle: 1000,
   });
   const headerLines = out.text!.split('\n');
   const reassertIdx = headerLines.findIndex(l =>
     l.includes('reassert relative mode after customStartGcode (T1-43)'),
   );
-  const userG90Idx = headerLines.findIndex(l => l.includes('user wrote absolute'));
-  assert(reassertIdx > -1, 'current + G90 in customStart: reassert emitted');
-  assert(userG90Idx < reassertIdx, 'reassert follows user G90');
+  const userCustomIdx = headerLines.findIndex(l => l.includes('user wrote custom start'));
+  assert(reassertIdx > -1, 'current + customStart: reassert emitted');
+  assert(userCustomIdx < reassertIdx, 'reassert follows user customStart');
   assert(/^G91\b/.test(headerLines[reassertIdx]!.trim()), 'reassert is G91');
 }
 

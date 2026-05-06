@@ -47,6 +47,7 @@ import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
 import { type GcodeGenerateOptions } from './GcodeOrigin';
 import { emptyTemplateContext, renderTemplate } from '../plan/GcodeTemplates';
+import { validateGcodeTemplates, type TemplateFinding } from '../preflight/GcodeTemplateValidator';
 
 export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
 
@@ -74,6 +75,16 @@ export interface OutputStrategy {
   encodeAirAssist(on: boolean): string;
   encodeZMove(z: number): string;
   encodeFooter(job: Job, options?: GcodeGenerateOptions): string;
+}
+
+export class TemplateValidationError extends Error {
+  readonly finding: TemplateFinding;
+
+  constructor(finding: TemplateFinding) {
+    super(`Template validation failed (${finding.code}): ${finding.message}`);
+    this.name = 'TemplateValidationError';
+    this.finding = finding;
+  }
 }
 
 // ─── STRATEGY REGISTRY ───────────────────────────────────────────
@@ -128,6 +139,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     this._prevZ = 0;
 
     try {
+      validateTemplatesBeforeEmission(job, options, this._maxSpindle);
       const lines: string[] = [];
       const generatedAt = (options?.clock ?? (() => new Date().toISOString()))();
       const header = this.encodeHeader(job, options, generatedAt);
@@ -416,5 +428,39 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       case 'marker':
         return `; OBJ ids=${move.sourceObjectIds.join(',')}`;
     }
+  }
+}
+
+function validateTemplatesBeforeEmission(
+  job: Job,
+  options: GcodeGenerateOptions | undefined,
+  maxSpindle: number,
+): void {
+  if (!options) return;
+  const hasTemplateInput = Boolean(
+    options.customStartGcode?.trim() ||
+    options.customEndGcode?.trim() ||
+    options.gcodeHeaderTemplate?.trim() ||
+    options.gcodeFooterTemplate?.trim(),
+  );
+  if (!hasTemplateInput) return;
+
+  const templateContext = options.gcodeTemplateContext ?? {
+    ...emptyTemplateContext(),
+    jobName: job.name || 'untitled',
+  };
+  const findings = validateGcodeTemplates({
+    customStart: options.customStartGcode,
+    customEnd: options.customEndGcode,
+    headerTemplate: options.gcodeHeaderTemplate,
+    footerTemplate: options.gcodeFooterTemplate,
+    templateContext,
+    bedWidthMm: templateContext.bedWidthMm,
+    bedHeightMm: templateContext.bedHeightMm,
+    maxSpindle,
+  });
+  const firstError = findings.find(finding => finding.severity === 'error');
+  if (firstError) {
+    throw new TemplateValidationError(firstError);
   }
 }

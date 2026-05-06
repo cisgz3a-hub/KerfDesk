@@ -16,6 +16,7 @@ import { createScene } from '../src/core/scene/Scene';
 import { createLayer } from '../src/core/scene/Layer';
 import { type RectGeometry, type SceneObject } from '../src/core/scene/SceneObject';
 import { IDENTITY_MATRIX, generateId } from '../src/core/types';
+import { TemplateValidationError } from '../src/core/output/Output';
 import { GrblOutputStrategy } from '../src/core/output/GrblStrategy';
 
 let passed = 0;
@@ -150,19 +151,18 @@ void (async () => {
       totalDistanceMm: 0, rapidDistanceMm: 0, cutDistanceMm: 0, estimatedTimeSeconds: 0,
       moveCount: 0, operationCount: 0, passCount: 0,
     }, bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
-    const out = strategy.generate(plan, job, {
-      startMode: 'absolute',
-      gcodeHeaderTemplate: 'M3 S100 ; malicious laser-on in template',
-      returnPosition: null,
-    });
-    const text = out.text ?? '';
-    const lines = text.split('\n');
-    const idxSafetyM5 = indexOfFirst(lines, /^M5 .*T2-14 safety baseline/);
-    const idxMaliciousM3 = indexOfFirst(lines, /^M3 S100/);
-    assert(idxSafetyM5 >= 0 && idxMaliciousM3 >= 0,
-      `malicious template: both safety M5 and template M3 present`);
-    assert(idxSafetyM5 < idxMaliciousM3,
-      `malicious template: safety M5 emitted BEFORE template M3 (M5@${idxSafetyM5}, M3@${idxMaliciousM3})`);
+    let threwTemplateError = false;
+    try {
+      strategy.generate(plan, job, {
+        startMode: 'absolute',
+        gcodeHeaderTemplate: 'M3 S100 ; malicious laser-on in template',
+        returnPosition: null,
+      });
+    } catch (error) {
+      threwTemplateError = error instanceof TemplateValidationError;
+    }
+    assert(threwTemplateError,
+      `malicious template: output generation rejects unsafe laser-on template`);
   }
 
   // 4. Custom end gcode → safety footer (M5 + M2) still last
@@ -176,7 +176,7 @@ void (async () => {
     }, bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
     const out = strategy.generate(plan, job, {
       startMode: 'absolute',
-      customEndGcode: '; my custom end',
+      customEndGcode: 'M5\n; my custom end',
       returnPosition: null,
     });
     const text = out.text ?? '';
@@ -203,7 +203,7 @@ void (async () => {
     }, bounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 } };
     const out = strategy.generate(plan, job, {
       startMode: 'absolute',
-      gcodeFooterTemplate: '; just a comment, no M5 no M2',
+      gcodeFooterTemplate: 'M5\n; just a comment, no M2',
       returnPosition: null,
     });
     const text = out.text ?? '';
