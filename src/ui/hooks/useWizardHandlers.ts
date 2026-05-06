@@ -115,9 +115,6 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
 
     // Apply wizard results to scene
-    const matX = Math.round((result.bedWidth - result.materialWidth) / 2);
-    const matY = Math.round((result.bedHeight - result.materialHeight) / 2);
-
     const wattsRaw = result.machineWatts || '10';
     const wattsParsed = parseInt(wattsRaw.split(/[-]/)[0]?.replace(/\D/g, '') || '10', 10) || 10;
     const mt = result.machineType || 'diode';
@@ -172,17 +169,9 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     const newScene = {
       ...scene,
       canvas: { ...scene.canvas, width: result.bedWidth, height: result.bedHeight },
-      material: {
-        enabled: true,
-        x: matX,
-        y: matY,
-        width: result.materialWidth,
-        height: result.materialHeight,
-        thickness: result.materialThickness,
-        type: result.materialType as NonNullable<Scene['material']>['type'],
-        name: result.materialName,
-        color: result.materialColor,
-      },
+      // Setup material answers are only recommendation inputs. Do not place a
+      // material board on the canvas; users can add one explicitly later.
+      material: null,
       machine: {
         name: result.machineName || 'Custom',
         watts: result.machineWatts || '',

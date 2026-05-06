@@ -2332,6 +2332,7 @@ export function ConnectionPanelMain({
         laserModeBanner,
         connectSection,
       }),
+      isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
         style: {
           flex: 1,
@@ -2348,7 +2349,6 @@ export function ConnectionPanelMain({
           isRunning,
           displayPaused,
           workflowSection,
-          controlsSection,
           layerOverviewSection,
           gcodeWarning,
           issuesSection,

@@ -5,7 +5,6 @@ interface MoveControlsProps {
   isRunning: boolean;
   displayPaused: boolean;
   workflowSection: React.ReactNode;
-  controlsSection: React.ReactNode;
   layerOverviewSection: React.ReactNode;
   gcodeWarning: React.ReactNode;
   issuesSection: React.ReactNode;
@@ -18,7 +17,6 @@ export function MoveControls(props: MoveControlsProps) {
     isRunning,
     displayPaused,
     workflowSection,
-    controlsSection,
     layerOverviewSection,
     gcodeWarning,
     issuesSection,
@@ -29,7 +27,6 @@ export function MoveControls(props: MoveControlsProps) {
     React.Fragment,
     null,
     !isRunning && !displayPaused && workflowSection,
-    !isRunning && !displayPaused && controlsSection,
     layerOverviewSection,
     gcodeWarning,
     issuesSection,
