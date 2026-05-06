@@ -1,4 +1,4 @@
-import { useCallback, type Dispatch, type MutableRefObject, type SetStateAction } from 'react';
+import { useCallback, type MutableRefObject } from 'react';
 import { createScene, type Scene } from '../../core/scene/Scene';
 import { deserializeScene, serializeForAutosave } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
@@ -6,7 +6,7 @@ import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 
 export interface UseFileHandlersParams {
   scene: Scene;
-  setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
+  setSelectedIds: (ids: ReadonlySet<string>) => void;
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   sceneIsDirtyRef: MutableRefObject<boolean>;
   lastSavedSceneRef: MutableRefObject<string>;

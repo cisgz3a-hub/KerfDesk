@@ -6627,7 +6627,7 @@ App.tsx becomes a thin composition of stores + top-level effects for persistence
 
 **Priority:** Tier 2 (but can parallel with T2-4).
 
-**Status:** Phase 1 store foundation implemented in working tree (pending commit). Added Zustand-backed `appDialogsStore`, `appSettingsStore`, and `viewportStore`, with focused store tests. `App.tsx` no longer owns the small UI-shell state for dialog visibility/payloads, setup/recovery prompts, toolpath/G-code preview toggles, drag-over state, text placement hints, text preview font readiness, material-library refresh token, calibration last-result handoff, persisted production mode, or bed-tab overlay layout. Full T2-6 remains open: scene/selection/history, machine/start-mode, and deeper viewport migration are still multi-pass follow-ups.
+**Status:** Phase 1 store foundation shipped in `c138e15`; Phase 2 editor-shell migration implemented in working tree (pending commit). Added Zustand-backed `appDialogsStore`, `appSettingsStore`, `viewportStore`, and `editorStore`, with focused store tests. `App.tsx` no longer owns the small UI-shell state for dialog visibility/payloads, setup/recovery prompts, toolpath/G-code preview toggles, drag-over state, text placement hints, text preview font readiness, material-library refresh token, calibration last-result handoff, persisted production mode, bed-tab overlay layout, active tool, or selected object ids. Full T2-6 remains open: scene/history, machine/start-mode, and deeper viewport migration are still multi-pass follow-ups.
 
 ---
 
@@ -19810,7 +19810,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-3 Service-layer paywall gates (shipped; token signing deferred to Tier 3)
 - [x] T2-4 Split ConnectionPanelMain (8 phases shipped; sub-component extraction folded into T2-6)
 - [x] T2-5 Gcode template validator (Shipped — `validateGcodeTemplate` with 13 issue kinds + 36-test pin; preflight UI + customStartGcode-setter wiring deferred as T2-5-followup)
-- [ ] T2-6 Zustand stores, split App.tsx (Phase 1 store foundation implemented pending commit; full scene/history split remains)
+- [ ] T2-6 Zustand stores, split App.tsx (Phase 1 shipped in `c138e15`; Phase 2 editor-store migration pending commit; full scene/history split remains)
 - [x] T2-7 Controller abstraction real, Marlin stub (closed pre-session — abstraction shipped; Marlin stub deferred to T2-24 / T4-7)
 - [x] T2-8 Split Preflight into rule modules (closed pre-session — 8 modules in src/core/preflight/rules/)
 - [ ] T2-10 Establish single MachineCommandGateway choke point (filed; multi-pass architectural)

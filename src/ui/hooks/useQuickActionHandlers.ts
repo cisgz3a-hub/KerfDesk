@@ -1,11 +1,11 @@
-import { useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { generateId } from '../../core/types';
 
 export interface UseQuickActionHandlersParams {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
-  setSelectedIds: Dispatch<SetStateAction<ReadonlySet<string>>>;
+  setSelectedIds: (ids: ReadonlySet<string>) => void;
   handleSceneCommit: (newScene: Scene) => void;
   handleDelete: () => void;
   centerOnMaterial: () => void;

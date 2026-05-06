@@ -46,6 +46,7 @@ import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { useEditorStore } from '../stores/editorStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
@@ -182,7 +183,8 @@ export function App() {
   }, [scene.objects]);
 
   const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
-  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  const selectedIds = useEditorStore(s => s.selectedIds);
+  const setSelectedIds = useEditorStore(s => s.setSelectedIds);
   // T2-78: ref-shadow of selectedIds so SceneTransaction's getSelection
   // dep can read the freshest value without rebuilding the useMemo on
   // every selection change. Synced via the useEffect below.
@@ -190,7 +192,8 @@ export function App() {
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
   }, [selectedIds]);
-  const [activeTool, setActiveTool] = useState<ToolType>('select');
+  const activeTool = useEditorStore(s => s.activeTool);
+  const setActiveTool = useEditorStore(s => s.setActiveTool);
   const isDragOver = useAppDialogsStore(s => s.isDragOver);
   const setIsDragOver = useAppDialogsStore(s => s.setIsDragOver);
   const showGridArray = useAppDialogsStore(s => s.showGridArray);
