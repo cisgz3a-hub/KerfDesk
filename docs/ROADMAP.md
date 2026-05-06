@@ -8397,6 +8397,8 @@ private _onTransportData(line: string, ctx: TransportCallbackContext): void {
 
 **Cross-check note (audit 3B):** Audit's section 9.4, 8.4, 3.8.
 
+**Status:** Shipped in <TBD> (focused MVP — pure primitive: allocator + token + isStale check + guard wrapper; transport+controller wiring deferred as T2-34-followup). New `src/communication/ConnectionGenerationGuard.ts` exports `ConnectionToken` (id + generation + createdAt), `TransportCallbackContext` (connectionId + generation), `ConnectionGenerationAllocator` (strictly-increasing generation, optional startGeneration + clock injection, `nextGeneration` introspection), `isStaleContext(ctx, active)` pure check (null active → stale; generation mismatch → stale; id mismatch → stale; matching → live), `contextFromToken(token)`, `withGenerationGuard(bound, getActive, callback)` wrapper that becomes a no-op once the bound token is no longer active (re-evaluates `getActive` each call so connection replacements take effect immediately), `guardCallback(getActive, callback)` two-pass guard for transports that propagate ctx as the first argument, `compareTokens(a, b)`, `classifyContext(ctx, active)` returning `StaleEventReason` (4: live / no-active-connection / generation-mismatch / id-mismatch) for diagnostics. Pinned by `tests/connection-generation-guard.test.ts` (47 contracts: allocator strictly-increasing generations + readable ids + clock-injected createdAt + startGeneration override + nextGeneration introspection; isStaleContext live/null-active/gen-mismatch/id-mismatch; contextFromToken; withGenerationGuard live + bound-to-old-with-fresh-active drops + null-active drops + getActive re-evaluated each call; guardCallback live + stale-ctx; compareTokens; classifyContext per kind; **THE audit's headline case** — old transport's stale event arrives in microtask queue after disconnect/reconnect, gets DROPPED, new transport's events still flow; source-level pin). **Out of scope (T2-34-followup):** wiring `WebSerialPort.onData/onError/onClose` to accept and forward `TransportCallbackContext`; `GrblController.connect` receiving a token from ConnectionManager (T2-32); per-event-handler `if (isStaleContext(ctx, this._activeToken)) return` adoption. **Hardware verification: not required** (pure event-filter primitive; no g-code, no machine state).
+
 ---
 
 ### T2-35 | Electron serial subsystem decision 鈥?complete it OR remove it
@@ -19795,7 +19797,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-31 Make `SerialPortLike.close()` async (shipped 2026-05-05 in `898b510` — unblocks T2-32 / T2-33)
 - [ ] T2-32 Connection lifecycle state machine 鈥?ConnectionManager (filed; depends on T2-24, T2-31)
 - [x] T2-33 Partial-open cleanup in `WebSerialPort.requestAndOpen` (shipped 2026-05-05 in `f5d77dd`)
-- [ ] T2-34 Connection generation guard 鈥?token tagged on transport callbacks (filed; depends on T2-32)
+- [x] T2-34 Connection generation guard — token tagged on transport callbacks (Shipped — allocator + token + isStale + guardCallback + classifyContext; transport+controller wiring deferred as T2-34-followup; depends on T2-32)
 - [ ] T2-35 Electron serial subsystem decision 鈥?complete it OR remove it (filed; supersedes T1-27 partial fix)
 - [ ] T2-36 Subscription-based transport callbacks (filed; pairs with T2-34)
 - [x] T2-37 Capability snapshot in ValidatedJobTicket (Shipped — TicketCapabilitySnapshot type + 7-kind mismatch reasons + ordered detector; ValidatedJobTicket migration deferred as T2-37-followup; refines T2-1, T2-29)
