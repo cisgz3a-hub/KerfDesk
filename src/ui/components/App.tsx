@@ -47,6 +47,7 @@ import { useDialogs } from '../hooks/useDialogs';
 import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useEditorStore } from '../stores/editorStore';
+import { useMachineStartStore } from '../stores/machineStartStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
@@ -222,22 +223,13 @@ export function App() {
   const closeSettings = useAppDialogsStore(s => s.closeSettings);
   const showBoxStudio = useAppDialogsStore(s => s.showBoxStudio);
   const setShowBoxStudio = useAppDialogsStore(s => s.setShowBoxStudio);
-  const [profileRevision, setProfileRevision] = useState(0);
-  const [startMode, setStartMode] = useState<StartMode>(() => {
-    try {
-      const raw = localStorage.getItem('laserforge_start_mode');
-      if (raw === 'absolute' || raw === 'current' || raw === 'savedOrigin') return raw;
-    } catch { /* ignore */ }
-    return 'absolute';
-  });
-  const [savedOrigin, setSavedOrigin] = useState<{ x: number; y: number } | null>(() => {
-    try {
-      const raw = localStorage.getItem('laserforge_saved_origin');
-      return raw ? JSON.parse(raw) as { x: number; y: number } : null;
-    } catch {
-      return null;
-    }
-  });
+  const profileRevision = useMachineStartStore(s => s.profileRevision);
+  const bumpProfileRevision = useMachineStartStore(s => s.bumpProfileRevision);
+  const startMode = useMachineStartStore(s => s.startMode);
+  const setStartMode = useMachineStartStore(s => s.setStartMode);
+  const savedOrigin = useMachineStartStore(s => s.savedOrigin);
+  const setSavedOrigin = useMachineStartStore(s => s.setSavedOrigin);
+  const resetCurrentModeAfterDisconnect = useMachineStartStore(s => s.resetCurrentModeAfterDisconnect);
   const startModeRef = useRef(startMode);
   startModeRef.current = startMode;
   const gcodePreview = useAppDialogsStore(s => s.gcodePreview);
@@ -347,7 +339,7 @@ export function App() {
   void materialLibraryRevision;
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
 
-  const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
+  const refreshProfiles = useCallback(() => bumpProfileRevision(), [bumpProfileRevision]);
   useEffect(() => {
     void Promise.all([
       initializeDeviceProfiles(),
@@ -572,12 +564,9 @@ export function App() {
 
   useEffect(() => {
     if (grbl.machineState?.status === 'disconnected' && startModeRef.current === 'current') {
-      setStartMode('absolute');
-      try {
-        localStorage.setItem('laserforge_start_mode', 'absolute');
-      } catch { /* ignore */ }
+      resetCurrentModeAfterDisconnect();
     }
-  }, [grbl.machineState?.status]);
+  }, [grbl.machineState?.status, resetCurrentModeAfterDisconnect]);
 
   // Safety: clean stop on page unload — soft reset path + laser off; no disconnect (port dies with the page).
   useEffect(() => {
@@ -621,9 +610,6 @@ export function App() {
       return;
     }
     setSavedOrigin(origin);
-    try {
-      localStorage.setItem('laserforge_saved_origin', JSON.stringify(origin));
-    } catch { /* ignore */ }
     // T1-41: snapshot G54 *after* the Set Origin G10 command was
     // accepted, so any subsequent saved-origin job can verify the
     // work coordinate system hasn't drifted (user typing G10 in the
@@ -1144,9 +1130,6 @@ export function App() {
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
-    try {
-      localStorage.setItem('laserforge_start_mode', mode);
-    } catch { /* ignore */ }
     handleSceneCommit({
       ...scene,
       startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
