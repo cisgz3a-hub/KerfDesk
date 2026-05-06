@@ -15255,7 +15255,7 @@ This is **defense in depth**, not a replacement: preflight gives users a chance 
 
 **Cross-check note (audit 5D):** Audit's Priority 10.
 
-**Status:** Shipped in `<TBD>`: `BaseGCodeStrategy.generate` now validates `customStartGcode`, `customEndGcode`, `gcodeHeaderTemplate`, and `gcodeFooterTemplate` before rendering/emitting G-code. It reuses `validateGcodeTemplates` and throws exported `TemplateValidationError` on hard errors, so non-UI compile/output paths cannot bypass template safety. Pinned by `tests/compiler-template-validation.test.ts`. Hardware verification not required (software-only emission guard).
+**Status:** Shipped in `412250c`: `BaseGCodeStrategy.generate` now validates `customStartGcode`, `customEndGcode`, `gcodeHeaderTemplate`, and `gcodeFooterTemplate` before rendering/emitting G-code. It reuses `validateGcodeTemplates` and throws exported `TemplateValidationError` on hard errors, so non-UI compile/output paths cannot bypass template safety. Pinned by `tests/compiler-template-validation.test.ts`. Hardware verification not required (software-only emission guard).
 
 ---
 
@@ -19947,7 +19947,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
 - [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers; SvgParser/PathParser wiring deferred as T2-123-followup; pairs with T1-92)
 - [x] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (Shipped — limits + typed error + check helpers; useImport.ts wiring deferred as T2-124-followup; pairs with T1-92)
-- [x] T2-125 Compiler/output layer enforces template validation (shipped in `<TBD>`; defense in depth for T1-91)
+- [x] T2-125 Compiler/output layer enforces template validation (shipped in `412250c`; defense in depth for T1-91)
 - [x] T2-126 Falcon WiFi treated as untrusted telemetry — UI labels + safety boundary (Shipped — typed trust classifier + per-action policy gate + identity check + UI-badge + override-dialog copy; ConnectionPanelMain wiring deferred as T2-126-followup; pairs with T1-94)
 - [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
 - [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
