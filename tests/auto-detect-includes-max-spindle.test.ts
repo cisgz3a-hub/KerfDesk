@@ -1,5 +1,5 @@
 /**
- * T1-52: Auto-Detect Machine in App.tsx must copy live `$30`
+ * T1-52: Auto-Detect Machine must copy live `$30`
  * (`grblMachineInfo.maxSpindle`) into the active profile, alongside
  * the bed/feed/accel fields it already copies. The previous behavior
  * silently dropped `maxSpindle`, leaving the profile stuck at
@@ -20,8 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const appPath = resolve(here, '../src/ui/components/App.tsx');
-const appSrc = readFileSync(appPath, 'utf-8');
+const hookPath = resolve(here, '../src/ui/hooks/useAppDeviceProfiles.ts');
+const hookSrc = readFileSync(hookPath, 'utf-8');
 
 let passed = 0;
 let failed = 0;
@@ -38,11 +38,11 @@ function assert(c: boolean, m: string): void {
 console.log('\n=== T1-52 auto-detect-includes-max-spindle ===\n');
 
 // Locate the handleAutoDetectMachine body.
-const startIdx = appSrc.indexOf('const handleAutoDetectMachine = useCallback');
+const startIdx = hookSrc.indexOf('const handleAutoDetectMachine = useCallback');
 assert(startIdx >= 0, 'handleAutoDetectMachine is defined');
-const endIdx = appSrc.indexOf('}, [grblMachineInfo, updateActiveProfile]', startIdx);
+const endIdx = hookSrc.indexOf('}, [grblMachineInfo, updateActiveProfile]', startIdx);
 assert(endIdx > startIdx, 'handleAutoDetectMachine body terminates');
-const body = appSrc.slice(startIdx, endIdx);
+const body = hookSrc.slice(startIdx, endIdx);
 
 // 1. updateActiveProfile is called from inside the handler.
 assert(

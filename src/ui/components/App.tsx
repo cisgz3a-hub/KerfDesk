@@ -39,6 +39,7 @@ import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
 import { useKerfHandlers } from '../hooks/useKerfHandlers';
 import { useMaterialTestHandlers } from '../hooks/useMaterialTestHandlers';
+import { useAppDeviceProfiles } from '../hooks/useAppDeviceProfiles';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
@@ -96,24 +97,14 @@ import { type ResponseCurve } from '../../core/materials/ResponseCurve';
 import {
   getPresets,
   savePreset,
-  migrateDeviceProfileResponseCurves,
-  initializeMaterialLibrary,
 } from '../../core/materials/MaterialLibrary';
 import type { MaterialPreset } from '../../core/materials/MaterialPreset';
-import { initializeMaterialPresets } from '../../core/materials/MaterialPresets';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
 import {
-  deleteDeviceProfile,
   getActiveProfile,
-  getActiveProfileId,
-  getDeviceProfiles,
-  initializeDeviceProfiles,
-  applyProfileToScene,
-  profileFromScene,
   saveDeviceProfile,
-  setActiveProfileId,
   type DeviceProfile,
 } from '../../core/devices/DeviceProfile';
 import { MachineSettingsTab } from './settings/MachineSettingsTab';
@@ -122,7 +113,6 @@ import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
 import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
 import { entitlementService, tierDisplayName } from '../../entitlements';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
-import { resolveBedHeightMm, resolveBedWidthMm } from '../../app/PipelineService';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -313,196 +303,31 @@ export function App() {
     return info;
   }, [grbl.controller, grbl.machineState]);
 
-  const activeProfile = useMemo(() => {
-    void profileRevision;
-    return getActiveProfile();
-  }, [profileRevision]);
-  const activeProfileId = useMemo(() => {
-    void profileRevision;
-    return getActiveProfileId();
-  }, [profileRevision]);
-
-  const resolvedMachineBedWidthMm = useMemo(
-    () => resolveBedWidthMm(getActiveProfile(), machineBedFromGrbl),
-    [profileRevision, machineBedFromGrbl],
-  );
-  const resolvedMachineBedHeightMm = useMemo(
-    () => resolveBedHeightMm(getActiveProfile(), machineBedFromGrbl),
-    [profileRevision, machineBedFromGrbl],
-  );
-
-  const allProfiles = useMemo(() => {
-    void profileRevision;
-    return getDeviceProfiles();
-  }, [profileRevision]);
-  void materialLibraryRevision;
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
-
-  const refreshProfiles = useCallback(() => bumpProfileRevision(), [bumpProfileRevision]);
-  useEffect(() => {
-    void Promise.all([
-      initializeDeviceProfiles(),
-      initializeMaterialLibrary(),
-      initializeMaterialPresets(),
-      entitlementService.initialize(),
-    ])
-      .then(() => {
-        migrateDeviceProfileResponseCurves();
-        refreshProfiles();
-      })
-      .catch(() => {
-        migrateDeviceProfileResponseCurves();
-        refreshProfiles();
-      });
-  }, [refreshProfiles]);
-  useEffect(() => {
-    const onExternalProfileChange = () => refreshProfiles();
-    window.addEventListener('laserforge:active-profile-changed', onExternalProfileChange);
-    return () => window.removeEventListener('laserforge:active-profile-changed', onExternalProfileChange);
-  }, [refreshProfiles]);
-  const updateActiveProfile = useCallback((updates: Partial<DeviceProfile>) => {
-    const current = getActiveProfile();
-    if (!current) return;
-    const updated: DeviceProfile = { ...current, ...updates };
-    saveDeviceProfile(updated);
-    refreshProfiles();
-  }, [refreshProfiles]);
-
-  useEffect(() => {
-    const ctrl = grbl.controller;
-    if (!ctrl || typeof ctrl.onWcsConsentNeeded !== 'function') return;
-
-    return ctrl.onWcsConsentNeeded(async ({ g54, statusMask }) => {
-      const profile = getActiveProfile();
-      if (profile?.suppressWcsConsent === true) {
-        ctrl.applyWcsNormalization?.();
-        return;
-      }
-
-      const g54Line = `G54 offset: X=${g54.x.toFixed(3)} Y=${g54.y.toFixed(3)} Z=${g54.z.toFixed(3)}`;
-      const maskLine = `$10 status mask: ${statusMask}`;
-
-      const result = await showConfirmWithCheckbox(
-        'Normalize machine settings?',
-        'LaserForge requires G54 = (0,0,0) and $10 = 0 for reliable job placement.\n\n'
-          + 'Your machine currently has:\n'
-          + g54Line + '\n'
-          + maskLine
-          + '\n\n'
-          + 'Normalize now? (Decline to leave settings unchanged — job placement is your responsibility.)',
-        "Don't ask again for this profile",
-      );
-
-      if (result.checkboxChecked) {
-        const p = getActiveProfile();
-        if (p) {
-          const updated: DeviceProfile = { ...p, suppressWcsConsent: true };
-          saveDeviceProfile(updated);
-          refreshProfiles();
-        }
-      }
-
-      if (result.ok) {
-        ctrl.applyWcsNormalization?.();
-      } else {
-        ctrl.skipWcsNormalization?.();
-      }
-    });
-  }, [grbl.controller, showConfirmWithCheckbox, refreshProfiles]);
-
-  useEffect(() => {
-    const ctrl = grbl.controller;
-    if (!ctrl || typeof ctrl.setStopOnError !== 'function') return;
-    const profile = getActiveProfile();
-    const value = profile?.stopOnError !== false;
-    ctrl.setStopOnError(value);
-  }, [grbl.controller, profileRevision]);
-
-  const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
-    target.scanningOffsets = previous.scanningOffsets;
-    target.maxAccelMmPerS2 = previous.maxAccelMmPerS2;
-    target.accelAwarePower = previous.accelAwarePower;
-    target.minPowerRatioAccel = previous.minPowerRatioAccel;
-    target.smartOverscanEnabled = previous.smartOverscanEnabled;
-    target.overscanMm = previous.overscanMm;
-    target.preferredPort = previous.preferredPort;
-    target.startGcode = previous.startGcode;
-    target.endGcode = previous.endGcode;
-    target.gcodeHeaderTemplate = previous.gcodeHeaderTemplate;
-    target.gcodeFooterTemplate = previous.gcodeFooterTemplate;
-    target.maxRateX = previous.maxRateX;
-    target.maxRateY = previous.maxRateY;
-    target.maxAccelX = previous.maxAccelX;
-    target.maxAccelY = previous.maxAccelY;
-    if (previous.suppressWcsConsent) target.suppressWcsConsent = true;
-    if (previous.stopOnError === false) target.stopOnError = false;
-  }, []);
-  const setActiveProfileAndApply = useCallback((id: string | null) => {
-    setActiveProfileId(id);
-    refreshProfiles();
-    if (!id) return;
-    const profile = getDeviceProfiles().find(p => p.id === id);
-    if (!profile) return;
-    handleSceneCommitRef.current?.(applyProfileToScene(profile, scene));
-  }, [refreshProfiles, scene]);
-  const createProfileFromCurrentScene = useCallback((name: string) => {
-    const profile = profileFromScene(name, scene);
-    saveDeviceProfile(profile);
-    setActiveProfileId(profile.id);
-    refreshProfiles();
-  }, [scene, refreshProfiles]);
-  const updateCurrentProfileFromScene = useCallback(() => {
-    const current = getActiveProfile();
-    if (!current) return;
-    const updated = profileFromScene(current.name, scene);
-    updated.id = current.id;
-    updated.createdAt = current.createdAt;
-    updated.returnToOrigin = current.returnToOrigin ?? true;
-    mergeProfilePreservedFields(updated, current);
-    saveDeviceProfile(updated);
-    refreshProfiles();
-  }, [scene, mergeProfilePreservedFields, refreshProfiles]);
-  const deleteProfileAndClearActive = useCallback((id: string) => {
-    deleteDeviceProfile(id);
-    if (getActiveProfileId() === id) setActiveProfileId(null);
-    refreshProfiles();
-  }, [refreshProfiles]);
-  const handleAutoDetectMachine = useCallback(() => {
-    if (!grblMachineInfo) return;
-    const current = getActiveProfile();
-    if (!current) return;
-    updateActiveProfile({
-      bedWidth: grblMachineInfo.bedWidth > 0 ? grblMachineInfo.bedWidth : current.bedWidth,
-      bedHeight: grblMachineInfo.bedHeight > 0 ? grblMachineInfo.bedHeight : current.bedHeight,
-      maxRateX: grblMachineInfo.maxFeedX > 0 ? grblMachineInfo.maxFeedX : current.maxRateX,
-      maxRateY: grblMachineInfo.maxFeedY > 0 ? grblMachineInfo.maxFeedY : current.maxRateY,
-      maxAccelX: grblMachineInfo.maxAccelX > 0 ? grblMachineInfo.maxAccelX : current.maxAccelX,
-      maxAccelY: grblMachineInfo.maxAccelY > 0 ? grblMachineInfo.maxAccelY : current.maxAccelY,
-      maxAccelMmPerS2:
-        grblMachineInfo.maxAccelX > 0 && grblMachineInfo.maxAccelY > 0
-          ? Math.min(grblMachineInfo.maxAccelX, grblMachineInfo.maxAccelY)
-          : (grblMachineInfo.maxAccelX > 0 ? grblMachineInfo.maxAccelX
-            : (grblMachineInfo.maxAccelY > 0 ? grblMachineInfo.maxAccelY : current.maxAccelMmPerS2)),
-      // T1-52: copy live `$30` (maxSpindle) into the active profile
-      // when Auto-Detect runs. Previously the safety-most-relevant
-      // power-scaling value silently did NOT update — a controller
-      // reporting `$30=255` paired with the createBlankProfile default
-      // `maxSpindle: 1000` made `encodePowerValue(50)` emit `S500`,
-      // which the controller clamped to its `$30` ceiling and
-      // delivered as 100% power. Now the profile mirrors the live
-      // value when the controller reports a positive number; the
-      // current value is preserved when `$30` is unknown
-      // (controllerMaxSpindle null/non-positive). Separate audit-
-      // extended fields (`$32` laser mode, `$22` homing, `$20` soft
-      // limits, `$23` origin direction) are deliberately out of scope
-      // — `$23` requires safe semantics mapping (audit P3 explicit
-      // caveat), and the others would need a new `laserModeEnabled`
-      // profile field. Filed as a follow-up if/when prioritized.
-      maxSpindle: grblMachineInfo.maxSpindle > 0
-        ? grblMachineInfo.maxSpindle
-        : current.maxSpindle,
-    });
-  }, [grblMachineInfo, updateActiveProfile]);
+  const {
+    activeProfile,
+    activeProfileId,
+    resolvedMachineBedWidthMm,
+    resolvedMachineBedHeightMm,
+    allProfiles,
+    refreshProfiles,
+    updateActiveProfile,
+    setActiveProfileAndApply,
+    createProfileFromCurrentScene,
+    updateCurrentProfileFromScene,
+    deleteProfileAndClearActive,
+    handleAutoDetectMachine,
+  } = useAppDeviceProfiles({
+    scene,
+    profileRevision,
+    bumpProfileRevision,
+    machineBedFromGrbl,
+    grblMachineInfo,
+    controller: grbl.controller,
+    showConfirmWithCheckbox,
+    applyProfileScene: (nextScene) => handleSceneCommitRef.current?.(nextScene),
+  });
+  void materialLibraryRevision;
 
   const {
     currentGcode,
