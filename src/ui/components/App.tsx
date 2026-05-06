@@ -151,7 +151,8 @@ export function App() {
     finishPrompt,
   } = useModal();
   const dialogs = useDialogs();
-  const [zoomLevel, setZoomLevel] = useState(100);
+  const zoomLevel = useViewportStore(s => s.zoomLevel);
+  const setZoomLevel = useViewportStore(s => s.setZoomLevel);
   const viewportActionsRef = useRef<ViewportActions | null>(null);
   const materialBarRef = useRef<MaterialBarHandle | null>(null);
 
@@ -182,7 +183,8 @@ export function App() {
     return { minX, minY, maxX, maxY };
   }, [scene.objects]);
 
-  const [canvasSize, setCanvasSize] = useState({ width: window.innerWidth, height: window.innerHeight - 34 });
+  const canvasSize = useViewportStore(s => s.canvasSize);
+  const setCanvasSize = useViewportStore(s => s.setCanvasSize);
   const selectedIds = useEditorStore(s => s.selectedIds);
   const setSelectedIds = useEditorStore(s => s.setSelectedIds);
   // T2-78: ref-shadow of selectedIds so SceneTransaction's getSelection
@@ -238,7 +240,8 @@ export function App() {
   const toolpathPreviewMoves = useAppDialogsStore(s => s.toolpathPreviewMoves);
   const setToolpathPreviewMoves = useAppDialogsStore(s => s.setToolpathPreviewMoves);
   const clearToolpathPreview = useAppDialogsStore(s => s.clearToolpathPreview);
-  const [previewMode, setPreviewMode] = useState(false);
+  const previewMode = useViewportStore(s => s.previewMode);
+  const togglePreviewMode = useViewportStore(s => s.togglePreviewMode);
   const bedTabLayout = useViewportStore(s => s.bedTabLayout);
   const handleViewportLayout = useViewportStore(s => s.setBedTabLayout);
 
@@ -790,9 +793,10 @@ export function App() {
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
+    onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [setCanvasSize]);
 
   // Re-check setup after paint so Electron/localStorage is ready (avoids race with first launch).
   useEffect(() => {
@@ -1862,7 +1866,7 @@ export function App() {
       onKerfWizard: () => {
         if (gatedFeature('kerf_wizard')) setShowKerfWizard(true);
       },
-      onPreviewToggle: () => setPreviewMode(p => !p),
+      onPreviewToggle: togglePreviewMode,
       previewMode,
       onUndo: handleUndo,
       onRedo: handleRedo,

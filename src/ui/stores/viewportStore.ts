@@ -7,11 +7,23 @@ export interface BedTabLayout {
   readonly zoom: number;
 }
 
+export interface CanvasSize {
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface ViewportState {
+  zoomLevel: number;
+  canvasSize: CanvasSize;
+  previewMode: boolean;
   bedTabLayout: BedTabLayout;
 }
 
 export interface ViewportActions {
+  setZoomLevel: (zoomLevel: number) => void;
+  setCanvasSize: (size: CanvasSize) => void;
+  setPreviewMode: (enabled: boolean) => void;
+  togglePreviewMode: () => void;
   setBedTabLayout: (layout: BedTabLayout) => void;
   resetViewport: () => void;
 }
@@ -19,6 +31,12 @@ export interface ViewportActions {
 export type ViewportStore = ViewportState & ViewportActions;
 
 export const viewportInitialState: ViewportState = {
+  zoomLevel: 100,
+  canvasSize: {
+    width: 800,
+    height: 600,
+  },
+  previewMode: false,
   bedTabLayout: {
     bedScreenX: 0,
     bedScreenY: 0,
@@ -29,6 +47,15 @@ export const viewportInitialState: ViewportState = {
 export function createViewportStore(): UseBoundStore<StoreApi<ViewportStore>> {
   return create<ViewportStore>((set) => ({
     ...viewportInitialState,
+    setZoomLevel: (zoomLevel) => set({ zoomLevel }),
+    setCanvasSize: (size) => set(state => {
+      if (state.canvasSize.width === size.width && state.canvasSize.height === size.height) {
+        return state;
+      }
+      return { canvasSize: size };
+    }),
+    setPreviewMode: (enabled) => set({ previewMode: enabled }),
+    togglePreviewMode: () => set(state => ({ previewMode: !state.previewMode })),
     setBedTabLayout: (layout) => set(state => {
       if (
         state.bedTabLayout.bedScreenX === layout.bedScreenX &&
