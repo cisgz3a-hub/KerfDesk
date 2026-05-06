@@ -88,8 +88,7 @@ import { MaterialLibraryDialog } from './MaterialLibraryDialog';
 import { CameraDialog } from './CameraDialog';
 import { KerfWizard } from './KerfWizard';
 import { VariableTextDialog } from './VariableTextDialog';
-import { AddTextDialog } from './AddTextDialog';
-import { FontCreditsDialog } from './FontCreditsDialog';
+import { AppTextDialogs } from './AppTextDialogs';
 import { StatusFooter } from './StatusFooter';
 import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
 import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
@@ -1885,30 +1884,30 @@ export function App() {
       onDismiss: () => setToastSuggestion(null),
     }),
 
-    React.createElement(AddTextDialog, {
-      showTextDialog: dialogs.showTextDialog,
-      editingTextId: dialogs.editingTextId,
-      textInput: dialogs.textInput,
-      textFont: dialogs.textFont,
-      textSize: dialogs.textSize,
-      textBold: dialogs.textBold,
-      textItalic: dialogs.textItalic,
-      textPreviewFontReady,
-      setTextInput: dialogs.setTextInput,
-      setTextFont: dialogs.setTextFont,
-      setTextSize: dialogs.setTextSize,
-      setTextBold: dialogs.setTextBold,
-      setTextItalic: dialogs.setTextItalic,
-      onClose: () => {
-        dialogs.closeTextDialog();
-        setTextPlacementPt(null);
+    React.createElement(AppTextDialogs, {
+      textDialog: {
+        showTextDialog: dialogs.showTextDialog,
+        editingTextId: dialogs.editingTextId,
+        textInput: dialogs.textInput,
+        textFont: dialogs.textFont,
+        textSize: dialogs.textSize,
+        textBold: dialogs.textBold,
+        textItalic: dialogs.textItalic,
+        textPreviewFontReady,
+        setTextInput: dialogs.setTextInput,
+        setTextFont: dialogs.setTextFont,
+        setTextSize: dialogs.setTextSize,
+        setTextBold: dialogs.setTextBold,
+        setTextItalic: dialogs.setTextItalic,
+        onClose: () => {
+          dialogs.closeTextDialog();
+          setTextPlacementPt(null);
+        },
+        onSubmit: handleAddTextDialogSubmit,
+        onShowFontCredits: () => setShowFontCredits(true),
       },
-      onSubmit: handleAddTextDialogSubmit,
-      onShowFontCredits: () => setShowFontCredits(true),
-    }),
-
-    showFontCredits && React.createElement(FontCreditsDialog, {
-      onClose: () => setShowFontCredits(false),
+      showFontCredits,
+      onCloseFontCredits: () => setShowFontCredits(false),
     }),
 
     modal && React.createElement(AppModal, {
