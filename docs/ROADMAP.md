@@ -15341,6 +15341,8 @@ The autosave namespace gets a much higher limit because real projects with embed
 
 **Cross-check note (audit 5D):** Audit's DoS 6 + Priority 13.
 
+**Status:** Shipped in <TBD> (focused MVP — namespace caps + check helpers; typed-IPC integration deferred as T2-127-followup). New `src/storage/StorageSizeLimits.ts` exports `StorageNamespace` (10 — profiles / materials / autosave / jobLogs / replays / settings / licenseCache / history / correlationState / other), `NamespaceLimit` (maxValueBytes + maxTotalBytes), `NAMESPACE_LIMITS` (per-namespace caps from audit recommendation: profiles/materials 100KB×5MB, autosave 50MB×50MB for project files with images, jobLogs 5MB×100MB, settings 50KB×1MB, licenseCache 10KB×10KB, replays 5MB×50MB, history 5MB×50MB, correlationState 10KB×100KB, other 1MB×10MB), `StorageLimitErrorKind` (value-too-large / namespace-full / invalid-utf8), `StorageLimitError` (kind + namespace + observed + limit), `byteLengthUtf8` (counts UTF-8 bytes without depending on Node Buffer; handles surrogate pairs as 4 bytes; lone surrogate falls back to 3-byte replacement), `checkValueSize(namespace, value)` throws on per-value over-limit, `checkNamespaceTotal({namespace, currentBytes, incomingBytes})` throws on namespace-full, `checkSaveAllowed({namespace, value, currentBytes})` combined check (value-too-large fires BEFORE namespace-full so the user gets the more specific message), `storageLimitUserMessage(err)` per-kind toast/banner copy. Pinned by `tests/storage-size-limits.test.ts` (69 contracts: NAMESPACE_LIMITS values match audit; byteLengthUtf8 ASCII/2-byte/3-byte/emoji-surrogate/lone-surrogate; checkValueSize under/at/over per namespace; per-namespace different limits (200KB autosave OK but licenseCache rejects same); checkNamespaceTotal under/exact/over; checkSaveAllowed combined; **value-too-large fires before namespace-full**; THE audit's headline cases (200KB profile rejected, 80KB profile passes, total > 5MB next save rejected); per-kind user messages with formatted KB/MB; every namespace has positive limits with maxValue ≤ maxTotal; source-level pin). **Out of scope (T2-127-followup):** wiring `checkSaveAllowed` into the typed IPC layer (T2-120) at every save handler — `ipcMain.handle('profiles:save', ...)` etc. **Hardware verification: not required**.
+
 ---
 
 ### T2-128 | Per-namespace storage authorization (refines T1-84 + T2-120)
@@ -19882,7 +19884,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (Shipped — limits + typed error + check helpers; useImport.ts wiring deferred as T2-124-followup; pairs with T1-92)
 - [ ] T2-125 Compiler/output layer enforces template validation (filed; defense in depth for T1-91)
 - [ ] T2-126 Falcon WiFi treated as untrusted telemetry 鈥?UI labels + safety boundary (filed; pairs with T1-94)
-- [ ] T2-127 Storage value size limits per-key (filed; pairs with T2-120)
+- [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
 - [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
 - [ ] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (filed; T1-25 follow-up; reads `getUnsafeAtConnect()` + T1-29 recovery flow)
 
