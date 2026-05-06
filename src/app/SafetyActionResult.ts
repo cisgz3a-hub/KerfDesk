@@ -111,3 +111,33 @@ export function makeNotConnectedResult(action: SafetyAction): SafetyActionResult
     timestamp: Date.now(),
   };
 }
+
+export function makePauseResult(message?: string): SafetyActionResult {
+  return {
+    action: 'pause',
+    accepted: true,
+    motionState: 'paused',
+    laserState: 'commandedOff',
+    positionTrusted: true,
+    requiresRehome: false,
+    requiresReconnect: false,
+    requiresInspection: false,
+    message: message ?? 'Pause command sent. Motion is feed-held; laser-off command sent.',
+    timestamp: Date.now(),
+  };
+}
+
+export function makeResumeResult(message?: string): SafetyActionResult {
+  return {
+    action: 'resume',
+    accepted: true,
+    motionState: 'running',
+    laserState: 'unknown',
+    positionTrusted: true,
+    requiresRehome: false,
+    requiresReconnect: false,
+    requiresInspection: false,
+    message: message ?? 'Resume command sent.',
+    timestamp: Date.now(),
+  };
+}

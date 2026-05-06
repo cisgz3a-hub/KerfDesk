@@ -1,8 +1,10 @@
 /**
- * MachineService.pause() / resume() map 1:1 to the controller.
+ * MachineService.pause() / resume() map 1:1 to the controller and
+ * return T2-41 SafetyActionResult outcomes.
  * Run: npx tsx tests/machine-service-pause-resume.test.ts
  */
 import { MachineService } from '../src/app/MachineService';
+import type { SafetyActionResult } from '../src/app/SafetyActionResult';
 import { type LaserController } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 
@@ -62,15 +64,25 @@ console.log('\n=== machine-service pause/resume ===\n');
 
 pauseCalls.length = 0;
 resumeCalls.length = 0;
-svc.pause();
+const pauseResult: SafetyActionResult = svc.pause();
 assert(pauseCalls.length === 1 && resumeCalls.length === 0, 'pause() calls controller.pause() once, not resume');
 assert(pauseCalls[0] === 'pause', 'pause() path is pause');
+assert(pauseResult.action === 'pause', 'pause() result action=pause');
+assert(pauseResult.accepted === true, 'pause() result accepted=true');
+assert(pauseResult.motionState === 'paused', 'pause() result motionState=paused');
+assert(pauseResult.laserState === 'commandedOff', 'pause() result laserState=commandedOff');
+assert(pauseResult.positionTrusted === true, 'pause() preserves position trust');
+assert(pauseResult.requiresRehome === false, 'pause() does not require rehome');
 
 pauseCalls.length = 0;
 resumeCalls.length = 0;
-svc.resume();
+const resumeResult: SafetyActionResult = svc.resume();
 assert(resumeCalls.length === 1 && pauseCalls.length === 0, 'resume() calls controller.resume() once, not pause');
 assert(resumeCalls[0] === 'resume', 'resume() path is resume');
+assert(resumeResult.action === 'resume', 'resume() result action=resume');
+assert(resumeResult.accepted === true, 'resume() result accepted=true');
+assert(resumeResult.motionState === 'running', 'resume() result motionState=running');
+assert(resumeResult.positionTrusted === true, 'resume() preserves position trust');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

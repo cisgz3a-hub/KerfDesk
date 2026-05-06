@@ -23,7 +23,13 @@ import {
 } from '../core/job/JobLog';
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
 import { estimateJobTime } from '../core/output/TimeEstimator';
-import { type SafetyActionResult, makeSoftResetStopResult } from './SafetyActionResult';
+import {
+  type SafetyActionResult,
+  makeNotConnectedResult,
+  makePauseResult,
+  makeResumeResult,
+  makeSoftResetStopResult,
+} from './SafetyActionResult';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -1197,13 +1203,35 @@ export class MachineService {
   }
 
   /** Pause the currently running job (feed-hold). */
-  pause(): void {
-    this.controllerRef.current.pause();
+  pause(): SafetyActionResult {
+    const ctrl = this.controllerRef.current;
+    if (!ctrl) return makeNotConnectedResult('pause');
+    try {
+      ctrl.pause();
+      return makePauseResult();
+    } catch (err: unknown) {
+      return {
+        ...makeNotConnectedResult('pause'),
+        requiresReconnect: false,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
   /** Resume a paused job. */
-  resume(): void {
-    this.controllerRef.current.resume();
+  resume(): SafetyActionResult {
+    const ctrl = this.controllerRef.current;
+    if (!ctrl) return makeNotConnectedResult('resume');
+    try {
+      ctrl.resume();
+      return makeResumeResult();
+    } catch (err: unknown) {
+      return {
+        ...makeNotConnectedResult('resume'),
+        requiresReconnect: false,
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
   }
 
   /**
