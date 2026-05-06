@@ -53,13 +53,28 @@ function installMockLocalStorage(): void {
 }
 
 /**
- * Strip lines that are intentionally non-deterministic (timestamp).
- * Everything else must compare byte-identical across runs.
+ * Strip lines that are intentionally non-deterministic (timestamps,
+ * version/id stamps). Everything else must compare byte-identical
+ * across runs.
+ *
+ * Templates today emit `; Generated: {DATE} {TIME}` (see
+ * `src/core/plan/GcodeTemplates.ts`); the original spec used
+ * `; Date:`. Strip both — and `Version` / `Id` / `Time` — for
+ * symmetry with `tests/e2e/helpers/compileToGcode.ts`. Without
+ * this, a compile that crosses a wall-clock-second boundary
+ * spuriously fails the gate (the actual T2-23 contract is about
+ * algorithmic determinism, not the clock).
  */
 function normalizeForDeterminism(gcode: string): string {
   return gcode
     .split('\n')
-    .filter(l => !/^; Date: /.test(l))
+    .filter(l =>
+      !/^;\s*Generated:/i.test(l) &&
+      !/^;\s*Date:/i.test(l) &&
+      !/^;\s*Time:/i.test(l) &&
+      !/^;\s*Version:/i.test(l) &&
+      !/^;\s*Id:/i.test(l),
+    )
     .join('\n');
 }
 
