@@ -10,13 +10,31 @@ import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { prepareImageGrayscale } from '../../workers/imagePrepClient';
 import { captureSceneRevision, isSceneStale } from './asyncSceneGuard';
+import {
+  ImageImportLimitError,
+  checkImageDimensions,
+  checkImageFileSize,
+  imageLimitErrorMessage,
+} from '../../import/image/ImageImportLimits';
 
 const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB - inline below, IndexedDB above
 
 type ImageImportResult =
   | { kind: 'ok'; scene: Scene }
   | { kind: 'stale' }
+  | { kind: 'blocked' }
   | { kind: 'failed' };
+
+async function probeImageDimensionsBeforeDecode(source: File): Promise<boolean> {
+  if (typeof createImageBitmap !== 'function') return false;
+  const bitmap = await createImageBitmap(source);
+  try {
+    checkImageDimensions(bitmap.width, bitmap.height);
+    return true;
+  } finally {
+    bitmap.close();
+  }
+}
 
 export interface UseImportDeps {
   handleSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
@@ -59,11 +77,15 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       const revisionAtStart = captureSceneRevision(scene);
       let dataUri: string;
       let displayName: string;
+      let dimensionsCheckedBeforeDecode = false;
 
       if (typeof source === 'string') {
         dataUri = source;
         displayName = (fileName || 'image').replace(/\.[^.]+$/, '');
       } else {
+        // T2-124: stage 1 runs before FileReader reads the bytes.
+        checkImageFileSize(source.size);
+        dimensionsCheckedBeforeDecode = await probeImageDimensionsBeforeDecode(source);
         dataUri = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result as string);
@@ -79,6 +101,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         img.onerror = () => reject(new Error('Failed to decode image'));
         img.src = dataUri;
       });
+      if (!dimensionsCheckedBeforeDecode) {
+        checkImageDimensions(img.naturalWidth || img.width, img.naturalHeight || img.height);
+      }
 
       let imageSrc = dataUri;
       if (dataUri.length > IMAGE_INDEXEDDB_THRESHOLD) {
@@ -237,6 +262,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
 
       return { kind: 'ok', scene: newScene };
     } catch (err) {
+      if (err instanceof ImageImportLimitError) {
+        await showAlertRef.current('Image Too Large', imageLimitErrorMessage(err));
+        return { kind: 'blocked' };
+      }
       console.error('[useImport] Image import failed:', err);
       return { kind: 'failed' };
     }
@@ -245,6 +274,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
   const handleImageImport = useCallback(async (file: File) => {
     const result = await importImageUnified(file, file.name);
     if (result.kind === 'stale') return;
+    if (result.kind === 'blocked') return;
     if (result.kind === 'failed') {
       await showAlert('Import Failed', 'Could not import the image file.');
       return;

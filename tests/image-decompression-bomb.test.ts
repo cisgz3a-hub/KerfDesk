@@ -214,6 +214,7 @@ void (async () => {
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
   const src = fs.readFileSync(path.resolve(here, '../src/import/image/ImageImportLimits.ts'), 'utf-8');
+  const useImportSrc = fs.readFileSync(path.resolve(here, '../src/ui/hooks/useImport.ts'), 'utf-8');
   assert(/T2-124/.test(src), 'T2-124 marker in ImageImportLimits.ts');
   for (const id of [
     'IMAGE_LIMITS', 'ImageImportLimitError', 'checkImageFileSize',
@@ -221,6 +222,14 @@ void (async () => {
   ]) {
     assert(src.includes(id), `export '${id}' declared`);
   }
+  assert(/checkImageFileSize\(source\.size\)/.test(useImportSrc),
+    'useImport checks File.size before reading image bytes');
+  assert(/createImageBitmap\(source\)/.test(useImportSrc),
+    'useImport probes File dimensions before FileReader/Image decode when createImageBitmap is available');
+  assert(/checkImageDimensions\(.*img\.naturalWidth.*img\.naturalHeight/s.test(useImportSrc),
+    'useImport checks decoded image dimensions before grayscale processing fallback');
+  assert(/imageLimitErrorMessage/.test(useImportSrc),
+    'useImport surfaces typed image-limit error messages');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
