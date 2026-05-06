@@ -35,11 +35,9 @@ import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
-import { useMaterialHandlers } from '../hooks/useMaterialHandlers';
 import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
-import { useKerfHandlers } from '../hooks/useKerfHandlers';
-import { useMaterialTestHandlers } from '../hooks/useMaterialTestHandlers';
 import { useAppDeviceProfiles } from '../hooks/useAppDeviceProfiles';
+import { useAppMaterialWorkflows } from '../hooks/useAppMaterialWorkflows';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
@@ -92,21 +90,9 @@ import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
 import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
-import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
-import { type ResponseCurve } from '../../core/materials/ResponseCurve';
-import {
-  getPresets,
-  savePreset,
-} from '../../core/materials/MaterialLibrary';
-import type { MaterialPreset } from '../../core/materials/MaterialPreset';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
-import {
-  getActiveProfile,
-  saveDeviceProfile,
-  type DeviceProfile,
-} from '../../core/devices/DeviceProfile';
 import { MachineSettingsTab } from './settings/MachineSettingsTab';
 import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
 import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
@@ -1448,71 +1434,23 @@ export function App() {
     closeBoxStudio();
   }, [closeBoxStudio, handleBoxGenerate]);
 
-  const { handleMaterialTestApply } = useMaterialTestHandlers({
-    scene,
-    handleSceneCommit,
-  });
-
-  const handleCalibrationGridEmitted = useCallback((result: CalibrationGridResult) => {
-    const nextScene: Scene = {
-      ...scene,
-      layers: [...scene.layers, ...result.layers],
-      objects: [...scene.objects, ...result.objects],
-      activeLayerId: result.layers[0]?.id ?? scene.activeLayerId,
-    };
-    setLastCalibrationGridResult(result);
-    handleSceneCommit(nextScene, 'calibration-grid');
-  }, [scene, handleSceneCommit]);
-
-  const handleCalibrationCurveReady = useCallback((
-    curve: ResponseCurve,
-    _measurements: Array<{ index: number; commandedPower: number; meanLuminance: number; observedDarkness: number }>,
-  ) => {
-    // Preferred path: bind the curve to a matching MaterialPreset so it
-    // follows the material (and any layers linked via materialPresetId)
-    // across jobs and device profiles.
-    const matching = getPresets().find(
-      p => p.material.toLowerCase() === curve.materialName.toLowerCase(),
-    );
-    if (matching) {
-      const updatedPreset: MaterialPreset = { ...matching, responseCurve: curve };
-      savePreset(updatedPreset);
-      return;
-    }
-
-    // Fallback: no matching preset — keep writing to the device profile so
-    // the legacy JobCompiler read path still finds the curve.
-    const profile = getActiveProfile();
-    if (!profile) return;
-    const updated: DeviceProfile = {
-      ...profile,
-      responseCurves: {
-        ...(profile.responseCurves ?? {}),
-        [curve.materialName]: curve,
-      },
-    };
-    saveDeviceProfile(updated);
-    refreshProfiles();
-  }, [refreshProfiles]);
-
   const {
+    handleMaterialTestApply,
+    handleCalibrationGridEmitted,
+    handleCalibrationCurveReady,
     handleKerfGenerateTest,
     handleKerfApply,
     handleKerfSaveToPreset,
-  } = useKerfHandlers({
-    scene,
-    handleSceneCommit,
-    showAlert,
-  });
-
-  const {
     handleMaterialConfirm,
     handleMaterialClear,
     handleMaterialPresetApply,
-  } = useMaterialHandlers({
+  } = useAppMaterialWorkflows({
     scene,
     handleSceneCommit,
+    showAlert,
     setShowMaterial: dialogs.setShowMaterial,
+    setLastCalibrationGridResult,
+    refreshProfiles,
   });
 
   const handleNudge = useCallback((dx: number, dy: number, commit: boolean) => {
