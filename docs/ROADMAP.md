@@ -6767,7 +6767,7 @@ No policy enforcement yet. New code uses gateway, old code keeps working. Allows
 
 **Audit's recommendation pushback:** Audit suggested removing all raw `sendCommand` access. That's correct as an end-state but cannot be a single commit 鈥?gradual migration through 5 passes is the realistic path. The audit's `CommandIntent` discriminated union shape is reasonable; we may simplify based on what operations actually need.
 
-**Status:** Pass 1 delegating MachineCommandGateway shipped in `<TBD>`; ExecutionCoordinator migration, helper migration, policy enforcement, and static guard remain.
+**Status:** Pass 1 delegating MachineCommandGateway shipped in `47d85ca`; ExecutionCoordinator migration, helper migration, policy enforcement, and static guard remain.
 
 ---
 
@@ -19828,7 +19828,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-6 Zustand stores, split App.tsx (Phase 1 shipped in `c138e15`; Phase 2 editor-store migration shipped in `734b49f`; Phase 3a machine-start migration shipped in `1188f55`; Phase 3b active-job canvas migration shipped in `bc90fad`; Phase 3c viewport shell migration shipped in `eb8f0c0`; Phase 3d history metadata migration shipped in `60615cf`; Phase 3e scene owner migration shipped in `bf2dcd2`; HistoryManager ownership and App.tsx file split remain)
 - [x] T2-7 Controller abstraction real, Marlin stub (closed pre-session — abstraction shipped; Marlin stub deferred to T2-24 / T4-7)
 - [x] T2-8 Split Preflight into rule modules (closed pre-session — 8 modules in src/core/preflight/rules/)
-- [ ] T2-10 Establish single MachineCommandGateway choke point (Pass 1 delegating gateway shipped in `<TBD>`; multi-pass architectural migration remains)
+- [ ] T2-10 Establish single MachineCommandGateway choke point (Pass 1 delegating gateway shipped in `47d85ca`; multi-pass architectural migration remains)
 - [x] T2-11 Service-layer operation mutex for laser-on operations (shipped 2026-05-04 in `24ce00a` — unblocks T1-30)
 - [x] T2-12 Unified MachineSafetyState type — consolidation of safety fields (Shipped — 17-state discriminated union + computeMachineSafetyState + 4 gate predicates; UI gate migration deferred as T2-12-followup)
 - [x] T2-13 Fault-injecting test transport (FaultInjectingSerialPort) (harness shipped 2026-05-05 in `191d19b`; per-test migration of T1-22 / T1-25 / T1-28 / T1-29 deferred to dependent ticket work)
