@@ -47,6 +47,7 @@ import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useEditorStore } from '../stores/editorStore';
 import { useMachineStartStore } from '../stores/machineStartStore';
+import { useSceneHistoryStore } from '../stores/sceneHistoryStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
@@ -634,7 +635,8 @@ export function App() {
   // invalidate.frame() callback for any non-preview kind: edits
   // (since step 3), undo/redo (since step 5), and future
   // load/async-result paths.
-  const [historyVersion, setHistoryVersion] = useState(0);
+  const historyVersion = useSceneHistoryStore(s => s.historyVersion);
+  const bumpHistoryVersion = useSceneHistoryStore(s => s.bumpHistoryVersion);
   const productionMode = useAppSettingsStore(s => s.productionMode);
   const setProductionMode = useAppSettingsStore(s => s.setProductionMode);
   const handleToggleProductionMode = useCallback(() => {
@@ -813,16 +815,18 @@ export function App() {
   const historyRef = useRef<HistoryManager>(new HistoryManager());
   const isNudgingRef = useRef(false);
   const nudgeSceneRef = useRef<Scene | null>(null);
-  const [historyAvail, setHistoryAvail] = useState({ canUndo: false, canRedo: false });
+  const canUndo = useSceneHistoryStore(s => s.canUndo);
+  const canRedo = useSceneHistoryStore(s => s.canRedo);
+  const setHistoryAvailability = useSceneHistoryStore(s => s.setHistoryAvailability);
 
   useEffect(() => {
     const h = historyRef.current;
     const sync = () => {
-      setHistoryAvail({ canUndo: h.canUndo(), canRedo: h.canRedo() });
+      setHistoryAvailability({ canUndo: h.canUndo(), canRedo: h.canRedo() });
     };
     sync();
     return h.onChange(sync);
-  }, []);
+  }, [setHistoryAvailability]);
 
   // Push initial scene on mount
   useEffect(() => {
@@ -837,7 +841,7 @@ export function App() {
   // step 3 starts routing handleSceneCommit through it.
   //
   // Captured-identity stability: React state setters
-  // (setScene/setSelectedIds/setGcodeStale/setHistoryVersion) are stable
+  // (setScene/setSelectedIds/setGcodeStale/bumpHistoryVersion) are stable
   // by React's contract. historyRef and sceneIsDirtyRef are refs -
   // captured by reference, dereferenced inside the lambdas (T2-76 design
   // risk 2 mitigation, see T2-76-design.md). setGcodeStale comes from
@@ -885,11 +889,11 @@ export function App() {
       getSelection: () => selectedIdsRef.current,
       invalidate: {
         compile: () => setGcodeStale(true),
-        frame: () => setHistoryVersion(v => v + 1),
+        frame: bumpHistoryVersion,
         preflight: () => { /* no-op: see comment above */ },
       },
     }),
-    [setGcodeStale],
+    [setGcodeStale, bumpHistoryVersion],
   );
   void commitSceneTransaction;
 
@@ -1870,8 +1874,8 @@ export function App() {
       previewMode,
       onUndo: handleUndo,
       onRedo: handleRedo,
-      canUndo: historyAvail.canUndo,
-      canRedo: historyAvail.canRedo,
+      canUndo,
+      canRedo,
       projectName: scene.metadata?.name,
       isConnected: toolbarLaserConnected,
       materialName: scene.material?.name ?? null,
