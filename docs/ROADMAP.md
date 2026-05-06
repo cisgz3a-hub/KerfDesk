@@ -7799,6 +7799,8 @@ async unlock(): Promise<OperationResult> {
 
 **Cross-check note (audit 3A):** Verified scattered booleans in DeviceProfile.ts. Audit's Priority 2.
 
+**Status:** Shipped in <TBD> (focused MVP — full type + GRBL declaration + check helpers + profile override; ControllerInterface wiring deferred as T2-25-followup). New `src/controllers/ControllerCapabilities.ts` exports `ControllerCapabilities` (5-block interface: output / laser / motion / operations / transport), 9 supporting literal unions (OutputFormat / JobExecutionModel / PowerUnit / LaserOffOperation / MotionAxis / CoordinateSystem / StartMode / TransportKind / AckModel), `OperationCapability` (the 11 boolean operation flags), `grblCapabilities` const (the GRBL 1.1 ground-truth: gcode-text/line-stream/spindle-s/maxPower=1000/M3+M4 yes/inline-power no/laser-off-via-M5/cartesian X-Y/maxLineLength=80/canAutofocus=false/usb-serial/ok-line-ack), `CapabilityCheckResult`, `checkOperationCapability(caps, op)` (gate every operation entrypoint goes through; returns ok:true OR ok:false with user-facing reason ready for SafetyActionResult.message / toast), `ProfileOverrides` interface, `applyProfileOverrides(caps, overrides)` (composes `caps` with profile-derived overrides — homingEnabled / autofocusSupported / bedWidth / bedHeight / maxPowerValue; returns NEW object, input not mutated; invalid values silently ignored). Pairs with T2-43 (`ControllerSafetyCapabilities` shipped in `dc60b2e`) — T2-43 covers the SAFETY axis (e-stop method, latency, etc.), T2-25 covers the full surface. Pinned by `tests/controller-capabilities-enforced.test.ts` (80 contracts: every GRBL output/laser/motion/operations/transport field's value pinned with rationale; checkOperationCapability positive + negative + every operation has a distinct human-readable reason; profile overrides for homing/autofocus/bed/maxPower; invalid override values ignored; deep-copy semantics — input never mutated; hypothetical Marlin (no $X / no $H) typechecks; hypothetical Ruida (file-upload, native-binary, no jog) typechecks; source-level pin for every export). **Out of scope (T2-25-followup):** wiring `capabilities` onto `ControllerInterface` + consumers in `ExecutionCoordinator.unlock/home/frameDot` + `MachineService.jog` + `ControlPanel` button-disabling. **Hardware verification: not required** (declarative type + helper).
+
 ---
 
 ### T2-26 | Move GRBL command construction out of generic layers
@@ -19748,7 +19750,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-22 Standardize test runner 鈥?auto-discovery + consistent reporter (Stage 1 shipped 2026-05-05 in `0b33d3d` — auto-discovery walk; Stage 2 vitest migration deferred)
 - [x] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (shipped 2026-05-05 in `185a096`)
 - [ ] T2-24 Split LaserController into protocol-neutral core + dialect extensions (filed; foundation for audit 3A work)
-- [ ] T2-25 Create real ControllerCapabilities model (filed; depends on T2-24)
+- [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
 - [ ] T2-26 Move GRBL command construction out of generic layers (filed; 6-pass migration, depends on T2-24/25)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
