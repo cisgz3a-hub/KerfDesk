@@ -25,6 +25,7 @@ import { deleteObjects } from '../../core/scene/SceneOps';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
+import { AppDragDropOverlay } from './AppDragDropOverlay';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
 import { useClipboard } from '../hooks/useClipboard';
@@ -1470,24 +1471,7 @@ export function App() {
     onDragLeave: handleDragLeave,
     onDrop: handleDrop,
   },
-    isDragOver && React.createElement('div', {
-      style: {
-        position: 'absolute',
-        inset: 0,
-        background: 'rgba(59, 139, 235, 0.15)',
-        border: '3px dashed #3b8beb',
-        borderRadius: 8,
-        zIndex: 999,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        pointerEvents: 'none',
-      },
-    },
-      React.createElement('div', {
-        style: { color: '#3b8beb', fontSize: 20, fontFamily: 'monospace' },
-      }, 'Drop file to import (SVG, DXF, PNG, JPG, JSON)'),
-    ),
+    isDragOver && React.createElement(AppDragDropOverlay),
 
     React.createElement(FileToolbar, {
       scene,
