@@ -97,12 +97,8 @@ import { LearnedToast } from './LearnedToast';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
-import { SettingsModal, type SettingsTab } from './SettingsModal';
-import { MachineSettingsTab } from './settings/MachineSettingsTab';
-import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
-import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
-import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
-import { entitlementService, tierDisplayName } from '../../entitlements';
+import { type SettingsTab } from './SettingsModal';
+import { AppSettingsModal } from './AppSettingsModal';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
 
 type StartMode = GcodeStartMode;
@@ -1844,61 +1840,25 @@ export function App() {
       onClose: () => dialogs.setShowShortcuts(false),
     }),
 
-    React.createElement(SettingsModal, {
+    React.createElement(AppSettingsModal, {
       open: settingsOpen,
       onClose: closeSettings,
       initialTab: settingsInitialTab,
-      machineTab: React.createElement(MachineSettingsTab, {
-        activeProfile,
-        onUpdateProfile: updateActiveProfile,
-        canAutoDetect: !!grblMachineInfo,
-        onAutoDetect: handleAutoDetectMachine,
-        autoDetecting: false,
-        onReRunSetup: () => {
-          closeSettings();
-          dialogs.setShowSetup(true);
-        },
-      }),
-      gcodeTab: React.createElement(GcodeSettingsTab, {
-        activeProfile,
-        onUpdateProfile: updateActiveProfile,
-      }),
-      calibrationTab: React.createElement(CalibrationSettingsTab, {
-        activeProfile,
-        onUpdateProfile: updateActiveProfile,
-      }),
-      profilesTab: React.createElement(ProfilesSettingsTab, {
-        profiles: allProfiles,
-        activeProfileId,
-        onSetActiveProfile: setActiveProfileAndApply,
-        onCreateProfileFromCurrentScene: createProfileFromCurrentScene,
-        onUpdateCurrentFromScene: updateCurrentProfileFromScene,
-        onDeleteProfile: deleteProfileAndClearActive,
-      }),
-      aboutTab: React.createElement('div', null,
-        React.createElement('h3', { style: { marginTop: 0 } }, 'LaserForge'),
-        React.createElement('p', { style: { fontSize: 12, color: '#c0c0d0', lineHeight: 1.6 } },
-          `Version: v0.1.0`, React.createElement('br'),
-          `License: ${tierDisplayName(entitlementService.getState().tier)}`,
-        ),
-        React.createElement('p', { style: { fontSize: 11, color: '#888', marginTop: 20 } },
-          'Third-party licenses: see LICENSES-THIRD-PARTY.md'),
-        React.createElement('p', { style: { marginTop: 12 } },
-          React.createElement('button', {
-            type: 'button',
-            onClick: () => setShowFontCredits(true),
-            style: {
-              background: 'rgba(0,212,255,0.08)',
-              border: '1px solid rgba(0,212,255,0.25)',
-              borderRadius: 6,
-              padding: '8px 14px',
-              fontSize: 12,
-              color: '#00d4ff',
-              cursor: 'pointer',
-              fontFamily: "'DM Sans', system-ui, sans-serif",
-            },
-          }, 'Font credits (bundled fonts)')),
-      ),
+      activeProfile,
+      onUpdateProfile: updateActiveProfile,
+      canAutoDetect: !!grblMachineInfo,
+      onAutoDetect: handleAutoDetectMachine,
+      onReRunSetup: () => {
+        closeSettings();
+        dialogs.setShowSetup(true);
+      },
+      profiles: allProfiles,
+      activeProfileId,
+      onSetActiveProfile: setActiveProfileAndApply,
+      onCreateProfileFromCurrentScene: createProfileFromCurrentScene,
+      onUpdateCurrentFromScene: updateCurrentProfileFromScene,
+      onDeleteProfile: deleteProfileAndClearActive,
+      onShowFontCredits: () => setShowFontCredits(true),
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {
