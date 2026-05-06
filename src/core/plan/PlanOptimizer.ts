@@ -66,6 +66,18 @@ export interface OptimizePlanConfig {
   maxRapidSpeed?: number;
   /** Max acceleration in mm/s² (default 500). */
   maxAcceleration?: number;
+  /** T2-17-followup: cooperative cancellation for long operation-planning loops. */
+  signal?: AbortSignal;
+  /** T2-17-followup: progress through the operation-planning loop. */
+  onProgress?: (event: OptimizePlanProgress) => void;
+}
+
+export interface OptimizePlanProgress {
+  readonly phase: 'operation';
+  readonly operationIndex: number;
+  readonly operationCount: number;
+  readonly fraction: number;
+  readonly detail?: string;
 }
 
 /**
@@ -79,7 +91,12 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
   const plan = createEmptyPlan(job.id);
   let currentPos: Point = { x: 0, y: 0 };
 
-  for (const operation of job.operations) {
+  const operationCount = job.operations.length;
+  reportOptimizeProgress(config, 0, operationCount);
+  throwIfOptimizeAborted(config?.signal);
+
+  for (let operationIndex = 0; operationIndex < operationCount; operationIndex++) {
+    const operation = job.operations[operationIndex];
     const planned = planOperation(operation, currentPos);
     if (planned.length === 0) continue;
 
@@ -89,6 +106,8 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
 
     // Track laser head position across operations
     currentPos = getFinalPosition(planned);
+    reportOptimizeProgress(config, operationIndex + 1, operationCount, operation.id);
+    throwIfOptimizeAborted(config?.signal);
   }
 
   // Compute bounds from all moves
@@ -101,6 +120,29 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
   );
 
   return plan;
+}
+
+function throwIfOptimizeAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
+function reportOptimizeProgress(
+  config: OptimizePlanConfig | undefined,
+  operationIndex: number,
+  operationCount: number,
+  detail?: string,
+): void {
+  if (!config?.onProgress) return;
+  const fraction = operationCount === 0 ? 1 : operationIndex / operationCount;
+  config.onProgress({
+    phase: 'operation',
+    operationIndex,
+    operationCount,
+    fraction,
+    detail,
+  });
 }
 
 // ─── OPERATION PLANNING ──────────────────────────────────────────

@@ -216,6 +216,10 @@ export async function compileGcode(
   reportPhase(opts, 'plan', 0, 'Optimizing toolpath');
   const plan = optimizePlan(job, {
     maxRapidSpeed: profile?.maxFeedRate ?? 6000,
+    signal: opts.signal,
+    onProgress: (event) => {
+      reportPhase(opts, 'plan', event.fraction, event.detail ?? 'Optimizing toolpath');
+    },
   });
   reportPhase(opts, 'plan', 1);
 
