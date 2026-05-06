@@ -141,3 +141,26 @@ export function makeResumeResult(message?: string): SafetyActionResult {
     timestamp: Date.now(),
   };
 }
+
+export function makeDisconnectResult(args?: {
+  accepted?: boolean;
+  message?: string;
+}): SafetyActionResult {
+  const accepted = args?.accepted ?? true;
+  return {
+    action: 'disconnectSafe',
+    accepted,
+    motionState: accepted ? 'stopped' : 'unknown',
+    laserState: accepted ? 'commandedOff' : 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: true,
+    requiresInspection: false,
+    message: args?.message ?? (
+      accepted
+        ? 'Disconnected safely. Laser-off command sent before closing the port.'
+        : 'Disconnect did not complete cleanly. Reconnect before sending more commands.'
+    ),
+    timestamp: Date.now(),
+  };
+}

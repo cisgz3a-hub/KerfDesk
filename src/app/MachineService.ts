@@ -26,6 +26,7 @@ import { estimateJobTime } from '../core/output/TimeEstimator';
 import {
   type SafetyActionResult,
   makeNotConnectedResult,
+  makeDisconnectResult,
   makePauseResult,
   makeResumeResult,
   makeSoftResetStopResult,
@@ -1017,8 +1018,9 @@ export class MachineService {
     }
   }
 
-  async disconnect(): Promise<void> {
+  async disconnect(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
+    let result = makeDisconnectResult();
     try {
       if (ctrl) {
         try {
@@ -1026,7 +1028,16 @@ export class MachineService {
         } catch {
           /* not connected, buffer full, or port already gone */
         }
-        await ctrl.disconnect();
+        try {
+          await ctrl.disconnect();
+        } catch (err: unknown) {
+          result = makeDisconnectResult({
+            accepted: false,
+            message: err instanceof Error ? err.message : String(err),
+          });
+        }
+      } else {
+        result = makeNotConnectedResult('disconnectSafe');
       }
     } finally {
       this.portRef.current = null;
@@ -1045,6 +1056,7 @@ export class MachineService {
       // burn; that's qualitatively different from a renderer crash.
       clearUnsafePriorState();
     }
+    return result;
   }
 
   // T1-41: snapshot G54 captured at Set Origin time. Caller is App.tsx's
