@@ -19,8 +19,8 @@
  * Last updated: UI Wiring — App Shell
  */
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { type Scene, createScene } from '../../core/scene/Scene';
+import React, { useRef, useEffect, useCallback, useMemo } from 'react';
+import { type Scene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { HistoryManager } from '../history/HistoryManager';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
@@ -48,6 +48,7 @@ import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useEditorStore } from '../stores/editorStore';
 import { useMachineStartStore } from '../stores/machineStartStore';
 import { useSceneHistoryStore } from '../stores/sceneHistoryStore';
+import { useSceneStore } from '../stores/sceneStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
@@ -163,10 +164,8 @@ export function App() {
     void injectBundledFontFaces();
   }, []);
 
-  const [scene, setScene] = useState<Scene>(() => {
-    const initial = createScene(400, 300, 'Untitled');
-    return initial;
-  });
+  const scene = useSceneStore(s => s.scene);
+  const setScene = useSceneStore(s => s.setScene);
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
 
