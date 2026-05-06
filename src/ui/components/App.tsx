@@ -27,7 +27,6 @@ import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
-import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useCompileManager } from '../hooks/useCompileManager';
@@ -41,6 +40,7 @@ import { useAppMaterialWorkflows } from '../hooks/useAppMaterialWorkflows';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useAppNudgeWorkflow } from '../hooks/useAppNudgeWorkflow';
+import { useAppKeyboardWorkflow } from '../hooks/useAppKeyboardWorkflow';
 import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
 import { useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
@@ -1419,74 +1419,28 @@ export function App() {
     handleSceneCommit,
   });
 
-  useKeyboardShortcuts(
-    useMemo(
-      () => ({
-        onUndo: handleUndo,
-        onRedo: handleRedo,
-        onSave: () => void handleKeyboardSave(),
-        onOpen: handleKeyboardOpen,
-        onNew: () => void handleKeyboardNew(),
-        onSelectAll: handleSelectAll,
-        onDelete: handleDelete,
-        onCopy: handleCopy,
-        onPaste: handlePaste,
-        onDuplicate: handleDuplicate,
-        onEscape: () => {
-          handleClearSelection();
-          setActiveTool('select');
-        },
-        onZoomIn: () => viewportActionsRef.current?.zoomIn(),
-        onZoomOut: () => viewportActionsRef.current?.zoomOut(),
-        onZoomFit: () => viewportActionsRef.current?.fitToBed(),
-        onToolSelect: () => setActiveTool('select'),
-        onToolRect: () => setActiveTool('rect'),
-        onToolEllipse: () => setActiveTool('ellipse'),
-        onToolLine: () => setActiveTool('line'),
-        onToolText: () => setActiveTool('text'),
-        onToolNode: () => setActiveTool('node'),
-        onToolPan: () => {},
-        onToggleToolpath: () => {
-          handleTogglePreview();
-        },
-        onToggleShortcuts: () => dialogs.setShowShortcuts(s => !s),
-        onNudge: handleNudge,
-        selectionCount: selectedIds.size,
-        clipboardItemCount: clipboard.length,
-        onBooleanUnion: () => void sceneOps.performBoolean('union'),
-        onBooleanSubtract: () => void sceneOps.performBoolean('subtract'),
-        onBooleanIntersect: () => void sceneOps.performBoolean('intersect'),
-        onAlignSelectionCenter: () => {
-          if (selectedIds.size === 0) return;
-          sceneOps.centerOnMaterial();
-        },
-        onGridArray: handleGridArray,
-      }),
-      [
-        handleUndo,
-        handleRedo,
-        handleKeyboardSave,
-        handleKeyboardOpen,
-        handleKeyboardNew,
-        handleSelectAll,
-        handleDelete,
-        handleCopy,
-        handlePaste,
-        handleDuplicate,
-        handleClearSelection,
-        handleNudge,
-        sceneOps.performBoolean,
-        sceneOps.centerOnMaterial,
-        handleGridArray,
-        handleTogglePreview,
-        scene,
-        selectedIds,
-        clipboard,
-        handleSceneCommit,
-        dialogs.setShowShortcuts,
-      ],
-    ),
-  );
+  useAppKeyboardWorkflow({
+    handleUndo,
+    handleRedo,
+    handleKeyboardSave,
+    handleKeyboardOpen,
+    handleKeyboardNew,
+    handleSelectAll,
+    handleDelete,
+    handleCopy,
+    handlePaste,
+    handleDuplicate,
+    handleClearSelection,
+    handleNudge,
+    handleGridArray,
+    handleTogglePreview,
+    viewportActionsRef,
+    setActiveTool,
+    setShowShortcuts: dialogs.setShowShortcuts,
+    selectedIds,
+    clipboardItemCount: clipboard.length,
+    sceneOps,
+  });
 
   const hasSelectedText = scene.objects.some(o =>
     selectedIds.has(o.id) && o.geometry.type === 'text'
