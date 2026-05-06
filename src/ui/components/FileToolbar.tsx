@@ -23,7 +23,7 @@ import { clearAutosave } from '../../app/autosavePersistence';
 import { TestGridDialog } from './TestGridDialog';
 // ─── PROPS ───────────────────────────────────────────────────────
 
-interface FileToolbarProps {
+export interface FileToolbarProps {
   scene: Scene;
   /** Compile scene to G-code (shared with App — resets singleton strategy state). */
   compileGcode: (scene: Scene) => Promise<string | null>;

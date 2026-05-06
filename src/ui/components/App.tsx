@@ -25,6 +25,7 @@ import { deleteObjects } from '../../core/scene/SceneOps';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
+import { buildAppFileToolbarProps } from './appFileToolbarProps';
 import { AppDragDropOverlay } from './AppDragDropOverlay';
 import { AppRecoverySetup } from './AppRecoverySetup';
 import { AppModal } from './AppModal';
@@ -1473,7 +1474,7 @@ export function App() {
   },
     isDragOver && React.createElement(AppDragDropOverlay),
 
-    React.createElement(FileToolbar, {
+    React.createElement(FileToolbar, buildAppFileToolbarProps({
       scene,
       compileGcode,
       onSceneChange: handleSceneChange,
@@ -1526,7 +1527,7 @@ export function App() {
       onOpenSettings: (tab?: SettingsTab) => {
         openSettings(tab);
       },
-    }),
+    })),
 
     React.createElement(AppRecoverySetup, {
       showRecover,
