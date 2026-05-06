@@ -340,7 +340,7 @@ export type CanvasViewportQuickActions = {
   handleTextToPath: () => void;
 };
 
-interface CanvasViewportProps {
+export interface CanvasViewportProps {
   scene: Scene;
   simulation?: SimulationResult | null;
   width?: number;

@@ -58,6 +58,7 @@ import { useMachineService } from '../hooks/useMachineService';
 import { GrblController } from '../../controllers/grbl/GrblController';
 import { sendResetWcsCommand } from '../../app/sendResetWcsCommand';
 import { CanvasViewport, type ViewportActions } from './CanvasViewport';
+import { buildAppCanvasViewportProps } from './appCanvasViewportProps';
 import { ModeTabsOverlay } from './canvas/ModeTabsOverlay';
 import { LayerPanel } from './LayerPanel';
 import { ToolBar, type ToolType } from './ToolBar';
@@ -1609,7 +1610,7 @@ export function App() {
                 ? `Design starts at saved origin X:${savedOrigin.x.toFixed(0)} Y:${savedOrigin.y.toFixed(0)}`
                 : 'No saved origin - set one below',
           ),
-          React.createElement(CanvasViewport, {
+          React.createElement(CanvasViewport, buildAppCanvasViewportProps({
           scene,
           activeTool: activeTool,
           width: canvasViewportWidth,
@@ -1650,7 +1651,7 @@ export function App() {
           interactableLayerIds,
           onActivateLayer: handleActivateLayer,
           burnState: machineUi.burnState,
-        }),
+        })),
           React.createElement(ModeTabsOverlay, {
             viewportX: bedTabLayout.bedScreenX,
             viewportY: bedTabLayout.bedScreenY,
