@@ -40,6 +40,7 @@ import { useAppDeviceProfiles } from '../hooks/useAppDeviceProfiles';
 import { useAppMaterialWorkflows } from '../hooks/useAppMaterialWorkflows';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
+import { useAppNudgeWorkflow } from '../hooks/useAppNudgeWorkflow';
 import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
 import { useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
@@ -622,8 +623,6 @@ export function App() {
     return () => cancelAnimationFrame(id);
   }, [dialogs.setShowSetup]);
 
-  const isNudgingRef = useRef(false);
-  const nudgeSceneRef = useRef<Scene | null>(null);
   const canUndo = useSceneHistoryStore(s => s.canUndo);
   const canRedo = useSceneHistoryStore(s => s.canRedo);
   const pushHistory = useSceneHistoryStore(s => s.pushHistory);
@@ -1413,29 +1412,12 @@ export function App() {
     refreshProfiles,
   });
 
-  const handleNudge = useCallback((dx: number, dy: number, commit: boolean) => {
-    if (commit) {
-      if (isNudgingRef.current && nudgeSceneRef.current) {
-        handleSceneCommit(nudgeSceneRef.current, 'nudge');
-        isNudgingRef.current = false;
-        nudgeSceneRef.current = null;
-      }
-      return;
-    }
-    if (selectedIds.size === 0) return;
-    const baseScene = nudgeSceneRef.current || scene;
-    const newScene = {
-      ...baseScene,
-      objects: baseScene.objects.map(o =>
-        selectedIds.has(o.id)
-          ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
-          : o
-      ),
-    };
-    handleSceneChange(newScene);
-    nudgeSceneRef.current = newScene;
-    isNudgingRef.current = true;
-  }, [scene, selectedIds, handleSceneChange, handleSceneCommit]);
+  const { handleNudge } = useAppNudgeWorkflow({
+    scene,
+    selectedIds,
+    handleSceneChange,
+    handleSceneCommit,
+  });
 
   useKeyboardShortcuts(
     useMemo(
