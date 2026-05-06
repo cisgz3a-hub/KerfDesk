@@ -2,6 +2,7 @@ import {
   createSceneHistoryStore,
   sceneHistoryInitialState,
 } from '../src/ui/stores/sceneHistoryStore';
+import { createScene } from '../src/core/scene/Scene';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -32,4 +33,27 @@ function assert(condition: unknown, message: string): void {
   assert(store.getState().historyVersion === sceneHistoryInitialState.historyVersion, 'reset restores history version');
   assert(store.getState().canUndo === sceneHistoryInitialState.canUndo, 'reset restores canUndo');
   assert(store.getState().canRedo === sceneHistoryInitialState.canRedo, 'reset restores canRedo');
+}
+
+{
+  const store = createSceneHistoryStore();
+  const first = createScene();
+  const second = { ...first, metadata: { ...first.metadata, name: 'second' } };
+
+  store.getState().resetHistory(first, { action: 'init' });
+  assert(store.getState().canUndo === false, 'resetHistory seeds a clean baseline');
+
+  store.getState().pushHistory(second, { action: 'rename' });
+  assert(store.getState().canUndo === true, 'pushHistory updates canUndo');
+  assert(store.getState().canRedo === false, 'pushHistory clears canRedo');
+
+  const undo = store.getState().undoHistoryEntry();
+  assert(undo?.scene === first, 'undoHistoryEntry returns the previous scene entry');
+  assert(store.getState().canUndo === false, 'undoHistoryEntry updates canUndo');
+  assert(store.getState().canRedo === true, 'undoHistoryEntry updates canRedo');
+
+  const redo = store.getState().redoHistoryEntry();
+  assert(redo?.scene === second, 'redoHistoryEntry returns the next scene entry');
+  assert(store.getState().canUndo === true, 'redoHistoryEntry restores canUndo');
+  assert(store.getState().canRedo === false, 'redoHistoryEntry updates canRedo');
 }

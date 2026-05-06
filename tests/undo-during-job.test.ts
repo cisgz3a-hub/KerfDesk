@@ -47,8 +47,8 @@ void (async () => {
     'handleUndo invokes showAlert on job-running path');
   assert(undoBlock != null && /Undo blocked/.test(undoBlock[0]),
     'handleUndo showAlert title is "Undo blocked"');
-  assert(undoBlock != null && /\[applyHistoryScene, grbl\.isJobRunning, showAlert\]/.test(undoBlock[0]),
-    'handleUndo dep array includes grbl.isJobRunning + showAlert');
+  assert(undoBlock != null && /grbl\.isJobRunning/.test(undoBlock[0]) && /showAlert/.test(undoBlock[0]) && /undoHistoryEntry/.test(undoBlock[0]),
+    'handleUndo dep array includes grbl.isJobRunning + showAlert + undoHistoryEntry');
 
   // 3. handleRedo guards on grbl.isJobRunning
   const redoBlock = appSrc.match(/const handleRedo = useCallback\(\([\s\S]*?\}, \[[^\]]+\]\);/);
@@ -56,21 +56,21 @@ void (async () => {
     'handleRedo body checks grbl.isJobRunning');
   assert(redoBlock != null && /Redo blocked/.test(redoBlock[0]),
     'handleRedo showAlert title is "Redo blocked"');
-  assert(redoBlock != null && /\[applyHistoryScene, grbl\.isJobRunning, showAlert\]/.test(redoBlock[0]),
-    'handleRedo dep array includes grbl.isJobRunning + showAlert');
+  assert(redoBlock != null && /grbl\.isJobRunning/.test(redoBlock[0]) && /showAlert/.test(redoBlock[0]) && /redoHistoryEntry/.test(redoBlock[0]),
+    'handleRedo dep array includes grbl.isJobRunning + showAlert + redoHistoryEntry');
 
   // 4. The guard fires BEFORE undoEntry() / redoEntry() — proves we
   //    don't pop history state then refuse to apply (which would lose
   //    the entry).
   if (undoBlock != null) {
     const guardIdx = undoBlock[0].search(/grbl\.isJobRunning/);
-    const popIdx = undoBlock[0].search(/\.undoEntry\(\)/);
+    const popIdx = undoBlock[0].search(/undoHistoryEntry\(\)/);
     assert(guardIdx >= 0 && popIdx >= 0 && guardIdx < popIdx,
       `handleUndo guard runs BEFORE history pop (guard@${guardIdx}, pop@${popIdx})`);
   }
   if (redoBlock != null) {
     const guardIdx = redoBlock[0].search(/grbl\.isJobRunning/);
-    const popIdx = redoBlock[0].search(/\.redoEntry\(\)/);
+    const popIdx = redoBlock[0].search(/redoHistoryEntry\(\)/);
     assert(guardIdx >= 0 && popIdx >= 0 && guardIdx < popIdx,
       `handleRedo guard runs BEFORE history pop (guard@${guardIdx}, pop@${popIdx})`);
   }

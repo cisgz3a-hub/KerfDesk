@@ -2,7 +2,7 @@
  * === FILE: /src/ui/components/App.tsx ===
  *
  * Purpose:    Root application component. Owns the Scene state,
- *             integrates HistoryManager for undo/redo, and wires
+ *             integrates the scene history store for undo/redo, and wires
  *             file operations to the toolbar.
  *
  *             State flow:
@@ -13,7 +13,7 @@
  *
  * Dependencies:
  *   - /src/core/scene/Scene.ts
- *   - /src/ui/history/HistoryManager.ts
+ *   - /src/ui/stores/sceneHistoryStore.ts
  *   - /src/ui/components/FileToolbar.tsx
  *   - /src/ui/components/CanvasViewport.tsx
  * Last updated: UI Wiring — App Shell
@@ -22,7 +22,6 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
-import { HistoryManager } from '../history/HistoryManager';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
@@ -811,27 +810,20 @@ export function App() {
     return () => cancelAnimationFrame(id);
   }, [dialogs.setShowSetup]);
 
-  const historyRef = useRef<HistoryManager>(new HistoryManager());
   const isNudgingRef = useRef(false);
   const nudgeSceneRef = useRef<Scene | null>(null);
   const canUndo = useSceneHistoryStore(s => s.canUndo);
   const canRedo = useSceneHistoryStore(s => s.canRedo);
-  const setHistoryAvailability = useSceneHistoryStore(s => s.setHistoryAvailability);
-
-  useEffect(() => {
-    const h = historyRef.current;
-    const sync = () => {
-      setHistoryAvailability({ canUndo: h.canUndo(), canRedo: h.canRedo() });
-    };
-    sync();
-    return h.onChange(sync);
-  }, [setHistoryAvailability]);
+  const pushHistory = useSceneHistoryStore(s => s.pushHistory);
+  const resetHistory = useSceneHistoryStore(s => s.resetHistory);
+  const undoHistoryEntry = useSceneHistoryStore(s => s.undoHistoryEntry);
+  const redoHistoryEntry = useSceneHistoryStore(s => s.redoHistoryEntry);
 
   // Push initial scene on mount
   useEffect(() => {
     // T2-78: tag the seed entry so it shows up in the history with a
     // meaningful label rather than the generic 'edit' default.
-    historyRef.current.push(scene, { action: 'init' });
+    resetHistory(scene, { action: 'init' });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // T2-76 step 2 of 8: wire the unified scene-mutation function. Step 2
@@ -841,9 +833,9 @@ export function App() {
   //
   // Captured-identity stability: React state setters
   // (setScene/setSelectedIds/setGcodeStale/bumpHistoryVersion) are stable
-  // by React's contract. historyRef and sceneIsDirtyRef are refs -
-  // captured by reference, dereferenced inside the lambdas (T2-76 design
-  // risk 2 mitigation, see T2-76-design.md). setGcodeStale comes from
+  // by React's contract. sceneIsDirtyRef is captured by reference and
+  // dereferenced inside the lambda (T2-76 design risk 2 mitigation, see
+  // T2-76-design.md). setGcodeStale comes from
   // useCompileManager's return object so its identity is not guaranteed
   // stable across renders; including it in the dep array matches the
   // applyHistoryScene precedent below.
@@ -875,8 +867,8 @@ export function App() {
     () => makeCommitSceneTransaction({
       setScene,
       history: {
-        push: (s, m) => historyRef.current.push(s, m),
-        reset: (s, m) => historyRef.current.reset(s, m),
+        push: pushHistory,
+        reset: resetHistory,
       },
       setSelectedIds: (ids) => setSelectedIds(ids),
       notifyDirty: (dirty) => { sceneIsDirtyRef.current = dirty; },
@@ -892,7 +884,7 @@ export function App() {
         preflight: () => { /* no-op: see comment above */ },
       },
     }),
-    [setGcodeStale, bumpHistoryVersion],
+    [setGcodeStale, bumpHistoryVersion, pushHistory, resetHistory],
   );
   void commitSceneTransaction;
 
@@ -1417,11 +1409,11 @@ export function App() {
       );
       return;
     }
-    const entry = historyRef.current.undoEntry();
+    const entry = undoHistoryEntry();
     if (!entry) return;
     const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
     applyHistoryScene(entry.scene, 'undo', validSelection);
-  }, [applyHistoryScene, grbl.isJobRunning, showAlert]);
+  }, [applyHistoryScene, grbl.isJobRunning, showAlert, undoHistoryEntry]);
 
   const handleRedo = useCallback(() => {
     if (grbl.isJobRunning) {
@@ -1431,11 +1423,11 @@ export function App() {
       );
       return;
     }
-    const entry = historyRef.current.redoEntry();
+    const entry = redoHistoryEntry();
     if (!entry) return;
     const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
     applyHistoryScene(entry.scene, 'redo', validSelection);
-  }, [applyHistoryScene, grbl.isJobRunning, showAlert]);
+  }, [applyHistoryScene, grbl.isJobRunning, showAlert, redoHistoryEntry]);
 
   const handleSelectAll = useCallback(() => {
     const allIds = new Set(scene.objects.filter(o => o.visible && !o.locked).map(o => o.id));
