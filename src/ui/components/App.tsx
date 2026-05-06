@@ -26,6 +26,7 @@ import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scen
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { FileToolbar } from './FileToolbar';
 import { AppDragDropOverlay } from './AppDragDropOverlay';
+import { AppRecoverySetup } from './AppRecoverySetup';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
 import { useClipboard } from '../hooks/useClipboard';
@@ -74,7 +75,6 @@ import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
-import { WelcomeWizard } from './WelcomeWizard';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
 import { TemplateBrowser } from './TemplateBrowser';
@@ -1528,42 +1528,33 @@ export function App() {
       },
     }),
 
-    showRecover && !dialogs.showSetup && React.createElement('div', {
-      style: {
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        gap: 12, padding: '6px 16px',
-        background: 'rgba(0, 212, 255, 0.06)',
-        borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
-        fontFamily: "'DM Sans', system-ui, sans-serif",
-        fontSize: 11,
+    React.createElement(AppRecoverySetup, {
+      showRecover,
+      showSetup: dialogs.showSetup,
+      recoverAutosaveTimeLabel,
+      onRecover: handleRecover,
+      onDismissRecover: () => {
+        setShowRecover(false);
+        setRecoverAutosaveTimeLabel(null);
+        clearAutosave();
       },
-    },
-      React.createElement('span', { style: { color: '#8888aa' } },
-        `Unsaved work found from ${recoverAutosaveTimeLabel ?? 'previous session'}`,
-      ),
-      React.createElement('button', {
-        onClick: handleRecover,
-        style: {
-          padding: '3px 12px', background: 'rgba(0, 212, 255, 0.1)',
-          border: '1px solid #00d4ff', borderRadius: 4,
-          color: '#00d4ff', fontSize: 10, cursor: 'pointer',
-          fontFamily: "'DM Sans', system-ui, sans-serif", fontWeight: 500,
-        },
-      }, 'Recover'),
-      React.createElement('button', {
-        onClick: () => {
-          setShowRecover(false);
-          setRecoverAutosaveTimeLabel(null);
-          clearAutosave();
-        },
-        style: {
-          padding: '3px 12px', background: 'transparent',
-          border: '1px solid #252540', borderRadius: 4,
-          color: '#555570', fontSize: 10, cursor: 'pointer',
-          fontFamily: "'DM Sans', system-ui, sans-serif",
-        },
-      }, 'Dismiss'),
-    ),
+      onWizardComplete: handleWizardComplete,
+      onWizardSkip: handleWizardSkip,
+      initialBedWidth: activeProfile?.bedWidth ?? scene.canvas.width,
+      initialBedHeight: activeProfile?.bedHeight ?? scene.canvas.height,
+      initialMaterialType: scene.material?.type,
+      initialMaterialName: scene.material?.name,
+      initialMaterialColor: scene.material?.color,
+      initialMaterialWidth: scene.material?.width,
+      initialMaterialHeight: scene.material?.height,
+      initialMaterialThickness: scene.material?.thickness,
+      initialMachineName: scene.machine?.name,
+      initialMachineWatts: scene.machine?.watts,
+      initialMachineType: scene.machine?.type,
+      initialOriginCorner: activeProfile?.originCorner,
+      initialHomingEnabled: activeProfile?.homingEnabled,
+      initialMaxSpindle: activeProfile?.maxSpindle,
+    }),
 
     React.createElement('div', {
       style: { flex: 1, overflow: 'hidden', display: 'flex' },
@@ -1844,25 +1835,6 @@ export function App() {
       onGenerate: handleBoxGenerate,
       onClose: () => dialogs.setShowBoxGenerator(false),
       onOpenStudio: openBoxStudio,
-    }),
-
-    dialogs.showSetup && React.createElement(WelcomeWizard, {
-      onComplete: handleWizardComplete,
-      onSkip: handleWizardSkip,
-      initialBedWidth: activeProfile?.bedWidth ?? scene.canvas.width,
-      initialBedHeight: activeProfile?.bedHeight ?? scene.canvas.height,
-      initialMaterialType: scene.material?.type,
-      initialMaterialName: scene.material?.name,
-      initialMaterialColor: scene.material?.color,
-      initialMaterialWidth: scene.material?.width,
-      initialMaterialHeight: scene.material?.height,
-      initialMaterialThickness: scene.material?.thickness,
-      initialMachineName: scene.machine?.name,
-      initialMachineWatts: scene.machine?.watts,
-      initialMachineType: scene.machine?.type,
-      initialOriginCorner: activeProfile?.originCorner,
-      initialHomingEnabled: activeProfile?.homingEnabled,
-      initialMaxSpindle: activeProfile?.maxSpindle,
     }),
 
     dialogs.showShortcuts && React.createElement(ShortcutsPanel, {
