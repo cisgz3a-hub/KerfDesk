@@ -44,6 +44,9 @@ import { type MachineTransformResult } from '../../core/plan/MachineTransform';
 import { type Move } from '../../core/plan/Plan';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
+import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
+import { useAppSettingsStore } from '../stores/appSettingsStore';
+import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { useMachineService } from '../hooks/useMachineService';
@@ -85,7 +88,7 @@ import { StatusFooter } from './StatusFooter';
 import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
 import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
-import { getSuggestion, type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
+import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { type CalibrationGridResult } from '../../core/materials/CalibrationGrid';
 import { type ResponseCurve } from '../../core/materials/ResponseCurve';
 import {
@@ -188,26 +191,34 @@ export function App() {
     selectedIdsRef.current = selectedIds;
   }, [selectedIds]);
   const [activeTool, setActiveTool] = useState<ToolType>('select');
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [showGridArray, setShowGridArray] = useState(false);
-  const [showNesting, setShowNesting] = useState(false);
-  const [gridArrayBounds, setGridArrayBounds] = useState({ w: 0, h: 0 });
-  const [showMaterialTest, setShowMaterialTest] = useState(false);
-  const [showCalibrateMaterial, setShowCalibrateMaterial] = useState(false);
-  const [showMaterialLibrary, setShowMaterialLibrary] = useState(false);
-  const [materialLibraryRev, setMaterialLibraryRev] = useState(0);
-  const [showCamera, setShowCamera] = useState(false);
-  const [showKerfWizard, setShowKerfWizard] = useState(false);
-  const [showFontCredits, setShowFontCredits] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<SettingsTab>('machine');
-  const [showBoxStudio, setShowBoxStudio] = useState(() => {
-    try {
-      return window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio';
-    } catch {
-      return false;
-    }
-  });
+  const isDragOver = useAppDialogsStore(s => s.isDragOver);
+  const setIsDragOver = useAppDialogsStore(s => s.setIsDragOver);
+  const showGridArray = useAppDialogsStore(s => s.showGridArray);
+  const setShowGridArray = useAppDialogsStore(s => s.setShowGridArray);
+  const gridArrayBounds = useAppDialogsStore(s => s.gridArrayBounds);
+  const setGridArrayBounds = useAppDialogsStore(s => s.setGridArrayBounds);
+  const showNesting = useAppDialogsStore(s => s.showNesting);
+  const setShowNesting = useAppDialogsStore(s => s.setShowNesting);
+  const showMaterialTest = useAppDialogsStore(s => s.showMaterialTest);
+  const setShowMaterialTest = useAppDialogsStore(s => s.setShowMaterialTest);
+  const showCalibrateMaterial = useAppDialogsStore(s => s.showCalibrateMaterial);
+  const setShowCalibrateMaterial = useAppDialogsStore(s => s.setShowCalibrateMaterial);
+  const showMaterialLibrary = useAppDialogsStore(s => s.showMaterialLibrary);
+  const setShowMaterialLibrary = useAppDialogsStore(s => s.setShowMaterialLibrary);
+  const materialLibraryRevision = useAppDialogsStore(s => s.materialLibraryRevision);
+  const bumpMaterialLibraryRevision = useAppDialogsStore(s => s.bumpMaterialLibraryRevision);
+  const showCamera = useAppDialogsStore(s => s.showCamera);
+  const setShowCamera = useAppDialogsStore(s => s.setShowCamera);
+  const showKerfWizard = useAppDialogsStore(s => s.showKerfWizard);
+  const setShowKerfWizard = useAppDialogsStore(s => s.setShowKerfWizard);
+  const showFontCredits = useAppDialogsStore(s => s.showFontCredits);
+  const setShowFontCredits = useAppDialogsStore(s => s.setShowFontCredits);
+  const settingsOpen = useAppDialogsStore(s => s.settingsOpen);
+  const settingsInitialTab = useAppDialogsStore(s => s.settingsInitialTab);
+  const openSettings = useAppDialogsStore(s => s.openSettings);
+  const closeSettings = useAppDialogsStore(s => s.closeSettings);
+  const showBoxStudio = useAppDialogsStore(s => s.showBoxStudio);
+  const setShowBoxStudio = useAppDialogsStore(s => s.setShowBoxStudio);
   const [profileRevision, setProfileRevision] = useState(0);
   const [startMode, setStartMode] = useState<StartMode>(() => {
     try {
@@ -226,27 +237,16 @@ export function App() {
   });
   const startModeRef = useRef(startMode);
   startModeRef.current = startMode;
-  const [gcodePreview, setGcodePreview] = useState<string | null>(null);
-  const [showToolpathPreview, setShowToolpathPreview] = useState(false);
-  const [toolpathPreviewMoves, setToolpathPreviewMoves] = useState<readonly Move[] | null>(null);
+  const gcodePreview = useAppDialogsStore(s => s.gcodePreview);
+  const setGcodePreview = useAppDialogsStore(s => s.setGcodePreview);
+  const showToolpathPreview = useAppDialogsStore(s => s.showToolpathPreview);
+  const setShowToolpathPreview = useAppDialogsStore(s => s.setShowToolpathPreview);
+  const toolpathPreviewMoves = useAppDialogsStore(s => s.toolpathPreviewMoves);
+  const setToolpathPreviewMoves = useAppDialogsStore(s => s.setToolpathPreviewMoves);
+  const clearToolpathPreview = useAppDialogsStore(s => s.clearToolpathPreview);
   const [previewMode, setPreviewMode] = useState(false);
-  const [bedTabLayout, setBedTabLayout] = useState({
-    bedScreenX: 0,
-    bedScreenY: 0,
-    zoom: 1.5,
-  });
-  const handleViewportLayout = useCallback((layout: { bedScreenX: number; bedScreenY: number; zoom: number }) => {
-    setBedTabLayout(prev => {
-      if (
-        prev.bedScreenX === layout.bedScreenX &&
-        prev.bedScreenY === layout.bedScreenY &&
-        prev.zoom === layout.zoom
-      ) {
-        return prev;
-      }
-      return layout;
-    });
-  }, []);
+  const bedTabLayout = useViewportStore(s => s.bedTabLayout);
+  const handleViewportLayout = useViewportStore(s => s.setBedTabLayout);
 
   const [activeJobMoves, setActiveJobMoves] = useState<readonly Move[] | null>(null);
   const [activeJobPlanBounds, setActiveJobPlanBounds] = useState<{
@@ -341,6 +341,7 @@ export function App() {
     void profileRevision;
     return getDeviceProfiles();
   }, [profileRevision]);
+  void materialLibraryRevision;
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
 
   const refreshProfiles = useCallback(() => setProfileRevision(v => v + 1), []);
@@ -648,19 +649,11 @@ export function App() {
   // (since step 3), undo/redo (since step 5), and future
   // load/async-result paths.
   const [historyVersion, setHistoryVersion] = useState(0);
-  const [productionMode, setProductionMode] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('laserforge_production_mode') === 'true';
-    } catch {
-      return false;
-    }
-  });
+  const productionMode = useAppSettingsStore(s => s.productionMode);
+  const setProductionMode = useAppSettingsStore(s => s.setProductionMode);
   const handleToggleProductionMode = useCallback(() => {
     if (productionMode) {
       setProductionMode(false);
-      try {
-        localStorage.setItem('laserforge_production_mode', 'false');
-      } catch { /* ignore */ }
       return;
     }
     if (!isProUnlocked()) {
@@ -670,21 +663,17 @@ export function App() {
       return;
     }
     setProductionMode(true);
-    try {
-      localStorage.setItem('laserforge_production_mode', 'true');
-    } catch { /* ignore */ }
-  }, [productionMode]);
+  }, [productionMode, setProductionMode]);
 
   useEffect(() => {
     if (productionMode && !isProUnlocked()) {
       setProductionMode(false);
-      try {
-        localStorage.setItem('laserforge_production_mode', 'false');
-      } catch { /* ignore */ }
     }
-  }, [productionMode]);
-  const [showRecover, setShowRecover] = useState(false);
-  const [recoverAutosaveTimeLabel, setRecoverAutosaveTimeLabel] = useState<string | null>(null);
+  }, [productionMode, setProductionMode]);
+  const showRecover = useAppDialogsStore(s => s.showRecover);
+  const setShowRecover = useAppDialogsStore(s => s.setShowRecover);
+  const recoverAutosaveTimeLabel = useAppDialogsStore(s => s.recoverAutosaveTimeLabel);
+  const setRecoverAutosaveTimeLabel = useAppDialogsStore(s => s.setRecoverAutosaveTimeLabel);
 
   useEffect(() => {
     let cancelled = false;
@@ -710,7 +699,7 @@ export function App() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setRecoverAutosaveTimeLabel, setShowRecover]);
 
   // T1-29: surface the unsafe-prior-state recovery dialog at startup. The
   // flag was set by MachineService.startValidatedJob and is cleared on
@@ -747,16 +736,16 @@ export function App() {
       clearUnsafePriorState();
     });
   }, [showAlert]);
-  const [toastSuggestion, setToastSuggestion] = useState<{ suggestion: MaterialSuggestion; materialName: string } | null>(null);
-  const [textPlacementHint, setTextPlacementHint] = useState<string | null>(null);
-  const [textPlacementPt, setTextPlacementPt] = useState<{ x: number; y: number } | null>(null);
-  const [textPreviewFontReady, setTextPreviewFontReady] = useState(true);
-  const [lastCalibrationGridResult, setLastCalibrationGridResult] = useState<CalibrationGridResult | null>(null);
-  const [, setPendingCalibration] = useState<{
-    photoData: ImageData;
-    result: CalibrationGridResult;
-    roi: { x: number; y: number; width: number; height: number };
-  } | null>(null);
+  const toastSuggestion = useAppDialogsStore(s => s.toastSuggestion);
+  const setToastSuggestion = useAppDialogsStore(s => s.setToastSuggestion);
+  const textPlacementHint = useAppDialogsStore(s => s.textPlacementHint);
+  const setTextPlacementHint = useAppDialogsStore(s => s.setTextPlacementHint);
+  const textPlacementPt = useAppDialogsStore(s => s.textPlacementPt);
+  const setTextPlacementPt = useAppDialogsStore(s => s.setTextPlacementPt);
+  const textPreviewFontReady = useAppDialogsStore(s => s.textPreviewFontReady);
+  const setTextPreviewFontReady = useAppDialogsStore(s => s.setTextPreviewFontReady);
+  const lastCalibrationGridResult = useAppDialogsStore(s => s.lastCalibrationGridResult);
+  const setLastCalibrationGridResult = useAppDialogsStore(s => s.setLastCalibrationGridResult);
 
   useEffect(() => {
     if (!textPlacementHint) return;
@@ -1276,14 +1265,14 @@ export function App() {
 
   const handleTogglePreview = useCallback(() => {
     setShowToolpathPreview(p => !p);
-  }, []);
+  }, [setShowToolpathPreview]);
 
   // Clear preview state only when preview mode is actually off or suppressed by a job.
   useEffect(() => {
     if (!showToolpathPreview || grbl.isJobRunning) {
       setToolpathPreviewMoves(null);
     }
-  }, [showToolpathPreview, grbl.isJobRunning]);
+  }, [showToolpathPreview, grbl.isJobRunning, setToolpathPreviewMoves]);
 
   // Toolpath overlay follows the same `scene` as the canvas (fingerprint includes geometry, layers, transforms).
   useEffect(() => {
@@ -1297,14 +1286,13 @@ export function App() {
       if (cancelled) return;
       if (m === null) {
         void showAlert('No Objects', 'No objects to preview. Add objects to an output layer first.');
-        setShowToolpathPreview(false);
-        setToolpathPreviewMoves(null);
+        clearToolpathPreview();
         return;
       }
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning]);
+  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning, clearToolpathPreview, setToolpathPreviewMoves]);
 
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
@@ -1630,25 +1618,25 @@ export function App() {
 
   useEffect(() => {
     const handlePopState = () => {
-      setShowBoxStudio(window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio');
+      setShowBoxStudio(isBoxStudioPath(window.location.pathname));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, []);
+  }, [setShowBoxStudio]);
 
   const openBoxStudio = useCallback(() => {
     setShowBoxStudio(true);
     if (window.location.pathname !== '/box-studio') {
       window.history.pushState({}, '', '/box-studio');
     }
-  }, []);
+  }, [setShowBoxStudio]);
 
   const closeBoxStudio = useCallback(() => {
     setShowBoxStudio(false);
-    if (window.location.pathname === '/box-studio' || window.location.pathname === '/tools/box-studio') {
+    if (isBoxStudioPath(window.location.pathname)) {
       window.history.pushState({}, '', '/');
     }
-  }, []);
+  }, [setShowBoxStudio]);
 
   const handleBoxStudioGenerate = useCallback((objects: SceneObject[]) => {
     handleBoxGenerate(objects);
@@ -1684,7 +1672,6 @@ export function App() {
     if (matching) {
       const updatedPreset: MaterialPreset = { ...matching, responseCurve: curve };
       savePreset(updatedPreset);
-      setPendingCalibration(null);
       return;
     }
 
@@ -1701,7 +1688,6 @@ export function App() {
     };
     saveDeviceProfile(updated);
     refreshProfiles();
-    setPendingCalibration(null);
   }, [refreshProfiles]);
 
   const {
@@ -1915,8 +1901,7 @@ export function App() {
       machineBedWidth: resolvedMachineBedWidthMm,
       machineBedHeight: resolvedMachineBedHeightMm,
       onOpenSettings: (tab?: SettingsTab) => {
-        setSettingsInitialTab(tab ?? 'machine');
-        setSettingsOpen(true);
+        openSettings(tab);
       },
     }),
 
@@ -2076,8 +2061,7 @@ export function App() {
         onClose: () => dialogs.setShowConnection(false),
         onDisconnect: () => dialogs.setShowConnection(false),
       onOpenSettings: (tab?: SettingsTab) => {
-        setSettingsInitialTab(tab ?? 'machine');
-        setSettingsOpen(true);
+        openSettings(tab);
       },
         bedWidth: resolvedMachineBedWidthMm,
         bedHeight: resolvedMachineBedHeightMm,
@@ -2218,7 +2202,7 @@ export function App() {
     showMaterialLibrary && React.createElement(MaterialLibraryDialog, {
       scene,
       onClose: () => setShowMaterialLibrary(false),
-      onMaterialApplied: () => setMaterialLibraryRev(r => r + 1),
+      onMaterialApplied: bumpMaterialLibraryRevision,
     }),
 
     showCamera && React.createElement(CameraDialog, {
@@ -2264,7 +2248,7 @@ export function App() {
 
     React.createElement(SettingsModal, {
       open: settingsOpen,
-      onClose: () => setSettingsOpen(false),
+      onClose: closeSettings,
       initialTab: settingsInitialTab,
       machineTab: React.createElement(MachineSettingsTab, {
         activeProfile,
@@ -2273,7 +2257,7 @@ export function App() {
         onAutoDetect: handleAutoDetectMachine,
         autoDetecting: false,
         onReRunSetup: () => {
-          setSettingsOpen(false);
+          closeSettings();
           dialogs.setShowSetup(true);
         },
       }),

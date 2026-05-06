@@ -291,7 +291,32 @@ void (async () => {
   assert(messages.size === reasons.length, `each message distinct`);
 }
 
-// 22. Source-level pin
+// 22. expected device rejects a token with no device binding
+{
+  const v = stubVerifier({ knownKids: ['kid-1'] });
+  const r = await verifyEntitlementToken({
+    token: buildToken({}, buildPayload()),
+    verifier: v,
+    now: 50000,
+    expectedDeviceId: 'device-a',
+  });
+  assert(!r.ok && r.reason === 'device-mismatch', `missing deviceId -> device-mismatch`);
+}
+
+// 23. replay check can be skipped for idempotent local-cache re-reads
+{
+  const v = stubVerifier({ knownKids: ['kid-1'] });
+  const seen = new InMemoryJtiStore();
+  const t = buildToken();
+  const r1 = await verifyEntitlementToken({ token: t, verifier: v, now: 50000, seenJtis: seen });
+  assert(r1.ok, `cache 1st ok`);
+  const r2 = await verifyEntitlementToken({
+    token: t, verifier: v, now: 50000, seenJtis: seen, replayMode: 'ignore',
+  });
+  assert(r2.ok, `cache re-read ok when replayMode=ignore`);
+}
+
+// 24. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

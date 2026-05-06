@@ -1,17 +1,6 @@
-import { useState, useCallback } from 'react';
-import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
-
-/** Wizard key: Electron uses a separate key so browser dev `laserforge_setup_complete` does not skip the wizard in the packaged app. */
-function getSetupStorageKey(): string {
-  try {
-    if (typeof window !== 'undefined' && window.electronAPI?.isElectron) {
-      return 'laserforge_setup_complete_electron';
-    }
-  } catch {
-    /* ignore */
-  }
-  return 'laserforge_setup_complete';
-}
+import { useCallback } from 'react';
+import { type SceneObject } from '../../core/scene/SceneObject';
+import { useAppDialogsStore } from '../stores/appDialogsStore';
 
 export interface DialogState {
   showTextDialog: boolean;
@@ -35,57 +24,53 @@ export interface DialogState {
 }
 
 export function useDialogs() {
-  const [showTextDialog, setShowTextDialog] = useState(false);
-  const [editingTextId, setEditingTextId] = useState<string | null>(null);
-  const [textInput, setTextInput] = useState('');
-  const [textFont, setTextFont] = useState('Arial');
-  const [textSize, setTextSize] = useState(20);
-  const [textBold, setTextBold] = useState(false);
-  const [textItalic, setTextItalic] = useState(false);
+  const showTextDialog = useAppDialogsStore(s => s.showTextDialog);
+  const setShowTextDialog = useAppDialogsStore(s => s.setShowTextDialog);
+  const editingTextId = useAppDialogsStore(s => s.editingTextId);
+  const setEditingTextId = useAppDialogsStore(s => s.setEditingTextId);
+  const textInput = useAppDialogsStore(s => s.textInput);
+  const setTextInput = useAppDialogsStore(s => s.setTextInput);
+  const textFont = useAppDialogsStore(s => s.textFont);
+  const setTextFont = useAppDialogsStore(s => s.setTextFont);
+  const textSize = useAppDialogsStore(s => s.textSize);
+  const setTextSize = useAppDialogsStore(s => s.setTextSize);
+  const textBold = useAppDialogsStore(s => s.textBold);
+  const setTextBold = useAppDialogsStore(s => s.setTextBold);
+  const textItalic = useAppDialogsStore(s => s.textItalic);
+  const setTextItalic = useAppDialogsStore(s => s.setTextItalic);
+  const openTextEdit = useAppDialogsStore(s => s.openTextEdit);
+  const closeTextDialog = useAppDialogsStore(s => s.closeTextDialog);
 
-  const [showBoxGenerator, setShowBoxGenerator] = useState(false);
-  const [showVariableText, setShowVariableText] = useState(false);
-  const [variableTextSource, setVariableTextSource] = useState<SceneObject | null>(null);
-  const [showConnection, setShowConnection] = useState(false);
-  const [showToolpath, setShowToolpath] = useState(false);
-  const [showShortcuts, setShowShortcuts] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
-  const [showMaterial, setShowMaterial] = useState(false);
-  const [showSetup, setShowSetup] = useState(() => {
-    try {
-      return !localStorage.getItem(getSetupStorageKey());
-    } catch {
-      return true;
-    }
-  });
-  const [showFeedback, setShowFeedback] = useState(false);
-
-  const openTextEdit = useCallback((obj: SceneObject) => {
-    const geom = obj.geometry as TextGeometry;
-    setTextInput(geom.text || '');
-    setTextFont(geom.fontFamily || 'Arial');
-    setTextSize(geom.fontSize || 20);
-    setTextBold(geom.bold || false);
-    setTextItalic(geom.italic || false);
-    setEditingTextId(obj.id);
-    setShowTextDialog(true);
-  }, []);
-
-  const closeTextDialog = useCallback(() => {
-    setShowTextDialog(false);
-    setEditingTextId(null);
-    setTextInput('');
-  }, []);
+  const showBoxGenerator = useAppDialogsStore(s => s.showBoxGenerator);
+  const setShowBoxGenerator = useAppDialogsStore(s => s.setShowBoxGenerator);
+  const showVariableText = useAppDialogsStore(s => s.showVariableText);
+  const setShowVariableText = useAppDialogsStore(s => s.setShowVariableText);
+  const variableTextSource = useAppDialogsStore(s => s.variableTextSource);
+  const setVariableTextSource = useAppDialogsStore(s => s.setVariableTextSource);
+  const showConnection = useAppDialogsStore(s => s.showConnection);
+  const setShowConnection = useAppDialogsStore(s => s.setShowConnection);
+  const showToolpath = useAppDialogsStore(s => s.showToolpath);
+  const setShowToolpath = useAppDialogsStore(s => s.setShowToolpath);
+  const showShortcuts = useAppDialogsStore(s => s.showShortcuts);
+  const setShowShortcuts = useAppDialogsStore(s => s.setShowShortcuts);
+  const showTemplates = useAppDialogsStore(s => s.showTemplates);
+  const setShowTemplates = useAppDialogsStore(s => s.setShowTemplates);
+  const showMaterial = useAppDialogsStore(s => s.showMaterial);
+  const setShowMaterial = useAppDialogsStore(s => s.setShowMaterial);
+  const showSetup = useAppDialogsStore(s => s.showSetup);
+  const setShowSetup = useAppDialogsStore(s => s.setShowSetup);
+  const showFeedback = useAppDialogsStore(s => s.showFeedback);
+  const setShowFeedback = useAppDialogsStore(s => s.setShowFeedback);
 
   const openVariableText = useCallback((obj: SceneObject) => {
     setVariableTextSource(obj);
     setShowVariableText(true);
-  }, []);
+  }, [setShowVariableText, setVariableTextSource]);
 
   const closeVariableText = useCallback(() => {
     setShowVariableText(false);
     setVariableTextSource(null);
-  }, []);
+  }, [setShowVariableText, setVariableTextSource]);
 
   return {
     showTextDialog,

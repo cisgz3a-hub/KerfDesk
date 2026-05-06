@@ -73,8 +73,15 @@ export function evaluateSenderTrust(opts: {
   }
   // dev
   const expected = opts.env.expectedDevOrigin;
-  if (url.startsWith(expected)) {
-    return { trusted: true, reason: 'dev-localhost-origin' };
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      if (new URL(url).origin === new URL(expected).origin) {
+        return { trusted: true, reason: 'dev-localhost-origin' };
+      }
+    } catch {
+      return { trusted: false, reason: 'frame-url-malformed', observedUrl: url };
+    }
+    return { trusted: false, reason: 'untrusted-origin', observedUrl: url };
   }
   if (!url.startsWith('http://') && !url.startsWith('https://') &&
       !url.startsWith('file://')) {

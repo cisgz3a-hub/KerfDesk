@@ -151,6 +151,8 @@ export interface VerifyOptions {
   readonly maxClockSkewMs?: number;
   /** Optional replay-detection store. */
   readonly seenJtis?: JtiSeenStore;
+  /** Default 'detect'. Use 'ignore' for idempotent local-cache reads. */
+  readonly replayMode?: 'detect' | 'ignore';
   /** Optional device binding. When set, payload.deviceId must match. */
   readonly expectedDeviceId?: string;
 }
@@ -197,15 +199,14 @@ export async function verifyEntitlementToken(opts: VerifyOptions): Promise<Verif
   if (Math.abs(opts.now - payload.iat) > 365 * 24 * 60 * 60 * 1000) {
     return { ok: false, reason: 'clock-skew-exceeded', detail: 'iat more than a year off' };
   }
-  if (opts.expectedDeviceId !== undefined &&
-      payload.deviceId !== undefined &&
-      payload.deviceId !== opts.expectedDeviceId) {
+  if (opts.expectedDeviceId !== undefined && payload.deviceId !== opts.expectedDeviceId) {
     return { ok: false, reason: 'device-mismatch' };
   }
-  if (opts.seenJtis != null && opts.seenJtis.has(payload.jti)) {
+  const replayMode = opts.replayMode ?? 'detect';
+  if (replayMode === 'detect' && opts.seenJtis != null && opts.seenJtis.has(payload.jti)) {
     return { ok: false, reason: 'replay-detected' };
   }
-  if (opts.seenJtis != null) opts.seenJtis.add(payload.jti);
+  if (replayMode === 'detect' && opts.seenJtis != null) opts.seenJtis.add(payload.jti);
   return { ok: true, payload };
 }
 

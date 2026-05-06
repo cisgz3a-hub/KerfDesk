@@ -249,7 +249,16 @@ ipcMain.handle('b', (event) => {
   assert(!evaluateSenderTrust({ env: PACKAGED, frame: { url: 'http://attacker.com/' } }).trusted, `case C: attacker → blocked`);
 }
 
-// 25. Source-level pin
+// 25. Regression: dev origin must match exactly, not by string prefix
+{
+  const r = evaluateSenderTrust({
+    env: { kind: 'dev', expectedDevOrigin: 'http://localhost:3000' },
+    frame: { url: 'http://localhost:3000.evil.test/index.html' },
+  });
+  assert(!r.trusted, `dev prefix lookalike untrusted`);
+}
+
+// 26. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

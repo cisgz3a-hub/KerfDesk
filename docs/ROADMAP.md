@@ -6470,6 +6470,8 @@ Rewrite the 7 files to take a `StorageAdapter` injected at construction. App bou
 
 **Priority:** Tier 2.
 
+**Status:** Shipped before this follow-up; roadmap bookkeeping corrected after re-verification. Current code has `StorageAdapter` plus `FilesystemStorageAdapter`, `IndexedDbStorageAdapter`, `InMemoryStorageAdapter`, `createDefaultStorage`, and the `getStorage()` singleton. The seven originally-listed core/entitlement modules now use `getStorage()` for live reads/writes; direct `localStorage` is restricted to one-shot `migrate*FromLocalStorage` helpers. Autosave uses `getStorage()` through `src/app/autosavePersistence.ts` and preserves image payloads via the atomic autosave record path. Pinned by `tests/storage-adapter-contract.test.ts`, `tests/no-localstorage-in-core.test.ts`, `tests/autosave-preserves-images.test.ts`, and the existing storage/domain tests. Remaining storage hardening continues under T2-120/T2-127/T2-128 rather than T2-2.
+
 ---
 
 ### T2-3 | Service-layer paywall gates
@@ -6624,6 +6626,8 @@ App.tsx becomes a thin composition of stores + top-level effects for persistence
 4. At the end, App.tsx should be under 500 lines.
 
 **Priority:** Tier 2 (but can parallel with T2-4).
+
+**Status:** Phase 1 store foundation implemented in working tree (pending commit). Added Zustand-backed `appDialogsStore`, `appSettingsStore`, and `viewportStore`, with focused store tests. `App.tsx` no longer owns the small UI-shell state for dialog visibility/payloads, setup/recovery prompts, toolpath/G-code preview toggles, drag-over state, text placement hints, text preview font readiness, material-library refresh token, calibration last-result handoff, persisted production mode, or bed-tab overlay layout. Full T2-6 remains open: scene/selection/history, machine/start-mode, and deeper viewport migration are still multi-pass follow-ups.
 
 ---
 
@@ -19801,12 +19805,12 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-94 Falcon WS practical frame size cap (256 KB / 1 MB) (shipped pre-session)
 
 ### Tier 2 (This month)
-- [ ] T2-1 Validated Job Ticket
-- [ ] T2-2 `Storage` interface refactor
+- [x] T2-1 Validated Job Ticket (all 5 phases shipped; checklist catch-up)
+- [x] T2-2 `Storage` interface refactor (StorageAdapter + runtime adapters + getStorage migration; direct localStorage restricted to migration helpers)
 - [x] T2-3 Service-layer paywall gates (shipped; token signing deferred to Tier 3)
 - [x] T2-4 Split ConnectionPanelMain (8 phases shipped; sub-component extraction folded into T2-6)
 - [x] T2-5 Gcode template validator (Shipped — `validateGcodeTemplate` with 13 issue kinds + 36-test pin; preflight UI + customStartGcode-setter wiring deferred as T2-5-followup)
-- [ ] T2-6 Zustand stores, split App.tsx
+- [ ] T2-6 Zustand stores, split App.tsx (Phase 1 store foundation implemented pending commit; full scene/history split remains)
 - [x] T2-7 Controller abstraction real, Marlin stub (closed pre-session — abstraction shipped; Marlin stub deferred to T2-24 / T4-7)
 - [x] T2-8 Split Preflight into rule modules (closed pre-session — 8 modules in src/core/preflight/rules/)
 - [ ] T2-10 Establish single MachineCommandGateway choke point (filed; multi-pass architectural)

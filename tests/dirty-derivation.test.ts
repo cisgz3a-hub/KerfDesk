@@ -45,6 +45,8 @@ function makeRectScene(rectX: number = 10): ReturnType<typeof createScene> {
   const scene = createScene(400, 300, 'T2-88');
   // Override auto-generated scene id so two builds compare equal.
   (scene as { id: string }).id = 'fixed-scene';
+  scene.metadata.created = '2026-01-01T00:00:00.000Z';
+  scene.metadata.modified = '2026-01-01T00:00:00.000Z';
   const layer = createLayer(0, 'cut', 'Cut');
   (layer as { id: string }).id = 'fixed-layer';
   scene.layers = [layer];

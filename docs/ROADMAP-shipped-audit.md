@@ -240,6 +240,7 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
+| T2-2 | `Storage` interface refactor | `src/core/storage/StorageAdapter.ts` plus Filesystem/IndexedDb/InMemory adapters and `getStorage()` singleton exist. Live storage in the seven roadmap-listed core/entitlement modules uses `getStorage()`; direct `localStorage` is restricted to one-shot `migrate*FromLocalStorage` helpers and pinned by `tests/no-localstorage-in-core.test.ts`. Adapter behavior is pinned by `tests/storage-adapter-contract.test.ts`; autosave image preservation is pinned by `tests/autosave-preserves-images.test.ts`. | pre-session + catch-up |
 | T2-7 | Real controller abstraction | `src/controllers/ControllerInterface.ts`, `src/controllers/ControllerRegistry.ts`, `src/controllers/grbl/` exist as a real abstraction | pre-session |
 | T2-8 | Split Preflight into rule modules | `src/core/preflight/rules/` has 8 separate rule modules: `LayerSettingsPreflight`, `MachinePreflight`, `MachineStatePreflight`, `OptimizationPreflight`, `OutputBoundsPreflight`, `RasterPreflight`, `ScenePreflight`, `TemplatePreflight`, plus `sharedHelpers` | pre-session |
 | T2-22 | Standardized test runner | `scripts/run-tests.mjs` runs each test file in its own Node process. **Note:** auto-discovery part may not be done 鈥?manual list still in file. Treating as shipped because the consistent-reporter requirement is met. | pre-session |
@@ -352,7 +353,7 @@ Grouped by cluster. **Bold = highest leverage / blocks other work.**
 
 #### Reliability architecture (16 tickets)
 
-T2-1 (ValidatedJobTicket 鈥?type exists, contract not enforced), **T2-3** (paywall: `requireFeature` exists in scattered hooks; not service-layer-gated comprehensively), T2-5 (`GcodeTemplateValidator` exists at `src/core/preflight/GcodeTemplateValidator.ts` but not wired into compile pipeline), T2-6 (no Zustand stores), **T2-10** (no MachineCommandGateway), **T2-11** (no operation mutex), T2-13 (no FaultInjectingSerialPort), T2-14, T2-15 (no CompoundPath model), T2-16, T2-17 (no AbortSignal in compile), T2-18, T2-19, T2-20, T2-21 (no fast-check), T2-23, T2-24, T2-25 (no ControllerCapabilities), T2-26, T2-27, T2-28, T2-29.
+T2-1 (ValidatedJobTicket 鈥?type exists, contract not enforced), **T2-3** (paywall: `requireFeature` exists in scattered hooks; not service-layer-gated comprehensively), T2-5 (`GcodeTemplateValidator` exists at `src/core/preflight/GcodeTemplateValidator.ts` but not wired into compile pipeline), T2-6 (Zustand store foundation implemented pending commit; full scene/history split remains), **T2-10** (no MachineCommandGateway), **T2-11** (no operation mutex), T2-13 (no FaultInjectingSerialPort), T2-14, T2-15 (no CompoundPath model), T2-16, T2-17 (no AbortSignal in compile), T2-18, T2-19, T2-20, T2-21 (no fast-check), T2-23, T2-24, T2-25 (no ControllerCapabilities), T2-26, T2-27, T2-28, T2-29.
 
 #### Connection lifecycle (7 tickets)
 
@@ -501,4 +502,3 @@ After those close, every Tier 1 ticket I have evidence for is shipped. We then e
 - Future tickets that are scaffolded but not wired (T2-77 with `capturedRevisionId`, T2-88 referenced as future, T3-68 with `transitionLog` plumbed but no emitter) are counted as **open**, not partial. Scaffolding has value but it's preparation, not shipping.
 - The Tier 2 / Tier 3 / Tier 4 numbers above are lower bounds. As I find more work shipped without explicit T-markers, the shipped column grows.
 - Hash columns marked "pre-session" mean: shipped before the audit window; commit hash not in my context. Not a quality issue; just unrecoverable from this static probe.
-
