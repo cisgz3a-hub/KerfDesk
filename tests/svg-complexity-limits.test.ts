@@ -17,6 +17,9 @@ import {
   svgLimitErrorMessage,
   type SvgLimitKey,
 } from '../src/import/svg/SvgComplexityLimits';
+import { parseSvg } from '../src/import/svg/SvgParser';
+import { parsePathData } from '../src/import/svg/PathParser';
+import { importSvgToScene } from '../src/import/svg/SvgToScene';
 
 let passed = 0;
 let failed = 0;
@@ -27,6 +30,17 @@ function assert(c: boolean, m: string): void {
   } else {
     failed++;
     console.error(`  ✗ ${m}`);
+  }
+}
+
+function withTemporaryLimit<T>(limit: SvgLimitKey, value: number, fn: () => T): T {
+  const limits = SVG_LIMITS as unknown as Record<SvgLimitKey, number>;
+  const previous = limits[limit];
+  limits[limit] = value;
+  try {
+    return fn();
+  } finally {
+    limits[limit] = previous;
   }
 }
 
@@ -186,6 +200,73 @@ void (async () => {
   ]) {
     assert(src.includes(k), `limit '${k}' declared`);
   }
+}
+
+// 14. Parser wiring: traversal depth is enforced.
+{
+  let caught: unknown = null;
+  withTemporaryLimit('MAX_DEPTH', 1, () => {
+    try {
+      parseSvg('<svg><g><rect width="1" height="1"/></g></svg>');
+    } catch (e) {
+      caught = e;
+    }
+  });
+  assert(caught instanceof SvgImportLimitError,
+    'parseSvg rejects SVGs that exceed MAX_DEPTH');
+}
+
+// 15. Parser wiring: renderable count is enforced.
+{
+  let caught: unknown = null;
+  withTemporaryLimit('MAX_RENDERABLE', 1, () => {
+    try {
+      parseSvg('<svg><rect width="1" height="1"/><circle r="1"/></svg>');
+    } catch (e) {
+      caught = e;
+    }
+  });
+  assert(caught instanceof SvgImportLimitError,
+    'parseSvg rejects SVGs that exceed MAX_RENDERABLE');
+}
+
+// 16. Path parser wiring: token and segment caps are enforced.
+{
+  let tokenCaught: unknown = null;
+  withTemporaryLimit('MAX_PATH_TOKENS', 4, () => {
+    try {
+      parsePathData('M 0 0 L 1 1');
+    } catch (e) {
+      tokenCaught = e;
+    }
+  });
+  assert(tokenCaught instanceof SvgImportLimitError,
+    'parsePathData rejects paths that exceed MAX_PATH_TOKENS');
+
+  let segmentCaught: unknown = null;
+  withTemporaryLimit('MAX_PATH_SEGMENTS', 1, () => {
+    try {
+      parsePathData('M 0 0 L 1 1 L 2 2');
+    } catch (e) {
+      segmentCaught = e;
+    }
+  });
+  assert(segmentCaught instanceof SvgImportLimitError,
+    'parsePathData rejects paths that exceed MAX_PATH_SEGMENTS');
+}
+
+// 17. SvgToScene wiring: polygon/polyline point caps are enforced.
+{
+  let caught: unknown = null;
+  withTemporaryLimit('MAX_POLYGON_POINTS', 1, () => {
+    try {
+      importSvgToScene('<svg><polygon points="0,0 1,1"/></svg>');
+    } catch (e) {
+      caught = e;
+    }
+  });
+  assert(caught instanceof SvgImportLimitError,
+    'importSvgToScene rejects polygons that exceed MAX_POLYGON_POINTS');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

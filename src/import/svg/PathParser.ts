@@ -30,6 +30,7 @@ import {
   type SubPath,
   type PathSegment,
 } from '../../core/scene/SceneObject';
+import { assertSvgLimit } from './SvgComplexityLimits';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -42,6 +43,7 @@ export function parsePathData(d: string): PathGeometry {
   if (!d || d.trim() === '') return { type: 'path', subPaths: [] };
 
   const tokens = tokenize(d);
+  assertSvgLimit('MAX_PATH_TOKENS', tokens.length);
   const subPaths = buildSubPaths(tokens);
 
   return { type: 'path', subPaths };
@@ -77,6 +79,7 @@ function tokenize(d: string): Token[] {
 function buildSubPaths(tokens: Token[]): SubPath[] {
   const subPaths: SubPath[] = [];
   let currentSegments: PathSegment[] = [];
+  let segmentCount = 0;
   let curX = 0, curY = 0;       // Current point
   let startX = 0, startY = 0;   // Start of current subpath (for Z)
   let lastCmd = '';              // For implicit command repetition
@@ -103,10 +106,22 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
   function finishSubPath(closed: boolean): void {
     if (currentSegments.length > 0) {
       if (closed) {
-        currentSegments.push({ type: 'close' });
+        pushSegment({ type: 'close' });
       }
       subPaths.push({ segments: [...currentSegments], closed });
       currentSegments = [];
+    }
+  }
+
+  function pushSegment(segment: PathSegment): void {
+    segmentCount++;
+    assertSvgLimit('MAX_PATH_SEGMENTS', segmentCount);
+    currentSegments.push(segment);
+  }
+
+  function pushSegments(segments: PathSegment[]): void {
+    for (const segment of segments) {
+      pushSegment(segment);
     }
   }
 
@@ -142,13 +157,13 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
             curY = isRelative ? curY + y : y;
             startX = curX;
             startY = curY;
-            currentSegments.push({ type: 'move', to: { x: curX, y: curY } });
+            pushSegment({ type: 'move', to: { x: curX, y: curY } });
             first = false;
           } else {
             // Implicit lineto
             curX = isRelative ? curX + x : x;
             curY = isRelative ? curY + y : y;
-            currentSegments.push({ type: 'line', to: { x: curX, y: curY } });
+            pushSegment({ type: 'line', to: { x: curX, y: curY } });
           }
           lastCp2X = curX;
           lastCp2Y = curY;
@@ -162,7 +177,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           const y = nextNum();
           curX = isRelative ? curX + x : x;
           curY = isRelative ? curY + y : y;
-          currentSegments.push({ type: 'line', to: { x: curX, y: curY } });
+          pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
         } while (hasMoreNumbers());
@@ -173,7 +188,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
         do {
           const x = nextNum();
           curX = isRelative ? curX + x : x;
-          currentSegments.push({ type: 'line', to: { x: curX, y: curY } });
+          pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
         } while (hasMoreNumbers());
@@ -184,7 +199,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
         do {
           const y = nextNum();
           curY = isRelative ? curY + y : y;
-          currentSegments.push({ type: 'line', to: { x: curX, y: curY } });
+          pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
         } while (hasMoreNumbers());
@@ -201,7 +216,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
             x2 += curX; y2 += curY;
             x += curX;  y += curY;
           }
-          currentSegments.push({
+          pushSegment({
             type: 'cubic',
             cp1: { x: x1, y: y1 },
             cp2: { x: x2, y: y2 },
@@ -226,7 +241,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
             x2 += curX; y2 += curY;
             x += curX;  y += curY;
           }
-          currentSegments.push({
+          pushSegment({
             type: 'cubic',
             cp1: { x: cp1X, y: cp1Y },
             cp2: { x: x2, y: y2 },
@@ -248,7 +263,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
             cpX += curX; cpY += curY;
             x += curX;   y += curY;
           }
-          currentSegments.push({
+          pushSegment({
             type: 'quadratic',
             cp: { x: cpX, y: cpY },
             to: { x, y },
@@ -270,7 +285,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           if (isRelative) {
             x += curX; y += curY;
           }
-          currentSegments.push({
+          pushSegment({
             type: 'quadratic',
             cp: { x: cpX, y: cpY },
             to: { x, y },
@@ -299,7 +314,7 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
             curX, curY, x, y,
             rx, ry, rotation, !!largeArc, !!sweep
           );
-          currentSegments.push(...arcSegments);
+          pushSegments(arcSegments);
           lastCp2X = x;
           lastCp2Y = y;
           curX = x;

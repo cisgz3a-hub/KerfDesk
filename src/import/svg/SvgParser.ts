@@ -19,6 +19,7 @@
 import { DOMParser } from '@xmldom/xmldom';
 import { type Matrix3x2, IDENTITY_MATRIX } from '../../core/types';
 import { parseTransform, multiplyMatrix } from './TransformParser';
+import { assertSvgLimit, bumpAndAssert, emptyParseContext, type SvgParseContext } from './SvgComplexityLimits';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ const EMPTY_RESULT: SvgParseResult = {
  */
 export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParseResult {
   if (!svgString || svgString.trim() === '') return EMPTY_RESULT;
+  assertSvgLimit('MAX_BYTES', svgString.length);
 
   const unitMode: SvgUnitMode = options?.unitMode ?? 'laser';
 
@@ -93,7 +95,8 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
 
   // Traverse and collect elements with root transform applied
   const elements: SvgElement[] = [];
-  traverse(svgRoot, rootTransform, elements);
+  const context = emptyParseContext();
+  traverse(svgRoot, rootTransform, elements, context, 0, 0);
 
   return { elements, viewBox, widthMm, heightMm, svgUnits };
 }
@@ -188,7 +191,10 @@ const RENDERABLE_TAGS = new Set([
 function traverse(
   node: Element,
   parentTransform: Matrix3x2,
-  output: SvgElement[]
+  output: SvgElement[],
+  context: SvgParseContext,
+  depth: number,
+  transformDepth: number,
 ): void {
   const childNodes = node.childNodes;
   if (!childNodes) return;
@@ -197,15 +203,26 @@ function traverse(
     const child = childNodes[i] as Element;
     if (!child.tagName) continue;  // Skip text nodes
 
+    context.nodeCount = bumpAndAssert(context.nodeCount, 'MAX_NODES');
+    const childDepth = depth + 1;
+    assertSvgLimit('MAX_DEPTH', childDepth);
+
     const tag = child.tagName.toLowerCase().replace(/^svg:/, '');
-    const ownTransform = parseTransform(child.getAttribute('transform'));
+    const transformAttr = child.getAttribute('transform');
+    const childTransformDepth = transformAttr ? transformDepth + 1 : transformDepth;
+    assertSvgLimit('MAX_TRANSFORM_DEPTH', childTransformDepth);
+    context.depth = childDepth;
+    context.transformDepth = childTransformDepth;
+
+    const ownTransform = parseTransform(transformAttr);
     const worldTransform = multiplyMatrix(parentTransform, ownTransform);
 
     if (tag === 'g' || tag === 'svg') {
       // Group: recurse with accumulated transform
-      traverse(child, worldTransform, output);
+      traverse(child, worldTransform, output, context, childDepth, childTransformDepth);
     } else if (RENDERABLE_TAGS.has(tag)) {
       // Renderable element: extract attributes
+      context.renderableCount = bumpAndAssert(context.renderableCount, 'MAX_RENDERABLE');
       const attrs = extractAttributes(child);
       output.push({ tag, attrs, worldTransform });
     }

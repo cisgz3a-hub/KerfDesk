@@ -42,6 +42,7 @@ import {
   computeImportTransform,
   applyTransformToObjects,
 } from '../../io/SvgImportPlacement';
+import { assertSvgLimit } from './SvgComplexityLimits';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -376,6 +377,8 @@ function convertPolyline(attrs: Record<string, string>, closed: boolean): Geomet
     .filter(n => !isNaN(n));
 
   if (numbers.length < 4) return null; // Need at least 2 points
+
+  assertSvgLimit('MAX_POLYGON_POINTS', Math.floor(numbers.length / 2));
 
   const points: Point[] = [];
   for (let i = 0; i < numbers.length - 1; i += 2) {
