@@ -9,7 +9,7 @@ import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners, buildFrameGcode } from './frameGcode';
 import { waitForGrblIdle } from './grblIdlePoll';
-import { sendSetOriginWcsCommand } from './sendSetOriginWcsCommand';
+import { MachineCommandGateway } from './MachineCommandGateway';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
 
@@ -35,7 +35,7 @@ export interface FrameResult {
    *
    * - 'no-controller': no controller connection at the moment frameSafe was called.
    * - 'idle-timeout': GRBL did not report idle within the timeout.
-   * - 'command-blocked': ctrl.sendCommand() threw partway through corner streaming.
+   * - 'command-blocked': command emission threw partway through corner streaming.
    *   A subset of frame commands may have physically executed; the rest did not.
    * - 'operation-busy' (T2-11): another machine operation (test-fire, autofocus,
    *   set-origin, jog, or another frame) holds the service-layer mutex. Caller
@@ -93,8 +93,14 @@ export class ExecutionCoordinator {
     this.deps.notifySimulatorRef.current(line);
   }
 
+  private getCommandGateway(ctrl: LaserController | null = this.deps.controllerRef.current): MachineCommandGateway | null {
+    return ctrl ? new MachineCommandGateway(ctrl) : null;
+  }
+
   jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
-    if (!this.deps.controllerRef.current) return { ok: false, reason: 'no-controller' };
+    const ctrl = this.deps.controllerRef.current;
+    const gateway = this.getCommandGateway(ctrl);
+    if (!ctrl || !gateway) return { ok: false, reason: 'no-controller' };
     // T2-11: jog acquires the operation mutex for the duration of the
     // synchronous send. Sequential jogs (arrow-key spam) acquire and
     // release per call — no contention. The mutex prevents jog from
@@ -107,7 +113,19 @@ export class ExecutionCoordinator {
     try {
       const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
       this.notifySimulator(cmd);
-      return this.deps.machineService.jog(axis, distance, feedRate);
+      try {
+        gateway.jog(axis, distance, feedRate);
+      } catch (err: unknown) {
+        return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+      }
+      setTimeout(() => {
+        try {
+          ctrl.requestStatusReport();
+        } catch {
+          /* ignore */
+        }
+      }, 100);
+      return { ok: true };
     } finally {
       this.deps.machineService.releaseOperation('jog');
     }
@@ -151,16 +169,18 @@ export class ExecutionCoordinator {
 
   /** Unlock GRBL ($X). Caller must run danger confirmation before invoking this. */
   async unlock(): Promise<void> {
-    if (!this.deps.controllerRef.current) return;
+    const gateway = this.getCommandGateway();
+    if (!gateway) return;
     this.notifySimulator('$X');
-    await this.deps.machineService.sendCommand('$X', 'internal');
+    gateway.unlock();
   }
 
   /** Home ($H). Caller must confirm the user intends to home before invoking this. */
   async home(): Promise<void> {
-    if (!this.deps.controllerRef.current) return;
+    const gateway = this.getCommandGateway();
+    if (!gateway) return;
     this.notifySimulator('$H');
-    await this.deps.machineService.sendCommand('$H', 'internal');
+    gateway.home();
   }
 
   /** Frame without firing the laser (rapid moves only). */
@@ -210,6 +230,7 @@ export class ExecutionCoordinator {
   }): Promise<FrameResult> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
+    const gateway = this.getCommandGateway(ctrl)!;
 
     // T2-11: acquire the mutex BEFORE any side-effect (notifySimulator,
     // sendCommand, motion). frame-off and frame-dot use distinct kinds
@@ -243,7 +264,7 @@ export class ExecutionCoordinator {
         // return ok=true after a partial trace if GRBL reported idle at
         // the end. Partial framing is not enough to satisfy T1-59.
         try {
-          ctrl.sendCommand(line, 'internal');
+          gateway.sendInternalCommand(line);
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
           console.warn('[Command blocked]', msg);
@@ -289,6 +310,7 @@ export class ExecutionCoordinator {
   async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
+    const gateway = this.getCommandGateway(ctrl)!;
     // T2-11: acquire the mutex before issuing the M3 + arming the deadman.
     // Re-entry: same-kind acquire returns true (preserves the existing
     // "second beginTestFire resets the timer" semantics — the spec
@@ -301,7 +323,7 @@ export class ExecutionCoordinator {
     const cmd = `${TEST_FIRE_LASER_ON_WORD} S${sVal}`;
     this.notifySimulator(cmd);
     try {
-      ctrl.sendCommand(cmd, 'internal');
+      gateway.sendInternalCommand(cmd);
     } catch (err) {
       console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
       // T2-11: release on failed start. The mutex is only useful if it's
@@ -358,7 +380,7 @@ export class ExecutionCoordinator {
     const ctrl = this.deps.controllerRef.current;
     this.notifySimulator('M5 S0');
     if (!ctrl) return;
-    const result = await ctrl.safetyOff();
+    const result = await this.getCommandGateway(ctrl)!.laserOff();
     this.deps.machineService.notifyLaserSafetyOutcome(result.stage);
     if (result.stage === 'm5') return;
     if (result.stage === 'soft-reset') {
@@ -446,7 +468,12 @@ export class ExecutionCoordinator {
     }
     try {
       this.notifySimulator('G10 L20 P1 X0 Y0');
-      return await sendSetOriginWcsCommand(ctrl);
+      try {
+        this.getCommandGateway(ctrl)!.setOriginAtCurrentPosition();
+        return { ok: true };
+      } catch (err: unknown) {
+        return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+      }
     } finally {
       this.deps.machineService.releaseOperation('setOrigin');
     }

@@ -492,7 +492,7 @@ After those close, every Tier 1 ticket I have evidence for is shipped. We then e
 - T2-10 (MachineCommandGateway choke point 鈥?unblocks consistent gating across Tier 2)
 - T2-11 (operation mutex 鈥?unblocks T2-12 full canonical type)
 
-- T2-10 Pass 1 shipped in `47d85ca` (delegating MachineCommandGateway scaffold; call-site migration and policy enforcement remain)
+- T2-10 Pass 1 shipped in `47d85ca` (delegating MachineCommandGateway scaffold); Pass 2 shipped in `<TBD>` (ExecutionCoordinator command emission migrated through gateway; helper migration and policy enforcement remain)
 
 ---
 
