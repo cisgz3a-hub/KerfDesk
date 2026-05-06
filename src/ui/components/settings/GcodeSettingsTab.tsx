@@ -55,6 +55,14 @@ export function GcodeSettingsTab(props: GcodeSettingsTabProps) {
     maxHeight: 140,
     overflowY: 'auto',
   };
+  const textAreaStyle: React.CSSProperties = {
+    ...previewStyle,
+    color: '#e0e0ec',
+    width: '100%',
+    minHeight: 96,
+    resize: 'vertical',
+    outline: 'none',
+  };
 
   return React.createElement('div', null,
     React.createElement('h3', { style: { marginTop: 0, fontSize: 15 } }, 'G-code Templates'),
@@ -80,6 +88,26 @@ export function GcodeSettingsTab(props: GcodeSettingsTabProps) {
         borderRadius: 4, color: '#0a0a14', fontSize: 12, fontWeight: 600, cursor: 'pointer',
       },
     }, 'Edit templates...'),
+
+    React.createElement('div', { style: { ...sectionStyle, marginTop: 24 } },
+      React.createElement('div', { style: labelStyle }, 'Custom start G-code'),
+      React.createElement('textarea', {
+        value: activeProfile.startGcode ?? '',
+        spellCheck: false,
+        style: textAreaStyle,
+        onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onUpdateProfile({ startGcode: e.target.value }),
+      }),
+    ),
+
+    React.createElement('div', { style: sectionStyle },
+      React.createElement('div', { style: labelStyle }, 'Custom end G-code'),
+      React.createElement('textarea', {
+        value: activeProfile.endGcode ?? '',
+        spellCheck: false,
+        style: textAreaStyle,
+        onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => onUpdateProfile({ endGcode: e.target.value }),
+      }),
+    ),
 
     React.createElement(GcodeTemplateEditor, {
       open: editorOpen,
