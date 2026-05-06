@@ -8024,6 +8024,8 @@ if (!ctrl.capabilities.output.formats.includes(ticket.outputFormat)) {
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 6.
 
+**Status:** Shipped in <TBD> (focused MVP — family-agnostic schema + capability-match validator + adapter helpers; consumer migration deferred as T2-29-followup). New `src/core/job/FamilyAgnosticTicket.ts` exports `ControllerFamily` (5: grbl / marlin / smoothie / falcon-wifi / unknown), `OutputFormat` (4: gcode-lines / gcode-text / binary-stream / job-upload), `ControllerOutput` discriminated union (gcode-lines + gcode-text + binary-stream + job-upload), `FamilyAgnosticBounds`, `FamilyAgnosticTicket` (ticketId + sceneHash + profileHash + controllerFamily + outputFormat + outputHash + output + machinePlanBounds + preflightHash + createdAt), `FamilyMatchKind` (3), `FamilyMatchResult` discriminated union, `matchTicketToController(opts)` pure validator with audit-derived priority (family check fires BEFORE format check), `ticketFromGcodeLines(opts)` adapter for migration from the legacy gcode-only ticket shape, `gcodeLinesFromTicket(ticket)` + `gcodeTextFromTicket(ticket)` back-compat helpers (return null for binary/job-upload outputs — caller must branch on outputFormat), `outputByteSize(output)` (used by job-log size budget), `familyMatchUserMessage(result)` per-kind copy. Pinned by `tests/family-agnostic-ticket.test.ts` (59 contracts: GRBL+gcode-lines → match; marlin/grbl → controller-family-mismatch with expected/actual; family ok but format unsupported → output-format-not-supported with supported-list; multi-format controller; family check fires BEFORE format check; unknown family; ticketFromGcodeLines round-trip; gcodeLinesFromTicket on each kind including \\n-split for gcode-text and null for binary/job-upload; gcodeTextFromTicket joining with \\n; outputByteSize per kind; per-kind user messages; **THE audit's headline cases** (GRBL+GRBL accepts; marlin+GrblController blocks; capability gate works); ticket round-trip preserving lines; source-level pin). **Out of scope (T2-29-followup):** migrating `ValidatedJobTicket` interface in PipelineService / MachineService / JobLog / autosave to the new shape; replacing the theatre check at `MachineService.ts:349-355` with `matchTicketToController(...)`. **Hardware verification: not required**.
+
 ---
 
 ### T2-30 | Falcon WiFi as real LaserController / transport
@@ -19788,7 +19790,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-26 Move GRBL command construction out of generic layers (filed; 6-pass migration, depends on T2-24/25)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
-- [ ] T2-29 Refactor ValidatedJobTicket 鈥?controller-family-agnostic schema (filed; depends on T2-27)
+- [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)
 - [x] T2-31 Make `SerialPortLike.close()` async (shipped 2026-05-05 in `898b510` — unblocks T2-32 / T2-33)
 - [ ] T2-32 Connection lifecycle state machine 鈥?ConnectionManager (filed; depends on T2-24, T2-31)
