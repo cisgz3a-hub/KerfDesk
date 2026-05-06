@@ -7124,6 +7124,8 @@ Migration plan (multi-pass to avoid one-big-commit):
 
 **Cross-check note (audit 2C):** Audit's P0 #2 ("Replace FlatPath[] as the only manufacturing geometry model"). Verified the structural problem at every layer. Pushback on framing: this is multi-pass work, not a single ticket. T1-36 is the band-aid for the most painful symptom (kerf compensation broken). T2-15 is the architectural fix that catches everything.
 
+**Status:** Pass 1 foundation shipped in `<TBD>`: new `src/core/geometry/CompoundPath.ts` introduces the typed `Contour` / `CompoundPath` model, explicit contour roles (`outer` / `hole` / `island` / `open`), fill-rule tracking, winding + bounds helpers, and a tagged contour flattening adapter for later compiler migration. Pinned by `tests/compound-path-model.test.ts`. Existing `FlatPath[]` call sites are unchanged; Pass 2+ will migrate fill, offset, boolean ops, and output emission.
+
 **Notes folded in (from audit 2C):**
 - SVG `<text>` skipped 鈥?Pass 5 of T2-15 could add a warning at import time when text elements are skipped. UI-only change.
 - Group style inheritance 鈥?same area; flatten-time style resolution can collect inherited styles before flattening.
@@ -19833,7 +19835,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-12 Unified MachineSafetyState type — consolidation of safety fields (Shipped — 17-state discriminated union + computeMachineSafetyState + 4 gate predicates; UI gate migration deferred as T2-12-followup)
 - [x] T2-13 Fault-injecting test transport (FaultInjectingSerialPort) (harness shipped 2026-05-05 in `191d19b`; per-test migration of T1-22 / T1-25 / T1-28 / T1-29 deferred to dependent ticket work)
 - [x] T2-14 Non-removable G-code safety wrapper around custom templates (shipped 2026-05-05 in `94ebfa7`)
-- [ ] T2-15 CompoundPath model 鈥?preserve outer/hole/island semantics (filed; multi-pass architectural; T1-36 is band-aid)
+- [ ] T2-15 CompoundPath model 鈥?preserve outer/hole/island semantics (Pass 1 foundation shipped in `<TBD>`; fill/offset/boolean/output migrations remain)
 - [x] T2-16 Duplicate / overlap path detection in preflight (shipped 2026-05-05 in `cb93bf7`)
 - [ ] T2-17 AbortSignal + progress callback through compile pipeline (phase-boundary MVP shipped 2026-05-05 in `2a9c29c`; deep-loop instrumentation + UI integration filed as T2-17-followup)
 - [x] T2-18 Semantic G-code parser test helper (parser shipped 2026-05-05 in `9f353cd`; per-test migration deferred to T2-19 / T2-23 dependent work)
