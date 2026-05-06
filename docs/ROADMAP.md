@@ -53,7 +53,20 @@ The final audit (5E) is a GO/NO-GO synthesis, not a new finding. It scores the c
 
 This section is the release plan: where we are, what gates separate us from each release stage, and which existing tickets close those gates.
 
-### Current classification
+### Current checklist snapshot
+
+**Snapshot date:** 2026-05-06, branch `codex/t2-6-zustand-foundation`.
+
+The master checklist at the bottom of this file is the current source of truth:
+
+| Tier | Shipped | Open | Notes |
+|---|---:|---:|---|
+| Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
+| Tier 2 | 95 | 33 | T2-6 Phase 2 is shipped; Phase 3 scene/history split remains open. |
+
+### Historical audit classification
+
+The score table below is the 2026-04-30 audit baseline. It is retained for context, but it is not the live roadmap status.
 
 **Advanced Alpha 鈥?NO-GO for any release.**
 
