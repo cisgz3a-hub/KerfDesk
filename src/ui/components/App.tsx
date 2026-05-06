@@ -35,13 +35,13 @@ import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
-import { useGeneratorHandlers } from '../hooks/useGeneratorHandlers';
+import { useAppGeneratorWorkflows } from '../hooks/useAppGeneratorWorkflows';
 import { useAppDeviceProfiles } from '../hooks/useAppDeviceProfiles';
 import { useAppMaterialWorkflows } from '../hooks/useAppMaterialWorkflows';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
 import { useActiveJobCanvasStore } from '../stores/activeJobCanvasStore';
-import { isBoxStudioPath, useAppDialogsStore } from '../stores/appDialogsStore';
+import { useAppDialogsStore } from '../stores/appDialogsStore';
 import { useAppSettingsStore } from '../stores/appSettingsStore';
 import { useEditorStore } from '../stores/editorStore';
 import { useMachineStartStore } from '../stores/machineStartStore';
@@ -1372,67 +1372,27 @@ export function App() {
     dialogs.setShowConnection(false);
   }, [machineUi.executionCoordinator, dialogs]);
 
-  const handleGridArray = useCallback(() => {
-    if (selectedIds.size === 0) return;
-
-    // Compute bounds of selection
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const obj of scene.objects) {
-      if (!selectedIds.has(obj.id)) continue;
-      const b = computeObjectBounds(obj);
-      if (!b) continue;
-      minX = Math.min(minX, b.minX);
-      minY = Math.min(minY, b.minY);
-      maxX = Math.max(maxX, b.maxX);
-      maxY = Math.max(maxY, b.maxY);
-    }
-
-    setGridArrayBounds({ w: maxX - minX, h: maxY - minY });
-    setShowGridArray(true);
-  }, [scene, selectedIds]);
-
   const {
+    handleGridArray,
     handleGridArrayConfirm,
     handleNestingApply,
     handleBoxGenerate,
     handleVariableTextGenerate,
     handleTemplateSelect,
-  } = useGeneratorHandlers({
+    openBoxStudio,
+    closeBoxStudio,
+    handleBoxStudioGenerate,
+  } = useAppGeneratorWorkflows({
     scene,
     selectedIds,
     setSelectedIds,
     handleSceneCommit,
     setShowGridArray,
+    setGridArrayBounds,
     setShowTemplates: dialogs.setShowTemplates,
     showAlert,
+    setShowBoxStudio,
   });
-
-  useEffect(() => {
-    const handlePopState = () => {
-      setShowBoxStudio(isBoxStudioPath(window.location.pathname));
-    };
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [setShowBoxStudio]);
-
-  const openBoxStudio = useCallback(() => {
-    setShowBoxStudio(true);
-    if (window.location.pathname !== '/box-studio') {
-      window.history.pushState({}, '', '/box-studio');
-    }
-  }, [setShowBoxStudio]);
-
-  const closeBoxStudio = useCallback(() => {
-    setShowBoxStudio(false);
-    if (isBoxStudioPath(window.location.pathname)) {
-      window.history.pushState({}, '', '/');
-    }
-  }, [setShowBoxStudio]);
-
-  const handleBoxStudioGenerate = useCallback((objects: SceneObject[]) => {
-    handleBoxGenerate(objects);
-    closeBoxStudio();
-  }, [closeBoxStudio, handleBoxGenerate]);
 
   const {
     handleMaterialTestApply,
