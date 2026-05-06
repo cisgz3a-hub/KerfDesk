@@ -8619,6 +8619,8 @@ Compile, preflight, UI, and ticket all consume `CapabilityValue<T>` instead of b
 
 **Cross-check note (audit 3C):** Audit's Finding 3.2 + Priority 1. Refines T2-25.
 
+**Status:** Shipped in <TBD> (focused MVP — type + resolution helpers + confidence gate; ControllerCapabilities refactor deferred as T2-38-followup). New `src/controllers/CapabilityValue.ts` exports `CapabilitySource` (firmware / profile / default / unknown), `CapabilityConfidence` (verified / manual / fallback / unknown), `CapabilityValue<T>` (value + source + confidence + verifiedAt?), 4 builders (`verifiedFromFirmware`, `manualFromProfile`, `fallbackDefault`, `unknownValue`), `resolveCapabilityValue({firmware?, profile?, defaultValue?, now})` (priority chain firmware > profile > default; honours `0` and `false` as real values, only null/undefined → next), `meetsConfidence(v, required)` rank-based predicate (verified=3 / manual=2 / fallback=1 / unknown=0), `valueOrNull` + `valueOrThrow(v, fieldName)` extractors, `confidenceLabel`, `describeCapabilityValue` (audit-trail string with ISO timestamp). Pinned by `tests/capability-value-resolution.test.ts` (47 contracts: every builder shape; resolution priority firmware/profile/default/unknown; null vs undefined handled identically; zero + false honoured (not treated as missing); confidence rank in both directions; valueOrNull + valueOrThrow with field-named error; confidenceLabel non-empty per kind; describe includes value + source + confidence + ISO timestamp; spec scenarios — connected/disconnected/blank; source-level pin). **Out of scope (T2-38-followup):** refactoring `ControllerCapabilities` (T2-25) numeric/boolean fields to wrap in `CapabilityValue<T>`; threading `meetsConfidence` into preflight gates (T3-56) and UI confidence chips (T3-58). **Hardware verification: not required** (declarative wrapper).
+
 ---
 
 ### T2-39 | Strict profile validation on save
@@ -19765,7 +19767,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-35 Electron serial subsystem decision 鈥?complete it OR remove it (filed; supersedes T1-27 partial fix)
 - [ ] T2-36 Subscription-based transport callbacks (filed; pairs with T2-34)
 - [x] T2-37 Capability snapshot in ValidatedJobTicket (Shipped — TicketCapabilitySnapshot type + 7-kind mismatch reasons + ordered detector; ValidatedJobTicket migration deferred as T2-37-followup; refines T2-1, T2-29)
-- [ ] T2-38 `CapabilityValue<T>` model with source/confidence/verifiedAt (filed; refines T2-25)
+- [x] T2-38 `CapabilityValue<T>` model with source/confidence/verifiedAt (Shipped — type + builders + resolveCapabilityValue + meetsConfidence; ControllerCapabilities refactor deferred as T2-38-followup; refines T2-25)
 - [x] T2-39 Strict profile validation on save (shipped 2026-05-05 in `b87e59b` — validator + save-side rejection; Settings UI rendering deferred)
 - [ ] T2-40 Central operation-gating authority (filed; refines T2-26 + T3-47)
 - [ ] T2-41 `SafetyActionResult` typed return for safety methods (type + stopAndEnsureLaserOff migration shipped 2026-05-05 in `6fa502a`; pause/resume/disconnect/emergencyStop migrations filed as T2-41-followup)
