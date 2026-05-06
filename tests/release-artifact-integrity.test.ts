@@ -4,15 +4,23 @@
  * checksums — users couldn't verify a download against tampering.
  * Audit 5B Critical 6 + Required Priority 9.
  *
+ * T2-103-followup (2026-05-06): hashing primitive moved to
+ * `scripts/checksumHash.mjs` so `src/` stays free of static
+ * `node:*` imports (T1-89 renderer-sandbox contract).
+ *
  * Run: npx tsx tests/release-artifact-integrity.test.ts
  */
 import {
-  computeSha256Hex,
   formatChecksumLine,
   formatChecksumsFile,
   parseChecksumsFile,
   matchesAnyPattern,
 } from '../src/integrity/checksumFormat';
+// @ts-expect-error — scripts/checksumHash.mjs is plain JS with no .d.ts shim.
+import { computeSha256Hex as computeSha256HexJs } from '../scripts/checksumHash.mjs';
+const computeSha256Hex = computeSha256HexJs as (
+  data: Buffer | Uint8Array | string,
+) => string;
 
 let passed = 0;
 let failed = 0;
@@ -191,15 +199,32 @@ void (async () => {
   const src = fs.readFileSync(path.resolve(repoRoot, 'src/integrity/checksumFormat.ts'), 'utf-8');
   assert(/T2-103/.test(src), 'T2-103 marker in checksumFormat.ts');
   for (const id of [
-    'computeSha256Hex', 'formatChecksumLine', 'formatChecksumsFile',
+    'formatChecksumLine', 'formatChecksumsFile',
     'parseChecksumsFile', 'matchesAnyPattern',
   ]) {
     assert(src.includes(id), `export '${id}' declared`);
   }
+  // T2-103-followup: src/integrity/ must NOT statically import
+  // `node:*` (T1-89 renderer-sandbox contract pinned by
+  // tests/electron-renderer-sandbox.test.ts).
+  assert(!/^import\s[^;]*from\s+['"]node:/m.test(src),
+    'checksumFormat.ts has no static node:* import (renderer-safety)');
+  assert(!/export\s+(function|const|let|var)\s+computeSha256Hex\b/.test(src),
+    'computeSha256Hex was relocated out of src/ to scripts/checksumHash.mjs');
+
+  const hashScript = fs.readFileSync(path.resolve(repoRoot, 'scripts/checksumHash.mjs'), 'utf-8');
+  assert(/T2-103-followup/.test(hashScript),
+    'T2-103-followup marker in scripts/checksumHash.mjs');
+  assert(hashScript.includes('computeSha256Hex'),
+    'computeSha256Hex declared in scripts/checksumHash.mjs');
+  assert(/from ['"]node:crypto['"]/.test(hashScript),
+    'scripts/checksumHash.mjs imports node:crypto (renderer-safe location)');
 
   const script = fs.readFileSync(path.resolve(repoRoot, 'scripts/generate-checksums.mjs'), 'utf-8');
   assert(/T2-103/.test(script), 'T2-103 marker in generate-checksums.mjs');
   assert(/SHA256SUMS/.test(script), 'script writes SHA256SUMS');
+  assert(/from ['"]\.\/checksumHash\.mjs['"]/.test(script),
+    'generate-checksums.mjs imports computeSha256Hex from sibling script');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

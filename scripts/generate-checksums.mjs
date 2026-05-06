@@ -22,16 +22,18 @@
  *   patterns = '*.exe,*.dmg,*.zip,*.AppImage,*.deb,*.rpm'
  *   output   = '<dir>/SHA256SUMS'
  *
- * The pure helper functions are exported separately in
- * `src/release/checksumFormat.ts` so tests can verify the format
- * without spawning a child process.
+ * The pure format helpers are exported separately in
+ * `src/integrity/checksumFormat.ts` so tests can verify the format
+ * without spawning a child process. The hashing primitive
+ * `computeSha256Hex` lives in `scripts/checksumHash.mjs` because
+ * `src/` must not statically import `node:*` (T1-89 renderer-
+ * sandbox contract).
  */
-import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
+import { computeSha256Hex } from './checksumHash.mjs';
 import {
-  computeSha256Hex,
   formatChecksumLine,
   formatChecksumsFile,
   matchesAnyPattern,
@@ -87,18 +89,4 @@ function main() {
   for (const line of lines) console.log('  ' + line);
 }
 
-// computeSha256Hex from src/release/checksumFormat.ts works on Buffer
-// directly via the host's createHash; the import shim above is a no-op
-// for the .ts source. When running this script under Node ESM with
-// `tsx` we'd import the .ts file; under raw `node` the .js extension
-// requires the build step. To keep this script runnable directly,
-// override locally.
-function _ensureNodeCryptoHash() {
-  // Node version >= 14 covers our target.
-  if (typeof createHash !== 'function') {
-    throw new Error('node:crypto.createHash unavailable');
-  }
-}
-
-_ensureNodeCryptoHash();
 main();

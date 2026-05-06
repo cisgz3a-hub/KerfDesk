@@ -15,25 +15,18 @@
  * `scripts/generate-checksums.mjs`. Path note: avoiding `src/release/`
  * because the repo's top-level `.gitignore` excludes any `release/`
  * directory (the build output dir).
+ *
+ * **T2-103-followup (2026-05-06):** the hashing primitive
+ * `computeSha256Hex` (the only export here that needed
+ * `node:crypto`) was moved to `scripts/checksumHash.mjs` to satisfy
+ * the renderer-sandbox contract from T1-89 — `src/` must not
+ * statically import `node:*` modules (the renderer can load
+ * anything under `src/`, and `node:crypto` is unavailable there).
+ * The 4 pure string-manipulation helpers below have no Node
+ * dependency and are renderer-safe.
  */
-import { createHash } from 'node:crypto';
 
 const HEX64 = /^[0-9a-f]{64}$/;
-
-/**
- * Compute the lowercase hex SHA256 of a buffer or string. Strings
- * are encoded as UTF-8 before hashing (so the hash matches what
- * `sha256sum` produces on a file containing the same bytes).
- */
-export function computeSha256Hex(data: Buffer | Uint8Array | string): string {
-  const h = createHash('sha256');
-  if (typeof data === 'string') {
-    h.update(data, 'utf-8');
-  } else {
-    h.update(data);
-  }
-  return h.digest('hex');
-}
 
 /**
  * Format one line of a SHA256SUMS file. Validates that `hashHex` is
