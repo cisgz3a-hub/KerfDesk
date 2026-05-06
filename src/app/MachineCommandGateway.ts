@@ -4,6 +4,7 @@ export type MachineCommandGatewayController = Pick<LaserController, 'sendCommand
 export type MachineCommandGatewayAxis = 'X' | 'Y';
 
 export type LaserOffResult = Awaited<ReturnType<LaserController['safetyOff']>>;
+export type MachineCommandResult = { ok: true } | { ok: false; reason: string };
 
 /**
  * T2-10 pass 1: a single command choke point that preserves existing behavior.
@@ -30,6 +31,24 @@ export class MachineCommandGateway {
 
   resetWcsToMachineOrigin(): void {
     this.sendInternalCommand('G10 L2 P1 X0 Y0 Z0');
+  }
+
+  trySetOriginAtCurrentPosition(): MachineCommandResult {
+    try {
+      this.setOriginAtCurrentPosition();
+      return { ok: true };
+    } catch (err: unknown) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
+  }
+
+  tryResetWcsToMachineOrigin(): MachineCommandResult {
+    try {
+      this.resetWcsToMachineOrigin();
+      return { ok: true };
+    } catch (err: unknown) {
+      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    }
   }
 
   jog(axis: MachineCommandGatewayAxis, distanceMm: number, feedRateMmPerMinute: number): void {

@@ -1,3 +1,5 @@
+import { MachineCommandGateway } from './MachineCommandGateway';
+
 /**
  * Reset G54 work coordinate system to machine origin.
  * Used when leaving Origin mode so subsequent Bed/Head mode jobs
@@ -12,9 +14,5 @@ export function sendResetWcsCommand(
   controller: { sendCommand(s: string): void } | null | undefined,
 ): void {
   if (!controller || typeof controller.sendCommand !== 'function') return;
-  try {
-    controller.sendCommand('G10 L2 P1 X0 Y0 Z0');
-  } catch {
-    /* ignore blocked / disconnected */
-  }
+  new MachineCommandGateway(controller).tryResetWcsToMachineOrigin();
 }
