@@ -2382,15 +2382,22 @@ export function ConnectionPanelMain({
           onClick: () => {
             jobStoppedByUserRef.current = true;
             stopTestFire();
-            controllerRef.current?.emergencyStop();
+            const result = machineService.emergencyStop();
             void showAlert(
-              'Emergency stop',
-              'The machine was reset and the connection was closed. Reconnect when it is safe to continue.',
+              result.accepted ? 'Emergency stop' : 'Emergency stop failed',
+              result.message
+                ?? (result.accepted
+                  ? 'The machine was reset and the connection was closed. Reconnect when it is safe to continue.'
+                  : 'The controller did not accept the emergency stop. Use the physical E-stop or power disconnect, then inspect the machine before reconnecting.'),
             );
-            void machineService.disconnect().catch(() => { /* idempotent with controller.disconnect */ });
             portRef.current = null;
             setIsPaused(false);
-            setMessages(prev => [...prev, '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.']);
+            setMessages(prev => [
+              ...prev,
+              result.accepted
+                ? '⚠ EMERGENCY STOP — disconnected. Reconnect when safe.'
+                : `⚠ EMERGENCY STOP FAILED — ${result.message ?? 'use physical E-stop or power disconnect immediately.'}`,
+            ]);
           },
           style: {
             width: '100%', padding: '10px',
