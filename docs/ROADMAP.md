@@ -15835,6 +15835,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 ### T3-11 | Follow-up: burn-progress visual bugs
 
+**Status:** Shipped in `<TBD>`. Object lifecycle markers now advance from the acknowledged GRBL line, not from `_drainQueue` send time: pending job records carry the marker and `_handleOk()` emits it only after the corresponding `ok`. This keeps the burn halo from jumping ahead of GRBL's planner buffer. The burned-object completion marker is also inset from `worldBounds.maxX/minY` by `transform.screenPx(2)` so edge objects do not draw the marker directly on the bed boundary. Pinned by `tests/burn-progress-ack-timing.test.ts`. Hardware verification: not required (visual progress timing and canvas marker placement only).
+
 **Code references:**
 - `src/controllers/grbl/GrblController.ts:831-833` (lifecycle fires on send, not ack)
 - `src/ui/renderers/SceneRenderer.ts:826-834` (鉁?anchor at right edge can render outside bed)
@@ -20094,7 +20096,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-8 Electron CSP hardening
 - [x] T3-9 Tighten IPC attack surface
 - [x] T3-10 Input file-format size limits
-- [ ] T3-11 Burn-progress lag + 鉁?position
+- [x] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
 - [ ] T3-13 Active-edge-table fill scanline algorithm (filed; algorithmic improvement, upper-end users)
 - [ ] T3-14 Sampled / level-of-detail G-code preview (filed; large-job UX)

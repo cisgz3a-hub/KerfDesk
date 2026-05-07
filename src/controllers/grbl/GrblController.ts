@@ -47,6 +47,7 @@ const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 interface PendingLine {
   text: string;
   byteCount: number;
+  marker?: readonly string[] | null;
   system?: boolean;
 }
 
@@ -1545,6 +1546,9 @@ export class GrblController implements GrblControllerApi {
     if (!oldest.system) {
       this._linesAcknowledged++;
       this._recordAckTimestamp();
+      if (oldest.marker != null) {
+        this._emitObjectLifecycle(oldest.marker);
+      }
       this._emitProgress();
     }
 
@@ -1824,12 +1828,8 @@ export class GrblController implements GrblControllerApi {
       if (byteCount > this._bufferAvailable) break;
 
       const marker = this._lineMarkers[this._queueIndex];
-      if (marker != null) {
-        this._emitObjectLifecycle(marker);
-      }
-
       this._writeLine(line);
-      this._pending.push({ text: line, byteCount });
+      this._pending.push({ text: line, byteCount, marker });
       this._bufferAvailable -= byteCount;
       this._queueIndex++;
       this._recordSendTimestamp();
