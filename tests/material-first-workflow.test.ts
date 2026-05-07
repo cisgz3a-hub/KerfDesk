@@ -114,8 +114,8 @@ function run(): void {
   }
 
   {
-    const source = readFileSync('src/ui/hooks/useConnectionHandlers.ts', 'utf8');
-    assert(source.includes('markSettingsManualUnverified'), 'connection-sidebar manual power/speed/pass edits mark confidence unverified');
+    const source = readFileSync('src/ui/components/LayerPanel.tsx', 'utf8');
+    assert(source.includes('markSettingsManualUnverified'), 'LayerPanel manual power/speed/pass edits mark confidence unverified');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

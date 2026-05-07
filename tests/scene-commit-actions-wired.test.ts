@@ -64,6 +64,13 @@ for (const f of migratedHooks) {
     /\bSceneCommitAction\b/.test(src),
     `${f} references SceneCommitAction`,
   );
+  if (!/handleSceneCommit\(/.test(src)) {
+    assert(
+      f === 'src/ui/hooks/useConnectionHandlers.ts',
+      `${f} no longer performs scene commits after T2-61`,
+    );
+    continue;
+  }
   // At least one handleSceneCommit(...) call passes a kebab-case
   // string literal as its second argument. Excludes pure type-
   // signature lines. Accepts both 2-arg and 3-arg forms.

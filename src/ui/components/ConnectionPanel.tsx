@@ -16,6 +16,8 @@ import { FalconWiFiStatusPanel, FalconAlarmToastStack } from './falcon-wifi';
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
   | 'machineService'
+  | 'executionCoordinator'
+  | 'coordinatorSimulatorNotifyRef'
   | 'outcomeReplaySection'
   | 'messages'
   | 'appendMessage'

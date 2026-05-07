@@ -15,6 +15,7 @@ import {
   savePreset as persistMaterialPreset,
 } from '../../core/materials/MaterialLibrary';
 import type { MaterialPreset } from '../../core/materials/MaterialPreset';
+import { markSettingsManualUnverified } from '../../core/materials/MaterialSettingConfidence';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -170,13 +171,13 @@ export function LayerPanel({
     const clamped = Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0));
     onSceneCommit(updateLayer(scene, activeLayer.id, layer => ({
       ...layer,
-      settings: {
+      settings: markSettingsManualUnverified({
         ...layer.settings,
         power: {
           ...layer.settings.power,
           max: clamped,
         },
-      },
+      }),
     })));
   };
 
@@ -185,10 +186,10 @@ export function LayerPanel({
     const speed = Number.isFinite(value) ? value : 0;
     onSceneCommit(updateLayer(scene, activeLayer.id, layer => ({
       ...layer,
-      settings: {
+      settings: markSettingsManualUnverified({
         ...layer.settings,
         speed,
-      },
+      }),
     })));
   };
 
@@ -858,7 +859,7 @@ export function LayerPanel({
           onCommit: (n: number) => {
             onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
               ...l,
-              settings: { ...l.settings, passes: n },
+              settings: markSettingsManualUnverified({ ...l.settings, passes: n }),
             })));
           },
         }),

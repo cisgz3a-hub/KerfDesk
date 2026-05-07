@@ -835,11 +835,6 @@ export function App() {
 
   const {
     handleConnectionRecompile,
-    handleConnectionUpdateLayerMode,
-    handleConnectionUpdateLayerSetting,
-    handleConnectionUpdateLayerFillMode,
-    handleConnectionUpdateLayerFillInterval,
-    handleConnectionUpdateLayerFillBidirectional,
   } = useConnectionHandlers({
     scene,
     handleSceneCommit,
@@ -1709,11 +1704,6 @@ export function App() {
         onCancelCompile: cancelCompile,
         historyVersion,
         onRecompile: handleConnectionRecompile,
-        onUpdateLayerMode: handleConnectionUpdateLayerMode,
-        onUpdateLayerFillMode: handleConnectionUpdateLayerFillMode,
-        onUpdateLayerFillInterval: handleConnectionUpdateLayerFillInterval,
-        onUpdateLayerFillBidirectional: handleConnectionUpdateLayerFillBidirectional,
-        onUpdateLayerSetting: handleConnectionUpdateLayerSetting,
         machineUi,
       })),
       !connectionSidebarOpen && React.createElement('div', {

@@ -6,9 +6,7 @@ import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
-import { sortLayersByProcessingOrder, type LayerMode, type FillMode } from '../../core/scene/Layer';
-import { type PathGeometry, type TextGeometry } from '../../core/scene/SceneObject';
-import { textGeometryToPath } from '../../geometry/TextToPath';
+import { sortLayersByProcessingOrder, type LayerMode } from '../../core/scene/Layer';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflightSummary, type PreflightSummary } from '../../core/preflight/Preflight';
@@ -18,7 +16,8 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
-import { type MachineService, type LaserOutputState, type ApprovalToken } from '../../app/MachineService';
+import { type MachineService, type LaserOutputState } from '../../app/MachineService';
+import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
 import { computeFrameFreshnessKey } from '../../app/computeFrameFreshnessKey';
@@ -30,7 +29,6 @@ import {
   describeSavedOriginDrift,
 } from '../../app/savedOriginVerify';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
-import { MAX_LASER_SPEED } from '../../core/types';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { SimulatorView } from './SimulatorView';
 import { ConnectionControls } from './ConnectionControls';
@@ -241,11 +239,6 @@ export interface ConnectionPanelMainProps {
    */
   historyVersion?: number;
   onRecompile?: () => void;
-  onUpdateLayerMode?: (layerId: string, mode: LayerMode) => void;
-  onUpdateLayerFillMode?: (layerId: string, fillMode: FillMode) => void;
-  onUpdateLayerFillInterval?: (layerId: string, intervalMm: number) => void;
-  onUpdateLayerFillBidirectional?: (layerId: string, bidirectional: boolean) => void;
-  onUpdateLayerSetting?: (layerId: string, key: 'powerMax' | 'speed' | 'passes', value: number) => void;
   onOpenSettings?: (tab?: SettingsTab) => void;
   /** Panel width in px (host computes min(500, 45% window)). */
   sidebarWidth?: number;
@@ -299,11 +292,6 @@ export function ConnectionPanelMain({
   onCancelCompile,
   historyVersion = 0,
   onRecompile,
-  onUpdateLayerMode,
-  onUpdateLayerFillMode,
-  onUpdateLayerFillInterval,
-  onUpdateLayerFillBidirectional,
-  onUpdateLayerSetting,
   onOpenSettings,
   sidebarWidth = 500,
   machineService,
@@ -1839,305 +1827,27 @@ export function ConnectionPanelMain({
             `${objectCount} object${objectCount !== 1 ? 's' : ''}`,
           ),
         ),
-        m === 'engrave' && onUpdateLayerFillMode && React.createElement('div', {
-          style: { display: 'flex', gap: 3, marginBottom: 6 },
-        },
-          ...([
-            { mode: 'line' as const, label: 'Line fill' },
-            { mode: 'offset' as const, label: 'Offset (coming soon)' },
-            { mode: 'cross-hatch' as const, label: 'Cross-hatch' },
-          ]).map(f =>
-            React.createElement('button', {
-              type: 'button',
-              key: f.mode,
-              disabled: f.mode === 'offset',
-              onClick: () => {
-                if (f.mode === 'offset') return;
-                onUpdateLayerFillMode(layer.id, f.mode);
-              },
-              title: f.mode === 'offset' ? 'Offset fill not yet implemented' : undefined,
-              style: {
-                flex: 1, padding: '3px', fontSize: 9, borderRadius: 3,
-                cursor: f.mode === 'offset' ? 'not-allowed' : 'pointer',
-                opacity: f.mode === 'offset' ? 0.5 : 1,
-                fontFamily: font,
-                background: layer.settings.fill.mode === f.mode ? 'rgba(0,212,255,0.1)' : 'transparent',
-                border: layer.settings.fill.mode === f.mode ? '1px solid #00d4ff' : '1px solid #1a1a2e',
-                color: layer.settings.fill.mode === f.mode ? '#00d4ff' : '#555570',
-              },
-            }, f.label),
-          ),
-        ),
-        m === 'engrave' && onUpdateLayerFillInterval && React.createElement('div', {
-          style: { marginTop: 6, marginBottom: 4 },
-        },
-          React.createElement('div', {
-            style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 },
+        React.createElement('div', {
+          style: {
+            display: 'flex',
+            flexWrap: 'wrap' as const,
+            gap: 6,
+            fontSize: 10,
+            color: '#8888aa',
+            lineHeight: 1.4,
           },
-            React.createElement('span', { style: { fontSize: 9, color: '#555570' } }, 'Line spacing'),
-            React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } },
-              `${(Number(layer.settings.fill.interval) > 0 ? layer.settings.fill.interval : 0.1).toFixed(2)}mm`,
-            ),
-          ),
-          React.createElement('input', {
-            type: 'range',
-            min: 0.02,
-            max: 1,
-            step: 0.02,
-            value: Math.min(1, Math.max(0.02, Number(layer.settings.fill.interval) > 0 ? layer.settings.fill.interval : 0.1)),
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              onUpdateLayerFillInterval(layer.id, parseFloat(e.target.value));
-            },
-            style: { width: '100%', accentColor: '#00d4ff', height: 4 },
-          }),
-          React.createElement('div', {
-            style: { display: 'flex', justifyContent: 'space-between', fontSize: 8, color: '#333355', marginTop: 1 },
-          },
-            React.createElement('span', null, 'Dense (0.02)'),
-            React.createElement('span', null, 'Light (1.0)'),
-          ),
-        ),
-        m === 'engrave' && onUpdateLayerFillBidirectional && React.createElement('div', {
-          style: { display: 'flex', alignItems: 'center', gap: 8, marginTop: 4 },
         },
-          React.createElement('input', {
-            type: 'checkbox',
-            checked: layer.settings.fill.biDirectional !== false,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              onUpdateLayerFillBidirectional(layer.id, e.target.checked);
-            },
-            style: { accentColor: '#00d4ff', width: 12, height: 12, flexShrink: 0 },
-          }),
-          React.createElement('span', { style: { fontSize: 10, color: '#8888aa' } }, 'Bidirectional scanning'),
-          React.createElement('span', { style: { fontSize: 8, color: '#555570' } }, '(faster)'),
-        ),
-        onUpdateLayerSetting && React.createElement('div', {
-          style: { display: 'flex', gap: 6, marginTop: 6 },
-        },
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Power %'),
-            React.createElement('input', {
-              type: 'number',
-              value: layer.settings.power.max,
-              min: 0,
-              max: 100,
-              step: 5,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                onUpdateLayerSetting(layer.id, 'powerMax', parseInt(e.target.value, 10) || 0);
-              },
-              style: {
-                width: '100%',
-                padding: '5px 6px',
-                fontSize: 11,
-                fontFamily: mono,
-                background: '#0a0a14',
-                border: '1px solid #252540',
-                borderRadius: 4,
-                color: '#e0e0ec',
-                textAlign: 'center' as const,
-              },
-            }),
+          React.createElement('span', null, m.toUpperCase()),
+          React.createElement('span', null, `${Math.round(layer.settings.power.max)}%`),
+          React.createElement('span', null, `${Math.round(layer.settings.speed)} mm/min`),
+          React.createElement('span', null, `${Math.max(1, Math.round(layer.settings.passes))} pass${Math.max(1, Math.round(layer.settings.passes)) === 1 ? '' : 'es'}`),
+          m === 'engrave' && React.createElement('span', null,
+            `${layer.settings.fill.mode} fill @ ${(Number(layer.settings.fill.interval) > 0 ? layer.settings.fill.interval : 0.1).toFixed(2)}mm`,
           ),
-          React.createElement('div', { style: { flex: 1 } },
-            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Speed mm/min'),
-            React.createElement('input', {
-              type: 'number',
-              value: layer.settings.speed,
-              min: 10,
-              max: MAX_LASER_SPEED,
-              step: 100,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                onUpdateLayerSetting(layer.id, 'speed', parseInt(e.target.value, 10) || 1000);
-              },
-              style: {
-                width: '100%',
-                padding: '5px 6px',
-                fontSize: 11,
-                fontFamily: mono,
-                background: '#0a0a14',
-                border: '1px solid #252540',
-                borderRadius: 4,
-                color: '#e0e0ec',
-                textAlign: 'center' as const,
-              },
-            }),
-          ),
-          React.createElement('div', { style: { flex: 0.6 } },
-            React.createElement('div', { style: { fontSize: 8, color: '#555570', marginBottom: 2 } }, 'Passes'),
-            React.createElement('input', {
-              type: 'number',
-              value: layer.settings.passes,
-              min: 1,
-              max: 99,
-              step: 1,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                onUpdateLayerSetting(layer.id, 'passes', parseInt(e.target.value, 10) || 1);
-              },
-              style: {
-                width: '100%',
-                padding: '5px 6px',
-                fontSize: 11,
-                fontFamily: mono,
-                background: '#0a0a14',
-                border: '1px solid #252540',
-                borderRadius: 4,
-                color: '#e0e0ec',
-                textAlign: 'center' as const,
-              },
-            }),
+          m === 'engrave' && React.createElement('span', null,
+            layer.settings.fill.biDirectional !== false ? 'bidirectional' : 'one-way',
           ),
         ),
-        onUpdateLayerSetting && React.createElement('div', { style: { marginTop: 4 } },
-          React.createElement('input', {
-            type: 'range',
-            min: 0,
-            max: 100,
-            step: 5,
-            value: layer.settings.power.max,
-            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-              onUpdateLayerSetting(layer.id, 'powerMax', parseInt(e.target.value, 10));
-            },
-            style: { width: '100%', accentColor: modeColor, height: 4 },
-          }),
-        ),
-        // ── Text spacing controls (text objects + converted paths with sourceText) ──
-        (() => {
-          const textObjs = scene.objects.filter(o => o.layerId === layer.id && o.visible && o.geometry.type === 'text');
-          const convertedPaths = scene.objects.filter(o =>
-            o.layerId === layer.id && o.visible &&
-            o.geometry.type === 'path' && (o.geometry as PathGeometry).sourceText,
-          );
-          if (textObjs.length === 0 && convertedPaths.length === 0) return null;
-
-          // Get spacing values from text objects first, then from converted paths
-          const sourceGeom: TextGeometry | undefined =
-            textObjs.length > 0
-              ? (textObjs[0].geometry as TextGeometry)
-              : (convertedPaths[0].geometry as PathGeometry).sourceText;
-          if (!sourceGeom) return null;
-
-          const wordSp = sourceGeom.wordSpacing ?? 100;
-          const letterSp = sourceGeom.letterSpacing ?? 0;
-          const isConverted = textObjs.length === 0; // only converted paths, no live text
-
-          // Update spacing on live text objects (instant canvas feedback)
-          const updateLiveText = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
-            onSceneCommit({
-              ...scene,
-              objects: scene.objects.map(o => {
-                if (o.layerId !== layer.id || o.geometry.type !== 'text') return o;
-                return {
-                  ...o,
-                  geometry: { ...o.geometry, [prop]: value },
-                  _bounds: null,
-                  _worldTransform: null,
-                };
-              }),
-            });
-          };
-
-          // Update spacing on converted path sourceText (stored for reconversion)
-          const updateConvertedSpacing = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
-            onSceneCommit({
-              ...scene,
-              objects: scene.objects.map(o => {
-                if (o.layerId !== layer.id || o.geometry.type !== 'path') return o;
-                const pg = o.geometry as PathGeometry;
-                if (!pg.sourceText) return o;
-                return {
-                  ...o,
-                  geometry: { ...pg, sourceText: { ...pg.sourceText, [prop]: value } },
-                  _bounds: null,
-                  _worldTransform: null,
-                };
-              }),
-            });
-          };
-
-          const updateSpacing = (prop: 'wordSpacing' | 'letterSpacing', value: number) => {
-            if (textObjs.length > 0) updateLiveText(prop, value);
-            if (convertedPaths.length > 0) updateConvertedSpacing(prop, value);
-          };
-
-          // Re-convert paths from stored sourceText with updated spacing
-          const handleReconvert = async () => {
-            const newObjects = [...scene.objects];
-            for (let i = 0; i < newObjects.length; i++) {
-              const o = newObjects[i];
-              if (o.layerId !== layer.id || o.geometry.type !== 'path') continue;
-              const pg = o.geometry as PathGeometry;
-              if (!pg.sourceText) continue;
-              const result = await textGeometryToPath(pg.sourceText);
-              if (!result) continue;
-              newObjects[i] = {
-                ...o,
-                geometry: { type: 'path', subPaths: result.subPaths, sourceText: pg.sourceText },
-                _bounds: null,
-                _worldTransform: null,
-              };
-            }
-            onSceneCommit({ ...scene, objects: newObjects });
-          };
-
-          const label = textObjs.length > 0
-            ? `TEXT SPACING (${textObjs.length} text)`
-            : `TEXT SPACING (${convertedPaths.length} converted)`;
-
-          return React.createElement('div', {
-            style: { marginTop: 8, padding: '8px 0 2px', borderTop: '1px solid #1a1a2e' },
-          },
-            React.createElement('div', {
-              style: { fontSize: 9, color: '#00d4ff', marginBottom: 6, fontWeight: 600 },
-            }, label),
-            // Word spacing
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-            },
-              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Word spacing'),
-              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${wordSp}%`),
-            ),
-            React.createElement('input', {
-              type: 'range',
-              min: 50,
-              max: 400,
-              step: 10,
-              value: wordSp,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateSpacing('wordSpacing', parseInt(e.target.value, 10));
-              },
-              style: { width: '100%', accentColor: '#00d4ff', height: 4, marginBottom: 6 },
-            }),
-            // Letter spacing
-            React.createElement('div', {
-              style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
-            },
-              React.createElement('span', { style: { fontSize: 9, color: '#8888aa' } }, 'Letter spacing'),
-              React.createElement('span', { style: { fontSize: 9, color: '#00d4ff', fontFamily: mono } }, `${letterSp}%`),
-            ),
-            React.createElement('input', {
-              type: 'range',
-              min: -20,
-              max: 100,
-              step: 2,
-              value: letterSp,
-              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-                updateSpacing('letterSpacing', parseInt(e.target.value, 10));
-              },
-              style: { width: '100%', accentColor: '#00d4ff', height: 4 },
-            }),
-            // Re-convert button for converted paths
-            isConverted && React.createElement('button', {
-              type: 'button',
-              onClick: () => { void handleReconvert(); },
-              style: {
-                marginTop: 8, width: '100%', padding: '6px 0',
-                background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)',
-                borderRadius: 4, color: '#00d4ff', fontSize: 10, fontWeight: 600,
-                cursor: 'pointer', fontFamily: "'DM Sans', system-ui, sans-serif",
-              },
-            }, '↺ Apply spacing & re-convert'),
-          );
-        })(),
       ),
     );
   }
@@ -2146,7 +1856,6 @@ export function ConnectionPanelMain({
     isConnected &&
     !isRunning &&
     !displayPaused &&
-    onUpdateLayerMode &&
     layerOverviewRows.length > 0 &&
     React.createElement('div', {
       style: { padding: '10px 16px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
