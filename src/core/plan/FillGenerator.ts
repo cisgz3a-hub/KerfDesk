@@ -24,6 +24,7 @@
 
 import { type Point } from '../types';
 import { type FlatPath } from '../job/Job';
+import { flatPathsFromCompoundPath } from '../job/CompoundPathOutput';
 import { type CompoundPath } from '../geometry/CompoundPath';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
@@ -286,7 +287,11 @@ export function generateFillRowsForCompoundPaths(
   let rowIndex = initialRowIndex;
 
   for (const path of paths) {
-    const compoundRows = generateFillRows(compoundPathToFlatPaths(path), settings, rowIndex);
+    const compoundRows = generateFillRows(
+      flatPathsFromCompoundPath(path).filter(flatPath => flatPath.closed),
+      settings,
+      rowIndex,
+    );
     rows.push(...compoundRows);
     rowIndex += compoundRows.length;
   }
@@ -366,33 +371,6 @@ function extractEdges(paths: FlatPath[]): Edge[] {
   }
 
   return edges;
-}
-
-function compoundPathToFlatPaths(path: CompoundPath): FlatPath[] {
-  return path.contours
-    .filter(contour => contour.closed)
-    .map((contour, index) => {
-      const coords = new Float64Array(contour.points.length * 2);
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      contour.points.forEach((point, pointIndex) => {
-        coords[pointIndex * 2] = point.x;
-        coords[pointIndex * 2 + 1] = point.y;
-        minX = Math.min(minX, point.x);
-        minY = Math.min(minY, point.y);
-        maxX = Math.max(maxX, point.x);
-        maxY = Math.max(maxY, point.y);
-      });
-
-      return {
-        id: `${path.sourceObjectId}:${contour.role}:${index}`,
-        coords,
-        closed: true,
-        direction: contour.winding,
-        bounds: { minX, minY, maxX, maxY },
-        parentId: path.sourceObjectId,
-        powerScale: 1,
-      };
-    });
 }
 
 // ─── RAY-EDGE INTERSECTION ───────────────────────────────────────

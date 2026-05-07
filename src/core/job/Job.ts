@@ -19,6 +19,7 @@ import { type AABB, type Point, emptyAABB, generateId } from '../types';
 import { type FillMode, type ImageRasterMode } from '../scene/Layer';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
+import { type ContourRole } from '../geometry/CompoundPath';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -42,6 +43,12 @@ export interface FlatPath {
   direction: 'cw' | 'ccw';      // Winding (for inside-first ordering)
   bounds: AABB;
   parentId: string | null;       // For containment hierarchy
+  /** T2-15: source CompoundPath id when this path is one contour of a compound. */
+  compoundId?: string;
+  /** T2-15: explicit source contour role, preserved until final output ordering. */
+  contourRole?: ContourRole;
+  /** T2-15: stable contour index within the source CompoundPath. */
+  contourIndex?: number;
   /** Multiplier on layer max power (from SceneObject.powerScale). */
   powerScale: number;
 }
