@@ -21,21 +21,32 @@ function assert(condition: boolean, message: string): void {
 
 console.log('\n=== start-mode-wcs-reset ===');
 
+void (async () => {
+
 {
-  const sent: string[] = [];
-  const ctrl = { sendCommand: (s: string) => { sent.push(s); } };
-  sendResetWcsCommand(ctrl);
+  const operationSent: string[] = [];
+  const rawSent: string[] = [];
+  const ctrl = {
+    sendCommand: (s: string) => { rawSent.push(s); },
+    operations: {
+      resetWcsToMachineOrigin: async () => {
+        operationSent.push('G10 L2 P1 X0 Y0 Z0');
+        return { ok: true as const };
+      },
+    },
+  };
+  await sendResetWcsCommand(ctrl);
   assert(
-    sent.length === 1 && sent[0] === 'G10 L2 P1 X0 Y0 Z0',
-    'sends G10 L2 P1 X0 Y0 Z0 to clear WCS',
+    operationSent.length === 1 && operationSent[0] === 'G10 L2 P1 X0 Y0 Z0' && rawSent.length === 0,
+    'sends G10 L2 P1 X0 Y0 Z0 through operations only',
   );
 }
 
 {
   let throws = false;
   try {
-    sendResetWcsCommand(null);
-    sendResetWcsCommand(undefined);
+    await sendResetWcsCommand(null);
+    await sendResetWcsCommand(undefined);
   } catch {
     throws = true;
   }
@@ -44,14 +55,23 @@ console.log('\n=== start-mode-wcs-reset ===');
 
 {
   let throws = false;
-  const ctrl = { sendCommand: () => { throw new Error('disconnected'); } };
+  const ctrl = {
+    operations: {
+      resetWcsToMachineOrigin: async () => ({ ok: false as const, reason: 'disconnected' }),
+    },
+  };
   try {
-    sendResetWcsCommand(ctrl);
+    await sendResetWcsCommand(ctrl);
   } catch {
     throws = true;
   }
-  assert(!throws, 'swallows sendCommand errors');
+  assert(!throws, 'swallows reset operation errors');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
+
+})().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

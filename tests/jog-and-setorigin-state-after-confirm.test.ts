@@ -120,21 +120,25 @@ console.log('\n=== T1-105 Jog + Set Origin state-after-confirm ===\n');
 
 void (async () => {
   {
-    const { ctrl, rawSent } = makeController();
-    const result = sendSetOriginWcsCommand(ctrl);
-    assertContract(result.ok === true && rawSent[0] === 'G10 L20 P1 X0 Y0',
-      'sendSetOriginWcsCommand success returns ok=true and emits G10');
+    const { ctrl, operationSent, rawSent } = makeController();
+    const result = await sendSetOriginWcsCommand(ctrl);
+    assertContract(
+      result.ok === true
+      && operationSent[0] === 'G10 L20 P1 X0 Y0'
+      && rawSent.length === 0,
+      'sendSetOriginWcsCommand success returns ok=true through operations only',
+    );
   }
 
   {
-    const result = sendSetOriginWcsCommand(null);
+    const result = await sendSetOriginWcsCommand(null);
     assertContract(result.ok === false && result.reason === 'no-controller',
       'sendSetOriginWcsCommand null controller returns no-controller');
   }
 
   {
     const { ctrl } = makeController({ throwOnSend: true });
-    const result = sendSetOriginWcsCommand(ctrl);
+    const result = await sendSetOriginWcsCommand(ctrl);
     assertContract(result.ok === false && (result.reason ?? '').includes('rejected'),
       'sendSetOriginWcsCommand transport throw returns error reason');
   }

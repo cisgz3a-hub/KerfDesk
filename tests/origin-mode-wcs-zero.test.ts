@@ -25,21 +25,35 @@ function assert(condition: boolean, message: string): void {
 
 console.log('\n=== origin-mode-wcs-zero ===');
 
+void (async () => {
+
 {
-  const sent: string[] = [];
-  const ctrl = { sendCommand: (s: string) => { sent.push(s); } };
-  const result = sendSetOriginWcsCommand(ctrl);
-  assert(sent.length === 1 && sent[0] === 'G10 L20 P1 X0 Y0', 'sendSetOriginWcsCommand emits G10 L20 P1 X0 Y0');
+  const operationsSent: string[] = [];
+  const rawSent: string[] = [];
+  const ctrl = {
+    sendCommand: (s: string) => { rawSent.push(s); },
+    operations: {
+      setWorkOriginAtCurrentPosition: async () => {
+        operationsSent.push('G10 L20 P1 X0 Y0');
+        return { ok: true as const };
+      },
+    },
+  };
+  const result = await sendSetOriginWcsCommand(ctrl);
+  assert(
+    operationsSent.length === 1 && operationsSent[0] === 'G10 L20 P1 X0 Y0' && rawSent.length === 0,
+    'sendSetOriginWcsCommand emits G10 L20 P1 X0 Y0 through operations only',
+  );
   assert(result.ok === true, 'sendSetOriginWcsCommand success returns ok=true');
 }
 
 {
   let throws = false;
-  let nullResult: ReturnType<typeof sendSetOriginWcsCommand> | null = null;
-  let undefinedResult: ReturnType<typeof sendSetOriginWcsCommand> | null = null;
+  let nullResult: Awaited<ReturnType<typeof sendSetOriginWcsCommand>> | null = null;
+  let undefinedResult: Awaited<ReturnType<typeof sendSetOriginWcsCommand>> | null = null;
   try {
-    nullResult = sendSetOriginWcsCommand(null);
-    undefinedResult = sendSetOriginWcsCommand(undefined);
+    nullResult = await sendSetOriginWcsCommand(null);
+    undefinedResult = await sendSetOriginWcsCommand(undefined);
   } catch {
     throws = true;
   }
@@ -75,3 +89,8 @@ console.log('\n=== origin-mode-wcs-zero ===');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed`);
 process.exit(failed === 0 ? 0 : 1);
+
+})().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

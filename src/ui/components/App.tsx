@@ -947,7 +947,7 @@ export function App() {
     // readout to reflect machine coords after switching. Only 'savedOrigin'
     // mode wants the WCS offset to persist (user will Set Origin manually).
     if (mode !== 'savedOrigin') {
-      sendResetWcsCommand(grbl.controller);
+      void sendResetWcsCommand(grbl.controller);
     }
   }, [scene, handleSceneCommit, grbl.controller]);
 

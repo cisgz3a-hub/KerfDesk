@@ -1,4 +1,10 @@
-import { MachineCommandGateway } from './MachineCommandGateway';
+import type { OperationResult } from '../controllers/ControllerInterface';
+
+interface ResetWcsController {
+  operations: {
+    resetWcsToMachineOrigin(): Promise<OperationResult>;
+  };
+}
 
 /**
  * Reset G54 work coordinate system to machine origin.
@@ -10,9 +16,13 @@ import { MachineCommandGateway } from './MachineCommandGateway';
  * current position): we want WCS == machine coords regardless of
  * where the head happens to be.
  */
-export function sendResetWcsCommand(
-  controller: { sendCommand(s: string): void } | null | undefined,
-): void {
-  if (!controller || typeof controller.sendCommand !== 'function') return;
-  new MachineCommandGateway(controller).tryResetWcsToMachineOrigin();
+export async function sendResetWcsCommand(
+  controller: ResetWcsController | null | undefined,
+): Promise<void> {
+  if (!controller || typeof controller.operations?.resetWcsToMachineOrigin !== 'function') return;
+  try {
+    await controller.operations.resetWcsToMachineOrigin();
+  } catch {
+    /* best-effort WCS cleanup */
+  }
 }
