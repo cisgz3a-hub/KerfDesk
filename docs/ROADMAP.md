@@ -15664,6 +15664,8 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Status (partial):** Case 2 shipped in `3c1d5af` — added `tests/template-safety-enforcement.test.ts`, a focused six-case guard for dangerous template/custom-G-code surfaces: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, `$X` injection, and motion outside bed bounds. The master checklist remains open because cases 1, 3, 4, and 5 still need dedicated coverage.
 
+**Status (partial):** Case 3 shipped in `<TBD>` — added `tests/stale-gcode-blocks-start.test.ts`, which compiles a scene, mutates the design, attempts to start with the old ticket, and asserts the stale ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set. The master checklist remains open because cases 1, 4, and 5 still need dedicated coverage.
+
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
 **Fix:** Add these tests. They're the top-priority gap closers.
