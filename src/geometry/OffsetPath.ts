@@ -14,6 +14,7 @@
 
 import Offset from 'polygon-offset';
 import type { MultiPolygon } from 'polygon-clipping';
+import type { CompoundPath } from '../core/geometry/CompoundPath';
 import type { SceneObject } from '../core/scene/SceneObject';
 import type { PathGeometry } from '../core/scene/SceneObject';
 import { objectToPolygon, polygonToPathGeometry } from './BooleanOps';
@@ -39,6 +40,24 @@ function ringSignedArea(ring: Ring): number {
   return area / 2;
 }
 
+function ringAbsArea(ring: Ring): number {
+  return Math.abs(ringSignedArea(ring));
+}
+
+function pointInRing(p: Coord, ring: Ring): boolean {
+  let inside = false;
+  const n = ring.length - 1;
+  if (n < 3) return false;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = ring[i][0], yi = ring[i][1];
+    const xj = ring[j][0], yj = ring[j][1];
+    const intersects = (yi > p[1]) !== (yj > p[1]) &&
+      p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
 /**
  * Reverse the ring's vertex order, preserving the closing-vertex
  * convention (last == first).
@@ -61,6 +80,62 @@ function ensureWinding(ring: Ring, wantCCW: boolean): Ring {
   return isCCW === wantCCW ? ring : reverseRing(ring);
 }
 
+function contourToRing(points: CompoundPath['contours'][number]['points']): Ring | null {
+  if (points.length < 3) return null;
+  const ring = points.map(point => [point.x, point.y] as Coord);
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (first[0] !== last[0] || first[1] !== last[1]) {
+    ring.push([first[0], first[1]]);
+  }
+  return ring;
+}
+
+/**
+ * T2-15 Pass 3: build polygon-offset input directly from CompoundPath
+ * roles. This keeps explicit outer/hole/island structure until the
+ * offset boundary instead of asking loose subpaths to rediscover it.
+ */
+export function compoundPathToOffsetMultiPolygon(path: CompoundPath): MultiPolygon {
+  const result: MultiPolygon = [];
+  const outers: Array<{ ring: Ring; polygonIndex: number }> = [];
+  const pendingHoles: Ring[] = [];
+
+  for (const contour of path.contours) {
+    if (!contour.closed || contour.role === 'open') continue;
+    const ring = contourToRing(contour.points);
+    if (!ring) continue;
+
+    if (contour.role === 'outer' || contour.role === 'island') {
+      const outerRing = ensureWinding(ring, /* wantCCW */ true);
+      outers.push({ ring: outerRing, polygonIndex: result.length });
+      result.push([outerRing]);
+    } else if (contour.role === 'hole') {
+      pendingHoles.push(ensureWinding(ring, /* wantCCW */ false));
+    }
+  }
+
+  for (const hole of pendingHoles) {
+    const sample = hole[0];
+    let best: { ring: Ring; polygonIndex: number } | null = null;
+    for (const candidate of outers) {
+      if (!pointInRing(sample, candidate.ring)) continue;
+      if (!best || ringAbsArea(candidate.ring) < ringAbsArea(best.ring)) {
+        best = candidate;
+      }
+    }
+
+    if (best) {
+      result[best.polygonIndex].push(hole);
+    } else {
+      // Preserve orphan geometry rather than dropping it silently.
+      result.push([ensureWinding(hole, /* wantCCW */ true)]);
+    }
+  }
+
+  return result;
+}
+
 /**
  * Offset the object's polygon representation (world space), preserving
  * holes. Positive distance = outset (margin), negative = inset (padding).
@@ -72,10 +147,8 @@ function ensureWinding(ring: Ring, wantCCW: boolean): Ring {
  * yields a 52×52 outer with an 18×18 inner — both contours displaced
  * by 1mm into / out of the material as intended.
  */
-export function offsetObject(obj: SceneObject, distance: number): PathGeometry | null {
+function offsetMultiPolygon(multi: MultiPolygon, distance: number): PathGeometry | null {
   if (distance === 0) return null;
-
-  const multi = objectToPolygon(obj);
   if (!multi || multi.length === 0) return null;
 
   const combined: MultiPolygon = [];
@@ -127,4 +200,15 @@ export function offsetObject(obj: SceneObject, distance: number): PathGeometry |
   if (pathGeom.subPaths.length === 0) return null;
 
   return pathGeom;
+}
+
+export function offsetCompoundPath(path: CompoundPath, distance: number): PathGeometry | null {
+  return offsetMultiPolygon(compoundPathToOffsetMultiPolygon(path), distance);
+}
+
+export function offsetObject(obj: SceneObject, distance: number): PathGeometry | null {
+  if (distance === 0) return null;
+
+  const multi = objectToPolygon(obj);
+  return multi ? offsetMultiPolygon(multi, distance) : null;
 }
