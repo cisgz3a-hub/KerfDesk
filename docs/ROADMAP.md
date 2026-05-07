@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 122 | 6 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-102 failed-launch detection layer shipped with full updater rollback deferred; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 123 | 5 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99 signed Windows release workflow and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -13185,6 +13185,8 @@ The certificate is stored as a GitHub Actions secret (base64-encoded PFX). It's 
 
 **Cross-check note (audit 5B):** Audit's Critical 2 + Priority 3. Verified at package.json:44.
 
+**Status:** Shipped in TBD (focused MVP — signed Windows release workflow and builder config; certificate acquisition and first real signature verification remain business/release tasks). New `.github/workflows/release-windows.yml` runs only on `v*` tags, requires `WIN_CERT_PFX_BASE64` and `WIN_CERT_PASSWORD` secrets, builds with `npx electron-builder --win --config scripts/signing/electron-builder.windows-signed.cjs --publish never`, and uploads `release/*.exe` as a 30-day `windows-signed-installer` artifact. New `scripts/signing/electron-builder.windows-signed.cjs` extends the package build config, enables `signAndEditExecutable`, pins `publisherName: 'LaserForge'`, and signs with SHA-256 while leaving the default package/PR build unsigned. Pinned by `tests/windows-signing-release-workflow.test.ts` (15 contracts: tag-only trigger, no PR exposure, Windows runner, secret names, early secret failure, signed config command, artifact upload, signed builder config, and PR CI secret isolation). **Out of scope:** obtaining EV/OV cert, storing real GitHub secrets, first `signtool verify /pa` proof on a produced release artifact, and SmartScreen reputation validation. **Hardware verification: not required** (release engineering only).
+
 ---
 
 ### T2-100 | macOS code signing + notarization + stapling
@@ -20015,7 +20017,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (focused MVP shipped; lifecycle event contract + revocation merge/apply helpers; polling/storage wiring deferred)
 - [x] T2-97 Entitlement checks must never block safety controls (shipped 2026-05-05 in `9a62d90` — `docs/SAFETY_GUARANTEES.md` + behavioral + static-guard tests)
 - [x] T2-98 CI builds installers on Windows + macOS runners (focused MVP shipped; unsigned per-PR installer jobs + artifact upload)
-- [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
+- [x] T2-99 Windows code signing + signed CI releases (Shipped — tag-only signed Windows release workflow + electron-builder signed config; cert acquisition and first signature verification remain release tasks)
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
 - [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
 - [x] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (Shipped — Layer 1 failed-launch detector in Electron main; previous-installer retention and rollback UI deferred until T2-101/signing)
