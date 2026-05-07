@@ -20,6 +20,7 @@ export interface StartReadinessGate {
     | 'preflight'
     | 'machineState'
     | 'framing'
+    | 'currentModeAnchor'
     | 'laserState'
     | 'wcsState'
     | 'controllerConnected';

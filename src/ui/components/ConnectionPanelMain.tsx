@@ -28,6 +28,11 @@ import {
   verifySavedOriginG54,
   describeSavedOriginDrift,
 } from '../../app/savedOriginVerify';
+import {
+  captureCurrentFrameAnchor,
+  currentModeFrameAnchorAllowsStart,
+  type CurrentFrameAnchor,
+} from '../../app/CurrentFrameAnchor';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { SimulatorView } from './SimulatorView';
@@ -364,6 +369,7 @@ export function ConnectionPanelMain({
   const wasConnectedRef = useRef(false);
   const intentionalDisconnectRef = useRef(false);
   const hasFramed = useRef(false);
+  const currentFrameAnchorRef = useRef<CurrentFrameAnchor | null>(null);
 
   // T1-97 retire (2026-05-02): frame-before-start bypass override removed.
   // The underlying defect that made it necessary was structurally fixed by
@@ -542,6 +548,7 @@ export function ConnectionPanelMain({
   useEffect(() => {
     if (isConnected) {
       hasFramed.current = false;
+      currentFrameAnchorRef.current = null;
       hasJogged.current = false;
       hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
@@ -560,6 +567,7 @@ export function ConnectionPanelMain({
   // is already false.
   useEffect(() => {
     hasFramed.current = false;
+    currentFrameAnchorRef.current = null;
     setWorkflowVersion(v => v + 1);
   }, [historyVersion]);
 
@@ -597,6 +605,7 @@ export function ConnectionPanelMain({
     // hasFramed (it was already false at mount).
     if (lastFrameKeyRef.current !== null && lastFrameKeyRef.current !== frameFreshnessKey) {
       hasFramed.current = false;
+      currentFrameAnchorRef.current = null;
       setWorkflowVersion(v => v + 1);
     }
     lastFrameKeyRef.current = frameFreshnessKey;
@@ -1094,6 +1103,9 @@ export function ConnectionPanelMain({
       // configurations.
       bedWidthMm: bedWidth,
     };
+    const frameStartPosition = machineState?.position
+      ? { x: machineState.position.x, y: machineState.position.y }
+      : null;
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
 
@@ -1131,10 +1143,11 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -1163,6 +1176,9 @@ export function ConnectionPanelMain({
       // configurations.
       bedWidthMm: bedWidth,
     };
+    const frameStartPosition = machineState?.position
+      ? { x: machineState.position.x, y: machineState.position.y }
+      : null;
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
 
@@ -1198,10 +1214,11 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
@@ -1482,6 +1499,13 @@ export function ConnectionPanelMain({
   // controllers that don't implement it.
   const placementUncertain =
     controllerRef.current?.getPlacementUncertain?.() ?? false;
+  const currentModeFrameAnchorValid =
+    !requireFrame ||
+    currentModeFrameAnchorAllowsStart({
+      startMode,
+      frameAnchor: currentFrameAnchorRef.current,
+      machinePosition,
+    });
   // T1-30: canStartJob keeps its existing product-level conjuncts
   // (gcode exists / fresh / framed / preflight passed / not running /
   // machine bounds OK / laser output not unknown / WCS not uncertain)
@@ -1500,6 +1524,7 @@ export function ConnectionPanelMain({
     !gcodeStale &&
     !machineBlocksJobStart &&
     (!requireFrame || hasFramed.current) &&
+    currentModeFrameAnchorValid &&
     laserOutputState !== 'unknown' &&
     !placementUncertain &&
     (gates?.baseSafe ?? false);
@@ -1575,6 +1600,15 @@ export function ConnectionPanelMain({
           : (hasFramed.current ? 'ok' : 'fail'),
         failHeadline: 'Frame not done since last design change',
         failAction: 'Click Frame to confirm where the laser will burn (resets when you edit the design)',
+      },
+      {
+        id: 'currentModeAnchor',
+        label: 'Laser head still at framed start',
+        status: !requireFrame || startMode !== 'current'
+          ? 'ok'
+          : (hasFramed.current && currentModeFrameAnchorValid ? 'ok' : 'fail'),
+        failHeadline: 'Laser head moved after framing',
+        failAction: 'Frame again before starting from the laser head',
       },
       {
         id: 'laserState',

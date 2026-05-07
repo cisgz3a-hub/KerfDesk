@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 355 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 447 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 356 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 448 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,7 +23,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 37 | - |
+| `src/app` | 38 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 90 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
@@ -46,7 +46,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 394 | - |
+| `tests/` | 395 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -66,6 +66,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/CompiledJobState.ts`
 - `src/app/ConnectionManager.ts`
 - `src/app/CriticalEventStore.ts`
+- `src/app/CurrentFrameAnchor.ts`
 - `src/app/DisconnectTransaction.ts`
 - `src/app/DomainErrorState.ts`
 - `src/app/ErrorReporter.ts`
@@ -565,6 +566,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/crash-reporting-privacy.test.ts`
 - `tests/critical-event-preservation.test.ts`
 - `tests/csp-policy.test.ts`
+- `tests/current-mode-frame-anchor.test.ts`
 - `tests/customstart-mode-reassertion.test.ts`
 - `tests/delete-marks-dirty.test.ts`
 - `tests/dependency-security-scan.test.ts`
