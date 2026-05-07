@@ -565,15 +565,15 @@ export class GrblController implements GrblControllerApi {
         for (const cb of this._errorListeners) {
           cb(-1, `Serial error: ${err.message}`);
         }
-        // Abort active job on serial error — don't wait for close
-        this._abortJob();
+        // T3-2 case 5 / T3-16: a serial transport error during a job is
+        // operationally a cable pull. Abort the stream, close the failed
+        // handle best-effort, and force disconnected so the UI cannot start
+        // another job on a dead port.
+        this._handleTransportDisconnect(true);
       });
 
       port.onClose(() => {
-        this._stopStatusPolling();
-        this._abortJob();
-        this._port = null;
-        this._updateStatus('disconnected');
+        this._handleTransportDisconnect(false);
       });
 
       port.write('\n');
@@ -672,6 +672,32 @@ export class GrblController implements GrblControllerApi {
   }
 
   // ─── JOB EXECUTION ──────────────────────────────────────────
+
+  private _handleTransportDisconnect(closePort: boolean): void {
+    const port = this._port;
+    this._stopStatusPolling();
+    this._abortJob();
+    this._port = null;
+    this._maxSpindle = null;
+    this._settingsQueried = false;
+    this._awaitingSettingsOk = false;
+    this._awaitingWcsQueryOk = false;
+    this._currentG54 = null;
+    this._placementUncertain = false;
+    this._positionConfirmed = false;
+    this._safeStateCheckArmed = false;
+    if (this._safeStateWatchdog !== null) {
+      clearTimeout(this._safeStateWatchdog);
+      this._safeStateWatchdog = null;
+    }
+    this._unsafeAtConnect = null;
+    this._grblSettings.clear();
+    this._resetMachineSettingsCache();
+    this._updateStatus('disconnected');
+    if (closePort && port?.isOpen) {
+      void port.close().catch(() => { /* ignore transport-error cleanup close failures */ });
+    }
+  }
 
   async executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle> {
     if (output.kind !== 'gcode-lines') {

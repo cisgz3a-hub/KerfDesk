@@ -15670,6 +15670,10 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Status (partial):** Case 4 shipped in `00ce691` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
 
+**Status (partial):** Case 5 shipped in `<TBD>` — added `tests/cable-yanked-mid-job.test.ts` and fixed `GrblController` transport-error handling so a serial `onError` mid-job aborts the job, closes the failed port best-effort, transitions to `disconnected`, notifies UI state listeners, preserves autosave, and allows reconnect-then-start on a fresh port.
+
+**Status:** Shipped in `<TBD>` — all five critical T3-2 test files now exist and pass: UI start-job marker path, template safety enforcement, stale-scene start block, profile-change start block, and cable-yanked-mid-job recovery.
+
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
 **Fix:** Add these tests. They're the top-priority gap closers.
@@ -20063,7 +20067,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
-- [ ] T3-2 Write the 5 critical missing tests
+- [x] T3-2 Write the 5 critical missing tests
 - [ ] T3-3 Delete or auto-generate PROJECT_MAP
 - [ ] T3-4 Code-signed installer
 - [ ] T3-5 Auto-update channel
