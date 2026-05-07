@@ -15,6 +15,8 @@
     "license-check": "node scripts/license-check.mjs",
     "license-check:report": "node scripts/license-check-report.mjs",
     "license-check:summary": "node scripts/license-check-summary.mjs",
+    "project-map:generate": "node scripts/generate-project-map.mjs",
+    "project-map:check": "node scripts/generate-project-map.mjs --check",
     "test": "node scripts/run-tests.mjs",
     "prepare": "husky"
   },
