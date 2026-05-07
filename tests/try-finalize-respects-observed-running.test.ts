@@ -90,6 +90,7 @@ void (async () => {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (_output, _jobTicket) => new Promise(() => {}),
     sendJob: async () => {
       return new Promise<void>(() => {});
     },
@@ -122,7 +123,7 @@ void (async () => {
   }
   assert(
     svc.getActiveJobCanvasContext() === cctx,
-    'hanging sendJob: canvas context is set and stable',
+    'hanging executeJob: canvas context is set and stable',
   );
 
   const progress: JobProgress = {

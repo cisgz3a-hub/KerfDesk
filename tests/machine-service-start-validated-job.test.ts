@@ -128,6 +128,11 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      await sendJobImpl([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob: sendJobImpl,
     pause: () => {},
     resume: () => {},
@@ -169,10 +174,10 @@ async function run(): Promise<void> {
       canvasContext: canvasContextForTicket(ticket),
     });
 
-    assert(sentBatches.length === 1, 'sendJob invoked once');
+    assert(sentBatches.length === 1, 'executeJob streams once');
     assert(
       sentBatches[0]?.join('\n') === [...ticket.gcodeLines].join('\n'),
-      'sendJob receives ticket gcodeLines',
+      'executeJob receives ticket gcodeLines',
     );
     // T1-46: notifySimulatorTx is now deferred-and-chunked so sendJob can
     // start streaming first. Wait for the chunked fan-out to drain before
@@ -193,6 +198,44 @@ async function run(): Promise<void> {
       && ctx0.canvasMoves.length === 0,
       'getActiveJobCanvasContext holds same machineTransform ref and snapshot',
     );
+  }
+
+  {
+    const executeCalls: Array<{ outputKind: string; dialect?: string; lines: readonly string[]; ticketId: string }> = [];
+    const mock = {
+      ...makeMockController(async () => {
+        throw new Error('legacy sendJob should not be called');
+      }),
+      executeJob: async (output, jobTicket) => {
+        executeCalls.push({
+          outputKind: output.kind,
+          dialect: output.kind === 'gcode-lines' ? output.dialect : undefined,
+          lines: output.kind === 'gcode-lines' ? output.lines : [],
+          ticketId: jobTicket.ticketId,
+        });
+        return { id: jobTicket.ticketId, startedAt: 123 };
+      },
+    } as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    await svc.startValidatedJob({
+      ticket,
+      scene,
+      machineState: idle,
+      notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
+    });
+
+    assert(executeCalls.length === 1, 'startValidatedJob calls executeJob once');
+    assert(executeCalls[0]?.outputKind === 'gcode-lines', 'executeJob receives gcode-lines output');
+    assert(executeCalls[0]?.dialect === 'grbl', 'executeJob receives GRBL dialect');
+    assert(
+      executeCalls[0]?.lines.join('\n') === [...ticket.gcodeLines].join('\n'),
+      'executeJob receives ticket gcodeLines',
+    );
+    assert(executeCalls[0]?.ticketId === ticket.ticketId, 'executeJob receives the running ticket id');
   }
 
   {

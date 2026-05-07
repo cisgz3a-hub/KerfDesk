@@ -97,6 +97,12 @@ void (async () => {
       maxSpindle: null,
       connect: async () => {},
       disconnect: async () => {},
+      executeJob: async (_output, jobTicket) => {
+        if (sendThrows.current) {
+          throw new Error('stream failure');
+        }
+        return { id: jobTicket.ticketId, startedAt: 123 };
+      },
       sendJob: async () => {
         if (sendThrows.current) {
           throw new Error('stream failure');
@@ -131,7 +137,7 @@ void (async () => {
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
     }
-    assert(err.length > 0, 'sendJob error propagates');
+    assert(err.length > 0, 'executeJob error propagates');
     assert(svc.getActiveJobCanvasContext() === null, 'context cleared in startValidatedJob catch');
   }
 
@@ -143,6 +149,7 @@ void (async () => {
       maxSpindle: null,
       connect: async () => {},
       disconnect: async () => {},
+      executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
       sendJob: async () => {},
       pause: () => {},
       resume: () => {},
@@ -208,6 +215,7 @@ void (async () => {
       maxSpindle: null,
       connect: async () => {},
       disconnect: async () => {},
+      executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
       sendJob: async () => {},
       pause: () => {},
       resume: () => {},

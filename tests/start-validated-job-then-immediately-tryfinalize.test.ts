@@ -90,6 +90,7 @@ void (async () => {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (_output, _jobTicket) => new Promise(() => {}),
     sendJob: async () => new Promise<void>(() => {}),
     pause: () => {},
     resume: () => {},

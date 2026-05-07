@@ -687,20 +687,28 @@ export class MachineService {
         estimate ? estimate.totalSeconds * 1000 : null,
       );
 
-      // T1-46: kick off sendJob FIRST so the controller starts streaming
+      // T1-46/T2-27: kick off executeJob FIRST so the controller starts streaming
       // immediately; defer the simulator-fan-out loop to a chunked
       // setTimeout. notifySimulatorTx fans out to UI listeners (progress
       // overlays, replay capture mirror); doing 2M synchronous calls
-      // before sendJob meant the controller didn't see byte 1 until
+      // before job execution meant the controller didn't see byte 1 until
       // after the entire fan-out completed — multi-second freeze right
       // when the user expects "click Start → laser begins" within
       // ~100ms. Chunking yields between batches so the browser can
       // repaint and the controller's streaming continues uninterrupted.
       // Errors from individual notify callbacks are swallowed (matches
       // the existing per-callback try/catch in notifySimulatorTx) — a
-      // broken listener mustn't take down job start. sendJob's own
+      // broken listener mustn't take down job start. executeJob's own
       // promise carries the streaming/transport error contract.
-      const sendPromise = this.controllerRef.current.sendJob(lines);
+      const sendPromise = this.controllerRef.current.executeJob(
+        { kind: 'gcode-lines', lines, dialect: 'grbl' },
+        {
+          ticketId: ticket.ticketId,
+          sceneHash: ticket.sceneHash,
+          profileHash: ticket.profileHash,
+          outputHash: ticket.gcodeHash,
+        },
+      );
       this._notifySimulatorChunked(lines, notifySimulatorTx);
       await sendPromise;
     } catch (err) {

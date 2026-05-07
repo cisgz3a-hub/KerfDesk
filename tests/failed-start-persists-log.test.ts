@@ -122,6 +122,11 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      await sendJob([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob,
     pause: () => {},
     resume: () => {},

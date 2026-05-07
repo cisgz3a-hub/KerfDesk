@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 103 | 25 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-26 final simulator-literal close-out shipped; T2-6 App split remains open. |
+| Tier 2 | 104 | 24 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-27 typed executeJob MVP shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -7963,6 +7963,8 @@ async executeJob(output: ControllerOutput, ticket: JobTicket): Promise<JobHandle
 **Priority:** Tier 2 鈥?depends on T2-24. Required before any non-G-code controller can be added.
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 4 + Critical 3.
+
+**Status:** Shipped in `<TBD>` (focused typed execution MVP). `src/controllers/ControllerInterface.ts` now defines a discriminated `ControllerOutput` union and adds `executeJob(output, ticket)` to the line-stream and GRBL controller contracts. `GrblController.executeJob` rejects unsupported output kinds and non-GRBL gcode dialects before delegating accepted GRBL line output to the existing `sendJob` stream, returning a ticket-linked `JobHandle`. `MachineService.startValidatedJob` now constructs `{ kind: 'gcode-lines', dialect: 'grbl' }` and forwards the typed output plus a `ControllerJobTicket` to `executeJob`, so the app-level job-start path is no longer the universal `sendJob(lines)` contract. Pinned by `tests/execute-job-output-contract.test.ts`, `tests/machine-service-start-validated-job.test.ts`, and the existing start/finalize/wake-lock/job-context regression tests updated to mock `executeJob`. **Out of scope:** T2-28 will resolve the output target from the active profile/controller instead of hardcoding GRBL at the service boundary; T2-29 consumer migration still owns the broader family-agnostic ticket shape. Legacy `sendJob(lines)` remains as the GRBL low-level line-stream primitive. **Hardware verification: not required** (typed dispatch boundary; accepted GRBL output still flows through the same underlying stream).
 
 ---
 
@@ -19901,7 +19903,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-24 Split LaserController into protocol-neutral core + dialect extensions (focused contract foundation shipped in `72e3f97`; deeper consumer migration continues in T2-25/T2-26/T2-27/T3-45)
 - [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
 - [x] T2-26 Move GRBL command construction out of generic layers (final simulator-literal close-out shipped in `18114b9`; controller operation observers now own simulator fanout, generic coordinator/gateway code has no operation GRBL literals, stale gateway operation helpers removed)
-- [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
+- [x] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (Shipped - typed ControllerOutput + GRBL executeJob rejection/acceptance boundary + MachineService start path migrated; T2-28 owns dynamic output target selection)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)

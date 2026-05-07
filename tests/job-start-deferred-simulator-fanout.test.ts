@@ -1,13 +1,13 @@
 /**
- * T1-46: notifySimulatorTx fan-out is deferred so sendJob starts streaming
+ * T1-46: notifySimulatorTx fan-out is deferred so executeJob starts streaming
  * BEFORE the per-line loop completes. Pre-T1-46:
  *
  *   for (const line of lines) notifySimulatorTx(line);  // sync, multi-second on big jobs
- *   await sendJob(lines);                                // controller doesn't see byte 1 yet
+ *   await executeJob(output, ticket);                    // controller doesn't see byte 1 yet
  *
  * After T1-46:
  *
- *   const sendPromise = sendJob(lines);                  // controller starts streaming
+ *   const sendPromise = executeJob(output, ticket);      // controller starts streaming
  *   _notifySimulatorChunked(lines, notifySimulatorTx);   // chunked, deferred via setTimeout
  *   await sendPromise;                                    // resolves when stream finishes
  *
@@ -54,6 +54,11 @@ function makeMockController(onSendJob: (lines: string[]) => Promise<void>): Lase
     connect: async () => {},
     disconnect: async () => {},
     sendCommand: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      await onSendJob([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob: async (lines: string[]) => onSendJob(lines),
     pause: () => {},
     resume: () => {},
@@ -125,11 +130,11 @@ console.log('\n=== T1-46 deferred simulator fan-out ===\n');
 
 async function run(): Promise<void> {
 
-// ── 1. sendJob is invoked BEFORE the simulator fan-out completes ──
+// ── 1. executeJob is invoked BEFORE the simulator fan-out completes ──
 {
   const events: string[] = [];
   const mock = makeMockController(async () => {
-    events.push('sendJob-called');
+    events.push('executeJob-called');
   });
   const controllerRef = { current: mock } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };
@@ -148,15 +153,15 @@ async function run(): Promise<void> {
     canvasContext: ctxForTicket(ticket),
   });
 
-  // The controller's sendJob mock pushes 'sendJob-called' synchronously when
+  // The controller's executeJob mock pushes 'executeJob-called' synchronously when
   // invoked. T1-46 invokes it before scheduling notify chunks, so that event
   // must appear BEFORE any notify-N event.
-  const sendIdx = events.indexOf('sendJob-called');
+  const sendIdx = events.indexOf('executeJob-called');
   const firstNotifyIdx = events.findIndex(e => e.startsWith('notify-'));
-  assert(sendIdx >= 0, 'sendJob was called');
+  assert(sendIdx >= 0, 'executeJob was called');
   assert(
     firstNotifyIdx === -1 || sendIdx < firstNotifyIdx,
-    'T1-46: sendJob fired before any notifySimulatorTx (deferred fan-out)',
+    'T1-46: executeJob fired before any notifySimulatorTx (deferred fan-out)',
   );
 
   // Wait for the deferred chunks to drain.
@@ -208,8 +213,8 @@ async function run(): Promise<void> {
 
   assert(/T1-46/.test(src), 'T1-46 marker present in MachineService.ts');
   assert(
-    /const sendPromise = this\.controllerRef\.current\.sendJob\(lines\);[\s\S]{0,400}this\._notifySimulatorChunked/.test(src),
-    'startValidatedJob: sendJob promise captured BEFORE _notifySimulatorChunked invocation',
+    /const sendPromise = this\.controllerRef\.current\.executeJob\([\s\S]{0,800}this\._notifySimulatorChunked/.test(src),
+    'startValidatedJob: executeJob promise captured BEFORE _notifySimulatorChunked invocation',
   );
   assert(
     /private _notifySimulatorChunked\(\s*lines: string\[\],\s*notify:/.test(src),

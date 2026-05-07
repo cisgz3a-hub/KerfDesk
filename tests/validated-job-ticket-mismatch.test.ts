@@ -101,6 +101,11 @@ async function run(): Promise<void> {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      sendCalls.push([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob: async (lines: string[]) => {
       sendCalls.push([...lines]);
     },
@@ -146,7 +151,7 @@ async function run(): Promise<void> {
       'scene mismatch rejected',
     );
     assert(!errMsg.includes('hash'), 'scene mismatch: user-facing message hides hash details');
-    assert(sendCalls.length === 0, 'scene mismatch: sendJob not called');
+    assert(sendCalls.length === 0, 'scene mismatch: executeJob not called');
     assert(svc.getActiveTicket() === null, 'scene mismatch: activeTicket remains null');
   }
 
@@ -182,7 +187,7 @@ async function run(): Promise<void> {
       'profile mismatch rejected',
     );
     assert(!errMsg.includes('hash'), 'profile mismatch: user-facing message hides hash details');
-    assert(sendCalls.length === 0, 'profile mismatch: sendJob not called');
+    assert(sendCalls.length === 0, 'profile mismatch: executeJob not called');
     assert(svc.getActiveTicket() === null, 'profile mismatch: activeTicket remains null');
   }
 
@@ -207,7 +212,7 @@ async function run(): Promise<void> {
       canvasContext: activeJobContextFromCompile(compiled),
     });
 
-    assert(sendCalls.length === 1, 'clean path: sendJob called once');
+    assert(sendCalls.length === 1, 'clean path: executeJob called once');
     assert(svc.getActiveTicket()?.ticketId === compiled.ticket.ticketId, 'clean path: activeTicket set');
     svc.clearJobSession();
   }
@@ -244,7 +249,7 @@ async function run(): Promise<void> {
     }
 
     assert(errMsg.includes('gcode hash mismatch'), 'gcode corruption rejected');
-    assert(sendCalls.length === 0, 'gcode corruption: sendJob not called');
+    assert(sendCalls.length === 0, 'gcode corruption: executeJob not called');
     assert(svc.getActiveTicket() === null, 'gcode corruption: activeTicket remains null');
   }
 

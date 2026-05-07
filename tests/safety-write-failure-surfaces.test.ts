@@ -58,6 +58,7 @@ function makeController(): LaserController {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
     sendJob: async () => {},
     pause: () => {},
     resume: () => {},

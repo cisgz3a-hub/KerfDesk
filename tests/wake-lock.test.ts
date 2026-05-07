@@ -134,6 +134,11 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      await sendJobImpl([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob: sendJobImpl,
     pause: () => {},
     resume: () => {},
@@ -158,7 +163,7 @@ async function run(): Promise<void> {
   {
     installElectronApiWakeLockSpies();
     const mock = makeMockController(async () => {
-      assert(acquireCallCount === 1, 'acquire ran exactly once before sendJob body runs');
+      assert(acquireCallCount === 1, 'acquire ran exactly once before executeJob body runs');
     });
     const controllerRef = { current: mock } as { current: LaserController };
     const portRef = { current: null } as { current: SerialPortLike | null };
@@ -315,7 +320,7 @@ async function run(): Promise<void> {
     }
 
     assert(!threw, 'without electronAPI, startValidatedJob does not throw');
-    assert(sendJobCalls === 1, 'without electronAPI, sendJob still runs');
+    assert(sendJobCalls === 1, 'without electronAPI, executeJob still runs');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

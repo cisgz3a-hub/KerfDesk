@@ -128,12 +128,11 @@ export type ConnectionDescriptor =
   | WebSocketConnectionDescriptor
   | FileUploadConnectionDescriptor;
 
-export interface ControllerOutput {
-  kind: 'gcode-lines' | 'binary' | 'file' | 'device-native';
-  lines?: readonly string[];
-  bytes?: Uint8Array;
-  payload?: unknown;
-}
+export type ControllerOutput =
+  | { kind: 'gcode-lines'; lines: readonly string[]; dialect: 'grbl' | 'marlin' | 'smoothie' | string }
+  | { kind: 'gcode-text'; text: string; dialect: string }
+  | { kind: 'binary-job'; bytes: Uint8Array; format: 'ruida' | 'trocen' | string }
+  | { kind: 'device-job'; payload: unknown; format: string };
 
 export interface ControllerJobTicket {
   ticketId: string;
@@ -207,6 +206,7 @@ export type CommandSource = 'internal' | 'user';
 export interface GcodeLineController {
   readonly family: 'gcode-line-stream' | 'grbl';
   connect(port: SerialPortLike): Promise<void>;
+  executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
   sendCommand(command: string, source?: CommandSource): void;
 }
@@ -226,6 +226,7 @@ export interface GrblControllerApi extends GcodeLineController {
    * Stream a G-code job. Resolves when acceptance checks pass; streaming then
    * runs asynchronously. Sends a realtime `?` first to avoid stale read of `state.status`.
    */
+  executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
   pause(): void;
   resume(): void;

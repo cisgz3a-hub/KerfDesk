@@ -18,6 +18,9 @@ import {
   type ObjectLifecycleCallback,
   type Unsubscribe,
   type WcsConsentSnapshot,
+  type ControllerJobTicket,
+  type ControllerOutput,
+  type JobHandle,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { computeStreamingHealth } from './streamingHealth';
@@ -633,6 +636,20 @@ export class GrblController implements GrblControllerApi {
   }
 
   // ─── JOB EXECUTION ──────────────────────────────────────────
+
+  async executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle> {
+    if (output.kind !== 'gcode-lines') {
+      throw new Error(`GRBL controller only supports gcode-lines output, got ${output.kind}`);
+    }
+    if (output.dialect !== 'grbl') {
+      throw new Error(`GRBL controller cannot execute ${output.dialect} dialect; expected grbl`);
+    }
+    await this.sendJob([...output.lines]);
+    return {
+      id: ticket.ticketId,
+      startedAt: Date.now(),
+    };
+  }
 
   async sendJob(lines: string[]): Promise<void> {
     if (!this._port?.isOpen) throw new Error('Not connected');

@@ -115,6 +115,11 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (output, jobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      await sendJob([...output.lines]);
+      return { id: jobTicket.ticketId, startedAt: 123 };
+    },
     sendJob,
     pause: () => {},
     resume: () => {},
@@ -210,7 +215,7 @@ void (async () => {
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
     }
-    assert(err === 'send failed', 'sendJob failure propagates');
+    assert(err === 'send failed', 'executeJob failure propagates');
     assert(svc.getActiveTicket() === null, 'send failure clears active ticket');
     assert(svc.getActiveJobCanvasContext() === null, 'send failure clears canvas context');
 
@@ -307,7 +312,7 @@ void (async () => {
       err = e instanceof Error ? e.message : String(e);
     }
     assert(err.includes('no streamable'), 'empty/comment-only job is rejected');
-    assert(sendCalls === 0, 'empty/comment-only job never reaches controller.sendJob');
+    assert(sendCalls === 0, 'empty/comment-only job never reaches controller.executeJob');
     assert(svc.getActiveTicket() === null, 'empty/comment-only job leaves no active ticket');
   }
 
