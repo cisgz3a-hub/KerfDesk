@@ -1027,18 +1027,11 @@ export class MachineService {
   // ─── CONNECTION ─────────────────────────────────────────
 
   async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
-    // T1-50 Part B: accept an optional AbortSignal. The spec's full
-    // shape — propagating the signal through `WebSerialPort.requestAndOpen`
-    // and `GrblController.connect` so an in-flight open or handshake
-    // can be cancelled mid-air — needs API changes inside those classes
-    // and is filed as T2-32 / T2-33. For T1-50 we ship the interface
-    // stub plus `throwIfAborted` hooks at every await point: a caller
-    // that already aborted before calling, or that aborts during one
-    // of the underlying async steps, observes the throw at the next
-    // await boundary and triggers the T1-49 cleanup path. No
-    // production caller passes a signal yet, so this has zero
-    // behavioral effect today; future ConnectionManager work (T2-32)
-    // will plumb a real signal through.
+    // T1-50: accept an optional AbortSignal. T2-33 made
+    // WebSerialPort.requestAndOpen signal-aware; this service passes
+    // the same signal down so user-cancel during port selection/open
+    // uses the T1-49 cleanup path. GrblController.connect still checks
+    // at the service await boundary until its handshake is signal-aware.
     signal?.throwIfAborted();
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
@@ -1061,7 +1054,7 @@ export class MachineService {
     let ws: WebSerialPort | null = null;
     try {
       ws = createSerialPort('web') as WebSerialPort;
-      await ws.requestAndOpen(baudRate);
+      await ws.requestAndOpen(baudRate, signal);
       signal?.throwIfAborted();
       await this.controllerRef.current.connect(ws);
       signal?.throwIfAborted();

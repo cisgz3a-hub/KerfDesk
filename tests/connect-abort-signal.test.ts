@@ -17,6 +17,9 @@
  *
  * Run: npx tsx tests/connect-abort-signal.test.ts
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import url from 'node:url';
 import { MachineService } from '../src/app/MachineService';
 import {
   type LaserController,
@@ -95,22 +98,26 @@ function isAbortError(e: unknown): boolean {
 
 void (async () => {
   console.log('\n=== T1-50 Part B abortable connect (interface stub) ===\n');
+  const repoRoot = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), '..');
+  const machineServiceSource = fs.readFileSync(path.join(repoRoot, 'src', 'app', 'MachineService.ts'), 'utf8');
 
   const origIsSupported = WebSerialPort.isSupported;
   const origRequestAndOpen = (WebSerialPort.prototype as unknown as {
-    requestAndOpen: (b: number) => Promise<void>;
+    requestAndOpen: (b: number, s?: AbortSignal) => Promise<void>;
   }).requestAndOpen;
   const origClose = WebSerialPort.prototype.close;
 
-  let currentRequestAndOpenImpl: (this: WebSerialPort, b: number) => Promise<void>
+  let currentRequestAndOpenImpl: (this: WebSerialPort, b: number, s?: AbortSignal) => Promise<void>
     = async function () {};
+  let lastRequestAndOpenSignal: AbortSignal | undefined;
   let lastPortSpy: PortSpy | null = null;
 
   (WebSerialPort as unknown as { isSupported: () => boolean }).isSupported = () => true;
   (WebSerialPort.prototype as unknown as {
-    requestAndOpen: (b: number) => Promise<void>;
-  }).requestAndOpen = function (this: WebSerialPort, b: number): Promise<void> {
-    return currentRequestAndOpenImpl.call(this, b);
+    requestAndOpen: (b: number, s?: AbortSignal) => Promise<void>;
+  }).requestAndOpen = function (this: WebSerialPort, b: number, s?: AbortSignal): Promise<void> {
+    lastRequestAndOpenSignal = s;
+    return currentRequestAndOpenImpl.call(this, b, s);
   };
   // T2-31: close is now async on the SerialPortLike interface; the test
   // stub mirrors that signature so the prototype patch type-checks.
@@ -256,14 +263,19 @@ void (async () => {
 
       assert(portRef.current !== null,
         'unaborted signal: portRef points at the WebSerialPort (no behavior change)');
+      assert(lastRequestAndOpenSignal === ac.signal,
+        'unaborted signal: MachineService passes signal to WebSerialPort.requestAndOpen');
       assert(portSpy.closeCalls === 0, 'unaborted signal: port.close NOT called');
       assert(ctrl.disconnectCalls === 0,
         'unaborted signal: controller.disconnect NOT called');
     }
+
+    assert(/requestAndOpen\(baudRate,\s*signal\)/.test(machineServiceSource),
+      'source pin: MachineService passes AbortSignal into WebSerialPort.requestAndOpen');
   } finally {
     (WebSerialPort as unknown as { isSupported: () => boolean }).isSupported = origIsSupported;
     (WebSerialPort.prototype as unknown as {
-      requestAndOpen: (b: number) => Promise<void>;
+      requestAndOpen: (b: number, s?: AbortSignal) => Promise<void>;
     }).requestAndOpen = origRequestAndOpen;
     WebSerialPort.prototype.close = origClose;
   }
