@@ -288,6 +288,7 @@ export function ConnectionPanelMain({
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
   const [safetyState, setSafetyState] = useState<SafetyState>(() => machineService.getSafetyState());
+  const [connectionRecoveryVisible, setConnectionRecoveryVisible] = useState(false);
   // T1-50 Part A: UI mutex on Connect button. Without this, two
   // rapid clicks each call into `machineService.connectRealLaser()`,
   // each constructing a new WebSerialPort and racing on
@@ -319,6 +320,8 @@ export function ConnectionPanelMain({
   const jobProgressRef = useRef<JobProgress | null>(null);
   const elapsedSecondsRef = useRef(0);
   const jobStoppedByUserRef = useRef(false);
+  const wasConnectedRef = useRef(false);
+  const intentionalDisconnectRef = useRef(false);
   const hasFramed = useRef(false);
 
   // T1-97 retire (2026-05-02): frame-before-start bypass override removed.
@@ -448,6 +451,21 @@ export function ConnectionPanelMain({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
+
+  useEffect(() => {
+    if (isConnected) {
+      wasConnectedRef.current = true;
+      intentionalDisconnectRef.current = false;
+      setConnectionRecoveryVisible(false);
+      return;
+    }
+
+    if (wasConnectedRef.current && !intentionalDisconnectRef.current) {
+      setConnectionRecoveryVisible(true);
+    }
+    wasConnectedRef.current = false;
+    intentionalDisconnectRef.current = false;
+  }, [isConnected]);
 
   // T1-30: centralized command-gate computation. Replaces ~ten ad-hoc
   // `isConnected && !isRunning && status === 'idle'` checks scattered
@@ -747,6 +765,7 @@ export function ConnectionPanelMain({
   const handleDisconnect = useCallback(async () => {
     const ctrl = controllerRef.current;
     jobStoppedByUserRef.current = true;
+    intentionalDisconnectRef.current = true;
     try {
       if (ctrl?.isJobRunning) {
         try {
@@ -1160,6 +1179,9 @@ export function ConnectionPanelMain({
       case 'frame':
       case 'reframe':
         void handleFrameSafe();
+        break;
+      case 'reconnect':
+        setConnectionRecoveryVisible(false);
         break;
       default:
         break;
@@ -2042,6 +2064,15 @@ export function ConnectionPanelMain({
     readinessScore,
   });
 
+  const connectionRecoveryContent = connectionRecoveryVisible
+    ? buildRecoveryCard({ variant: 'disconnect' })
+    : null;
+  const connectionRecoveryCard = connectionRecoveryContent &&
+    React.createElement(RecoveryCard, {
+      content: connectionRecoveryContent,
+      onAction: handleRecoveryAction,
+    });
+
   const safetyRecoveryContent = safetyState.kind === 'requiresInspection'
     ? buildRecoveryCard({ variant: 'emergency-stop' })
     : null;
@@ -2332,6 +2363,7 @@ export function ConnectionPanelMain({
         laserModeBanner,
         connectSection,
       }),
+      connectionRecoveryCard,
       safetyRecoveryCard,
       isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
