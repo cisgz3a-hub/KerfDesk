@@ -38,6 +38,12 @@ import {
   type ResolvedLaserSettings, type FlatPath, type ProcessedBitmap,
   createEmptyJob, flatPathFromPoints,
 } from './Job';
+import {
+  compoundPathFromContours,
+  makeContour,
+  type CompoundPath,
+  type ContourRole,
+} from '../geometry/CompoundPath';
 import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
 import { getActiveProfile } from '../devices/DeviceProfile';
 import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
@@ -647,6 +653,7 @@ function compileGeometry(
   }
 
   const paths: FlatPath[] = [];
+  const compoundPaths: CompoundPath[] = [];
 
   for (const obj of objects) {
     if (!obj.visible) continue;
@@ -654,14 +661,18 @@ function compileGeometry(
     for (let i = 0; i < flatPaths.length; i++) {
       paths.push(flatPaths[i]);
     }
+    const compoundPath = flattenObjectAsCompound(obj, type);
+    if (compoundPath && compoundPath.contours.length > 0) {
+      compoundPaths.push(compoundPath);
+    }
   }
 
   if (paths.length === 0) return null;
 
   if (type === 'engrave') {
-    return { type: 'fill', paths };
+    return { type: 'fill', paths, compoundPaths };
   }
-  return { type: 'vector', paths };
+  return { type: 'vector', paths, compoundPaths };
 }
 
 // ─── FLATTEN OBJECT TO FLAT PATHS ────────────────────────────────
@@ -713,6 +724,60 @@ function flattenObject(
       entitlementPolicy.allowPowerScale ? rawPowerScale : 1.0,
     );
   });
+}
+
+// T2-15: preserve compound contour semantics beside the legacy FlatPath output.
+
+function flattenObjectAsCompound(
+  obj: SceneObject,
+  operationType: OperationType,
+): CompoundPath | null {
+  const groups = geometryToPoints(obj.geometry, operationType)
+    .map(group => ({
+      points: group.points.map(p => applyTransform(p, obj.transform)),
+      closed: group.closed,
+    }))
+    .filter(group => group.points.length >= (group.closed ? 3 : 2));
+
+  if (groups.length === 0) return null;
+
+  const roles = inferCompoundRoles(groups);
+  return compoundPathFromContours({
+    sourceObjectId: obj.id,
+    contours: groups.map((group, index) => makeContour(group.points, group.closed, roles[index])),
+  });
+}
+
+function inferCompoundRoles(groups: readonly PointGroup[]): ContourRole[] {
+  return groups.map((group, index) => {
+    if (!group.closed) return 'open';
+
+    const sample = group.points[0];
+    let depth = 0;
+    for (let i = 0; i < groups.length; i++) {
+      if (i === index) continue;
+      const candidate = groups[i];
+      if (!candidate.closed || candidate.points.length < 3) continue;
+      if (pointInPointGroup(sample, candidate.points)) depth++;
+    }
+
+    if (depth % 2 === 1) return 'hole';
+    return depth === 0 ? 'outer' : 'island';
+  });
+}
+
+function pointInPointGroup(point: Point, polygon: readonly Point[]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const yi = polygon[i].y;
+    const xj = polygon[j].x;
+    const yj = polygon[j].y;
+    const intersects = (yi > point.y) !== (yj > point.y) &&
+      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi || 1e-12) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
 }
 
 // ─── GEOMETRY TO POINTS ──────────────────────────────────────────

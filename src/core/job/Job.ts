@@ -19,7 +19,7 @@ import { type AABB, type Point, emptyAABB, generateId } from '../types';
 import { type FillMode, type ImageRasterMode } from '../scene/Layer';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
-import { type ContourRole } from '../geometry/CompoundPath';
+import { type CompoundPath, type ContourRole } from '../geometry/CompoundPath';
 
 // ─── OPERATION TYPE ──────────────────────────────────────────────
 
@@ -89,8 +89,8 @@ export interface ProcessedBitmap {
 // ─── OPERATION GEOMETRY ──────────────────────────────────────────
 
 export type OperationGeometry =
-  | { type: 'vector'; paths: FlatPath[] }      // cut, score, engrave outlines
-  | { type: 'fill';   paths: FlatPath[] }      // engrave fill boundaries
+  | { type: 'vector'; paths: FlatPath[]; compoundPaths?: CompoundPath[] }      // cut, score, engrave outlines
+  | { type: 'fill';   paths: FlatPath[]; compoundPaths?: CompoundPath[] }      // engrave fill boundaries
   | { type: 'raster'; bitmap: ProcessedBitmap }; // image engraving
 
 // ─── RESOLVED LASER SETTINGS ─────────────────────────────────────

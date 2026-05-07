@@ -31,6 +31,7 @@ import {
   type Job, type Operation, type FlatPath,
   type ResolvedLaserSettings,
 } from '../job/Job';
+import { type CompoundPath } from '../geometry/CompoundPath';
 import {
   type Plan, type PlannedOperation, type Move,
   createEmptyPlan, calculatePlanStats,
@@ -42,6 +43,7 @@ import {
 } from './ContainmentOrder';
 import {
   generateFillRows,
+  generateFillRowsForCompoundPaths,
   type FillSettings,
   type FillScanlineRow,
 } from './FillGenerator';
@@ -197,7 +199,8 @@ function planOperation(
       const fillMoves = planFillOperation(
         operation.geometry.paths,
         settings,
-        pos
+        pos,
+        operation.geometry.compoundPaths,
       );
       for (let i = 0; i < fillMoves.length; i++) {
         moves.push(fillMoves[i]);
@@ -493,7 +496,8 @@ function planPath(
 function planFillOperation(
   boundaryPaths: FlatPath[],
   settings: ResolvedLaserSettings,
-  startPos: Point
+  startPos: Point,
+  compoundPaths?: readonly CompoundPath[],
 ): Move[] {
   const fillMode = settings.fillMode ?? 'line';
   const baseAngle = settings.fillAngle;
@@ -511,7 +515,9 @@ function planFillOperation(
       biDirectional: settings.fillBiDirectional,
       overscanning: settings.overscanning,
     };
-    const rows = generateFillRows(boundaryPaths, fillSettings, rowIndex);
+    const rows = compoundPaths && compoundPaths.length > 0
+      ? generateFillRowsForCompoundPaths(compoundPaths, fillSettings, rowIndex)
+      : generateFillRows(boundaryPaths, fillSettings, rowIndex);
     rowIndex += rows.length;
     for (let i = 0; i < rows.length; i++) {
       allRows.push(rows[i]);
