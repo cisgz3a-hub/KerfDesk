@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 355 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 443 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 444 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -46,7 +46,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 390 | - |
+| `tests/` | 391 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -581,6 +581,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/dither-cache-key-content-hash.test.ts`
 - `tests/dither-serpentine.test.ts`
 - `tests/editor-store.test.ts`
+- `tests/electron-csp-integration.test.ts`
 - `tests/electron-navigation-blocked.test.ts`
 - `tests/electron-renderer-sandbox.test.ts`
 - `tests/entitlement-api-migration-phase2a.test.ts`

@@ -13863,6 +13863,8 @@ This is significant work. T2-107 tracks the debt; the implementation might be sp
 
 **Status:** Shipped in 17b0fed (focused MVP — centralized policy builder + 3-mode union + audit predicates; main.ts integration + dependency audit deferred as T2-107-followup). New `src/security/CspPolicy.ts` exports `CspMode` (dev / compatible / strict), `CspDirective`, `CspPolicy`, `buildCspPolicy(mode)` (returns the directive list per mode — `compatible` includes `'unsafe-inline'` + `'unsafe-eval'` matching the pre-T2-107 baseline; `strict` removes both unsafe tokens from script-src AND removes `'unsafe-inline'` from style-src; `dev` keeps loose for Vite HMR), `serializeCsp(policy)` (canonical `directive value1 value2; ...` format with no trailing semicolon), `getDirective`, `directiveAllowsToken`, `policyForbidsUnsafeEval` and `policyForbidsUnsafeInlineStyles` (audit predicates), `pickCspMode({isDev, strictOverride?})` (dev wins always; otherwise strictOverride or 'compatible' default). Object-src 'none', frame-src 'none', base-uri 'self' are present in EVERY mode (those are XSS hard-stops independent of inline/eval). Resource sources (img-src data:/blob:/indexeddb:, font-src data:, connect-src ws:/wss:/https: for Falcon Wi-Fi, worker-src blob: for web workers) are present in every mode. Pinned by `tests/csp-policy.test.ts` (68 contracts: every directive present per mode; compatible matches pre-T2-107 baseline (includes both unsafe tokens); strict has no unsafe-eval + no unsafe-inline anywhere; predicates flag the right modes; object/frame defenses always-on; serialiseCsp format + no trailing semicolon; pickCspMode dev wins over strictOverride; round-trip audit of compatible mode against the existing electron/main.ts string; source-level pin). **Out of scope (T2-107-followup):** wiring `electron/main.ts:190-191` to call `serializeCsp(buildCspPolicy(pickCspMode(...)))` (mechanical change once dep audit is done); the dependency audit itself — confirm which packages need eval (Vite HMR pre-7.0 historically; some templating libraries; some math expression evaluators) and which need inline styles (CSS-in-JS); migrate those to nonces/hashes; flip prod default from `'compatible'` to `'strict'`. **Hardware verification: not required**.
 
+**T3-8 follow-up:** Main-process CSP wiring shipped in `<TBD>`. The source of truth moved to `electron/cspPolicy.ts` so `electron:compile` can consume it directly; `src/security/CspPolicy.ts` now re-exports the same policy for existing tests. Production now defaults to strict script CSP (no `'unsafe-eval'`, no script `'unsafe-inline'`). Style `'unsafe-inline'` remains intentionally allowed because the current React UI uses inline style attributes; removing that is a separate style/nonce migration.
+
 ---
 
 ### T2-108 | Support bundle exporter 鈥?`Help 鈫?Export Diagnostic Bundle`
@@ -15770,6 +15772,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-8 | Electron CSP hardening
+
+**Status:** Shipped in `<TBD>`. `electron/main.ts` now builds the `Content-Security-Policy` header from `electron/cspPolicy.ts` instead of hard-coding the pre-audit unsafe header. Dev mode remains relaxed for Vite HMR; packaged production defaults to strict script CSP with no `'unsafe-eval'` and no script `'unsafe-inline'`, while style `'unsafe-inline'` is intentionally retained until the React inline-style/nonced-style migration is designed. `src/security/CspPolicy.ts` re-exports the same pure policy source so existing audit helpers keep a single contract. Pinned by `tests/electron-csp-integration.test.ts` plus the existing `tests/csp-policy.test.ts`. Hardware verification: not required (Electron shell header/security policy only).
 
 **Code reference:** `electron/main.ts:78-90`
 
@@ -20081,7 +20085,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-5 Auto-update channel
 - [x] T3-6 Crash reporting
 - [x] T3-7 Backward-compat fixture corpus
-- [ ] T3-8 Electron CSP hardening
+- [x] T3-8 Electron CSP hardening
 - [ ] T3-9 Tighten IPC attack surface
 - [ ] T3-10 Input file-format size limits
 - [ ] T3-11 Burn-progress lag + 鉁?position

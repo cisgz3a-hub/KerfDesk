@@ -11,6 +11,7 @@ import {
   getDirective,
   directiveAllowsToken,
   policyForbidsUnsafeEval,
+  policyForbidsUnsafeInlineScripts,
   policyForbidsUnsafeInlineStyles,
   pickCspMode,
   type CspMode,
@@ -19,8 +20,8 @@ import {
 let passed = 0;
 let failed = 0;
 function assert(c: boolean, m: string): void {
-  if (c) { passed++; console.log(`  ✓ ${m}`); }
-  else { failed++; console.error(`  ✗ ${m}`); }
+  if (c) { passed++; console.log(`  ok ${m}`); }
+  else { failed++; console.error(`  fail ${m}`); }
 }
 
 console.log('\n=== T2-107 CSP policy ===\n');
@@ -48,15 +49,15 @@ void (async () => {
     `compatible: style-src includes 'unsafe-inline'`);
 }
 
-// 3. Strict mode: NO unsafe-eval, NO unsafe-inline
+// 3. Strict mode: NO unsafe-eval, NO unsafe-inline scripts
 {
   const p = buildCspPolicy('strict');
   assert(!directiveAllowsToken(p, 'script-src', "'unsafe-eval'"),
     `strict: script-src does NOT include 'unsafe-eval'`);
   assert(!directiveAllowsToken(p, 'script-src', "'unsafe-inline'"),
     `strict: script-src does NOT include 'unsafe-inline'`);
-  assert(!directiveAllowsToken(p, 'style-src', "'unsafe-inline'"),
-    `strict: style-src does NOT include 'unsafe-inline'`);
+  assert(directiveAllowsToken(p, 'style-src', "'unsafe-inline'"),
+    `strict: style-src keeps 'unsafe-inline' until UI style migration`);
 }
 
 // 4. Strict mode: still has 'self' for script-src
@@ -74,10 +75,12 @@ void (async () => {
     `compatible: policyForbidsUnsafeEval = false`);
 }
 
-// 6. policyForbidsUnsafeInlineStyles predicate
+// 6. unsafe-inline predicates
 {
-  assert(policyForbidsUnsafeInlineStyles(buildCspPolicy('strict')),
-    `strict: policyForbidsUnsafeInlineStyles = true`);
+  assert(policyForbidsUnsafeInlineScripts(buildCspPolicy('strict')),
+    `strict: policyForbidsUnsafeInlineScripts = true`);
+  assert(!policyForbidsUnsafeInlineStyles(buildCspPolicy('strict')),
+    `strict: policyForbidsUnsafeInlineStyles = false until UI style migration`);
   assert(!policyForbidsUnsafeInlineStyles(buildCspPolicy('compatible')),
     `compatible: policyForbidsUnsafeInlineStyles = false`);
 }
@@ -135,22 +138,22 @@ void (async () => {
   assert(!text.endsWith(';'), `no trailing semicolon`);
 }
 
-// 12. pickCspMode: dev → 'dev'
+// 12. pickCspMode: dev -> 'dev'
 {
   assert(pickCspMode({ isDev: true }) === 'dev',
-    `isDev=true → 'dev'`);
+    `isDev=true -> 'dev'`);
 }
 
-// 13. pickCspMode: prod default → 'compatible'
+// 13. pickCspMode: prod default -> 'strict'
 {
-  assert(pickCspMode({ isDev: false }) === 'compatible',
-    `isDev=false → 'compatible' (default)`);
+  assert(pickCspMode({ isDev: false }) === 'strict',
+    `isDev=false -> 'strict' (production default)`);
 }
 
-// 14. pickCspMode: strictOverride → 'strict'
+// 14. pickCspMode: strictOverride -> 'strict'
 {
   assert(pickCspMode({ isDev: false, strictOverride: true }) === 'strict',
-    `strictOverride=true → 'strict'`);
+    `strictOverride=true -> 'strict'`);
 }
 
 // 15. pickCspMode: dev wins over strictOverride
@@ -185,12 +188,16 @@ void (async () => {
   const url = await import('node:url');
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
-  const src = fs.readFileSync(path.resolve(here, '../src/security/CspPolicy.ts'), 'utf-8');
-  assert(/T2-107/.test(src), 'T2-107 marker in CspPolicy.ts');
+  const src = fs.readFileSync(path.resolve(here, '../electron/cspPolicy.ts'), 'utf-8');
+  const shim = fs.readFileSync(path.resolve(here, '../src/security/CspPolicy.ts'), 'utf-8');
+  assert(/T2-107/.test(src), 'T2-107 marker in electron/cspPolicy.ts');
+  assert(/T3-8/.test(src), 'T3-8 marker in electron/cspPolicy.ts');
+  assert(shim.includes("../../electron/cspPolicy"), 'src/security/CspPolicy.ts re-exports Electron policy source');
   for (const id of [
     'CspMode', 'CspDirective', 'CspPolicy',
     'buildCspPolicy', 'serializeCsp', 'getDirective',
     'directiveAllowsToken', 'policyForbidsUnsafeEval',
+    'policyForbidsUnsafeInlineScripts',
     'policyForbidsUnsafeInlineStyles', 'pickCspMode',
   ]) {
     assert(src.includes(id), `export '${id}' declared`);

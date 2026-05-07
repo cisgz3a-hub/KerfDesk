@@ -15,6 +15,7 @@ import {
   markStartupSuccessful,
   recordStartupCrash,
 } from './startupCrashLoop';
+import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -200,24 +201,14 @@ function createWindow() {
   });
 
   // Content Security Policy — reduces XSS impact in the renderer
+  // T3-8: dev stays relaxed for Vite; packaged production removes unsafe
+  // script execution while preserving inline styles until the UI migration.
+  const cspHeader = serializeCsp(buildCspPolicy(pickCspMode({ isDev })));
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: indexeddb:",
-            "font-src 'self' data:",
-            "connect-src 'self' ws: wss: https:",
-            "worker-src 'self' blob:",
-            "object-src 'none'",
-            "frame-src 'none'",
-            "base-uri 'self'",
-          ].join('; '),
-        ],
+        'Content-Security-Policy': [cspHeader],
       },
     });
   });
