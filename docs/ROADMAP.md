@@ -10376,7 +10376,7 @@ These render in place of the current alarm banner / message log entries when the
 
 **Follow-up status:** Shipped in `87048f6`: `ConnectionPanelMain` now detects unexpected connected-to-disconnected transitions and shows the reusable disconnect recovery card via `buildRecoveryCard({ variant: 'disconnect' })`; deliberate Disconnect marks itself intentional so it does not surface recovery noise. Pinned by `tests/recovery-card-ui-wiring.test.ts`. **Out of scope:** frame-failed/job-failed variant routing remains open. **Hardware verification: not required** (UI-only recovery surface for existing disconnected state).
 
-**Follow-up status:** Shipped in `<TBD>`: failed Frame and Frame + Mark Center attempts now surface the reusable frame-failed recovery card via `buildRecoveryCard({ variant: 'frame-failed', frameTimeoutSec })`; successful frame attempts clear the recovery card. Pinned by `tests/recovery-card-ui-wiring.test.ts`. **Out of scope:** job-failed variant routing remains open. **Hardware verification: not required** (UI-only recovery surface; existing frame command paths preserved).
+**Follow-up status:** Shipped in `95bf63d`: failed Frame and Frame + Mark Center attempts now surface the reusable frame-failed recovery card via `buildRecoveryCard({ variant: 'frame-failed', frameTimeoutSec })`; successful frame attempts clear the recovery card. Pinned by `tests/recovery-card-ui-wiring.test.ts`. **Out of scope:** job-failed variant routing remains open. **Hardware verification: not required** (UI-only recovery surface; existing frame command paths preserved).
 
 ---
 
@@ -19896,7 +19896,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-60 Frame freshness invalidation 鈥?any relevant change resets `hasFramed` (shipped 2026-05-05 in `5f27d34`)
 - [ ] T2-61 Move design-editing controls (text spacing, etc.) out of connection panel (filed; UX coherence)
 - [x] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop / job-fail (Shipped — content layer per variant + GRBL alarm-code mapper + buildRecoveryCard router; React component deferred as T2-62-followup; refines T2-46)
-- T2-62 follow-up: React RecoveryCard + emergency-stop safety-state UI surface shipped in `8a37618`; alarm-state recovery-card routing + Unlock/Home/Frame action wiring shipped in `8f74144`; unexpected-disconnect recovery-card routing shipped in `87048f6`; frame-failed recovery-card routing shipped in `<TBD>`; job-failed variant remains open.
+- T2-62 follow-up: React RecoveryCard + emergency-stop safety-state UI surface shipped in `8a37618`; alarm-state recovery-card routing + Unlock/Home/Frame action wiring shipped in `8f74144`; unexpected-disconnect recovery-card routing shipped in `87048f6`; frame-failed recovery-card routing shipped in `95bf63d`; job-failed variant remains open.
 - [x] T2-63 Operation order preview with order warning (Shipped — analysis layer + cut-before-engrave detector + per-row formatter + ack predicate; UI integration deferred as T2-63-followup; depends on T2-58)
 - [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
 - [x] T2-65 Central error reporter — `reportError({domain, severity, recovery, developerDetails})` (Shipped — ErrorReporter class + singleton + reportError + errorFromCatch + history; per-site migration deferred as T2-65-followup; refines T2-57)
