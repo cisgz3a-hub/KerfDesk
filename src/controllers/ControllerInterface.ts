@@ -1,7 +1,10 @@
 /**
- * Abstract interface that all laser controllers implement.
- * Adding a new controller type (Marlin, Ruida, etc.) means
- * implementing this interface. Nothing else changes.
+ * Controller contracts.
+ *
+ * T2-24 splits the future protocol-neutral core from today's GRBL line-stream
+ * facade. `LaserController` remains as a legacy compatibility name for the
+ * current GRBL-shaped API while follow-up tickets migrate generic services to
+ * the narrower protocol-neutral interfaces.
  */
 
 import { type SerialPortLike } from '../communication/SerialPort';
@@ -39,12 +42,15 @@ export interface MachineState {
   errorCode: number | null;
 }
 
-export interface JobProgress {
+export interface ProtocolNeutralJobProgress {
+  percentComplete: number;
+  elapsedMs: number;
+}
+
+export interface GrblLineStreamProgress extends ProtocolNeutralJobProgress {
   linesSent: number;
   linesAcknowledged: number;
   totalLines: number;
-  percentComplete: number;
-  elapsedMs: number;
   bufferFill: number;
   /** GRBL streaming health: buffer fill vs ok-ack rate. */
   healthStatus: 'healthy' | 'warning' | 'saturated';
@@ -53,6 +59,8 @@ export interface JobProgress {
   /** Recent command send rate (sends/s), used as expected ack rate. Null until enough samples. */
   expectedAckRateHz: number | null;
 }
+
+export interface JobProgress extends GrblLineStreamProgress {}
 
 export type StateChangeCallback = (state: MachineState) => void;
 export type ProgressCallback = (progress: JobProgress) => void;
@@ -92,7 +100,98 @@ export interface WcsConsentSnapshot {
   statusMask: number;
 }
 
-export interface LaserController {
+export type ControllerFamily =
+  | 'gcode-line-stream'
+  | 'grbl'
+  | 'binary-stream'
+  | 'file-upload'
+  | 'device-native';
+
+export interface SerialConnectionDescriptor {
+  kind: 'serial';
+  port: SerialPortLike;
+}
+
+export interface WebSocketConnectionDescriptor {
+  kind: 'websocket';
+  url: string;
+  protocols?: string | string[];
+}
+
+export interface FileUploadConnectionDescriptor {
+  kind: 'file-upload';
+  endpoint?: string;
+}
+
+export type ConnectionDescriptor =
+  | SerialConnectionDescriptor
+  | WebSocketConnectionDescriptor
+  | FileUploadConnectionDescriptor;
+
+export interface ControllerOutput {
+  kind: 'gcode-lines' | 'binary' | 'file' | 'device-native';
+  lines?: readonly string[];
+  bytes?: Uint8Array;
+  payload?: unknown;
+}
+
+export interface ControllerJobTicket {
+  ticketId: string;
+  sceneHash?: string;
+  profileHash?: string;
+  outputHash?: string;
+}
+
+export interface JobHandle {
+  id: string;
+  startedAt: number;
+}
+
+export type OperationResult =
+  | { ok: true; message?: string }
+  | { ok: false; reason: string; message?: string };
+
+export interface DisconnectOptions {
+  reason?: string;
+  skipStop?: boolean;
+}
+
+export interface MachineOperationApi {
+  pauseJob(handle?: JobHandle): Promise<OperationResult>;
+  resumeJob(handle?: JobHandle): Promise<OperationResult>;
+  stopJob(handle?: JobHandle, reason?: string): Promise<OperationResult>;
+  emergencyStop(reason?: string): Promise<OperationResult>;
+}
+
+export interface ControllerEventBus {
+  onStateChange(callback: StateChangeCallback): Unsubscribe;
+  onProgress(callback: (progress: ProtocolNeutralJobProgress) => void): Unsubscribe;
+  onError(callback: ErrorCallback): Unsubscribe;
+}
+
+export interface ProtocolNeutralLaserController {
+  readonly id: string;
+  readonly family: ControllerFamily;
+  readonly state: MachineState;
+  readonly isJobRunning: boolean;
+  readonly operations: MachineOperationApi;
+  readonly events: ControllerEventBus;
+
+  connect(connection: ConnectionDescriptor): Promise<void>;
+  disconnect(options?: DisconnectOptions): Promise<void>;
+  executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
+}
+
+export type CommandSource = 'internal' | 'user';
+
+export interface GcodeLineController {
+  readonly family: 'gcode-line-stream' | 'grbl';
+  connect(port: SerialPortLike): Promise<void>;
+  sendJob(lines: string[]): Promise<void>;
+  sendCommand(command: string, source?: CommandSource): void;
+}
+
+export interface GrblControllerApi extends GcodeLineController {
   readonly protocolName: string;
   readonly state: MachineState;
   readonly isJobRunning: boolean;
@@ -151,7 +250,7 @@ export interface LaserController {
    * Manual line to GRBL. `internal` = LaserForge-generated (known sequences);
    * `user` = console / operator-typed (semantic gating is the UI’s responsibility).
    */
-  sendCommand(command: string, source?: 'internal' | 'user'): void;
+  sendCommand(command: string, source?: CommandSource): void;
   /**
    * Optional controller-native autofocus trigger.
    * Serial GRBL controllers can implement this; other controllers may omit it.
@@ -238,4 +337,17 @@ export interface LaserController {
    * See ObjectLifecycleCallback. Optional for non-GRBL controllers / tests.
    */
   onObjectLifecycle?(callback: ObjectLifecycleCallback): Unsubscribe;
+}
+
+export interface LaserController extends GrblControllerApi {}
+
+export function isGrblControllerApi(controller: unknown): controller is GrblControllerApi {
+  if (controller == null || typeof controller !== 'object') return false;
+  const candidate = controller as Partial<GrblControllerApi>;
+  return (
+    typeof candidate.sendCommand === 'function'
+    && typeof candidate.sendJob === 'function'
+    && typeof candidate.safetyOff === 'function'
+    && typeof candidate.requestStatusReport === 'function'
+  );
 }

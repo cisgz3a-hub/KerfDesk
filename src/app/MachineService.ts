@@ -45,12 +45,11 @@ import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
 import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import { type ControllerId } from '../controllers/ControllerRegistry';
 import {
-  classifyUserCommand as classifyUserGrbl,
-  type CommandSeverity,
-} from '../controllers/grbl/CommandClassifier';
-import {
+  classifyUserCommand,
   MachineCommandGateway,
   type ApprovalToken,
+  type CommandClassification,
+  type CommandSeverity,
 } from './MachineCommandGateway';
 
 export interface BurnState {
@@ -1185,11 +1184,11 @@ export class MachineService {
    * only sends after the user approves; this method does not prompt.
    */
   classifyUserCommand(command: string): CommandClassification {
-    return classifyUserGrbl(command);
+    return classifyUserCommand(command);
   }
 
   requestApproval(command: string): ApprovalToken | null {
-    const classification = classifyUserGrbl(command);
+    const classification = classifyUserCommand(command);
     if (classification.severity === 'safe') return null;
 
     const now = Date.now();

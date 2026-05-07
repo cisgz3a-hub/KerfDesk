@@ -4,7 +4,7 @@
  */
 
 import {
-  type LaserController,
+  type GrblControllerApi,
   type MachineState,
   type MachineStatus,
   type MachinePosition,
@@ -129,7 +129,8 @@ export interface GrblMachineInfo {
   maxAccelY: number;
 }
 
-export class GrblController implements LaserController {
+export class GrblController implements GrblControllerApi {
+  readonly family = 'grbl' as const;
   readonly protocolName = 'GRBL 1.1';
 
   private _state: MachineState;

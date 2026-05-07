@@ -5,6 +5,8 @@ import {
   type CommandSeverity,
 } from '../controllers/grbl/CommandClassifier';
 
+export type { CommandClassification, CommandSeverity };
+
 export type MachineCommandGatewayController = Pick<LaserController, 'sendCommand' | 'safetyOff'>;
 export type MachineCommandGatewayAxis = 'X' | 'Y';
 
@@ -24,6 +26,10 @@ export interface MachineCommandApprovalState {
   consumedApprovalNonces: Map<string, number>;
   pruneConsumedApprovalNonces(now: number): void;
   now?: () => number;
+}
+
+export function classifyUserCommand(command: string): CommandClassification {
+  return classifyUserGrbl(command);
 }
 
 /**
@@ -67,7 +73,7 @@ export class MachineCommandGateway {
     approvalState?: MachineCommandApprovalState,
   ): void {
     if (source === 'user') {
-      const classification = classifyUserGrbl(command);
+      const classification = classifyUserCommand(command);
       if (classification.severity !== 'safe') {
         const now = approvalState?.now?.() ?? Date.now();
         approvalState?.pruneConsumedApprovalNonces(now);
