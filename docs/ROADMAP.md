@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 105 | 23 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-28 output-target resolver MVP shipped; T2-6 App split remains open. |
+| Tier 2 | 106 | 22 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-32 ConnectionManager FSM foundation shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -8322,6 +8322,8 @@ export class ConnectionManager {
 **Priority:** Tier 2 鈥?depends on T2-24 (LaserController split for connection descriptor), T2-31 (async close). Foundation for T2-33, T2-34, T1-50 Part B.
 
 **Cross-check note (audit 3B):** Audit's section 6 + P0 fix #1.
+
+**Status:** Shipped in `<TBD>` (focused FSM foundation MVP). New `src/app/ConnectionManager.ts` exports the explicit `ConnectionLifecycle` union (`disconnected`, `selecting`, `opening`, `handshaking`, `ready`, `disconnecting`, `error`, `stale`) plus an injectable `ConnectionManager<TTransport,TController>` with subscribe/unsubscribe, guarded connect, ready/in-flight disconnect, stale-connection checks, `markStale(reason)`, cleanup adapter hooks, and throwing-subscriber isolation. The manager owns `activeConnectionId` and an `AbortController`; disconnect during `opening` aborts the active connect and resolves to `disconnected` without ever reaching `ready`. Pinned by `tests/connection-manager-fsm.test.ts` (31 contracts covering transition order, connect refusal from ready, failure cleanup/error, ready disconnect, disconnect-during-opening abort, stale id guard, subscriber resilience, stale state, and source-level state pins). **Out of scope:** migrating `MachineService.connectRealLaser`, `disconnect`, React button gating, and transport callback wiring to this manager; those follow-up migrations touch live controller/connection paths and need their own verification. **Hardware verification: not required** for this foundation (pure lifecycle state machine; no live transport behavior changed).
 
 ---
 
@@ -19910,7 +19912,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)
 - [x] T2-31 Make `SerialPortLike.close()` async (shipped 2026-05-05 in `898b510` — unblocks T2-32 / T2-33)
-- [ ] T2-32 Connection lifecycle state machine 鈥?ConnectionManager (filed; depends on T2-24, T2-31)
+- [x] T2-32 Connection lifecycle state machine - ConnectionManager (Shipped - pure FSM foundation + guarded connect/disconnect/stale checks; live MachineService/UI migration deferred)
 - [x] T2-33 Partial-open cleanup in `WebSerialPort.requestAndOpen` (shipped 2026-05-05 in `f5d77dd`)
 - [x] T2-34 Connection generation guard — token tagged on transport callbacks (Shipped — allocator + token + isStale + guardCallback + classifyContext; transport+controller wiring deferred as T2-34-followup; depends on T2-32)
 - [x] T2-35 Electron serial subsystem decision - complete it OR remove it (Shipped - Option 1 removal; native Electron serial IPC and `serialport` dependency removed; T1-27 subsumed)
