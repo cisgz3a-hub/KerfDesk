@@ -15747,6 +15747,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Fix:** Sentry has a free tier. Electron + Sentry SDK. Capture renderer errors, main-process errors, unhandled Promise rejections. Scrub PII (file paths, scene contents) before send. Include: error, stack, LaserForge version, controller type, OS.
 
+**Status:** Shipped in <TBD> (privacy-first renderer crash-reporting foundation). `src/diagnostics/CrashReporter.ts` builds redacted crash payloads with app version, source, controller type, and OS; it stays disabled when `VITE_LASERFORGE_CRASH_DSN` is empty, and sends only through an injected/default transport when configured. `src/main.tsx` now installs global renderer error/rejection handlers and wraps the app in `AppErrorBoundary`, both reporting through the same redacted sink. Pinned by `tests/crash-reporting-privacy.test.ts` for opt-in behavior, file path/email/IP/license/project-name/binary redaction, and root wiring. Main-process remote crash submission and real Sentry project validation remain release-ops work once an account/DSN exists.
+
 **Estimate:** 1-2 sessions.
 
 **Priority:** Tier 3.
@@ -20075,7 +20077,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-3 Delete or auto-generate PROJECT_MAP
 - [ ] T3-4 Code-signed installer
 - [x] T3-5 Auto-update channel
-- [ ] T3-6 Crash reporting
+- [x] T3-6 Crash reporting
 - [ ] T3-7 Backward-compat fixture corpus
 - [ ] T3-8 Electron CSP hardening
 - [ ] T3-9 Tighten IPC attack surface

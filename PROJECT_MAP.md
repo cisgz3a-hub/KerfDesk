@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 354 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 438 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 355 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 439 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -27,7 +27,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 90 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
-| `src/diagnostics` | 9 | - |
+| `src/diagnostics` | 10 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
@@ -46,7 +46,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 388 | - |
+| `tests/` | 389 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/helpers` | 7 | - |
 | `tests/simulators` | 4 | - |
@@ -219,6 +219,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/diagnostics/ControllerSettingsSnapshot.ts`
 - `src/diagnostics/CorrelationIds.ts`
 - `src/diagnostics/CrashLoopDetector.ts`
+- `src/diagnostics/CrashReporter.ts`
 - `src/diagnostics/Redaction.ts`
 - `src/diagnostics/StorageHealth.ts`
 - `src/diagnostics/SupportBundle.ts`
@@ -558,6 +559,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/controller-stop-safety.test.ts`
 - `tests/controller.test.ts`
 - `tests/correlation-ids.test.ts`
+- `tests/crash-reporting-privacy.test.ts`
 - `tests/critical-event-preservation.test.ts`
 - `tests/csp-policy.test.ts`
 - `tests/customstart-mode-reassertion.test.ts`
