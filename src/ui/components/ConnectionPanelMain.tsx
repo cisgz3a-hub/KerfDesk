@@ -289,6 +289,7 @@ export function ConnectionPanelMain({
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
   const [safetyState, setSafetyState] = useState<SafetyState>(() => machineService.getSafetyState());
   const [connectionRecoveryVisible, setConnectionRecoveryVisible] = useState(false);
+  const [frameRecoveryTimeoutSec, setFrameRecoveryTimeoutSec] = useState<number | null>(null);
   // T1-50 Part A: UI mutex on Connect button. Without this, two
   // rapid clicks each call into `machineService.connectRealLaser()`,
   // each constructing a new WebSerialPort and racing on
@@ -1045,6 +1046,7 @@ export function ConnectionPanelMain({
     const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs });
 
     if (!result.ok) {
+      setFrameRecoveryTimeoutSec(Math.round(idleTimeoutMs / 1000));
       if (result.reason === 'idle-timeout') {
         setMessages(prev => [...prev,
           `⚠ Frame (Safe): machine did not reach idle within ${Math.round(idleTimeoutMs / 1000)}s — check machine state`,
@@ -1063,6 +1065,7 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
   }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
@@ -1114,6 +1117,7 @@ export function ConnectionPanelMain({
     });
 
     if (!result.ok) {
+      setFrameRecoveryTimeoutSec(15);
       if (result.reason === 'idle-timeout') {
         setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle in time — check machine state']);
       } else if (result.reason === 'command-blocked') {
@@ -1128,6 +1132,7 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
   }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
@@ -2073,6 +2078,15 @@ export function ConnectionPanelMain({
       onAction: handleRecoveryAction,
     });
 
+  const frameRecoveryContent = frameRecoveryTimeoutSec != null
+    ? buildRecoveryCard({ variant: 'frame-failed', frameTimeoutSec: frameRecoveryTimeoutSec })
+    : null;
+  const frameRecoveryCard = frameRecoveryContent &&
+    React.createElement(RecoveryCard, {
+      content: frameRecoveryContent,
+      onAction: handleRecoveryAction,
+    });
+
   const safetyRecoveryContent = safetyState.kind === 'requiresInspection'
     ? buildRecoveryCard({ variant: 'emergency-stop' })
     : null;
@@ -2364,6 +2378,7 @@ export function ConnectionPanelMain({
         connectSection,
       }),
       connectionRecoveryCard,
+      frameRecoveryCard,
       safetyRecoveryCard,
       isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
