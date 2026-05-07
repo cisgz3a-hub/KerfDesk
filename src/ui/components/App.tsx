@@ -72,6 +72,7 @@ import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
+import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -440,8 +441,7 @@ export function App(): React.ReactElement {
       );
     }
   }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, showAlert]);
-  const sceneIsDirtyRef = useRef(false);
-  const lastSavedSceneRef = useRef('');
+  const lastSavedSceneHashRef = useRef<string>(hashSceneForPersistence(scene));
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5
   // (extended via unified function): bridge counter for
   // ConnectionPanelMain so it can reset hasFramed (which is
@@ -663,16 +663,14 @@ export function App(): React.ReactElement {
   //
   // Captured-identity stability: React state setters
   // (setScene/setSelectedIds/setGcodeStale/bumpHistoryVersion) are stable
-  // by React's contract. sceneIsDirtyRef is captured by reference and
-  // dereferenced inside the lambda (T2-76 design risk 2 mitigation, see
-  // T2-76-design.md). setGcodeStale comes from
+  // by React's contract. setGcodeStale comes from
   // useCompileManager's return object so its identity is not guaranteed
   // stable across renders; including it in the dep array matches the
   // applyHistoryScene precedent below.
   //
-  // notifyDirty: writes the boolean directly into sceneIsDirtyRef. T2-88
-  // (hash-derived dirty) will swap this implementation for a no-op when
-  // dirty becomes a derived value.
+  // notifyDirty: no-op after T2-88-followup. Dirty state is derived from
+  // `isDirty(scene, lastSavedSceneHashRef.current)`, so mutation sites no
+  // longer maintain a manual boolean.
   //
   // invalidate.frame: bumps setHistoryVersion. The sole reader is
   // ConnectionPanelMain which resets hasFramed.current on bumps. Once
@@ -701,7 +699,7 @@ export function App(): React.ReactElement {
         reset: resetHistory,
       },
       setSelectedIds: (ids) => setSelectedIds(ids),
-      notifyDirty: (dirty) => { sceneIsDirtyRef.current = dirty; },
+      notifyDirty: () => { /* dirty is hash-derived; see T2-88 */ },
       // T2-78: read-through-ref so SceneTransaction can record
       // selectionBefore on history entries without rebuilding this
       // useMemo every time the user clicks something. selectedIdsRef
@@ -977,7 +975,7 @@ export function App(): React.ReactElement {
       await machineUi.executionCoordinator.safeDisconnect();
     }
 
-    if (sceneIsDirtyRef.current) {
+    if (isDirty(scene, lastSavedSceneHashRef.current)) {
       const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
       if (!confirmed) return;
     }
@@ -988,7 +986,7 @@ export function App(): React.ReactElement {
     }
 
     window.location.href = '/landing.html';
-  }, [grbl.machineState?.status, machineUi.executionCoordinator]);
+  }, [grbl.machineState?.status, machineUi.executionCoordinator, scene]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
     if (selectedIds.size === 0) {
@@ -1060,6 +1058,7 @@ export function App(): React.ReactElement {
    */
   const handleNewProject = useCallback(
     (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
+      lastSavedSceneHashRef.current = hashSceneForPersistence(newScene);
       commitSceneTransaction(newScene, { kind: 'load', source }, {
         selectionAfter: new Set(),
       });
@@ -1128,35 +1127,26 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!sceneIsDirtyRef.current) return;
+      if (!isDirty(scene, lastSavedSceneHashRef.current)) return;
 
       let json: string;
+      let currentHash: string;
       try {
         json = serializeForAutosave(scene);
+        currentHash = hashSceneForPersistence(scene);
       } catch (e) {
         console.warn('[LaserForge] Autosave failed (serialize):', e);
-        // Leave sceneIsDirtyRef.current = true so the next tick retries.
         return;
       }
 
-      if (json === lastSavedSceneRef.current) {
-        sceneIsDirtyRef.current = false;
-        return;
-      }
-
-      // Only clear the dirty flag and advance lastSavedSceneRef AFTER the
-      // underlying storage write resolves. A failed write (quota, fs error,
-      // IPC failure) must leave the project marked dirty so the next tick
-      // retries — otherwise unsaved data is silently lost.
+      // Advance the saved hash only after the write resolves. Failed writes
+      // leave the old hash intact, so the next tick retries.
       void writeAutosaveAsync(json).then(
         () => {
-          lastSavedSceneRef.current = json;
-          sceneIsDirtyRef.current = false;
+          lastSavedSceneHashRef.current = currentHash;
         },
         (err: unknown) => {
           console.warn('[LaserForge] Autosave failed:', err);
-          // Intentionally do NOT clear sceneIsDirtyRef and do NOT advance
-          // lastSavedSceneRef — the project remains dirty for retry.
         },
       );
     }, 30000);
@@ -1332,8 +1322,10 @@ export function App(): React.ReactElement {
     scene,
     setSelectedIds,
     handleNewProject,
-    sceneIsDirtyRef,
-    lastSavedSceneRef,
+    isSceneDirty: () => isDirty(scene, lastSavedSceneHashRef.current),
+    markSceneSaved: (savedScene) => {
+      lastSavedSceneHashRef.current = hashSceneForPersistence(savedScene);
+    },
     showAlert,
     showConfirm,
   });

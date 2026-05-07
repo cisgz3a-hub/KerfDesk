@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 113 | 15 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-64 beginner/advanced user-mode foundation shipped; T2-6 App split remains open. |
+| Tier 2 | 114 | 14 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-88 dirty-state call-site migration shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -12434,6 +12434,10 @@ For T2-88's first ship, lazy on-demand is the simplest and avoids the cost entir
 
 ---
 
+
+**Follow-up status:** Shipped in `<TBD>` (call-site migration). `App.tsx` now initializes `lastSavedSceneHashRef` from the initial scene hash, derives exit/autosave dirty checks through `isDirty(scene, lastSavedSceneHashRef.current)`, advances the hash only after autosave writes resolve, and updates the baseline on file/autosave/new-project loads. `useFileHandlers` no longer accepts dirty refs; confirmed saves call `markSceneSaved(scene)`, and New Project prompts from the derived dirty selector. Pinned by `tests/dirty-state-app-migration.test.ts`. **Hardware verification: not required** (persistence/UI state only; no g-code or controller behavior).
+
+---
 ### T2-89 | Server-side entitlement service 鈥?signed token issuance
 
 **Code reference:** Currently `EntitlementService.verifyGumroad` (EntitlementService.ts:252-312) calls `https://api.gumroad.com/v2/licenses/verify` directly from the client. No LaserForge-controlled server in the flow.
@@ -19984,7 +19988,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (type + builder + diff helpers shipped 2026-05-05 in `9e755b7`; ValidatedJobTicket migration filed as T2-85-followup)
 - [x] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (type + helpers shipped 2026-05-05 in `b4769f0`; ConnectionPanelMain migration filed as T2-86-followup)
 - [x] T2-87 Explicit `RecoveryState` state machine (Shipped — 6-status union + per-step ack transitions + severity-ordered triggers + recoveryAllowsStart gate; canStart wiring deferred as T2-87-followup; composes T2-62/66/67)
-- [ ] T2-88 Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; 17-site call-site migration filed as T2-88-followup)
+- [x] T2-88 Hash-derived dirty state - replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; call-site migration shipped in `<TBD>`).
 - [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
 - [x] T2-90 Signed local entitlement token with public-key verification (Shipped — typed shape + base64url codec + format validators + verifier interface + replay/expiry/clock-skew/device-binding checks + InMemoryJtiStore; WebCrypto wiring deferred as T2-90-followup; depends on T2-89)
 - [x] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (Shipped — `src/entitlements/FeatureMatrix.ts` + source-scanning enforcement test; foundation, pairs with T1-78)
