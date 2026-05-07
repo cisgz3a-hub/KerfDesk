@@ -9,7 +9,6 @@ import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners } from './frameGcode';
 import { waitForGrblIdle } from './grblIdlePoll';
-import { MachineCommandGateway } from './MachineCommandGateway';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
 
@@ -91,10 +90,6 @@ export class ExecutionCoordinator {
 
   private notifySimulator(line: string): void {
     this.deps.notifySimulatorRef.current(line);
-  }
-
-  private getCommandGateway(ctrl: LaserController | null = this.deps.controllerRef.current): MachineCommandGateway | null {
-    return ctrl ? new MachineCommandGateway(ctrl) : null;
   }
 
   async jog(axis: 'X' | 'Y', distance: number, feedRate: number): Promise<{ ok: boolean; reason?: string }> {
