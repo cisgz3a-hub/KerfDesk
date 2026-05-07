@@ -24,6 +24,7 @@
 
 import { type Point } from '../types';
 import { type FlatPath } from '../job/Job';
+import { type CompoundPath } from '../geometry/CompoundPath';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
@@ -272,6 +273,28 @@ export function generateFillRows(
 }
 
 /**
+ * T2-15 Pass 2: generate fill rows from CompoundPath inputs while keeping
+ * each compound's edge pool isolated. This avoids unrelated overlapping
+ * objects canceling each other out under one global even-odd pass.
+ */
+export function generateFillRowsForCompoundPaths(
+  paths: readonly CompoundPath[],
+  settings: FillSettings,
+  initialRowIndex: number = 0,
+): FillScanlineRow[] {
+  const rows: FillScanlineRow[] = [];
+  let rowIndex = initialRowIndex;
+
+  for (const path of paths) {
+    const compoundRows = generateFillRows(compoundPathToFlatPaths(path), settings, rowIndex);
+    rows.push(...compoundRows);
+    rowIndex += compoundRows.length;
+  }
+
+  return rows;
+}
+
+/**
  * Calculate the expected number of scanlines for a given set of
  * paths and interval. Used for progress estimation.
  */
@@ -343,6 +366,33 @@ function extractEdges(paths: FlatPath[]): Edge[] {
   }
 
   return edges;
+}
+
+function compoundPathToFlatPaths(path: CompoundPath): FlatPath[] {
+  return path.contours
+    .filter(contour => contour.closed)
+    .map((contour, index) => {
+      const coords = new Float64Array(contour.points.length * 2);
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      contour.points.forEach((point, pointIndex) => {
+        coords[pointIndex * 2] = point.x;
+        coords[pointIndex * 2 + 1] = point.y;
+        minX = Math.min(minX, point.x);
+        minY = Math.min(minY, point.y);
+        maxX = Math.max(maxX, point.x);
+        maxY = Math.max(maxY, point.y);
+      });
+
+      return {
+        id: `${path.sourceObjectId}:${contour.role}:${index}`,
+        coords,
+        closed: true,
+        direction: contour.winding,
+        bounds: { minX, minY, maxX, maxY },
+        parentId: path.sourceObjectId,
+        powerScale: 1,
+      };
+    });
 }
 
 // ─── RAY-EDGE INTERSECTION ───────────────────────────────────────
