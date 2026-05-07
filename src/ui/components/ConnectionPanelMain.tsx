@@ -2539,10 +2539,10 @@ export function ConnectionPanelMain({
       },
         React.createElement('button', {
           type: 'button',
-          onClick: () => {
+          onClick: async () => {
             jobStoppedByUserRef.current = true;
             stopTestFire();
-            const result = machineService.emergencyStop();
+            const result = await machineService.emergencyStop();
             void showAlert(
               result.accepted ? 'Emergency stop' : 'Emergency stop failed',
               result.message

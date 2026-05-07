@@ -75,7 +75,10 @@ function makeController(args?: {
         args?.stop?.();
         return { ok: true };
       },
-      emergencyStop: async () => ({ ok: true }),
+      emergencyStop: async () => {
+        args?.emergencyStop?.();
+        return { ok: true };
+      },
     },
   } as LaserController;
 }
@@ -133,7 +136,7 @@ void (async () => {
     emergencyStop: () => {},
   }));
 
-  svc.emergencyStop();
+  await svc.emergencyStop();
   assert(kind(svc.getSafetyState()) === 'requiresInspection', 'emergencyStop result transitions to requiresInspection');
 }
 

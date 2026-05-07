@@ -33,8 +33,8 @@ const idle: MachineState = {
 
 function makeController(args?: {
   emergencyStop?: () => void;
-}): { controller: LaserController; calls: { emergencyStop: number } } {
-  const calls = { emergencyStop: 0 };
+}): { controller: LaserController; calls: { emergencyStop: number; rawEmergencyStop: number } } {
+  const calls = { emergencyStop: 0, rawEmergencyStop: 0 };
   const controller = {
     protocolName: 'mock',
     state: { ...idle },
@@ -47,7 +47,7 @@ function makeController(args?: {
     resume: () => {},
     stop: () => {},
     emergencyStop: () => {
-      calls.emergencyStop++;
+      calls.rawEmergencyStop++;
       args?.emergencyStop?.();
     },
     sendCommand: () => {},
@@ -57,20 +57,39 @@ function makeController(args?: {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => ({ ok: true }),
+      emergencyStop: async () => {
+        calls.emergencyStop++;
+        args?.emergencyStop?.();
+        return { ok: true };
+      },
+    },
   } as LaserController;
   return { controller, calls };
 }
 
 console.log('\n=== machine-service emergencyStop SafetyActionResult ===\n');
 
+void (async () => {
+
 {
   const { controller, calls } = makeController();
   const portRef = { current: {} as SerialPortLike } as { current: SerialPortLike | null };
   const svc = new MachineService({ current: controller }, portRef);
 
-  const result: SafetyActionResult = svc.emergencyStop();
+  const result: SafetyActionResult = await svc.emergencyStop();
 
-  assert(calls.emergencyStop === 1, 'emergencyStop calls controller.emergencyStop once');
+  assert(calls.emergencyStop === 1, 'emergencyStop calls controller operations.emergencyStop once');
+  assert(calls.rawEmergencyStop === 0, 'emergencyStop does not call raw controller.emergencyStop');
   assert(portRef.current === null, 'emergencyStop clears portRef');
   assert(result.action === 'emergencyStop', 'result action=emergencyStop');
   assert(result.accepted === true, 'result accepted=true');
@@ -92,7 +111,7 @@ console.log('\n=== machine-service emergencyStop SafetyActionResult ===\n');
   let result: SafetyActionResult | null = null;
   let threw = false;
   try {
-    result = svc.emergencyStop();
+    result = await svc.emergencyStop();
   } catch {
     threw = true;
   }
@@ -108,3 +127,8 @@ console.log('\n=== machine-service emergencyStop SafetyActionResult ===\n');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
+
+})().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});

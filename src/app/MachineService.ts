@@ -1130,12 +1130,13 @@ export class MachineService {
     return this._recordSafetyResult(result);
   }
 
-  emergencyStop(): SafetyActionResult {
+  async emergencyStop(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
     let result = makeEmergencyStopResult();
     try {
       if (ctrl) {
-        ctrl.emergencyStop();
+        const operationResult = await ctrl.operations.emergencyStop('MachineService.emergencyStop');
+        if (!operationResult.ok) throw new Error(operationResult.reason);
       } else {
         result = makeNotConnectedResult('emergencyStop');
       }
