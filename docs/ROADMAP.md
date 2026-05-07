@@ -8493,7 +8493,7 @@ Leaving it in the current state is the worst option:
 
 **Cross-check note (audit 3B):** Audit's section 4 + P1. Verified zero src/ usage of `connectPort`/`sendGcode`.
 
-**Status:** Shipped in <TBD> (Option 1 removal). Deleted the unused native Electron serial module, removed preload/main/type declarations for `serial:list`, `serial:connect`, `serial:disconnect`, and the already-retired `serial:send`, removed the production `serialport` dependency, and updated the T1-86 native-dependency guard to assert the current no-production-native-module packaging invariant. Pinned by `tests/no-electron-sendgcode-export.test.ts`, `tests/native-deps-prebuild-check.test.ts`, `npm run electron:compile`, and `npm run license-check`. T1-27's partial `sendGcode` removal is now subsumed by the broader T2-35 bridge removal. **Hardware verification: not required** (dead Electron IPC path; real controller path remains Web Serial through MachineService/GrblController).
+**Status:** Shipped in 152e1eb (Option 1 removal). Deleted the unused native Electron serial module, removed preload/main/type declarations for `serial:list`, `serial:connect`, `serial:disconnect`, and the already-retired `serial:send`, removed the production `serialport` dependency, and updated the T1-86 native-dependency guard to assert the current no-production-native-module packaging invariant. Pinned by `tests/no-electron-sendgcode-export.test.ts`, `tests/native-deps-prebuild-check.test.ts`, `npm run electron:compile`, and `npm run license-check`. T1-27's partial `sendGcode` removal is now subsumed by the broader T2-35 bridge removal. **Hardware verification: not required** (dead Electron IPC path; real controller path remains Web Serial through MachineService/GrblController).
 
 ---
 
