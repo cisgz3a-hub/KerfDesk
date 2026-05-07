@@ -5,9 +5,11 @@
 
 import polygonClipping from 'polygon-clipping';
 import type { MultiPolygon } from 'polygon-clipping';
+import type { CompoundPath } from '../core/geometry/CompoundPath';
 import type { SceneObject } from '../core/scene/SceneObject';
 import type { PathGeometry } from '../core/scene/SceneObject';
 import { assertFeature } from '../entitlements';
+import { compoundPathToMultiPolygon, multiPolygonToCompoundPath } from './CompoundPathPolygon';
 
 type Coord = [number, number];
 type Ring = Coord[];
@@ -287,17 +289,7 @@ export function polygonToPathGeometry(multiPolygon: MultiPolygon): PathGeometry 
 
 export type BooleanOp = 'union' | 'subtract' | 'intersect';
 
-export function booleanOperation(objA: SceneObject, objB: SceneObject, op: BooleanOp): PathGeometry | null {
-  // T1-78 Phase 2a: enforcement-style call site → assertFeature.
-  // Throws EntitlementError carrying the feature name; the previous
-  // ad-hoc `new Error('Boolean operations require a Pro license')`
-  // path is gone.
-  assertFeature('boolean_ops');
-  const polyA = objectToPolygon(objA);
-  const polyB = objectToPolygon(objB);
-
-  if (!polyA || !polyB) return null;
-
+function runBooleanOperation(polyA: MultiPolygon, polyB: MultiPolygon, op: BooleanOp): MultiPolygon | null {
   let result: MultiPolygon;
 
   try {
@@ -317,7 +309,44 @@ export function booleanOperation(objA: SceneObject, objB: SceneObject, op: Boole
     return null;
   }
 
-  if (!result || result.length === 0) return null;
+  return result && result.length > 0 ? result : null;
+}
+
+export function booleanCompoundPaths(
+  pathA: CompoundPath,
+  pathB: CompoundPath,
+  op: BooleanOp,
+): CompoundPath | null {
+  assertFeature('boolean_ops');
+
+  const result = runBooleanOperation(
+    compoundPathToMultiPolygon(pathA),
+    compoundPathToMultiPolygon(pathB),
+    op,
+  );
+  if (!result) return null;
+
+  const compound = multiPolygonToCompoundPath(
+    result,
+    `${pathA.sourceObjectId}-${op}-${pathB.sourceObjectId}`,
+    pathA.fillRule,
+  );
+  return compound.contours.length > 0 ? compound : null;
+}
+
+export function booleanOperation(objA: SceneObject, objB: SceneObject, op: BooleanOp): PathGeometry | null {
+  // T1-78 Phase 2a: enforcement-style call site → assertFeature.
+  // Throws EntitlementError carrying the feature name; the previous
+  // ad-hoc `new Error('Boolean operations require a Pro license')`
+  // path is gone.
+  assertFeature('boolean_ops');
+  const polyA = objectToPolygon(objA);
+  const polyB = objectToPolygon(objB);
+
+  if (!polyA || !polyB) return null;
+
+  const result = runBooleanOperation(polyA, polyB, op);
+  if (!result) return null;
 
   const pathGeom = polygonToPathGeometry(result);
   if (pathGeom.subPaths.length === 0) return null;
