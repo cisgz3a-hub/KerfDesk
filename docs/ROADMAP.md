@@ -19842,7 +19842,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-14 Max-update-depth crashes during fast vector resize (shipped + hardware-verified)
 - [x] T1-15 MachineService job lifecycle hardening (shipped; hardware sanity test pending)
 - [x] T1-16 Three render-loop crashes on load-another-job-after-complete (shipped + hardware-verified)
-- [ ] T1-17 Image import freezes the app — Passes 1-4a shipped 2026-04-30 (`023a341` + `0632b2b` + `b8f3dfb` + `05ce7b86`); Passes 4b/4c open
+- [ ] T1-17 Image import freezes the app — all implementation passes shipped (`023a341` + `0632b2b` + `b8f3dfb` + `05ce7b86` + `7bec4bc`); awaiting real 4-12MP photo UI-responsiveness verification before checklist close
 - [x] T1-18 Service-level test-fire deadman timeout — highest urgency safety (shipped pre-session)
 - [x] T1-19 Service-level approval tokens for dangerous commands (shipped 2026-04-30 in `1a78fdf`)
 - [x] T1-20 WCS normalization no-listener fallback hardening (shipped in `b0375fa`; close-out 2026-05-03)
