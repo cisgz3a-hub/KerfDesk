@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 117 | 11 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-98 CI installer jobs shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 119 | 9 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -15000,6 +15000,8 @@ For internal app paths (job streaming, jog, recovery flow) that need to send com
 
 **Cross-check note (audit 5D):** Audit's Critical 4 + Priority 5. Verified at electron/main.ts:256-261.
 
+**Status:** Closed in `<TBD>` (verified subsumed by T1-27/T2-35 removal). The vulnerable `serial:send` main-process IPC no longer exists, so there is no remaining generic main-process serial command path to classify. T1-27 removed the unused `window.electronAPI.sendGcode`/`serial:send` bypass, and T2-35 then removed the entire native Electron serial IPC subsystem (`serial:list`, `serial:connect`, `serial:disconnect`, `serial:send`, `electron/serial.ts`, and the production `serialport` dependency). Pinned by `tests/no-electron-sendgcode-export.test.ts` (19 contracts: no preload serial bridge exports, no serial IPC channel references in preload/main, no type declarations, `electron/serial.ts` deleted, and no production `src/` references to the old bridge). **Hardware verification: not required** (dead Electron IPC path; real controller path remains Web Serial through MachineService/GrblController).
+
 ---
 
 ### T2-122 | Typed serial command IPC 鈥?replace generic `sendGcode(arbitraryString)`
@@ -15073,6 +15075,8 @@ Job streaming uses `sendJobLine` (no classification 鈥?job lines are pre-valida
 **Priority:** Tier 2. Pairs with T2-121 (classifier). Together they replace the generic command surface with a typed surface.
 
 **Cross-check note (audit 5D):** Audit's Required Priority 5.
+
+**Status:** Closed in `<TBD>` (verified subsumed by T1-27/T2-35 removal). The generic `sendGcode(arbitraryString)` Electron IPC bridge this ticket intended to replace is gone. There is no `window.electronAPI.sendGcode`, no `serial:send` channel, no native serial module, and no production renderer reference to the removed bridge. The real controller command surface is Web Serial through MachineService/ExecutionCoordinator/GrblController, so typed Electron serial IPC handlers would be unused new surface area rather than a safety improvement. Pinned by `tests/no-electron-sendgcode-export.test.ts` (19 contracts). **Hardware verification: not required** (dead Electron IPC path; Web Serial controller behavior unchanged).
 
 ---
 
@@ -20027,8 +20031,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-118 Troubleshooting panel — `Help → Diagnostics` (Shipped — content layer with 5 typed sections + 5 common-issue guides + buildDiagnosticsPanel composer; React panel deferred as T2-118-followup)
 - [x] T2-119 IPC sender verification — `assertTrustedSender` in every handler (Shipped — typed environment + evaluator + assert helper + UntrustedSenderError + checkHandlerCoverage; per-handler adoption deferred as T2-119-followup; pairs with T1-89)
 - [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
-- [ ] T2-121 Main-process serial command classification enforcement (filed; pairs with T2-122)
-- [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
+- [x] T2-121 Main-process serial command classification enforcement (closed; vulnerable `serial:send` IPC removed by T1-27/T2-35, no main-process generic serial command path remains)
+- [x] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (closed; generic Electron `sendGcode` bridge removed by T1-27/T2-35, typed replacement would be unused surface)
 - [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers in `e137aea`; parser/converter wiring in `236ee5c`; pairs with T1-92)
 - [x] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (Shipped — limits + typed error + check helpers in `b751a1c`; useImport wiring in `83e724f`; pairs with T1-92)
 - [x] T2-125 Compiler/output layer enforces template validation (shipped in `412250c`; defense in depth for T1-91)
