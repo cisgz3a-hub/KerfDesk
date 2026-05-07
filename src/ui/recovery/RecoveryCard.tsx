@@ -1,5 +1,5 @@
 import React from 'react';
-import type { RecoveryCardContent } from './RecoveryCardContent';
+import type { RecoveryAction, RecoveryCardContent } from './RecoveryCardContent';
 
 const font = "'DM Sans', system-ui, sans-serif";
 
@@ -16,7 +16,7 @@ const actionLabel: Record<string, string> = {
 
 export interface RecoveryCardProps {
   content: RecoveryCardContent;
-  onAction?: (action: string) => void;
+  onAction?: (action: RecoveryAction) => void;
 }
 
 /**

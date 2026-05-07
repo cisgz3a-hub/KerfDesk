@@ -48,8 +48,12 @@ console.log('\n=== recovery card UI wiring ===\n');
 
   assert(/onSafetyStateChange/.test(source), 'ConnectionPanelMain subscribes to MachineService safety state');
   assert(/getSafetyState/.test(source), 'ConnectionPanelMain initializes from MachineService safety state');
+  assert(/buildRecoveryCard\(\{\s*variant:\s*'alarm'/.test(source), 'ConnectionPanelMain builds alarm recovery content');
+  assert(/alarmCode:\s*machineState\?\.alarmCode/.test(source), 'ConnectionPanelMain threads GRBL alarm code into the alarm recovery card');
   assert(/buildRecoveryCard\(\{\s*variant:\s*'emergency-stop'/.test(source), 'ConnectionPanelMain builds emergency-stop recovery content');
   assert(/React\.createElement\(RecoveryCard/.test(source), 'ConnectionPanelMain renders RecoveryCard');
+  assert(/handleRecoveryAction/.test(source), 'ConnectionPanelMain wires recovery-card actions');
+  assert(!/Machine halted \(alarm state\)/.test(source), 'ConnectionPanelMain no longer renders the legacy alarm banner copy');
   assert(/safetyRecoveryCard/.test(source), 'ConnectionPanelMain threads safetyRecoveryCard into the panel');
 }
 

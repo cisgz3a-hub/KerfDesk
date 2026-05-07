@@ -51,7 +51,7 @@ import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
 import { RecoveryCard } from '../recovery/RecoveryCard';
-import { buildRecoveryCard } from '../recovery/RecoveryCardContent';
+import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
 function jobModeLabel(scene: Scene): string {
   const outputLayers = scene.layers.filter(l => l.visible && l.output !== false);
@@ -1148,6 +1148,24 @@ export function ConnectionPanelMain({
     await executionCoordinator.unlock();
   }, [appendMessage, machineService, showConfirm, executionCoordinator]);
 
+  const handleRecoveryAction = useCallback((action: RecoveryAction) => {
+    switch (action) {
+      case 'unlock':
+        void handleUnlock();
+        break;
+      case 'home':
+      case 're-home':
+        void handleHome();
+        break;
+      case 'frame':
+      case 'reframe':
+        void handleFrameSafe();
+        break;
+      default:
+        break;
+    }
+  }, [handleFrameSafe, handleHome, handleUnlock]);
+
   /**
    * T2-12 part 2: clear a 'faulted_requires_inspection' state after
    * the user has confirmed they've inspected the machine. Asks once
@@ -1497,49 +1515,13 @@ export function ConnectionPanelMain({
     onClose,
   });
 
-  const alarmBanner = isConnected && machineState?.status === 'alarm' && React.createElement('div', {
-    style: {
-      margin: '10px 16px 0',
-      padding: '12px 14px',
-      background: 'rgba(255,68,102,0.08)',
-      border: '1px solid rgba(255,68,102,0.4)',
-      borderRadius: 8,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      flexShrink: 0,
-    },
-  },
-    React.createElement('div', { style: { fontSize: 20, flexShrink: 0 } }, '⚠'),
-    React.createElement('div', { style: { flex: 1, minWidth: 0 } },
-      React.createElement('div', {
-        style: { fontSize: 12, fontWeight: 600, color: '#ff4466', marginBottom: 2 },
-      }, 'Machine halted (alarm state)'),
-      React.createElement('div', {
-        style: { fontSize: 10, color: '#ff8ca0', lineHeight: 1.4 },
-      }, machineState?.alarmCode != null
-        ? `ALARM:${machineState.alarmCode}. Click Unlock to clear, then re-home if your machine supports it.`
-        : 'Click Unlock to clear the alarm, then re-home if your machine supports it.'),
-    ),
-    React.createElement('button', {
-      type: 'button',
-      onClick: handleUnlock,
-      style: {
-        padding: '8px 18px',
-        fontSize: 12,
-        fontWeight: 700,
-        borderRadius: 6,
-        cursor: 'pointer',
-        fontFamily: font,
-        background: '#ff4466',
-        border: '1px solid #ff4466',
-        color: '#fff',
-        flexShrink: 0,
-        whiteSpace: 'nowrap' as const,
-      },
-    }, '🔓 Unlock'),
-  );
-
+  const alarmRecoveryContent = isConnected && machineState?.status === 'alarm'
+    ? buildRecoveryCard({ variant: 'alarm', alarmCode: machineState?.alarmCode ?? null })
+    : null;
+  const alarmBanner = alarmRecoveryContent && React.createElement(RecoveryCard, {
+    content: alarmRecoveryContent,
+    onAction: handleRecoveryAction,
+  });
   const faultedBanner = isConnected && machineState?.status === 'faulted_requires_inspection' && React.createElement('div', {
     // T2-12 part 2: distinct from alarmBanner because the recovery
     // affordance differs. Alarm = "clear with $X" (firmware alarm
