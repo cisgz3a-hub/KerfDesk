@@ -15733,6 +15733,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Fix:** `electron-builder` ships with `electron-updater`. Wire it to a release server (GitHub Releases works for a start). On app start, check for updates. Offer download + install on next restart. Staged rollout (10% 鈫?50% 鈫?100%) if you want to be careful.
 
+**Status:** Shipped in <TBD>. T2-101 (`b8b6761`) added the Electron updater foundation: `electron-updater`, GitHub Releases publish metadata, packaged startup checks, update event forwarding, manual check/install IPC, and job-running install guard. T3-5 adds the missing renderer channel: `UpdateNotice` subscribes to `electronAPI.updates.onEvent`, surfaces available/download-progress/downloaded/error states, offers manual check, and disables "Restart to update" while a job is running. Pinned by `tests/update-notice-ui.test.tsx` plus existing `tests/auto-update-infrastructure.test.ts`. First signed release-feed validation still belongs to the release/signing process, not another app-side code path.
+
 **Estimate:** 2 sessions.
 
 **Priority:** Tier 3.
@@ -20072,7 +20074,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-2 Write the 5 critical missing tests
 - [x] T3-3 Delete or auto-generate PROJECT_MAP
 - [ ] T3-4 Code-signed installer
-- [ ] T3-5 Auto-update channel
+- [x] T3-5 Auto-update channel
 - [ ] T3-6 Crash reporting
 - [ ] T3-7 Backward-compat fixture corpus
 - [ ] T3-8 Electron CSP hardening

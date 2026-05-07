@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 353 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 437 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 354 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 438 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -39,14 +39,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/storage` | 2 | - |
 | `src/templates` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 137 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 138 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 387 | - |
+| `tests/` | 388 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/helpers` | 7 | - |
 | `tests/simulators` | 4 | - |
@@ -367,6 +367,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/TestGridDialog.tsx`
 - `src/ui/components/ToolBar.tsx`
 - `src/ui/components/TrialGuard.tsx`
+- `src/ui/components/UpdateNotice.tsx`
 - `src/ui/components/VariableTextDialog.tsx`
 - `src/ui/components/WelcomeWizard.tsx`
 - `src/ui/components/appCanvasViewportProps.ts`
@@ -835,6 +836,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/undo-during-job.test.ts`
 - `tests/undo-redo-invalidation.test.ts`
 - `tests/unsafe-prior-state-persistence.test.ts`
+- `tests/update-notice-ui.test.tsx`
 - `tests/usecompilemanager-cancel-progress.test.tsx`
 - `tests/usecompilemanager-stale-no-loop.test.tsx`
 - `tests/user-data-migration.test.ts`

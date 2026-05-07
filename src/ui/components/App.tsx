@@ -94,6 +94,7 @@ import { StatusFooter } from './StatusFooter';
 import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
 import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
+import { UpdateNotice } from './UpdateNotice';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
@@ -1740,6 +1741,10 @@ export function App(): React.ReactElement {
         }),
       ),
     ),
+
+    React.createElement(UpdateNotice, {
+      isJobRunning: grbl.isJobRunning,
+    }),
 
     React.createElement(StatusFooter, {
       scene,
