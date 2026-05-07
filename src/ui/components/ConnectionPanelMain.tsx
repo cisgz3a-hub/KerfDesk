@@ -23,7 +23,7 @@ import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
 import { computeFrameFreshnessKey } from '../../app/computeFrameFreshnessKey';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
-import { type CompileGcodeResult } from '../../app/PipelineService';
+import { type CompileGcodeResult, type CompileProgress } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
 import {
   verifySavedOriginG54,
@@ -190,6 +190,10 @@ export interface ConnectionPanelMainProps {
   onSelectMode: (mode: StartMode) => void;
   onSaveOrigin: () => void;
   gcodeStale?: boolean;
+  isCompiling?: boolean;
+  compileProgress?: CompileProgress | null;
+  isCompileCancelling?: boolean;
+  onCancelCompile?: () => void;
   /**
    * T1-75: increments when App.tsx applies an undo/redo. The panel watches
    * this counter via an effect that resets `hasFramed` (the burn bounds may
@@ -250,6 +254,10 @@ export function ConnectionPanelMain({
   onSelectMode,
   onSaveOrigin,
   gcodeStale = false,
+  isCompiling = false,
+  compileProgress = null,
+  isCompileCancelling = false,
+  onCancelCompile,
   historyVersion = 0,
   onRecompile,
   onUpdateLayerMode,
@@ -2083,6 +2091,81 @@ export function ConnectionPanelMain({
     }, '↻ Update'),
   );
 
+  const compilePercent = Math.round((compileProgress?.overallFraction ?? 0) * 100);
+  const compilePhaseLabel = compileProgress?.phase
+    ? ({
+        'text-expansion': 'Preparing text',
+        'compile-job': 'Building job',
+        plan: 'Optimizing path',
+        transform: 'Mapping machine',
+        output: 'Writing G-code',
+      } as Record<CompileProgress['phase'], string>)[compileProgress.phase]
+    : 'Compiling';
+  const compileProgressSection = isConnected && !isRunning && (isCompiling || compileProgress) && React.createElement('div', {
+    style: {
+      margin: '0 16px 8px',
+      padding: '10px 12px',
+      background: 'rgba(0,212,255,0.06)',
+      border: '1px solid rgba(0,212,255,0.24)',
+      borderRadius: 6,
+      flexShrink: 0,
+    },
+  },
+    React.createElement('div', {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 10,
+        marginBottom: 8,
+      },
+    },
+      React.createElement('div', { style: { minWidth: 0 } },
+        React.createElement('div', { style: { fontSize: 11, color: '#c9f4ff', fontWeight: 700 } },
+          isCompileCancelling ? 'Cancelling compile' : compilePhaseLabel,
+        ),
+        React.createElement('div', { style: { fontSize: 9, color: '#777798', marginTop: 2 } },
+          compileProgress?.detail ?? `${compilePercent}%`,
+        ),
+      ),
+      onCancelCompile && React.createElement('button', {
+        type: 'button',
+        onClick: onCancelCompile,
+        disabled: isCompileCancelling,
+        style: {
+          padding: '6px 12px',
+          fontSize: 11,
+          fontWeight: 700,
+          borderRadius: 6,
+          cursor: isCompileCancelling ? 'default' : 'pointer',
+          fontFamily: font,
+          background: isCompileCancelling ? 'rgba(85,85,112,0.22)' : 'rgba(255,68,102,0.10)',
+          border: isCompileCancelling ? '1px solid rgba(85,85,112,0.4)' : '1px solid rgba(255,68,102,0.65)',
+          color: isCompileCancelling ? '#777798' : '#ff6b89',
+          flexShrink: 0,
+        },
+      }, isCompileCancelling ? 'Cancelling' : 'Cancel'),
+    ),
+    React.createElement('div', {
+      style: {
+        width: '100%',
+        height: 6,
+        borderRadius: 999,
+        background: 'rgba(255,255,255,0.08)',
+        overflow: 'hidden',
+      },
+    },
+      React.createElement('div', {
+        style: {
+          width: `${compilePercent}%`,
+          height: '100%',
+          background: '#00d4ff',
+          transition: 'width 120ms linear',
+        },
+      }),
+    ),
+  );
+
   const issuesSection = isConnected && !isRunning && !displayPaused && React.createElement(Issues, {
     issues,
     readinessScore,
@@ -2428,6 +2511,7 @@ export function ConnectionPanelMain({
           workflowSection,
           layerOverviewSection,
           gcodeWarning,
+          compileProgressSection,
           issuesSection,
           outcomeExtrasSection,
         }),

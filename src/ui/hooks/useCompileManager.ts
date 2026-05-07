@@ -13,6 +13,7 @@ import {
   compileGcode as pipelineCompileGcode,
   compileToolpath as pipelineCompileToolpath,
   type CompileGcodeResult,
+  type CompileProgress,
 } from '../../app/PipelineService';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 
@@ -47,6 +48,9 @@ export interface UseCompileManagerResult {
   setGcodeStale: React.Dispatch<React.SetStateAction<boolean>>;
   lastResult: CompileGcodeResult | null;
   isCompiling: boolean;
+  compileProgress: CompileProgress | null;
+  isCompileCancelling: boolean;
+  cancelCompile: () => void;
   sceneCompileTick: number;
 }
 
@@ -69,6 +73,9 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
   const [currentGcode, setCurrentGcode] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<CompileGcodeResult | null>(null);
   const [isCompiling, setIsCompiling] = useState(false);
+  const [compileProgress, setCompileProgress] = useState<CompileProgress | null>(null);
+  const [isCompileCancelling, setIsCompileCancelling] = useState(false);
+  const compileAbortControllerRef = useRef<AbortController | null>(null);
 
   const sceneRevisionRef = useRef(0);
   const [sceneCompileTick, setSceneCompileTick] = useState(0);
@@ -161,6 +168,13 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     ],
   );
 
+  const cancelCompile = useCallback(() => {
+    const controller = compileAbortControllerRef.current;
+    if (!controller || controller.signal.aborted) return;
+    setIsCompileCancelling(true);
+    controller.abort();
+  }, []);
+
   const compileGcode = useCallback(
     async (targetScene: Scene): Promise<string | null> => {
       // Defense in depth: never compile during a running job. Compiles block the
@@ -182,7 +196,17 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
       // T1-58: profile snapshot taken alongside the request-id and scene-tick
       // snapshots so the entire compile attempt sees a consistent triple.
       const profileSnapshot = getActiveProfile();
+      compileAbortControllerRef.current?.abort();
+      const abortController = new AbortController();
+      compileAbortControllerRef.current = abortController;
       setIsCompiling(true);
+      setIsCompileCancelling(false);
+      setCompileProgress({
+        phase: 'text-expansion',
+        fraction: 0,
+        overallFraction: 0,
+        detail: 'Starting compile',
+      });
       try {
         const result = await pipelineCompileGcode(
           targetScene,
@@ -193,6 +217,14 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           machineBedFromControllerRef.current,
           controllerAccelMmPerS2,
           profileSnapshot,
+          {
+            signal: abortController.signal,
+            onProgress: (event) => {
+              if (requestId === compileRequestIdRef.current) {
+                setCompileProgress(event);
+              }
+            },
+          },
         );
         if (requestId !== compileRequestIdRef.current) {
           console.info('[useCompileManager] dropping stale compile result (request superseded)');
@@ -208,14 +240,22 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
         }
         return result.gcode;
       } catch (err) {
+        const isAbort = err instanceof DOMException && err.name === 'AbortError';
         if (requestId === compileRequestIdRef.current) {
-          console.error('G-code compilation failed:', err);
-          setLastResult(null);
+          if (!isAbort) {
+            console.error('G-code compilation failed:', err);
+            setLastResult(null);
+          }
         }
         return null;
       } finally {
         if (requestId === compileRequestIdRef.current) {
           setIsCompiling(false);
+          setIsCompileCancelling(false);
+          setCompileProgress(null);
+          if (compileAbortControllerRef.current === abortController) {
+            compileAbortControllerRef.current = null;
+          }
         }
       }
     },
@@ -256,6 +296,9 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     setGcodeStale,
     lastResult,
     isCompiling,
+    compileProgress,
+    isCompileCancelling,
+    cancelCompile,
     sceneCompileTick,
   };
 }

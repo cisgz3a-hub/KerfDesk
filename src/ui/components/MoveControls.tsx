@@ -7,6 +7,7 @@ interface MoveControlsProps {
   workflowSection: React.ReactNode;
   layerOverviewSection: React.ReactNode;
   gcodeWarning: React.ReactNode;
+  compileProgressSection: React.ReactNode;
   issuesSection: React.ReactNode;
   outcomeExtrasSection: React.ReactNode;
 }
@@ -19,6 +20,7 @@ export function MoveControls(props: MoveControlsProps) {
     workflowSection,
     layerOverviewSection,
     gcodeWarning,
+    compileProgressSection,
     issuesSection,
     outcomeExtrasSection,
   } = props;
@@ -29,6 +31,7 @@ export function MoveControls(props: MoveControlsProps) {
     !isRunning && !displayPaused && workflowSection,
     layerOverviewSection,
     gcodeWarning,
+    compileProgressSection,
     issuesSection,
     outcomeExtrasSection,
   );

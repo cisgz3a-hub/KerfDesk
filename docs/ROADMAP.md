@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 95 | 33 | T2-6 Phase 2 is shipped; Phase 3 scene/history split remains open. |
+| Tier 2 | 96 | 32 | T2-17 compile progress/cancel UI is shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -7275,7 +7275,9 @@ UI integration:
 
 **T2-17-followup pass 2:** `compileJob` object-loop progress + abort checkpoints shipped in `4c8a80c` (`CompileJobOptions.signal`, `CompileJobOptions.onProgress`, exported `CompileJobProgress`, and `PipelineService` compile-job phase mapping). This adds cooperative pre-start and mid-loop abort checks to JobCompiler and forwards object-level fractions through `compileGcode`. Pinned by `tests/jobcompiler-progress-cancel.test.ts`; regression coverage extended in `tests/compile-cancellable.test.ts`.
 
-**T2-17-followup pass 3:** `BaseGCodeStrategy.generate` output-loop progress + abort checkpoints shipped in `2c3e677` (`GcodeGenerateOptions.signal`, `GcodeGenerateOptions.onProgress`, exported `GcodeOutputProgress`, and `PipelineService` output-phase mapping). This adds cooperative pre-start, per-operation, per-move, and footer-boundary abort checks while G-code text is emitted. Pinned by `tests/output-progress-cancel.test.ts`; regression coverage extended in `tests/compile-cancellable.test.ts`. **Remaining follow-up:** UI integration (Cancel button + progress bar wiring in `useCompileManager`); worker offload / async yielding remains separate scope because synchronous loops can only observe a signal before entry or at their own callbacks.
+**T2-17-followup pass 3:** `BaseGCodeStrategy.generate` output-loop progress + abort checkpoints shipped in `2c3e677` (`GcodeGenerateOptions.signal`, `GcodeGenerateOptions.onProgress`, exported `GcodeOutputProgress`, and `PipelineService` output-phase mapping). This adds cooperative pre-start, per-operation, per-move, and footer-boundary abort checks while G-code text is emitted. Pinned by `tests/output-progress-cancel.test.ts`; regression coverage extended in `tests/compile-cancellable.test.ts`. **Remaining follow-up:** worker offload / async yielding remains separate T3-15 scope because synchronous loops can only observe a signal before entry or at their own callbacks.
+
+**T2-17-followup pass 4:** UI progress/cancel wiring shipped in `<TBD>` (`useCompileManager` owns an `AbortController`, exposes `compileProgress`, `isCompileCancelling`, and `cancelCompile`, and passes `signal` / `onProgress` into `pipelineCompileGcode`; `App` threads those props into `ConnectionPanel`; `ConnectionPanelMain` renders a compact compile progress bar plus Cancel/Cancelling control above jog controls). Cancelled compiles return `null`, clear compile state, and avoid false error logging. Pinned by `tests/usecompilemanager-cancel-progress.test.tsx`; regression coverage: `tests/compile-cancellable.test.ts`, `tests/pipeline.test.ts`, `npm run build`, and `npm test`. T2-17 is now shipped for the bounded renderer-thread contract; worker offload / async yielding remains T3-15 scope. **Hardware verification: not required** (compile UX state and cancellation plumbing only; no runtime machine command semantics changed).
 
 ---
 
@@ -19855,7 +19857,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-14 Non-removable G-code safety wrapper around custom templates (shipped 2026-05-05 in `94ebfa7`)
 - [x] T2-15 CompoundPath model 鈥?preserve outer/hole/island semantics (Pass 1 foundation shipped in `51083d5`; Pass 2 fill-generator entry point shipped in `5046318`; Pass 3 offset entry point shipped in `7e4bd2c`; Pass 4 boolean entry point shipped in `f37c4d1`; Pass 5 output-boundary role tagging shipped in `bf5ee53`; final compile/planner migration shipped in `44e797c`)
 - [x] T2-16 Duplicate / overlap path detection in preflight (shipped 2026-05-05 in `cb93bf7`)
-- [ ] T2-17 AbortSignal + progress callback through compile pipeline (phase-boundary MVP shipped 2026-05-05 in `2a9c29c`; PlanOptimizer loop instrumentation shipped in `d2f69b1`; compileJob loop instrumentation shipped in `4c8a80c`; output loop instrumentation shipped in `2c3e677`; UI integration remains)
+- [x] T2-17 AbortSignal + progress callback through compile pipeline (phase-boundary MVP shipped 2026-05-05 in `2a9c29c`; PlanOptimizer loop instrumentation shipped in `d2f69b1`; compileJob loop instrumentation shipped in `4c8a80c`; output loop instrumentation shipped in `2c3e677`; UI progress/cancel integration shipped in `<TBD>`; worker offload remains T3-15 scope)
 - [x] T2-18 Semantic G-code parser test helper (parser shipped 2026-05-05 in `9f353cd`; per-test migration deferred to T2-19 / T2-23 dependent work)
 - [x] T2-19 Burn-bounds analyzer test helper (shipped 2026-05-05 in `9246c76`; per-test migration of substring assertions deferred to dependent work)
 - [x] T2-20 Pixel fixture harness for raster regression tests (shipped 2026-05-05 in `8b23d67`; golden `.gcode` snapshot files deferred to T2-20-followup)
