@@ -266,19 +266,51 @@ void (async () => {
 
       assert(portRef.current !== null,
         'unaborted signal: portRef points at the WebSerialPort (no behavior change)');
-      assert(lastRequestAndOpenSignal === ac.signal,
-        'unaborted signal: MachineService passes signal to WebSerialPort.requestAndOpen');
-      assert(ctrl.lastConnectSignal === ac.signal,
-        'unaborted signal: MachineService passes signal to controller.connect');
+      assert(lastRequestAndOpenSignal instanceof AbortSignal && !lastRequestAndOpenSignal.aborted,
+        'unaborted signal: MachineService passes a service-owned signal to WebSerialPort.requestAndOpen');
+      assert(ctrl.lastConnectSignal === lastRequestAndOpenSignal,
+        'unaborted signal: MachineService passes the same service-owned signal to controller.connect');
       assert(portSpy.closeCalls === 0, 'unaborted signal: port.close NOT called');
       assert(ctrl.disconnectCalls === 0,
         'unaborted signal: controller.disconnect NOT called');
     }
 
-    assert(/requestAndOpen\(baudRate,\s*signal\)/.test(machineServiceSource),
-      'source pin: MachineService passes AbortSignal into WebSerialPort.requestAndOpen');
-    assert(/controllerRef\.current\.connect\(ws,\s*signal\)/.test(machineServiceSource),
-      'source pin: MachineService passes AbortSignal into controller.connect');
+    // ── 6. Service-owned cancellation: safeDisconnect can abort active connect ──
+    {
+      const ctrl = makeControllerSpy();
+      const portRef = { current: null } as { current: SerialPortLike | null };
+      const svc = new MachineService(
+        { current: ctrl.controller } as { current: LaserController },
+        portRef,
+      );
+      const portSpy: PortSpy = { closeCalls: 0 };
+      lastPortSpy = portSpy;
+      currentRequestAndOpenImpl = async (_b, s) => new Promise<void>((_resolve, reject) => {
+        s?.addEventListener('abort', () => {
+          reject(s.reason instanceof Error ? s.reason : new Error('service-owned abort'));
+        }, { once: true });
+      });
+      ctrl.setConnectImpl(async () => {});
+
+      const connectResult = svc.connectRealLaser(115200)
+        .then(() => 'resolved' as const)
+        .catch((err: unknown) => err);
+      await Promise.resolve();
+      const cancelled = await svc.cancelActiveConnect(new Error('connect cancelled by safeDisconnect'));
+      const result = await connectResult;
+
+      assert(cancelled === true, 'service cancel: cancelActiveConnect returns true for active connect');
+      assert(result instanceof Error && /safeDisconnect/i.test(result.message),
+        `service cancel: connect rejects with cancel reason (got ${result instanceof Error ? result.message : String(result)})`);
+      assert(portRef.current === null, 'service cancel: portRef stays null');
+      assert(portSpy.closeCalls === 1, 'service cancel: T1-49 cleanup closes the partial port');
+      assert(ctrl.connectCalls === 0, 'service cancel: controller.connect NOT called when open is aborted');
+    }
+
+    assert(/requestAndOpen\(baudRate,\s*connectSignal\)/.test(machineServiceSource),
+      'source pin: MachineService passes service-owned AbortSignal into WebSerialPort.requestAndOpen');
+    assert(/controllerRef\.current\.connect\(ws,\s*connectSignal\)/.test(machineServiceSource),
+      'source pin: MachineService passes service-owned AbortSignal into controller.connect');
   } finally {
     (WebSerialPort as unknown as { isSupported: () => boolean }).isSupported = origIsSupported;
     (WebSerialPort.prototype as unknown as {
