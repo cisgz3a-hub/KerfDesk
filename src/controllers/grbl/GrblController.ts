@@ -25,6 +25,14 @@ import {
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { computeStreamingHealth } from './streamingHealth';
 import { buildGrblFrameGcode } from './GrblFrameGcode';
+import {
+  type SafetyActionResult,
+  makeEmergencyStopResult,
+  makeNotConnectedResult,
+  makePauseResult,
+  makeResumeResult,
+  makeSoftResetStopResult,
+} from '../../app/SafetyActionResult';
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
@@ -199,32 +207,28 @@ export class GrblController implements GrblControllerApi {
     },
     pauseJob: async (): Promise<OperationResult> => {
       try {
-        this.pause();
-        return { ok: true };
+        return this._operationFromSafetyResult(this.pause());
       } catch (err: unknown) {
         return this._operationError(err);
       }
     },
     resumeJob: async (): Promise<OperationResult> => {
       try {
-        this.resume();
-        return { ok: true };
+        return this._operationFromSafetyResult(this.resume());
       } catch (err: unknown) {
         return this._operationError(err);
       }
     },
     stopJob: async (): Promise<OperationResult> => {
       try {
-        this.stop();
-        return { ok: true };
+        return this._operationFromSafetyResult(this.stop());
       } catch (err: unknown) {
         return this._operationError(err);
       }
     },
     emergencyStop: async (): Promise<OperationResult> => {
       try {
-        this.emergencyStop();
-        return { ok: true };
+        return this._operationFromSafetyResult(this.emergencyStop());
       } catch (err: unknown) {
         return this._operationError(err);
       }
@@ -842,8 +846,8 @@ export class GrblController implements GrblControllerApi {
    * Feed-hold pause. Machine decelerates cleanly, preserves position, laser turns off.
    * Recoverable via resume(). Send this for user-initiated pause during a job.
    */
-  pause(): void {
-    if (!this._port?.isOpen) return;
+  pause(): SafetyActionResult {
+    if (!this._port?.isOpen) return makeNotConnectedResult('pause');
     console.info('[GrblController] pause() — feed hold (recoverable)');
     if (this._isJobRunning) {
       this._pausePending = true;
@@ -862,14 +866,28 @@ export class GrblController implements GrblControllerApi {
           ),
       );
     }
+    return makePauseResult();
   }
 
   /**
    * Resume a feed-hold pause. Only meaningful after pause().
    */
-  resume(): void {
-    if (!this._port?.isOpen) return;
-    if (this._state.status !== 'hold' && !this._pausePending) return;
+  resume(): SafetyActionResult {
+    if (!this._port?.isOpen) return makeNotConnectedResult('resume');
+    if (this._state.status !== 'hold' && !this._pausePending) {
+      return {
+        action: 'resume',
+        accepted: false,
+        motionState: this._state.status === 'run' ? 'running' : 'unknown',
+        laserState: 'unknown',
+        positionTrusted: 'unknown',
+        requiresRehome: 'unknown',
+        requiresReconnect: false,
+        requiresInspection: false,
+        message: 'Resume ignored because the controller is not paused.',
+        timestamp: Date.now(),
+      };
+    }
     // T1-23: pause() emitted M5. Reassert the captured modal spindle
     // mode with S0 before cycle-start so the resumed stream has the
     // expected M3/M4 mode without firing before motion resumes.
@@ -886,11 +904,12 @@ export class GrblController implements GrblControllerApi {
     // Realtime `~` releases GRBL feed-hold; only continues streaming when a job is active.
     console.info('[GrblController] feed-hold release (~ / cycle-start)');
     this._sendRealtime(REALTIME_CYCLE_START);
-    if (!this._isJobRunning) return;
+    if (!this._isJobRunning) return makeResumeResult();
     this._resumeRequested = true;
     this._pausePending = false;
     this._state.status = 'run';
     this._drainQueue();
+    return makeResumeResult();
   }
 
   /**
@@ -911,12 +930,13 @@ export class GrblController implements GrblControllerApi {
    * For a pause/resume that preserves position, use pause() +
    * resume() (feed-hold / cycle-start).
    */
-  stop(): void {
-    if (!this._port?.isOpen) return;
+  stop(): SafetyActionResult {
+    if (!this._port?.isOpen) return makeNotConnectedResult('abortJob');
     console.info('[GrblController] stop() — soft reset, job aborted, re-home required');
     this._sendRealtime(REALTIME_RESET);
     this._abortJob();
     this._emitProgress();
+    return makeSoftResetStopResult();
   }
 
   /**
@@ -926,8 +946,8 @@ export class GrblController implements GrblControllerApi {
    * Use only for physical danger — fire, crash, runaway, user injury. For ordinary
    * "stop this job" use stop() instead.
    */
-  emergencyStop(): void {
-    if (!this._port?.isOpen) return;
+  emergencyStop(): SafetyActionResult {
+    if (!this._port?.isOpen) return makeNotConnectedResult('emergencyStop');
     console.warn(
       '[GrblController] EMERGENCY STOP — soft reset, position may be lost, rehome may be required. Disconnecting.',
     );
@@ -941,6 +961,7 @@ export class GrblController implements GrblControllerApi {
         err,
       );
     });
+    return makeEmergencyStopResult();
   }
 
   /**
@@ -1076,6 +1097,17 @@ export class GrblController implements GrblControllerApi {
 
   private _operationError(err: unknown): OperationResult {
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+
+  private _operationFromSafetyResult(result: SafetyActionResult): OperationResult {
+    if (result.accepted) {
+      return { ok: true, message: result.message };
+    }
+    return {
+      ok: false,
+      reason: result.message ?? `${result.action} not accepted`,
+      message: result.message,
+    };
   }
 
   private _trySendInternalOperationCommand(command: string, onCommand?: (line: string) => void): OperationResult {

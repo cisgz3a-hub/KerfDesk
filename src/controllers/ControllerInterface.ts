@@ -8,6 +8,7 @@
  */
 
 import { type SerialPortLike } from '../communication/SerialPort';
+import type { SafetyActionResult } from '../app/SafetyActionResult';
 
 export type MachineStatus =
   | 'disconnected'
@@ -228,11 +229,11 @@ export interface GrblControllerApi extends GcodeLineController {
    */
   executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
-  pause(): void;
-  resume(): void;
-  stop(): void;
+  pause(): SafetyActionResult;
+  resume(): SafetyActionResult;
+  stop(): SafetyActionResult;
   /** Soft reset — use only for true emergency (position may be lost). */
-  emergencyStop(): void;
+  emergencyStop(): SafetyActionResult;
 
   /**
    * Two-stage hardware laser-off (T1-22). Awaitable; never throws — returns a
