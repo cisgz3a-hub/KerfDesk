@@ -49,6 +49,9 @@ import type { StartReadiness, StartReadinessGate } from './connection/StartReadi
 import { Workflow } from './connection/Workflow';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
+import { type SafetyState } from '../../app/SafetyStateMachine';
+import { RecoveryCard } from '../recovery/RecoveryCard';
+import { buildRecoveryCard } from '../recovery/RecoveryCardContent';
 
 function jobModeLabel(scene: Scene): string {
   const outputLayers = scene.layers.filter(l => l.visible && l.output !== false);
@@ -284,6 +287,7 @@ export function ConnectionPanelMain({
   const [isAutoFocusing, setIsAutoFocusing] = useState(false);
   const [progressFlashGreen, setProgressFlashGreen] = useState(false);
   const [streamingLastUnhealthyAt, setStreamingLastUnhealthyAt] = useState<number | null>(null);
+  const [safetyState, setSafetyState] = useState<SafetyState>(() => machineService.getSafetyState());
   // T1-50 Part A: UI mutex on Connect button. Without this, two
   // rapid clicks each call into `machineService.connectRealLaser()`,
   // each constructing a new WebSerialPort and racing on
@@ -359,6 +363,11 @@ export function ConnectionPanelMain({
   useEffect(() => {
     isTestFiringRef.current = isTestFiring;
   }, [isTestFiring]);
+
+  useEffect(() => {
+    setSafetyState(machineService.getSafetyState());
+    return machineService.onSafetyStateChange(setSafetyState);
+  }, [machineService]);
 
   const stopTestFire = useCallback(() => {
     const cap = testFirePointerCaptureRef.current;
@@ -2051,6 +2060,14 @@ export function ConnectionPanelMain({
     readinessScore,
   });
 
+  const safetyRecoveryContent = safetyState.kind === 'requiresInspection'
+    ? buildRecoveryCard({ variant: 'emergency-stop' })
+    : null;
+  const safetyRecoveryCard = safetyRecoveryContent &&
+    React.createElement(RecoveryCard, {
+      content: safetyRecoveryContent,
+    });
+
   const outcomeExtrasSection = isConnected && !isRunning && !displayPaused && React.createElement(React.Fragment, null,
     jobCompleted && React.createElement('div', {
       style: {
@@ -2333,6 +2350,7 @@ export function ConnectionPanelMain({
         laserModeBanner,
         connectSection,
       }),
+      safetyRecoveryCard,
       isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
         style: {
