@@ -15704,7 +15704,7 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 Alternative: delete it entirely. The README + directory structure + module-boundary lints (already present in `tsconfig` or ESLint rules) are sufficient.
 
-**Status:** Shipped in <TBD>. `scripts/generate-project-map.mjs` now scans `src/` and `tests/`, rewrites `PROJECT_MAP.md` deterministically, and supports `--check` for drift detection. `package.json` exposes `project-map:generate` and `project-map:check`; `tests/project-map-generated.test.ts` pins the generated-map contract and runs under auto-discovered `npm test`.
+**Status:** Shipped in 1da30b0. `scripts/generate-project-map.mjs` now scans `src/` and `tests/`, rewrites `PROJECT_MAP.md` deterministically, and supports `--check` for drift detection. `package.json` exposes `project-map:generate` and `project-map:check`; `tests/project-map-generated.test.ts` pins the generated-map contract and runs under auto-discovered `npm test`.
 
 **Estimate:** 1 session for the generator; 15 min to delete.
 
