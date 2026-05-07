@@ -9,6 +9,7 @@ import {
   type MachineStatus,
   type MachinePosition,
   type JobProgress,
+  type OperationResult,
   type StateChangeCallback,
   type ProgressCallback,
   type ErrorCallback,
@@ -132,6 +133,59 @@ export interface GrblMachineInfo {
 export class GrblController implements GrblControllerApi {
   readonly family = 'grbl' as const;
   readonly protocolName = 'GRBL 1.1';
+  readonly operations = {
+    jog: async (args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand(`$J=G91 G21 ${args.axis}${args.distanceMm} F${args.feedMmPerMin}`),
+    home: async (): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('$H'),
+    unlockAlarm: async (): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('$X'),
+    setWorkOriginAtCurrentPosition: async (): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('G10 L20 P1 X0 Y0'),
+    resetWcsToMachineOrigin: async (): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('G10 L2 P1 X0 Y0 Z0'),
+    laserOff: async (): Promise<OperationResult> => {
+      const result = await this.safetyOff();
+      if (result.stage === 'm5') return { ok: true, message: 'Laser off confirmed.' };
+      return {
+        ok: false,
+        reason: result.stage,
+        message: result.error?.message,
+      };
+    },
+    pauseJob: async (): Promise<OperationResult> => {
+      try {
+        this.pause();
+        return { ok: true };
+      } catch (err: unknown) {
+        return this._operationError(err);
+      }
+    },
+    resumeJob: async (): Promise<OperationResult> => {
+      try {
+        this.resume();
+        return { ok: true };
+      } catch (err: unknown) {
+        return this._operationError(err);
+      }
+    },
+    stopJob: async (): Promise<OperationResult> => {
+      try {
+        this.stop();
+        return { ok: true };
+      } catch (err: unknown) {
+        return this._operationError(err);
+      }
+    },
+    emergencyStop: async (): Promise<OperationResult> => {
+      try {
+        this.emergencyStop();
+        return { ok: true };
+      } catch (err: unknown) {
+        return this._operationError(err);
+      }
+    },
+  };
 
   private _state: MachineState;
   private _port: SerialPortLike | null = null;
@@ -960,6 +1014,19 @@ export class GrblController implements GrblControllerApi {
     }
 
     this._writeLine(command);
+  }
+
+  private _operationError(err: unknown): OperationResult {
+    return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+  }
+
+  private _trySendInternalOperationCommand(command: string): OperationResult {
+    try {
+      this.sendCommand(command, 'internal');
+      return { ok: true };
+    } catch (err: unknown) {
+      return this._operationError(err);
+    }
   }
 
   requestStatusReport(): void {

@@ -157,6 +157,12 @@ export interface DisconnectOptions {
 }
 
 export interface MachineOperationApi {
+  jog(args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number }): Promise<OperationResult>;
+  home(): Promise<OperationResult>;
+  unlockAlarm(): Promise<OperationResult>;
+  setWorkOriginAtCurrentPosition(): Promise<OperationResult>;
+  resetWcsToMachineOrigin(): Promise<OperationResult>;
+  laserOff(opts?: { emergency?: boolean }): Promise<OperationResult>;
   pauseJob(handle?: JobHandle): Promise<OperationResult>;
   resumeJob(handle?: JobHandle): Promise<OperationResult>;
   stopJob(handle?: JobHandle, reason?: string): Promise<OperationResult>;
@@ -195,6 +201,7 @@ export interface GrblControllerApi extends GcodeLineController {
   readonly protocolName: string;
   readonly state: MachineState;
   readonly isJobRunning: boolean;
+  readonly operations: MachineOperationApi;
   /** GRBL $30 (max spindle/PWM). Null until parsed from a $$ response after connect. */
   readonly maxSpindle: number | null;
 
