@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 115 | 13 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-89 entitlement server contract shipped; T2-6 App split remains open. |
+| Tier 2 | 116 | 12 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-96 lifecycle contract shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -12989,6 +12989,8 @@ type LifecycleEvent =
 
 **Cross-check note (audit 5A):** Audit's Critical 9 + Priority 11.
 
+**Status:** Shipped in `<TBD>` (focused MVP - lifecycle event contract + revocation polling/state helpers; deployed polling and storage adapter wiring deferred). New `src/entitlements/EntitlementLifecycle.ts` exports `ENTITLEMENT_REVOCATIONS_PATH` (`/entitlement/revocations`), `EntitlementRevocation`, `RevocationPollState`, `EntitlementRevocationsResponse`, `LifecycleEvent` (verified/refunded/chargebacked/manually-revoked/plan-upgraded/plan-downgraded/expired), `mergeRevocationPollState(...)`, `findRevocationForPayload(...)`, `applyRevocationsToEntitlement(...)`, and `applyLifecycleEvent(...)`. The helper merges server revocation poll results into a local persisted set, dedupes by `jti`, advances `lastSeenRevocationAt`, immediately revokes the current token when its `jti` appears even if the user was in offline grace, clears paid features on revocation/expiry, and applies plan upgrades/downgrades by replacing the T2-92 feature list so `EntitlementService.canUse(feature)` reflects the new plan. Pinned by `tests/lifecycle-revocation.test.ts` (24 contracts: revocation endpoint constant, local merge/dedupe, current-token lookup, offline-grace override, plan downgrade feature replacement through T2-92, expiry state, and source-level lifecycle catalog pins). **Out of scope (T2-96-followup):** real `/entitlement/revocations?since=` HTTP client, persisted revocation-list adapter, polling cadence from `EntitlementService`, UI surfacing of lifecycle messages beyond existing T2-93 status copy, and server admin tooling for revocation events. **Hardware verification: not required** (commercial entitlement state only; no machine/controller behavior).
+
 ---
 
 ### T2-97 | Entitlement checks must never block safety controls
@@ -19998,7 +20000,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-93 License status enum 鈥?`LicenseStatus` first-class state machine (additive layer shipped 2026-05-05 in `e18e204`; legacy flat-`status` removal deferred to T2-93-followup)
 - [x] T2-94 Clock-tamper detection for offline grace (Shipped — detector + 4-kind tamper reasons + server-time-grace primitive; EntitlementService wiring deferred as T2-94-followup; depends on T2-89/T2-90 for full effect)
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)
-- [ ] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (filed; depends on T2-89)
+- [x] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (focused MVP shipped; lifecycle event contract + revocation merge/apply helpers; polling/storage wiring deferred)
 - [x] T2-97 Entitlement checks must never block safety controls (shipped 2026-05-05 in `9a62d90` — `docs/SAFETY_GUARANTEES.md` + behavioral + static-guard tests)
 - [ ] T2-98 CI builds installers on Windows + macOS runners (filed; release-engineering foundation)
 - [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)

@@ -7,6 +7,7 @@ export {
   type ActivateResult,
 } from './EntitlementService';
 export * from './ServerEntitlementService';
+export * from './EntitlementLifecycle';
 
 import type { ProFeature } from './types';
 import { entitlementService } from './EntitlementService';
