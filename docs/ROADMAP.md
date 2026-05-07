@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 110 | 18 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-58 Ready-to-Run panel shipped; T2-6 App split remains open. |
+| Tier 2 | 111 | 17 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-59 material confidence foundation shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -10245,6 +10245,8 @@ Material preset library is at T4-1. T2-59 builds the consumption-side workflow a
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 4 + Priority 5 + Section 5.
 
+**Status:** Shipped in <TBD> (focused MVP - material-setting confidence foundation + manual-edit invalidation). New `src/core/materials/MaterialSettingConfidence.ts` exports the T2-59 confidence model (`built-in-tested`, `user-saved`, `estimated`, `manual-unverified`), preset-confidence builders, manual-unverified marking helpers, material-operation extraction from a layer, and `buildUserSavedPresetFromLayer(...)`. `LaserSettings` now carries optional `settingsConfidence`; `applyMaterialPresetToLayer(...)` stamps `built-in-tested` for default presets and `user-saved` for user presets; `saveLayerSettingsAsUserPreset(...)` persists edited layer settings as a new user preset and returns the layer linked to that preset. The connection-sidebar power/speed/pass editor now calls `markSettingsManualUnverified(...)`, so a tested preset visibly stops claiming tested confidence after manual numeric edits. Pinned by `tests/material-first-workflow.test.ts` (17 contracts: built-in preset applies values with `built-in-tested`; manual edit transitions to `manual-unverified`; saving edited values creates a `user-saved` preset and relinks the layer; static pin for connection-sidebar manual invalidation). Regression: `tests/material-preset-schema.test.ts`, `npm run build`, `npm run electron:compile`. **Out of scope:** the full material-first card UI, confidence badges in every layer/settings surface, and guided material-test launch flow. **Hardware verification: not required** (metadata/state only; compile values unchanged except existing preset application semantics).
+
 ---
 
 ### T2-60 | Frame freshness invalidation 鈥?any relevant change resets `hasFramed`
@@ -19948,7 +19950,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-56 Move job log finalization out of mounted UI into MachineService subscription (auto-finalize hook shipped 2026-05-05 in `bb2f5d0`; ConnectionPanel useEffect kept idempotent for back-compat)
 - [x] T2-57 Typed error state per domain — compile/connection/job/machine (Shipped — DomainErrorState reducer + per-domain typed errors + 4 selector gates; per-site migration deferred as T2-57-followup)
 - [x] T2-58 Ready-to-Run unified pre-flight panel (Shipped - ReadyToRunPanel component + connected-sidebar integration; older scattered surfaces left in place for transitional safety)
-- [ ] T2-59 Material-first settings workflow with preset confidence labels (filed; large UX, ~3-5 sessions)
+- [x] T2-59 Material-first settings workflow with preset confidence labels (Shipped - confidence model + preset/manual/user-saved transitions; full card UI deferred)
 - [x] T2-60 Frame freshness invalidation 鈥?any relevant change resets `hasFramed` (shipped 2026-05-05 in `5f27d34`)
 - [ ] T2-61 Move design-editing controls (text spacing, etc.) out of connection panel (filed; UX coherence)
 - [x] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop / job-fail (Shipped — content layer per variant + GRBL alarm-code mapper + buildRecoveryCard router; React component deferred as T2-62-followup; refines T2-46)

@@ -139,6 +139,12 @@ export interface LaserSettings {
    * of T2-71's `Scene.metadata.deviceProfileSnapshot` pattern.
    */
   materialPresetSnapshot?: import('../materials/MaterialPresetSnapshot').MaterialPresetSnapshot;
+  /**
+   * T2-59: user-facing confidence for the power/speed/pass values currently
+   * on this layer. This distinguishes built-in tested presets from user-saved,
+   * estimated, and manual-unverified values without changing compile output.
+   */
+  settingsConfidence?: import('../materials/MaterialSettingConfidence').LayerSettingsConfidence;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

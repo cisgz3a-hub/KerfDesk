@@ -5,6 +5,11 @@ import { MAX_LASER_SPEED } from '../types';
 import { getDeviceProfiles, saveDeviceProfile, type DeviceProfile } from '../devices/DeviceProfile';
 import type { ResponseCurve } from './ResponseCurve';
 import { getStorage } from '../storage/storage';
+import {
+  buildUserSavedPresetFromLayer,
+  confidenceForPreset,
+  type SaveLayerSettingsAsUserPresetArgs,
+} from './MaterialSettingConfidence';
 
 const STORAGE_KEY = 'laserforge-material-presets';
 
@@ -155,6 +160,7 @@ export function applyMaterialPresetToLayer(layer: Layer, preset: MaterialPreset)
     speed,
     passes,
     materialPresetId: preset.id,
+    settingsConfidence: confidenceForPreset(preset, mode),
   };
 
   // Image-mode fields from operation (each applied only when the preset specifies it)
@@ -183,6 +189,26 @@ export function applyMaterialPresetToLayer(layer: Layer, preset: MaterialPreset)
   // lookup; intentionally NOT copied to the layer.
 
   return { ...layer, settings: nextSettings };
+}
+
+export function saveLayerSettingsAsUserPreset(
+  layer: Layer,
+  args: SaveLayerSettingsAsUserPresetArgs,
+): { preset: MaterialPreset; layer: Layer } {
+  const preset = buildUserSavedPresetFromLayer(layer, args);
+  savePreset(preset);
+  const applied = applyMaterialPresetToLayer(layer, preset);
+  return {
+    preset,
+    layer: applied ?? {
+      ...layer,
+      settings: {
+        ...layer.settings,
+        materialPresetId: preset.id,
+        settingsConfidence: confidenceForPreset(preset, layer.settings.mode),
+      },
+    },
+  };
 }
 
 /**

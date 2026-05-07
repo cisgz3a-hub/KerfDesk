@@ -4,6 +4,7 @@ import { type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { MAX_LASER_SPEED, MIN_LASER_SPEED } from '../../core/types';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
+import { markSettingsManualUnverified } from '../../core/materials/MaterialSettingConfidence';
 
 export interface ConnectionPanelGrbl {
   isJobRunning: boolean;
@@ -109,14 +110,14 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
           if (l.id !== layerId) return l;
           if (key === 'powerMax') {
             const v = Math.max(0, Math.min(100, Math.round(Number.isFinite(value) ? value : 0)));
-            return { ...l, settings: { ...l.settings, power: { ...l.settings.power, max: v } } };
+            return { ...l, settings: markSettingsManualUnverified({ ...l.settings, power: { ...l.settings.power, max: v } }) };
           }
           if (key === 'speed') {
             const v = Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, Math.round(Number.isFinite(value) ? value : 1000)));
-            return { ...l, settings: { ...l.settings, speed: v } };
+            return { ...l, settings: markSettingsManualUnverified({ ...l.settings, speed: v }) };
           }
           const v = Math.max(1, Math.min(99, Math.round(Number.isFinite(value) ? value : 1)));
-          return { ...l, settings: { ...l.settings, passes: v } };
+          return { ...l, settings: markSettingsManualUnverified({ ...l.settings, passes: v }) };
         }),
       }, 'layer-setting');
       if (connectionSidebarOpen) setGcodeStale(true);
