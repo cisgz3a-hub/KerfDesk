@@ -36,6 +36,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('power:acquireJobWakeLock') as Promise<number>,
   releaseJobWakeLock: () =>
     ipcRenderer.invoke('power:releaseJobWakeLock') as Promise<void>,
+  updates: {
+    check: () =>
+      ipcRenderer.invoke('update:check') as Promise<unknown>,
+    install: (state?: { jobRunning?: boolean }) =>
+      ipcRenderer.invoke('update:install', state) as Promise<unknown>,
+    onEvent: (handler: (event: unknown) => void) => {
+      const listener = (_e: IpcRendererEvent, event: unknown) => handler(event);
+      ipcRenderer.on('update:event', listener);
+      return () => {
+        ipcRenderer.removeListener('update:event', listener);
+      };
+    },
+  },
 
   // ─── Falcon WiFi (Phase 1: read-only status monitoring) ─────────
   falconWifi: {

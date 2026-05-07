@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
@@ -37,6 +38,15 @@ const isDev = !app.isPackaged;
  * has to be set deliberately.
  */
 const shouldOpenDevTools = isDev || process.env.ELECTRON_ENABLE_DEVTOOLS === '1';
+const UPDATE_CHECK_DELAY_MS = 30_000;
+
+type UpdateInstallResult =
+  | { ok: true }
+  | { ok: false; reason: 'not-packaged' | 'job-running' | 'install-failed'; message?: string };
+
+type UpdateCheckResult =
+  | { ok: true }
+  | { ok: false; reason: 'not-packaged' | 'check-failed'; message?: string };
 
 // T1-92: per-extension size caps applied before fs.readFileSync. Without
 // this, a 5 GB SVG selected from the dialog blocks the main process for
@@ -265,6 +275,47 @@ app.on('render-process-gone', (_event, _webContents, details) => {
   recordMainProcessCrash(`renderer gone: ${details.reason} (${details.exitCode})`);
 });
 
+function sendUpdateEvent(kind: string, payload?: unknown): void {
+  mainWindow?.webContents.send('update:event', { kind, payload });
+}
+
+autoUpdater.on('checking-for-update', () => {
+  sendUpdateEvent('checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+  sendUpdateEvent('available', info);
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  sendUpdateEvent('not-available', info);
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  sendUpdateEvent('download-progress', progress);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  sendUpdateEvent('downloaded', info);
+});
+
+autoUpdater.on('error', (err) => {
+  console.warn('[update] updater error', err);
+  sendUpdateEvent('error', err instanceof Error ? err.message : String(err));
+});
+
+function scheduleAutoUpdateCheck(): void {
+  if (isDev) return;
+  autoUpdater.autoDownload = true;
+  const timer = setTimeout(() => {
+    void autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
+      console.warn('[update] check failed', err);
+      sendUpdateEvent('error', err instanceof Error ? err.message : String(err));
+    });
+  }, UPDATE_CHECK_DELAY_MS);
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
 app.whenReady().then(() => {
   const startupStatus = beginStartupCrashLoopTracking(app.getPath('userData'));
   if (startupStatus.shouldEnterSafeMode) {
@@ -274,6 +325,7 @@ app.whenReady().then(() => {
     );
   }
   createWindow();
+  scheduleAutoUpdateCheck();
 });
 
 app.on('window-all-closed', () => {
@@ -288,6 +340,10 @@ let safeShutdownDone = false;
 
 /** OS wake lock id while a job is active (see power:acquireJobWakeLock). */
 let jobWakeLockId: number | null = null;
+
+function isJobWakeLockActive(): boolean {
+  return jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId);
+}
 
 app.on('before-quit', (e) => {
   if (safeShutdownDone) return;
@@ -441,6 +497,40 @@ ipcMain.handle('power:releaseJobWakeLock', () => {
   }
   jobWakeLockId = null;
 });
+
+ipcMain.handle('update:check', async (): Promise<UpdateCheckResult> => {
+  if (isDev) return { ok: false, reason: 'not-packaged' };
+  try {
+    await autoUpdater.checkForUpdatesAndNotify();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'check-failed',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+});
+
+ipcMain.handle(
+  'update:install',
+  (_event, state?: { jobRunning?: boolean }): UpdateInstallResult => {
+    if (isDev) return { ok: false, reason: 'not-packaged' };
+    if (state?.jobRunning === true || isJobWakeLockActive()) {
+      return { ok: false, reason: 'job-running' };
+    }
+    try {
+      autoUpdater.quitAndInstall();
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'install-failed',
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+);
 
 // T2-35: Electron native serial IPC removed. The renderer uses Web Serial via
 // MachineService/GrblController; keeping a parallel serialport bridge exposed

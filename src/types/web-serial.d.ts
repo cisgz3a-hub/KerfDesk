@@ -19,6 +19,11 @@ declare global {
     // T1-84: storageClear was removed from the IPC.
     acquireJobWakeLock?: () => Promise<number>;
     releaseJobWakeLock?: () => Promise<void>;
+    updates?: {
+      check(): Promise<unknown>;
+      install(state?: { jobRunning?: boolean }): Promise<unknown>;
+      onEvent(handler: (event: unknown) => void): () => void;
+    };
   }
 
   interface Window {

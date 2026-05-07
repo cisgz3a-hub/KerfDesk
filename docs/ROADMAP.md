@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 124 | 4 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -13410,6 +13410,8 @@ These manifests + the installers are uploaded to the GitHub Release. `electron-u
 
 **Cross-check note (audit 5B):** Audit's Critical 1 + Priority 5.
 
+**Status:** Shipped in TBD (focused MVP — Electron auto-update infrastructure with signed-release publish metadata; visible update UI and first real release-feed validation deferred). Added `electron-updater` as a runtime dependency and package `build.publish` metadata for GitHub Releases (`stolkjohannjohann-sudo/LaserForge`) so electron-builder can emit update manifests for tagged releases. `electron/main.ts` imports `autoUpdater`, schedules `checkForUpdatesAndNotify()` 30 seconds after packaged startup, forwards checking/available/not-available/download-progress/downloaded/error events through `update:event`, catches network/update-check failures as non-fatal warnings, exposes `update:check`, and gates `update:install` so `quitAndInstall()` refuses while the renderer reports `jobRunning` or the main-process job wake lock is active. `electron/preload.ts` exposes `electronAPI.updates.check/install/onEvent`, with matching `ElectronAPI` types. Pinned by `tests/auto-update-infrastructure.test.ts` (26 contracts: dependency, GitHub publish config, delayed packaged-only check, forwarded events, non-fatal error path, manual check IPC, job-running install guard, preload bridge, unsubscribe, and global typings). **Out of scope:** renderer notification UI, release notes UI, first real GitHub Release manifest validation (`latest.yml` / `latest-mac.yml`), installer signature verification proof from a produced release, and rollback UI integration. **Hardware verification: not required** (release engineering only; install is explicitly blocked during active jobs).
+
 ---
 
 ### T2-102 | Rollback strategy 鈥?failed-launch detection + previous-version retention
@@ -20021,7 +20023,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-98 CI builds installers on Windows + macOS runners (focused MVP shipped; unsigned per-PR installer jobs + artifact upload)
 - [x] T2-99 Windows code signing + signed CI releases (Shipped — tag-only signed Windows release workflow + electron-builder signed config; cert acquisition and first signature verification remain release tasks)
 - [x] T2-100 macOS code signing + notarization + stapling (Shipped — tag-only signed/notarized macOS release workflow + hardened-runtime electron-builder config; Apple account/secrets and first Gatekeeper proof remain release tasks)
-- [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
+- [x] T2-101 Auto-update infrastructure — `electron-updater` with signed releases (Shipped — dependency + GitHub publish metadata + packaged startup check + update event bridge + job-running install guard; visible UI and first feed validation deferred)
 - [x] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (Shipped — Layer 1 failed-launch detector in Electron main; previous-installer retention and rollback UI deferred until T2-101/signing)
 - [x] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (Shipped — checksum-format helpers + generator script; SBOM tooling + GPG signing wiring deferred as T2-103-followup; depends on T2-98)
 - [x] T2-104 Versioned user-data migration framework (Shipped — DataDomain (10) + DomainMigrationStep + Registry (chain validation) + migrateUserData runner + 2 typed errors; per-loader adoption deferred as T2-104-followup)
