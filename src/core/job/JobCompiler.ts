@@ -60,6 +60,21 @@ export interface CompileJobOptions {
    * example GRBL M4). When true, software accel-aware splitting is disabled.
    */
   strategySupportsDynamicLaserPower?: boolean;
+  /** Cooperative cancellation checked at compile-loop boundaries. */
+  signal?: AbortSignal;
+  /** Object-level progress for synchronous compileJob callers. */
+  onProgress?: (event: CompileJobProgress) => void;
+}
+
+export interface CompileJobProgress {
+  fraction: number;
+  completedObjects: number;
+  totalObjects: number;
+  layerIndex: number;
+  layerCount: number;
+  objectIndex: number;
+  objectCount: number;
+  detail?: string;
 }
 
 /** Min/max plausible acceleration (mm/s²) for controller-reported and profile-sourced values. */
@@ -162,9 +177,39 @@ function objectsOnLayerInSceneOrder(scene: Scene, layerId: string): SceneObject[
   return scene.objects.filter(o => o.layerId === layerId && o.visible);
 }
 
+function throwIfCompileAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
+function countCompilableObjects(scene: Scene, outputLayers: readonly Layer[]): number {
+  let count = 0;
+  for (const layer of outputLayers) {
+    const objects = getObjectsByLayer(scene, layer.id).filter(o => o.visible);
+    if (layer.settings.mode === 'image') {
+      count += objects.filter(o => o.geometry.type === 'image').length;
+    } else {
+      count += objects.length;
+    }
+  }
+  return count;
+}
+
+function reportCompileProgress(
+  options: CompileJobOptions | undefined,
+  event: Omit<CompileJobProgress, 'fraction'>,
+): void {
+  if (!options?.onProgress) return;
+  const total = Math.max(1, event.totalObjects);
+  const fraction = Math.max(0, Math.min(1, event.completedObjects / total));
+  options.onProgress({ ...event, fraction });
+}
+
 // ─── MAIN COMPILER ───────────────────────────────────────────────
 
 export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
+  throwIfCompileAborted(options?.signal);
   const job = createEmptyJob(scene.metadata.name, scene.id);
   const outputLayers = sortLayersByProcessingOrder(getOutputLayers(scene));
   const optimizeOrder = options?.optimizeOrder ?? scene.compileOptions?.optimizeOrder !== false;
@@ -173,14 +218,39 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
   const entitlementPolicy = createEntitlementPolicy();
 
   let totalObjects = 0;
+  const progressTotalObjects = countCompilableObjects(scene, outputLayers);
+  let completedObjects = 0;
+
+  const markObjectCompiled = (
+    layerIndex: number,
+    objectIndex: number,
+    objectCount: number,
+  ): void => {
+    completedObjects++;
+    reportCompileProgress(options, {
+      completedObjects,
+      totalObjects: progressTotalObjects,
+      layerIndex,
+      layerCount: outputLayers.length,
+      objectIndex,
+      objectCount,
+      detail: `Compiled ${completedObjects}/${progressTotalObjects} job objects`,
+    });
+    throwIfCompileAborted(options?.signal);
+  };
 
   if (!optimizeOrder) {
-    for (const layer of outputLayers) {
+    for (let layerIndex = 0; layerIndex < outputLayers.length; layerIndex++) {
+      throwIfCompileAborted(options?.signal);
+      const layer = outputLayers[layerIndex];
       const objects = getObjectsByLayer(scene, layer.id);
       if (objects.length === 0) continue;
 
       if (layer.settings.mode === 'image') {
-        for (const obj of objects) {
+        const visibleImageObjects = objects.filter(obj => obj.visible && obj.geometry.type === 'image');
+        for (let objectIndex = 0; objectIndex < visibleImageObjects.length; objectIndex++) {
+          throwIfCompileAborted(options?.signal);
+          const obj = visibleImageObjects[objectIndex];
           if (!obj.visible || obj.geometry.type !== 'image') continue;
           const imgOp = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
           if (imgOp) {
@@ -188,15 +258,20 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
             totalObjects++;
           }
+          markObjectCompiled(layerIndex, objectIndex, visibleImageObjects.length);
         }
         continue;
       }
 
-      const operation = compileOperation(layer, objects, sceneMaterialName, entitlementPolicy, compileOpts);
+      const visibleObjects = objects.filter(obj => obj.visible);
+      const operation = compileOperation(layer, visibleObjects, sceneMaterialName, entitlementPolicy, compileOpts);
       if (operation) {
         job.operations.push(operation);
         job.bounds = mergeAABB(job.bounds, operation.bounds);
-        totalObjects += objects.length;
+        totalObjects += visibleObjects.length;
+      }
+      for (let objectIndex = 0; objectIndex < visibleObjects.length; objectIndex++) {
+        markObjectCompiled(layerIndex, objectIndex, visibleObjects.length);
       }
     }
   } else {
@@ -208,19 +283,23 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
     const postVectorShapes: OrderableShape[] = [];
 
     for (let phase = 0; phase < outputLayers.length; phase++) {
+      throwIfCompileAborted(options?.signal);
       const layer = outputLayers[phase];
       const orderedObjs = objectsOnLayerInSceneOrder(scene, layer.id);
       if (orderedObjs.length === 0) continue;
 
       if (layer.settings.mode === 'image') {
-        for (const obj of orderedObjs) {
-          if (obj.geometry.type !== 'image') continue;
+        const imageObjects = orderedObjs.filter(obj => obj.geometry.type === 'image');
+        for (let objectIndex = 0; objectIndex < imageObjects.length; objectIndex++) {
+          throwIfCompileAborted(options?.signal);
+          const obj = imageObjects[objectIndex];
           const imgOp = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
           if (imgOp) {
             rasterOps.push(imgOp);
             job.bounds = mergeAABB(job.bounds, imgOp.bounds);
             totalObjects++;
           }
+          markObjectCompiled(phase, objectIndex, imageObjects.length);
         }
         continue;
       }
@@ -228,14 +307,26 @@ export function compileJob(scene: Scene, options?: CompileJobOptions): Job {
       const targetPool = phase < splitPhase ? preVectorShapes : postVectorShapes;
       const sceneIndexById = new Map(scene.objects.map((o, i) => [o.id, i]));
 
-      for (const obj of orderedObjs) {
+      for (let objectIndex = 0; objectIndex < orderedObjs.length; objectIndex++) {
+        throwIfCompileAborted(options?.signal);
+        const obj = orderedObjs[objectIndex];
         const op = compileOperation(layer, [obj], sceneMaterialName, entitlementPolicy, compileOpts);
-        if (!op) continue;
-        if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') continue;
+        if (!op) {
+          markObjectCompiled(phase, objectIndex, orderedObjs.length);
+          continue;
+        }
+        if (op.geometry.type !== 'vector' && op.geometry.type !== 'fill') {
+          markObjectCompiled(phase, objectIndex, orderedObjs.length);
+          continue;
+        }
         const shape = vectorOpToOrderableShape(op, phase, sceneIndexById.get(obj.id) ?? 0);
-        if (!shape) continue;
+        if (!shape) {
+          markObjectCompiled(phase, objectIndex, orderedObjs.length);
+          continue;
+        }
         targetPool.push(shape);
         totalObjects++;
+        markObjectCompiled(phase, objectIndex, orderedObjs.length);
       }
     }
 

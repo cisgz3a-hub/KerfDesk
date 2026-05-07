@@ -3,8 +3,8 @@
  * Pre-T2-17 the compile was uncancellable internally — once started,
  * every loop ran to completion. The MVP shipped here adds phase-
  * boundary checkpoints (5 phases: text-expansion, compile-job, plan,
- * transform, output); deep-loop instrumentation in JobCompiler /
- * PlanOptimizer / Output is filed as T2-17-followup.
+ * transform, output); JobCompiler / PlanOptimizer deep-loop progress is
+ * wired into those phases. Output and UI wiring remain T2-17 follow-up work.
  *
  * Run: npx tsx tests/compile-cancellable.test.ts
  */
@@ -39,28 +39,31 @@ function installMockLocalStorage(): void {
   } as Storage;
 }
 
-function makeRectScene(): ReturnType<typeof createScene> {
+function makeRectScene(objectCount: number = 1): ReturnType<typeof createScene> {
   const scene = createScene(400, 300, 'T2-17');
   const layer = createLayer(0, 'cut', 'Cut');
   layer.settings.speed = 1500;
   layer.settings.power = { min: 20, max: 80 };
   scene.layers = [layer];
   scene.activeLayerId = layer.id;
-  const geom: RectGeometry = { type: 'rect', x: 10, y: 10, width: 50, height: 50, cornerRadius: 0 };
-  scene.objects = [{
-    id: generateId(),
-    type: 'rect',
-    name: 'r',
-    layerId: layer.id,
-    parentId: null,
-    transform: { ...IDENTITY_MATRIX },
-    geometry: geom,
-    visible: true,
-    locked: false,
-    powerScale: 1,
-    _bounds: null,
-    _worldTransform: null,
-  }];
+  scene.objects = [];
+  for (let i = 0; i < objectCount; i++) {
+    const geom: RectGeometry = { type: 'rect', x: 10 + i * 4, y: 10, width: 2, height: 2, cornerRadius: 0 };
+    scene.objects.push({
+      id: generateId(),
+      type: 'rect',
+      name: `r-${i}`,
+      layerId: layer.id,
+      parentId: null,
+      transform: { ...IDENTITY_MATRIX },
+      geometry: geom,
+      visible: true,
+      locked: false,
+      powerScale: 1,
+      _bounds: null,
+      _worldTransform: null,
+    });
+  }
   return scene;
 }
 
@@ -118,6 +121,22 @@ void (async () => {
       `progress: first overallFraction starts low (got ${events[0].overallFraction.toFixed(2)})`);
     assert(events[events.length - 1].overallFraction >= 0.99,
       `progress: last overallFraction reaches 1 (got ${events[events.length - 1].overallFraction.toFixed(2)})`);
+  }
+
+  // 2b. JobCompiler deep-loop progress maps into the compile-job phase, so the
+  //     UI can show real movement while job operations are built.
+  {
+    const scene = makeRectScene(5);
+    const events: CompileProgress[] = [];
+    const result = await compileGcode(scene, 'absolute', null, null, 'grbl', null, 1000, getActiveProfile(), {
+      onProgress: (e) => events.push(e),
+    });
+    assert(result != null, 'compile-job deep progress: compile still succeeds');
+    const compileJobFractions = events
+      .filter(e => e.phase === 'compile-job')
+      .map(e => e.fraction);
+    assert(compileJobFractions.some(f => f > 0 && f < 1),
+      `compile-job deep progress: intermediate fractions forwarded (got [${compileJobFractions.map(f => f.toFixed(2)).join(', ')}])`);
   }
 
   // 3. AbortSignal aborted BEFORE compile starts → throws AbortError

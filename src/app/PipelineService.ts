@@ -84,12 +84,11 @@ export interface CompileToolpathResult {
 /**
  * T2-17: optional cooperative-cancel + progress hooks for compileGcode.
  * Pre-T2-17 the compile was uncancellable internally — once started,
- * every loop ran to completion. The phase-boundary hooks here let the
- * UI surface a Cancel button + progress bar without waiting for the
- * deep-loop instrumentation in JobCompiler / PlanOptimizer / Output
- * (filed as T2-17-followup). Aborting at a phase boundary throws an
- * AbortError; pre-existing callers that don't pass `opts` see no
- * behavior change.
+ * every loop ran to completion. The hooks here let the UI surface a
+ * Cancel button + progress bar across phase boundaries and through
+ * JobCompiler / PlanOptimizer deep loops. Output generation remains a
+ * later T2-17 follow-up. Aborting at a checkpoint throws an AbortError;
+ * pre-existing callers that don't pass `opts` see no behavior change.
  */
 export interface CompileOptions {
   signal?: AbortSignal;
@@ -179,7 +178,7 @@ export async function compileGcode(
   profile: DeviceProfile | null = null,
   /**
    * T2-17: optional AbortSignal + progress callback. Phase-boundary
-   * checkpoints ship now; deep-loop instrumentation is T2-17-followup.
+   * checkpoints plus JobCompiler / PlanOptimizer deep-loop checkpoints.
    * Defaults to `{}` so existing callers see no behavior change.
    */
   opts: CompileOptions = {},
@@ -205,6 +204,10 @@ export async function compileGcode(
   const job = compileJob(sceneForJob, {
     machineAccelMmPerS2: controllerAccelMmPerS2,
     strategySupportsDynamicLaserPower: strategy.supportsDynamicLaserPower ?? false,
+    signal: opts.signal,
+    onProgress: (event) => {
+      reportPhase(opts, 'compile-job', event.fraction, event.detail ?? 'Compiling job operations');
+    },
   });
   reportPhase(opts, 'compile-job', 1);
   if (job.operations.length === 0) return null;
