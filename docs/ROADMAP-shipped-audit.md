@@ -241,7 +241,7 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
 | T2-2 | `Storage` interface refactor | `src/core/storage/StorageAdapter.ts` plus Filesystem/IndexedDb/InMemory adapters and `getStorage()` singleton exist. Live storage in the seven roadmap-listed core/entitlement modules uses `getStorage()`; direct `localStorage` is restricted to one-shot `migrate*FromLocalStorage` helpers and pinned by `tests/no-localstorage-in-core.test.ts`. Adapter behavior is pinned by `tests/storage-adapter-contract.test.ts`; autosave image preservation is pinned by `tests/autosave-preserves-images.test.ts`. | pre-session + catch-up |
-| T2-7 | Real controller abstraction | `src/controllers/ControllerInterface.ts`, `src/controllers/ControllerRegistry.ts`, `src/controllers/grbl/` exist as a real abstraction | pre-session |
+| T2-7 | Real controller abstraction / Marlin stub closed by product decision | `src/controllers/ControllerInterface.ts`, `src/controllers/ControllerRegistry.ts`, `src/controllers/grbl/` exist as a real GRBL-focused abstraction. User decision on 2026-05-07: skip Marlin for the MVP. LaserForge remains GRBL/Falcon-focused; second-controller implementation is deferred to Tier 4 (`T4-7`) if future target users require it. | pre-session + product decision |
 | T2-8 | Split Preflight into rule modules | `src/core/preflight/rules/` has 8 separate rule modules: `LayerSettingsPreflight`, `MachinePreflight`, `MachineStatePreflight`, `OptimizationPreflight`, `OutputBoundsPreflight`, `RasterPreflight`, `ScenePreflight`, `TemplatePreflight`, plus `sharedHelpers` | pre-session |
 | T2-22 | Standardized test runner | `scripts/run-tests.mjs` runs each test file in its own Node process. **Note:** auto-discovery part may not be done 鈥?manual list still in file. Treating as shipped because the consistent-reporter requirement is met. | pre-session |
 | T2-67 | `failed_to_start` outcome enum + 8-distinct-outcomes finalization | `src/ui/components/JobOutcomeDialog.tsx`; `failed_to_start` handled in `JobLogViewer.tsx:66,89` | `a1bb80f` |
@@ -463,8 +463,8 @@ T4-2 (kerf planner UI 鈥?beyond the kerf compensation already shipped in box ge
 
 Started at **15 advisories** (2 low, 2 moderate, 11 high) per prior session. After audit work:
 
-- **Cleared (14):** xmldom upgrade, dompurify upgrade, electron-builder cluster (multiple commits including major bump), postcss override (commits `93b305b` 鈥?`0046a04`)
-- **Remaining (1):** Electron 34鈫?1 major bump 鈥?deferred (full-session smoke surface, would need re-running the entire app + IPC + dialog test set)
+- **Cleared (15):** xmldom upgrade, dompurify upgrade, electron-builder cluster, postcss override, Electron runtime upgrade to `42.0.0` (`89c0fe0`).
+- **Remaining (0):** none. Electron was upgraded to `42.0.0` in `89c0fe0`; `npm audit --audit-level=high` reported 0 vulnerabilities after the audit fix.
 
 ---
 

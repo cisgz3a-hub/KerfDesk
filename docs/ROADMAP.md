@@ -59,10 +59,10 @@ This section is the release plan: where we are, what gates separate us from each
 
 The master checklist at the bottom of this file is the current source of truth:
 
-| Tier | Shipped | Open | Notes |
+| Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 98 | 30 | T2-35 native Electron serial bridge removed; T2-6 App split remains open. |
+| Tier 2 | 102 | 26 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -6678,6 +6678,8 @@ App.tsx becomes a thin composition of stores + top-level effects for persistence
 **Priority:** Tier 2 (only if planning to support Marlin or any second controller; otherwise skip and document the GRBL-only stance).
 
 **Cross-check note (audit 3A, 2026-04-25):** Audit 3A confirms this ticket's framing is correct but proposes a more rigorous decomposition. The "force discovery of abstraction holes" approach is now superseded 鈥?audit 3A explicitly enumerates the holes (verified 22 leak locations across MachineService, ExecutionCoordinator, frameGcode, electron/serial.ts, PipelineService, GcodeTemplateValidator). T2-7's actual implementation should now sequence as: T2-24 (interface split) 鈫?T2-25 (capabilities) 鈫?T2-26 (operations API) 鈫?T2-27 (executeJob) 鈫?T2-29 (ticket refactor) 鈫?T3-42 (dialect validators) 鈫?THEN T2-7 (Marlin controller as concrete second controller). The original T2-7 spec sketched what audit 3A formalized; this entry remains for the actual Marlin controller implementation, which becomes much smaller (~1-2 sessions) once the foundation is in place.
+
+**Status:** Closed 2026-05-07 by product decision — Marlin support is skipped for the MVP. LaserForge stays GRBL/Falcon-focused for now; second-controller implementation remains a Tier 4 product expansion under T4-7 if future target users require it. No code change needed.
 
 ---
 
@@ -19878,7 +19880,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-4 Split ConnectionPanelMain (8 phases shipped; sub-component extraction folded into T2-6)
 - [x] T2-5 Gcode template validator (Shipped — `validateGcodeTemplate` with 13 issue kinds + 36-test pin; custom start/end G-code settings wiring shipped in `7494b65`; ValidatedJobTicket template opt-in hash remains deferred)
 - [ ] T2-6 Zustand stores, split App.tsx (Phase 1 shipped in `c138e15`; Phase 2 editor-store migration shipped in `734b49f`; Phase 3a machine-start migration shipped in `1188f55`; Phase 3b active-job canvas migration shipped in `bc90fad`; Phase 3c viewport shell migration shipped in `eb8f0c0`; Phase 3d history metadata migration shipped in `60615cf`; Phase 3e scene owner migration shipped in `bf2dcd2`; Phase 3f HistoryManager ownership shipped in `3a9fb00`; Phase 3g device-profile orchestration extraction shipped in `a91d64c`; Phase 3h material workflow extraction shipped in `b3d20ee`; Phase 3i generator workflow extraction shipped in `a65e7cb`; Phase 3j nudge workflow extraction shipped in `f106957`; Phase 3k keyboard workflow extraction shipped in `5e43c4e`; Phase 3l drag/drop overlay extraction shipped in `dc4f6e2`; Phase 3m recovery/setup composition extraction shipped in `e79e726`; Phase 3n file-toolbar prop builder shipped in `9be4749`; Phase 3o canvas-viewport prop builder shipped in `44e9171`; Phase 3p connection-panel prop builder shipped in `e6498b4`; Phase 3q settings modal composition shipped in `44f6ee4`; Phase 3r text/font dialog composition shipped in `a7e8869`; Phase 3s App.tsx size audit shipped in `1b39a64`; further App.tsx file split remains)
-- [x] T2-7 Controller abstraction real, Marlin stub (closed pre-session — abstraction shipped; Marlin stub deferred to T2-24 / T4-7)
+- [x] T2-7 Controller abstraction real, Marlin stub (closed 2026-05-07 by product decision — GRBL/Falcon MVP; Marlin deferred to T4-7)
 - [x] T2-8 Split Preflight into rule modules (closed pre-session — 8 modules in src/core/preflight/rules/)
 - [x] T2-10 Establish single MachineCommandGateway choke point (Shipped in `6bafcbf`; Pass 1 `47d85ca`, Pass 2 `2713fab`, Pass 3 `80bc3a9`, Pass 4 `cb55dea`, Pass 5 `6bafcbf`)
 - [x] T2-11 Service-layer operation mutex for laser-on operations (shipped 2026-05-04 in `24ce00a` — unblocks T1-30)
