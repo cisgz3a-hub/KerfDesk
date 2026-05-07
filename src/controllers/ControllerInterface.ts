@@ -162,6 +162,7 @@ export interface MachineOperationApi {
   unlockAlarm(): Promise<OperationResult>;
   setWorkOriginAtCurrentPosition(): Promise<OperationResult>;
   resetWcsToMachineOrigin(): Promise<OperationResult>;
+  testFire(args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult>;
   laserOff(opts?: { emergency?: boolean }): Promise<OperationResult>;
   pauseJob(handle?: JobHandle): Promise<OperationResult>;
   resumeJob(handle?: JobHandle): Promise<OperationResult>;

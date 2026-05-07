@@ -78,6 +78,14 @@ async function run(): Promise<void> {
 
   {
   const { ctrl, port } = await connectedController();
+  const result = await ctrl.operations.testFire({ powerPercent: 5, maxSpindle: 1000 });
+  assert(result.ok, 'testFire returns ok');
+  assert(sent(port).includes('M3 S50'), 'testFire emits GRBL M3 S-value inside controller');
+  await ctrl.disconnect();
+  }
+
+  {
+  const { ctrl, port } = await connectedController();
   const result = await ctrl.operations.laserOff();
   assert(result.ok, 'laserOff returns ok when M5 path succeeds');
   assert(sent(port).includes('M5 S0'), 'laserOff emits M5 S0 inside controller safetyOff');
@@ -98,14 +106,17 @@ async function run(): Promise<void> {
   assert(/interface MachineOperationApi[\s\S]*jog/.test(iface), 'MachineOperationApi declares jog');
   assert(/interface MachineOperationApi[\s\S]*unlockAlarm/.test(iface), 'MachineOperationApi declares unlockAlarm');
   assert(/interface MachineOperationApi[\s\S]*setWorkOriginAtCurrentPosition/.test(iface), 'MachineOperationApi declares setWorkOriginAtCurrentPosition');
+  assert(/interface MachineOperationApi[\s\S]*testFire/.test(iface), 'MachineOperationApi declares testFire');
   assert(/readonly operations: MachineOperationApi/.test(iface), 'GrblControllerApi exposes operations');
   assert(/readonly operations =/.test(grbl), 'GrblController implements operations object');
   assert(/_trySendInternalOperationCommand/.test(grbl), 'GRBL command strings are isolated behind operation helper');
   assert(/operations\.unlockAlarm\(\)/.test(coordinator), 'ExecutionCoordinator.unlock uses operations.unlockAlarm');
   assert(/operations\.home\(\)/.test(coordinator), 'ExecutionCoordinator.home uses operations.home');
   assert(/operations\.setWorkOriginAtCurrentPosition\(\)/.test(coordinator), 'ExecutionCoordinator.setOrigin uses operations.setWorkOriginAtCurrentPosition');
+  assert(/operations\.testFire\(\{/.test(coordinator), 'ExecutionCoordinator.beginTestFire uses operations.testFire');
   assert(!/gateway\.unlock\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.unlock');
   assert(!/gateway\.home\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.home');
+  assert(!/gateway\.sendInternalCommand\(cmd\)/.test(coordinator), 'ExecutionCoordinator.beginTestFire no longer sends laser-on through gateway');
   assert(!/setOriginAtCurrentPosition\(\);\n\s*return \{ ok: true \}/.test(coordinator), 'ExecutionCoordinator no longer forwards set-origin through gateway');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed`);

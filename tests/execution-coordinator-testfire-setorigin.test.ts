@@ -48,6 +48,10 @@ void (async () => {
           return { ok: true as const };
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async (args: { powerPercent: number; maxSpindle: number }) => {
+          sent.push(`M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`);
+          return { ok: true as const };
+        },
         laserOff: async () => ({ ok: true as const }),
         pauseJob: async () => ({ ok: true as const }),
         resumeJob: async () => ({ ok: true as const }),
@@ -125,6 +129,7 @@ void (async () => {
         unlockAlarm: async () => ({ ok: true as const }),
         setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: false as const, reason: 'blocked', message: 'blocked' }),
         laserOff: async () => ({ ok: true as const }),
         pauseJob: async () => ({ ok: true as const }),
         resumeJob: async () => ({ ok: true as const }),
@@ -138,9 +143,7 @@ void (async () => {
       resume: () => {},
       stop: () => {},
       emergencyStop: () => {},
-      sendCommand: () => {
-        throw new Error('blocked');
-      },
+      sendCommand: () => {},
       requestStatusReport: () => {},
       onStateChange: () => () => {},
       onProgress: () => () => {},
@@ -156,7 +159,7 @@ void (async () => {
       controllerRef,
       notifySimulatorRef: { current: () => {} },
     });
-    assert((await coord.beginTestFire({ maxSpindle: 1000 })) === false, 'sendCommand throws → false');
+    assert((await coord.beginTestFire({ maxSpindle: 1000 })) === false, 'operations.testFire rejects -> false');
   }
 
   {

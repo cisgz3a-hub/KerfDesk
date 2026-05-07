@@ -312,7 +312,6 @@ export class ExecutionCoordinator {
   async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
-    const gateway = this.getCommandGateway(ctrl)!;
     // T2-11: acquire the mutex before issuing the M3 + arming the deadman.
     // Re-entry: same-kind acquire returns true (preserves the existing
     // "second beginTestFire resets the timer" semantics — the spec
@@ -324,10 +323,12 @@ export class ExecutionCoordinator {
     const sVal = Math.max(0, Math.round((TEST_FIRE_POWER_PERCENT / 100) * args.maxSpindle));
     const cmd = `${TEST_FIRE_LASER_ON_WORD} S${sVal}`;
     this.notifySimulator(cmd);
-    try {
-      gateway.sendInternalCommand(cmd);
-    } catch (err) {
-      console.warn('[TestFire] start blocked:', err instanceof Error ? err.message : err);
+    const result = await ctrl.operations.testFire({
+      powerPercent: TEST_FIRE_POWER_PERCENT,
+      maxSpindle: args.maxSpindle,
+    });
+    if (!result.ok) {
+      console.warn('[TestFire] start blocked:', result.message ?? result.reason);
       // T2-11: release on failed start. The mutex is only useful if it's
       // actually freed when the operation didn't begin.
       this.deps.machineService.releaseOperation('testFire');

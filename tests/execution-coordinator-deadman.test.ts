@@ -65,6 +65,26 @@ function makeMockController(sent: string[], throwOnSend = false): LaserControlle
     onProgress: () => () => {},
     onError: () => () => {},
     onRawLine: () => () => {},
+    operations: {
+      jog: async () => ({ ok: true as const }),
+      home: async () => ({ ok: true as const }),
+      unlockAlarm: async () => ({ ok: true as const }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+      resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+      testFire: async (args: { powerPercent: number; maxSpindle: number }) => {
+        if (throwOnSend) return { ok: false as const, reason: 'blocked', message: 'blocked' };
+        sent.push(`M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`);
+        return { ok: true as const };
+      },
+      laserOff: async () => {
+        sent.push('M5 S0');
+        return { ok: true as const };
+      },
+      pauseJob: async () => ({ ok: true as const }),
+      resumeJob: async () => ({ ok: true as const }),
+      stopJob: async () => ({ ok: true as const }),
+      emergencyStop: async () => ({ ok: true as const }),
+    },
     safetyOff: async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
@@ -141,13 +161,13 @@ void (async () => {
     );
   }
 
-  // ── 3. Does NOT arm if beginTestFire failed (sendCommand threw) ────────
+  // ── 3. Does NOT arm if beginTestFire failed (operation rejected) ───────
   {
     const log: SentLog = { sent: [], sim: [] };
     const coord = makeCoord(makeMockController(log.sent, true), log, 50);
 
     const ok = await coord.beginTestFire({ maxSpindle: 1000 });
-    assert(ok === false, 'beginTestFire returns false when sendCommand throws');
+    assert(ok === false, 'beginTestFire returns false when operations.testFire rejects');
 
     // No timer should have been armed. Wait past where the deadman would have
     // fired and assert no M5 was issued from the service.

@@ -144,6 +144,10 @@ export class GrblController implements GrblControllerApi {
       this._trySendInternalOperationCommand('G10 L20 P1 X0 Y0'),
     resetWcsToMachineOrigin: async (): Promise<OperationResult> =>
       this._trySendInternalOperationCommand('G10 L2 P1 X0 Y0 Z0'),
+    testFire: async (args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult> => {
+      const sVal = Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle));
+      return this._trySendInternalOperationCommand(`M3 S${sVal}`);
+    },
     laserOff: async (): Promise<OperationResult> => {
       const result = await this.safetyOff();
       if (result.stage === 'm5') return { ok: true, message: 'Laser off confirmed.' };

@@ -78,6 +78,14 @@ function makeController(overrides?: Partial<LaserController>): LaserController {
       unlockAlarm: async () => ({ ok: true }),
       setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
       resetWcsToMachineOrigin: async () => ({ ok: true }),
+      testFire: async (args: { powerPercent: number; maxSpindle: number }) => {
+        try {
+          overrides?.sendCommand?.(`M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`);
+          return { ok: true };
+        } catch (err) {
+          return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+        }
+      },
       laserOff: async () => ({ ok: true }),
       pauseJob: async () => ({ ok: true }),
       resumeJob: async () => ({ ok: true }),
@@ -247,7 +255,7 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
   svc.releaseOperation('frame');
 }
 
-// 13. coord.beginTestFire releases mutex on sendCommand throw
+// 13. coord.beginTestFire releases mutex on rejected testFire operation
 {
   const ctrl = makeController({
     sendCommand: () => { throw new Error('blocked'); },
@@ -255,7 +263,7 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
   const svc = makeService(ctrl);
   const coord = makeCoord(svc, ctrl);
   const ok = await coord.beginTestFire({ maxSpindle: 1000 });
-  assert(ok === false, 'beginTestFire returns false on sendCommand throw');
+  assert(ok === false, 'beginTestFire returns false on rejected testFire operation');
   assert(svc.getActiveOperation() === null,
     'mutex released after failed beginTestFire start (no leak)');
 }
