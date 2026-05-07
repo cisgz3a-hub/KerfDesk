@@ -86,6 +86,7 @@ function makeController(overrides?: Partial<LaserController>): LaserController {
           return { ok: false, reason: err instanceof Error ? err.message : String(err) };
         }
       },
+      frame: async () => ({ ok: true }),
       laserOff: async () => ({ ok: true }),
       pauseJob: async () => ({ ok: true }),
       resumeJob: async () => ({ ok: true }),

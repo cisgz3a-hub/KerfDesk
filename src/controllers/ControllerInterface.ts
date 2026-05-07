@@ -151,6 +151,10 @@ export type OperationResult =
   | { ok: true; message?: string }
   | { ok: false; reason: string; message?: string };
 
+export type FrameOperationResult =
+  | { ok: true; message?: string }
+  | { ok: false; reason: string; message?: string; blockedAtLine?: number };
+
 export interface DisconnectOptions {
   reason?: string;
   skipStop?: boolean;
@@ -163,6 +167,15 @@ export interface MachineOperationApi {
   setWorkOriginAtCurrentPosition(): Promise<OperationResult>;
   resetWcsToMachineOrigin(): Promise<OperationResult>;
   testFire(args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult>;
+  frame(args: {
+    corners: readonly { x: number; y: number }[];
+    startMode: 'absolute' | 'current';
+    laserMode: 'off' | 'dot';
+    maxSpindle: number;
+    crosshairAfterFrame?: boolean;
+    onCommand?: (line: string) => void;
+    lineDelayMs?: number;
+  }): Promise<FrameOperationResult>;
   laserOff(opts?: { emergency?: boolean }): Promise<OperationResult>;
   pauseJob(handle?: JobHandle): Promise<OperationResult>;
   resumeJob(handle?: JobHandle): Promise<OperationResult>;

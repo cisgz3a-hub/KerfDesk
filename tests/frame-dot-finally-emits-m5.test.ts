@@ -5,6 +5,7 @@
  */
 import { ExecutionCoordinator, type FrameResult } from '../src/app/ExecutionCoordinator';
 import type { LaserController, MachineState } from '../src/controllers/ControllerInterface';
+import { buildGrblFrameGcode } from '../src/controllers/grbl/GrblFrameGcode';
 
 let passed = 0;
 let failed = 0;
@@ -58,6 +59,30 @@ function makeController(opts: {
       unlockAlarm: async () => ({ ok: true as const }),
       setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
       resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+      testFire: async () => ({ ok: true as const }),
+      frame: async (args) => {
+        const lines = buildGrblFrameGcode(args.corners, {
+          startMode: args.startMode,
+          laserMode: args.laserMode,
+          maxSpindle: args.maxSpindle,
+          crosshairAfterFrame: args.crosshairAfterFrame,
+        });
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i]!;
+          try {
+            ctrl.sendCommand(line);
+          } catch (err) {
+            return {
+              ok: false as const,
+              reason: 'command-blocked',
+              message: err instanceof Error ? err.message : String(err),
+              blockedAtLine: i,
+            };
+          }
+          args.onCommand?.(line);
+        }
+        return { ok: true as const };
+      },
       laserOff: async () => {
         safetyOffCalls++;
         if (opts.safetyOffThrows) throw new Error('mock: safetyOff transport failure');

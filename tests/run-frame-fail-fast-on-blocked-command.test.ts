@@ -6,6 +6,7 @@
  */
 import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import type { LaserController } from '../src/controllers/ControllerInterface';
+import { buildGrblFrameGcode } from '../src/controllers/grbl/GrblFrameGcode';
 
 let passed = 0;
 let failed = 0;
@@ -24,6 +25,7 @@ interface MockController {
   state: LaserController['state'];
   sentCommands: string[];
   throwOnCommandIndex: number | null;
+  operations: LaserController['operations'];
   sendCommand: (cmd: string, source?: 'internal' | 'user') => void;
   requestStatusReport: () => void;
 }
@@ -49,6 +51,43 @@ function makeController(throwOnIndex: number | null = null): MockController {
     requestStatusReport() {
       /* no-op */
     },
+    operations: {} as LaserController['operations'],
+  };
+  ctrl.operations = {
+    jog: async () => ({ ok: true }),
+    home: async () => ({ ok: true }),
+    unlockAlarm: async () => ({ ok: true }),
+    setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+    resetWcsToMachineOrigin: async () => ({ ok: true }),
+    testFire: async () => ({ ok: true }),
+    frame: async (args) => {
+      const lines = buildGrblFrameGcode(args.corners, {
+        startMode: args.startMode,
+        laserMode: args.laserMode,
+        maxSpindle: args.maxSpindle,
+        crosshairAfterFrame: args.crosshairAfterFrame,
+      });
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        try {
+          ctrl.sendCommand(line);
+        } catch (err) {
+          return {
+            ok: false,
+            reason: 'command-blocked',
+            message: err instanceof Error ? err.message : String(err),
+            blockedAtLine: i,
+          };
+        }
+        args.onCommand?.(line);
+      }
+      return { ok: true };
+    },
+    laserOff: async () => ({ ok: true }),
+    pauseJob: async () => ({ ok: true }),
+    resumeJob: async () => ({ ok: true }),
+    stopJob: async () => ({ ok: true }),
+    emergencyStop: async () => ({ ok: true }),
   };
   return ctrl;
 }

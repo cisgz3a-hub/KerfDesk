@@ -10,6 +10,7 @@ import {
   type MachinePosition,
   type JobProgress,
   type OperationResult,
+  type FrameOperationResult,
   type StateChangeCallback,
   type ProgressCallback,
   type ErrorCallback,
@@ -20,6 +21,7 @@ import {
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { computeStreamingHealth } from './streamingHealth';
+import { buildGrblFrameGcode } from './GrblFrameGcode';
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
@@ -147,6 +149,39 @@ export class GrblController implements GrblControllerApi {
     testFire: async (args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult> => {
       const sVal = Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle));
       return this._trySendInternalOperationCommand(`M3 S${sVal}`);
+    },
+    frame: async (args: {
+      corners: readonly { x: number; y: number }[];
+      startMode: 'absolute' | 'current';
+      laserMode: 'off' | 'dot';
+      maxSpindle: number;
+      crosshairAfterFrame?: boolean;
+      onCommand?: (line: string) => void;
+      lineDelayMs?: number;
+    }): Promise<FrameOperationResult> => {
+      const lines = buildGrblFrameGcode(args.corners, {
+        startMode: args.startMode,
+        laserMode: args.laserMode,
+        maxSpindle: args.maxSpindle,
+        crosshairAfterFrame: args.crosshairAfterFrame,
+      });
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]!;
+        const result = await this._trySendInternalOperationCommand(line);
+        if (!result.ok) {
+          return {
+            ok: false,
+            reason: 'command-blocked',
+            message: result.message ?? result.reason,
+            blockedAtLine: i,
+          };
+        }
+        args.onCommand?.(line);
+        if ((args.lineDelayMs ?? 0) > 0) {
+          await new Promise(r => setTimeout(r, args.lineDelayMs));
+        }
+      }
+      return { ok: true };
     },
     laserOff: async (): Promise<OperationResult> => {
       const result = await this.safetyOff();

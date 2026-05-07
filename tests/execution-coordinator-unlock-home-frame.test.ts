@@ -31,6 +31,23 @@ const idle: MachineState = {
   errorCode: null,
 };
 
+function frameOperation(sent: string[], onLine?: (line: string) => void) {
+  return async (args: Parameters<LaserController['operations']['frame']>[0]) => {
+    const lines = buildFrameGcode(args.corners, {
+      startMode: args.startMode,
+      laserMode: args.laserMode,
+      maxSpindle: args.maxSpindle,
+      crosshairAfterFrame: args.crosshairAfterFrame,
+    });
+    for (const line of lines) {
+      sent.push(line);
+      args.onCommand?.(line);
+      onLine?.(line);
+    }
+    return { ok: true as const };
+  };
+}
+
 void (async () => {
   console.log('\n=== execution-coordinator unlock/home/frame ===\n');
 
@@ -53,6 +70,8 @@ void (async () => {
         },
         setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation(sent),
         laserOff: async () => ({ ok: true as const }),
         pauseJob: async () => ({ ok: true as const }),
         resumeJob: async () => ({ ok: true as const }),
@@ -151,6 +170,22 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation(sent, (line) => {
+          if (line === 'G90') status = 'idle';
+        }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       safetyOff: async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
@@ -212,6 +247,20 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation([]),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       safetyOff: async () => ({ stage: 'm5' as const }),
     } as LaserController;
     const controllerRef = { current: mock };
@@ -263,6 +312,25 @@ void (async () => {
       onProgress: () => () => {},
       onError: () => () => {},
       onRawLine: () => () => {},
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation(sent, (line) => {
+          if (line === 'G90') status = 'idle';
+        }),
+        laserOff: async () => {
+          sent.push('M5 S0');
+          return { ok: true as const };
+        },
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       safetyOff: async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };

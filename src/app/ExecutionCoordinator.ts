@@ -7,7 +7,7 @@ import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
-import { buildFrameCorners, buildFrameGcode } from './frameGcode';
+import { buildFrameCorners } from './frameGcode';
 import { waitForGrblIdle } from './grblIdlePoll';
 import { MachineCommandGateway } from './MachineCommandGateway';
 
@@ -232,8 +232,6 @@ export class ExecutionCoordinator {
   }): Promise<FrameResult> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
-    const gateway = this.getCommandGateway(ctrl)!;
-
     // T2-11: acquire the mutex BEFORE any side-effect (notifySimulator,
     // sendCommand, motion). frame-off and frame-dot use distinct kinds
     // because the spec lists them separately and the gate semantics
@@ -247,37 +245,29 @@ export class ExecutionCoordinator {
 
     const { sceneBounds, transformOpts, laserMode, maxSpindle = 1000, withCrosshair = false } = args;
     const corners = buildFrameCorners(sceneBounds, transformOpts);
-    const lines = buildFrameGcode(corners, {
-      startMode: transformOpts.startMode,
-      laserMode,
-      maxSpindle,
-      crosshairAfterFrame: withCrosshair,
-    });
 
     // T1-21: frame-dot emits M4 before the final M5. If the streaming
     // sequence returns early (T1-103 command-blocked) or throws before
     // the trailing M5, force the laser modal state off before returning.
     try {
-      for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]!;
-        this.notifySimulator(line);
-        // T1-103: if any frame command throws, fail the entire frame.
-        // The previous behavior (catch + console.warn + continue) could
-        // return ok=true after a partial trace if GRBL reported idle at
-        // the end. Partial framing is not enough to satisfy T1-59.
-        try {
-          gateway.sendInternalCommand(line);
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : String(err);
-          console.warn('[Command blocked]', msg);
-          return {
-            ok: false,
-            reason: 'command-blocked',
-            blockedError: msg,
-            blockedAtLine: i,
-          };
-        }
-        await new Promise(r => setTimeout(r, 50));
+      const frameResult = await ctrl.operations.frame({
+        corners,
+        startMode: transformOpts.startMode,
+        laserMode,
+        maxSpindle,
+        crosshairAfterFrame: withCrosshair,
+        onCommand: line => this.notifySimulator(line),
+        lineDelayMs: 50,
+      });
+      if (!frameResult.ok) {
+        const msg = frameResult.message ?? frameResult.reason;
+        console.warn('[Command blocked]', msg);
+        return {
+          ok: false,
+          reason: 'command-blocked',
+          blockedError: msg,
+          blockedAtLine: frameResult.blockedAtLine,
+        };
       }
 
       const idleOk = await waitForGrblIdle(ctrl, args.idleTimeoutMs);

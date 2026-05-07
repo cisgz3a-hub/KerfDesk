@@ -86,6 +86,26 @@ async function run(): Promise<void> {
 
   {
   const { ctrl, port } = await connectedController();
+  const result = await ctrl.operations.frame({
+    corners: [
+      { x: 0, y: 0 },
+      { x: 10, y: 0 },
+      { x: 10, y: 10 },
+      { x: 0, y: 10 },
+      { x: 0, y: 0 },
+    ],
+    startMode: 'absolute',
+    laserMode: 'off',
+    maxSpindle: 1000,
+    crosshairAfterFrame: false,
+  });
+  assert(result.ok, 'frame returns ok');
+  assert(sent(port).includes('G90') && sent(port).includes('M5 S0'), 'frame emits GRBL frame sequence inside controller');
+  await ctrl.disconnect();
+  }
+
+  {
+  const { ctrl, port } = await connectedController();
   const result = await ctrl.operations.laserOff();
   assert(result.ok, 'laserOff returns ok when M5 path succeeds');
   assert(sent(port).includes('M5 S0'), 'laserOff emits M5 S0 inside controller safetyOff');
@@ -107,6 +127,7 @@ async function run(): Promise<void> {
   assert(/interface MachineOperationApi[\s\S]*unlockAlarm/.test(iface), 'MachineOperationApi declares unlockAlarm');
   assert(/interface MachineOperationApi[\s\S]*setWorkOriginAtCurrentPosition/.test(iface), 'MachineOperationApi declares setWorkOriginAtCurrentPosition');
   assert(/interface MachineOperationApi[\s\S]*testFire/.test(iface), 'MachineOperationApi declares testFire');
+  assert(/interface MachineOperationApi[\s\S]*frame/.test(iface), 'MachineOperationApi declares frame');
   assert(/readonly operations: MachineOperationApi/.test(iface), 'GrblControllerApi exposes operations');
   assert(/readonly operations =/.test(grbl), 'GrblController implements operations object');
   assert(/_trySendInternalOperationCommand/.test(grbl), 'GRBL command strings are isolated behind operation helper');
@@ -114,9 +135,11 @@ async function run(): Promise<void> {
   assert(/operations\.home\(\)/.test(coordinator), 'ExecutionCoordinator.home uses operations.home');
   assert(/operations\.setWorkOriginAtCurrentPosition\(\)/.test(coordinator), 'ExecutionCoordinator.setOrigin uses operations.setWorkOriginAtCurrentPosition');
   assert(/operations\.testFire\(\{/.test(coordinator), 'ExecutionCoordinator.beginTestFire uses operations.testFire');
+  assert(/operations\.frame\(\{/.test(coordinator), 'ExecutionCoordinator.runFrame uses operations.frame');
   assert(!/gateway\.unlock\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.unlock');
   assert(!/gateway\.home\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.home');
   assert(!/gateway\.sendInternalCommand\(cmd\)/.test(coordinator), 'ExecutionCoordinator.beginTestFire no longer sends laser-on through gateway');
+  assert(!/gateway\.sendInternalCommand\(line\)/.test(coordinator), 'ExecutionCoordinator.runFrame no longer streams frame lines through gateway');
   assert(!/setOriginAtCurrentPosition\(\);\n\s*return \{ ok: true \}/.test(coordinator), 'ExecutionCoordinator no longer forwards set-origin through gateway');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed`);
