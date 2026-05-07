@@ -99,6 +99,7 @@ import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { type SettingsTab } from './SettingsModal';
 import { AppSettingsModal } from './AppSettingsModal';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { type UserMode } from '../../app/UserModeGates';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -453,6 +454,21 @@ export function App(): React.ReactElement {
   const bumpHistoryVersion = useSceneHistoryStore(s => s.bumpHistoryVersion);
   const productionMode = useAppSettingsStore(s => s.productionMode);
   const setProductionMode = useAppSettingsStore(s => s.setProductionMode);
+  const userMode = useAppSettingsStore(s => s.userMode);
+  const setUserMode = useAppSettingsStore(s => s.setUserMode);
+  const handleSetUserMode = useCallback((mode: UserMode) => {
+    if (mode === userMode) return;
+    if (mode === 'beginner') {
+      setUserMode('beginner');
+      return;
+    }
+    const confirmed = confirm(
+      'Switch to Advanced mode?\n\n'
+      + 'Advanced mode allows explicit overrides for some beginner safety gates, including starting without framing.\n\n'
+      + 'Use this only if you understand your machine behavior.',
+    );
+    if (confirmed) setUserMode('advanced');
+  }, [setUserMode, userMode]);
   const handleToggleProductionMode = useCallback(() => {
     if (productionMode) {
       setProductionMode(false);
@@ -1666,6 +1682,7 @@ export function App(): React.ReactElement {
         scene,
         sidebarWidth: connectionSidebarWidth,
         productionMode,
+        userMode,
         gcode: currentGcode,
         compiledJobTicket: lastResult?.ticket ?? null,
         lastGcodeCompileResult: lastResult,
@@ -1856,6 +1873,8 @@ export function App(): React.ReactElement {
       onUpdateCurrentFromScene: updateCurrentProfileFromScene,
       onDeleteProfile: deleteProfileAndClearActive,
       onShowFontCredits: () => setShowFontCredits(true),
+      userMode,
+      onSetUserMode: handleSetUserMode,
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {

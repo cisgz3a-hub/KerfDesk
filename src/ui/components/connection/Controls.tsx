@@ -7,6 +7,7 @@ interface ControlsProps {
   isSimulator: boolean;
   isRunning: boolean;
   displayPaused: boolean;
+  startButtonLabel?: string;
   /**
    * T1-96: structured readiness state replaces the single-string
    * `startDisabledReason`. The panel renders nothing when
@@ -28,6 +29,7 @@ export function Controls({
   isSimulator,
   isRunning,
   displayPaused,
+  startButtonLabel,
   startReadiness,
   onFrame,
   onStartJob,
@@ -74,7 +76,7 @@ export function Controls({
             border: canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
             color: canStartJob ? '#2dd4a0' : '#333355',
           },
-        }, `▶ START${isSimulator ? ' (Sim)' : ''}`),
+        }, startButtonLabel ?? `▶ START${isSimulator ? ' (Sim)' : ''}`),
       ),
       React.createElement(StartReadinessPanel, { readiness: startReadiness }),
     ),

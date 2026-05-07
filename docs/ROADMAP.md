@@ -55,14 +55,14 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-07, branch `codex/t2-6-zustand-foundation`.
+**Snapshot date:** 2026-05-07, branch `codex/t2-64-user-mode-gates`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 112 | 16 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-61 design-edit cleanup shipped; T2-6 App split remains open. |
+| Tier 2 | 113 | 15 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-64 beginner/advanced user-mode foundation shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -10496,7 +10496,9 @@ The warning is informational 鈥?users with intentional unusual orders (e.g. cut
 
 ### T2-64 | Beginner-vs-Advanced mode toggle with safety gates differing per mode
 
-**Code reference:** No current beginner/advanced distinction in the codebase. T1-59 (frame gate) introduces the question: should advanced users be able to skip framing?
+**Status:** Shipped in `<TBD>` (focused MVP: persisted `UserMode`, pure gate policy, Settings toggle, and frame-before-start override wiring; deeper per-gate migrations remain follow-up scope).
+
+**Code reference:** `src/app/UserModeGates.ts` defines `UserMode` and the beginner/advanced gate policy. `src/ui/stores/appSettingsStore.ts` persists `userMode` with default `beginner`. `src/ui/components/AppSettingsModal.tsx` exposes the operator-mode toggle, and `src/ui/components/ConnectionPanelMain.tsx` consumes the policy so beginner mode requires Frame before Start while advanced mode can explicitly show `Start without framing`.
 
 **Problem:** Audit 4B Section 11: "the app currently sits in an awkward middle: too technical for beginners, not organized enough for experts." A user-mode toggle lets the app present strict gates to beginners (block Start until frame, require profile confirmed, show recovery cards prominently) while letting experienced users override gates with explicit acknowledgement.
 
@@ -19958,7 +19960,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop / job-fail (Shipped — content layer per variant + GRBL alarm-code mapper + buildRecoveryCard router; React component deferred as T2-62-followup; refines T2-46)
 - T2-62 follow-up: React RecoveryCard + emergency-stop safety-state UI surface shipped in `8a37618`; alarm-state recovery-card routing + Unlock/Home/Frame action wiring shipped in `8f74144`; unexpected-disconnect recovery-card routing shipped in `87048f6`; frame-failed recovery-card routing shipped in `95bf63d`; job-failed recovery-card routing + Stop/Compile action wiring shipped in `a332cc8`.
 - [x] T2-63 Operation order preview with order warning (Shipped — analysis layer + cut-before-engrave detector + per-row formatter + ack predicate; ReadyToRunPanel display shipped with T2-58; acknowledgement/reorder controls deferred as T2-63-followup)
-- [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
+- [x] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (Shipped - persisted UserMode + pure gate policy + Settings toggle + frame-before-start advanced override; deeper per-gate migrations deferred)
 - [x] T2-65 Central error reporter — `reportError({domain, severity, recovery, developerDetails})` (Shipped — ErrorReporter class + singleton + reportError + errorFromCatch + history; per-site migration deferred as T2-65-followup; refines T2-57)
 - [x] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (Shipped — type + transition + canStart predicate; MachineState wiring deferred as T2-66-followup; refines T2-44)
 - [x] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (shipped 2026-04-25 in `a1bb80f`)

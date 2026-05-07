@@ -50,6 +50,7 @@ import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
 import { analyzeOperationOrder, type OperationKind, type OperationRow } from '../../app/OperationOrder';
+import { computeUserModeGatePolicy, type UserMode } from '../../app/UserModeGates';
 import { RecoveryCard } from '../recovery/RecoveryCard';
 import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
@@ -216,6 +217,7 @@ export interface ConnectionPanelMainProps {
   /** Called after a successful disconnect cleanup so the host can hide the panel */
   onDisconnect?: () => void;
   productionMode?: boolean;
+  userMode?: UserMode;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
@@ -275,6 +277,7 @@ export function ConnectionPanelMain({
   activeProfile,
   onDisconnect,
   productionMode = false,
+  userMode = 'beginner',
   showAlert,
   showConfirm,
   showPrompt,
@@ -1434,11 +1437,10 @@ export function ConnectionPanelMain({
     machineStatus !== 'idle' &&
     machineStatus !== 'disconnected' &&
     machineStatus !== 'connecting';
-  // T1-59 frame-before-start gate. When T2-64 (advanced-mode setting) lands,
-  // this becomes `const requireFrame = !advancedMode`. Until then, beginner
-  // default = require frame. Prevents wrong-position-burn on confused
-  // origin/saved-origin/mirror configurations.
-  const requireFrame = true;
+  // T1-59 + T2-64: beginner mode requires a fresh frame before Start;
+  // advanced mode can explicitly override that gate.
+  const userModeGatePolicy = computeUserModeGatePolicy(userMode);
+  const requireFrame = userModeGatePolicy.requireFrameBeforeStart;
   // T1-22: read laser-output safety state for the start-job gate.
   // T2-12 part 1: subscribed instead of polled. The previous polled
   // getter at this site relied on workflowVersion bumps to refresh on
@@ -2080,6 +2082,9 @@ export function ConnectionPanelMain({
     isRunning,
     displayPaused,
     startReadiness,
+    startButtonLabel: !requireFrame && !hasFramed.current && userModeGatePolicy.startWithoutFramingLabel
+      ? userModeGatePolicy.startWithoutFramingLabel
+      : undefined,
     onFrame: () => { void handleFrameSafe(); },
     onStartJob: () => { void handleStartJob(); },
     onPauseResume: () => { void handlePauseResume(); },
