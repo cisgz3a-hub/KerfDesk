@@ -7,8 +7,8 @@ function assert(condition: unknown, message: string): void {
 const source = readFileSync('src/app/ExecutionCoordinator.ts', 'utf8');
 
 assert(
-  source.includes("import { MachineCommandGateway } from './MachineCommandGateway';"),
-  'ExecutionCoordinator imports MachineCommandGateway',
+  !source.includes('MachineCommandGateway'),
+  'ExecutionCoordinator no longer imports or creates MachineCommandGateway (superseded by T2-26 operations)',
 );
 assert(!source.includes('ctrl.sendCommand('), 'ExecutionCoordinator does not call ctrl.sendCommand directly');
 assert(
@@ -17,6 +17,11 @@ assert(
 );
 assert(
   !source.includes('sendSetOriginWcsCommand('),
-  'ExecutionCoordinator set-origin routes through gateway, not the helper raw controller path',
+  'ExecutionCoordinator set-origin does not route through the helper raw controller path',
 );
-assert(source.includes('new MachineCommandGateway(ctrl)'), 'ExecutionCoordinator creates a gateway from the current controller');
+assert(source.includes('ctrl.operations.unlockAlarm()'), 'ExecutionCoordinator unlock routes through operations API');
+assert(source.includes('ctrl.operations.home()'), 'ExecutionCoordinator home routes through operations API');
+assert(
+  source.includes('ctrl.operations.setWorkOriginAtCurrentPosition()'),
+  'ExecutionCoordinator set-origin routes through operations API',
+);

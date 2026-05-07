@@ -2,6 +2,10 @@
  * Audit-cluster regression test: keep the security-relevant runtime deps
  * pinned to versions that have the published advisories patched.
  *
+ * 2026-05-07 audit update: Electron is no longer deferred. The worktree audit
+ * upgraded it to 42.0.0, `npm audit --audit-level=high` now reports zero
+ * vulnerabilities, and this test pins that runtime line below.
+ *
  * BACKGROUND — npm audit triage performed across four commits:
  *
  * Initial state (pre-93b305b): 15 advisories (2 low, 2 moderate, 11 high).
@@ -469,6 +473,32 @@ function lockVersion(packagePath: string): string {
   assert(
     sanitizeSites[0]?.includes('TemplateBrowser') ?? false,
     `DOMPurify.sanitize site is in TemplateBrowser.tsx (got "${sanitizeSites[0] ?? '<none>'}")`,
+  );
+}
+
+// Invariant 3: Electron stays on the audit-clearing runtime line found during
+// the full worktree audit. This does not replace npm audit; it prevents a
+// quiet package.json or lockfile downgrade back to the vulnerable major.
+{
+  const declared = pkg.devDependencies?.electron ?? '';
+  const declaredMin = declared.replace(/^[\^~]/, '');
+  assert(
+    declared.length > 0,
+    'electron is declared in devDependencies',
+  );
+  assert(
+    semverCmp(declaredMin, '42.0.0') >= 0,
+    `electron declared at >= 42.0.0 (audit-clearing runtime line); got "${declared}"`,
+  );
+
+  const resolved = lockVersion('node_modules/electron');
+  assert(
+    resolved.length > 0,
+    'electron is resolved in package-lock.json',
+  );
+  assert(
+    semverCmp(resolved, '42.0.0') >= 0,
+    `electron resolved at >= 42.0.0 in lockfile; got "${resolved}"`,
   );
 }
 

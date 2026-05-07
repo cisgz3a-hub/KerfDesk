@@ -20,6 +20,7 @@ import {
   type JobProgress,
   type LaserController,
   type MachineState,
+  type OperationResult,
 } from '../src/controllers/ControllerInterface';
 import { ConnectionPanelMain } from '../src/ui/components/ConnectionPanelMain';
 
@@ -87,10 +88,25 @@ function idleMachineState(): MachineState {
 }
 
 function makeController(): LaserController {
+  const ok = async (): Promise<OperationResult> => ({ ok: true });
   return {
     protocolName: 'mock',
     state: idleMachineState(),
     isJobRunning: false,
+    operations: {
+      jog: ok,
+      home: ok,
+      unlockAlarm: ok,
+      setWorkOriginAtCurrentPosition: ok,
+      resetWcsToMachineOrigin: ok,
+      testFire: ok,
+      frame: async () => ({ ok: true, commands: [] }),
+      laserOff: ok,
+      pauseJob: ok,
+      resumeJob: ok,
+      stopJob: ok,
+      emergencyStop: ok,
+    },
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
