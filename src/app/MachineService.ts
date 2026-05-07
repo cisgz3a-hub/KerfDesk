@@ -1353,8 +1353,9 @@ export class MachineService {
    * laser commandedOff, position lost, rehome required.
    */
   async stopAndEnsureLaserOff(sendTx?: (line: string) => void): Promise<SafetyActionResult> {
-    this.controllerRef.current.stop();
-    // Soft reset handles laser-off as part of GRBL's reset sequence.
+    const result = await this.controllerRef.current.operations.stopJob(undefined, 'stopAndEnsureLaserOff');
+    if (!result.ok) throw new Error(result.reason);
+    // The controller stop operation handles laser-off as part of its reset/abort sequence.
     // M5 via sendCommand would race the reset and usually throw
     // 'Not connected' anyway. Intentionally no follow-up writes here.
     void sendTx;

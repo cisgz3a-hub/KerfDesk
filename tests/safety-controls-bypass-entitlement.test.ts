@@ -87,6 +87,21 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       calls.safetyOff++;
       return { stage: 'm5' as const };
     },
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => {
+        calls.stop++;
+        return { ok: true };
+      },
+      emergencyStop: async () => ({ ok: true }),
+    },
   };
   return { ctrl: ctrl as LaserController, calls };
 }
@@ -148,7 +163,7 @@ for (const { label, setup } of states) {
   threw = false;
   try { await svc.stopAndEnsureLaserOff(); } catch { threw = true; }
   assert(!threw && calls.stop === 1,
-    `[${label}] svc.stopAndEnsureLaserOff() does not throw, controller.stop called`);
+    `[${label}] svc.stopAndEnsureLaserOff() does not throw, controller operations.stopJob called`);
 
   // disconnect
   threw = false;

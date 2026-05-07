@@ -7889,6 +7889,8 @@ Migration plan (multi-pass):
 
 **T2-26 pass 3b:** `MachineService.jog` migrated from `new MachineCommandGateway(ctrl).jog(...)` to `await ctrl.operations.jog({ axis, distanceMm, feedMmPerMin })` in `4ff79ea`. The method now returns a promise with the same `{ ok, reason }` contract and still schedules a status refresh after accepted jogs. Pinned by `tests/jog-and-setorigin-state-after-confirm.test.ts` (MachineService jog succeeds through `operations.jog` only, preserves no-controller and transport-rejected results). **Remaining T2-26 work:** coordinator jog/frame/test-fire/laser-off, MachineService pause/resume/stop/emergencyStop, set-origin helpers/electron cleanup, and the static no-GRBL-command guard.
 
+**T2-26 pass 3c:** `MachineService.stopAndEnsureLaserOff` migrated from raw `controller.stop()` to `await ctrl.operations.stopJob(...)` in `<TBD>`. The existing `Promise<SafetyActionResult>` contract and soft-reset safety-state semantics are preserved, while GRBL stop construction stays inside the active controller. Pinned by `tests/safety-action-result.test.ts`, `tests/safety-controls-bypass-entitlement.test.ts`, and `tests/machine-service-safety-state-machine.test.ts`. **Remaining T2-26 work:** coordinator jog/frame/test-fire/laser-off, synchronous MachineService pause/resume/emergencyStop contract migration, set-origin helpers/electron cleanup, and the static no-GRBL-command guard.
+
 ---
 
 ### T2-27 | Replace `sendJob(lines: string[])` with `executeJob(ControllerOutput, JobTicket)`
@@ -19876,7 +19878,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (shipped 2026-05-05 in `185a096`)
 - [x] T2-24 Split LaserController into protocol-neutral core + dialect extensions (focused contract foundation shipped in `72e3f97`; deeper consumer migration continues in T2-25/T2-26/T2-27/T3-45)
 - [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
-- [ ] T2-26 Move GRBL command construction out of generic layers (Pass 1 operations API shipped in `cf29a3e`; Pass 2a ExecutionCoordinator unlock/home/set-origin shipped in `3870d2d`; Pass 3a MachineService disconnect laser-off shipped in `4bea2e6`; Pass 3b MachineService jog shipped in `4ff79ea`; coordinator jog/frame/test-fire/laser-off plus remaining MachineService/static-guard passes remain)
+- [ ] T2-26 Move GRBL command construction out of generic layers (Pass 1 operations API shipped in `cf29a3e`; Pass 2a ExecutionCoordinator unlock/home/set-origin shipped in `3870d2d`; Pass 3a MachineService disconnect laser-off shipped in `4bea2e6`; Pass 3b MachineService jog shipped in `4ff79ea`; Pass 3c MachineService stop shipped in `<TBD>`; coordinator jog/frame/test-fire/laser-off plus remaining MachineService/static-guard passes remain)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)

@@ -50,8 +50,9 @@ const idle: MachineState = {
   feedRate: 0, spindleSpeed: 0, alarmCode: null, errorCode: null,
 };
 
-function makeMockCtrl(): { ctrl: LaserController; stopCalls: { count: number } } {
+function makeMockCtrl(): { ctrl: LaserController; rawStopCalls: { count: number }; operationStopCalls: { count: number } } {
   const stopCalls = { count: 0 };
+  const operationStopCalls = { count: 0 };
   const ctrl: Partial<LaserController> = {
     state: idle,
     isJobRunning: false,
@@ -70,8 +71,23 @@ function makeMockCtrl(): { ctrl: LaserController; stopCalls: { count: number } }
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => {
+        operationStopCalls.count++;
+        return { ok: true };
+      },
+      emergencyStop: async () => ({ ok: true }),
+    },
   };
-  return { ctrl: ctrl as LaserController, stopCalls };
+  return { ctrl: ctrl as LaserController, rawStopCalls: stopCalls, operationStopCalls };
 }
 
 function makeService(ctrl: LaserController): MachineService {
@@ -151,11 +167,13 @@ void (async () => {
 // 5. MachineService.stopAndEnsureLaserOff returns SafetyActionResult
 //    with soft-reset semantics
 {
-  const { ctrl, stopCalls } = makeMockCtrl();
+  const { ctrl, rawStopCalls, operationStopCalls } = makeMockCtrl();
   const svc = makeService(ctrl);
   const result: SafetyActionResult = await svc.stopAndEnsureLaserOff();
-  assert(stopCalls.count === 1,
-    `stopAndEnsureLaserOff: controller.stop called once (got ${stopCalls.count})`);
+  assert(operationStopCalls.count === 1,
+    `stopAndEnsureLaserOff: controller operations.stopJob called once (got ${operationStopCalls.count})`);
+  assert(rawStopCalls.count === 0,
+    `stopAndEnsureLaserOff: raw controller.stop not called by MachineService (got ${rawStopCalls.count})`);
   assert(result.action === 'abortJob',
     `stopAndEnsureLaserOff: result.action=abortJob (got ${result.action})`);
   assert(result.accepted === true,

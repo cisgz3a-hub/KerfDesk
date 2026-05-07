@@ -56,6 +56,21 @@ function makeController(args?: {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => {
+        args?.stop?.();
+        return { ok: true };
+      },
+      emergencyStop: async () => ({ ok: true }),
+    },
   } as LaserController;
 }
 
@@ -72,6 +87,8 @@ function kind(state: SafetyState): SafetyState['kind'] {
 
 console.log('\n=== machine-service SafetyStateMachine wiring ===\n');
 
+void (async () => {
+
 {
   const svc = makeService();
 
@@ -83,7 +100,7 @@ console.log('\n=== machine-service SafetyStateMachine wiring ===\n');
   svc.resume();
   assert(kind(svc.getSafetyState()) === 'running', 'resume result transitions service state to running');
 
-  void svc.stopAndEnsureLaserOff();
+  await svc.stopAndEnsureLaserOff();
   const stopped = svc.getSafetyState();
   assert(kind(stopped) === 'stoppedPositionUnknown', 'soft-reset stop transitions to stoppedPositionUnknown');
   assert(
@@ -129,5 +146,10 @@ console.log('\n=== machine-service SafetyStateMachine wiring ===\n');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
+
+})().catch((err: unknown) => {
+  console.error(err);
+  process.exit(1);
+});
 
 export {};
