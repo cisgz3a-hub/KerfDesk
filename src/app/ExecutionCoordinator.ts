@@ -382,18 +382,20 @@ export class ExecutionCoordinator {
     const ctrl = this.deps.controllerRef.current;
     this.notifySimulator('M5 S0');
     if (!ctrl) return;
-    const result = await this.getCommandGateway(ctrl)!.laserOff();
-    this.deps.machineService.notifyLaserSafetyOutcome(result.stage);
-    if (result.stage === 'm5') return;
-    if (result.stage === 'soft-reset') {
+    const result = await ctrl.operations.laserOff({ emergency: true });
+    const stage = result.ok ? 'm5' : result.reason === 'soft-reset' ? 'soft-reset' : 'failed';
+    const message = result.ok ? '' : result.message ?? result.reason;
+    this.deps.machineService.notifyLaserSafetyOutcome(stage);
+    if (stage === 'm5') return;
+    if (stage === 'soft-reset') {
       console.warn(
         '[LaserOff] M5 transport failed; soft reset succeeded:',
-        result.error?.message ?? '',
+        message,
       );
       return;
     }
     // stage === 'failed'
-    const msg = result.error?.message ?? 'unknown';
+    const msg = message || 'unknown';
     if (!msg.includes('Not connected')) {
       console.warn('[LaserOff] blocked:', msg);
     }

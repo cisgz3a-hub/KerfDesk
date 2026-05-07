@@ -52,6 +52,22 @@ function makeController(opts: {
     resume() { /* no-op */ },
     stop() { /* no-op */ },
     emergencyStop() { /* no-op */ },
+    operations: {
+      jog: async () => ({ ok: true as const }),
+      home: async () => ({ ok: true as const }),
+      unlockAlarm: async () => ({ ok: true as const }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+      resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+      laserOff: async () => {
+        safetyOffCalls++;
+        if (opts.safetyOffThrows) throw new Error('mock: safetyOff transport failure');
+        return { ok: true as const };
+      },
+      pauseJob: async () => ({ ok: true as const }),
+      resumeJob: async () => ({ ok: true as const }),
+      stopJob: async () => ({ ok: true as const }),
+      emergencyStop: async () => ({ ok: true as const }),
+    },
     async safetyOff() {
       safetyOffCalls++;
       if (opts.safetyOffThrows) throw new Error('mock: safetyOff transport failure');
@@ -175,4 +191,3 @@ async function main(): Promise<void> {
 }
 
 void main();
-

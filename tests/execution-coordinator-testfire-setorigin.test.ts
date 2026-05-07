@@ -123,10 +123,7 @@ void (async () => {
         jog: async () => ({ ok: true as const }),
         home: async () => ({ ok: true as const }),
         unlockAlarm: async () => ({ ok: true as const }),
-        setWorkOriginAtCurrentPosition: async () => {
-          sent.push('G10 L20 P1 X0 Y0');
-          return { ok: true as const };
-        },
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
         laserOff: async () => ({ ok: true as const }),
         pauseJob: async () => ({ ok: true as const }),
@@ -178,7 +175,10 @@ void (async () => {
           return { ok: true as const };
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
-        laserOff: async () => ({ ok: true as const }),
+        laserOff: async () => {
+          sent.push('M5 S0');
+          return { ok: true as const };
+        },
         pauseJob: async () => ({ ok: true as const }),
         resumeJob: async () => ({ ok: true as const }),
         stopJob: async () => ({ ok: true as const }),
@@ -253,6 +253,18 @@ void (async () => {
       onError: () => () => {},
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('Not connected') }),
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: false as const, reason: 'failed', message: 'Not connected' }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
@@ -297,6 +309,18 @@ void (async () => {
       onError: () => () => {},
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('serial fault') }),
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: false as const, reason: 'failed', message: 'serial fault' }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
     } as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
