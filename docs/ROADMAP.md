@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 116 | 12 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-96 lifecycle contract shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 117 | 11 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-98 CI installer jobs shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -13123,6 +13123,8 @@ For T2-98's first ship, recommend Approach A even with the cost 鈥?catching a b
 
 **Cross-check note (audit 5B):** Audit's Critical 4 + Priority 1. Verified at .github/workflows/ci.yml.
 
+**Status:** Shipped in `<TBD>` (focused MVP - per-PR unsigned Windows/macOS installer build jobs added to CI; signing/notarization deferred to T2-99/T2-100). `.github/workflows/ci.yml` keeps the existing Ubuntu `test` job with `npm audit --omit=dev --audit-level=moderate`, `npm run build`, and `npm test`, and adds `build-windows` on `windows-latest` plus `build-macos` on `macos-latest`. Each platform job checks out code, uses `actions/setup-node@v4` with Node 20 and npm cache, runs `npm ci`, `npm run electron:compile`, `npm run build`, then the platform installer command (`npm run electron:build` or `npm run electron:build:mac`) and uploads `release/*.exe` / `release/*.dmg` via `actions/upload-artifact@v4` with `if-no-files-found: error` and 7-day retention. macOS PR builds set `CSC_IDENTITY_AUTO_DISCOVERY=false` so they remain unsigned until release signing is wired. Pinned by `tests/ci-installer-builds.test.ts` (19 contracts: existing Linux CI remains; Windows/macOS runner jobs exist; each runs install/compile/build/installer/upload steps; artifact patterns are platform-specific; PR CI does not expose signing/notarization secret env vars). **Out of scope (T2-98-followup):** debugging first remote runner failures if GitHub-hosted Windows/macOS expose packaging quirks not reproducible locally; signed release builds remain T2-99/T2-100. **Hardware verification: not required** (CI/release engineering only).
+
 ---
 
 ### T2-99 | Windows code signing 鈥?cert + Electron Builder env config + signed CI builds
@@ -20002,7 +20004,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)
 - [x] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (focused MVP shipped; lifecycle event contract + revocation merge/apply helpers; polling/storage wiring deferred)
 - [x] T2-97 Entitlement checks must never block safety controls (shipped 2026-05-05 in `9a62d90` — `docs/SAFETY_GUARANTEES.md` + behavioral + static-guard tests)
-- [ ] T2-98 CI builds installers on Windows + macOS runners (filed; release-engineering foundation)
+- [x] T2-98 CI builds installers on Windows + macOS runners (focused MVP shipped; unsigned per-PR installer jobs + artifact upload)
 - [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
 - [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
