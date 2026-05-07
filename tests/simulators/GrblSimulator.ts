@@ -5,6 +5,13 @@
  */
 
 import type { SerialPortLike } from '../../src/communication/SerialPort';
+import { grblCapabilities } from '../../src/controllers/ControllerCapabilities';
+import type { ControllerCapabilities } from '../../src/controllers/ControllerCapabilities';
+import type { ControllerFault } from '../helpers/ControllerFault';
+import type {
+  SimulatedControllerDevice,
+  SimulatedControllerIdentity,
+} from './SimulatedControllerDevice';
 
 export type GrblSimulatorState = 'idle' | 'run' | 'hold' | 'alarm' | 'door' | 'check' | 'sleep';
 export type DistanceMode = 'absolute' | 'relative';
@@ -89,7 +96,13 @@ function hasToken(line: string, token: string): boolean {
   return new RegExp(`(^|\\s)${token}(\\s|$)`).test(line);
 }
 
-export class GrblSimulator {
+export class GrblSimulator implements SimulatedControllerDevice<GrblFirmwareSnapshot> {
+  readonly identity: SimulatedControllerIdentity = {
+    family: 'grbl',
+    protocol: 'GRBL 1.1',
+    displayName: 'GRBL 1.1 simulator',
+  };
+  readonly capabilities: ControllerCapabilities = grblCapabilities;
   readonly rxBufferSize: number;
   readonly plannerCapacity: number;
   readonly bedWidth: number;
@@ -106,6 +119,8 @@ export class GrblSimulator {
   private rxOverflowCount = 0;
   private readonly plannerQueue: ParsedMove[] = [];
   private readonly outgoing: string[] = [];
+  private readonly injectedFaults = new Map<string, ControllerFault>();
+  private nextFaultId = 1;
 
   constructor(options: GrblSimulatorOptions = {}) {
     this.rxBufferSize = options.rxBufferSize ?? DEFAULT_RX_BUFFER_SIZE;
@@ -197,6 +212,11 @@ export class GrblSimulator {
     return this.outgoing.splice(0);
   }
 
+  readOutgoingBytes(): Uint8Array[] {
+    const encoder = new TextEncoder();
+    return this.readOutgoingLines().map(line => encoder.encode(`${line}\n`));
+  }
+
   snapshot(): GrblFirmwareSnapshot {
     return {
       state: this.state,
@@ -227,6 +247,16 @@ export class GrblSimulator {
     this.rxOverflowCount = 0;
     this.plannerQueue.length = 0;
     this.outgoing.length = 0;
+  }
+
+  reset(): void {
+    this.resetToFactory();
+  }
+
+  injectFault(fault: ControllerFault): string {
+    const id = `fault_${this.nextFaultId++}`;
+    this.injectedFaults.set(id, fault);
+    return id;
   }
 
   private handleLine(line: string): void {

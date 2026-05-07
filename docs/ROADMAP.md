@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 108 | 20 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-47 GRBL simulator foundation shipped; T2-6 App split remains open. |
+| Tier 2 | 109 | 19 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-48 simulator device framework shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -9366,6 +9366,8 @@ The compliance tests catch architectural bugs in `LaserController` interface or 
 **Priority:** Tier 2. Pairs with T2-24 (controller interface split) and T2-47. Refines T3-43 by giving the test matrix a typed contract.
 
 **Cross-check note (audit 3E):** Audit's Critical 7 + section 7 + P1 framework.
+
+**Status:** Shipped in `<TBD>` (focused framework MVP). New `tests/simulators/SimulatedControllerDevice.ts` exports `SimulatedControllerIdentity`, generic `SimulatedControllerDevice<TSnapshot>`, `SimulatedControllerSnapshot`, `ComplianceCheckResult`, and `runControllerComplianceChecks(makeDevice)`. The contract gives every simulator a family/protocol identity, `ControllerCapabilities`, byte input/output, virtual-time `tick`, typed snapshot, fault injection hook, and reset path. `GrblSimulator` now implements the interface, exposes `grblCapabilities`, supports `readOutgoingBytes()`, and returns traceable fault ids from `injectFault`. Pinned by `tests/simulators/simulated-controller-device.test.ts` (22 contracts) plus the existing T2-47 simulator test. **Out of scope:** family-specific Marlin/DSP/Wi-Fi simulator implementations and richer cross-family compliance suites. **Hardware verification: not required** (test framework only).
 
 ---
 
@@ -19933,7 +19935,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-45 `JobExecutionSession` with safety methods on the session handle (Shipped — interface + JobProgress + JobCompletionResult + status predicates + builders; MachineService wiring deferred as T2-45-followup; refines T2-27)
 - [x] T2-46 User-facing safety outcome messages + Activity Log (Shipped — formatSafetyOutcome formatter + ActivityLogRow + isPersistentSeverity + isIncidentWorthy; UI-surface wiring deferred as T2-46-followup; depends on T2-41)
 - [x] T2-47 Realistic GRBL firmware simulator - planner queue, RX buffer, modal state, alarm lock (Shipped - `GrblSimulator` firmware-state foundation + `SimulatedGrblSerialPort`; legacy mock migration deferred)
-- [ ] T2-48 Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface (filed; refines T3-43)
+- [x] T2-48 Multi-controller simulator framework - `SimulatedControllerDevice` interface (Shipped - shared simulator contract + compliance harness; GRBL simulator implements it)
 - [x] T2-49 Virtual time / deterministic scheduler for tests (Shipped — `tests/helpers/VirtualScheduler.ts` + RealScheduler with shared SchedulerLike interface; per-test migration deferred as T2-49-followup; refines T2-22)
 - [x] T2-50 Scenario-driven failure injection API — typed `injectFault({type,...})` (Shipped — `tests/helpers/ControllerFault.ts` 13-variant union + FaultQueue dispatcher + chaos-RNG; T2-47 GrblSimulator integration deferred as T2-50-followup; refines T2-13)
 - [x] T2-51 `CompiledJobState` atomic state shape (Shipped — 5-status union + transitions w/ T1-57 race guard + selector suite; useCompileManager migration deferred as T2-51-followup; closes T1-56/57/58 structurally)
