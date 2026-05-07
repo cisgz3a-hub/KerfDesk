@@ -15835,7 +15835,7 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 ### T3-11 | Follow-up: burn-progress visual bugs
 
-**Status:** Shipped in `<TBD>`. Object lifecycle markers now advance from the acknowledged GRBL line, not from `_drainQueue` send time: pending job records carry the marker and `_handleOk()` emits it only after the corresponding `ok`. This keeps the burn halo from jumping ahead of GRBL's planner buffer. The burned-object completion marker is also inset from `worldBounds.maxX/minY` by `transform.screenPx(2)` so edge objects do not draw the marker directly on the bed boundary. Pinned by `tests/burn-progress-ack-timing.test.ts`. Hardware verification: not required (visual progress timing and canvas marker placement only).
+**Status:** Shipped in `589b49b`. Object lifecycle markers now advance from the acknowledged GRBL line, not from `_drainQueue` send time: pending job records carry the marker and `_handleOk()` emits it only after the corresponding `ok`. This keeps the burn halo from jumping ahead of GRBL's planner buffer. The burned-object completion marker is also inset from `worldBounds.maxX/minY` by `transform.screenPx(2)` so edge objects do not draw the marker directly on the bed boundary. Pinned by `tests/burn-progress-ack-timing.test.ts`. Hardware verification: not required (visual progress timing and canvas marker placement only).
 
 **Code references:**
 - `src/controllers/grbl/GrblController.ts:831-833` (lifecycle fires on send, not ack)
