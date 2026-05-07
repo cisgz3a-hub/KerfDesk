@@ -94,8 +94,14 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
       resetWcsToMachineOrigin: async () => ({ ok: true }),
       laserOff: async () => ({ ok: true }),
-      pauseJob: async () => ({ ok: true }),
-      resumeJob: async () => ({ ok: true }),
+      pauseJob: async () => {
+        calls.pause++;
+        return { ok: true };
+      },
+      resumeJob: async () => {
+        calls.resume++;
+        return { ok: true };
+      },
       stopJob: async () => {
         calls.stop++;
         return { ok: true };
@@ -149,15 +155,15 @@ for (const { label, setup } of states) {
 
   // pause
   let threw = false;
-  try { svc.pause(); } catch { threw = true; }
+  try { await svc.pause(); } catch { threw = true; }
   assert(!threw && calls.pause === 1,
-    `[${label}] svc.pause() does not throw, controller.pause called`);
+    `[${label}] svc.pause() does not throw, controller operations.pauseJob called`);
 
   // resume
   threw = false;
-  try { svc.resume(); } catch { threw = true; }
+  try { await svc.resume(); } catch { threw = true; }
   assert(!threw && calls.resume === 1,
-    `[${label}] svc.resume() does not throw, controller.resume called`);
+    `[${label}] svc.resume() does not throw, controller operations.resumeJob called`);
 
   // stop (via stopAndEnsureLaserOff)
   threw = false;

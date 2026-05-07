@@ -63,8 +63,14 @@ function makeController(args?: {
       setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
       resetWcsToMachineOrigin: async () => ({ ok: true }),
       laserOff: async () => ({ ok: true }),
-      pauseJob: async () => ({ ok: true }),
-      resumeJob: async () => ({ ok: true }),
+      pauseJob: async () => {
+        args?.pause?.();
+        return { ok: true };
+      },
+      resumeJob: async () => {
+        args?.resume?.();
+        return { ok: true };
+      },
       stopJob: async () => {
         args?.stop?.();
         return { ok: true };
@@ -94,10 +100,10 @@ void (async () => {
 
   assert(kind(svc.getSafetyState()) === 'safeIdle', 'initial service safety state is safeIdle');
 
-  svc.pause();
+  await svc.pause();
   assert(kind(svc.getSafetyState()) === 'pausedVerified', 'pause result transitions service state to pausedVerified');
 
-  svc.resume();
+  await svc.resume();
   assert(kind(svc.getSafetyState()) === 'running', 'resume result transitions service state to running');
 
   await svc.stopAndEnsureLaserOff();
@@ -114,10 +120,10 @@ void (async () => {
   const observed: SafetyState['kind'][] = [];
   const unsubscribe = svc.onSafetyStateChange((state) => observed.push(state.kind));
 
-  svc.pause();
-  svc.resume();
+  await svc.pause();
+  await svc.resume();
   unsubscribe();
-  svc.pause();
+  await svc.pause();
 
   assert(observed.join(',') === 'pausedVerified,running', 'onSafetyStateChange publishes transitions and unsubscribes');
 }
@@ -136,7 +142,7 @@ void (async () => {
     pause: () => { throw new Error('feed hold rejected'); },
   }));
 
-  const result = svc.pause();
+  const result = await svc.pause();
   const state = svc.getSafetyState();
 
   assert(result.accepted === false, 'failed pause returns accepted=false');

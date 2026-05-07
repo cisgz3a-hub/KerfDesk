@@ -1226,9 +1226,9 @@ export function ConnectionPanelMain({
     const held = isPaused || machineState?.status === 'hold';
     try {
       if (held) {
-        machineService.resume();
+        await machineService.resume();
       } else {
-        machineService.pause();
+        await machineService.pause();
       }
       setIsPaused(!held);
     } catch (err: unknown) {

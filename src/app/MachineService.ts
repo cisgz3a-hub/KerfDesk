@@ -1310,11 +1310,12 @@ export class MachineService {
   }
 
   /** Pause the currently running job (feed-hold). */
-  pause(): SafetyActionResult {
+  async pause(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('pause'));
     try {
-      ctrl.pause();
+      const result = await ctrl.operations.pauseJob();
+      if (!result.ok) throw new Error(result.reason);
       return this._recordSafetyResult(makePauseResult());
     } catch (err: unknown) {
       return this._recordSafetyResult({
@@ -1326,11 +1327,12 @@ export class MachineService {
   }
 
   /** Resume a paused job. */
-  resume(): SafetyActionResult {
+  async resume(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('resume'));
     try {
-      ctrl.resume();
+      const result = await ctrl.operations.resumeJob();
+      if (!result.ok) throw new Error(result.reason);
       return this._recordSafetyResult(makeResumeResult());
     } catch (err: unknown) {
       return this._recordSafetyResult({
