@@ -19,6 +19,11 @@ import { optimizePlan } from '../core/plan/PlanOptimizer';
 import { getOutputStrategy } from '../core/output/Output';
 import '../core/output/GrblStrategy';
 import { getActiveProfile, type DeviceProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
+import {
+  grblCapabilities,
+  type ControllerCapabilities,
+  type OutputFormat as ControllerCapabilityOutputFormat,
+} from '../controllers/ControllerCapabilities';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
 import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
@@ -29,6 +34,71 @@ import {
 } from '../core/plan/GcodeTemplates';
 
 const DEFAULT_MACHINE_BED_MM = 300;
+const OUTPUT_FORMATS: readonly OutputFormat[] = ['grbl', 'marlin', 'smoothie', 'ruida', 'custom'];
+
+type OutputTargetSource = 'profile-preference' | 'controller-default' | 'legacy-fallback';
+
+export interface OutputTarget {
+  readonly format: OutputFormat;
+  readonly dialect: string;
+  readonly controllerFormat: ControllerCapabilityOutputFormat;
+  readonly source: OutputTargetSource;
+}
+
+const OUTPUT_FORMAT_TO_CONTROLLER_FORMAT: Record<OutputFormat, ControllerCapabilityOutputFormat> = {
+  grbl: 'gcode-text',
+  marlin: 'gcode-text',
+  smoothie: 'gcode-text',
+  ruida: 'gcode-binary',
+  custom: 'native-binary',
+};
+
+function isOutputFormat(value: unknown): value is OutputFormat {
+  return typeof value === 'string' && (OUTPUT_FORMATS as readonly string[]).includes(value);
+}
+
+function controllerSupportsOutput(
+  caps: ControllerCapabilities,
+  format: OutputFormat,
+): boolean {
+  return caps.output.formats.includes(OUTPUT_FORMAT_TO_CONTROLLER_FORMAT[format]);
+}
+
+function makeOutputTarget(
+  format: OutputFormat,
+  profile: DeviceProfile | null,
+  source: OutputTargetSource,
+): OutputTarget {
+  return {
+    format,
+    dialect: profile?.outputDialect?.trim() || format,
+    controllerFormat: OUTPUT_FORMAT_TO_CONTROLLER_FORMAT[format],
+    source,
+  };
+}
+
+/**
+ * T2-28: resolve the output strategy from profile preference + controller
+ * capabilities instead of hardcoding GRBL at each compile surface.
+ */
+export function resolveOutputTarget(
+  profile: DeviceProfile | null,
+  controllerCapabilities: ControllerCapabilities = grblCapabilities,
+  legacyFallbackFormat: OutputFormat = 'grbl',
+): OutputTarget {
+  const preferred = isOutputFormat(profile?.outputFormat) ? profile.outputFormat : null;
+  if (preferred && controllerSupportsOutput(controllerCapabilities, preferred)) {
+    return makeOutputTarget(preferred, profile, 'profile-preference');
+  }
+
+  for (const format of OUTPUT_FORMATS) {
+    if (controllerSupportsOutput(controllerCapabilities, format)) {
+      return makeOutputTarget(format, profile, 'controller-default');
+    }
+  }
+
+  return makeOutputTarget(legacyFallbackFormat, profile, 'legacy-fallback');
+}
 
 /** Prefer controller $130/$131, then profile, then default — same priority as compile path. */
 export function resolveBedWidthMm(
@@ -92,6 +162,7 @@ export interface CompileToolpathResult {
 export interface CompileOptions {
   signal?: AbortSignal;
   onProgress?: (event: CompileProgress) => void;
+  controllerCapabilities?: ControllerCapabilities;
 }
 
 export interface CompileProgress {
@@ -188,7 +259,8 @@ export async function compileGcode(
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
   reportPhase(opts, 'text-expansion', 1);
 
-  const strategy = getOutputStrategy(outputFormat);
+  const outputTarget = resolveOutputTarget(profile, opts.controllerCapabilities ?? grblCapabilities, outputFormat);
+  const strategy = getOutputStrategy(outputTarget.format);
   if (!strategy) return null;
 
   if (failedTextObjects.length > 0) {
@@ -346,9 +418,12 @@ export async function compileToolpath(
    * pre-T1-58 behavior.
    */
   profile: DeviceProfile | null = null,
+  outputFormat: OutputFormat = 'grbl',
+  controllerCapabilities: ControllerCapabilities = grblCapabilities,
 ): Promise<CompileToolpathResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
-  const strategy = getOutputStrategy('grbl');
+  const outputTarget = resolveOutputTarget(profile, controllerCapabilities, outputFormat);
+  const strategy = getOutputStrategy(outputTarget.format);
 
   if (failedTextObjects.length > 0) {
     console.warn(

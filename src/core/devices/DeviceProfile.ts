@@ -6,6 +6,7 @@
 import { type Scene } from '../scene/Scene';
 import { type ScanningOffsetTable } from '../plan/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
+import { type OutputFormat } from '../output/Output';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
   BUILT_IN_HEADER_TEMPLATES,
@@ -167,6 +168,14 @@ export interface DeviceProfile {
    * profiles so the UI can pick the correct connection & status widgets.
    */
   connection?: DeviceConnection;
+
+  /**
+   * T2-28: optional preferred output strategy/dialect for this profile.
+   * When omitted, PipelineService resolves a target from controller
+   * capabilities and falls back to the historical GRBL target.
+   */
+  outputFormat?: OutputFormat;
+  outputDialect?: string;
 
   /**
    * Material response curves keyed by material name. D.13 Phase 1 stores

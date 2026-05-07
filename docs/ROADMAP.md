@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 104 | 24 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-27 typed executeJob MVP shipped; T2-6 App split remains open. |
+| Tier 2 | 105 | 23 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-28 output-target resolver MVP shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -8028,6 +8028,8 @@ Same in `compileToolpath` for preview.
 **Priority:** Tier 2 鈥?depends on T2-25 (capabilities), independent of T2-24. Could ship before T2-24 if needed.
 
 **Cross-check note (audit 3A):** Verified at exact lines. Audit's Priority 5 + Critical 4.
+
+**Status:** Shipped in `<TBD>` (focused output-target resolver MVP). `src/app/PipelineService.ts` now exports `resolveOutputTarget(profile, controllerCapabilities, legacyFallbackFormat)`, bridging profile preferences (`outputFormat` / `outputDialect`) with controller capability output formats (`gcode-text`, `gcode-binary`, `native-binary`) and preserving the historical GRBL fallback when no capability target is available. `compileGcode` resolves an `OutputTarget` before `getOutputStrategy(...)` instead of looking up the raw `outputFormat` parameter directly, and `compileToolpath` uses the same resolver instead of hardcoding `getOutputStrategy('grbl')`. `src/core/devices/DeviceProfile.ts` now carries optional `outputFormat` and `outputDialect` fields for future profiles. Pinned by `tests/output-target-resolution.test.ts` plus the existing compile/profile/ticket regression tests. **Out of scope:** registering non-GRBL output strategies, exposing output-target controls in Settings, and wiring live controller capabilities into `useCompileManager` once `ControllerInterface.capabilities` lands from the T2-25 follow-up. **Hardware verification: not required** (compile-target selection helper; current default still resolves to GRBL).
 
 ---
 
@@ -19904,7 +19906,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
 - [x] T2-26 Move GRBL command construction out of generic layers (final simulator-literal close-out shipped in `18114b9`; controller operation observers now own simulator fanout, generic coordinator/gateway code has no operation GRBL literals, stale gateway operation helpers removed)
 - [x] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (Shipped - typed ControllerOutput + GRBL executeJob rejection/acceptance boundary + MachineService start path migrated; T2-28 owns dynamic output target selection)
-- [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
+- [x] T2-28 Profile/controller-driven output target selection (Shipped - resolveOutputTarget helper + compileGcode/compileToolpath resolver wiring + optional profile outputFormat/outputDialect; live controller capability plumbing deferred)
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)
 - [ ] T2-30 Falcon WiFi as real LaserController / transport (filed; depends on T2-24, T3-45)
 - [x] T2-31 Make `SerialPortLike.close()` async (shipped 2026-05-05 in `898b510` — unblocks T2-32 / T2-33)
