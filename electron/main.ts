@@ -2,7 +2,12 @@ import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'el
 import * as path from 'path';
 import * as fs from 'fs';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
-import { storageGet, storageSet, storageRemove, storageList } from './storage';
+import {
+  namespacedStorageGet,
+  namespacedStorageSet,
+  namespacedStorageRemove,
+  namespacedStorageList,
+} from './storage';
 import { STORAGE_NAMESPACES, isStorageKeyAllowed, type StorageNamespace } from './storageNamespaces';
 
 let mainWindow: BrowserWindow | null = null;
@@ -336,25 +341,24 @@ function registerStorageNamespace(namespace: StorageNamespace): void {
   ipcMain.handle(`${channelPrefix}:get`, (_event, key: unknown) => {
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
-    return storageGet(key);
+    return namespacedStorageGet(namespace, key);
   });
 
   ipcMain.handle(`${channelPrefix}:set`, (_event, key: unknown, value: unknown) => {
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
     if (typeof value !== 'string') throw new Error('Invalid storage value');
-    storageSet(key, value);
+    namespacedStorageSet(namespace, key, value);
   });
 
   ipcMain.handle(`${channelPrefix}:remove`, (_event, key: unknown) => {
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
-    storageRemove(key);
+    namespacedStorageRemove(namespace, key);
   });
 
   ipcMain.handle(`${channelPrefix}:list`, () => {
-    const keys = storageList();
-    return keys.filter(key => isStorageKeyAllowed(namespace, key));
+    return namespacedStorageList(namespace);
   });
 }
 

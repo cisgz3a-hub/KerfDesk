@@ -34,48 +34,71 @@ async function run(): Promise<void> {
   try {
     const backend = createStorageFsBackend(tempRoot);
 
-    assert(backend.storageGet('missing') === null, 'get(missing) returns null');
+    assert(
+      backend.namespacedGet('deviceProfiles', 'laserforge_device_profiles') === null,
+      'get(missing) returns null',
+    );
 
-    backend.storageSet('k', 'v');
-    assert(backend.storageGet('k') === 'v', 'set/get round trip');
+    backend.namespacedSet('deviceProfiles', 'laserforge_device_profiles', 'v');
+    assert(
+      backend.namespacedGet('deviceProfiles', 'laserforge_device_profiles') === 'v',
+      'set/get round trip',
+    );
 
-    backend.storageSet('k', 'a');
-    backend.storageSet('k', 'b');
-    assert(backend.storageGet('k') === 'b', 'set overwrites value');
+    backend.namespacedSet('deviceProfiles', 'laserforge_device_profiles', 'a');
+    backend.namespacedSet('deviceProfiles', 'laserforge_device_profiles', 'b');
+    assert(
+      backend.namespacedGet('deviceProfiles', 'laserforge_device_profiles') === 'b',
+      'set overwrites value',
+    );
 
-    backend.storageRemove('k');
-    assert(backend.storageGet('k') === null, 'remove deletes key');
+    backend.namespacedRemove('deviceProfiles', 'laserforge_device_profiles');
+    assert(
+      backend.namespacedGet('deviceProfiles', 'laserforge_device_profiles') === null,
+      'remove deletes key',
+    );
 
     let removeMissingThrew = false;
     try {
-      backend.storageRemove('missing-remove');
+      backend.namespacedRemove('deviceProfiles', 'laserforge_device_profile_missing');
     } catch {
       removeMissingThrew = true;
     }
     assert(!removeMissingThrew, 'remove(missing) does not throw');
 
-    backend.storageSet('pref:1', 'x');
-    backend.storageSet('pref:2', 'y');
-    backend.storageSet('other:1', 'z');
-    const listed = backend.storageList();
+    backend.namespacedSet('deviceProfiles', 'laserforge_device_profile_1', 'x');
+    backend.namespacedSet('deviceProfiles', 'laserforge_device_profile_2', 'y');
+    backend.namespacedSet('materials', 'laserforge_material_1', 'z');
+    const listed = backend.namespacedList('deviceProfiles');
     assert(
-      listed.includes('pref:1') && listed.includes('pref:2') && listed.includes('other:1'),
-      'list returns all keys',
+      listed.includes('laserforge_device_profile_1')
+      && listed.includes('laserforge_device_profile_2')
+      && !listed.includes('laserforge_material_1'),
+      'list returns namespace keys',
     );
-    const pref = backend.storageList('pref:');
-    assert(pref.length === 2 && pref.every(k => k.startsWith('pref:')), 'list(prefix) filters keys');
+    const pref = backend.namespacedList('deviceProfiles', 'laserforge_device_profile_');
+    assert(
+      pref.length === 2 && pref.every(k => k.startsWith('laserforge_device_profile_')),
+      'list(prefix) filters keys',
+    );
 
-    const unicodeKey = '鍵🔑:emoji';
+    const unicodeKey = 'laserforge_settings_unicode';
     const unicodeValue = 'hello 你好 🚀';
-    backend.storageSet(unicodeKey, unicodeValue);
-    assert(backend.storageGet(unicodeKey) === unicodeValue, 'unicode key/value round-trip');
+    backend.namespacedSet('settings', unicodeKey, unicodeValue);
+    assert(
+      backend.namespacedGet('settings', unicodeKey) === unicodeValue,
+      'unicode key/value round-trip',
+    );
 
     const large = 'L'.repeat(1024 * 1024);
-    backend.storageSet('large', large);
-    assert((backend.storageGet('large') ?? '').length === large.length, '1MB value round-trips');
+    backend.namespacedSet('autosave', 'laserforge_autosave_record', large);
+    assert(
+      (backend.namespacedGet('autosave', 'laserforge_autosave_record') ?? '').length === large.length,
+      '1MB value round-trips',
+    );
 
     backend.storageClear();
-    assert(backend.storageList().length === 0, 'clear removes all entries');
+    assert(backend.namespacedList('autosave').length === 0, 'clear removes all entries');
   } finally {
     rmrf(tempRoot);
   }

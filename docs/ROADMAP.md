@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 120 | 8 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-120 typed storage IPC shipped with T2-128 per-namespace backend authorization still open; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 121 | 7 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-120/T2-128 storage namespace boundary shipped; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -15549,6 +15549,8 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 **Cross-check note (audit 5D):** Audit's Priority 4 (deep). Refines T1-84 + T2-120.
 
+**Status:** Shipped in TBD (focused MVP — storage backend now requires an explicit namespace for every filesystem get/set/remove/list, and generic top-level `storageGet` / `storageSet` / `storageRemove` / `storageList` exports are gone). `electron/storage.ts` exposes `namespacedStorageGet`, `namespacedStorageSet`, `namespacedStorageRemove`, and `namespacedStorageList`; `createStorageFsBackend` exposes matching `namespaced*` methods. Each method validates the requested key with `electron/storageNamespaces.ts` before touching the file. `electron/main.ts` now calls only the namespaced helpers from its typed IPC handlers, so a future direct storage import has to carry namespace intent. Pinned by `tests/namespace-isolation.test.ts` (16 contracts: profile and entitlement keys stay isolated, cross-namespace read/write rejected, failed cross-write leaves existing license value unchanged, namespaced listing excludes other domains and preserves prefix filtering, generic exports absent, main imports namespaced helpers) plus updated `tests/storage-filesystem-unit.test.ts` (10 contracts for round-trip, overwrite, remove, namespace list, prefix list, Unicode, large values, clear). **Out of scope:** T2-127 size-limit enforcement in Electron handlers and deeper per-domain schema validation. **Hardware verification: not required** (filesystem storage boundary only; no controller commands or emitted G-code changed).
+
 ---
 
 ### T2-129 | Destructive `forceSafeState()` primitive — operator-initiated force-safe-state recovery + T1-29 acknowledgement integration
@@ -20040,7 +20042,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-125 Compiler/output layer enforces template validation (shipped in `412250c`; defense in depth for T1-91)
 - [x] T2-126 Falcon WiFi treated as untrusted telemetry — UI labels + safety boundary (Shipped — typed trust classifier + per-action policy gate + identity check + UI-badge + override-dialog copy; ConnectionPanelMain wiring deferred as T2-126-followup; pairs with T1-94)
 - [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
-- [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
+- [x] T2-128 Per-namespace storage authorization (Shipped — Electron filesystem backend now requires namespace + validates key allow-lists before get/set/remove/list; generic storage helpers removed)
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
 
 ### Tier 3 (This quarter)
