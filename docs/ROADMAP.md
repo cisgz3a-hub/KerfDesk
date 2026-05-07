@@ -15670,9 +15670,9 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Status (partial):** Case 4 shipped in `00ce691` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
 
-**Status (partial):** Case 5 shipped in `<TBD>` — added `tests/cable-yanked-mid-job.test.ts` and fixed `GrblController` transport-error handling so a serial `onError` mid-job aborts the job, closes the failed port best-effort, transitions to `disconnected`, notifies UI state listeners, preserves autosave, and allows reconnect-then-start on a fresh port.
+**Status (partial):** Case 5 shipped in `4a30ad7` — added `tests/cable-yanked-mid-job.test.ts` and fixed `GrblController` transport-error handling so a serial `onError` mid-job aborts the job, closes the failed port best-effort, transitions to `disconnected`, notifies UI state listeners, preserves autosave, and allows reconnect-then-start on a fresh port.
 
-**Status:** Shipped in `<TBD>` — all five critical T3-2 test files now exist and pass: UI start-job marker path, template safety enforcement, stale-scene start block, profile-change start block, and cable-yanked-mid-job recovery.
+**Status:** Shipped in `4a30ad7` — all five critical T3-2 test files now exist and pass: UI start-job marker path, template safety enforcement, stale-scene start block, profile-change start block, and cable-yanked-mid-job recovery.
 
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
