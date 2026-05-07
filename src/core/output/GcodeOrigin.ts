@@ -11,6 +11,10 @@ export type GcodeStartMode = 'absolute' | 'current' | 'savedOrigin';
 export interface GcodeGenerateOptions {
   startMode?: GcodeStartMode;
   savedOrigin?: { x: number; y: number } | null;
+  /** Cooperative cancellation checked during G-code emission. */
+  signal?: AbortSignal;
+  /** Move-level progress for text G-code generation. */
+  onProgress?: (event: GcodeOutputProgress) => void;
   /** GRBL $30 — max spindle/PWM (S range). Default 1000. */
   maxSpindle?: number;
   /** Machine-space XY to rapid to before M2; omit or null to skip the return move. */
@@ -30,6 +34,18 @@ export interface GcodeGenerateOptions {
    * header date comments. Production omits this and uses wall time.
    */
   clock?: () => string;
+}
+
+export interface GcodeOutputProgress {
+  fraction: number;
+  completedMoves: number;
+  totalMoves: number;
+  operationIndex: number;
+  operationCount: number;
+  moveIndex: number;
+  moveCount: number;
+  emittedLines: number;
+  detail?: string;
 }
 
 export function designMinFromJob(job: Job): { minX: number; minY: number } {

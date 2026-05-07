@@ -87,6 +87,26 @@ export class TemplateValidationError extends Error {
   }
 }
 
+function throwIfOutputAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
+function countPlanMoves(plan: Plan): number {
+  return plan.operations.reduce((sum, operation) => sum + operation.moves.length, 0);
+}
+
+function reportOutputProgress(
+  options: GcodeGenerateOptions | undefined,
+  event: Parameters<NonNullable<GcodeGenerateOptions['onProgress']>>[0],
+): void {
+  if (!options?.onProgress) return;
+  const total = Math.max(1, event.totalMoves);
+  const fraction = Math.max(0, Math.min(1, event.completedMoves / total));
+  options.onProgress({ ...event, fraction });
+}
+
 // ─── STRATEGY REGISTRY ───────────────────────────────────────────
 
 const strategies = new Map<OutputFormat, OutputStrategy>();
@@ -132,14 +152,18 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   private static readonly _posEps = 0.0005;
 
   generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
+    throwIfOutputAborted(options?.signal);
     this.currentSpeed = 0;
     this._maxSpindle = options?.maxSpindle ?? 1000;
     this._relative = options?.startMode === 'current';
     this._prevPos = { x: 0, y: 0 };
     this._prevZ = 0;
+    const totalMoves = countPlanMoves(plan);
+    let completedMoves = 0;
 
     try {
       validateTemplatesBeforeEmission(job, options, this._maxSpindle);
+      throwIfOutputAborted(options?.signal);
       const lines: string[] = [];
       const generatedAt = (options?.clock ?? (() => new Date().toISOString()))();
       const header = this.encodeHeader(job, options, generatedAt);
@@ -148,7 +172,9 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         lines.push(headerLines[i]);
       }
 
-      for (const op of plan.operations) {
+      for (let operationIndex = 0; operationIndex < plan.operations.length; operationIndex++) {
+        throwIfOutputAborted(options?.signal);
+        const op = plan.operations[operationIndex];
         const srcOp = job.operations.find(o => o.id === op.operationId);
         const passes = Math.max(1, srcOp?.settings.passes ?? 1);
         lines.push('');
@@ -158,8 +184,23 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
           lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
         }
 
-        for (const move of op.moves) {
+        for (let moveIndex = 0; moveIndex < op.moves.length; moveIndex++) {
+          throwIfOutputAborted(options?.signal);
+          const move = op.moves[moveIndex];
           lines.push(this.encodeMove(move));
+          completedMoves++;
+          reportOutputProgress(options, {
+            fraction: 0,
+            completedMoves,
+            totalMoves,
+            operationIndex,
+            operationCount: plan.operations.length,
+            moveIndex,
+            moveCount: op.moves.length,
+            emittedLines: lines.length,
+            detail: `Emitted ${completedMoves}/${totalMoves} G-code moves`,
+          });
+          throwIfOutputAborted(options?.signal);
         }
       }
 
@@ -169,6 +210,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       // position before the template block runs. Non-template footers already
       // append this inside encodeFooter(); skip when no template to avoid duplicating.
       if (this._relative && options?.gcodeFooterTemplate?.trim()) {
+        throwIfOutputAborted(options?.signal);
         const backX = -this._prevPos.x;
         const backY = -this._prevPos.y;
         const eps = BaseGCodeStrategy._posEps;
@@ -179,12 +221,14 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       }
 
       lines.push('');
+      throwIfOutputAborted(options?.signal);
       const previewFooter = this.encodeFooter(job, options, lines.length + 1);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
       const totalLines = lines.length + footerLineCount;
       const footer = this.encodeFooter(job, options, totalLines);
       const footerLines = footer.split(/\r?\n/);
       for (let i = 0; i < footerLines.length; i++) {
+        throwIfOutputAborted(options?.signal);
         lines.push(footerLines[i]);
       }
 
@@ -196,9 +240,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         .filter(l => l.trim().length > 0)
         .slice(-5);
       if (!/\bM5\b/i.test(tailNonEmpty.join('\n'))) {
+        throwIfOutputAborted(options?.signal);
         lines.push('M5 S0 ; T1-26 defense-in-depth laser-off');
       }
 
+      throwIfOutputAborted(options?.signal);
       const text = lines.filter(l => l !== undefined).join('\n');
 
       return {

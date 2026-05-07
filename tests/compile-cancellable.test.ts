@@ -3,8 +3,8 @@
  * Pre-T2-17 the compile was uncancellable internally — once started,
  * every loop ran to completion. The MVP shipped here adds phase-
  * boundary checkpoints (5 phases: text-expansion, compile-job, plan,
- * transform, output); JobCompiler / PlanOptimizer deep-loop progress is
- * wired into those phases. Output and UI wiring remain T2-17 follow-up work.
+ * transform, output); JobCompiler / PlanOptimizer / Output deep-loop
+ * progress is wired into those phases. UI wiring remains T2-17 follow-up work.
  *
  * Run: npx tsx tests/compile-cancellable.test.ts
  */
@@ -137,6 +137,22 @@ void (async () => {
       .map(e => e.fraction);
     assert(compileJobFractions.some(f => f > 0 && f < 1),
       `compile-job deep progress: intermediate fractions forwarded (got [${compileJobFractions.map(f => f.toFixed(2)).join(', ')}])`);
+  }
+
+  // 2c. Output deep-loop progress maps into the output phase while G-code
+  //     lines are emitted.
+  {
+    const scene = makeRectScene(5);
+    const events: CompileProgress[] = [];
+    const result = await compileGcode(scene, 'absolute', null, null, 'grbl', null, 1000, getActiveProfile(), {
+      onProgress: (e) => events.push(e),
+    });
+    assert(result != null, 'output deep progress: compile still succeeds');
+    const outputFractions = events
+      .filter(e => e.phase === 'output')
+      .map(e => e.fraction);
+    assert(outputFractions.some(f => f > 0 && f < 1),
+      `output deep progress: intermediate fractions forwarded (got [${outputFractions.map(f => f.toFixed(2)).join(', ')}])`);
   }
 
   // 3. AbortSignal aborted BEFORE compile starts → throws AbortError

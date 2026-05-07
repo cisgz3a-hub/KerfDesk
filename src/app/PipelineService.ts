@@ -86,8 +86,7 @@ export interface CompileToolpathResult {
  * Pre-T2-17 the compile was uncancellable internally — once started,
  * every loop ran to completion. The hooks here let the UI surface a
  * Cancel button + progress bar across phase boundaries and through
- * JobCompiler / PlanOptimizer deep loops. Output generation remains a
- * later T2-17 follow-up. Aborting at a checkpoint throws an AbortError;
+ * JobCompiler / PlanOptimizer / Output deep loops. Aborting at a checkpoint throws an AbortError;
  * pre-existing callers that don't pass `opts` see no behavior change.
  */
 export interface CompileOptions {
@@ -178,7 +177,7 @@ export async function compileGcode(
   profile: DeviceProfile | null = null,
   /**
    * T2-17: optional AbortSignal + progress callback. Phase-boundary
-   * checkpoints plus JobCompiler / PlanOptimizer deep-loop checkpoints.
+   * checkpoints plus JobCompiler / PlanOptimizer / Output deep-loop checkpoints.
    * Defaults to `{}` so existing callers see no behavior change.
    */
   opts: CompileOptions = {},
@@ -295,6 +294,10 @@ export async function compileGcode(
       returnY: machineTransform.returnPosition.y,
     },
     maxSpindle,
+    signal: opts.signal,
+    onProgress: (event) => {
+      reportPhase(opts, 'output', event.fraction, event.detail ?? 'Emitting G-code');
+    },
   });
   if (!output.text) return null;
   reportPhase(opts, 'output', 1);
