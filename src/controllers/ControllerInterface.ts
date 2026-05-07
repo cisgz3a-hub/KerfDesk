@@ -207,7 +207,7 @@ export type CommandSource = 'internal' | 'user';
 
 export interface GcodeLineController {
   readonly family: 'gcode-line-stream' | 'grbl';
-  connect(port: SerialPortLike): Promise<void>;
+  connect(port: SerialPortLike, signal?: AbortSignal): Promise<void>;
   executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
   sendCommand(command: string, source?: CommandSource): void;
@@ -221,7 +221,7 @@ export interface GrblControllerApi extends GcodeLineController {
   /** GRBL $30 (max spindle/PWM). Null until parsed from a $$ response after connect. */
   readonly maxSpindle: number | null;
 
-  connect(port: SerialPortLike): Promise<void>;
+  connect(port: SerialPortLike, signal?: AbortSignal): Promise<void>;
   disconnect(): Promise<void>;
 
   /**

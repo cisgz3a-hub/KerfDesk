@@ -5,12 +5,9 @@
  * route through the T1-49 cleanup path (port closed, portRef nulled,
  * controller.disconnect best-effort called).
  *
- * Full propagation through `WebSerialPort.requestAndOpen` and
- * `GrblController.connect` so an in-flight open / handshake can be
- * cancelled mid-air is filed as T2-32 / T2-33. T1-50 Part B is the
- * interface stub plus `throwIfAborted` checks — pure type-system /
- * error-path plumbing, zero behavioral effect in production today
- * (no caller passes a signal).
+ * Follow-up slices now pass the same UI-owned signal through
+ * `WebSerialPort.requestAndOpen` and `GrblController.connect`, so
+ * cancel covers port selection/open and the GRBL welcome handshake.
  *
  * Hardware verification: not required (UI plumbing for previously-
  * swallowed async failures, no g-code or machine-state change).
@@ -53,6 +50,7 @@ interface ControllerSpy {
   controller: LaserController;
   connectCalls: number;
   disconnectCalls: number;
+  lastConnectSignal: AbortSignal | undefined;
   setConnectImpl: (impl: () => Promise<void>) => void;
 }
 
@@ -61,13 +59,18 @@ function makeControllerSpy(): ControllerSpy {
   const spy: ControllerSpy = {
     connectCalls: 0,
     disconnectCalls: 0,
+    lastConnectSignal: undefined,
     setConnectImpl: (impl) => { connectImpl = impl; },
     controller: {
       protocolName: 'mock',
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
-      connect: async () => { spy.connectCalls += 1; await connectImpl(); },
+      connect: async (_port: SerialPortLike, signal?: AbortSignal) => {
+        spy.connectCalls += 1;
+        spy.lastConnectSignal = signal;
+        await connectImpl();
+      },
       disconnect: async () => { spy.disconnectCalls += 1; },
       sendJob: async () => {},
       pause: () => {},
@@ -265,6 +268,8 @@ void (async () => {
         'unaborted signal: portRef points at the WebSerialPort (no behavior change)');
       assert(lastRequestAndOpenSignal === ac.signal,
         'unaborted signal: MachineService passes signal to WebSerialPort.requestAndOpen');
+      assert(ctrl.lastConnectSignal === ac.signal,
+        'unaborted signal: MachineService passes signal to controller.connect');
       assert(portSpy.closeCalls === 0, 'unaborted signal: port.close NOT called');
       assert(ctrl.disconnectCalls === 0,
         'unaborted signal: controller.disconnect NOT called');
@@ -272,6 +277,8 @@ void (async () => {
 
     assert(/requestAndOpen\(baudRate,\s*signal\)/.test(machineServiceSource),
       'source pin: MachineService passes AbortSignal into WebSerialPort.requestAndOpen');
+    assert(/controllerRef\.current\.connect\(ws,\s*signal\)/.test(machineServiceSource),
+      'source pin: MachineService passes AbortSignal into controller.connect');
   } finally {
     (WebSerialPort as unknown as { isSupported: () => boolean }).isSupported = origIsSupported;
     (WebSerialPort.prototype as unknown as {

@@ -391,8 +391,9 @@ export class GrblController implements GrblControllerApi {
 
   // ─── LIFECYCLE ──────────────────────────────────────────────
 
-  async connect(port: SerialPortLike): Promise<void> {
+  async connect(port: SerialPortLike, signal?: AbortSignal): Promise<void> {
     if (this._port) throw new Error('Already connected. Disconnect first.');
+    signal?.throwIfAborted();
 
     this._maxSpindle = null;
     this._settingsQueried = false;
@@ -416,7 +417,8 @@ export class GrblController implements GrblControllerApi {
 
     return new Promise<void>((resolve, reject) => {
       let welcomeReceived = false;
-      let timeout: ReturnType<typeof setTimeout>;
+      let connectSettled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       let probeI: ReturnType<typeof setTimeout> | undefined;
       let probeSettings: ReturnType<typeof setTimeout> | undefined;
       let probeWifi1: ReturnType<typeof setTimeout> | undefined;
@@ -436,7 +438,34 @@ export class GrblController implements GrblControllerApi {
         probeWifi3 = undefined;
       };
 
+      const cleanupConnectTimers = (): void => {
+        if (timeout !== undefined) {
+          clearTimeout(timeout);
+          timeout = undefined;
+        }
+        clearProbeTimers();
+      };
+
+      const abortReason = (): Error =>
+        signal?.reason instanceof Error ? signal.reason : new Error('Connection aborted by user');
+
+      const onAbort = (): void => {
+        if (connectSettled) return;
+        connectSettled = true;
+        cleanupConnectTimers();
+        this._stopStatusPolling();
+        if (this._port === port) {
+          void port.close().catch(() => { /* ignore abort cleanup close failures */ });
+          this._port = null;
+        }
+        this._updateStatus('disconnected');
+        reject(abortReason());
+      };
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+
       port.onData((line) => {
+        if (connectSettled && !welcomeReceived) return;
         this._emitRawLine(line, 'rx');
 
         // USB: stay quiet until polled; `?` yields `<State|...>`. Only treat lines
@@ -469,9 +498,10 @@ export class GrblController implements GrblControllerApi {
           isGrblStatusWelcome;
 
         if (!welcomeReceived && isWelcome) {
+          connectSettled = true;
+          signal?.removeEventListener('abort', onAbort);
           welcomeReceived = true;
-          clearTimeout(timeout);
-          clearProbeTimers();
+          cleanupConnectTimers();
           // Never claim idle if the controller is already in motion (avoids overlapping streams).
           this._updateStatus(statusWelcome ?? 'idle');
           // T1-25: arm the safe-state handshake. The next status report
@@ -568,7 +598,9 @@ export class GrblController implements GrblControllerApi {
           }
         }, 1000);
         timeout = setTimeout(() => {
-          clearProbeTimers();
+          connectSettled = true;
+          signal?.removeEventListener('abort', onAbort);
+          cleanupConnectTimers();
           this._stopStatusPolling();
           if (this._port) {
             // T2-31: close() is now async. setTimeout cannot await; chain

@@ -1056,7 +1056,7 @@ export class MachineService {
       ws = createSerialPort('web') as WebSerialPort;
       await ws.requestAndOpen(baudRate, signal);
       signal?.throwIfAborted();
-      await this.controllerRef.current.connect(ws);
+      await this.controllerRef.current.connect(ws, signal);
       signal?.throwIfAborted();
       this.portRef.current = ws;
       this.state.isSimulator = false;
