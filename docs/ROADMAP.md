@@ -15662,7 +15662,7 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 ### T3-2 | Write the 5 critical missing tests
 
-**Status (partial):** Case 1 shipped in `<TBD>` — added `tests/ui-start-job-end-to-end.test.ts`, which compiles a two-object scene, applies the same non-empty line filter used by the UI start path, streams through `GrblController.sendJob`, and asserts object lifecycle callbacks fire for both generated object IDs in marker order while marker comments are stripped before serial write. The master checklist remains open because case 5 still needs dedicated coverage.
+**Status (partial):** Case 1 shipped in `93a3351` — added `tests/ui-start-job-end-to-end.test.ts`, which compiles a two-object scene, applies the same non-empty line filter used by the UI start path, streams through `GrblController.sendJob`, and asserts object lifecycle callbacks fire for both generated object IDs in marker order while marker comments are stripped before serial write. The master checklist remains open because case 5 still needs dedicated coverage.
 
 **Status (partial):** Case 2 shipped in `3c1d5af` — added `tests/template-safety-enforcement.test.ts`, a focused six-case guard for dangerous template/custom-G-code surfaces: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, `$X` injection, and motion outside bed bounds.
 
