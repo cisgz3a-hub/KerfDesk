@@ -10496,7 +10496,7 @@ The warning is informational 鈥?users with intentional unusual orders (e.g. cut
 
 ### T2-64 | Beginner-vs-Advanced mode toggle with safety gates differing per mode
 
-**Status:** Shipped in `<TBD>` (focused MVP: persisted `UserMode`, pure gate policy, Settings toggle, and frame-before-start override wiring; deeper per-gate migrations remain follow-up scope).
+**Status:** Shipped in `85ecd46` (focused MVP: persisted `UserMode`, pure gate policy, Settings toggle, and frame-before-start override wiring; deeper per-gate migrations remain follow-up scope).
 
 **Code reference:** `src/app/UserModeGates.ts` defines `UserMode` and the beginner/advanced gate policy. `src/ui/stores/appSettingsStore.ts` persists `userMode` with default `beginner`. `src/ui/components/AppSettingsModal.tsx` exposes the operator-mode toggle, and `src/ui/components/ConnectionPanelMain.tsx` consumes the policy so beginner mode requires Frame before Start while advanced mode can explicitly show `Start without framing`.
 
