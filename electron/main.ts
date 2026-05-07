@@ -55,7 +55,8 @@ type UpdateCheckResult =
 // many seconds, allocates a 5 GB string, and ships it over IPC. Even a
 // well-meaning user with a misconfigured CAD exporter could freeze or
 // crash the app. Each cap is sized for legitimate content of that type:
-// SVG/DXF rarely exceed a few MB; G-code can be tens of MB for fine work
+// SVG rarely exceeds a few MB; DXF is allowed a larger import-boundary
+// cap because some CAD exports are verbose. G-code can be tens of MB for fine work
 // on a big bed; project JSON tracks scene + history at modest size.
 //
 // Note on .laserforge.json: path.extname("project.laserforge.json")
@@ -64,7 +65,7 @@ type UpdateCheckResult =
 const MAX_FILE_BYTES_BY_EXTENSION: Record<string, number> = {
   '.json':  50 * 1024 * 1024,
   '.svg':   25 * 1024 * 1024,
-  '.dxf':   25 * 1024 * 1024,
+  '.dxf':   50 * 1024 * 1024,
   '.gcode': 100 * 1024 * 1024,
   '.nc':    100 * 1024 * 1024,
   '.png':   100 * 1024 * 1024,

@@ -15811,6 +15811,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 ### T3-10 | Input file-format size limits
 
+**Status:** Shipped in `<TBD>`. Closed the remaining import-limit gap by adding `DXF_IMPORT_LIMITS` to `src/import/dxf/DxfParser.ts`: 50 MB file cap, 500K total entity cap, and 10K per-entity group cap. `parseDxf` now checks text size before splitting and rejects entity/group bombs with `DxfImportLimitError`; it also no longer counts the `SECTION` marker as a fake entity. Browser DXF file-input and drag/drop paths now call `assertDxfFileSize(file.size)` before `file.text()`, while Electron `dialog:open` aligns DXF to the same 50 MB cap. The image side of the ticket was already covered by T1-17/T1-35/T2-124: worker-based image prep, 4000 px import downsample, 50 MB image file cap, and decoded pixel/dimension limits remain pinned by existing tests. Hardware verification: not required (input validation/import parsing only).
+
 **Code references:**
 - `src/import/dxf/DxfParser.ts:17-76` (no size or entity count limits)
 - `src/import/Dithering.ts:40-60` (main-thread, no image size cap)
@@ -20091,7 +20093,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-7 Backward-compat fixture corpus
 - [x] T3-8 Electron CSP hardening
 - [x] T3-9 Tighten IPC attack surface
-- [ ] T3-10 Input file-format size limits
+- [x] T3-10 Input file-format size limits
 - [ ] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
 - [ ] T3-13 Active-edge-table fill scanline algorithm (filed; algorithmic improvement, upper-end users)

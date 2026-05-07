@@ -17,6 +17,7 @@ import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
+import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { clearAutosave } from '../../app/autosavePersistence';
@@ -212,6 +213,7 @@ export function FileToolbar({
     if (!file) return;
 
     try {
+      assertDxfFileSize(file.size);
       const text = await file.text();
 
       const updated = importDxfIntoScene(text, scene);
