@@ -29,7 +29,11 @@ const baseState: MachineState = {
   errorCode: null,
 };
 
-function operations(laserOff: () => Promise<{ ok: true; message?: string } | { ok: false; reason: string; message?: string }>) {
+type LaserOffObserverArgs = { emergency?: boolean; onCommand?: (line: string) => void };
+
+function operations(
+  laserOff: (args?: LaserOffObserverArgs) => Promise<{ ok: true; message?: string } | { ok: false; reason: string; message?: string }>,
+) {
   return {
     jog: async () => ({ ok: true as const }),
     home: async () => ({ ok: true as const }),
@@ -76,8 +80,9 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-      operations: operations(async () => {
+      operations: operations(async (args) => {
         sent.push('M5 S0');
+        args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
     } as LaserController;
@@ -118,8 +123,9 @@ void (async () => {
         rawSafetyOffCalls++;
         return { stage: 'm5' as const };
       },
-      operations: operations(async () => {
+      operations: operations(async (args) => {
         sent.push('M5 S0');
+        args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
     } as LaserController;
@@ -148,7 +154,7 @@ void (async () => {
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
     await coord.emergencyLaserOff();
-    assert(sim.length === 1 && sim[0] === 'M5 S0', 'no controller → simulator only M5');
+    assert(sim.length === 0, 'no controller → no simulator M5');
   }
 
   {
@@ -295,8 +301,9 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-      operations: operations(async () => {
+      operations: operations(async (args) => {
         sent.push('M5 S0');
+        args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
     } as LaserController;
@@ -482,8 +489,9 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-      operations: operations(async () => {
+      operations: operations(async (args) => {
         sent.push('M5 S0');
+        args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
     } as LaserController;

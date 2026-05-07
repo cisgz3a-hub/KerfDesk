@@ -51,8 +51,9 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
     operations: {
-      jog: async ({ axis, distanceMm, feedMmPerMin }) => {
+      jog: async ({ axis, distanceMm, feedMmPerMin, onCommand }) => {
         jogSpy(axis as 'X' | 'Y', distanceMm, feedMmPerMin);
+        onCommand?.(`$J=G91 G21 ${axis}${distanceMm} F${feedMmPerMin}`);
         return { ok: true };
       },
       home: async () => ({ ok: true }),

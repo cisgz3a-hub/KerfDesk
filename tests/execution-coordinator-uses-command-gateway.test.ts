@@ -19,9 +19,10 @@ assert(
   !source.includes('sendSetOriginWcsCommand('),
   'ExecutionCoordinator set-origin does not route through the helper raw controller path',
 );
-assert(source.includes('ctrl.operations.unlockAlarm()'), 'ExecutionCoordinator unlock routes through operations API');
-assert(source.includes('ctrl.operations.home()'), 'ExecutionCoordinator home routes through operations API');
+assert(source.includes('ctrl.operations.unlockAlarm({'), 'ExecutionCoordinator unlock routes through operations API');
+assert(source.includes('ctrl.operations.home({'), 'ExecutionCoordinator home routes through operations API');
 assert(
-  source.includes('ctrl.operations.setWorkOriginAtCurrentPosition()'),
+  source.includes('ctrl.operations.setWorkOriginAtCurrentPosition({'),
   'ExecutionCoordinator set-origin routes through operations API',
 );
+assert(source.includes('onCommand: line => this.notifySimulator(line)'), 'ExecutionCoordinator gets simulator lines from operation observers');

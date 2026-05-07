@@ -161,12 +161,12 @@ export interface DisconnectOptions {
 }
 
 export interface MachineOperationApi {
-  jog(args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number }): Promise<OperationResult>;
-  home(): Promise<OperationResult>;
-  unlockAlarm(): Promise<OperationResult>;
-  setWorkOriginAtCurrentPosition(): Promise<OperationResult>;
-  resetWcsToMachineOrigin(): Promise<OperationResult>;
-  testFire(args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult>;
+  jog(args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number; onCommand?: (line: string) => void }): Promise<OperationResult>;
+  home(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
+  unlockAlarm(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
+  setWorkOriginAtCurrentPosition(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
+  resetWcsToMachineOrigin(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
+  testFire(args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }): Promise<OperationResult>;
   frame(args: {
     corners: readonly { x: number; y: number }[];
     startMode: 'absolute' | 'current';
@@ -176,7 +176,7 @@ export interface MachineOperationApi {
     onCommand?: (line: string) => void;
     lineDelayMs?: number;
   }): Promise<FrameOperationResult>;
-  laserOff(opts?: { emergency?: boolean }): Promise<OperationResult>;
+  laserOff(opts?: { emergency?: boolean; onCommand?: (line: string) => void }): Promise<OperationResult>;
   pauseJob(handle?: JobHandle): Promise<OperationResult>;
   resumeJob(handle?: JobHandle): Promise<OperationResult>;
   stopJob(handle?: JobHandle, reason?: string): Promise<OperationResult>;

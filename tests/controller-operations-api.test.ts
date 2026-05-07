@@ -54,9 +54,16 @@ async function run(): Promise<void> {
 
   {
   const { ctrl, port } = await connectedController();
-  const result = await ctrl.operations.jog({ axis: 'X', distanceMm: 2.5, feedMmPerMin: 1200 });
+  const observed: string[] = [];
+  const result = await ctrl.operations.jog({
+    axis: 'X',
+    distanceMm: 2.5,
+    feedMmPerMin: 1200,
+    onCommand: line => observed.push(line),
+  });
   assert(result.ok, 'jog returns ok');
   assert(sent(port).includes('$J=G91 G21 X2.5 F1200'), 'jog emits GRBL $J inside controller');
+  assert(observed[0] === '$J=G91 G21 X2.5 F1200', 'jog reports emitted command to operation observer');
   await ctrl.disconnect();
   }
 
@@ -78,9 +85,15 @@ async function run(): Promise<void> {
 
   {
   const { ctrl, port } = await connectedController();
-  const result = await ctrl.operations.testFire({ powerPercent: 5, maxSpindle: 1000 });
+  const observed: string[] = [];
+  const result = await ctrl.operations.testFire({
+    powerPercent: 5,
+    maxSpindle: 1000,
+    onCommand: line => observed.push(line),
+  });
   assert(result.ok, 'testFire returns ok');
   assert(sent(port).includes('M3 S50'), 'testFire emits GRBL M3 S-value inside controller');
+  assert(observed[0] === 'M3 S50', 'testFire reports emitted command to operation observer');
   await ctrl.disconnect();
   }
 
@@ -106,9 +119,11 @@ async function run(): Promise<void> {
 
   {
   const { ctrl, port } = await connectedController();
-  const result = await ctrl.operations.laserOff();
+  const observed: string[] = [];
+  const result = await ctrl.operations.laserOff({ onCommand: line => observed.push(line) });
   assert(result.ok, 'laserOff returns ok when M5 path succeeds');
   assert(sent(port).includes('M5 S0'), 'laserOff emits M5 S0 inside controller safetyOff');
+  assert(observed[0] === 'M5 S0', 'laserOff reports emitted command to operation observer');
   await ctrl.disconnect();
   }
 
@@ -131,11 +146,12 @@ async function run(): Promise<void> {
   assert(/readonly operations: MachineOperationApi/.test(iface), 'GrblControllerApi exposes operations');
   assert(/readonly operations =/.test(grbl), 'GrblController implements operations object');
   assert(/_trySendInternalOperationCommand/.test(grbl), 'GRBL command strings are isolated behind operation helper');
-  assert(/operations\.unlockAlarm\(\)/.test(coordinator), 'ExecutionCoordinator.unlock uses operations.unlockAlarm');
-  assert(/operations\.home\(\)/.test(coordinator), 'ExecutionCoordinator.home uses operations.home');
-  assert(/operations\.setWorkOriginAtCurrentPosition\(\)/.test(coordinator), 'ExecutionCoordinator.setOrigin uses operations.setWorkOriginAtCurrentPosition');
+  assert(/operations\.unlockAlarm\(\{/.test(coordinator), 'ExecutionCoordinator.unlock uses operations.unlockAlarm');
+  assert(/operations\.home\(\{/.test(coordinator), 'ExecutionCoordinator.home uses operations.home');
+  assert(/operations\.setWorkOriginAtCurrentPosition\(\{/.test(coordinator), 'ExecutionCoordinator.setOrigin uses operations.setWorkOriginAtCurrentPosition');
   assert(/operations\.testFire\(\{/.test(coordinator), 'ExecutionCoordinator.beginTestFire uses operations.testFire');
   assert(/operations\.frame\(\{/.test(coordinator), 'ExecutionCoordinator.runFrame uses operations.frame');
+  assert(/onCommand: line => this\.notifySimulator\(line\)/.test(coordinator), 'ExecutionCoordinator uses operation observers for simulator notifications');
   assert(!/gateway\.unlock\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.unlock');
   assert(!/gateway\.home\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.home');
   assert(!/gateway\.sendInternalCommand\(cmd\)/.test(coordinator), 'ExecutionCoordinator.beginTestFire no longer sends laser-on through gateway');

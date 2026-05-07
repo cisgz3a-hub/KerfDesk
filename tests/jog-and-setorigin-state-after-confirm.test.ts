@@ -53,9 +53,11 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
     isJobRunning: false,
     maxSpindle: null,
     operations: {
-      jog: async ({ axis, distanceMm, feedMmPerMin }) => {
+      jog: async ({ axis, distanceMm, feedMmPerMin, onCommand }) => {
         try {
-          sendOperation(`$J=G91 G21 ${axis}${distanceMm} F${feedMmPerMin}`);
+          const cmd = `$J=G91 G21 ${axis}${distanceMm} F${feedMmPerMin}`;
+          sendOperation(cmd);
+          onCommand?.(cmd);
           return { ok: true as const };
         } catch (err: unknown) {
           return { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
@@ -63,9 +65,11 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
       },
       home: async () => ({ ok: true as const }),
       unlockAlarm: async () => ({ ok: true as const }),
-      setWorkOriginAtCurrentPosition: async () => {
+      setWorkOriginAtCurrentPosition: async (args?: { onCommand?: (line: string) => void }) => {
         try {
-          sendOperation('G10 L20 P1 X0 Y0');
+          const cmd = 'G10 L20 P1 X0 Y0';
+          sendOperation(cmd);
+          args?.onCommand?.(cmd);
           return { ok: true as const };
         } catch (err: unknown) {
           return { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
@@ -191,8 +195,8 @@ void (async () => {
     const { ctrl } = makeController({ throwOnSend: true });
     const sim: string[] = [];
     const result = await makeCoordinator(ctrl, sim).setOriginAtCurrentPosition();
-    assertContract(result.ok === false && sim[0] === 'G10 L20 P1 X0 Y0',
-      'ExecutionCoordinator.setOriginAtCurrentPosition returns failure and still records simulator intent');
+    assertContract(result.ok === false && sim.length === 0,
+      'ExecutionCoordinator.setOriginAtCurrentPosition failure does not record an un-emitted simulator command');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

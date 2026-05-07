@@ -136,19 +136,19 @@ export class GrblController implements GrblControllerApi {
   readonly family = 'grbl' as const;
   readonly protocolName = 'GRBL 1.1';
   readonly operations = {
-    jog: async (args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number }): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand(`$J=G91 G21 ${args.axis}${args.distanceMm} F${args.feedMmPerMin}`),
-    home: async (): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand('$H'),
-    unlockAlarm: async (): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand('$X'),
-    setWorkOriginAtCurrentPosition: async (): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand('G10 L20 P1 X0 Y0'),
-    resetWcsToMachineOrigin: async (): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand('G10 L2 P1 X0 Y0 Z0'),
-    testFire: async (args: { powerPercent: number; maxSpindle: number }): Promise<OperationResult> => {
+    jog: async (args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number; onCommand?: (line: string) => void }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand(`$J=G91 G21 ${args.axis}${args.distanceMm} F${args.feedMmPerMin}`, args.onCommand),
+    home: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('$H', args?.onCommand),
+    unlockAlarm: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('$X', args?.onCommand),
+    setWorkOriginAtCurrentPosition: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('G10 L20 P1 X0 Y0', args?.onCommand),
+    resetWcsToMachineOrigin: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
+      this._trySendInternalOperationCommand('G10 L2 P1 X0 Y0 Z0', args?.onCommand),
+    testFire: async (args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }): Promise<OperationResult> => {
       const sVal = Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle));
-      return this._trySendInternalOperationCommand(`M3 S${sVal}`);
+      return this._trySendInternalOperationCommand(`M3 S${sVal}`, args.onCommand);
     },
     frame: async (args: {
       corners: readonly { x: number; y: number }[];
@@ -167,7 +167,7 @@ export class GrblController implements GrblControllerApi {
       });
       for (let i = 0; i < lines.length; i++) {
         const line = lines[i]!;
-        const result = await this._trySendInternalOperationCommand(line);
+        const result = await this._trySendInternalOperationCommand(line, args.onCommand);
         if (!result.ok) {
           return {
             ok: false,
@@ -176,16 +176,18 @@ export class GrblController implements GrblControllerApi {
             blockedAtLine: i,
           };
         }
-        args.onCommand?.(line);
         if ((args.lineDelayMs ?? 0) > 0) {
           await new Promise(r => setTimeout(r, args.lineDelayMs));
         }
       }
       return { ok: true };
     },
-    laserOff: async (): Promise<OperationResult> => {
+    laserOff: async (opts?: { emergency?: boolean; onCommand?: (line: string) => void }): Promise<OperationResult> => {
       const result = await this.safetyOff();
-      if (result.stage === 'm5') return { ok: true, message: 'Laser off confirmed.' };
+      if (result.stage === 'm5') {
+        opts?.onCommand?.('M5 S0');
+        return { ok: true, message: 'Laser off confirmed.' };
+      }
       return {
         ok: false,
         reason: result.stage,
@@ -1059,9 +1061,10 @@ export class GrblController implements GrblControllerApi {
     return { ok: false, reason: err instanceof Error ? err.message : String(err) };
   }
 
-  private _trySendInternalOperationCommand(command: string): OperationResult {
+  private _trySendInternalOperationCommand(command: string, onCommand?: (line: string) => void): OperationResult {
     try {
       this.sendCommand(command, 'internal');
+      onCommand?.(command);
       return { ok: true };
     } catch (err: unknown) {
       return this._operationError(err);

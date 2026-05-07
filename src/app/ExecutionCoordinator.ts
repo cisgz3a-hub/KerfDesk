@@ -65,13 +65,6 @@ export const TEST_FIRE_DEADMAN_MS = 5000;
 export const TEST_FIRE_POWER_PERCENT = 5;
 
 /**
- * Test-fire is a stationary burn. GRBL dynamic mode (M4) may energize fans
- * while suppressing beam output until motion starts, so use constant-power M3
- * for the held focus/test pulse and always pair it with M5 on release/deadman.
- */
-export const TEST_FIRE_LASER_ON_WORD = 'M3';
-
-/**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
  *
  * T2-4 migration: machine authority lives here; UI should call these methods
@@ -105,10 +98,13 @@ export class ExecutionCoordinator {
       return { ok: false, reason: 'operation-busy' };
     }
     try {
-      const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
-      this.notifySimulator(cmd);
       try {
-        const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
+        const result = await ctrl.operations.jog({
+          axis,
+          distanceMm: distance,
+          feedMmPerMin: feedRate,
+          onCommand: line => this.notifySimulator(line),
+        });
         if (!result.ok) return { ok: false, reason: result.reason };
       } catch (err: unknown) {
         return { ok: false, reason: err instanceof Error ? err.message : String(err) };
@@ -166,8 +162,9 @@ export class ExecutionCoordinator {
   async unlock(): Promise<void> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return;
-    this.notifySimulator('$X');
-    const result = await ctrl.operations.unlockAlarm();
+    const result = await ctrl.operations.unlockAlarm({
+      onCommand: line => this.notifySimulator(line),
+    });
     if (!result.ok) throw new Error(result.reason);
   }
 
@@ -175,8 +172,9 @@ export class ExecutionCoordinator {
   async home(): Promise<void> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return;
-    this.notifySimulator('$H');
-    const result = await ctrl.operations.home();
+    const result = await ctrl.operations.home({
+      onCommand: line => this.notifySimulator(line),
+    });
     if (!result.ok) throw new Error(result.reason);
   }
 
@@ -305,12 +303,10 @@ export class ExecutionCoordinator {
     if (!this.deps.machineService.tryAcquireOperation('testFire')) {
       return false;
     }
-    const sVal = Math.max(0, Math.round((TEST_FIRE_POWER_PERCENT / 100) * args.maxSpindle));
-    const cmd = `${TEST_FIRE_LASER_ON_WORD} S${sVal}`;
-    this.notifySimulator(cmd);
     const result = await ctrl.operations.testFire({
       powerPercent: TEST_FIRE_POWER_PERCENT,
       maxSpindle: args.maxSpindle,
+      onCommand: line => this.notifySimulator(line),
     });
     if (!result.ok) {
       console.warn('[TestFire] start blocked:', result.message ?? result.reason);
@@ -366,9 +362,11 @@ export class ExecutionCoordinator {
    */
   async emergencyLaserOff(): Promise<void> {
     const ctrl = this.deps.controllerRef.current;
-    this.notifySimulator('M5 S0');
     if (!ctrl) return;
-    const result = await ctrl.operations.laserOff({ emergency: true });
+    const result = await ctrl.operations.laserOff({
+      emergency: true,
+      onCommand: line => this.notifySimulator(line),
+    });
     const stage = result.ok ? 'm5' : result.reason === 'soft-reset' ? 'soft-reset' : 'failed';
     const message = result.ok ? '' : result.message ?? result.reason;
     this.deps.machineService.notifyLaserSafetyOutcome(stage);
@@ -457,8 +455,9 @@ export class ExecutionCoordinator {
       return { ok: false, reason: 'operation-busy' };
     }
     try {
-      this.notifySimulator('G10 L20 P1 X0 Y0');
-      return ctrl.operations.setWorkOriginAtCurrentPosition();
+      return ctrl.operations.setWorkOriginAtCurrentPosition({
+        onCommand: line => this.notifySimulator(line),
+      });
     } finally {
       this.deps.machineService.releaseOperation('setOrigin');
     }

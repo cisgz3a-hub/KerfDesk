@@ -55,14 +55,14 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-06, branch `codex/t2-6-zustand-foundation`.
+**Snapshot date:** 2026-05-07, branch `codex/t2-6-zustand-foundation`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 102 | 26 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-6 App split remains open. |
+| Tier 2 | 103 | 25 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-26 final simulator-literal close-out shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -7908,6 +7908,8 @@ Migration plan (multi-pass):
 **T2-26 pass 3e:** `MachineService.emergencyStop` migrated from raw `controller.emergencyStop()` to awaited `ctrl.operations.emergencyStop(...)` in `398b5ca`, and the emergency-stop button awaits the typed result before showing the alert/message. Pinned by `tests/machine-service-emergency-stop-safety-result.test.ts`, `tests/machine-service-safety-state-machine.test.ts`, and `tests/connection-panel-emergency-stop-service.test.ts`. **Remaining T2-26 work:** coordinator frame/test-fire/laser-off, electron serial cleanup, and the static no-GRBL-command guard.
 
 **T2-26 pass 4a:** WCS helper commands migrated from `MachineCommandGateway` to controller operations in `d2a81f2`. `sendSetOriginWcsCommand` now awaits `operations.setWorkOriginAtCurrentPosition()`, `sendResetWcsCommand` awaits `operations.resetWcsToMachineOrigin()`, and `App.tsx` fire-and-forgets the async reset on start-mode changes. Pinned by `tests/jog-and-setorigin-state-after-confirm.test.ts`, `tests/origin-mode-wcs-zero.test.ts`, `tests/start-mode-wcs-reset.test.ts`, and `tests/wcs-command-helpers-use-gateway.test.ts`. **Remaining T2-26 work:** future stricter simulator-literal guard.
+
+**Status:** Shipped in `<TBD>`. Final close-out: controller operations now accept an optional `onCommand` observer and report emitted operation lines from inside `GrblController` only after the command send succeeds; `ExecutionCoordinator` no longer constructs simulator-only GRBL literals for jog, unlock, home, test-fire, laser-off, or set-origin; `MachineCommandGateway` no longer exposes stale operation helpers and remains only the user-command approval/sendCommand choke point. The stricter static guard now pins no GRBL operation literals in generic coordinator/gateway code. Pinned by `tests/t2-26-operation-routing-static-guard.test.ts`, `tests/controller-operations-api.test.ts`, `tests/machine-command-gateway.test.ts`, `tests/execution-coordinator*.test.ts`, `tests/jog-and-setorigin-state-after-confirm.test.ts`, and full `npm test`. **Hardware verification: not required** for this close-out (routing/static boundary; emitted controller commands are unchanged on success, and failed/no-controller paths no longer log fake simulator command lines).
 
 ---
 
@@ -19898,7 +19900,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (shipped 2026-05-05 in `185a096`)
 - [x] T2-24 Split LaserController into protocol-neutral core + dialect extensions (focused contract foundation shipped in `72e3f97`; deeper consumer migration continues in T2-25/T2-26/T2-27/T3-45)
 - [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
-- [ ] T2-26 Move GRBL command construction out of generic layers (Pass 1 operations API shipped in `cf29a3e`; Pass 2a ExecutionCoordinator unlock/home/set-origin shipped in `3870d2d`; Pass 2b ExecutionCoordinator/UI jog shipped in `73d63d0`; Pass 2c ExecutionCoordinator emergency laser-off shipped in `a73f06c`; Pass 2d ExecutionCoordinator begin-test-fire shipped in `c5e0d00`; Pass 2e ExecutionCoordinator frame/frame-dot shipped in `d309bdb`; Pass 3a MachineService disconnect laser-off shipped in `4bea2e6`; Pass 3b MachineService jog shipped in `4ff79ea`; Pass 3c MachineService stop shipped in `19a4a4b`; Pass 3d MachineService pause/resume shipped in `c2da2c7`; Pass 3e MachineService emergencyStop shipped in `398b5ca`; Pass 4a WCS helpers shipped in `d2a81f2`; Pass 6a routing guard shipped in `09ea230`; future stricter simulator-literal guard remains)
+- [x] T2-26 Move GRBL command construction out of generic layers (final simulator-literal close-out shipped in `<TBD>`; controller operation observers now own simulator fanout, generic coordinator/gateway code has no operation GRBL literals, stale gateway operation helpers removed)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)

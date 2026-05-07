@@ -60,12 +60,14 @@ void (async () => {
       maxSpindle: null,
       operations: {
         jog: async () => ({ ok: true as const }),
-        home: async () => {
+        home: async (args?: { onCommand?: (line: string) => void }) => {
           sent.push('$H');
+          args?.onCommand?.('$H');
           return { ok: true as const };
         },
-        unlockAlarm: async () => {
+        unlockAlarm: async (args?: { onCommand?: (line: string) => void }) => {
           sent.push('$X');
+          args?.onCommand?.('$X');
           return { ok: true as const };
         },
         setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),

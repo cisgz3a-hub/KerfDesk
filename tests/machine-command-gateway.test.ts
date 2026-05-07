@@ -6,19 +6,11 @@ function assert(condition: unknown, message: string): void {
 
 function createController() {
   const sent: Array<{ command: string; source?: 'internal' | 'user' }> = [];
-  let safetyOffCalls = 0;
   return {
     sent,
-    get safetyOffCalls() {
-      return safetyOffCalls;
-    },
     controller: {
       sendCommand(command: string, source?: 'internal' | 'user') {
         sent.push({ command, source });
-      },
-      async safetyOff() {
-        safetyOffCalls += 1;
-        return { stage: 'm5' as const };
       },
     },
   };
@@ -29,37 +21,35 @@ async function run(): Promise<void> {
     const { controller, sent } = createController();
     const gateway = new MachineCommandGateway(controller);
 
-    gateway.sendInternalCommand('$X');
-    assert(sent.length === 1, 'sendInternalCommand delegates exactly once');
-    assert(sent[0]?.command === '$X', 'sendInternalCommand preserves command');
-    assert(sent[0]?.source === 'internal', 'sendInternalCommand marks source internal');
+    gateway.sendCommand('G0 X1', 'internal');
+    assert(sent.length === 1, 'sendCommand delegates exactly once');
+    assert(sent[0]?.command === 'G0 X1', 'sendCommand preserves command');
+    assert(sent[0]?.source === 'internal', 'sendCommand preserves internal source');
   }
 
   {
     const { controller, sent } = createController();
     const gateway = new MachineCommandGateway(controller);
 
-    gateway.unlock();
-    gateway.home();
-    gateway.setOriginAtCurrentPosition();
-    gateway.resetWcsToMachineOrigin();
-    gateway.jog('X', 5, 1200);
-
-    assert(
-      sent.map(e => e.command).join('|') === '$X|$H|G10 L20 P1 X0 Y0|G10 L2 P1 X0 Y0 Z0|$J=G91 G21 X5 F1200',
-      'operation helpers delegate expected command sequence',
-    );
-    assert(sent.every(e => e.source === 'internal'), 'operation helpers use internal source');
+    gateway.sendCommand('G0 X1', 'user');
+    assert(sent.length === 1, 'safe user command forwards without approval token');
+    assert(sent[0]?.source === 'user', 'safe user command preserves user source');
   }
 
   {
-    const created = createController();
-    const { controller } = created;
+    const { controller, sent } = createController();
     const gateway = new MachineCommandGateway(controller);
-    const result = await gateway.laserOff();
+    let blocked: Error & { code?: string; blockReason?: string } | null = null;
 
-    assert(result.stage === 'm5', 'laserOff delegates to controller safetyOff');
-    assert(created.safetyOffCalls === 1, 'laserOff calls safetyOff once');
+    try {
+      gateway.sendCommand('M3 S100', 'user');
+    } catch (err: unknown) {
+      blocked = err as Error & { code?: string; blockReason?: string };
+    }
+
+    assert(sent.length === 0, 'dangerous user command is not forwarded without approval token');
+    assert(blocked?.code === 'COMMAND_BLOCKED', 'dangerous user command throws COMMAND_BLOCKED');
+    assert(blocked?.blockReason === 'no-token', 'dangerous user command reports missing approval token');
   }
 }
 

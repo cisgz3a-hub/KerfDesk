@@ -43,13 +43,16 @@ void (async () => {
         jog: async () => ({ ok: true as const }),
         home: async () => ({ ok: true as const }),
         unlockAlarm: async () => ({ ok: true as const }),
-        setWorkOriginAtCurrentPosition: async () => {
+        setWorkOriginAtCurrentPosition: async (args?: { onCommand?: (line: string) => void }) => {
           sent.push('G10 L20 P1 X0 Y0');
+          args?.onCommand?.('G10 L20 P1 X0 Y0');
           return { ok: true as const };
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
-        testFire: async (args: { powerPercent: number; maxSpindle: number }) => {
-          sent.push(`M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`);
+        testFire: async (args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }) => {
+          const line = `M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`;
+          sent.push(line);
+          args.onCommand?.(line);
           return { ok: true as const };
         },
         laserOff: async () => ({ ok: true as const }),
@@ -178,8 +181,9 @@ void (async () => {
           return { ok: true as const };
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
-        laserOff: async () => {
+        laserOff: async (args?: { onCommand?: (line: string) => void }) => {
           sent.push('M5 S0');
+          args?.onCommand?.('M5 S0');
           return { ok: true as const };
         },
         pauseJob: async () => ({ ok: true as const }),
@@ -231,7 +235,7 @@ void (async () => {
       notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
     });
     await coord.endTestFire();
-    assert(sim.length === 1 && sim[0] === 'M5 S0', 'no controller → simulator only M5');
+    assert(sim.length === 0, 'no controller → no simulator M5');
   }
 
   {
@@ -357,8 +361,9 @@ void (async () => {
         jog: async () => ({ ok: true as const }),
         home: async () => ({ ok: true as const }),
         unlockAlarm: async () => ({ ok: true as const }),
-        setWorkOriginAtCurrentPosition: async () => {
+        setWorkOriginAtCurrentPosition: async (args?: { onCommand?: (line: string) => void }) => {
           sent.push('G10 L20 P1 X0 Y0');
+          args?.onCommand?.('G10 L20 P1 X0 Y0');
           return { ok: true as const };
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
