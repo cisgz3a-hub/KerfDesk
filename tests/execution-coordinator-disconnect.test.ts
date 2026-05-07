@@ -4,6 +4,7 @@
  */
 import { MachineService } from '../src/app/MachineService';
 import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
+import { type SafetyActionResult } from '../src/app/SafetyActionResult';
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 
@@ -85,10 +86,10 @@ void (async () => {
         args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     await svc.disconnect();
     assert(
       portDisconnectCalls === 1 && sent[0] === 'M5 S0' && sent.length === 1,
@@ -128,10 +129,10 @@ void (async () => {
         args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -146,7 +147,7 @@ void (async () => {
   {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -180,10 +181,10 @@ void (async () => {
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('Not connected') }),
       operations: operations(async () => ({ ok: false as const, reason: 'failed', message: 'Not connected' })),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
@@ -225,10 +226,10 @@ void (async () => {
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('serial fault') }),
       operations: operations(async () => ({ ok: false as const, reason: 'failed', message: 'serial fault' })),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
@@ -250,10 +251,10 @@ void (async () => {
   {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     let disconnectCalls = 0;
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
       disconnectCalls++;
       return inner();
     };
@@ -306,12 +307,12 @@ void (async () => {
         args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
       disconnectCalls++;
       return inner();
     };
@@ -355,12 +356,12 @@ void (async () => {
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('serial fault') }),
       operations: operations(async () => ({ ok: false as const, reason: 'failed', message: 'serial fault' })),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
       disconnectCalls++;
       return inner();
     };
@@ -402,12 +403,12 @@ void (async () => {
         return { stage: 'm5' as const };
       },
       operations: operations(async () => ({ ok: false as const, reason: 'failed', message: 'M5 blocked' })),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
       disconnectCalls++;
       return inner();
     };
@@ -441,13 +442,13 @@ void (async () => {
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'failed' as const, error: new Error('Not connected') }),
       operations: operations(async () => ({ ok: false as const, reason: 'failed', message: 'Not connected' })),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     let disconnectCalls = 0;
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => {
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
       disconnectCalls++;
       return inner();
     };
@@ -494,12 +495,12 @@ void (async () => {
         args?.onCommand?.('M5 S0');
         return { ok: true as const };
       }),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const inner = svc.disconnect.bind(svc);
-    (svc as unknown as { disconnect: () => Promise<void> }).disconnect = async () => inner();
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => inner();
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,

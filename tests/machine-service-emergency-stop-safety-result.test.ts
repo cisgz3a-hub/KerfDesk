@@ -73,7 +73,7 @@ function makeController(args?: {
         return { ok: true };
       },
     },
-  } as LaserController;
+  } as unknown as LaserController;
   return { controller, calls };
 }
 

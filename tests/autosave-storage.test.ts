@@ -108,7 +108,7 @@ async function run(): Promise<void> {
     memoryStore[AUTOSAVE_TIME_KEY] = '2026-01-01T00:00:00.000Z';
 
     const payload = await readAutosave();
-    assert(payload?.json.includes('migrated'), 'legacy localStorage json migrated');
+    assert(payload != null && payload.json.includes('migrated'), 'legacy localStorage json migrated');
     assert(memoryStore[AUTOSAVE_KEY] == null, 'legacy autosave key cleared from localStorage');
     const fromAdapter = await adapter.get(AUTOSAVE_KEY);
     assert(fromAdapter != null && fromAdapter.includes('migrated'), 'adapter holds migrated autosave');

@@ -119,7 +119,7 @@ function makeController(): LaserController {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 type StartArgs = Parameters<MachineService['startValidatedJob']>[0];

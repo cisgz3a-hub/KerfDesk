@@ -9,6 +9,7 @@
 
 import { type SerialPortLike } from '../communication/SerialPort';
 import type { SafetyActionResult } from '../app/SafetyActionResult';
+import type { GcodeStartMode } from '../core/output/GcodeOrigin';
 
 export type MachineStatus =
   | 'disconnected'
@@ -169,7 +170,7 @@ export interface MachineOperationApi {
   testFire(args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }): Promise<OperationResult>;
   frame(args: {
     corners: readonly { x: number; y: number }[];
-    startMode: 'absolute' | 'current';
+    startMode: GcodeStartMode;
     laserMode: 'off' | 'dot';
     maxSpindle: number;
     crosshairAfterFrame?: boolean;

@@ -53,6 +53,7 @@ export function useMaterialHandlers(params: UseMaterialHandlersParams): Material
         : mode === 'engrave' ? settings.engrave
         : mode === 'score' ? settings.score
         : settings.engrave;
+      if (!s) return l;
       return {
         ...l,
         settings: {

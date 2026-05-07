@@ -80,7 +80,7 @@ function makeController(args?: {
         return { ok: true };
       },
     },
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 function makeService(controller = makeController()): MachineService {

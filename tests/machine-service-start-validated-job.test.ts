@@ -8,6 +8,8 @@ import { GrblController } from '../src/controllers/grbl/GrblController';
 import { MockSerialPort, type SerialPortLike } from '../src/communication/SerialPort';
 import {
   type JobProgress,
+  type ControllerOutput,
+  type ControllerJobTicket,
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
@@ -128,7 +130,7 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (output, jobTicket) => {
+    executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
       if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
       await sendJobImpl([...output.lines]);
       return { id: jobTicket.ticketId, startedAt: 123 };
@@ -145,7 +147,7 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 async function run(): Promise<void> {
@@ -206,7 +208,7 @@ async function run(): Promise<void> {
       ...makeMockController(async () => {
         throw new Error('legacy sendJob should not be called');
       }),
-      executeJob: async (output, jobTicket) => {
+      executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
         executeCalls.push({
           outputKind: output.kind,
           dialect: output.kind === 'gcode-lines' ? output.dialect : undefined,
@@ -215,7 +217,7 @@ async function run(): Promise<void> {
         });
         return { id: jobTicket.ticketId, startedAt: 123 };
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock } as { current: LaserController };
     const portRef = { current: null } as { current: SerialPortLike | null };
     const svc = new MachineService(controllerRef, portRef);
@@ -300,7 +302,7 @@ async function run(): Promise<void> {
     await ctrl.connect(port);
     await flush(30);
 
-    const controllerRef = { current: ctrl as LaserController };
+    const controllerRef = { current: ctrl as unknown as LaserController };
     const portRef = { current: port as SerialPortLike };
     const svc = new MachineService(controllerRef, portRef);
 

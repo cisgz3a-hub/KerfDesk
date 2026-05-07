@@ -58,7 +58,7 @@ export function useAppGeneratorWorkflows({
   } = useGeneratorHandlers({
     scene,
     selectedIds,
-    setSelectedIds,
+    setSelectedIds: ids => setSelectedIds(new Set(ids)),
     handleSceneCommit,
     setShowGridArray,
     setShowTemplates,

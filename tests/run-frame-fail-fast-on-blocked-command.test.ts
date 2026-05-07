@@ -51,7 +51,7 @@ function makeController(throwOnIndex: number | null = null): MockController {
     requestStatusReport() {
       /* no-op */
     },
-    operations: {} as LaserController['operations'],
+    operations: {} as unknown as LaserController['operations'],
   };
   ctrl.operations = {
     jog: async () => ({ ok: true }),
@@ -94,7 +94,7 @@ function makeController(throwOnIndex: number | null = null): MockController {
 
 function makeCoordinator(ctrl: MockController | null): ExecutionCoordinator {
   return new ExecutionCoordinator({
-    controllerRef: { current: ctrl as unknown as LaserController | null },
+    controllerRef: { current: ctrl as unknown as unknown as LaserController | null },
     // T2-11: runFrame now acquires/releases the operation mutex. Provide
     // a permissive stub so existing frame-flow tests aren't blocked by
     // a missing mutex; tryAcquireOperation always returns true, releaseOperation no-ops.

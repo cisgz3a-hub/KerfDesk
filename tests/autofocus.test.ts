@@ -104,7 +104,7 @@ async function testMachineServiceAutoFocus(): Promise<void> {
     runAutoFocus: async (command: string, timeoutMs: number = 15000) => {
       calls.push({ command, timeoutMs });
     },
-  } as LaserController;
+  } as unknown as LaserController;
 
   const controllerRef = { current: controller } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };

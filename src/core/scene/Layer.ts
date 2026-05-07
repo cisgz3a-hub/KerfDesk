@@ -41,7 +41,12 @@ export type DitherMode =
   | 'jarvis'
   | 'stucki'
   | 'ordered'
-  | 'atkinson';
+  | 'atkinson'
+  | 'burkes'
+  | 'sierra3'
+  | 'sierra2'
+  | 'sierra-lite'
+  | 'random';
 
 export type CutOrder = 'layer-priority' | 'object-order' | 'optimized';
 

@@ -131,7 +131,9 @@ async function run(): Promise<void> {
   const ctrl = new GrblController();
   const result = await ctrl.operations.home();
   assert(!result.ok, 'operation failure is returned instead of thrown');
-  assert(result.reason.toLowerCase().includes('not connected'), 'operation failure carries reason');
+  if (!result.ok) {
+    assert(result.reason.toLowerCase().includes('not connected'), 'operation failure carries reason');
+  }
   }
 
   const iface = readFileSync('src/controllers/ControllerInterface.ts', 'utf8');

@@ -7,6 +7,8 @@ import { MachineService } from '../src/app/MachineService';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 import {
   type JobProgress,
+  type ControllerOutput,
+  type ControllerJobTicket,
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
@@ -115,7 +117,7 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (output, jobTicket) => {
+    executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
       if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
       await sendJob([...output.lines]);
       return { id: jobTicket.ticketId, startedAt: 123 };
@@ -132,7 +134,7 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 async function waitForContext(svc: MachineService): Promise<void> {

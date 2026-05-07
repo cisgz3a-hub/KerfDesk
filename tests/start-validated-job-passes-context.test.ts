@@ -5,7 +5,7 @@
 import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { MachineService } from '../src/app/MachineService';
 import { type SerialPortLike } from '../src/communication/SerialPort';
-import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
+import { type ControllerOutput, type ControllerJobTicket, type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
@@ -77,7 +77,7 @@ void (async () => {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
+    executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
     sendJob: async () => {},
     pause: () => {},
     resume: () => {},
@@ -90,7 +90,7 @@ void (async () => {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
   const controllerRef = { current: mock } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };
   const svc = new MachineService(controllerRef, portRef);

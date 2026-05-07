@@ -27,7 +27,8 @@
  *
  * Run: npx tsx tests/machine-service-user-sendcommand.test.ts
  */
-import { MachineService, type ApprovalToken } from '../src/app/MachineService';
+import { MachineService } from '../src/app/MachineService';
+import { type ApprovalToken } from '../src/app/MachineCommandGateway';
 import { classifyUserCommand } from '../src/controllers/grbl/CommandClassifier';
 import { type LaserController } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
@@ -66,7 +67,7 @@ const mockController: LaserController = {
   resume: () => {},
   stop: () => {},
   emergencyStop: () => {},
-  sendCommand: (cmd, source) => {
+  sendCommand: (cmd: string, source?: "internal" | "user") => {
     sent.push({ cmd, source: source ?? 'internal' });
   },
   requestStatusReport: () => {},
@@ -75,7 +76,7 @@ const mockController: LaserController = {
   onError: () => () => {},
   onRawLine: () => () => {},
   safetyOff: async () => ({ stage: 'm5' as const }),
-} as LaserController;
+} as unknown as LaserController;
 
 const controllerRef = { current: mockController } as { current: LaserController };
 const portRef = { current: null } as { current: SerialPortLike | null };

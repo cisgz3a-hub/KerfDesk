@@ -20,10 +20,10 @@ if (typeof (globalThis as any).requestAnimationFrame !== 'function') {
     setTimeout(() => cb(0), 0) as unknown as number;
 }
 if (typeof (win.HTMLElement.prototype as { attachEvent?: unknown }).attachEvent !== 'function') {
-  (win.HTMLElement.prototype as { attachEvent: () => void }).attachEvent = () => {};
+  (win.HTMLElement.prototype as unknown as { attachEvent: () => void }).attachEvent = () => {};
 }
 if (typeof (win.HTMLElement.prototype as { detachEvent?: unknown }).detachEvent !== 'function') {
-  (win.HTMLElement.prototype as { detachEvent: () => void }).detachEvent = () => {};
+  (win.HTMLElement.prototype as unknown as { detachEvent: () => void }).detachEvent = () => {};
 }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;

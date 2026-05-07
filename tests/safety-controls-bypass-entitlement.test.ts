@@ -22,6 +22,7 @@
  */
 import type { MutableRefObject } from 'react';
 import { MachineService } from '../src/app/MachineService';
+import { type SafetyAction, type SafetyActionResult } from '../src/app/SafetyActionResult';
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 import { EntitlementService } from '../src/entitlements/EntitlementService';
@@ -53,6 +54,20 @@ const idle: MachineState = {
   feedRate: 0, spindleSpeed: 0, alarmCode: null, errorCode: null,
 };
 
+function acceptedSafety(action: SafetyAction): SafetyActionResult {
+  return {
+    action,
+    accepted: true,
+    motionState: 'unknown',
+    laserState: 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: false,
+    requiresInspection: false,
+    timestamp: Date.now(),
+  };
+}
+
 interface MockCounters {
   pause: number;
   resume: number;
@@ -74,10 +89,10 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
     disconnect: async () => { calls.disconnect++; },
     sendCommand: () => {},
     sendJob: async () => {},
-    pause: () => { calls.pause++; },
-    resume: () => { calls.resume++; },
-    stop: () => { calls.stop++; },
-    emergencyStop: () => { calls.emergency++; },
+    pause: () => { calls.pause++; return acceptedSafety('pause'); },
+    resume: () => { calls.resume++; return acceptedSafety('resume'); },
+    stop: () => { calls.stop++; return acceptedSafety('abortJob'); },
+    emergencyStop: () => { calls.emergency++; return acceptedSafety('emergencyStop'); },
     requestStatusReport: () => {},
     onStateChange: () => () => {},
     onProgress: () => () => {},
@@ -93,6 +108,8 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       unlockAlarm: async () => ({ ok: true }),
       setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
       resetWcsToMachineOrigin: async () => ({ ok: true }),
+      testFire: async () => ({ ok: true }),
+      frame: async () => ({ ok: true }),
       laserOff: async () => ({ ok: true }),
       pauseJob: async () => {
         calls.pause++;
@@ -109,7 +126,7 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       emergencyStop: async () => ({ ok: true }),
     },
   };
-  return { ctrl: ctrl as LaserController, calls };
+  return { ctrl: ctrl as unknown as LaserController, calls };
 }
 
 function makeService(ctrl: LaserController): MachineService {

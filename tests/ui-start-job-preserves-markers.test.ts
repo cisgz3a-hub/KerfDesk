@@ -79,10 +79,10 @@ async function run(): Promise<void> {
   await flush(30);
   await flush(30);
 
-  const nonEmptyEvents: { ids: string[]; reason?: string }[] = [];
-  ctrl.onObjectLifecycle?.((activeObjectIds, reason) => {
+  const nonEmptyEvents: { ids: string[] }[] = [];
+  ctrl.onObjectLifecycle?.((activeObjectIds: readonly string[]) => {
     if (activeObjectIds.length > 0) {
-      nonEmptyEvents.push({ ids: [...activeObjectIds], reason });
+      nonEmptyEvents.push({ ids: [...activeObjectIds] });
     }
   });
 

@@ -251,7 +251,7 @@ const fwd11 = { ...minimalBase, version: '1.1' };
 const loaded11 = deserializeScene(JSON.stringify(fwd11));
 assert(loaded11.id === 'fwd-scene', 'Envelope 1.1: scene loads');
 
-const noEnvVer = JSON.parse(JSON.stringify(minimalBase)) as typeof minimalBase;
+const noEnvVer = JSON.parse(JSON.stringify(minimalBase)) as Partial<typeof minimalBase>;
 delete noEnvVer.version;
 const loadedNo = deserializeScene(JSON.stringify(noEnvVer));
 assert(loadedNo.id === 'fwd-scene', 'Missing envelope version: treated as major 1');

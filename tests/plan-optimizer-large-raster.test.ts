@@ -59,6 +59,7 @@ test('optimizePlan handles large raster without stack overflow', () => {
         width,
         height,
         dpi: 254,
+        sourceObjectId: 'large-raster-object',
         mode: '1bit',
         data,
         physicalWidth: 120,

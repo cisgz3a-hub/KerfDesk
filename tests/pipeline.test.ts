@@ -101,9 +101,11 @@ assert(cutOp.settings.insideFirst === true, 'Inside-first is enabled');
 
 assert(cutOp.geometry.type === 'vector', 'Cut geometry is vector type');
 if (cutOp.geometry.type === 'vector') {
-  const rectPath = cutOps.find(o => o.geometry.paths.some(p => p.coords.length === 8))?.geometry;
-  assert(rectPath && rectPath.type === 'vector', 'Rectangle cut path present');
-  if (rectPath.type === 'vector') {
+  const rectPath = cutOps.find(
+    o => o.geometry.type === 'vector' && o.geometry.paths.some(p => p.coords.length === 8),
+  )?.geometry;
+  assert(rectPath?.type === 'vector', 'Rectangle cut path present');
+  if (rectPath?.type === 'vector') {
     const rp = rectPath.paths.find(p => p.coords.length === 8)!;
     assert(rp.closed === true, 'Rectangle path is closed');
     assert(rp.coords[0] === 50, 'First point X = 50 (transform applied)');
@@ -355,8 +357,9 @@ if (firstBurn.type === 'linear') {
 // Bidirectional: first burn after each row's rapid should alternate X direction
 const rowFirstBurnDirs: number[] = [];
 for (let i = 0; i < fillMoves.length; i++) {
-  if (fillMoves[i].type !== 'rapid') continue;
-  const rx = fillMoves[i].to.x;
+  const move = fillMoves[i];
+  if (move.type !== 'rapid') continue;
+  const rx = move.to.x;
   for (let j = i + 1; j < fillMoves.length; j++) {
     const n = fillMoves[j];
     if (n.type === 'rapid') break;

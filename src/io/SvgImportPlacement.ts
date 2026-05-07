@@ -47,6 +47,7 @@ const DEFAULT_OPTIONS: Required<ImportOptions> = {
   padding: 0.1,
   preserveAspect: true,
   allowScaleUp: false,
+  svgUnitMode: 'laser',
 };
 
 // ─── COMPUTE IMPORT TRANSFORM ────────────────────────────────────

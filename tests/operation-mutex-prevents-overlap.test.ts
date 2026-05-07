@@ -94,7 +94,7 @@ function makeController(overrides?: Partial<LaserController>): LaserController {
       emergencyStop: async () => ({ ok: true }),
     },
     ...overrides,
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 function makeService(ctrl: LaserController): MachineService {

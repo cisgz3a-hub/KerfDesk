@@ -76,7 +76,7 @@ function makeController(args?: {
       stopJob: async () => ({ ok: true }),
       emergencyStop: async () => ({ ok: true }),
     },
-  } as LaserController;
+  } as unknown as LaserController;
   return { controller, calls };
 }
 

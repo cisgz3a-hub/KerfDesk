@@ -80,10 +80,10 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const notifyRef = { current: (line: string) => { sim.push(line); } };
     const coord = new ExecutionCoordinator({
@@ -109,7 +109,7 @@ void (async () => {
   {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -153,10 +153,10 @@ void (async () => {
       onError: () => () => {},
       onRawLine: () => () => {},
       safetyOff: async () => ({ stage: 'm5' as const }),
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
@@ -210,10 +210,10 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -227,7 +227,7 @@ void (async () => {
   {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -272,10 +272,10 @@ void (async () => {
         stopJob: async () => ({ ok: true as const }),
         emergencyStop: async () => ({ ok: true as const }),
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
@@ -328,10 +328,10 @@ void (async () => {
         stopJob: async () => ({ ok: true as const }),
         emergencyStop: async () => ({ ok: true as const }),
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const coord = new ExecutionCoordinator({
       machineService: svc,
       controllerRef,
@@ -392,10 +392,10 @@ void (async () => {
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-    } as LaserController;
+    } as unknown as LaserController;
     const controllerRef = { current: mock };
     const portRef = { current: null } as { current: SerialPortLike | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,
@@ -414,7 +414,7 @@ void (async () => {
   {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
-    const svc = new MachineService(controllerRef, portRef);
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     const sim: string[] = [];
     const coord = new ExecutionCoordinator({
       machineService: svc,

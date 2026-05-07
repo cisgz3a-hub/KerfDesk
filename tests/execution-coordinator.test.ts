@@ -51,7 +51,17 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
     operations: {
-      jog: async ({ axis, distanceMm, feedMmPerMin, onCommand }) => {
+      jog: async ({
+        axis,
+        distanceMm,
+        feedMmPerMin,
+        onCommand,
+      }: {
+        axis: 'X' | 'Y' | 'Z';
+        distanceMm: number;
+        feedMmPerMin: number;
+        onCommand?: (line: string) => void;
+      }) => {
         jogSpy(axis as 'X' | 'Y', distanceMm, feedMmPerMin);
         onCommand?.(`$J=G91 G21 ${axis}${distanceMm} F${feedMmPerMin}`);
         return { ok: true };
@@ -66,7 +76,7 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
       stopJob: async () => ({ ok: true }),
       emergencyStop: async () => ({ ok: true }),
     },
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 void (async () => {

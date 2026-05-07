@@ -66,7 +66,9 @@ const ditherCanvasByKey = new Map<string, HTMLCanvasElement>();
 
 function shrinkMap<K, V>(m: Map<K, V>): void {
   while (m.size > RENDER_CACHE_CAP) {
-    m.delete(m.keys().next().value);
+    const oldestKey = m.keys().next().value;
+    if (oldestKey === undefined) break;
+    m.delete(oldestKey);
   }
 }
 

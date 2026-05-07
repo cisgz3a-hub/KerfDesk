@@ -4,6 +4,7 @@
  * Run: npx tsx tests/frame-dot-finally-emits-m5.test.ts
  */
 import { ExecutionCoordinator, type FrameResult } from '../src/app/ExecutionCoordinator';
+import { type SafetyAction, type SafetyActionResult } from '../src/app/SafetyActionResult';
 import type { LaserController, MachineState } from '../src/controllers/ControllerInterface';
 import { buildGrblFrameGcode } from '../src/controllers/grbl/GrblFrameGcode';
 
@@ -18,6 +19,20 @@ function assertContract(condition: boolean, message: string): void {
     failed++;
     console.error(`  ✗ ${message}`);
   }
+}
+
+function acceptedSafety(action: SafetyAction): SafetyActionResult {
+  return {
+    action,
+    accepted: true,
+    motionState: 'unknown',
+    laserState: 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: false,
+    requiresInspection: false,
+    timestamp: Date.now(),
+  };
 }
 
 interface MockController {
@@ -49,10 +64,10 @@ function makeController(opts: {
     async connect() { /* no-op */ },
     async disconnect() { /* no-op */ },
     async sendJob() { /* no-op */ },
-    pause() { /* no-op */ },
-    resume() { /* no-op */ },
-    stop() { /* no-op */ },
-    emergencyStop() { /* no-op */ },
+    pause() { return acceptedSafety('pause'); },
+    resume() { return acceptedSafety('resume'); },
+    stop() { return acceptedSafety('abortJob'); },
+    emergencyStop() { return acceptedSafety('emergencyStop'); },
     operations: {
       jog: async () => ({ ok: true as const }),
       home: async () => ({ ok: true as const }),
@@ -108,7 +123,7 @@ function makeController(opts: {
   } satisfies Partial<LaserController>;
 
   return {
-    ctrl: ctrl as unknown as LaserController,
+    ctrl: ctrl as unknown as unknown as LaserController,
     sentCommands,
     get safetyOffCalls() {
       return safetyOffCalls;

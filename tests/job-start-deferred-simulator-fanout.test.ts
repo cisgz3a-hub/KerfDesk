@@ -19,7 +19,7 @@
  */
 import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { MachineService } from '../src/app/MachineService';
-import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
+import { type ControllerOutput, type ControllerJobTicket, type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 import { createScene } from '../src/core/scene/Scene';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
@@ -54,7 +54,7 @@ function makeMockController(onSendJob: (lines: string[]) => Promise<void>): Lase
     connect: async () => {},
     disconnect: async () => {},
     sendCommand: async () => {},
-    executeJob: async (output, jobTicket) => {
+    executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
       if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
       await onSendJob([...output.lines]);
       return { id: jobTicket.ticketId, startedAt: 123 };
@@ -76,7 +76,7 @@ function makeMockController(onSendJob: (lines: string[]) => Promise<void>): Lase
     requestStatusReport: () => {},
     laserOnAt: () => {},
     laserOff: () => {},
-  } as unknown as LaserController;
+  } as unknown as unknown as LaserController;
 }
 
 const idle: MachineState = {

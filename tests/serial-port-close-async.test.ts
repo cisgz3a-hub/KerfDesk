@@ -35,7 +35,7 @@ async function run(): Promise<void> {
 // ── 1. Interface contract: close() returns a Promise (compile-time check
 //      via the SerialPortLike type; runtime check via .then) ──
 {
-  const p: SerialPortLike = new MockSerialPort();
+  const p = new MockSerialPort();
   p.open();
   const result = p.close();
   assert(result instanceof Promise,

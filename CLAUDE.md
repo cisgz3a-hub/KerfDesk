@@ -92,7 +92,7 @@ Use `<TBD>` as the hash placeholder while editing; substitute the real hash afte
 
 ## Hard rules that cost real time when violated
 
-**TS baseline: 43 errors.** Every commit must verify `npx tsc --noEmit 2>&1 | Select-String "error TS" | Measure-Object -Line` returns 43. Above 43 = regression introduced by your change; fix before commit. Below 43 = note in commit message (someone fixed something incidentally; don't accept silently — confirm it's intentional).
+**TS baseline: 0 errors.** Every commit must verify `npx tsc --noEmit --pretty false` returns 0 TypeScript errors. Any TypeScript error is a regression introduced by your change; fix before commit.
 
 **Verify external claims against actual code before patching.** When ChatGPT, Cursor, an audit doc, or a previous session asserts a line number, symbol name, or behavior, grep/read the live tree first. The single most expensive defect of the prior session arc was T1-97 — a fix shipped against ChatGPT's diagnosis of `commitSceneTransaction` that was wrong on the line it claimed; the real bug was a 15s hardcoded frame timeout (T1-98). Three rules from that incident:
 

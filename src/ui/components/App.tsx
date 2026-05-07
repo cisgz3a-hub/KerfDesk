@@ -115,7 +115,7 @@ function filterValidIds(ids: ReadonlySet<string>, scene: Scene): Set<string> {
   return valid;
 }
 
-export function App() {
+export function App(): React.ReactElement {
   const {
     modal,
     showAlert,

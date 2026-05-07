@@ -50,7 +50,6 @@ function makeJobAndPlan(moveCount: number): { job: Job; plan: Plan } {
       to: { x: i + 1, y: 0 },
       power: 50,
       speed: 1000,
-      sourceObjectIds: ['obj-1'],
     });
   }
 

@@ -36,7 +36,9 @@ function outlineCacheSet(key: string, paths: SubPath[]): void {
   textOutlineCache.delete(key);
   textOutlineCache.set(key, cloneSubPaths(paths));
   while (textOutlineCache.size > TEXT_OUTLINE_CACHE_MAX) {
-    textOutlineCache.delete(textOutlineCache.keys().next().value);
+    const oldestKey = textOutlineCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    textOutlineCache.delete(oldestKey);
   }
 }
 

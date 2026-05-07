@@ -89,7 +89,7 @@ function makeMockController(sent: string[], throwOnSend = false): LaserControlle
         sent.push('M5 S0');
         return { stage: 'm5' as const };
       },
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 function makeCoord(

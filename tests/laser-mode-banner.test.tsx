@@ -68,7 +68,7 @@ function makeStub(opts: {
       if (opts.throwSend) throw new Error('simulated send failure');
       sends.push({ cmd, source });
     },
-  } as LaserController;
+  } as unknown as LaserController;
   return { ctrl, sends };
 }
 
@@ -278,7 +278,7 @@ async function main(): Promise<void> {
       isJobRunning: false,
       maxSpindle: null,
       sendCommand: (): void => {},
-    } as LaserController;
+    } as unknown as LaserController;
     await renderBanner({
       controller: ctrl,
       isOperational: true,

@@ -53,7 +53,7 @@ function makeMockPort(): { port: SerialPortLike; events: SentEvent[]; flush: () 
     onClose() {
       /* no-op */
     },
-    close() {
+    async close() {
       open = false;
     },
   };

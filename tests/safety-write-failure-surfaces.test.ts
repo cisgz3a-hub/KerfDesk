@@ -19,6 +19,8 @@
  */
 import { MachineService } from '../src/app/MachineService';
 import {
+  type ControllerOutput,
+  type ControllerJobTicket,
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
@@ -58,7 +60,7 @@ function makeController(): LaserController {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
+    executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
     sendJob: async () => {},
     pause: () => {},
     resume: () => {},
@@ -71,7 +73,7 @@ function makeController(): LaserController {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 function makeService(): MachineService {

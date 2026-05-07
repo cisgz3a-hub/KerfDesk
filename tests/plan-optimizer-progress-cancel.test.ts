@@ -15,7 +15,7 @@ function settings(): ResolvedLaserSettings {
     zStepPerPass: 0,
     fillInterval: 0,
     fillAngle: 0,
-    fillMode: 'none',
+    fillMode: 'line',
     fillBiDirectional: false,
     overscanning: 0,
     overcut: 0,
@@ -82,4 +82,3 @@ assert.throws(
   },
 );
 assert.equal(threwAbort, true);
-

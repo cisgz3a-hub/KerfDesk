@@ -8,7 +8,7 @@ import { type CompileGcodeResult } from '../src/app/PipelineService';
 import { MachineService } from '../src/app/MachineService';
 import { compileGcode } from '../src/app/PipelineService';
 import { type SerialPortLike } from '../src/communication/SerialPort';
-import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
+import { type ControllerOutput, type ControllerJobTicket, type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import {
   createBlankProfile,
   getActiveProfile,
@@ -57,7 +57,7 @@ function makeCtrl(sendJob: (lines: string[]) => Promise<void> = async () => {}):
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (output, jobTicket) => {
+    executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
       if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
       await sendJob([...output.lines]);
       return { id: jobTicket.ticketId, startedAt: 123 };
@@ -74,7 +74,7 @@ function makeCtrl(sendJob: (lines: string[]) => Promise<void> = async () => {}):
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 const memoryStore: Record<string, string> = {};

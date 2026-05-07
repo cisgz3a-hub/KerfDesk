@@ -51,8 +51,8 @@ function makeRasterScene(): ReturnType<typeof createScene> {
   const scene = createScene(400, 300, 'M4Raster');
   const rasterLayer = createLayer(0, 'image', 'Raster');
   rasterLayer.settings.speed = 6000;
-  rasterLayer.settings.powerMin = 20;
-  rasterLayer.settings.powerMax = 80;
+  rasterLayer.settings.power.min = 20;
+  rasterLayer.settings.power.max = 80;
   rasterLayer.settings.accelAwarePower = true;
   scene.layers = [rasterLayer];
   scene.activeLayerId = rasterLayer.id;
@@ -156,4 +156,3 @@ void (async () => {
   console.error(e);
   process.exit(1);
 });
-

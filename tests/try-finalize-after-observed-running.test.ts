@@ -8,6 +8,8 @@ import { MachineService } from '../src/app/MachineService';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 import {
   type JobProgress,
+  type ControllerOutput,
+  type ControllerJobTicket,
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
@@ -115,7 +117,7 @@ void (async () => {
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},
-    executeJob: async (_output, jobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
+    executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),
     sendJob: async () => {},
     pause: () => {},
     resume: () => {},
@@ -128,7 +130,7 @@ void (async () => {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
   const controllerRef = { current: mock } as { current: LaserController };
   const portRef = { current: null } as { current: SerialPortLike | null };
   const svc = new MachineService(controllerRef, portRef);

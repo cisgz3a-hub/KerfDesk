@@ -122,7 +122,7 @@ function makeController(): LaserController {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
-  } as LaserController;
+  } as unknown as LaserController;
 }
 
 function PanelHarness(props: {

@@ -74,7 +74,7 @@ const mockController: LaserController = {
     stopJob: async () => ({ ok: true }),
     emergencyStop: async () => ({ ok: true }),
   },
-} as LaserController;
+} as unknown as LaserController;
 
 const controllerRef = { current: mockController } as { current: LaserController };
 const portRef = { current: null } as { current: SerialPortLike | null };

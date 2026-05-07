@@ -77,7 +77,7 @@ function makeController(opts?: {
         if (i >= 0) rawSubs.splice(i, 1);
       };
     },
-  } as LaserController;
+  } as unknown as LaserController;
 
   return { ctrl, sends, emit };
 }

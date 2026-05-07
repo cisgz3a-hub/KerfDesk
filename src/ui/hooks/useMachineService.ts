@@ -1,14 +1,13 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
-import { type MockSerialPort } from '../../communication/SerialPort';
-import { type WebSerialPort } from '../../communication/WebSerialPort';
+import { type SerialPortLike } from '../../communication/SerialPort';
 import { MachineService, type BurnState } from '../../app/MachineService';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 
 interface UseMachineServiceArgs {
   controllerRef: MutableRefObject<LaserController | null>;
-  portRef: MutableRefObject<WebSerialPort | MockSerialPort | null>;
+  portRef: MutableRefObject<SerialPortLike | null>;
   /**
    * T2-56: signals when the controller has been created and assigned
    * to `controllerRef.current`. The auto-finalize listener attaches
@@ -23,7 +22,7 @@ interface UseMachineServiceArgs {
 export function useMachineService(args: UseMachineServiceArgs) {
   const { controllerRef, portRef, controllerReady } = args;
   const service = useMemo(
-    () => new MachineService(controllerRef, portRef),
+    () => new MachineService(controllerRef as MutableRefObject<LaserController>, portRef),
     [controllerRef, portRef],
   );
 

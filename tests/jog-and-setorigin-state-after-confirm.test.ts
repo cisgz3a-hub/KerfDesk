@@ -7,7 +7,8 @@
 import { MachineService } from '../src/app/MachineService';
 import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import { sendSetOriginWcsCommand } from '../src/app/sendSetOriginWcsCommand';
-import type { LaserController, MachineState } from '../src/controllers/ControllerInterface';
+import { type SafetyAction, type SafetyActionResult } from '../src/app/SafetyActionResult';
+import type { ControllerOutput, ControllerJobTicket, LaserController, MachineState } from '../src/controllers/ControllerInterface';
 import type { SerialPortLike } from '../src/communication/SerialPort';
 
 let passed = 0;
@@ -32,6 +33,20 @@ const idleState: MachineState = {
   errorCode: null,
 };
 
+function acceptedSafety(action: SafetyAction): SafetyActionResult {
+  return {
+    action,
+    accepted: true,
+    motionState: 'unknown',
+    laserState: 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: false,
+    requiresInspection: false,
+    timestamp: Date.now(),
+  };
+}
+
 function makeController(opts: { throwOnSend?: boolean } = {}): {
   ctrl: LaserController;
   operationSent: string[];
@@ -48,6 +63,7 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
     operationSent.push(cmd);
   };
   const ctrl = {
+    family: 'grbl' as const,
     protocolName: 'mock',
     state: idleState,
     isJobRunning: false,
@@ -76,6 +92,8 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
         }
       },
       resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+      testFire: async () => ({ ok: true as const }),
+      frame: async () => ({ ok: true as const }),
       laserOff: async () => ({ ok: true as const }),
       pauseJob: async () => ({ ok: true as const }),
       resumeJob: async () => ({ ok: true as const }),
@@ -84,11 +102,12 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
     },
     connect: async () => {},
     disconnect: async () => {},
+    executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 0 }),
     sendJob: async () => {},
-    pause: () => {},
-    resume: () => {},
-    stop: () => {},
-    emergencyStop: () => {},
+    pause: () => acceptedSafety('pause'),
+    resume: () => acceptedSafety('resume'),
+    stop: () => acceptedSafety('abortJob'),
+    emergencyStop: () => acceptedSafety('emergencyStop'),
     sendCommand: send,
     requestStatusReport: () => {},
     onStateChange: () => () => {},
