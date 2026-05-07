@@ -34,8 +34,8 @@ const idle: MachineState = {
 function makeController(args?: {
   disconnect?: () => Promise<void>;
   sendCommand?: (cmd: string) => void;
-}): { controller: LaserController; calls: { disconnect: number; commands: string[] } } {
-  const calls = { disconnect: 0, commands: [] as string[] };
+}): { controller: LaserController; calls: { disconnect: number; commands: string[]; laserOff: number } } {
+  const calls = { disconnect: 0, commands: [] as string[], laserOff: 0 };
   const controller = {
     protocolName: 'mock',
     state: { ...idle },
@@ -61,6 +61,21 @@ function makeController(args?: {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => {
+        calls.laserOff++;
+        return { ok: true };
+      },
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => ({ ok: true }),
+      emergencyStop: async () => ({ ok: true }),
+    },
   } as LaserController;
   return { controller, calls };
 }
@@ -75,7 +90,8 @@ void (async () => {
 
     const result: SafetyActionResult = await svc.disconnect();
 
-    assert(calls.commands[0] === 'M5 S0', 'disconnect sends M5 S0 before controller disconnect');
+    assert(calls.laserOff === 1, 'disconnect uses controller operations.laserOff before controller disconnect');
+    assert(calls.commands.length === 0, 'disconnect does not construct a raw M5 command in MachineService');
     assert(calls.disconnect === 1, 'disconnect calls controller.disconnect once');
     assert(portRef.current === null, 'disconnect clears portRef');
     assert(result.action === 'disconnectSafe', 'result action=disconnectSafe');

@@ -1095,7 +1095,7 @@ export class MachineService {
     try {
       if (ctrl) {
         try {
-          new MachineCommandGateway(ctrl).sendInternalCommand('M5 S0');
+          await ctrl.operations.laserOff();
         } catch {
           /* not connected, buffer full, or port already gone */
         }
@@ -1120,7 +1120,7 @@ export class MachineService {
       // Set Origin before any saved-origin job.
       this._savedOriginG54Snapshot = null;
       // T1-29: user-initiated disconnect is a clean shutdown path.
-      // Service ran M5 S0 + controller disconnect above; the job, if
+      // Service ran controller laser-off + controller disconnect above; the job, if
       // any was active, is being intentionally stopped. Clear the
       // flag so the next launch doesn't surface the recovery dialog.
       // Disconnect-while-job-runs IS the user explicitly halting the
