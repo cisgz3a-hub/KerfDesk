@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 107 | 21 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-41 controller-interface migration now completes the SafetyActionResult ticket; T2-6 App split remains open. |
+| Tier 2 | 108 | 20 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-47 GRBL simulator foundation shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -9306,6 +9306,8 @@ Existing `MockSerialPort` stays for legacy tests; new tests use `GrblSimulator` 
 **Priority:** Tier 2 鈥?test infrastructure. Foundation for proving GRBL behavior under realistic firmware state conditions. Required before T2-49 (virtual-time tests) becomes valuable.
 
 **Cross-check note (audit 3E):** Audit's Critical 1 + Findings 8.1-8.3 + P0 simulator architecture. Refines T2-13 (which provides the transport-side fault injection); T2-47 adds the firmware-side state model.
+
+**Status:** Shipped in `<TBD>` (focused simulator foundation). New `tests/simulators/GrblSimulator.ts` exports `GrblSimulator`, `GrblFirmwareSnapshot`, modal/state types, and `SimulatedGrblSerialPort`. The simulator owns firmware state (`idle/run/hold/alarm/...`), modal state (`G20/G21`, `G90/G91`, `M3/M4/M5`, `S`, `F`, WCS, G92 offset), RX-buffer accounting with overflow reporting, a planner queue advanced by `tick(ms)`, position trust, and realtime byte effects for status query/feed-hold/cycle-start/soft-reset. Soft reset clears planner state, restores safe modal defaults, marks position untrusted, and enters alarm; alarm lock refuses motion and `$H` until `$X` unlock. The serial adapter implements `SerialPortLike` so real `GrblController` streaming can run against the simulator. Pinned by `tests/simulators/grbl-simulator.test.ts` (37 contracts, including 200-line `GrblController` stream with zero RX overflow). **Out of scope (T2-47-followup):** migrating legacy `MockSerialPort` tests, fuller hard/soft-limit modeling, door/sleep variants, and virtual-time scheduler integration. **Hardware verification: not required** (test simulator only).
 
 ---
 
@@ -19930,7 +19932,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - T2-44 follow-up: MachineService safety-state wiring shipped in `1b2fd8e`; recovery UI consumption remains open.
 - [x] T2-45 `JobExecutionSession` with safety methods on the session handle (Shipped — interface + JobProgress + JobCompletionResult + status predicates + builders; MachineService wiring deferred as T2-45-followup; refines T2-27)
 - [x] T2-46 User-facing safety outcome messages + Activity Log (Shipped — formatSafetyOutcome formatter + ActivityLogRow + isPersistentSeverity + isIncidentWorthy; UI-surface wiring deferred as T2-46-followup; depends on T2-41)
-- [ ] T2-47 Realistic GRBL firmware simulator 鈥?planner queue, RX buffer, modal state, alarm lock (filed; refines T2-13)
+- [x] T2-47 Realistic GRBL firmware simulator - planner queue, RX buffer, modal state, alarm lock (Shipped - `GrblSimulator` firmware-state foundation + `SimulatedGrblSerialPort`; legacy mock migration deferred)
 - [ ] T2-48 Multi-controller simulator framework 鈥?`SimulatedControllerDevice` interface (filed; refines T3-43)
 - [x] T2-49 Virtual time / deterministic scheduler for tests (Shipped — `tests/helpers/VirtualScheduler.ts` + RealScheduler with shared SchedulerLike interface; per-test migration deferred as T2-49-followup; refines T2-22)
 - [x] T2-50 Scenario-driven failure injection API — typed `injectFault({type,...})` (Shipped — `tests/helpers/ControllerFault.ts` 13-variant union + FaultQueue dispatcher + chaos-RNG; T2-47 GrblSimulator integration deferred as T2-50-followup; refines T2-13)
