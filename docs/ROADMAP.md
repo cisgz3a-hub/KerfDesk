@@ -15757,7 +15757,7 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 ### T3-7 | Backward-compat fixture corpus
 
-**Status:** Shipped in `<TBD>`. Added a checked-in project fixture corpus under `tests/fixtures/projects/` covering a current v1 cut project, a legacy-minimal score project, and a best-effort v1.1 multi-layer vector project. `tests/backward-compat-project-fixtures.test.ts` parses every fixture, validates the LaserForge v1 envelope, deserializes through `deserializeScene`, compiles, optimizes, and emits GRBL G-code with a laser-off command. This gives save/load/compiler migrations a pinned backward-compat safety net instead of relying on hand-opened sample files. `PROJECT_MAP.md` regenerated to include the fixtures and the new test. Hardware verification: not required (project file load/compile fixture coverage only).
+**Status:** Shipped in `021277d`. Added a checked-in project fixture corpus under `tests/fixtures/projects/` covering a current v1 cut project, a legacy-minimal score project, and a best-effort v1.1 multi-layer vector project. `tests/backward-compat-project-fixtures.test.ts` parses every fixture, validates the LaserForge v1 envelope, deserializes through `deserializeScene`, compiles, optimizes, and emits GRBL G-code with a laser-off command. This gives save/load/compiler migrations a pinned backward-compat safety net instead of relying on hand-opened sample files. `PROJECT_MAP.md` regenerated to include the fixtures and the new test. Hardware verification: not required (project file load/compile fixture coverage only).
 
 **Problem:** No pinned real-world project fixtures. Version N refactor that breaks loading of Version N-1 files has no safety net.
 
