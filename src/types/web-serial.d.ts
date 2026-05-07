@@ -8,10 +8,7 @@ declare global {
     saveGcode?: (defaultName: string, content: string) => Promise<boolean>;
     openFile?: () => Promise<{ fileName: string; content: string; ext: string } | null>;
     isElectron?: boolean;
-    listPorts?: () => Promise<{ path: string; manufacturer?: string }[]>;
-    connectPort?: (portPath: string, baudRate: number) => Promise<boolean>;
-    disconnectPort?: () => Promise<void>;
-    // T1-27: sendGcode declaration removed with the preload export and IPC handler.
+    // T2-35: native Electron serial bridge declarations removed.
     quit?: () => Promise<void>;
     storageGet?: (key: string) => Promise<string | null>;
     storageSet?: (key: string, value: string) => Promise<void>;

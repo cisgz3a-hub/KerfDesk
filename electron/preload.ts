@@ -8,13 +8,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openFile: () =>
     ipcRenderer.invoke('dialog:open'),
   isElectron: true,
-  listPorts: () => ipcRenderer.invoke('serial:list') as Promise<{ path: string; manufacturer?: string }[]>,
-  connectPort: (portPath: string, baudRate: number) =>
-    ipcRenderer.invoke('serial:connect', portPath, baudRate) as Promise<boolean>,
-  disconnectPort: () => ipcRenderer.invoke('serial:disconnect') as Promise<void>,
-  // T1-27: sendGcode IPC export removed. It routed raw renderer gcode
-  // through serial:send, bypassing MachineService / ExecutionCoordinator /
-  // GrblController. No application code called it at removal time.
+  // T2-35: native Electron serial IPC exports removed. Web Serial remains the
+  // controller path; no renderer-exposed serial:* bridge exists here.
   quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
   storageGet: (key: string) => ipcRenderer.invoke('storage:get', key) as Promise<string | null>,
   storageSet: (key: string, value: string) =>

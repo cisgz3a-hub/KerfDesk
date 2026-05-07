@@ -1,7 +1,6 @@
 import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
-import { listSerialPorts, openSerial, closeSerial, safeCloseSerial } from './serial';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
 import { storageGet, storageSet, storageRemove, storageList } from './storage';
 
@@ -246,9 +245,7 @@ app.on('before-quit', (e) => {
     jobWakeLockId = null;
   }
   shutdownFalconWiFi();
-  safeCloseSerial()
-    .catch(err => console.error('[before-quit] safe close failed:', err))
-    .finally(() => app.quit());
+  app.quit();
 });
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────
@@ -383,22 +380,10 @@ ipcMain.handle('power:releaseJobWakeLock', () => {
   jobWakeLockId = null;
 });
 
-// ─── SERIAL / GRBL ───────────────────────────────────────────────
-
-ipcMain.handle('serial:list', async () => listSerialPorts());
-
-ipcMain.handle('serial:connect', async (_event, portPath: string, baudRate: number) => {
-  if (portPath === 'SIMULATOR') return false;
-  return openSerial(portPath, baudRate);
-});
-
-ipcMain.handle('serial:disconnect', async () => {
-  await closeSerial();
-});
-
-// T1-27: serial:send IPC handler removed. It wrote raw renderer-provided
-// lines via writeSerialLine, bypassing MachineService / ExecutionCoordinator /
-// GrblController and all semantic safety gates.
+// T2-35: Electron native serial IPC removed. The renderer uses Web Serial via
+// MachineService/GrblController; keeping a parallel serialport bridge exposed
+// unused connect/list/disconnect channels and confused the controller boundary.
+// T1-27's serial:send bypass removal is subsumed here: no serial:* IPC remains.
 
 ipcMain.handle('app:quit', () => {
   app.quit();
