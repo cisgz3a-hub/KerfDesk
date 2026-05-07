@@ -6,6 +6,7 @@ export {
   tierDisplayName,
   type ActivateResult,
 } from './EntitlementService';
+export * from './ServerEntitlementService';
 
 import type { ProFeature } from './types';
 import { entitlementService } from './EntitlementService';

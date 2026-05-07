@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 114 | 14 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-88 dirty-state call-site migration shipped; T2-6 App split remains open. |
+| Tier 2 | 115 | 13 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-89 entitlement server contract shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -12509,6 +12509,8 @@ The Gumroad direct-verify path stays as a fallback for offline-grace scenarios w
 
 **Cross-check note (audit 5A):** Audit's Critical 2 + Priority 2.
 
+**Status:** Shipped in `<TBD>` (focused MVP - stack-agnostic server entitlement contract + pure activation/refresh issuance helpers; deployed server adapter and client token-preference wiring deferred). New `src/entitlements/ServerEntitlementService.ts` exports endpoint constants for `/entitlement/activate`, `/entitlement/refresh`, and `/entitlement/public-key`; request/response shapes; `GumroadLicenseVerifier` server-side dependency; `EntitlementBusinessRules` policy hook for manual revocation, seat/device limits, and plan flags; `ServerEntitlementSigner` private-key boundary; `activateServerEntitlement(...)`; `refreshServerEntitlement(...)`; and `normalizeLicenseCode(...)`. The helper normalizes license codes before verification, rejects blank codes before any Gumroad call, treats refunded/chargebacked/disputed Gumroad records as `revoked` without signing, applies LaserForge business-rule decisions before token issuance, signs T2-90-compatible `EntitlementTokenPayload` values with explicit features, server timestamps, jti, expiry, and optional `deviceId`, and refreshes existing verified payloads by rotating jti/expiry while preserving subject/features/device. Pinned by `tests/server-entitlement-service.test.ts` (29 contracts: endpoint paths, normalization, blank rejection, signed activation payload, revoked Gumroad no-sign path, business-rule denial, refresh rotation, and source-level pins that Gumroad verification and signing are explicit injected dependencies). **Out of scope (T2-89-followup):** actual Cloudflare/Vercel/Lambda adapter, secret storage, real Gumroad HTTP client on the server, public-key publication/CI key check, EntitlementService "prefer token if present" cache path, and eventual retirement of the client direct-Gumroad fallback. **Hardware verification: not required** (commercial entitlement logic only; no machine/controller behavior).
+
 ---
 
 ### T2-90 | Signed local entitlement token with public-key verification
@@ -19989,7 +19991,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (type + helpers shipped 2026-05-05 in `b4769f0`; ConnectionPanelMain migration filed as T2-86-followup)
 - [x] T2-87 Explicit `RecoveryState` state machine (Shipped — 6-status union + per-step ack transitions + severity-ordered triggers + recoveryAllowsStart gate; canStart wiring deferred as T2-87-followup; composes T2-62/66/67)
 - [x] T2-88 Hash-derived dirty state - replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; call-site migration shipped in `0166216`).
-- [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
+- [x] T2-89 Server-side entitlement service with signed token issuance (focused MVP shipped; stack-agnostic contract + activation/refresh issuance helpers; deployed server/client token-preference wiring deferred)
 - [x] T2-90 Signed local entitlement token with public-key verification (Shipped — typed shape + base64url codec + format validators + verifier interface + replay/expiry/clock-skew/device-binding checks + InMemoryJtiStore; WebCrypto wiring deferred as T2-90-followup; depends on T2-89)
 - [x] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (Shipped — `src/entitlements/FeatureMatrix.ts` + source-scanning enforcement test; foundation, pairs with T1-78)
 - [x] T2-92 Per-feature granular `canUse` — replace single `hasPro` boolean (Shipped — `EntitlementService.canUse` consumes its argument; new `EntitlementState.features?` field; legacy back-compat preserved; pairs with T2-89/T2-91)
