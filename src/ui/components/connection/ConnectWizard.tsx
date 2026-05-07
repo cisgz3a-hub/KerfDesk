@@ -5,6 +5,7 @@ interface ConnectWizardProps {
   webSerialSupported: boolean;
   onConnectUsb: () => void;
   onConnectSimulator: () => void;
+  onCancelConnect?: () => void;
   /**
    * T1-50 Part A: when true, both buttons are disabled and labeled
    * "Connecting…" so a rapid double-click cannot start a second
@@ -20,6 +21,7 @@ export function ConnectWizard({
   webSerialSupported,
   onConnectUsb,
   onConnectSimulator,
+  onCancelConnect,
   connecting = false,
 }: ConnectWizardProps) {
   return React.createElement('div', {
@@ -42,6 +44,15 @@ export function ConnectWizard({
         opacity: connecting ? 0.5 : 1,
       },
     }, connecting ? 'Connecting…' : '🔌 Connect via USB'),
+    connecting && onCancelConnect && React.createElement('button', {
+      type: 'button',
+      onClick: onCancelConnect,
+      style: {
+        width: '100%', maxWidth: 280, padding: '10px', fontSize: 12, fontWeight: 600,
+        borderRadius: 10, cursor: 'pointer', fontFamily: font,
+        background: 'rgba(255,68,102,0.08)', border: '1px solid rgba(255,68,102,0.8)', color: '#ff6685',
+      },
+    }, 'Cancel connect'),
     !webSerialSupported && React.createElement('div', {
       style: {
         width: '100%', maxWidth: 280, padding: '10px 12px',

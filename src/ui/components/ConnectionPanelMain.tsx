@@ -335,9 +335,10 @@ export function ConnectionPanelMain({
   // `requestAndOpen` / `controller.connect`. The first wins; the
   // second's port stays opened and unowned. Mutex disables the
   // button while a connect is in flight; UI shows "Connecting…".
-  // (Part B — abortable connect via AbortSignal through MachineService
-  // — remains the future safety-path work.)
+  // Part B wires a real USB cancel button to MachineService/WebSerialPort's
+  // AbortSignal-aware cleanup path while a connect is in flight.
   const [connecting, setConnecting] = useState(false);
+  const connectAbortRef = useRef<AbortController | null>(null);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -798,18 +799,33 @@ export function ConnectionPanelMain({
     }
     // T1-50 Part A: see comment on the `connecting` state above.
     if (connecting) return;
+    const connectAbortController = new AbortController();
+    connectAbortRef.current = connectAbortController;
     setConnecting(true);
     try {
       appendMessage('Port opened, waiting for GRBL welcome...');
-      await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200);
+      await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200, connectAbortController.signal);
       setSimulator(false);
       appendMessage('✓ Real laser connected via USB');
     } catch (e: any) {
-      appendMessage(`Connection failed: ${e.message}`);
+      if (connectAbortController.signal.aborted) {
+        appendMessage('Connection cancelled by user');
+      } else {
+        appendMessage(`Connection failed: ${e.message}`);
+      }
     } finally {
+      if (connectAbortRef.current === connectAbortController) {
+        connectAbortRef.current = null;
+      }
       setConnecting(false);
     }
   };
+
+  const cancelConnect = useCallback(() => {
+    const connectAbortController = connectAbortRef.current;
+    if (!connectAbortController || connectAbortController.signal.aborted) return;
+    connectAbortController.abort(new Error('Connection cancelled by user'));
+  }, []);
 
   const handleDisconnect = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -1671,6 +1687,7 @@ export function ConnectionPanelMain({
     webSerialSupported: WebSerialPort.isSupported(),
     onConnectUsb: () => { void connectRealLaser(); },
     onConnectSimulator: () => { void connectSimulator(); },
+    onCancelConnect: connectAbortRef.current ? cancelConnect : undefined,
     connecting,
   });
 
