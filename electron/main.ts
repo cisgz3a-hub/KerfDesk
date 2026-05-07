@@ -9,6 +9,11 @@ import {
   namespacedStorageList,
 } from './storage';
 import { STORAGE_NAMESPACES, isStorageKeyAllowed, type StorageNamespace } from './storageNamespaces';
+import {
+  beginStartupCrashLoopTracking,
+  markStartupSuccessful,
+  recordStartupCrash,
+} from './startupCrashLoop';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -220,6 +225,19 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
+  // T2-102 Layer 1: after the renderer has loaded and stayed alive for a
+  // short stable window, clear the failed-launch marker. Until this fires,
+  // the next boot treats this launch as failed and can enter safe mode.
+  const startupWindow = mainWindow;
+  startupWindow.webContents.once('did-finish-load', () => {
+    const timer = setTimeout(() => {
+      if (mainWindow === startupWindow) {
+        markStartupSuccessful(app.getPath('userData'));
+      }
+    }, 10_000);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -227,7 +245,36 @@ function createWindow() {
 
 registerFalconWiFiIpc(() => mainWindow);
 
-app.whenReady().then(createWindow);
+function recordMainProcessCrash(reason: string): void {
+  try {
+    recordStartupCrash(app.getPath('userData'), reason);
+  } catch (err) {
+    console.warn('[startup] failed to record startup crash', err);
+  }
+}
+
+process.on('uncaughtExceptionMonitor', (err) => {
+  recordMainProcessCrash(err.stack || err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  recordMainProcessCrash(String(reason));
+});
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  recordMainProcessCrash(`renderer gone: ${details.reason} (${details.exitCode})`);
+});
+
+app.whenReady().then(() => {
+  const startupStatus = beginStartupCrashLoopTracking(app.getPath('userData'));
+  if (startupStatus.shouldEnterSafeMode) {
+    console.warn(
+      `[startup] T2-102: ${startupStatus.consecutiveFailures} failed launches; `
+      + 'safe-mode / rollback UI should be offered.',
+    );
+  }
+  createWindow();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();

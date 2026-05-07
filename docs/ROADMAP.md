@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 121 | 7 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-120/T2-128 storage namespace boundary shipped; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 122 | 6 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-102 failed-launch detection layer shipped with full updater rollback deferred; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -13476,6 +13476,8 @@ The test gate: every release with a user-data migration must include a roll-forw
 
 **Cross-check note (audit 5B):** Audit's Critical 7 + Priority 6.
 
+**Status:** Shipped in TBD (focused MVP — Layer 1 failed-launch detection; previous-version installer retention and rollback UI deferred until T2-101 auto-update/signing exists). New `electron/startupCrashLoop.ts` persists `startup-crash-loop.json` in userData with `bootInProgress`, consecutive failure count, last start/success/failure timestamps, and last failure reason. `beginStartupCrashLoopTracking()` marks a boot in progress and recovers a prior in-progress boot as a failed launch; `markStartupSuccessful()` clears the failure count after the renderer survives the stable window; `recordStartupCrash()` records main-process / renderer crash reasons. `electron/main.ts` calls the tracker on `app.whenReady`, marks success 10 seconds after `did-finish-load`, records `uncaughtExceptionMonitor`, `unhandledRejection`, and `render-process-gone`, and warns when three failed launches mean safe-mode / rollback UI should be offered. Pinned by `tests/rollback-crash-loop-detection.test.ts` (16 contracts: boot marker file written, three failed launches triggers safe mode on the next boot, successful boot clears count, explicit crash reason persists, main.ts wiring exists). **Out of scope:** previous-installer retention, invoking rollback installers, user-data rollback round trips, and visible recovery UI. **Hardware verification: not required** (startup bookkeeping only; no controller commands or emitted G-code changed).
+
 ---
 
 ### T2-103 | Release artifact integrity 鈥?SHA256 + SBOM + signed checksum + release provenance
@@ -20016,7 +20018,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
 - [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
 - [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
-- [ ] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
+- [x] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (Shipped — Layer 1 failed-launch detector in Electron main; previous-installer retention and rollback UI deferred until T2-101/signing)
 - [x] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (Shipped — checksum-format helpers + generator script; SBOM tooling + GPG signing wiring deferred as T2-103-followup; depends on T2-98)
 - [x] T2-104 Versioned user-data migration framework (Shipped — DataDomain (10) + DomainMigrationStep + Registry (chain validation) + migrateUserData runner + 2 typed errors; per-loader adoption deferred as T2-104-followup)
 - [x] T2-105 Startup diagnostics + safe mode + crash-loop recovery (Shipped — pure crash-loop detector with reconcileOnBoot for "host died silently"; Electron `electron/main.ts` wiring deferred as T2-105-followup; pairs with T2-102)
