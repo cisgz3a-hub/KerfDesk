@@ -6,7 +6,7 @@ import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
-import { type LayerMode, type FillMode } from '../../core/scene/Layer';
+import { sortLayersByProcessingOrder, type LayerMode, type FillMode } from '../../core/scene/Layer';
 import { type PathGeometry, type TextGeometry } from '../../core/scene/SceneObject';
 import { textGeometryToPath } from '../../geometry/TextToPath';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
@@ -46,10 +46,12 @@ import { jobModePlanSummary } from './connection/jobModePlanSummary';
 import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
 import type { StartReadiness, StartReadinessGate } from './connection/StartReadinessPanel';
+import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
 import { Workflow } from './connection/Workflow';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
+import { analyzeOperationOrder, type OperationKind, type OperationRow } from '../../app/OperationOrder';
 import { RecoveryCard } from '../recovery/RecoveryCard';
 import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
@@ -86,6 +88,43 @@ function formatJobTime(seconds: number): string {
   const m = Math.floor(s / 60);
   const r = s % 60;
   return `${m}:${r.toString().padStart(2, '0')}`;
+}
+
+function readyStartModeLabel(mode: GcodeStartMode): string {
+  switch (mode) {
+    case 'absolute': return 'Bed coordinates';
+    case 'current': return 'From laser head';
+    case 'savedOrigin': return 'From saved origin';
+  }
+}
+
+function layerModeToOperationKind(mode: LayerMode): OperationKind {
+  return mode === 'image' ? 'image' : mode;
+}
+
+function buildReadyOperationRows(scene: Scene): OperationRow[] {
+  const visibleObjectCounts = new Map<string, number>();
+  for (const object of scene.objects) {
+    if (!object.visible) continue;
+    visibleObjectCounts.set(object.layerId, (visibleObjectCounts.get(object.layerId) ?? 0) + 1);
+  }
+
+  const layers = sortLayersByProcessingOrder(
+    scene.layers.filter(layer => layer.visible && layer.output !== false),
+  );
+  const rows: OperationRow[] = [];
+  for (const layer of layers) {
+    if ((visibleObjectCounts.get(layer.id) ?? 0) === 0) continue;
+    rows.push({
+      index: rows.length + 1,
+      layerName: layer.name || `Layer ${layer.id.slice(0, 4)}`,
+      kind: layerModeToOperationKind(layer.settings.mode),
+      powerPercent: Math.round(layer.settings.power.max),
+      feedRateMmPerMin: Math.round(layer.settings.speed),
+      passes: Math.max(1, Math.round(layer.settings.passes)),
+    });
+  }
+  return rows;
 }
 
 function playCompletionBeep(): void {
@@ -1657,6 +1696,56 @@ export function ConnectionPanelMain({
             ? 'Fix issues below first'
             : 'Prepare job';
   const estimatedTimeFormatted = gcode ? estimateJobTime(gcode).formatted : null;
+  const readyOperationRows = useMemo(() => buildReadyOperationRows(scene), [scene]);
+  const readyOperationAnalysis = useMemo(
+    () => analyzeOperationOrder(readyOperationRows),
+    [readyOperationRows],
+  );
+  const readyWarnings: ReadyToRunWarning[] = startReadiness.gates
+    .filter(gate => gate.status === 'fail')
+    .map(gate => ({
+      id: gate.id,
+      severity: 'blocker' as const,
+      text: gate.failHeadline ?? `${gate.label} is not ready`,
+      action: gate.failAction,
+    }));
+  const readyBounds = lastGcodeCompileResult?.machinePlanBounds ?? machinePlanBounds ?? frameMachineBounds;
+  const readyToRunData: ReadyToRunPanelData = {
+    machine: {
+      connectionLabel: isSimulator ? 'Connected (Sim)' : 'Connected',
+      profileLabel: activeProfile?.name ?? scene.machine?.name ?? 'No profile selected',
+      statusLabel: machineState?.status ?? 'unknown',
+      bedLabel: `${fmtMm(bedWidth)} x ${fmtMm(bedHeight)} mm bed`,
+      positionLabel: machinePosition
+        ? `X${fmtMm(machinePosition.x)} Y${fmtMm(machinePosition.y)}`
+        : 'Position unknown',
+    },
+    job: {
+      summaryLabel: `${readyOperationRows.length} operation${readyOperationRows.length === 1 ? '' : 's'}`,
+      boundsLabel: `X${fmtMm(readyBounds.minX)} Y${fmtMm(readyBounds.minY)} to X${fmtMm(readyBounds.maxX)} Y${fmtMm(readyBounds.maxY)}`,
+      estimatedTimeLabel: estimatedTimeFormatted,
+      operationAnalysis: readyOperationAnalysis,
+    },
+    material: {
+      label: scene.material?.name ?? 'No material selected',
+      sizeLabel: scene.material
+        ? `${fmtMm(scene.material.width)} x ${fmtMm(scene.material.height)} x ${fmtMm(scene.material.thickness)} mm`
+        : 'Not set',
+      reminders: [
+        { id: 'focus', label: 'Focus checked' },
+        { id: 'hold-down', label: 'Material held flat' },
+        { id: 'ventilation', label: 'Ventilation and air assist checked' },
+      ],
+    },
+    position: {
+      startModeLabel: readyStartModeLabel(startMode),
+      originLabel: startPositionStatus,
+      frameStatusLabel: hasFramed.current ? 'Frame complete' : 'Frame required before Start',
+    },
+    warnings: readyWarnings,
+    canStartJob,
+    startBlockedReason: startReadiness.blockingGate?.failHeadline ?? null,
+  };
 
   const workflowSection = isConnected && React.createElement(React.Fragment, null,
     React.createElement(Workflow, {
@@ -2445,6 +2534,13 @@ export function ConnectionPanelMain({
     ),
   );
 
+  const readyToRunSection = isConnected && !isRunning && !displayPaused && gcode && !gcodeStale &&
+    React.createElement(ReadyToRunPanel, {
+      data: readyToRunData,
+      startLabel: `START${isSimulator ? ' (Sim)' : ''}`,
+      onStartJob: () => { void handleStartJob(); },
+    });
+
   const simulatorView = showSimulator && isSimulator && isConnected && React.createElement('div', {
     style: { height: 250, borderTop: '1px solid #1a1a2e', flexShrink: 0, minHeight: 160 },
   },
@@ -2504,6 +2600,7 @@ export function ConnectionPanelMain({
         },
       },
         profileSection,
+        readyToRunSection,
         React.createElement(MoveControls, {
           isConnected,
           isRunning,

@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 109 | 19 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-48 simulator device framework shipped; T2-6 App split remains open. |
+| Tier 2 | 110 | 18 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-58 Ready-to-Run panel shipped; T2-6 App split remains open. |
 
 ### Historical audit classification
 
@@ -10177,6 +10177,8 @@ The material checkboxes are user-acknowledged reminders, not enforced state. The
 
 **Cross-check note (audit 4B):** Audit's Critical UX failure 1 + Priority 1. The Sherrington of UX work in Phase 4B.
 
+**Status:** Shipped in <TBD> (focused MVP - `ReadyToRunPanel` component + live connected-sidebar integration). New `src/ui/components/connection/ReadyToRunPanel.tsx` consolidates Machine, Job, Material, Position, Operation order, Warnings, and Start into one final pre-flight surface once a connected machine has fresh compiled G-code. `ConnectionPanelMain` builds panel data from the active profile, machine status/position, bed size, machine-plan bounds, estimated G-code time, material dimensions, existing start-readiness gates, and T2-63 `analyzeOperationOrder(...)` rows derived from output layers. Material reminder checkboxes are local acknowledgements only and do not block Start; the panel Start button mirrors the canonical `canStartJob` gate and shows the first blocking reason when disabled. Pinned by `tests/ready-to-run-panel.test.tsx` (renders all top-level sections, disables Start with reason, reminder checkbox state persists across rerenders without blocking Start, and operation order renders in analysis order with a cut-before-engrave warning). Verified with `npx tsx tests/ready-to-run-panel.test.tsx`, `npm run build`, and `npm run electron:compile`. Repo-wide `npx tsc --noEmit --pretty false` still reports the pre-existing TypeScript baseline; the only hit touching `ConnectionPanelMain.tsx` is the known pre-existing `ApprovalToken` export mismatch. **Out of scope:** replacing/collapsing the older scattered Workflow / Issues / footer Start surfaces after user testing; richer frame-age timing and warning acknowledgements remain follow-up UX. **Hardware verification: not required** (display/integration only; Start still uses existing gates and start handler).
+
 ---
 
 ### T2-59 | Material-first settings workflow with preset confidence labels
@@ -19945,13 +19947,13 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-55 Transactional `resetProjectRuntimeState()` (Shipped — typed trigger union + 9-step canonical-ordered orchestrator + profile-switch predicate; App.tsx callsite migration deferred as T2-55-followup; depends on T2-51)
 - [x] T2-56 Move job log finalization out of mounted UI into MachineService subscription (auto-finalize hook shipped 2026-05-05 in `bb2f5d0`; ConnectionPanel useEffect kept idempotent for back-compat)
 - [x] T2-57 Typed error state per domain — compile/connection/job/machine (Shipped — DomainErrorState reducer + per-domain typed errors + 4 selector gates; per-site migration deferred as T2-57-followup)
-- [ ] T2-58 Ready-to-Run unified pre-flight panel (filed; biggest UX win, depends on T2-51 + T2-53)
+- [x] T2-58 Ready-to-Run unified pre-flight panel (Shipped - ReadyToRunPanel component + connected-sidebar integration; older scattered surfaces left in place for transitional safety)
 - [ ] T2-59 Material-first settings workflow with preset confidence labels (filed; large UX, ~3-5 sessions)
 - [x] T2-60 Frame freshness invalidation 鈥?any relevant change resets `hasFramed` (shipped 2026-05-05 in `5f27d34`)
 - [ ] T2-61 Move design-editing controls (text spacing, etc.) out of connection panel (filed; UX coherence)
 - [x] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop / job-fail (Shipped — content layer per variant + GRBL alarm-code mapper + buildRecoveryCard router; React component deferred as T2-62-followup; refines T2-46)
 - T2-62 follow-up: React RecoveryCard + emergency-stop safety-state UI surface shipped in `8a37618`; alarm-state recovery-card routing + Unlock/Home/Frame action wiring shipped in `8f74144`; unexpected-disconnect recovery-card routing shipped in `87048f6`; frame-failed recovery-card routing shipped in `95bf63d`; job-failed recovery-card routing + Stop/Compile action wiring shipped in `a332cc8`.
-- [x] T2-63 Operation order preview with order warning (Shipped — analysis layer + cut-before-engrave detector + per-row formatter + ack predicate; UI integration deferred as T2-63-followup; depends on T2-58)
+- [x] T2-63 Operation order preview with order warning (Shipped — analysis layer + cut-before-engrave detector + per-row formatter + ack predicate; ReadyToRunPanel display shipped with T2-58; acknowledgement/reorder controls deferred as T2-63-followup)
 - [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
 - [x] T2-65 Central error reporter — `reportError({domain, severity, recovery, developerDetails})` (Shipped — ErrorReporter class + singleton + reportError + errorFromCatch + history; per-site migration deferred as T2-65-followup; refines T2-57)
 - [x] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (Shipped — type + transition + canStart predicate; MachineState wiring deferred as T2-66-followup; refines T2-44)
