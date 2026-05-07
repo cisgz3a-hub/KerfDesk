@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 119 | 9 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 120 | 8 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-120 typed storage IPC shipped with T2-128 per-namespace backend authorization still open; T2-121/T2-122 closed as subsumed by native serial IPC removal; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -14904,6 +14904,8 @@ The renderer-side `Storage` adapter abstraction stays 鈥?it now wraps the typed
 
 **Cross-check note (audit 5D):** Audit's Critical 12 + Priority 4.
 
+**Status:** Shipped in TBD (focused MVP — renderer-facing Electron storage IPC no longer exposes broad `storageGet` / `storageSet` / `storageRemove` / `storageList`; it exposes a typed `storage` namespace object instead). New `src/core/storage/StorageNamespaces.ts` routes known LaserForge keys into explicit namespaces (`deviceProfiles`, `materials`, `autosave`, `jobLogs`, `replays`, `entitlements`, `diagnostics`, `settings`). `FilesystemStorageAdapter` keeps the renderer `StorageAdapter` contract but routes every get/set/remove/list call through the matching namespace and preserves `list(prefix)` filtering. `electron/preload.ts` exposes namespaced storage scopes, while `electron/main.ts` registers namespaced storage handlers and rejects keys that do not belong to the requested namespace via `electron/storageNamespaces.ts`. Pinned by `tests/typed-storage-ipc.test.ts` (25 contracts: key routing, unknown-key rejection, adapter namespace calls, prefix-list filtering, broad preload exports removed, broad main handlers removed, typed namespace handlers registered, allow-list validation present) and updated `tests/storage-ipc-no-broad-clear.test.ts` (17 contracts; T1-84 bulk-clear guarantee plus T2-120 no-broad-storage guard shape). **Out of scope (T2-128):** deeper backend authorization inside `electron/storage.ts`, license-write service migration, and per-domain schema validation beyond namespace/key allow-lists. **Hardware verification: not required** (IPC/storage boundary only; no controller commands or emitted G-code changed).
+
 ---
 
 ### T2-121 | Main-process serial command classification enforcement
@@ -20030,7 +20032,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-117 Correlation IDs across systems (Shipped — type + generator + snapshot helpers in `src/diagnostics/CorrelationIds.ts`; subsystem propagation deferred as T2-117-followup)
 - [x] T2-118 Troubleshooting panel — `Help → Diagnostics` (Shipped — content layer with 5 typed sections + 5 common-issue guides + buildDiagnosticsPanel composer; React panel deferred as T2-118-followup)
 - [x] T2-119 IPC sender verification — `assertTrustedSender` in every handler (Shipped — typed environment + evaluator + assert helper + UntrustedSenderError + checkHandlerCoverage; per-handler adoption deferred as T2-119-followup; pairs with T1-89)
-- [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
+- [x] T2-120 Replace generic storage IPC with typed namespaced APIs (Shipped — renderer-facing Electron storage now uses typed namespace scopes; generic storageGet/storageSet/storageRemove/storageList IPC removed; deeper backend authorization remains T2-128)
 - [x] T2-121 Main-process serial command classification enforcement (closed; vulnerable `serial:send` IPC removed by T1-27/T2-35, no main-process generic serial command path remains)
 - [x] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (closed; generic Electron `sendGcode` bridge removed by T1-27/T2-35, typed replacement would be unused surface)
 - [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers in `e137aea`; parser/converter wiring in `236ee5c`; pairs with T1-92)

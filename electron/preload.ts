@@ -1,5 +1,15 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
+function storageScope(channelPrefix: string) {
+  return {
+    get: (key: string) => ipcRenderer.invoke(`${channelPrefix}:get`, key) as Promise<string | null>,
+    set: (key: string, value: string) =>
+      ipcRenderer.invoke(`${channelPrefix}:set`, key, value) as Promise<void>,
+    remove: (key: string) => ipcRenderer.invoke(`${channelPrefix}:remove`, key) as Promise<void>,
+    list: () => ipcRenderer.invoke(`${channelPrefix}:list`) as Promise<string[]>,
+  };
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
   saveFile: (defaultName: string, content: string) =>
     ipcRenderer.invoke('dialog:save', defaultName, content),
@@ -11,11 +21,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // T2-35: native Electron serial IPC exports removed. Web Serial remains the
   // controller path; no renderer-exposed serial:* bridge exists here.
   quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
-  storageGet: (key: string) => ipcRenderer.invoke('storage:get', key) as Promise<string | null>,
-  storageSet: (key: string, value: string) =>
-    ipcRenderer.invoke('storage:set', key, value) as Promise<void>,
-  storageRemove: (key: string) => ipcRenderer.invoke('storage:remove', key) as Promise<void>,
-  storageList: (prefix?: string) => ipcRenderer.invoke('storage:list', prefix) as Promise<string[]>,
+  storage: {
+    deviceProfiles: storageScope('storage:deviceProfiles'),
+    materials: storageScope('storage:materials'),
+    autosave: storageScope('storage:autosave'),
+    jobLogs: storageScope('storage:jobLogs'),
+    replays: storageScope('storage:replays'),
+    entitlements: storageScope('storage:entitlements'),
+    diagnostics: storageScope('storage:diagnostics'),
+    settings: storageScope('storage:settings'),
+  },
   // T1-84: storageClear removed. See electron/main.ts for the explanation.
   acquireJobWakeLock: () =>
     ipcRenderer.invoke('power:acquireJobWakeLock') as Promise<number>,

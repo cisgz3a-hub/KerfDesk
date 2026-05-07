@@ -10,10 +10,12 @@ declare global {
     isElectron?: boolean;
     // T2-35: native Electron serial bridge declarations removed.
     quit?: () => Promise<void>;
-    storageGet?: (key: string) => Promise<string | null>;
-    storageSet?: (key: string, value: string) => Promise<void>;
-    storageRemove?: (key: string) => Promise<void>;
-    storageList?: (prefix?: string) => Promise<string[]>;
+    storage?: Record<string, {
+      get(key: string): Promise<string | null>;
+      set(key: string, value: string): Promise<void>;
+      remove(key: string): Promise<void>;
+      list(): Promise<string[]>;
+    }>;
     // T1-84: storageClear was removed from the IPC.
     acquireJobWakeLock?: () => Promise<number>;
     releaseJobWakeLock?: () => Promise<void>;

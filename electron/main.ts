@@ -3,6 +3,7 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
 import { storageGet, storageSet, storageRemove, storageList } from './storage';
+import { STORAGE_NAMESPACES, isStorageKeyAllowed, type StorageNamespace } from './storageNamespaces';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -324,32 +325,42 @@ function assertNonEmptyString(value: unknown, label: string): asserts value is s
   }
 }
 
-function assertOptionalString(value: unknown, label: string): asserts value is string | undefined {
-  if (value != null && typeof value !== 'string') {
-    throw new Error(`Invalid ${label}`);
+function assertStorageNamespaceKey(namespace: StorageNamespace, key: string): void {
+  if (!isStorageKeyAllowed(namespace, key)) {
+    throw new Error(`Invalid storage key for ${namespace} namespace`);
   }
 }
 
-ipcMain.handle('storage:get', (_event, key: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  return storageGet(key);
-});
+function registerStorageNamespace(namespace: StorageNamespace): void {
+  const channelPrefix = `storage:${namespace}`;
+  ipcMain.handle(`${channelPrefix}:get`, (_event, key: unknown) => {
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    return storageGet(key);
+  });
 
-ipcMain.handle('storage:set', (_event, key: unknown, value: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  if (typeof value !== 'string') throw new Error('Invalid storage value');
-  storageSet(key, value);
-});
+  ipcMain.handle(`${channelPrefix}:set`, (_event, key: unknown, value: unknown) => {
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    if (typeof value !== 'string') throw new Error('Invalid storage value');
+    storageSet(key, value);
+  });
 
-ipcMain.handle('storage:remove', (_event, key: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  storageRemove(key);
-});
+  ipcMain.handle(`${channelPrefix}:remove`, (_event, key: unknown) => {
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    storageRemove(key);
+  });
 
-ipcMain.handle('storage:list', (_event, prefix: unknown) => {
-  assertOptionalString(prefix, 'storage prefix');
-  return storageList(prefix);
-});
+  ipcMain.handle(`${channelPrefix}:list`, () => {
+    const keys = storageList();
+    return keys.filter(key => isStorageKeyAllowed(namespace, key));
+  });
+}
+
+for (const namespace of STORAGE_NAMESPACES) {
+  registerStorageNamespace(namespace);
+}
 
 // T1-84: storage:clear IPC was removed. The previous handler wiped every
 // .json file in the storage directory in one call — license, profiles,
