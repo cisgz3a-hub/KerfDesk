@@ -530,17 +530,21 @@ export function ConnectionPanelMain({
   // prevents the user from clicking buttons that would just bounce off
   // the mutex anyway.
   //
-  // `activeOperation` and `recoveryPending` are read inline (not from
-  // React state) because their transitions are driven by machineState
-  // changes (which already trigger re-renders) or by long-lived modals
-  // that block UI input directly. Future work may add an explicit
-  // subscription if non-modal recovery surfaces (T3-91) need it.
+  // `activeOperation` and `recoveryPending` are read once per render
+  // (not from React state) because their transitions are driven by
+  // machineState changes (which already trigger re-renders) or by
+  // long-lived modals that block UI input directly. Future work may add
+  // an explicit subscription if non-modal recovery surfaces (T3-91)
+  // need it.
+  const activeOperation = machineService.getActiveOperation();
+  const recoveryPending = getUnsafePriorState() != null;
+  const laserOutputForGates = machineService.getLaserOutputState();
   const gates = machineState
     ? computeCommandGates({
         state: machineState,
-        laserOutput: machineService.getLaserOutputState(),
-        activeOperation: machineService.getActiveOperation(),
-        recoveryPending: getUnsafePriorState() != null,
+        laserOutput: laserOutputForGates,
+        activeOperation,
+        recoveryPending,
       })
     : null;
   const canAutoFocus = gates?.baseSafe ?? false;
@@ -1546,6 +1550,23 @@ export function ConnectionPanelMain({
         severity: i.severity as 'blocker' | 'warning',
         text: i.title,
       }));
+    const frameControlBlockedHeadline = (() => {
+      if (!isConnected) return 'No controller connection';
+      if (!machineState) return 'Waiting for controller state';
+      if (laserOutputState === 'unknown') return 'Laser-safety state unknown';
+      if (laserOutputState === 'on') return 'Laser output is still marked on';
+      if (activeOperation != null) {
+        return `Operation "${activeOperation.kind}" is still in progress`;
+      }
+      if (recoveryPending) return 'Previous job recovery is pending';
+      if (machineState.errorCode != null) {
+        return `Controller error ${machineState.errorCode}`;
+      }
+      if (machineStatus != null && machineStatus !== 'idle') {
+        return `Machine is "${machineStatus}"`;
+      }
+      return 'Frame control is not available';
+    })();
 
     const gates: StartReadinessGate[] = [
       {
@@ -1593,13 +1614,22 @@ export function ConnectionPanelMain({
         failAction: 'Wait for idle, or stop/reset on the controller if it is stuck',
       },
       {
+        id: 'frameControls',
+        label: 'Frame control available',
+        status: !isConnected || !machineState
+          ? 'pending'
+          : (canFrame ? 'ok' : 'fail'),
+        failHeadline: frameControlBlockedHeadline,
+        failAction: 'Clear this machine/safety hold, then click Frame before Start',
+      },
+      {
         id: 'framing',
         label: 'Job framed',
         status: !requireFrame
           ? 'ok'
-          : (hasFramed.current ? 'ok' : 'fail'),
-        failHeadline: 'Frame not done since last design change',
-        failAction: 'Click Frame to confirm where the laser will burn (resets when you edit the design)',
+          : (hasFramed.current ? 'ok' : (canFrame ? 'fail' : 'pending')),
+        failHeadline: 'Frame required before Start',
+        failAction: 'Click Frame to confirm where the laser will burn',
       },
       {
         id: 'currentModeAnchor',

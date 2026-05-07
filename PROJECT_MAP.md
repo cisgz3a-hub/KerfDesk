@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 356 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 448 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 449 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -46,7 +46,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 395 | - |
+| `tests/` | 396 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -806,6 +806,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/stale-gcode-blocks-start.test.ts`
 - `tests/start-mode-labels.test.ts`
 - `tests/start-mode-wcs-reset.test.ts`
+- `tests/start-readiness-frame-control-gate.test.ts`
 - `tests/start-readiness-panel.test.tsx`
 - `tests/start-validated-job-passes-context.test.ts`
 - `tests/start-validated-job-then-immediately-tryfinalize.test.ts`

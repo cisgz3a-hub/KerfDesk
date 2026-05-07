@@ -19,6 +19,7 @@ export interface StartReadinessGate {
     | 'gcodeFresh'
     | 'preflight'
     | 'machineState'
+    | 'frameControls'
     | 'framing'
     | 'currentModeAnchor'
     | 'laserState'
@@ -39,7 +40,7 @@ export interface StartReadiness {
   ready: boolean;
   /** The first failing gate, or null when ready. Drives the collapsed summary. */
   blockingGate: StartReadinessGate | null;
-  /** All eight gates, in canonical order. */
+  /** All gates, in canonical order. */
   gates: ReadonlyArray<StartReadinessGate>;
 }
 
