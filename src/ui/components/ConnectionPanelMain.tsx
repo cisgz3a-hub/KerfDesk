@@ -290,6 +290,7 @@ export function ConnectionPanelMain({
   const [safetyState, setSafetyState] = useState<SafetyState>(() => machineService.getSafetyState());
   const [connectionRecoveryVisible, setConnectionRecoveryVisible] = useState(false);
   const [frameRecoveryTimeoutSec, setFrameRecoveryTimeoutSec] = useState<number | null>(null);
+  const [jobFailedRecoveryMessage, setJobFailedRecoveryMessage] = useState<string | null>(null);
   // T1-50 Part A: UI mutex on Connect button. Without this, two
   // rapid clicks each call into `machineService.connectRealLaser()`,
   // each constructing a new WebSerialPort and racing on
@@ -585,10 +586,19 @@ export function ConnectionPanelMain({
 
       if (completedOk) {
         playCompletionBeep();
+        setJobFailedRecoveryMessage(null);
         setJobCompleted(true);
         setCompletedTime(Math.max(0, elapsedAtEnd));
         setProgressFlashGreen(true);
         window.setTimeout(() => setProgressFlashGreen(false), 1400);
+      } else if (!stopped) {
+        setJobFailedRecoveryMessage(
+          jp != null
+            ? `Job ended before completion (${jp.linesAcknowledged}/${jp.totalLines} lines acknowledged).`
+            : 'Job ended before completion.',
+        );
+      } else {
+        setJobFailedRecoveryMessage(null);
       }
 
       jobStartTimeRef.current = null;
@@ -932,6 +942,7 @@ export function ConnectionPanelMain({
       ...prev,
       `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
     ]);
+    setJobFailedRecoveryMessage(null);
     try {
       const canvasContext = {
         canvasMoves: lastGcodeCompileResult.canvasMoves,
@@ -958,6 +969,7 @@ export function ConnectionPanelMain({
       setElapsedSeconds(0);
       elapsedSecondsRef.current = 0;
       const msg = e instanceof Error ? e.message : String(e);
+      setJobFailedRecoveryMessage(`Job failed to start: ${msg}`);
       setMessages(prev => [...prev, `Failed to start: ${msg}`]);
       await showAlert('Cannot start job', msg);
     }
@@ -1172,27 +1184,6 @@ export function ConnectionPanelMain({
     await executionCoordinator.unlock();
   }, [appendMessage, machineService, showConfirm, executionCoordinator]);
 
-  const handleRecoveryAction = useCallback((action: RecoveryAction) => {
-    switch (action) {
-      case 'unlock':
-        void handleUnlock();
-        break;
-      case 'home':
-      case 're-home':
-        void handleHome();
-        break;
-      case 'frame':
-      case 'reframe':
-        void handleFrameSafe();
-        break;
-      case 'reconnect':
-        setConnectionRecoveryVisible(false);
-        break;
-      default:
-        break;
-    }
-  }, [handleFrameSafe, handleHome, handleUnlock]);
-
   /**
    * T2-12 part 2: clear a 'faulted_requires_inspection' state after
    * the user has confirmed they've inspected the machine. Asks once
@@ -1280,6 +1271,34 @@ export function ConnectionPanelMain({
       );
     }
   }, [appendMessage, notifySimulatorTx, machineService, showAlert]);
+
+  const handleRecoveryAction = useCallback((action: RecoveryAction) => {
+    switch (action) {
+      case 'unlock':
+        void handleUnlock();
+        break;
+      case 'home':
+      case 're-home':
+        void handleHome();
+        break;
+      case 'frame':
+      case 'reframe':
+        void handleFrameSafe();
+        break;
+      case 'reconnect':
+        setConnectionRecoveryVisible(false);
+        break;
+      case 'stop':
+        void handleStop();
+        break;
+      case 'compile':
+        setJobFailedRecoveryMessage(null);
+        onRecompile?.();
+        break;
+      default:
+        break;
+    }
+  }, [handleFrameSafe, handleHome, handleStop, handleUnlock, onRecompile]);
 
   /** Deadman: laser is on only while primary pointer is held on the button. */
   const beginTestFire = useCallback(
@@ -2087,6 +2106,15 @@ export function ConnectionPanelMain({
       onAction: handleRecoveryAction,
     });
 
+  const jobFailedRecoveryContent = jobFailedRecoveryMessage != null
+    ? buildRecoveryCard({ variant: 'job-failed', errorMessage: jobFailedRecoveryMessage })
+    : null;
+  const jobFailedRecoveryCard = jobFailedRecoveryContent &&
+    React.createElement(RecoveryCard, {
+      content: jobFailedRecoveryContent,
+      onAction: handleRecoveryAction,
+    });
+
   const safetyRecoveryContent = safetyState.kind === 'requiresInspection'
     ? buildRecoveryCard({ variant: 'emergency-stop' })
     : null;
@@ -2379,6 +2407,7 @@ export function ConnectionPanelMain({
       }),
       connectionRecoveryCard,
       frameRecoveryCard,
+      jobFailedRecoveryCard,
       safetyRecoveryCard,
       isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
