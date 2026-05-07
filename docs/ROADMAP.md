@@ -15662,11 +15662,13 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 ### T3-2 | Write the 5 critical missing tests
 
-**Status (partial):** Case 2 shipped in `3c1d5af` — added `tests/template-safety-enforcement.test.ts`, a focused six-case guard for dangerous template/custom-G-code surfaces: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, `$X` injection, and motion outside bed bounds. The master checklist remains open because cases 1, 3, 4, and 5 still need dedicated coverage.
+**Status (partial):** Case 1 shipped in `<TBD>` — added `tests/ui-start-job-end-to-end.test.ts`, which compiles a two-object scene, applies the same non-empty line filter used by the UI start path, streams through `GrblController.sendJob`, and asserts object lifecycle callbacks fire for both generated object IDs in marker order while marker comments are stripped before serial write. The master checklist remains open because case 5 still needs dedicated coverage.
 
-**Status (partial):** Case 3 shipped in `420e3fc` — added `tests/stale-gcode-blocks-start.test.ts`, which compiles a scene, mutates the design, attempts to start with the old ticket, and asserts the stale ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set. The master checklist remains open because cases 1, 4, and 5 still need dedicated coverage.
+**Status (partial):** Case 2 shipped in `3c1d5af` — added `tests/template-safety-enforcement.test.ts`, a focused six-case guard for dangerous template/custom-G-code surfaces: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, `$X` injection, and motion outside bed bounds.
 
-**Status (partial):** Case 4 shipped in `00ce691` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set. The master checklist remains open because cases 1 and 5 still need dedicated coverage.
+**Status (partial):** Case 3 shipped in `420e3fc` — added `tests/stale-gcode-blocks-start.test.ts`, which compiles a scene, mutates the design, attempts to start with the old ticket, and asserts the stale ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
+
+**Status (partial):** Case 4 shipped in `00ce691` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
 
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
