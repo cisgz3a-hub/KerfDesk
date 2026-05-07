@@ -1,0 +1,90 @@
+{
+  "format": "laserforge",
+  "version": "1.1",
+  "appVersion": "fixture-v1_1-multilayer",
+  "scene": {
+    "id": "fixture-v1-1-multilayer",
+    "version": "1.1",
+    "canvas": { "width": 500, "height": 350, "origin": "top-left", "units": "mm" },
+    "layers": [
+      {
+        "id": "layer-cut",
+        "name": "Cut",
+        "color": "#E63E6D",
+        "visible": true,
+        "locked": false,
+        "output": true,
+        "order": 0,
+        "settings": {
+          "mode": "cut",
+          "power": { "min": 0, "max": 75 },
+          "speed": 180,
+          "airAssist": true
+        }
+      },
+      {
+        "id": "layer-engrave",
+        "name": "Engrave",
+        "color": "#2DD4A0",
+        "visible": true,
+        "locked": false,
+        "output": true,
+        "order": 1,
+        "settings": {
+          "mode": "engrave",
+          "power": { "min": 0, "max": 35 },
+          "speed": 1800,
+          "fill": { "enabled": true, "interval": 0.5, "angle": 0, "mode": "line", "biDirectional": true }
+        }
+      }
+    ],
+    "objects": [
+      {
+        "id": "obj-panel",
+        "type": "rect",
+        "name": "Panel",
+        "layerId": "layer-cut",
+        "parentId": null,
+        "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "tx": 40, "ty": 40 },
+        "geometry": { "type": "rect", "x": 0, "y": 0, "width": 160, "height": 100, "cornerRadius": 0 },
+        "visible": true,
+        "locked": false,
+        "powerScale": 1
+      },
+      {
+        "id": "obj-badge",
+        "type": "ellipse",
+        "name": "Logo badge",
+        "layerId": "layer-engrave",
+        "parentId": null,
+        "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "tx": 120, "ty": 90 },
+        "geometry": { "type": "ellipse", "cx": 0, "cy": 0, "rx": 35, "ry": 22 },
+        "visible": true,
+        "locked": false,
+        "powerScale": 1
+      }
+    ],
+    "material": {
+      "name": "Basswood",
+      "type": "plywood",
+      "color": "#c99b61",
+      "width": 200,
+      "height": 140,
+      "thickness": 3,
+      "x": 30,
+      "y": 30
+    },
+    "startPosition": { "x": 0, "y": 0 },
+    "compileOptions": { "optimizeOrder": true },
+    "activeLayerId": "layer-cut",
+    "metadata": {
+      "name": "Fixture - Multilayer Vector",
+      "created": "2026-05-07T00:00:00.000Z",
+      "modified": "2026-05-07T00:00:00.000Z",
+      "author": "",
+      "notes": "T3-7 1.1 best-effort compatibility fixture",
+      "deviceProfileId": "fixture-profile",
+      "materialPresetId": "fixture-material"
+    }
+  }
+}

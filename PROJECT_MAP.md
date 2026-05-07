@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 355 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 439 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 443 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -46,8 +46,9 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 389 | - |
+| `tests/` | 390 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
+| `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
 | `tests/simulators` | 4 | - |
 
@@ -505,6 +506,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/autosave-previous-slot.test.ts`
 - `tests/autosave-serialization.test.ts`
 - `tests/autosave-storage.test.ts`
+- `tests/backward-compat-project-fixtures.test.ts`
 - `tests/bed-height-resolver-parity.test.ts`
 - `tests/boolean-ops-throws-without-license.test.ts`
 - `tests/box-dimension-modes.test.ts`
@@ -900,6 +902,12 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/e2e/snapshots/text-hershey-sans.gcode`
 - `tests/e2e/text-bundled-inter.test.ts`
 - `tests/e2e/text-hershey-sans.test.ts`
+
+### `tests/fixtures`
+
+- `tests/fixtures/projects/v1-basic-cut.lfproj`
+- `tests/fixtures/projects/v1-legacy-minimal-score.lfproj`
+- `tests/fixtures/projects/v1_1-multilayer-vector.lfproj`
 
 ### `tests/helpers`
 
