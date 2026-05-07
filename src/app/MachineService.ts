@@ -1290,11 +1290,12 @@ export class MachineService {
     }
   }
 
-  jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
+  async jog(axis: 'X' | 'Y', distance: number, feedRate: number): Promise<{ ok: boolean; reason?: string }> {
     const ctrl = this.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
     try {
-      new MachineCommandGateway(ctrl).jog(axis, distance, feedRate);
+      const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
+      if (!result.ok) return { ok: false, reason: result.reason };
     } catch (err: unknown) {
       return { ok: false, reason: err instanceof Error ? err.message : String(err) };
     }
