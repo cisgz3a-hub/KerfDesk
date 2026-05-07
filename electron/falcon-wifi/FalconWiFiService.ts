@@ -2,7 +2,7 @@
  * Falcon WiFi IPC surface for the Electron main process.
  *
  * Responsibilities:
- *   - Wrap the HTTP and WebSocket clients with typed ipcMain.handle() calls.
+ *   - Wrap the HTTP and WebSocket clients with typed IPC invoke handlers.
  *   - Own the single active WebSocket connection (Phase 1 supports exactly
  *     one Falcon at a time; Phase 2 may extend to multi-device).
  *   - Forward WS events to the renderer via webContents.send() on the
@@ -22,6 +22,7 @@
  */
 
 import { ipcMain, type BrowserWindow } from 'electron';
+import { assertTrustedSender } from '../security';
 
 import {
   testConnection,
@@ -95,25 +96,29 @@ export function registerFalconWiFiIpc(getWindow: () => BrowserWindow | null): vo
 
   ipcMain.handle(
     CH.testConnection,
-    async (_event, ip: unknown): Promise<FalconTestConnectionResult> => {
+    async (event, ip: unknown): Promise<FalconTestConnectionResult> => {
+      assertTrustedSender(event);
       if (!isValidIp(ip)) return { ok: false, error: 'Invalid IP/host' };
       return testConnection(ip);
     },
   );
 
-  ipcMain.handle(CH.getState, async (_event, ip: unknown): Promise<number> => {
+  ipcMain.handle(CH.getState, async (event, ip: unknown): Promise<number> => {
+    assertTrustedSender(event);
     if (!isValidIp(ip)) throw new Error('Invalid IP/host');
     return getWorkState(ip);
   });
 
-  ipcMain.handle(CH.getProgress, async (_event, ip: unknown): Promise<number> => {
+  ipcMain.handle(CH.getProgress, async (event, ip: unknown): Promise<number> => {
+    assertTrustedSender(event);
     if (!isValidIp(ip)) throw new Error('Invalid IP/host');
     return getWorkProgress(ip);
   });
 
   ipcMain.handle(
     CH.getDeviceStatus,
-    async (_event, ip: unknown): Promise<FalconDeviceStatus> => {
+    async (event, ip: unknown): Promise<FalconDeviceStatus> => {
+      assertTrustedSender(event);
       if (!isValidIp(ip)) throw new Error('Invalid IP/host');
       return getDeviceStatus(ip);
     },
@@ -121,7 +126,8 @@ export function registerFalconWiFiIpc(getWindow: () => BrowserWindow | null): vo
 
   ipcMain.handle(
     CH.wsConnect,
-    async (_event, ip: unknown): Promise<{ ok: boolean; error?: string }> => {
+    async (event, ip: unknown): Promise<{ ok: boolean; error?: string }> => {
+      assertTrustedSender(event);
       if (!isValidIp(ip)) return { ok: false, error: 'Invalid IP/host' };
       refreshWindow();
       closeActiveHandle();
@@ -135,14 +141,18 @@ export function registerFalconWiFiIpc(getWindow: () => BrowserWindow | null): vo
     },
   );
 
-  ipcMain.handle(CH.wsDisconnect, async () => {
+  ipcMain.handle(CH.wsDisconnect, async (event) => {
+    assertTrustedSender(event);
     closeActiveHandle();
   });
 
-  ipcMain.handle(CH.wsStatus, () => ({
-    connected: !!activeHandle && activeHandle.isActive(),
-    ip: activeHandle?.ip ?? null,
-  }));
+  ipcMain.handle(CH.wsStatus, (event) => {
+    assertTrustedSender(event);
+    return {
+      connected: !!activeHandle && activeHandle.isActive(),
+      ip: activeHandle?.ip ?? null,
+    };
+  });
 }
 
 /** Called from before-quit to avoid leaking the socket. */

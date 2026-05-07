@@ -14826,6 +14826,8 @@ grep -A 1 "ipcMain.handle" electron/main.ts | grep -B 1 -v "assertTrustedSender"
 
 **Status:** Shipped in 4f9ef6f (focused MVP — typed environment + pure trust evaluator + throwing-guard helper + UntrustedSenderError + checkHandlerCoverage CI helper; per-handler adoption deferred as T2-119-followup since it's a per-handler review across ~15 sites). New `src/security/TrustedSender.ts` exports `AppEnvironment` 3-kind union (packaged | dev w/ expectedDevOrigin | test), `SenderFrame`, `TrustReason` (7: packaged-file-url / dev-localhost-origin / test-environment / unknown-scheme / untrusted-origin / no-frame / frame-url-malformed), `TrustResult` discriminated union, `evaluateSenderTrust({env, frame})` pure evaluator with **canonical priority order** (test → trusted regardless; null frame → no-frame; non-string/empty url → frame-url-malformed; packaged + file:// → trusted, anything else → untrusted-origin; dev + matches expectedDevOrigin → trusted; dev + non-http(s)/file scheme → unknown-scheme; dev + http(s) origin mismatch → untrusted-origin), `UntrustedSenderError` typed-error class (carries observed URL + reason in message), `assertSenderTrustResult(result)`, `assertTrustedSenderFrame({env, frame})` single-call form (the audit's "apply at top of every handler" pattern), `describeTrustResult(result)` user-facing diagnostic copy, `HandlerCoverageReport` shape, `checkHandlerCoverage({source, guardName?, windowLines?})` CI helper that scans source text for `ipcMain.handle` lines + verifies a guard call within `windowLines` (default 5) — runs from a static read so the audit's grep test contract is enforceable in our suite without spawning grep. **Renderer-safe:** module is pure logic with no Electron import, so unit tests run under tsx without dragging in electron. The actual `ipcMain.handle` wiring lives in `electron/security.ts` (T2-119-followup). Pinned by `tests/ipc-sender-verification.test.ts` (63 contracts: packaged + file:// → trusted; packaged + http/https/devtools → untrusted; packaged + null frame → no-frame; dev + localhost match → trusted + wrong port → untrusted + file:// in dev → untrusted; dev + custom scheme → unknown-scheme; test + any URL + null frame → trusted; non-string url → frame-url-malformed; empty url → frame-url-malformed; assertSenderTrustResult throws on untrusted + no-throw on trusted; assertTrustedSenderFrame integration; UntrustedSenderError carries URL + reason in message; describeTrustResult trusted vs each refusal reason; checkHandlerCoverage all-guarded + bare-handler-flagged + custom guard name + flagged-snippet identifies handler; **THE audit's headline** — packaged file://, dev localhost, attacker domain rejected; source-level pin). **Out of scope (T2-119-followup):** writing `electron/security.ts` that calls `assertTrustedSenderFrame({env: app.isPackaged ? {kind:'packaged'} : {kind:'dev', expectedDevOrigin:'http://localhost:3000/'}, frame: event.senderFrame})` from a single `assertTrustedSender(event)` wrapper; applying that wrapper at the top of every `ipcMain.handle` site (~15 handlers in `electron/main.ts` covering storage / serial / dialog / falcon-wifi); CI integration of `checkHandlerCoverage` against electron/main.ts. **Hardware verification: not required**.
 
+**T3-9 follow-up:** Per-handler Electron adoption shipped in `<TBD>`. `electron/security.ts` now provides the main-process wrapper, all current `electron/main.ts` and Falcon WiFi handlers call it, and `tests/ipc-attack-surface.test.ts` statically guards the coverage.
+
 ---
 
 ### T2-120 | Replace generic storage IPC with typed namespaced APIs
@@ -15788,6 +15790,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-9 | Tighten IPC attack surface
+
+**Status:** Shipped in `<TBD>`. Added `electron/security.ts` with a main-process `assertTrustedSender(event)` wrapper, then guarded every current `ipcMain.handle` entry in `electron/main.ts` and `electron/falcon-wifi/FalconWiFiService.ts` before input validation or privileged work. Packaged builds trust only `file://` sender frames; dev builds trust only the parsed `http://localhost:3000/` origin (no prefix lookalikes). `tests/ipc-attack-surface.test.ts` statically enforces guard coverage for both main and Falcon handlers so future IPC cannot be added bare. Existing typed storage and T2-119 sender-verification tests remain green. Hardware verification: not required (main-process IPC authorization only).
 
 **Code reference:** `electron/preload.ts`, `electron/main.ts` ipcMain handlers
 
@@ -20086,7 +20090,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-6 Crash reporting
 - [x] T3-7 Backward-compat fixture corpus
 - [x] T3-8 Electron CSP hardening
-- [ ] T3-9 Tighten IPC attack surface
+- [x] T3-9 Tighten IPC attack surface
 - [ ] T3-10 Input file-format size limits
 - [ ] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)

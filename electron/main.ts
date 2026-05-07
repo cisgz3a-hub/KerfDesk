@@ -16,6 +16,7 @@ import {
   recordStartupCrash,
 } from './startupCrashLoop';
 import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
+import { assertTrustedSender } from './security';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -350,7 +351,8 @@ app.on('before-quit', (e) => {
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────
 
-ipcMain.handle('dialog:save', async (_event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:save', async (event, defaultName: string, content: string) => {
+  assertTrustedSender(event);
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
@@ -364,7 +366,8 @@ ipcMain.handle('dialog:save', async (_event, defaultName: string, content: strin
   return true;
 });
 
-ipcMain.handle('dialog:saveGcode', async (_event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:saveGcode', async (event, defaultName: string, content: string) => {
+  assertTrustedSender(event);
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
@@ -378,7 +381,8 @@ ipcMain.handle('dialog:saveGcode', async (_event, defaultName: string, content: 
   return true;
 });
 
-ipcMain.handle('dialog:open', async () => {
+ipcMain.handle('dialog:open', async (event) => {
+  assertTrustedSender(event);
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     filters: [
@@ -432,26 +436,30 @@ function assertStorageNamespaceKey(namespace: StorageNamespace, key: string): vo
 
 function registerStorageNamespace(namespace: StorageNamespace): void {
   const channelPrefix = `storage:${namespace}`;
-  ipcMain.handle(`${channelPrefix}:get`, (_event, key: unknown) => {
+  ipcMain.handle(`${channelPrefix}:get`, (event, key: unknown) => {
+    assertTrustedSender(event);
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
     return namespacedStorageGet(namespace, key);
   });
 
-  ipcMain.handle(`${channelPrefix}:set`, (_event, key: unknown, value: unknown) => {
+  ipcMain.handle(`${channelPrefix}:set`, (event, key: unknown, value: unknown) => {
+    assertTrustedSender(event);
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
     if (typeof value !== 'string') throw new Error('Invalid storage value');
     namespacedStorageSet(namespace, key, value);
   });
 
-  ipcMain.handle(`${channelPrefix}:remove`, (_event, key: unknown) => {
+  ipcMain.handle(`${channelPrefix}:remove`, (event, key: unknown) => {
+    assertTrustedSender(event);
     assertNonEmptyString(key, 'storage key');
     assertStorageNamespaceKey(namespace, key);
     namespacedStorageRemove(namespace, key);
   });
 
-  ipcMain.handle(`${channelPrefix}:list`, () => {
+  ipcMain.handle(`${channelPrefix}:list`, (event) => {
+    assertTrustedSender(event);
     return namespacedStorageList(namespace);
   });
 }
@@ -474,7 +482,8 @@ for (const namespace of STORAGE_NAMESPACES) {
 // Chromium doesn't throttle our renderer, and the OS doesn't
 // sleep. Released on all job-end paths.
 
-ipcMain.handle('power:acquireJobWakeLock', () => {
+ipcMain.handle('power:acquireJobWakeLock', (event) => {
+  assertTrustedSender(event);
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     return jobWakeLockId;
   }
@@ -482,14 +491,16 @@ ipcMain.handle('power:acquireJobWakeLock', () => {
   return jobWakeLockId;
 });
 
-ipcMain.handle('power:releaseJobWakeLock', () => {
+ipcMain.handle('power:releaseJobWakeLock', (event) => {
+  assertTrustedSender(event);
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     powerSaveBlocker.stop(jobWakeLockId);
   }
   jobWakeLockId = null;
 });
 
-ipcMain.handle('update:check', async (): Promise<UpdateCheckResult> => {
+ipcMain.handle('update:check', async (event): Promise<UpdateCheckResult> => {
+  assertTrustedSender(event);
   if (isDev) return { ok: false, reason: 'not-packaged' };
   try {
     await autoUpdater.checkForUpdatesAndNotify();
@@ -505,7 +516,8 @@ ipcMain.handle('update:check', async (): Promise<UpdateCheckResult> => {
 
 ipcMain.handle(
   'update:install',
-  (_event, state?: { jobRunning?: boolean }): UpdateInstallResult => {
+  (event, state?: { jobRunning?: boolean }): UpdateInstallResult => {
+    assertTrustedSender(event);
     if (isDev) return { ok: false, reason: 'not-packaged' };
     if (state?.jobRunning === true || isJobWakeLockActive()) {
       return { ok: false, reason: 'job-running' };
@@ -528,6 +540,7 @@ ipcMain.handle(
 // unused connect/list/disconnect channels and confused the controller boundary.
 // T1-27's serial:send bypass removal is subsumed here: no serial:* IPC remains.
 
-ipcMain.handle('app:quit', () => {
+ipcMain.handle('app:quit', (event) => {
+  assertTrustedSender(event);
   app.quit();
 });
