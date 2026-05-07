@@ -15666,6 +15666,8 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Status (partial):** Case 3 shipped in `420e3fc` — added `tests/stale-gcode-blocks-start.test.ts`, which compiles a scene, mutates the design, attempts to start with the old ticket, and asserts the stale ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set. The master checklist remains open because cases 1, 4, and 5 still need dedicated coverage.
 
+**Status (partial):** Case 4 shipped in `<TBD>` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set. The master checklist remains open because cases 1 and 5 still need dedicated coverage.
+
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
 **Fix:** Add these tests. They're the top-priority gap closers.
