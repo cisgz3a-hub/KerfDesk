@@ -856,7 +856,7 @@ export function ConnectionPanelMain({
   );
 
   const handleJog = useCallback(
-    (axis: 'X' | 'Y', distance: number) => {
+    async (axis: 'X' | 'Y', distance: number) => {
       // T1-104: Jog requires exact idle. T1-105: hasJogged flips only
       // after the command is accepted by the transport.
       if (machineState?.status !== 'idle') {
@@ -865,7 +865,7 @@ export function ConnectionPanelMain({
         ]);
         return;
       }
-      const result = executionCoordinator.jog(axis, distance, 3000);
+      const result = await executionCoordinator.jog(axis, distance, 3000);
       if (!result.ok) {
         setMessages(prev => [...prev,
           `⚠ Jog failed: ${result.reason ?? 'unknown'}. Check connection and machine state.`,

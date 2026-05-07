@@ -72,6 +72,18 @@ function makeController(overrides?: Partial<LaserController>): LaserController {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => ({ ok: true }),
+      emergencyStop: async () => ({ ok: true }),
+    },
     ...overrides,
   } as LaserController;
 }
@@ -197,15 +209,15 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
   });
 }
 
-// 10. coord.jog acquires + releases (post-call, mutex is free)
+// 10. coord.jog acquires + releases (after awaited operation, mutex is free)
 {
   const ctrl = makeController({ sendCommand: () => {} });
   const svc = makeService(ctrl);
   const coord = makeCoord(svc, ctrl);
-  const r = coord.jog('X', 5, 1500);
+  const r = await coord.jog('X', 5, 1500);
   assert(r.ok === true, 'jog succeeds when mutex is free');
   assert(svc.getActiveOperation() === null,
-    'mutex released after synchronous jog returns');
+    'mutex released after awaited jog returns');
 }
 
 // 11. coord.jog refuses while another op holds the mutex
@@ -214,7 +226,7 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
   const svc = makeService(ctrl);
   svc.tryAcquireOperation('testFire');  // simulate test-fire in flight
   const coord = makeCoord(svc, ctrl);
-  const r = coord.jog('X', 5, 1500);
+  const r = await coord.jog('X', 5, 1500);
   assert(r.ok === false && r.reason === 'operation-busy',
     'jog refuses with operation-busy when testFire is held');
   assert(svc.getActiveOperation()?.kind === 'testFire',

@@ -42,10 +42,7 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
     stop: () => {},
     emergencyStop: () => {},
     sendCommand: (cmd: string, _source?: string) => {
-      if (cmd.startsWith('$J=')) {
-        const m = cmd.match(/\$J=G91 G21 ([XY])([-\d.]+) F(\d+)/);
-        if (m) jogSpy(m[1] as 'X' | 'Y', parseFloat(m[2]), parseInt(m[3], 10));
-      }
+      void cmd;
     },
     requestStatusReport: () => {},
     onStateChange: () => () => {},
@@ -53,6 +50,21 @@ function makeController(jogSpy: (axis: 'X' | 'Y', d: number, f: number) => void)
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async ({ axis, distanceMm, feedMmPerMin }) => {
+        jogSpy(axis as 'X' | 'Y', distanceMm, feedMmPerMin);
+        return { ok: true };
+      },
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => ({ ok: true }),
+      emergencyStop: async () => ({ ok: true }),
+    },
   } as LaserController;
 }
 
@@ -74,7 +86,7 @@ void (async () => {
     notifySimulatorRef: notifyRef,
   });
 
-  const jogResult = coord.jog('X', 1.5, 2400);
+  const jogResult = await coord.jog('X', 1.5, 2400);
 
   assert(simLines.length === 1 && simLines[0]?.includes('$J=') && simLines[0]?.includes('X1.5'), 'simulator sees $J line');
   assert(jogCalls.length === 1 && jogCalls[0]?.axis === 'X' && jogCalls[0]?.d === 1.5 && jogCalls[0]?.f === 2400, 'controller receives jog');
@@ -88,7 +100,7 @@ void (async () => {
     controllerRef: { current: null },
     notifySimulatorRef: nr2,
   });
-  const noCtrlResult = coordNoCtrl.jog('Y', 10, 3000);
+  const noCtrlResult = await coordNoCtrl.jog('Y', 10, 3000);
   assert(jogCalls.length === 0 && sim2.length === 0, 'no controller → jog is a no-op');
   assert(noCtrlResult.ok === false && noCtrlResult.reason === 'no-controller', 'no controller → jog returns no-controller result');
 

@@ -164,11 +164,16 @@ void (async () => {
   }
 
   {
-    const { ctrl } = makeController();
+    const { ctrl, operationSent, rawSent } = makeController();
     const sim: string[] = [];
-    const result = makeCoordinator(ctrl, sim).jog('Y', 5, 2000);
-    assertContract(result.ok === true && sim[0]?.includes('$J=G91 G21 Y5'),
-      'ExecutionCoordinator.jog forwards success and notifies simulator');
+    const result = await makeCoordinator(ctrl, sim).jog('Y', 5, 2000);
+    assertContract(
+      result.ok === true
+      && sim[0]?.includes('$J=G91 G21 Y5')
+      && operationSent[0]?.includes('$J=G91 G21 Y5')
+      && rawSent.length === 0,
+      'ExecutionCoordinator.jog forwards success through operations and notifies simulator',
+    );
   }
 
   {

@@ -97,10 +97,9 @@ export class ExecutionCoordinator {
     return ctrl ? new MachineCommandGateway(ctrl) : null;
   }
 
-  jog(axis: 'X' | 'Y', distance: number, feedRate: number): { ok: boolean; reason?: string } {
+  async jog(axis: 'X' | 'Y', distance: number, feedRate: number): Promise<{ ok: boolean; reason?: string }> {
     const ctrl = this.deps.controllerRef.current;
-    const gateway = this.getCommandGateway(ctrl);
-    if (!ctrl || !gateway) return { ok: false, reason: 'no-controller' };
+    if (!ctrl) return { ok: false, reason: 'no-controller' };
     // T2-11: jog acquires the operation mutex for the duration of the
     // synchronous send. Sequential jogs (arrow-key spam) acquire and
     // release per call — no contention. The mutex prevents jog from
@@ -114,7 +113,8 @@ export class ExecutionCoordinator {
       const cmd = `$J=G91 G21 ${axis}${distance} F${feedRate}`;
       this.notifySimulator(cmd);
       try {
-        gateway.jog(axis, distance, feedRate);
+        const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
+        if (!result.ok) return { ok: false, reason: result.reason };
       } catch (err: unknown) {
         return { ok: false, reason: err instanceof Error ? err.message : String(err) };
       }
