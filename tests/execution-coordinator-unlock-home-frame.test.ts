@@ -41,6 +41,24 @@ void (async () => {
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => {
+          sent.push('$H');
+          return { ok: true as const };
+        },
+        unlockAlarm: async () => {
+          sent.push('$X');
+          return { ok: true as const };
+        },
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       connect: async () => {},
       disconnect: async () => {},
       sendJob: async () => {},

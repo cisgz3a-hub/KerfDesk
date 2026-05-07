@@ -34,11 +34,41 @@ const idleState: MachineState = {
 
 function makeController(opts: { throwOnSend?: boolean } = {}): { ctrl: LaserController; sent: string[] } {
   const sent: string[] = [];
+  const send = (cmd: string): void => {
+    if (opts.throwOnSend) throw new Error('mock: transport rejected');
+    sent.push(cmd);
+  };
   const ctrl = {
     protocolName: 'mock',
     state: idleState,
     isJobRunning: false,
     maxSpindle: null,
+    operations: {
+      jog: async ({ axis, distanceMm, feedMmPerMin }) => {
+        try {
+          send(`$J=G91 G21 ${axis}${distanceMm} F${feedMmPerMin}`);
+          return { ok: true as const };
+        } catch (err: unknown) {
+          return { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
+        }
+      },
+      home: async () => ({ ok: true as const }),
+      unlockAlarm: async () => ({ ok: true as const }),
+      setWorkOriginAtCurrentPosition: async () => {
+        try {
+          send('G10 L20 P1 X0 Y0');
+          return { ok: true as const };
+        } catch (err: unknown) {
+          return { ok: false as const, reason: err instanceof Error ? err.message : String(err) };
+        }
+      },
+      resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+      laserOff: async () => ({ ok: true as const }),
+      pauseJob: async () => ({ ok: true as const }),
+      resumeJob: async () => ({ ok: true as const }),
+      stopJob: async () => ({ ok: true as const }),
+      emergencyStop: async () => ({ ok: true as const }),
+    },
     connect: async () => {},
     disconnect: async () => {},
     sendJob: async () => {},
@@ -46,10 +76,7 @@ function makeController(opts: { throwOnSend?: boolean } = {}): { ctrl: LaserCont
     resume: () => {},
     stop: () => {},
     emergencyStop: () => {},
-    sendCommand: (cmd: string) => {
-      if (opts.throwOnSend) throw new Error('mock: transport rejected');
-      sent.push(cmd);
-    },
+    sendCommand: send,
     requestStatusReport: () => {},
     onStateChange: () => () => {},
     onProgress: () => () => {},
@@ -152,4 +179,3 @@ void (async () => {
   console.error(err);
   process.exit(1);
 });
-

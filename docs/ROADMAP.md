@@ -7883,6 +7883,8 @@ Migration plan (multi-pass):
 
 **Status:** Partial pass 1 shipped in `cf29a3e`. `MachineOperationApi` now declares semantic operations for `jog`, `home`, `unlockAlarm`, `setWorkOriginAtCurrentPosition`, `resetWcsToMachineOrigin`, `laserOff`, and the job-control operations. `GrblControllerApi` exposes `operations`, and `GrblController.operations` implements the GRBL command construction internally (`$J`, `$H`, `$X`, `G10 L20`, `G10 L2`, and `safetyOff`/`M5 S0`) while returning `OperationResult` instead of throwing for normal operation failures. Pinned by `tests/controller-operations-api.test.ts` (20 contracts: each operation returns a result, emits the same GRBL command internally, disconnected failures return `{ ok: false, reason }`, and source-level API pins). Regression: `tests/controller-interface-protocol-neutral.test.ts`, `tests/controller.test.ts`, `tests/machine-command-gateway.test.ts`, and `npm run build`. **Remaining T2-26 passes:** migrate `ExecutionCoordinator`, `MachineService`, frame generation, set-origin helpers/electron cleanup, then add the static no-GRBL-command guard. **Hardware verification: not required** for pass 1 (additive API over existing command paths; no call sites migrated yet).
 
+**T2-26 pass 2a:** `ExecutionCoordinator.unlock`, `ExecutionCoordinator.home`, and `ExecutionCoordinator.setOriginAtCurrentPosition` migrated to `ctrl.operations.unlockAlarm()`, `ctrl.operations.home()`, and `ctrl.operations.setWorkOriginAtCurrentPosition()` in `<TBD>`. This removes their authority path through `MachineCommandGateway` while preserving simulator-intent notifications and existing UI return contracts. Pinned by `tests/controller-operations-api.test.ts` source checks and `tests/jog-and-setorigin-state-after-confirm.test.ts` behavior coverage. **Remaining ExecutionCoordinator work:** jog remains synchronous for the current UI contract; frame/test-fire/laser-off need richer operation/simulator/safety result handling before migration.
+
 ---
 
 ### T2-27 | Replace `sendJob(lines: string[])` with `executeJob(ControllerOutput, JobTicket)`
@@ -19870,7 +19872,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-23 Determinism gate 鈥?same scene compiled 20脳 must be byte-identical (shipped 2026-05-05 in `185a096`)
 - [x] T2-24 Split LaserController into protocol-neutral core + dialect extensions (focused contract foundation shipped in `72e3f97`; deeper consumer migration continues in T2-25/T2-26/T2-27/T3-45)
 - [x] T2-25 Create real ControllerCapabilities model (Shipped — full type + GRBL declaration + checkOperationCapability gate + applyProfileOverrides; ControllerInterface wiring deferred as T2-25-followup)
-- [ ] T2-26 Move GRBL command construction out of generic layers (Pass 1 operations API shipped in `cf29a3e`; ExecutionCoordinator/MachineService/frame/static-guard passes remain)
+- [ ] T2-26 Move GRBL command construction out of generic layers (Pass 1 operations API shipped in `cf29a3e`; Pass 2a ExecutionCoordinator unlock/home/set-origin shipped in `<TBD>`; jog/frame/test-fire/laser-off plus MachineService/static-guard passes remain)
 - [ ] T2-27 Replace `sendJob(lines)` with `executeJob(ControllerOutput, ticket)` (filed; depends on T2-24)
 - [ ] T2-28 Profile/controller-driven output target selection (filed; depends on T2-25)
 - [x] T2-29 Refactor ValidatedJobTicket — controller-family-agnostic schema (Shipped — family-agnostic schema + matchTicketToController + adapter helpers; consumer migration deferred as T2-29-followup)

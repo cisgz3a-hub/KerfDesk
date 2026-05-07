@@ -39,6 +39,21 @@ void (async () => {
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => {
+          sent.push('G10 L20 P1 X0 Y0');
+          return { ok: true as const };
+        },
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       connect: async () => {},
       disconnect: async () => {},
       sendJob: async () => {},
@@ -104,6 +119,21 @@ void (async () => {
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => {
+          sent.push('G10 L20 P1 X0 Y0');
+          return { ok: true as const };
+        },
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       connect: async () => {},
       disconnect: async () => {},
       sendJob: async () => {},
@@ -139,6 +169,21 @@ void (async () => {
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => {
+          sent.push('G10 L20 P1 X0 Y0');
+          return { ok: true as const };
+        },
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       connect: async () => {},
       disconnect: async () => {},
       sendJob: async () => {},
@@ -281,6 +326,21 @@ void (async () => {
       state: idle,
       isJobRunning: false,
       maxSpindle: null,
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => {
+          sent.push('G10 L20 P1 X0 Y0');
+          return { ok: true as const };
+        },
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
       connect: async () => {},
       disconnect: async () => {},
       sendJob: async () => {},

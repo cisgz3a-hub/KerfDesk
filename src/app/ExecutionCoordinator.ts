@@ -169,18 +169,20 @@ export class ExecutionCoordinator {
 
   /** Unlock GRBL ($X). Caller must run danger confirmation before invoking this. */
   async unlock(): Promise<void> {
-    const gateway = this.getCommandGateway();
-    if (!gateway) return;
+    const ctrl = this.deps.controllerRef.current;
+    if (!ctrl) return;
     this.notifySimulator('$X');
-    gateway.unlock();
+    const result = await ctrl.operations.unlockAlarm();
+    if (!result.ok) throw new Error(result.reason);
   }
 
   /** Home ($H). Caller must confirm the user intends to home before invoking this. */
   async home(): Promise<void> {
-    const gateway = this.getCommandGateway();
-    if (!gateway) return;
+    const ctrl = this.deps.controllerRef.current;
+    if (!ctrl) return;
     this.notifySimulator('$H');
-    gateway.home();
+    const result = await ctrl.operations.home();
+    if (!result.ok) throw new Error(result.reason);
   }
 
   /** Frame without firing the laser (rapid moves only). */
@@ -468,12 +470,7 @@ export class ExecutionCoordinator {
     }
     try {
       this.notifySimulator('G10 L20 P1 X0 Y0');
-      try {
-        this.getCommandGateway(ctrl)!.setOriginAtCurrentPosition();
-        return { ok: true };
-      } catch (err: unknown) {
-        return { ok: false, reason: err instanceof Error ? err.message : String(err) };
-      }
+      return ctrl.operations.setWorkOriginAtCurrentPosition();
     } finally {
       this.deps.machineService.releaseOperation('setOrigin');
     }

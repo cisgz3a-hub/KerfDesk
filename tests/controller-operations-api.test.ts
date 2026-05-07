@@ -93,6 +93,7 @@ async function run(): Promise<void> {
 
   const iface = readFileSync('src/controllers/ControllerInterface.ts', 'utf8');
   const grbl = readFileSync('src/controllers/grbl/GrblController.ts', 'utf8');
+  const coordinator = readFileSync('src/app/ExecutionCoordinator.ts', 'utf8');
 
   assert(/interface MachineOperationApi[\s\S]*jog/.test(iface), 'MachineOperationApi declares jog');
   assert(/interface MachineOperationApi[\s\S]*unlockAlarm/.test(iface), 'MachineOperationApi declares unlockAlarm');
@@ -100,6 +101,12 @@ async function run(): Promise<void> {
   assert(/readonly operations: MachineOperationApi/.test(iface), 'GrblControllerApi exposes operations');
   assert(/readonly operations =/.test(grbl), 'GrblController implements operations object');
   assert(/_trySendInternalOperationCommand/.test(grbl), 'GRBL command strings are isolated behind operation helper');
+  assert(/operations\.unlockAlarm\(\)/.test(coordinator), 'ExecutionCoordinator.unlock uses operations.unlockAlarm');
+  assert(/operations\.home\(\)/.test(coordinator), 'ExecutionCoordinator.home uses operations.home');
+  assert(/operations\.setWorkOriginAtCurrentPosition\(\)/.test(coordinator), 'ExecutionCoordinator.setOrigin uses operations.setWorkOriginAtCurrentPosition');
+  assert(!/gateway\.unlock\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.unlock');
+  assert(!/gateway\.home\(\)/.test(coordinator), 'ExecutionCoordinator no longer calls gateway.home');
+  assert(!/setOriginAtCurrentPosition\(\);\n\s*return \{ ok: true \}/.test(coordinator), 'ExecutionCoordinator no longer forwards set-origin through gateway');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed`);
   if (failed > 0) process.exitCode = 1;
