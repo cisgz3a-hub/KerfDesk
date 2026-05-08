@@ -16495,7 +16495,7 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 ### T3-27 | SVG `<text>` element import 鈥?convert to outlines or warn
 
-**Status:** Shipped in `<TBD>` — Stage 1 warning path. `parseSvg` now reports skipped `<text>` elements, `SvgToScene` exposes report-returning import helpers while keeping the legacy `Scene` return API, and the toolbar plus drag/drop SVG import paths show a user warning with examples and "Convert text to outlines" guidance. Pinned by `tests/svg-text-import-warning.test.ts`. **Hardware verification: not required** (import warning/reporting only; no G-code, motion, or safety gate behavior changed).
+**Status:** Shipped in `3d2c1bc` — Stage 1 warning path. `parseSvg` now reports skipped `<text>` elements, `SvgToScene` exposes report-returning import helpers while keeping the legacy `Scene` return API, and the toolbar plus drag/drop SVG import paths show a user warning with examples and "Convert text to outlines" guidance. Pinned by `tests/svg-text-import-warning.test.ts`. **Hardware verification: not required** (import warning/reporting only; no G-code, motion, or safety gate behavior changed).
 
 **Code reference:** `src/import/svg/SvgParser.ts:183-186` (RENDERABLE_TAGS missing `text`).
 
@@ -20364,7 +20364,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
-- [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `<TBD>` — text skip warning/report path)
+- [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
 - [ ] T3-28 SVG inherited group styles applied at flatten time
 - [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
