@@ -160,15 +160,23 @@ function ditherCacheSet(key: string, canvas: HTMLCanvasElement): void {
 }
 
 export interface SceneMachineOverlayOptions {
-  /** Current G-code start mode — controls where machine (0,0) is drawn. */
+  /** Current G-code start mode -- controls which anchor marker is drawn. */
   startMode?: 'absolute' | 'current' | 'savedOrigin';
   /** Saved origin in canvas coordinates for saved-origin mode. */
   savedOrigin?: { x: number; y: number } | null;
-  /** Physical bed size in mm for reachable area rectangle. */
+  /** Physical bed size in mm, retained for callers that share machine overlay options. */
   bedWidthMm?: number;
   bedHeightMm?: number;
-  /** Machine origin corner for reachable area direction. */
+  /** Machine origin corner, retained for callers that share machine overlay options. */
   originCorner?: MachineOriginCorner;
+}
+
+type SceneBounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+export interface MachineOriginMarker {
+  x: number;
+  y: number;
+  label: 'Bed origin' | 'Head start' | 'Saved zero';
 }
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
@@ -191,7 +199,7 @@ function renderMachineWorkAreaOverlay(
   ctx.restore();
 }
 
-function computeSceneBounds(scene: Scene): { minX: number; minY: number; maxX: number; maxY: number } {
+function computeSceneBounds(scene: Scene): SceneBounds {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -211,76 +219,51 @@ function computeSceneBounds(scene: Scene): { minX: number; minY: number; maxX: n
   return { minX, minY, maxX, maxY };
 }
 
+function hasSceneBounds(sceneBounds: SceneBounds): boolean {
+  return (
+    Number.isFinite(sceneBounds.minX) &&
+    Number.isFinite(sceneBounds.minY) &&
+    Number.isFinite(sceneBounds.maxX) &&
+    Number.isFinite(sceneBounds.maxY) &&
+    (sceneBounds.maxX !== sceneBounds.minX || sceneBounds.maxY !== sceneBounds.minY)
+  );
+}
+
+export function resolveMachineOriginMarker(
+  sceneBounds: SceneBounds,
+  options: SceneMachineOverlayOptions,
+): MachineOriginMarker | null {
+  switch (options.startMode) {
+    case 'absolute':
+      return { x: 0, y: 0, label: 'Bed origin' };
+    case 'current':
+      if (!hasSceneBounds(sceneBounds)) return null;
+      return { x: sceneBounds.minX, y: sceneBounds.minY, label: 'Head start' };
+    case 'savedOrigin':
+      if (!options.savedOrigin) return null;
+      return { x: options.savedOrigin.x, y: options.savedOrigin.y, label: 'Saved zero' };
+    default:
+      return null;
+  }
+}
+
 function renderMachineOriginOverlay(
   ctx: CanvasRenderingContext2D,
   transform: Transform,
-  sceneBounds: { minX: number; minY: number; maxX: number; maxY: number },
+  sceneBounds: SceneBounds,
   options: SceneMachineOverlayOptions,
 ): void {
-  if (!options.startMode || !options.bedWidthMm || !options.bedHeightMm) return;
+  const marker = resolveMachineOriginMarker(sceneBounds, options);
+  if (!marker) return;
 
-  let originCanvasX = 0;
-  let originCanvasY = 0;
-  switch (options.startMode) {
-    case 'absolute':
-      originCanvasX = 0;
-      originCanvasY = 0;
-      break;
-    case 'current':
-      originCanvasX = Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0;
-      originCanvasY = Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0;
-      break;
-    case 'savedOrigin':
-      originCanvasX = options.savedOrigin?.x ?? 0;
-      originCanvasY = options.savedOrigin?.y ?? 0;
-      break;
-  }
-
-  let boxMinX: number;
-  let boxMaxX: number;
-  let boxMinY: number;
-  let boxMaxY: number;
-
-  if (options.startMode === 'absolute') {
-    // Canvas (0,0) is machine (0,0) in absolute mode; match visible bed exactly.
-    boxMinX = 0;
-    boxMaxX = options.bedWidthMm;
-    boxMinY = 0;
-    boxMaxY = options.bedHeightMm;
-  } else {
-    const frontOrigin = options.originCorner === 'front-left' || options.originCorner === 'front-right';
-    boxMinX = originCanvasX;
-    boxMaxX = originCanvasX + options.bedWidthMm;
-    if (frontOrigin) {
-      boxMinY = originCanvasY - options.bedHeightMm;
-      boxMaxY = originCanvasY;
-    } else {
-      boxMinY = originCanvasY;
-      boxMaxY = originCanvasY + options.bedHeightMm;
-    }
-  }
-
-  const p1 = transform.worldToScreen({ x: boxMinX, y: boxMinY });
-  const p2 = transform.worldToScreen({ x: boxMaxX, y: boxMaxY });
-  const origin = transform.worldToScreen({ x: originCanvasX, y: originCanvasY });
+  const origin = transform.worldToScreen(marker);
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  ctx.strokeStyle = 'rgba(45, 212, 160, 0.35)';
-  ctx.setLineDash([6, 4]);
+  const size = 9;
+  ctx.strokeStyle = 'rgba(45, 212, 160, 0.58)';
   ctx.lineWidth = 1;
-  ctx.strokeRect(
-    Math.min(p1.x, p2.x),
-    Math.min(p1.y, p2.y),
-    Math.abs(p2.x - p1.x),
-    Math.abs(p2.y - p1.y),
-  );
-  ctx.setLineDash([]);
-
-  const size = 14;
-  ctx.strokeStyle = 'rgba(45, 212, 160, 0.85)';
-  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(origin.x - size, origin.y);
   ctx.lineTo(origin.x + size, origin.y);
@@ -288,9 +271,14 @@ function renderMachineOriginOverlay(
   ctx.lineTo(origin.x, origin.y + size);
   ctx.stroke();
 
-  ctx.fillStyle = 'rgba(45, 212, 160, 0.85)';
+  ctx.fillStyle = 'rgba(45, 212, 160, 0.22)';
+  ctx.beginPath();
+  ctx.arc(origin.x, origin.y, 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = 'rgba(190, 255, 235, 0.68)';
   ctx.font = '10px monospace';
-  ctx.fillText('M(0,0)', origin.x + size + 4, origin.y + 4);
+  ctx.fillText(marker.label, origin.x + size + 4, origin.y + 4);
   ctx.restore();
 }
 
