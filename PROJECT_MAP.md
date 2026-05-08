@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 359 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 463 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 360 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 464 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -40,14 +40,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 140 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 141 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 410 | - |
+| `tests/` | 411 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -395,6 +395,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/canvas/ModeTabsOverlay.tsx`
 - `src/ui/components/common/FontPicker.tsx`
 - `src/ui/components/connection/ConnectWizard.tsx`
+- `src/ui/components/connection/ConnectionDetailsPanel.tsx`
 - `src/ui/components/connection/Controls.tsx`
 - `src/ui/components/connection/Issues.tsx`
 - `src/ui/components/connection/Jog.tsx`
@@ -553,6 +554,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/connect-cleanup-on-partial-failure.test.ts`
 - `tests/connect-safe-state-clears-on-recovery.test.ts`
 - `tests/connect-safe-state-handshake.test.ts`
+- `tests/connection-details-panel.test.tsx`
 - `tests/connection-generation-guard.test.ts`
 - `tests/connection-manager-fsm.test.ts`
 - `tests/connection-panel-emergency-stop-service.test.ts`

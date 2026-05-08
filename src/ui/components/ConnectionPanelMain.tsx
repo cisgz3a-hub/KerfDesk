@@ -51,6 +51,11 @@ import { Controls } from './connection/Controls';
 import type { StartReadiness, StartReadinessGate } from './connection/StartReadinessPanel';
 import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
 import { JobPosition, WorkflowSteps } from './connection/Workflow';
+import {
+  ConnectionDetailsPanel,
+  JobDetailsLaunchers,
+  type ConnectionDetailsPanelKey,
+} from './connection/ConnectionDetailsPanel';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
@@ -316,8 +321,8 @@ export function ConnectionPanelMain({
   const [preflight, setPreflight] = useState<PreflightSummary | null>(null);
   const preflightRef = useRef<PreflightSummary | null>(null);
   const [showSimulator, setShowSimulator] = useState(false);
+  const [detailsPanel, setDetailsPanel] = useState<ConnectionDetailsPanelKey | null>(null);
   const [jogStep, setJogStep] = useState(10);
-  const [showMore, setShowMore] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [manualCmd, setManualCmd] = useState('');
   const [isTestFiring, setIsTestFiring] = useState(false);
@@ -406,6 +411,7 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessages([]);
     setShowSimulator(false);
+    setDetailsPanel(null);
     // Mount-only reset for panel-local view state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -498,6 +504,12 @@ export function ConnectionPanelMain({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
+
+  useEffect(() => {
+    if (!isConnected || isRunning || displayPaused) {
+      setDetailsPanel(null);
+    }
+  }, [displayPaused, isConnected, isRunning]);
 
   useEffect(() => {
     if (isConnected) {
@@ -2079,6 +2091,12 @@ export function ConnectionPanelMain({
     readinessScore,
   });
 
+  const detailLaunchersSection = isConnected && !isRunning && !displayPaused &&
+    React.createElement(JobDetailsLaunchers, {
+      issueCount: issues.length,
+      onOpen: setDetailsPanel,
+    });
+
   const connectionRecoveryContent = connectionRecoveryVisible
     ? buildRecoveryCard({ variant: 'disconnect' })
     : null;
@@ -2223,24 +2241,16 @@ export function ConnectionPanelMain({
     }),
   );
 
-  const moreSection = isConnected && React.createElement('div', {
-    style: { borderTop: '1px solid #1a1a2e', flexShrink: 0 },
-  },
-    React.createElement('button', {
-      type: 'button',
-      onClick: () => setShowMore(v => !v),
-      style: {
-        width: '100%', padding: '8px 16px', fontSize: 10,
-        background: 'transparent', border: 'none', color: '#555570',
-        cursor: 'pointer', fontFamily: font,
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-      },
+  const advancedMachineDetailsSection = isConnected && React.createElement('div', {
+    style: {
+      padding: '10px 16px 12px',
+      display: 'flex',
+      flexDirection: 'column' as const,
+      gap: 8,
     },
-      React.createElement('span', null, 'More options'),
-      React.createElement('span', null, showMore ? '▲' : '▼'),
-    ),
-    showMore && React.createElement('div', {
-      style: { padding: '8px 16px 12px', display: 'flex', flexDirection: 'column' as const, gap: 6, maxHeight: 200, overflowY: 'auto' as const },
+  },
+    React.createElement('div', {
+      style: { display: 'flex', flexDirection: 'column' as const, gap: 8 },
     },
       isSimulator && React.createElement('button', {
         type: 'button',
@@ -2379,6 +2389,15 @@ export function ConnectionPanelMain({
     }),
   );
 
+  const advancedSection = isConnected && React.createElement(ConsolePanel, {
+    isConnected,
+    isRunning,
+    controller: controllerRef.current,
+    sendUserCommand: sendCmd,
+    advancedSection: advancedMachineDetailsSection,
+    simulatorView,
+  });
+
   // ─── Render ─────────────────────────────────────────────
   // Sidebar layout: parent row provides width; this fills height beside the canvas.
 
@@ -2401,18 +2420,19 @@ export function ConnectionPanelMain({
       React.createElement(ConnectionControls, {
         isConnected,
         statusSection,
-        alarmBanner,
-        faultedBanner,
-        laserModeBanner,
+        alarmBanner: detailsPanel == null ? alarmBanner : null,
+        faultedBanner: detailsPanel == null ? faultedBanner : null,
+        laserModeBanner: detailsPanel == null ? laserModeBanner : null,
         connectSection,
       }),
-      connectionRecoveryCard,
-      frameRecoveryCard,
-      jobFailedRecoveryCard,
-      safetyRecoveryCard,
-      isConnected && profileSection,
-      isConnected && !isRunning && !displayPaused && controlsSection,
-      isConnected && !isRunning && !displayPaused && jobPositionSection,
+      detailsPanel == null && connectionRecoveryCard,
+      detailsPanel == null && frameRecoveryCard,
+      detailsPanel == null && jobFailedRecoveryCard,
+      detailsPanel == null && safetyRecoveryCard,
+      isConnected && detailsPanel == null && profileSection,
+      isConnected && detailsPanel == null && !isRunning && !displayPaused && controlsSection,
+      isConnected && detailsPanel == null && !isRunning && !displayPaused && jobPositionSection,
+      isConnected && detailsPanel == null && !isRunning && !displayPaused && detailLaunchersSection,
       isConnected && React.createElement('div', {
         style: {
           flex: 1,
@@ -2423,26 +2443,26 @@ export function ConnectionPanelMain({
           flexDirection: 'column' as const,
         },
       },
-        readyToRunSection,
-        React.createElement(MoveControls, {
-          isConnected,
-          isRunning,
-          displayPaused,
-          workflowStepsSection,
-          layerOverviewSection,
-          gcodeWarning,
-          compileProgressSection,
-          issuesSection,
-          outcomeExtrasSection,
-        }),
-        React.createElement(ConsolePanel, {
-          isConnected,
-          isRunning,
-          controller: controllerRef.current,
-          sendUserCommand: sendCmd,
-          moreSection,
-          simulatorView,
-        }),
+        detailsPanel != null
+          ? React.createElement(ConnectionDetailsPanel, {
+              activePanel: detailsPanel,
+              issueCount: issues.length,
+              onSelect: setDetailsPanel,
+              onClose: () => setDetailsPanel(null),
+              workflowSection: workflowStepsSection,
+              issuesSection,
+              advancedSection,
+            })
+          : React.createElement(React.Fragment, null,
+              readyToRunSection,
+              React.createElement(MoveControls, {
+                isConnected,
+                layerOverviewSection,
+                gcodeWarning,
+                compileProgressSection,
+                outcomeExtrasSection,
+              }),
+            ),
       ),
       React.createElement(JobControls, {
         isConnected,
@@ -2459,6 +2479,7 @@ export function ConnectionPanelMain({
       },
         React.createElement('button', {
           type: 'button',
+          'data-testid': 'connection-emergency-stop',
           onClick: async () => {
             jobStoppedByUserRef.current = true;
             stopTestFire();

@@ -66,7 +66,7 @@ assert(
 // 3. profileSection is rendered in the main panel body, BEFORE the
 //    MoveControls component (so the user sees it without scrolling).
 {
-  const profileIdx = src.indexOf('profileSection,\n');
+  const profileIdx = src.indexOf('detailsPanel == null && profileSection');
   const moveControlsIdx = src.indexOf('React.createElement(MoveControls,', profileIdx);
   assert(profileIdx > 0, 'profileSection is referenced in the JSX tree');
   assert(
@@ -102,10 +102,10 @@ assert(
 {
   const renderStart = src.indexOf('React.createElement(ConnectionControls');
   const scrollBodyIdx = src.indexOf("overflowY: 'auto' as const", renderStart);
-  const profileRenderIdx = src.indexOf('isConnected && profileSection', renderStart);
+  const profileRenderIdx = src.indexOf('isConnected && detailsPanel == null && profileSection', renderStart);
   assert(renderStart > 0, 'main render tree found');
   assert(scrollBodyIdx > 0, 'scrollable panel body found');
-  assert(profileRenderIdx > 0, 'profileSection is referenced in the JSX tree');
+  assert(profileRenderIdx > 0, 'profileSection is referenced in the main machine JSX tree');
   assert(
     profileRenderIdx < scrollBodyIdx,
     'profileSection renders in the fixed Machine zone before the scrollable body',
