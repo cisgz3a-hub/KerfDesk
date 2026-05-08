@@ -16326,7 +16326,7 @@ In-app: when user starts a current-mode job that's >5min estimated runtime, surf
 
 **Priority:** Tier 3 鈥?documentation/UX.
 
-**Status:** Shipped in <TBD> — added `docs/PRODUCTION_RUNS.md` with the production-run recommendation and a one-time long-job tip in `ConnectionPanelMain`. When a user starts a `Start from laser head` job estimated over five minutes, the app reminds them that Set Origin + Use saved zero point is more repeatable for longer and repeat jobs. The tip is informational only; it does not block Start or change G-code generation.
+**Status:** Shipped in `8fa3e82` — added `docs/PRODUCTION_RUNS.md` with the production-run recommendation and a one-time long-job tip in `ConnectionPanelMain`. When a user starts a `Start from laser head` job estimated over five minutes, the app reminds them that Set Origin + Use saved zero point is more repeatable for longer and repeat jobs. The tip is informational only; it does not block Start or change G-code generation.
 
 ---
 
@@ -20341,7 +20341,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
 - [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
-- [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped — production-run doc + one-time long-job tip)
+- [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [ ] T3-20 Add G17 plane-select and G94 feed-mode to header baseline
 - [ ] T3-21 Frame-dot hardcoded F3000 should follow profile / settings
 - [ ] T3-22 Tolerance-based grayscale segment merge in raster
