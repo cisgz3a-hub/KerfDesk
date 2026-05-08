@@ -16137,7 +16137,7 @@ Complexity becomes O((scanlines + edges) log edges), which for 50k edges + 4k sc
 
 **Cross-check note (audit 2E):** Audit's Priority 5. Verified. Real but not urgent.
 
-**Status:** Shipped in `<TBD>`. `generateFillRows` now builds scanline edge buckets with per-edge `enterRow` / `leaveRow` metadata, maintains an `activeEdges` set per row, and intersects only the active row subset instead of rescanning the full rotated edge pool for every scanline. Existing fill behavior is pinned for rectangle, disjoint-segment, compound-fill, raster, and pipeline paths by `tests/fill-generator-active-edge-table.test.ts`, `tests/compound-fill-generator.test.ts`, `tests/raster-output-uses-modal-m4.test.ts`, and `tests/pipeline.test.ts`. Hardware verification: not required (algorithmic planner/performance change; no controller command contract changes).
+**Status:** Shipped in `1a2c2fb`. `generateFillRows` now builds scanline edge buckets with per-edge `enterRow` / `leaveRow` metadata, maintains an `activeEdges` set per row, and intersects only the active row subset instead of rescanning the full rotated edge pool for every scanline. Existing fill behavior is pinned for rectangle, disjoint-segment, compound-fill, raster, and pipeline paths by `tests/fill-generator-active-edge-table.test.ts`, `tests/compound-fill-generator.test.ts`, `tests/raster-output-uses-modal-m4.test.ts`, and `tests/pipeline.test.ts`. Hardware verification: not required (algorithmic planner/performance change; no controller command contract changes).
 
 ---
 
