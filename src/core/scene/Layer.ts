@@ -104,6 +104,8 @@ export interface LaserSettings {
     contrast: number;       // -100 to 100
     gamma: number;          // 0.1 to 5.0
     invert: boolean;
+    /** Grayscale raster: merge adjacent burn spans when power differs by this many percentage points or less. */
+    grayscalePowerMergeTolerance?: number;
     /** @deprecated Use `imageMode === 'grayscale'` instead. */
     passThrough: boolean;
   };
@@ -199,6 +201,7 @@ export function defaultLaserSettings(mode: LayerMode = 'cut'): LaserSettings {
       contrast: 0,
       gamma: 1.0,
       invert: false,
+      grayscalePowerMergeTolerance: 2,
       passThrough: false,
     },
     airAssist: mode === 'cut',

@@ -480,6 +480,10 @@ function resolveSettings(
       : userRequestedAccelAwarePower;
   const minPowerRatioAccel =
     s.minPowerRatioAccel ?? profile?.minPowerRatioAccel ?? 0.1;
+  const grayscalePowerMergeTolerance =
+    typeof s.image.grayscalePowerMergeTolerance === 'number' && Number.isFinite(s.image.grayscalePowerMergeTolerance)
+      ? Math.max(0, Math.min(100, s.image.grayscalePowerMergeTolerance))
+      : 2;
 
   let scanningOffsets: ScanningOffsetTable = EMPTY_OFFSET_TABLE;
   if (s.useScanOffsets === false) {
@@ -574,6 +578,7 @@ function resolveSettings(
     minPowerRatioAccel,
 
     scanningOffsets,
+    grayscalePowerMergeTolerance,
     responseCurve,
   };
 }

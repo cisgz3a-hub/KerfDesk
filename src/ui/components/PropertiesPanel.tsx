@@ -28,6 +28,7 @@ import { FontPicker } from './common/FontPicker';
 import { isProUnlocked } from './TrialGuard';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
+import { DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE } from '../../core/plan/RasterGenerator';
 
 export interface ObjectPropertiesTabProps {
   scene: Scene;
@@ -1072,6 +1073,8 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       const invertVal = ims.invert ?? geom.invert ?? false;
       const imageMode: ImageRasterMode = ims.imageMode ?? 'dither';
       const thresholdVal = ims.imageThreshold ?? 128;
+      const grayscalePowerMergeToleranceVal =
+        ims.grayscalePowerMergeTolerance ?? DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE;
 
       const commitRasterLayer = (patch: Partial<typeof ims>) => {
         const s = sceneRef.current;
@@ -1303,7 +1306,24 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
                 });
               },
             }),
-          ),
+        ),
+
+        imageMode === 'grayscale' && React.createElement(React.Fragment, null,
+          React.createElement('div', { style: { ...labelStyle, marginTop: 4 } },
+            `Power merge tolerance (${grayscalePowerMergeToleranceVal})`),
+          React.createElement('input', {
+            type: 'range',
+            min: 0,
+            max: 10,
+            step: 1,
+            value: grayscalePowerMergeToleranceVal,
+            title: 'Merge adjacent grayscale burn spans when their power differs by this many percentage points or less.',
+            style: { width: '100%', accentColor: theme.accent.cyan, marginBottom: 8 },
+            onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
+              commitRasterLayer({ grayscalePowerMergeTolerance: parseInt(e.currentTarget.value, 10) });
+            },
+          }),
+        ),
 
         imageMode === 'dither' && React.createElement(React.Fragment, null,
           React.createElement('div', { style: { ...labelStyle, marginTop: 4 } }, 'Dithering algorithm'),

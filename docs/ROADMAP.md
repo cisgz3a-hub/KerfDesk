@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 17 | 73 | Active quarter-scope backlog; T3-21 configurable frame-dot feed rate shipped in this batch. |
+| Tier 3 | 18 | 72 | Active quarter-scope backlog; T3-22 grayscale raster merge tolerance shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16395,6 +16395,8 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 **Priority:** Tier 3. Quality-of-life improvement on top of T1-31.
 
+**Status:** Shipped in `<TBD>` — grayscale raster segmentation now merges adjacent variable-power spans within a configurable tolerance (default 2 power points), while still splitting at off pixels. Image layer settings expose the tolerance, and compiler/planner plumbing carries it into raster scanline generation.
+
 ---
 
 ### T3-23 | Warn when powerMin > 0 with photo-style image content
@@ -20349,7 +20351,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
-- [ ] T3-22 Tolerance-based grayscale segment merge in raster
+- [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `<TBD>` — default 2-point grayscale power merge tolerance with UI setting)
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count

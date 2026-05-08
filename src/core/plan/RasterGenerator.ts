@@ -24,6 +24,8 @@
 import { type ProcessedBitmap } from '../job/Job';
 import { darknessToPower, type ResponseCurve } from '../materials/ResponseCurve';
 
+export const DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE = 2;
+
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
 /**
@@ -52,6 +54,8 @@ export interface RasterSettings {
   speed: number;           // mm/min
   biDirectional: boolean;
   overscanning: number;    // mm extension beyond segment boundaries
+  /** Grayscale mode: merge adjacent spans whose power differs by this many percentage points or less. */
+  grayscalePowerMergeTolerance?: number;
   responseCurve?: ResponseCurve;
 }
 
@@ -173,7 +177,7 @@ export function luminanceToLaserPower(
 }
 
 /**
- * Variable-power row: each pixel gets S = luminanceToLaserPower; adjacent equal S merge.
+ * Variable-power row: each pixel gets S = luminanceToLaserPower; adjacent near-equal S merge.
  * Pixels with S <= 0 are treated as laser off (skip).
  */
 function extractSegmentsGrayscale(
@@ -188,6 +192,7 @@ function extractSegmentsGrayscale(
   const segments: RasterSegment[] = [];
   let segStart: number | null = null;
   let currentPower = -1;
+  const mergeTolerance = normalizeGrayscalePowerMergeTolerance(settings.grayscalePowerMergeTolerance);
 
   const flush = (endCol: number) => {
     if (segStart === null || currentPower <= 0) {
@@ -219,7 +224,7 @@ function extractSegmentsGrayscale(
     if (segStart === null) {
       segStart = col;
       currentPower = S;
-    } else if (S !== currentPower) {
+    } else if (Math.abs(S - currentPower) > mergeTolerance) {
       flush(col);
       segStart = col;
       currentPower = S;
@@ -235,6 +240,13 @@ function extractSegmentsGrayscale(
 /**
  * Create a RasterSegment from pixel column indices.
  */
+function normalizeGrayscalePowerMergeTolerance(value: number | undefined): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE;
+  }
+  return Math.max(0, Math.min(100, value));
+}
+
 function createSegment(
   colStart: number,
   colEnd: number,

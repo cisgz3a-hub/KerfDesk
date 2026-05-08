@@ -129,6 +129,9 @@ export interface ResolvedLaserSettings {
   /** Raster: scanning offset table (empty = no lateral shift). */
   scanningOffsets: ScanningOffsetTable;
 
+  /** Raster grayscale: merge adjacent variable-power spans within this tolerance. */
+  grayscalePowerMergeTolerance?: number;
+
   /** Optional material response curve for raster power mapping. */
   responseCurve?: ResponseCurve;
 }

@@ -661,6 +661,7 @@ function planRasterOperation(
     speed: settings.speed,
     biDirectional: settings.fillBiDirectional,
     overscanning: settings.overscanning,
+    grayscalePowerMergeTolerance: settings.grayscalePowerMergeTolerance,
     responseCurve: settings.responseCurve,
   };
 
