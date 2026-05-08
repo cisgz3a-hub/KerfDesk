@@ -16473,7 +16473,7 @@ const direction: 'ltr' | 'rtl' =
 
 ### T3-26 | Blue-noise / advanced halftone dithering
 
-**Status:** Shipped in `<TBD>` — added a deterministic `blue-noise` dither option to the shared dithering mode list and image pipeline. The mode uses a named 16x16 toroidal best-candidate threshold tile, producing binary output with stable density while keeping black all-burn and white all-off. Pinned by `tests/blue-noise-dither.test.ts`. **Hardware verification: not required** (image preprocessing option only; no machine command or safety gate behavior changed).
+**Status:** Shipped in `e083791` — added a deterministic `blue-noise` dither option to the shared dithering mode list and image pipeline. The mode uses a named 16x16 toroidal best-candidate threshold tile, producing binary output with stable density while keeping black all-burn and white all-off. Pinned by `tests/blue-noise-dither.test.ts`. **Hardware verification: not required** (image preprocessing option only; no machine command or safety gate behavior changed).
 
 **Code reference:** `src/import/Dithering.ts` (existing modes: threshold, floyd-steinberg, jarvis, stucki, atkinson, burkes, sierra variants, ordered (Bayer), random).
 
@@ -20361,7 +20361,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `681a178` — non-blocking grayscale/photo image minimum-power warning)
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
-- [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `<TBD>` — deterministic blue-noise dither mode)
+- [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
 - [ ] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn
 - [ ] T3-28 SVG inherited group styles applied at flatten time
 - [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
