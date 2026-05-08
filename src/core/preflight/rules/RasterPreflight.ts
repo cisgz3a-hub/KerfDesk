@@ -11,10 +11,15 @@ function computeSmartOverscanEstimate(speedMmPerMin: number, profile: DeviceProf
   return Math.max(((v * v) / (2 * Math.max(a, 1))) * safety, floor);
 }
 
+function formatPowerPercent(value: number): string {
+  return Number.isInteger(value) ? `${value}%` : `${Number(value.toFixed(1))}%`;
+}
+
 export function runRasterChecks(ctx: PreflightContext, out: PreflightResult[]): void {
   const { scene, profile } = ctx;
   const bedWidth = profile?.bedWidth ?? 300;
   let emittedCalibrationWarning = false;
+  const emittedPowerMinWarnings = new Set<string>();
 
   for (const layer of scene.layers) {
     if (layer.visible === false || layer.output === false) continue;
@@ -37,6 +42,22 @@ export function runRasterChecks(ctx: PreflightContext, out: PreflightResult[]): 
             fix: { label: 'Disable smart overscan', action: { type: 'disableSmartOverscan', layerId: layer.id } },
           });
         }
+      }
+
+      if (
+        layer.settings.image.imageMode === 'grayscale' &&
+        layer.settings.power.min > 0 &&
+        !emittedPowerMinWarnings.has(layer.id)
+      ) {
+        const powerMin = formatPowerPercent(layer.settings.power.min);
+        out.push({
+          severity: 'warning',
+          code: PREFLIGHT_CODES.IMAGE_POWER_MIN_MARKS_WHITE,
+          message: `Layer "${layer.name}" has minimum power ${powerMin} with a photo-style image. White areas will receive ${powerMin} laser power. For photo engraving, set minimum power to 0.`,
+          layerId: layer.id,
+          objectId: obj.id,
+        });
+        emittedPowerMinWarnings.add(layer.id);
       }
     }
 

@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 18 | 72 | Active quarter-scope backlog; T3-22 grayscale raster merge tolerance shipped in this batch. |
+| Tier 3 | 19 | 71 | Active quarter-scope backlog; T3-23 photo-style raster power-min warning shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16401,6 +16401,8 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 ### T3-23 | Warn when powerMin > 0 with photo-style image content
 
+**Status:** Shipped in `<TBD>` — grayscale/photo image layers now raise a non-blocking preflight warning when minimum power is above zero, because white pixels in grayscale raster output still receive that minimum power. The warning is deduped per visible/output layer, does not block Start, and stays quiet for threshold/dither image modes plus hidden or output-disabled content. Pinned by `tests/raster-power-min-preflight.test.ts`. **Hardware verification: not required** (preflight warning only; no G-code generation, motion, or safety gate behavior changed).
+
 **Code reference:** `src/core/plan/RasterGenerator.ts:208` (`luminanceToLaserPower` 鈥?white pixels map to powerMin), `src/core/preflight/rules/RasterPreflight.ts` (where the warning would go).
 
 **Problem:** Audit 2B noted: in grayscale raster mode, white pixels (luminance 255) map to `powerMin`. If user sets `powerMin = 5%` (sometimes wanted for materials needing minimum marking power), white areas of a photo also get 5% burn. For photo engraving where users expect white to mean "no burn," this produces unintended marking on the workpiece background.
@@ -20352,7 +20354,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
 - [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
-- [ ] T3-23 Warn when powerMin > 0 with photo-style image content
+- [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `<TBD>` — non-blocking grayscale/photo image minimum-power warning)
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count
 - [ ] T3-26 Blue-noise / advanced halftone dithering modes
