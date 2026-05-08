@@ -18,6 +18,7 @@ export type DitherMode =
   | 'sierra3'
   | 'sierra2'
   | 'sierra-lite'
+  | 'blue-noise'
   | 'random';
 
 export function getDitherModes(): { id: DitherMode; name: string }[] {
@@ -33,6 +34,7 @@ export function getDitherModes(): { id: DitherMode; name: string }[] {
     { id: 'sierra3', name: 'Sierra 3' },
     { id: 'sierra2', name: 'Sierra 2' },
     { id: 'sierra-lite', name: 'Sierra Lite' },
+    { id: 'blue-noise', name: 'Blue Noise' },
     { id: 'random', name: 'Random' },
   ];
 }
@@ -55,6 +57,7 @@ export function ditherImage(
     case 'sierra3': return ditherErrorDiffusion(data, width, height, threshold, SIERRA3);
     case 'sierra2': return ditherErrorDiffusion(data, width, height, threshold, SIERRA2);
     case 'sierra-lite': return ditherErrorDiffusion(data, width, height, threshold, SIERRA_LITE);
+    case 'blue-noise': return ditherBlueNoise(data, width, height);
     case 'random': return ditherRandom(data, width, height);
     case 'ordered': return ditherOrdered(data, width, height);
     default: return data.slice();
@@ -222,6 +225,95 @@ function ditherOrdered(
       const bayerVal = BAYER_4X4[y % 4][x % 4];
       const thresh = ((bayerVal + 0.5) / 16) * 255;
       out[i] = data[i] < thresh ? 255 : 0; // dark = burn
+    }
+  }
+
+  return out;
+}
+
+// ─── BLUE NOISE ─────────────────────────────────────────────────────────────
+
+export const BLUE_NOISE_TILE_SIZE = 16;
+let blueNoiseThresholdTile: Uint8Array | null = null;
+
+function toroidalDistanceSq(a: number, b: number, size: number): number {
+  const ax = a % size;
+  const ay = Math.floor(a / size);
+  const bx = b % size;
+  const by = Math.floor(b / size);
+  const dxRaw = Math.abs(ax - bx);
+  const dyRaw = Math.abs(ay - by);
+  const dx = Math.min(dxRaw, size - dxRaw);
+  const dy = Math.min(dyRaw, size - dyRaw);
+  return dx * dx + dy * dy;
+}
+
+function tieBreakHash(index: number): number {
+  let n = Math.imul(index ^ 0x9e3779b9, 0x85ebca6b);
+  n ^= n >>> 13;
+  n = Math.imul(n, 0xc2b2ae35);
+  return (n ^ (n >>> 16)) >>> 0;
+}
+
+export function buildBlueNoiseThresholdTile(size: number = BLUE_NOISE_TILE_SIZE): Uint8Array {
+  const tileSize = Math.max(2, Math.floor(size));
+  const cellCount = tileSize * tileSize;
+  const ranks = new Uint16Array(cellCount);
+  const occupied = new Uint8Array(cellCount);
+  const placed: number[] = [];
+
+  for (let rank = 0; rank < cellCount; rank++) {
+    let bestIndex = -1;
+    let bestDistance = -1;
+    let bestTie = -1;
+
+    for (let index = 0; index < cellCount; index++) {
+      if (occupied[index]) continue;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      for (const filled of placed) {
+        const distance = toroidalDistanceSq(index, filled, tileSize);
+        if (distance < nearestDistance) nearestDistance = distance;
+      }
+      const candidateDistance = placed.length === 0 ? Number.POSITIVE_INFINITY : nearestDistance;
+      const tie = tieBreakHash(index);
+      if (candidateDistance > bestDistance || (candidateDistance === bestDistance && tie > bestTie)) {
+        bestIndex = index;
+        bestDistance = candidateDistance;
+        bestTie = tie;
+      }
+    }
+
+    occupied[bestIndex] = 1;
+    placed.push(bestIndex);
+    ranks[bestIndex] = rank;
+  }
+
+  const thresholds = new Uint8Array(cellCount);
+  for (let i = 0; i < cellCount; i++) {
+    thresholds[i] = Math.max(1, Math.min(255, Math.floor(((cellCount - ranks[i]) / cellCount) * 256)));
+  }
+  return thresholds;
+}
+
+function getBlueNoiseThresholdTile(): Uint8Array {
+  if (!blueNoiseThresholdTile) {
+    blueNoiseThresholdTile = buildBlueNoiseThresholdTile();
+  }
+  return blueNoiseThresholdTile;
+}
+
+function ditherBlueNoise(
+  data: Uint8Array, width: number, height: number
+): Uint8Array {
+  const out = new Uint8Array(width * height);
+  const tile = getBlueNoiseThresholdTile();
+  const size = BLUE_NOISE_TILE_SIZE;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = y * width + x;
+      const threshold = tile[(y % size) * size + (x % size)];
+      out[i] = data[i] < threshold ? 255 : 0; // dark = burn
     }
   }
 

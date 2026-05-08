@@ -46,6 +46,7 @@ export type DitherMode =
   | 'sierra3'
   | 'sierra2'
   | 'sierra-lite'
+  | 'blue-noise'
   | 'random';
 
 export type CutOrder = 'layer-priority' | 'object-order' | 'optimized';
