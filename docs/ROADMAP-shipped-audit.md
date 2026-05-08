@@ -228,6 +228,8 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 |---|---|---|
 | T1-23 | Pause must emit explicit M5 (or document firmware proof) | needs modal-state subsystem |
 | T1-25 | Reconnect safe-state handshake | 1-2 sessions |
+| T1-109 | Frame bounds must filter by `layer.output` (frame walks beyond burn area for guide-layer scenes) | 30 min |
+| T1-110 | Start button hidden by low contrast / Head-mode anchor invalidation surfaces poorly | ~1 hr |
 
 ### Tier 1 not yet re-verified individually
 

@@ -6385,6 +6385,91 @@ A layer can have `visible: true` (drawn on canvas) but `output: false` (excluded
 
 ---
 
+### T1-109 | Frame bounds must filter by `layer.output` (frame walks beyond burn area)
+
+**Code reference:** `src/ui/components/App.tsx:155-167` (inline `sceneBounds` useMemo); `src/geometry/bounds.ts:69-87` (`computeSceneBounds`); `src/core/job/JobCompiler.ts:177, 214` (compile-side filter via `getOutputLayers`); `src/ui/components/ConnectionPanelMain.tsx:707-715, 730-762` (`sceneBounds` prop + `frameMachineBounds` consumer).
+
+**Problem:** Reported by Falcon A1 Pro tester 2026-05-08: framing in Origin or Head mode walks far beyond the actual burn area, including off-bed, when the scene contains a guide / reference layer.
+
+Cross-checked at App.tsx:155-167:
+
+```ts
+const sceneBounds = useMemo(() => {
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const obj of scene.objects) {
+    if (!obj.visible) continue;
+    const b = computeObjectBounds(obj);
+    if (!b) continue;
+    minX = Math.min(minX, b.minX);
+    // ...
+  }
+  return { minX, minY, maxX, maxY };
+}, [scene.objects]);
+```
+
+This iterates `scene.objects` and filters only by `obj.visible`. It does NOT check `layer.visible` and does NOT check `layer.output`. The compile-side filter at `JobCompiler.ts:214` uses `getOutputLayers` = `l.visible && l.output`, then `JobCompiler.ts:177` requires `obj.layerId === layer.id && o.visible` per layer.
+
+For any scene with a visible-on-canvas layer marked `output: false` (the standard guide / reference / placement-aid pattern), `sceneBounds` includes guide-layer geometry but the compiled job does not. `frameMachineBounds` (ConnectionPanelMain.tsx:730) and `buildFrameCorners` (frameGcode.ts:14) both consume this inflated `sceneBounds`, so frame motion traces a box larger than the burn area — and on a guide that extends near the bed edges, that box can go off-bed.
+
+This is the same class of bug as T1-107 (preflight bed-bounds + visible-layer-for-output checks ignored `layer.output`). T1-107 fixed the preflight call sites; the frame-bounds call site in `App.tsx` was missed because the inline computation does not flow through `geometry/bounds.ts`.
+
+Note `computeSceneBounds` in `bounds.ts:69` filters by `obj.visible && layer.visible` — slightly tighter than App's inline (which omits `layer.visible` too) — but still does not check `layer.output`. Any new caller wiring `computeSceneBounds` into a job-output path would inherit the same bug.
+
+**Identified by:** Falcon A1 Pro tester repro 2026-05-08, confirmed by code reading. Same root-cause class as T1-107.
+
+**Fix:** Add `computeOutputBounds(scene)` helper to `src/geometry/bounds.ts` that filters by `obj.visible && layer.visible && layer.output !== false`. This is the canonical "what will burn" bounds — same predicate the JobCompiler's `getOutputLayers` + visible-object filter applies. App.tsx:155 swaps its inline computation for `computeOutputBounds(scene)`. `computeSceneBounds` is unchanged — `SceneRenderer` and `SvgToScene` legitimately need full-scene bounds for viewport rendering and import positioning.
+
+**Tests:** `tests/frame-bounds-output-layer-filter.test.ts`:
+1. Scene with `output: true` engraving layer + `output: false` guide layer — `computeOutputBounds` returns only the engraving-layer AABB; `computeSceneBounds` (regression) still returns the union.
+2. Scene with all `output: false` layers but visible content — `computeOutputBounds` returns empty AABB.
+3. Hidden layer (`visible: false`) ignored even when `output: true`.
+4. Hidden object (`visible: false`) ignored even when on visible+output layer.
+5. Source-pin: `App.tsx` no longer iterates raw `scene.objects` with the visible-only filter; references `computeOutputBounds`.
+6. Integration shape: bounds returned by `computeOutputBounds` match the canvas-space AABB of the same set the JobCompiler would compile from the scene (cross-check against `getOutputLayers` + `objectsOnLayerInSceneOrder`).
+
+**Estimate:** 30 min including tests.
+
+**Priority:** Tier 1 — frame motion goes beyond the burn area and potentially off-bed. Same severity class as T1-39, T1-40, T1-42 (frame ≠ burn). Hardware verification by re-running the Falcon tester repro: design the same scene with a guide layer, frame in Origin mode, confirm frame outline matches the engraving area only.
+
+**Status:** Open.
+
+---
+
+### T1-110 | Start button hidden by low contrast / Head-mode anchor invalidation surfaces poorly
+
+**Code reference:** `src/ui/components/connection/Controls.tsx:66-79` (Start button styling when disabled); `src/ui/components/connection/StartReadinessPanel.tsx:74-119` (collapsed-by-default readiness panel); `src/app/CurrentFrameAnchor.ts:13` (0.25mm tolerance constant); `src/ui/components/ConnectionPanelMain.tsx:1524-1534` (`canStartJob` conjuncts), `src/ui/components/ConnectionPanelMain.tsx:1634-1642` (`currentModeAnchor` gate).
+
+**Problem:** Reported by Falcon A1 Pro tester 2026-05-08: "most of the time the start button doesn't show." Two paths produce this user-visible symptom; neither involves the Start button actually being unmounted from the DOM.
+
+1. **Visual.** `Controls.tsx:75-78` renders disabled Start as `background: #1a1a2e`, `border: 1px solid #252540`, `color: #333355`. On the dark sidebar (also `#1a1a2e`), the button blends into the panel background and the text is at the edge of perception. From the user's perspective it looks like "no button there." Compare to enabled Start: `background: rgba(45,212,160,0.12)` (visible green), `color: #2dd4a0` (bright). The contrast gap is intentional (disabled = dim) but overshoots into "invisible."
+
+2. **Anchor.** In Head mode (`startMode === 'current'`), `canStartJob` requires `currentModeFrameAnchorValid` (ConnectionPanelMain.tsx:1531). That predicate (`CurrentFrameAnchor.ts:36-39`) returns false when `Math.abs(machinePosition.x - frameAnchor.x) > 0.25` or the same on Y. The 0.25 mm tolerance is intentional safety — Head mode burns are positioned relative to the head's location at frame time, so any movement breaks that relationship. But the moment a user nudges a jog button (or some controllers drift slightly during status polls), Start silently disables. The `currentModeAnchor` gate carries the right reason ("Laser head moved after framing"), but `StartReadinessPanel` starts collapsed (`useState(false)` at StartReadinessPanel.tsx:75), so the failure reason isn't visible until the user clicks "Why?". Combined with #1, the Start button looks gone with no apparent recourse.
+
+**Identified by:** Falcon A1 Pro tester repro 2026-05-08, confirmed by code reading. Both contributing causes verified at named line numbers.
+
+**Fix:**
+
+1. **Disabled-Start contrast.** Raise `color` on the disabled Start button from `#333355` to `#555570` (still dim, but readable on `#1a1a2e`). Optionally raise border from `#252540` to `#3a3a55` so the button outline is distinguishable from the sidebar.
+
+2. **Auto-expand readiness panel for "user invalidated" gates.** `StartReadinessPanel` accepts a new prop `autoExpandForGates?: GateId[]` (or equivalent). When `readiness.blockingGate?.id` matches one of `currentModeAnchor`, `framing`, `frameControl`, the panel mounts with `expanded: true`. Other gates (e.g. `controllerConnected`, `gcodeCompiled`) — long-lived setup state, not user-invalidated — stay collapsed-by-default to keep the sidebar tight.
+
+3. **No tolerance change.** The 0.25 mm tolerance in `CurrentFrameAnchor.ts:13` is intentional safety and stays. The fix is making the consequence visible, not loosening the gate.
+
+**Tests:** `tests/start-button-disabled-contrast.test.tsx`, `tests/start-readiness-auto-expand.test.tsx`:
+1. `canStartJob === false` and blocking gate id `currentModeAnchor` — `StartReadinessPanel` renders with `aria-expanded='true'`.
+2. `canStartJob === false` and blocking gate id `controllerConnected` — `StartReadinessPanel` renders with `aria-expanded='false'` (preserves prior collapsed-by-default UX for setup gates).
+3. `canStartJob === false` and blocking gate id `framing` — auto-expanded.
+4. Disabled Start button color is `#555570` (or whatever new constant ships) — source-level pin so we don't drift back.
+5. Source-level pin: `CurrentFrameAnchor.ts:13` constant unchanged at 0.25 (no tolerance regression).
+
+**Estimate:** ~1 hour including tests.
+
+**Priority:** Tier 1 — workflow blocker. The user-experienced symptom is "the app's broken / Start gone" for what's actually intentional safety gating that lacks user-visible explanation.
+
+**Status:** Open.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
