@@ -292,6 +292,10 @@ export class GrblController implements GrblControllerApi {
   private _awaitingSettingsOk = false;
   /** Waiting for `ok` after a `$#` WCS / parameter report. */
   private _awaitingWcsQueryOk = false;
+  /** Waiting for `ok` after a one-off `$#` work-offset request. */
+  private _awaitingWorkOffsetRequestOk = false;
+  private _workOffsetRequestResolve: ((g54: { x: number; y: number; z: number } | null) => void) | null = null;
+  private _workOffsetRequestTimer: ReturnType<typeof setTimeout> | null = null;
   private _currentG54: { x: number; y: number; z: number } | null = null;
   private _wcsConsentListeners = new Set<(state: WcsConsentSnapshot) => void>();
   /**
@@ -653,6 +657,7 @@ export class GrblController implements GrblControllerApi {
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
     this._awaitingWcsQueryOk = false;
+    this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
     // T1-20: nothing to be uncertain about when not connected.
     this._placementUncertain = false;
@@ -683,6 +688,7 @@ export class GrblController implements GrblControllerApi {
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
     this._awaitingWcsQueryOk = false;
+    this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
     this._placementUncertain = false;
     this._positionConfirmed = false;
@@ -1371,30 +1377,34 @@ export class GrblController implements GrblControllerApi {
    * if the controller is disconnected or the response did not parse
    * within the timeout.
    *
-   * Implementation: clear `_currentG54` (tombstone), send `$#`, then
-   * poll for `_currentG54` to repopulate when the next `[G54:x,y,z]`
-   * line arrives. The timeout defaults to 1 second — generous for any
-   * real GRBL response, short enough to avoid hanging the UI.
+   * Implementation: clear `_currentG54` (tombstone), send `$#`, parse the
+   * next `[G54:x,y,z]`, then resolve when GRBL sends the trailing `ok`.
+   * This is intentionally separate from the startup WCS-consent query.
    */
   async requestWorkOffsets(timeoutMs = 1000): Promise<{ x: number; y: number; z: number } | null> {
     if (!this._port?.isOpen) return null;
+    if (this._awaitingWcsQueryOk) return null;
+    this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
-    this._writeSystemLine('$#');
-    const start = Date.now();
     return new Promise<{ x: number; y: number; z: number } | null>((resolve) => {
-      const tick = (): void => {
-        if (this._currentG54) {
-          resolve(this._currentG54);
-          return;
-        }
-        if (Date.now() - start >= timeoutMs) {
-          resolve(null);
-          return;
-        }
-        setTimeout(tick, 20);
-      };
-      tick();
+      this._awaitingWorkOffsetRequestOk = true;
+      this._workOffsetRequestResolve = resolve;
+      this._workOffsetRequestTimer = setTimeout(() => {
+        this._finishWorkOffsetRequest(null);
+      }, Math.max(0, timeoutMs));
+      this._writeSystemLine('$#');
     });
+  }
+
+  private _finishWorkOffsetRequest(g54: { x: number; y: number; z: number } | null): void {
+    const resolve = this._workOffsetRequestResolve;
+    if (this._workOffsetRequestTimer !== null) {
+      clearTimeout(this._workOffsetRequestTimer);
+      this._workOffsetRequestTimer = null;
+    }
+    this._awaitingWorkOffsetRequestOk = false;
+    this._workOffsetRequestResolve = null;
+    if (resolve) resolve(g54 ? { ...g54 } : null);
   }
 
   private _onSettingsDollarOk(): void {
@@ -1506,6 +1516,20 @@ export class GrblController implements GrblControllerApi {
         this._awaitingWcsQueryOk = false;
         this._currentG54 = null;
         this.skipWcsNormalization();
+        return;
+      }
+      this._tryParseG54WcsLine(line);
+      return;
+    }
+
+    if (this._awaitingWorkOffsetRequestOk) {
+      if (line === 'ok') {
+        this._finishWorkOffsetRequest(this._currentG54);
+        return;
+      }
+      if (line.startsWith('error:')) {
+        this._currentG54 = null;
+        this._finishWorkOffsetRequest(null);
         return;
       }
       this._tryParseG54WcsLine(line);

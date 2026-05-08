@@ -282,7 +282,7 @@ export class MockSerialPort implements SerialPortLike {
     }
     if (line === '$#') {
       return [
-        '[G54:0.000,0.000,0.000]',
+        `[G54:${this._workOffsetX.toFixed(3)},${this._workOffsetY.toFixed(3)},0.000]`,
         '[G55:0.000,0.000,0.000]',
         'ok',
       ];
