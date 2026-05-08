@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 357 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 452 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 358 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 453 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -38,6 +38,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/security` | 3 | - |
 | `src/storage` | 2 | - |
 | `src/templates` | 1 | - |
+| `src/transports` | 1 | - |
 | `src/types` | 3 | - |
 | `src/ui` | 139 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
@@ -46,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 399 | - |
+| `tests/` | 400 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -314,6 +315,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 ### `src/templates`
 
 - `src/templates/TemplateLibrary.ts`
+
+### `src/transports`
+
+- `src/transports/Transport.ts`
 
 ### `src/types`
 
@@ -838,6 +843,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/text-property-edits-undoable.test.ts`
 - `tests/ticket-capability-snapshot-validation.test.ts`
 - `tests/ticket-validation-message-translation.test.ts`
+- `tests/transport-abstraction.test.ts`
 - `tests/transport-multi-subscribe.test.ts`
 - `tests/troubleshooting-panel.test.ts`
 - `tests/try-finalize-after-observed-running.test.ts`
