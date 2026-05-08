@@ -16353,7 +16353,7 @@ Trivial change. Two lines added to the default header.
 
 **Priority:** Tier 3 鈥?minor defensive hardening. Combines naturally with T2-14 (non-removable safety wrapper).
 
-**Status:** Shipped in `<TBD>` — the non-removable GRBL header baseline now reasserts `G17` (XY plane) and `G94` (feed per minute) before laser-off. Pinned by `tests/gcode-header-modal-baseline.test.ts`; E2E G-code snapshots refreshed, and `tests/gcode-relative-mode.test.ts` now treats `G17` as a modal line instead of a `G1` motion line.
+**Status:** Shipped in `8c82e91` — the non-removable GRBL header baseline now reasserts `G17` (XY plane) and `G94` (feed per minute) before laser-off. Pinned by `tests/gcode-header-modal-baseline.test.ts`; E2E G-code snapshots refreshed, and `tests/gcode-relative-mode.test.ts` now treats `G17` as a modal line instead of a `G1` motion line.
 
 ---
 
@@ -20345,7 +20345,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
 - [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
-- [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `<TBD>` — non-removable G-code header modal baseline)
+- [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [ ] T3-21 Frame-dot hardcoded F3000 should follow profile / settings
 - [ ] T3-22 Tolerance-based grayscale segment merge in raster
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content
