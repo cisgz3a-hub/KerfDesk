@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 358 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 457 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 359 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 458 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -40,14 +40,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 139 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 140 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 404 | - |
+| `tests/` | 405 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -336,6 +336,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/AppSettingsModal.tsx`
 - `src/ui/components/AppTextDialogs.tsx`
 - `src/ui/components/BoxGenerator.tsx`
+- `src/ui/components/BuildStamp.tsx`
 - `src/ui/components/CameraDialog.tsx`
 - `src/ui/components/CanvasViewport.tsx`
 - `src/ui/components/ConnectionControls.tsx`
@@ -523,6 +524,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/box-library-filtering.test.tsx`
 - `tests/box-library.test.ts`
 - `tests/box-preset-preview-model.test.ts`
+- `tests/build-stamp.test.tsx`
 - `tests/burn-moves-2d.test.ts`
 - `tests/burn-progress-ack-timing.test.ts`
 - `tests/cable-yanked-mid-job.test.ts`
