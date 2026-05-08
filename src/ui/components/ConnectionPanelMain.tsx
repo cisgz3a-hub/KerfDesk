@@ -98,6 +98,7 @@ type StartMode = GcodeStartMode;
 
 /** Keep streaming-health banner visible briefly after status recovers (reduces flicker). */
 const STREAMING_WARNING_HOLD_MS = 3000;
+const CURRENT_MODE_LONG_JOB_TIP_KEY = 'laserforge_current_mode_long_job_tip_acknowledged';
 
 function formatJobTime(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
@@ -1111,6 +1112,26 @@ export function ConnectionPanelMain({
       ]);
       await showAlert('Cannot start job', 'The compile output is out of date for this ticket. Recompile, then start.');
       return;
+    }
+    if (startMode === 'current' && gcode && estimateJobTime(gcode).totalSeconds > 5 * 60) {
+      let shouldShowProductionTip = true;
+      try {
+        shouldShowProductionTip = localStorage.getItem(CURRENT_MODE_LONG_JOB_TIP_KEY) !== 'true';
+      } catch {
+        shouldShowProductionTip = true;
+      }
+      if (shouldShowProductionTip) {
+        await showAlert(
+          'Production positioning tip',
+          'For longer jobs and repeat burns, Set Origin and Use saved zero point are more repeatable than Start from laser head. Head mode is still fine for quick one-off jobs, alignment tests, and prototypes.',
+          'See docs/PRODUCTION_RUNS.md for the recommended production workflow.',
+        );
+        try {
+          localStorage.setItem(CURRENT_MODE_LONG_JOB_TIP_KEY, 'true');
+        } catch {
+          /* localStorage may be unavailable in tests or hardened browser modes. */
+        }
+      }
     }
     setMessages(prev => [
       ...prev,
