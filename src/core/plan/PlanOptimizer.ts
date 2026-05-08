@@ -209,7 +209,12 @@ function planOperation(
       // VECTOR (cut/score): Outline paths with inside-first ordering
       const paths = operation.geometry.paths;
       if (paths.length > 0) {
-        const ordered = orderPathsForCutting(paths, pos, settings.insideFirst);
+        const ordered = orderPathsForCutting(
+          paths,
+          pos,
+          settings.insideFirst,
+          operation.type === 'cut',
+        );
         for (const { path, reversed } of ordered) {
           moves.push({ type: 'marker', sourceObjectIds: [path.id] });
           const pathMoves = planPath(path, reversed, settings);
@@ -532,7 +537,7 @@ function planFillOperation(
     );
     let pos = startPos;
     const movesOut: Move[] = [];
-    const ordered = orderPathsForCutting(boundaryPaths, pos, false);
+    const ordered = orderPathsForCutting(boundaryPaths, pos, false, false);
     for (const { path, reversed } of ordered) {
       const pathMoves = planPath(path, reversed, settings);
       for (let i = 0; i < pathMoves.length; i++) {
@@ -859,18 +864,20 @@ function appendRasterBurnMoves(
 // ─── PATH ORDERING (INSIDE-FIRST + NEAREST-NEIGHBOR) ─────────────
 
 /**
- * Order paths for cutting with two constraints:
- * 1. Inner paths must be cut before outer paths (containment safety)
- * 2. Within each containment depth, minimize travel (2-opt order + best direction)
+ * Order vector paths with three constraints:
+ * 1. Optional open-before-closed ordering for cut operations (score-like cuts before part release)
+ * 2. Inner closed paths must be cut before outer paths when insideFirst is enabled
+ * 3. Within each partition/depth, minimize travel (2-opt order + best direction)
  *
  * When insideFirst is false, uses 2-opt ordering from the job start (no nesting).
  */
 function orderPathsForCutting(
   paths: FlatPath[],
   startPos: Point,
-  insideFirst: boolean
+  insideFirst: boolean,
+  openBeforeClosed: boolean = false,
 ): OrderedPath[] {
-  if (!insideFirst || paths.length <= 1) {
+  if ((!insideFirst && !openBeforeClosed) || paths.length <= 1) {
     return orderWithBestDirection(optimizePathOrder(paths, startPos), startPos);
   }
 
@@ -881,37 +888,45 @@ function orderPathsForCutting(
     (p.closed ? closed : open).push(p);
   }
 
-  // If no closed paths, just nearest-neighbor the open ones
-  if (closed.length === 0) {
-    return orderWithBestDirection(optimizePathOrder(open, startPos), startPos);
-  }
-
-  // Build containment tree and get depth-grouped paths
-  const depthGroups = getDepthGroups(closed);
   const result: OrderedPath[] = [];
   let pos = startPos;
 
-  // Process from deepest to shallowest (inner before outer)
-  const maxDepth = Math.max(...depthGroups.keys());
-  for (let depth = maxDepth; depth >= 0; depth--) {
-    const group = depthGroups.get(depth);
-    if (!group || group.length === 0) continue;
-
-    // Within this depth level, optimize order then pick traversal direction
-    const ordered = orderWithBestDirection(optimizePathOrder(group, pos), pos);
-    for (let i = 0; i < ordered.length; i++) {
-      result.push(ordered[i]);
+  if (openBeforeClosed && open.length > 0) {
+    const orderedOpen = orderWithBestDirection(optimizePathOrder(open, pos), pos);
+    for (let i = 0; i < orderedOpen.length; i++) {
+      result.push(orderedOpen[i]);
     }
+    pos = getLastOrderedPathEndpoint(orderedOpen, pos);
+  }
 
-    // Update position to end of last path in this group
-    if (ordered.length > 0) {
-      const last = ordered[ordered.length - 1];
-      pos = getPathEndpoint(last.path, last.reversed);
+  if (closed.length > 0) {
+    if (insideFirst) {
+      // Build containment tree and get depth-grouped paths
+      const depthGroups = getDepthGroups(closed);
+
+      // Process from deepest to shallowest (inner before outer)
+      const maxDepth = Math.max(...depthGroups.keys());
+      for (let depth = maxDepth; depth >= 0; depth--) {
+        const group = depthGroups.get(depth);
+        if (!group || group.length === 0) continue;
+
+        // Within this depth level, optimize order then pick traversal direction
+        const ordered = orderWithBestDirection(optimizePathOrder(group, pos), pos);
+        for (let i = 0; i < ordered.length; i++) {
+          result.push(ordered[i]);
+        }
+        pos = getLastOrderedPathEndpoint(ordered, pos);
+      }
+    } else {
+      const orderedClosed = orderWithBestDirection(optimizePathOrder(closed, pos), pos);
+      for (let i = 0; i < orderedClosed.length; i++) {
+        result.push(orderedClosed[i]);
+      }
+      pos = getLastOrderedPathEndpoint(orderedClosed, pos);
     }
   }
 
-  // Open paths go last, optimized order
-  if (open.length > 0) {
+  if (!openBeforeClosed && open.length > 0) {
     const orderedOpen = orderWithBestDirection(optimizePathOrder(open, pos), pos);
     for (let i = 0; i < orderedOpen.length; i++) {
       result.push(orderedOpen[i]);
@@ -919,6 +934,12 @@ function orderPathsForCutting(
   }
 
   return result;
+}
+
+function getLastOrderedPathEndpoint(ordered: OrderedPath[], fallback: Point): Point {
+  if (ordered.length === 0) return fallback;
+  const last = ordered[ordered.length - 1];
+  return getPathEndpoint(last.path, last.reversed);
 }
 
 /**
