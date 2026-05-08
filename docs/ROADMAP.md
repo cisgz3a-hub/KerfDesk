@@ -16395,7 +16395,7 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 **Priority:** Tier 3. Quality-of-life improvement on top of T1-31.
 
-**Status:** Shipped in `<TBD>` — grayscale raster segmentation now merges adjacent variable-power spans within a configurable tolerance (default 2 power points), while still splitting at off pixels. Image layer settings expose the tolerance, and compiler/planner plumbing carries it into raster scanline generation.
+**Status:** Shipped in `03c916f` — grayscale raster segmentation now merges adjacent variable-power spans within a configurable tolerance (default 2 power points), while still splitting at off pixels. Image layer settings expose the tolerance, and compiler/planner plumbing carries it into raster scanline generation.
 
 ---
 
@@ -20351,7 +20351,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
-- [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `<TBD>` — default 2-point grayscale power merge tolerance with UI setting)
+- [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count
