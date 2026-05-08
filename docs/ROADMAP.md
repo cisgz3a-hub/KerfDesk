@@ -16401,7 +16401,7 @@ T1-31 (raster motion strategy) makes this matter less because each segment becom
 
 ### T3-23 | Warn when powerMin > 0 with photo-style image content
 
-**Status:** Shipped in `<TBD>` — grayscale/photo image layers now raise a non-blocking preflight warning when minimum power is above zero, because white pixels in grayscale raster output still receive that minimum power. The warning is deduped per visible/output layer, does not block Start, and stays quiet for threshold/dither image modes plus hidden or output-disabled content. Pinned by `tests/raster-power-min-preflight.test.ts`. **Hardware verification: not required** (preflight warning only; no G-code generation, motion, or safety gate behavior changed).
+**Status:** Shipped in `681a178` — grayscale/photo image layers now raise a non-blocking preflight warning when minimum power is above zero, because white pixels in grayscale raster output still receive that minimum power. The warning is deduped per visible/output layer, does not block Start, and stays quiet for threshold/dither image modes plus hidden or output-disabled content. Pinned by `tests/raster-power-min-preflight.test.ts`. **Hardware verification: not required** (preflight warning only; no G-code generation, motion, or safety gate behavior changed).
 
 **Code reference:** `src/core/plan/RasterGenerator.ts:208` (`luminanceToLaserPower` 鈥?white pixels map to powerMin), `src/core/preflight/rules/RasterPreflight.ts` (where the warning would go).
 
@@ -20354,7 +20354,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
 - [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
-- [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `<TBD>` — non-blocking grayscale/photo image minimum-power warning)
+- [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `681a178` — non-blocking grayscale/photo image minimum-power warning)
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count
 - [ ] T3-26 Blue-noise / advanced halftone dithering modes
