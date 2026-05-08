@@ -648,15 +648,17 @@ if (grblStrategy) {
   assert(text.includes('M4'), 'G-code includes M4 (dynamic laser ON)');
   assert(text.includes('M5'), 'G-code includes M5 (laser OFF)');
   assert(text.includes('G0'), 'G-code includes G0 (rapid moves)');
-  assert(text.includes('G1'), 'G-code includes G1 (linear moves)');
+  assert(/\bG1\b/.test(text), 'G-code includes G1 (linear moves)');
   assert(text.includes('M2'), 'G-code includes M2 (program end)');
   assert(text.includes('M8'), 'G-code includes M8 (air assist ON)');
   assert(text.includes('M9'), 'G-code includes M9 (air assist OFF)');
   
   // Verify M4 appears BEFORE the first G1 in the output
+  const outputLines = text.split(/\r?\n/);
   const m4Pos = text.indexOf('M4');
-  const firstG1 = text.indexOf('G1');
-  assert(m4Pos < firstG1, 'M4 (laser on) appears before first G1 (cut move)');
+  const m4Line = outputLines.findIndex(line => /^M4\b/i.test(line.trim()));
+  const firstG1Line = outputLines.findIndex(line => /^G1\b/i.test(line.trim()));
+  assert(m4Line >= 0 && firstG1Line >= 0 && m4Line < firstG1Line, 'M4 (laser on) appears before first G1 (cut move)');
 
   // Verify M5 appears AFTER M4 (laser on before off)
   const firstM5After = text.indexOf('M5 S0', m4Pos);

@@ -63,6 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 3 | 16 | 74 | Active quarter-scope backlog; T3-20 header modal baseline shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16352,6 +16353,8 @@ Trivial change. Two lines added to the default header.
 
 **Priority:** Tier 3 鈥?minor defensive hardening. Combines naturally with T2-14 (non-removable safety wrapper).
 
+**Status:** Shipped in `<TBD>` — the non-removable GRBL header baseline now reasserts `G17` (XY plane) and `G94` (feed per minute) before laser-off. Pinned by `tests/gcode-header-modal-baseline.test.ts`; E2E G-code snapshots refreshed, and `tests/gcode-relative-mode.test.ts` now treats `G17` as a modal line instead of a `G1` motion line.
+
 ---
 
 ### T3-21 | Frame-dot hardcoded F3000 should follow profile / settings
@@ -20342,7 +20345,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
 - [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
-- [ ] T3-20 Add G17 plane-select and G94 feed-mode to header baseline
+- [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `<TBD>` — non-removable G-code header modal baseline)
 - [ ] T3-21 Frame-dot hardcoded F3000 should follow profile / settings
 - [ ] T3-22 Tolerance-based grayscale segment merge in raster
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content

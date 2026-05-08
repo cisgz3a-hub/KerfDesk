@@ -228,7 +228,7 @@ function rectangleJobAndPlan(withSpeedChange: boolean): { job: Job; plan: Plan }
   const text = strategy!.generate(plan, job, { startMode: 'current', returnPosition: null }).text ?? '';
   const lines = text.split('\n');
   const objIdx = lines.findIndex(l => /;\s*OBJ\s+ids=obj-a/i.test(l.trim()));
-  const g1Idx = lines.findIndex(l => l.trim().startsWith('G1'));
+  const g1Idx = lines.findIndex(l => /^G1\b/i.test(l.trim()));
   assert(objIdx >= 0 && g1Idx >= 0 && objIdx < g1Idx, 'Head: OBJ comment precedes first G1');
 }
 

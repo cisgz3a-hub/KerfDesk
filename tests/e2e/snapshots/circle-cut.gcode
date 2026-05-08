@@ -2,7 +2,9 @@
 ; Job: circle-cut fixture
 ; Objects: 1, Layers: 1
 G21 ; T2-14 safety baseline: mm mode
+G17 ; T3-20 safety baseline: XY plane
 G91 ; T2-14 safety baseline: relative positioning (Head mode)
+G94 ; T3-20 safety baseline: feed per minute
 M5 S0 ; T2-14 safety baseline: laser off at start
 
 ; --- Cut (pass 1) ---

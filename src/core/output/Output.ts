@@ -272,8 +272,9 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     // REPLACED `defaultBlock` entirely — the template author was trusted to
     // include G21 + G90/G91 + M5. A template omitting any of those silently
     // produced unsafe job start (firmware default units could be inches;
-    // distance mode could be left-over G91 from a prior job; laser modal
-    // state could be M3/M4 from a prior burn). Now the safety baseline is
+    // distance mode could be left-over G91 from a prior job; feed mode /
+    // active plane could carry over from hand-entered CNC commands; laser
+    // modal state could be M3/M4 from a prior burn). Now the safety baseline is
     // emitted FIRST and is non-removable; template / customStart extras
     // append AFTER it. Duplicate G21/G90/M5 from older user templates is
     // idempotent and harmless. Adding new safety modals (e.g. T1-32 $32
@@ -285,9 +286,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       `; Date: ${dateStamp}`,
       `; Objects: ${job.metadata.objectCount}, Layers: ${job.metadata.layerCount}`,
       'G21 ; T2-14 safety baseline: mm mode',
+      'G17 ; T3-20 safety baseline: XY plane',
       useRelative
         ? 'G91 ; T2-14 safety baseline: relative positioning (Head mode)'
         : 'G90 ; T2-14 safety baseline: absolute positioning',
+      'G94 ; T3-20 safety baseline: feed per minute',
       `${this.encodeLaserOff()} ; T2-14 safety baseline: laser off at start`,
     ];
 
