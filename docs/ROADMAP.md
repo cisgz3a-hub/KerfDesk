@@ -16171,7 +16171,7 @@ The user opens the preview tab to verify their compiled job before running it. F
 
 **Cross-check note (audit 2E):** Audit's Priority 7. Verified.
 
-**Status:** Shipped in `<TBD>`. Added a pure sampled preview model in `src/ui/components/gcodePreviewModel.ts` and wired `GcodePreview` to store/render a capped move set instead of splitting and storing every G-code line. Large previews keep full move counts, travel/cut counts, bounds, and duration estimates while the canvas draws a sampled representation plus a visible "Sampled preview" note. Pinned by `tests/gcode-preview-large-job-sampling.test.ts`. Follow-up if real users still hit preview limits: move the same pure parser behind a Web Worker and add zoom-region detail rendering.
+**Status:** Shipped in `e933099`. Added a pure sampled preview model in `src/ui/components/gcodePreviewModel.ts` and wired `GcodePreview` to store/render a capped move set instead of splitting and storing every G-code line. Large previews keep full move counts, travel/cut counts, bounds, and duration estimates while the canvas draws a sampled representation plus a visible "Sampled preview" note. Pinned by `tests/gcode-preview-large-job-sampling.test.ts`. Follow-up if real users still hit preview limits: move the same pure parser behind a Web Worker and add zoom-region detail rendering.
 
 ---
 
