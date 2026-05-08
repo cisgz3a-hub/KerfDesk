@@ -6573,7 +6573,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 
 **Priority:** Tier 1 — workflow accelerator. Each manual deploy round-trip costs real iteration time. Same severity class as T1-112 (the diagnostic) but addresses the cause rather than the symptom.
 
-**Status:** Shipped 2026-05-08 in `<T113>`. Hardware verification not required (CI/CD plumbing only). Manual prerequisite on first run: repo Settings → Pages → Source: GitHub Actions.
+**Status:** Shipped 2026-05-08 in `71d0552`. Hardware verification not required (CI/CD plumbing only). Manual prerequisite on first run: repo Settings → Pages → Source: GitHub Actions.
 
 ---
 
