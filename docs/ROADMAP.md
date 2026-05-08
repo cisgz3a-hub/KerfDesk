@@ -6534,7 +6534,7 @@ There is no in-app indicator of which commit the tester is running. `__APP_VERSI
 
 **Priority:** Tier 1 — workflow / safety-adjacent. Stale deployments masked T1-111 for a hardware-testing iteration; the cost of misdiagnosis on a real laser is non-trivial. The fix is one-time mechanical work and unblocks future testers from the same trap.
 
-**Status:** Shipped 2026-05-08 in `<T112>`. Hardware verification not required (UI overlay only; no g-code, machine-state, or gating-logic change).
+**Status:** Shipped 2026-05-08 in `82ccc22`. Hardware verification not required (UI overlay only; no g-code, machine-state, or gating-logic change).
 
 ---
 
