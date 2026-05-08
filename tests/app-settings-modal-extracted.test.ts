@@ -29,3 +29,9 @@ assert(
   componentSource.includes('Third-party licenses: see LICENSES-THIRD-PARTY.md'),
   'AppSettingsModal should preserve About tab license guidance',
 );
+assert(
+  componentSource.includes('Operator mode')
+    && componentSource.includes("modeButton('beginner', 'Beginner')")
+    && componentSource.includes("modeButton('advanced', 'Advanced')"),
+  'AppSettingsModal should expose the T2-64 operator mode toggle',
+);

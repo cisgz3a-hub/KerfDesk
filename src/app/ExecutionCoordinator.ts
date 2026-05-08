@@ -423,7 +423,15 @@ export class ExecutionCoordinator {
     if (!ctrl) return;
 
     const status = ctrl.state.status;
-    if (status === 'disconnected' || status === 'connecting') return;
+    if (status === 'disconnected') return;
+    if (status === 'connecting') {
+      try {
+        await this.deps.machineService.cancelActiveConnect(new Error('Connection cancelled by disconnect'));
+      } catch (err) {
+        console.warn('[Disconnect] connect-cancel failed:', err instanceof Error ? err.message : err);
+      }
+      return;
+    }
 
     if (!options?.skipStop) {
       try {

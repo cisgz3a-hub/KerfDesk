@@ -72,6 +72,7 @@ import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
+import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
@@ -93,12 +94,18 @@ import { StatusFooter } from './StatusFooter';
 import { MaterialBar, type MaterialBarHandle } from './MaterialBar';
 import { CalibrateMaterialDialog } from './materials/CalibrateMaterialDialog';
 import { LearnedToast } from './LearnedToast';
+import { UpdateNotice } from './UpdateNotice';
 import { getSuggestion } from '../../core/materials/MaterialFeedback';
 import { BUNDLED_FONTS } from '../../fonts/fontRegistry';
 import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { type SettingsTab } from './SettingsModal';
 import { AppSettingsModal } from './AppSettingsModal';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { type UserMode } from '../../app/UserModeGates';
+import {
+  resolveTextOperationLayer,
+  textOperationModeForObject,
+} from '../scene/TextOperationLayer';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -439,8 +446,7 @@ export function App(): React.ReactElement {
       );
     }
   }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, showAlert]);
-  const sceneIsDirtyRef = useRef(false);
-  const lastSavedSceneRef = useRef('');
+  const lastSavedSceneHashRef = useRef<string>(hashSceneForPersistence(scene));
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5
   // (extended via unified function): bridge counter for
   // ConnectionPanelMain so it can reset hasFramed (which is
@@ -453,6 +459,21 @@ export function App(): React.ReactElement {
   const bumpHistoryVersion = useSceneHistoryStore(s => s.bumpHistoryVersion);
   const productionMode = useAppSettingsStore(s => s.productionMode);
   const setProductionMode = useAppSettingsStore(s => s.setProductionMode);
+  const userMode = useAppSettingsStore(s => s.userMode);
+  const setUserMode = useAppSettingsStore(s => s.setUserMode);
+  const handleSetUserMode = useCallback((mode: UserMode) => {
+    if (mode === userMode) return;
+    if (mode === 'beginner') {
+      setUserMode('beginner');
+      return;
+    }
+    const confirmed = confirm(
+      'Switch to Advanced mode?\n\n'
+      + 'Advanced mode allows explicit overrides for some beginner safety gates, including starting without framing.\n\n'
+      + 'Use this only if you understand your machine behavior.',
+    );
+    if (confirmed) setUserMode('advanced');
+  }, [setUserMode, userMode]);
   const handleToggleProductionMode = useCallback(() => {
     if (productionMode) {
       setProductionMode(false);
@@ -592,20 +613,21 @@ export function App(): React.ReactElement {
   ]);
 
   const handleTextPlaced = useCallback(() => {
-    setTextPlacementHint('Tip: Select text and click "Convert to Path" before cutting');
+    setTextPlacementHint('Tip: Names default to Engrave. Choose Cut only when you want outlines.');
   }, []);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
     dialogs.setEditingTextId(null);
+    dialogs.setTextOperationMode('engrave');
     setTextPlacementPt({ x: world.x, y: world.y });
     dialogs.setShowTextDialog(true);
-  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog]);
+  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog, dialogs.setTextOperationMode]);
 
   const handleEditText = useCallback((obj: SceneObject) => {
-    dialogs.openTextEdit(obj);
+    dialogs.openTextEdit(obj, textOperationModeForObject(scene, obj));
     setTextPlacementPt(null);
     setSelectedIds(new Set([obj.id]));
-  }, [dialogs.openTextEdit]);
+  }, [dialogs.openTextEdit, scene]);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -647,16 +669,14 @@ export function App(): React.ReactElement {
   //
   // Captured-identity stability: React state setters
   // (setScene/setSelectedIds/setGcodeStale/bumpHistoryVersion) are stable
-  // by React's contract. sceneIsDirtyRef is captured by reference and
-  // dereferenced inside the lambda (T2-76 design risk 2 mitigation, see
-  // T2-76-design.md). setGcodeStale comes from
+  // by React's contract. setGcodeStale comes from
   // useCompileManager's return object so its identity is not guaranteed
   // stable across renders; including it in the dep array matches the
   // applyHistoryScene precedent below.
   //
-  // notifyDirty: writes the boolean directly into sceneIsDirtyRef. T2-88
-  // (hash-derived dirty) will swap this implementation for a no-op when
-  // dirty becomes a derived value.
+  // notifyDirty: no-op after T2-88-followup. Dirty state is derived from
+  // `isDirty(scene, lastSavedSceneHashRef.current)`, so mutation sites no
+  // longer maintain a manual boolean.
   //
   // invalidate.frame: bumps setHistoryVersion. The sole reader is
   // ConnectionPanelMain which resets hasFramed.current on bumps. Once
@@ -685,7 +705,7 @@ export function App(): React.ReactElement {
         reset: resetHistory,
       },
       setSelectedIds: (ids) => setSelectedIds(ids),
-      notifyDirty: (dirty) => { sceneIsDirtyRef.current = dirty; },
+      notifyDirty: () => { /* dirty is hash-derived; see T2-88 */ },
       // T2-78: read-through-ref so SceneTransaction can record
       // selectionBefore on history entries without rebuilding this
       // useMemo every time the user clicks something. selectedIdsRef
@@ -749,13 +769,15 @@ export function App(): React.ReactElement {
     if (!dialogs.textInput.trim()) return;
 
     if (dialogs.editingTextId) {
+      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
       const newScene = {
-        ...scene,
-        objects: scene.objects.map(o =>
+        ...resolved.scene,
+        objects: resolved.scene.objects.map(o =>
           o.id === dialogs.editingTextId
             ? {
                 ...o,
                 name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
+                layerId: resolved.layerId,
                 geometry: {
                   ...(o.geometry as TextGeometry),
                   type: 'text' as const,
@@ -771,10 +793,9 @@ export function App(): React.ReactElement {
             : o
         ),
       };
-      handleSceneCommit(newScene, 'text-edit');
+      handleSceneCommit(newScene, 'text-edit', new Set([dialogs.editingTextId]));
     } else {
-      const layerId = scene.activeLayerId || scene.layers[0]?.id;
-      if (!layerId) return;
+      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
 
       const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
       const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
@@ -783,7 +804,7 @@ export function App(): React.ReactElement {
         id: generateId(),
         type: 'text',
         name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-        layerId,
+        layerId: resolved.layerId,
         parentId: null,
         transform: { ...IDENTITY_MATRIX, tx, ty },
         geometry: {
@@ -802,8 +823,8 @@ export function App(): React.ReactElement {
       };
 
       const newScene = {
-        ...scene,
-        objects: [...scene.objects, textObj],
+        ...resolved.scene,
+        objects: [...resolved.scene.objects, textObj],
       };
       // T2-79+: atomic — selection of the new text object rides into
       // the history entry's selectionAfter. Undo restores pre-add
@@ -823,6 +844,7 @@ export function App(): React.ReactElement {
     dialogs.textSize,
     dialogs.textBold,
     dialogs.textItalic,
+    dialogs.textOperationMode,
     dialogs.editingTextId,
     dialogs.closeTextDialog,
     textPlacementPt,
@@ -961,7 +983,7 @@ export function App(): React.ReactElement {
       await machineUi.executionCoordinator.safeDisconnect();
     }
 
-    if (sceneIsDirtyRef.current) {
+    if (isDirty(scene, lastSavedSceneHashRef.current)) {
       const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
       if (!confirmed) return;
     }
@@ -972,7 +994,7 @@ export function App(): React.ReactElement {
     }
 
     window.location.href = '/landing.html';
-  }, [grbl.machineState?.status, machineUi.executionCoordinator]);
+  }, [grbl.machineState?.status, machineUi.executionCoordinator, scene]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
     if (selectedIds.size === 0) {
@@ -1044,6 +1066,7 @@ export function App(): React.ReactElement {
    */
   const handleNewProject = useCallback(
     (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
+      lastSavedSceneHashRef.current = hashSceneForPersistence(newScene);
       commitSceneTransaction(newScene, { kind: 'load', source }, {
         selectionAfter: new Set(),
       });
@@ -1112,35 +1135,26 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!sceneIsDirtyRef.current) return;
+      if (!isDirty(scene, lastSavedSceneHashRef.current)) return;
 
       let json: string;
+      let currentHash: string;
       try {
         json = serializeForAutosave(scene);
+        currentHash = hashSceneForPersistence(scene);
       } catch (e) {
         console.warn('[LaserForge] Autosave failed (serialize):', e);
-        // Leave sceneIsDirtyRef.current = true so the next tick retries.
         return;
       }
 
-      if (json === lastSavedSceneRef.current) {
-        sceneIsDirtyRef.current = false;
-        return;
-      }
-
-      // Only clear the dirty flag and advance lastSavedSceneRef AFTER the
-      // underlying storage write resolves. A failed write (quota, fs error,
-      // IPC failure) must leave the project marked dirty so the next tick
-      // retries — otherwise unsaved data is silently lost.
+      // Advance the saved hash only after the write resolves. Failed writes
+      // leave the old hash intact, so the next tick retries.
       void writeAutosaveAsync(json).then(
         () => {
-          lastSavedSceneRef.current = json;
-          sceneIsDirtyRef.current = false;
+          lastSavedSceneHashRef.current = currentHash;
         },
         (err: unknown) => {
           console.warn('[LaserForge] Autosave failed:', err);
-          // Intentionally do NOT clear sceneIsDirtyRef and do NOT advance
-          // lastSavedSceneRef — the project remains dirty for retry.
         },
       );
     }, 30000);
@@ -1279,6 +1293,7 @@ export function App(): React.ReactElement {
       setTextSize: dialogs.setTextSize,
       setTextBold: dialogs.setTextBold,
       setTextItalic: dialogs.setTextItalic,
+      setTextOperationMode: dialogs.setTextOperationMode,
       setTextPlacementPt,
       setShowVariableText: dialogs.setShowVariableText,
       setVariableTextSource: dialogs.setVariableTextSource,
@@ -1316,8 +1331,10 @@ export function App(): React.ReactElement {
     scene,
     setSelectedIds,
     handleNewProject,
-    sceneIsDirtyRef,
-    lastSavedSceneRef,
+    isSceneDirty: () => isDirty(scene, lastSavedSceneHashRef.current),
+    markSceneSaved: (savedScene) => {
+      lastSavedSceneHashRef.current = hashSceneForPersistence(savedScene);
+    },
     showAlert,
     showConfirm,
   });
@@ -1666,6 +1683,7 @@ export function App(): React.ReactElement {
         scene,
         sidebarWidth: connectionSidebarWidth,
         productionMode,
+        userMode,
         gcode: currentGcode,
         compiledJobTicket: lastResult?.ticket ?? null,
         lastGcodeCompileResult: lastResult,
@@ -1731,6 +1749,10 @@ export function App(): React.ReactElement {
         }),
       ),
     ),
+
+    React.createElement(UpdateNotice, {
+      isJobRunning: grbl.isJobRunning,
+    }),
 
     React.createElement(StatusFooter, {
       scene,
@@ -1856,6 +1878,8 @@ export function App(): React.ReactElement {
       onUpdateCurrentFromScene: updateCurrentProfileFromScene,
       onDeleteProfile: deleteProfileAndClearActive,
       onShowFontCredits: () => setShowFontCredits(true),
+      userMode,
+      onSetUserMode: handleSetUserMode,
     }),
 
     toastSuggestion && React.createElement(LearnedToast, {
@@ -1891,12 +1915,14 @@ export function App(): React.ReactElement {
         textSize: dialogs.textSize,
         textBold: dialogs.textBold,
         textItalic: dialogs.textItalic,
+        textOperationMode: dialogs.textOperationMode,
         textPreviewFontReady,
         setTextInput: dialogs.setTextInput,
         setTextFont: dialogs.setTextFont,
         setTextSize: dialogs.setTextSize,
         setTextBold: dialogs.setTextBold,
         setTextItalic: dialogs.setTextItalic,
+        setTextOperationMode: dialogs.setTextOperationMode,
         onClose: () => {
           dialogs.closeTextDialog();
           setTextPlacementPt(null);

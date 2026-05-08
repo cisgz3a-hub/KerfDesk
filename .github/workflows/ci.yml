@@ -23,3 +23,47 @@ jobs:
       - run: npm audit --omit=dev --audit-level=moderate
       - run: npm run build
       - run: npm test
+
+  build-windows:
+    # T2-98: prove the real Windows installer path on every PR.
+    # Signing is deliberately left for T2-99 release builds.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run electron:compile
+      - run: npm run build
+      - run: npm run electron:build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  build-macos:
+    # T2-98: prove the real macOS installer path on every PR.
+    # T2-100 adds signing/notarization secrets for release builds.
+    runs-on: macos-latest
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run electron:compile
+      - run: npm run build
+      - run: npm run electron:build:mac
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-installer
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 7

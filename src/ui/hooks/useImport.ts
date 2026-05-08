@@ -3,6 +3,7 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
+import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
@@ -304,15 +305,14 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       if (!file) return;
 
       const name = file.name.toLowerCase();
-      const text = name.endsWith('.svg') || name.endsWith('.dxf') || name.endsWith('.json')
-        ? await file.text()
-        : null;
 
       try {
-        if (name.endsWith('.laserforge.json') || (name.endsWith('.json') && text)) {
-          const loaded = deserializeScene(text!);
+        if (name.endsWith('.laserforge.json') || name.endsWith('.json')) {
+          const text = await file.text();
+          const loaded = deserializeScene(text);
           handleNewProject(loaded, 'file');
-        } else if (name.endsWith('.svg') && text) {
+        } else if (name.endsWith('.svg')) {
+          const text = await file.text();
           const layerId = scene.activeLayerId || scene.layers[0]?.id;
           if (!layerId) return;
           const updated = importSvgIntoScene(text, scene, layerId, {
@@ -333,7 +333,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
                 },
           });
           handleSceneCommit(updated, 'svg-import');
-        } else if (name.endsWith('.dxf') && text) {
+        } else if (name.endsWith('.dxf')) {
+          assertDxfFileSize(file.size);
+          const text = await file.text();
           const updated = importDxfIntoScene(text, scene);
           handleSceneCommit(updated, 'dxf-import');
         } else if (file.type.startsWith('image/')) {

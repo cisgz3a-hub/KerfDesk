@@ -870,7 +870,8 @@ function renderObject(
       ctx.textAlign = 'right';
       ctx.textBaseline = 'top';
       ctx.fillStyle = 'rgba(45, 212, 160, 0.8)';
-      ctx.fillText('✓', worldBounds.maxX, worldBounds.minY);
+      const burnedMarkerInset = transform.screenPx(2);
+      ctx.fillText('\u2713', worldBounds.maxX - burnedMarkerInset, worldBounds.minY + burnedMarkerInset);
       ctx.restore();
     }
   }

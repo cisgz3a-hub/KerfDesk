@@ -1,0 +1,43 @@
+name: macOS Signed Notarized Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos-signed:
+    runs-on: macos-latest
+    env:
+      CSC_LINK: ${{ secrets.MAC_CERT_P12_BASE64 }}
+      CSC_KEY_PASSWORD: ${{ secrets.MAC_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      MAC_SIGNING_IDENTITY: ${{ secrets.MAC_SIGNING_IDENTITY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Verify signing and notarization secrets
+        shell: bash
+        run: |
+          test -n "$CSC_LINK" || { echo "MAC_CERT_P12_BASE64 secret is required for signed macOS releases."; exit 1; }
+          test -n "$CSC_KEY_PASSWORD" || { echo "MAC_CERT_PASSWORD secret is required for signed macOS releases."; exit 1; }
+          test -n "$APPLE_ID" || { echo "APPLE_ID secret is required for notarized macOS releases."; exit 1; }
+          test -n "$APPLE_APP_SPECIFIC_PASSWORD" || { echo "APPLE_APP_SPECIFIC_PASSWORD secret is required for notarized macOS releases."; exit 1; }
+          test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required for notarized macOS releases."; exit 1; }
+      - run: npm ci
+      - run: npm run build
+      - run: npm run electron:compile
+      - run: npm run icons:ico
+      - name: Build signed and notarized macOS DMG
+        run: npx electron-builder --mac --config scripts/signing/electron-builder.macos-signed.cjs --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macos-signed-notarized-dmg
+          path: release/*.dmg
+          if-no-files-found: error
+          retention-days: 30

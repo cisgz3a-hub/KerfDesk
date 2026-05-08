@@ -28,6 +28,11 @@ import {
   verifySavedOriginG54,
   describeSavedOriginDrift,
 } from '../../app/savedOriginVerify';
+import {
+  captureCurrentFrameAnchor,
+  currentModeFrameAnchorAllowsStart,
+  type CurrentFrameAnchor,
+} from '../../app/CurrentFrameAnchor';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { SimulatorView } from './SimulatorView';
@@ -50,6 +55,7 @@ import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
 import { analyzeOperationOrder, type OperationKind, type OperationRow } from '../../app/OperationOrder';
+import { computeUserModeGatePolicy, type UserMode } from '../../app/UserModeGates';
 import { RecoveryCard } from '../recovery/RecoveryCard';
 import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
@@ -216,6 +222,7 @@ export interface ConnectionPanelMainProps {
   /** Called after a successful disconnect cleanup so the host can hide the panel */
   onDisconnect?: () => void;
   productionMode?: boolean;
+  userMode?: UserMode;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   showPrompt: (title: string, message: string, defaultValue?: string) => Promise<string | null>;
@@ -275,6 +282,7 @@ export function ConnectionPanelMain({
   activeProfile,
   onDisconnect,
   productionMode = false,
+  userMode = 'beginner',
   showAlert,
   showConfirm,
   showPrompt,
@@ -332,9 +340,10 @@ export function ConnectionPanelMain({
   // `requestAndOpen` / `controller.connect`. The first wins; the
   // second's port stays opened and unowned. Mutex disables the
   // button while a connect is in flight; UI shows "Connecting…".
-  // (Part B — abortable connect via AbortSignal through MachineService
-  // — remains the future safety-path work.)
+  // Part B wires a real USB cancel button to MachineService/WebSerialPort's
+  // AbortSignal-aware cleanup path while a connect is in flight.
   const [connecting, setConnecting] = useState(false);
+  const connectAbortRef = useRef<AbortController | null>(null);
 
   const controllerRef = useRef(controller);
   controllerRef.current = controller;
@@ -360,6 +369,7 @@ export function ConnectionPanelMain({
   const wasConnectedRef = useRef(false);
   const intentionalDisconnectRef = useRef(false);
   const hasFramed = useRef(false);
+  const currentFrameAnchorRef = useRef<CurrentFrameAnchor | null>(null);
 
   // T1-97 retire (2026-05-02): frame-before-start bypass override removed.
   // The underlying defect that made it necessary was structurally fixed by
@@ -520,17 +530,21 @@ export function ConnectionPanelMain({
   // prevents the user from clicking buttons that would just bounce off
   // the mutex anyway.
   //
-  // `activeOperation` and `recoveryPending` are read inline (not from
-  // React state) because their transitions are driven by machineState
-  // changes (which already trigger re-renders) or by long-lived modals
-  // that block UI input directly. Future work may add an explicit
-  // subscription if non-modal recovery surfaces (T3-91) need it.
+  // `activeOperation` and `recoveryPending` are read once per render
+  // (not from React state) because their transitions are driven by
+  // machineState changes (which already trigger re-renders) or by
+  // long-lived modals that block UI input directly. Future work may add
+  // an explicit subscription if non-modal recovery surfaces (T3-91)
+  // need it.
+  const activeOperation = machineService.getActiveOperation();
+  const recoveryPending = getUnsafePriorState() != null;
+  const laserOutputForGates = machineService.getLaserOutputState();
   const gates = machineState
     ? computeCommandGates({
         state: machineState,
-        laserOutput: machineService.getLaserOutputState(),
-        activeOperation: machineService.getActiveOperation(),
-        recoveryPending: getUnsafePriorState() != null,
+        laserOutput: laserOutputForGates,
+        activeOperation,
+        recoveryPending,
       })
     : null;
   const canAutoFocus = gates?.baseSafe ?? false;
@@ -538,6 +552,7 @@ export function ConnectionPanelMain({
   useEffect(() => {
     if (isConnected) {
       hasFramed.current = false;
+      currentFrameAnchorRef.current = null;
       hasJogged.current = false;
       hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
@@ -556,6 +571,7 @@ export function ConnectionPanelMain({
   // is already false.
   useEffect(() => {
     hasFramed.current = false;
+    currentFrameAnchorRef.current = null;
     setWorkflowVersion(v => v + 1);
   }, [historyVersion]);
 
@@ -593,6 +609,7 @@ export function ConnectionPanelMain({
     // hasFramed (it was already false at mount).
     if (lastFrameKeyRef.current !== null && lastFrameKeyRef.current !== frameFreshnessKey) {
       hasFramed.current = false;
+      currentFrameAnchorRef.current = null;
       setWorkflowVersion(v => v + 1);
     }
     lastFrameKeyRef.current = frameFreshnessKey;
@@ -795,18 +812,33 @@ export function ConnectionPanelMain({
     }
     // T1-50 Part A: see comment on the `connecting` state above.
     if (connecting) return;
+    const connectAbortController = new AbortController();
+    connectAbortRef.current = connectAbortController;
     setConnecting(true);
     try {
       appendMessage('Port opened, waiting for GRBL welcome...');
-      await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200);
+      await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200, connectAbortController.signal);
       setSimulator(false);
       appendMessage('✓ Real laser connected via USB');
     } catch (e: any) {
-      appendMessage(`Connection failed: ${e.message}`);
+      if (connectAbortController.signal.aborted) {
+        appendMessage('Connection cancelled by user');
+      } else {
+        appendMessage(`Connection failed: ${e.message}`);
+      }
     } finally {
+      if (connectAbortRef.current === connectAbortController) {
+        connectAbortRef.current = null;
+      }
       setConnecting(false);
     }
   };
+
+  const cancelConnect = useCallback(() => {
+    const connectAbortController = connectAbortRef.current;
+    if (!connectAbortController || connectAbortController.signal.aborted) return;
+    connectAbortController.abort(new Error('Connection cancelled by user'));
+  }, []);
 
   const handleDisconnect = useCallback(async () => {
     const ctrl = controllerRef.current;
@@ -1075,6 +1107,9 @@ export function ConnectionPanelMain({
       // configurations.
       bedWidthMm: bedWidth,
     };
+    const frameStartPosition = machineState?.position
+      ? { x: machineState.position.x, y: machineState.position.y }
+      : null;
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
 
@@ -1112,10 +1147,11 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -1144,6 +1180,9 @@ export function ConnectionPanelMain({
       // configurations.
       bedWidthMm: bedWidth,
     };
+    const frameStartPosition = machineState?.position
+      ? { x: machineState.position.x, y: machineState.position.y }
+      : null;
 
     const corners = buildFrameCorners(sceneBounds, transformOpts);
 
@@ -1179,10 +1218,11 @@ export function ConnectionPanelMain({
     }
 
     hasFramed.current = true;
+    currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleHome = useCallback(async () => {
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
@@ -1434,11 +1474,10 @@ export function ConnectionPanelMain({
     machineStatus !== 'idle' &&
     machineStatus !== 'disconnected' &&
     machineStatus !== 'connecting';
-  // T1-59 frame-before-start gate. When T2-64 (advanced-mode setting) lands,
-  // this becomes `const requireFrame = !advancedMode`. Until then, beginner
-  // default = require frame. Prevents wrong-position-burn on confused
-  // origin/saved-origin/mirror configurations.
-  const requireFrame = true;
+  // T1-59 + T2-64: beginner mode requires a fresh frame before Start;
+  // advanced mode can explicitly override that gate.
+  const userModeGatePolicy = computeUserModeGatePolicy(userMode);
+  const requireFrame = userModeGatePolicy.requireFrameBeforeStart;
   // T1-22: read laser-output safety state for the start-job gate.
   // T2-12 part 1: subscribed instead of polled. The previous polled
   // getter at this site relied on workflowVersion bumps to refresh on
@@ -1464,6 +1503,13 @@ export function ConnectionPanelMain({
   // controllers that don't implement it.
   const placementUncertain =
     controllerRef.current?.getPlacementUncertain?.() ?? false;
+  const currentModeFrameAnchorValid =
+    !requireFrame ||
+    currentModeFrameAnchorAllowsStart({
+      startMode,
+      frameAnchor: currentFrameAnchorRef.current,
+      machinePosition,
+    });
   // T1-30: canStartJob keeps its existing product-level conjuncts
   // (gcode exists / fresh / framed / preflight passed / not running /
   // machine bounds OK / laser output not unknown / WCS not uncertain)
@@ -1482,6 +1528,7 @@ export function ConnectionPanelMain({
     !gcodeStale &&
     !machineBlocksJobStart &&
     (!requireFrame || hasFramed.current) &&
+    currentModeFrameAnchorValid &&
     laserOutputState !== 'unknown' &&
     !placementUncertain &&
     (gates?.baseSafe ?? false);
@@ -1503,6 +1550,23 @@ export function ConnectionPanelMain({
         severity: i.severity as 'blocker' | 'warning',
         text: i.title,
       }));
+    const frameControlBlockedHeadline = (() => {
+      if (!isConnected) return 'No controller connection';
+      if (!machineState) return 'Waiting for controller state';
+      if (laserOutputState === 'unknown') return 'Laser-safety state unknown';
+      if (laserOutputState === 'on') return 'Laser output is still marked on';
+      if (activeOperation != null) {
+        return `Operation "${activeOperation.kind}" is still in progress`;
+      }
+      if (recoveryPending) return 'Previous job recovery is pending';
+      if (machineState.errorCode != null) {
+        return `Controller error ${machineState.errorCode}`;
+      }
+      if (machineStatus != null && machineStatus !== 'idle') {
+        return `Machine is "${machineStatus}"`;
+      }
+      return 'Frame control is not available';
+    })();
 
     const gates: StartReadinessGate[] = [
       {
@@ -1550,13 +1614,31 @@ export function ConnectionPanelMain({
         failAction: 'Wait for idle, or stop/reset on the controller if it is stuck',
       },
       {
+        id: 'frameControls',
+        label: 'Frame control available',
+        status: !isConnected || !machineState
+          ? 'pending'
+          : (canFrame ? 'ok' : 'fail'),
+        failHeadline: frameControlBlockedHeadline,
+        failAction: 'Clear this machine/safety hold, then click Frame before Start',
+      },
+      {
         id: 'framing',
         label: 'Job framed',
         status: !requireFrame
           ? 'ok'
-          : (hasFramed.current ? 'ok' : 'fail'),
-        failHeadline: 'Frame not done since last design change',
-        failAction: 'Click Frame to confirm where the laser will burn (resets when you edit the design)',
+          : (hasFramed.current ? 'ok' : (canFrame ? 'fail' : 'pending')),
+        failHeadline: 'Frame required before Start',
+        failAction: 'Click Frame to confirm where the laser will burn',
+      },
+      {
+        id: 'currentModeAnchor',
+        label: 'Laser head still at framed start',
+        status: !requireFrame || startMode !== 'current'
+          ? 'ok'
+          : (hasFramed.current && currentModeFrameAnchorValid ? 'ok' : 'fail'),
+        failHeadline: 'Laser head moved after framing',
+        failAction: 'Frame again before starting from the laser head',
       },
       {
         id: 'laserState',
@@ -1669,6 +1751,7 @@ export function ConnectionPanelMain({
     webSerialSupported: WebSerialPort.isSupported(),
     onConnectUsb: () => { void connectRealLaser(); },
     onConnectSimulator: () => { void connectSimulator(); },
+    onCancelConnect: connectAbortRef.current ? cancelConnect : undefined,
     connecting,
   });
 
@@ -2080,6 +2163,9 @@ export function ConnectionPanelMain({
     isRunning,
     displayPaused,
     startReadiness,
+    startButtonLabel: !requireFrame && !hasFramed.current && userModeGatePolicy.startWithoutFramingLabel
+      ? userModeGatePolicy.startWithoutFramingLabel
+      : undefined,
     onFrame: () => { void handleFrameSafe(); },
     onStartJob: () => { void handleStartJob(); },
     onPauseResume: () => { void handlePauseResume(); },

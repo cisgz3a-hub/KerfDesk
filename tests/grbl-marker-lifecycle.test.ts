@@ -1,5 +1,6 @@
 /**
- * GrblController parses ; OBJ ids= markers in sendJob and fires onObjectLifecycle.
+ * GrblController parses ; OBJ ids= markers in sendJob and fires onObjectLifecycle
+ * after the corresponding GRBL line is acknowledged.
  * Run: npx tsx tests/grbl-marker-lifecycle.test.ts
  */
 
@@ -45,23 +46,19 @@ console.log('\n=== grbl-marker-lifecycle ===');
     'G1 X20 Y20 F1000',
   ];
   await ctrl.sendJob(lines);
-  await flush();
-  await flush();
-  await flush();
-
   assert(events.length >= 1, 'at least initial lifecycle event');
   assert(events.some(e => e.length === 0), 'includes reset [] at job start');
-  assert(events.some(e => e.join(',') === 'obj-1'), 'includes obj-1 before G0');
-  assert(events.some(e => e.join(',') === 'obj-2'), 'includes obj-2 before G1');
 
   const joined = port.received.join('\n');
   assert(!joined.includes('OBJ'), 'port never receives OBJ comment lines');
 
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 120; i++) {
     await flush();
     if (!ctrl.isJobRunning) break;
   }
 
+  assert(events.some(e => e.join(',') === 'obj-1'), 'includes obj-1 after G0 ack');
+  assert(events.some(e => e.join(',') === 'obj-2'), 'includes obj-2 after G1 ack');
   assert(events.length >= 2 && events[events.length - 1]?.length === 0, 'job end emits []');
 
   await ctrl.disconnect();

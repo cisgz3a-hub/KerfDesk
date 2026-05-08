@@ -51,7 +51,9 @@ const allOkGates: StartReadinessGate[] = [
   makeGate('gcodeFresh', 'ok'),
   makeGate('preflight', 'ok'),
   makeGate('machineState', 'ok'),
+  makeGate('frameControls', 'ok'),
   makeGate('framing', 'ok'),
+  makeGate('currentModeAnchor', 'ok'),
   makeGate('laserState', 'ok'),
   makeGate('wcsState', 'ok'),
 ];
@@ -122,11 +124,11 @@ async function run(): Promise<void> {
     const rows = container.querySelectorAll('[data-testid^="start-readiness-gate-"]');
     const failingRow = container.querySelector('[data-testid="start-readiness-gate-gcodeFresh"]');
     assert(
-      rows.length === 8 &&
+      rows.length === allOkGates.length &&
         failingRow?.getAttribute('data-gate-status') === 'fail' &&
         failingRow.textContent?.includes('Design changed since last compile') === true &&
         failingRow.textContent?.includes('Click ↻ Update above to recompile') === true,
-      'expanded state shows all 8 gates with failing-gate status, headline, and action',
+      'expanded state shows all gates with failing-gate status, headline, and action',
     );
     await cleanup(root);
   }

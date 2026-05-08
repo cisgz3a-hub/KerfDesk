@@ -12,7 +12,7 @@
  * user who doesn't realize their software emits absurdly large SVGs
  * exhibits the same failure.
  *
- * Fix: per-extension size table (.svg = 25 MB, .json = 50 MB, .gcode =
+ * Fix: per-extension size table (.svg = 25 MB, .dxf = 50 MB, .json = 50 MB, .gcode =
  * 100 MB, etc.) plus a default cap (50 MB) for unknown extensions.
  * fs.statSync runs before fs.readFileSync; oversized files throw a
  * descriptive error that the renderer surfaces to the user.
@@ -55,7 +55,7 @@ console.log('\n=== dialog:open file size limit (T1-92) ===\n');
 const MAX_FILE_BYTES_BY_EXTENSION: Record<string, number> = {
   '.json':  50 * 1024 * 1024,
   '.svg':   25 * 1024 * 1024,
-  '.dxf':   25 * 1024 * 1024,
+  '.dxf':   50 * 1024 * 1024,
   '.gcode': 100 * 1024 * 1024,
   '.nc':    100 * 1024 * 1024,
   '.png':   100 * 1024 * 1024,
@@ -103,10 +103,11 @@ const MB = 1024 * 1024;
   assert(evaluateSizeLimit('.nc', 105 * MB) !== null, '.nc 105 MB: rejected (same cap as .gcode)');
 }
 
-// ── BEHAVIOR: DXF cap (25 MB, same as SVG) ──────────────────────────
+// ── BEHAVIOR: DXF cap (50 MB) ──────────────────────────
 {
   assert(evaluateSizeLimit('.dxf', 24 * MB) === null, '.dxf 24 MB: accepted');
-  assert(evaluateSizeLimit('.dxf', 25 * MB + 1) !== null, '.dxf 25 MB + 1 byte: rejected');
+  assert(evaluateSizeLimit('.dxf', 50 * MB) === null, '.dxf exactly 50 MB: accepted');
+  assert(evaluateSizeLimit('.dxf', 50 * MB + 1) !== null, '.dxf 50 MB + 1 byte: rejected');
 }
 
 // ── BEHAVIOR: image caps (100 MB each) ──────────────────────────────

@@ -55,14 +55,14 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-07, branch `codex/t2-6-zustand-foundation`.
+**Snapshot date:** 2026-05-07, branch `codex/t2-64-user-mode-gates`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 112 | 16 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-61 design-edit cleanup shipped; T2-6 App split remains open. |
+| Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
 
@@ -2831,7 +2831,7 @@ async connectRealLaser(baudRate: number): Promise<void> {
 
 ### T1-50 | Connect button mutex / abortable connect
 
-**Status:** Part A shipped 2026-05-04 in `d4e3e35`. **Part B interface stub shipped 2026-05-04 in `1f135d9`.** `MachineService.connectRealLaser` accepts an optional `signal?: AbortSignal`. `signal?.throwIfAborted()` runs at the entry, after `requestAndOpen`, and after `controller.connect`. An aborted signal causes the next await to throw, which routes through the T1-49 cleanup path (port closed, portRef nulled, controller.disconnect best-effort called). **Full propagation through `WebSerialPort.requestAndOpen` and `GrblController.connect` so an in-flight open / handshake can be cancelled mid-air remains future work** under T2-32 (ConnectionManager + connection generation guard) and T2-33 (`requestAndOpen` partial-open cleanup). T1-50 Part B is the type-system plumbing: today no production caller passes a signal, so the new parameter has zero behavioral effect; the interface is ready for downstream wiring. Pinned by `tests/connect-abort-signal.test.ts` (21 contracts: pre-aborted early throw, abort-mid-open + abort-mid-connect cleanup, no-signal production-path equivalence, unaborted-signal no-effect). **Hardware verification: not required (UI plumbing for previously-swallowed async failures, no g-code or machine-state change).** **Part A delivers the rapid-double-click protection:** `connecting` state added to `ConnectionPanelMain` and gating both `connectRealLaser` and `connectSimulator` (same race-shape with a MockSerialPort). Each handler short-circuits if `connecting === true` and uses try/finally to release the flag. `ConnectWizard` accepts an optional `connecting?: boolean` prop and renders both buttons as `disabled` with `'Connecting…'` label, `cursor: wait`, `opacity: 0.5`, and a defensive `onClick` that re-checks `connecting`. Defaults to `false` when omitted so any future caller without the prop stays in the safe (enabled) default. Pinned by `tests/connect-button-mutex.test.tsx` (18 behavioral contracts via JSDOM + React act: idle render, idle clicks fire, connecting render disables both buttons + swaps labels, connecting clicks no-op, prop omitted defaults to enabled). **Part B follow-up scope:** AbortSignal plumbing for cancel-mid-connect; safe-disconnect during `connecting` state. That work touches `src/app/MachineService.ts` and `src/communication/WebSerialPort.ts` and is the safety-path component of T1-50.
+**Status:** Part A shipped 2026-05-04 in `d4e3e35`. **Part B interface stub shipped 2026-05-04 in `1f135d9`.** `MachineService.connectRealLaser` accepts an optional `signal?: AbortSignal`. `signal?.throwIfAborted()` runs at the entry, after `requestAndOpen`, and after `controller.connect`. An aborted signal causes the next await to throw, which routes through the T1-49 cleanup path (port closed, portRef nulled, controller.disconnect best-effort called). **Follow-up shipped in 164e6be:** after T2-33 made `WebSerialPort.requestAndOpen(baudRate, signal?)` signal-aware, `MachineService.connectRealLaser` now passes the same `AbortSignal` into `requestAndOpen`, so user-cancel during port selection/open unwinds acquired browser serial resources through the T2-33 cleanup path instead of waiting for the next service await boundary. Pinned by `tests/connect-abort-signal.test.ts` (30 contracts, including behavior + source pins for service-owned `requestAndOpen(baudRate, connectSignal)` / `controllerRef.current.connect(ws, connectSignal)` and service-level `cancelActiveConnect`) plus `tests/grbl-connect-abort-signal.test.ts` (4 contracts: aborted silent handshake rejects promptly, preserves cancel/abort message, returns to disconnected, closes serial port), and regressed with `tests/web-serial-partial-open-cleanup.test.ts` (38 contracts). **UI cancel follow-up shipped in `a72bc4a`:** `ConnectionPanelMain` now owns a per-real-USB-connect `AbortController`, passes `connectAbortController.signal` into `machineService.connectRealLaser(...)`, exposes `cancelConnect`, and clears the ref in `finally`. `ConnectWizard` accepts `onCancelConnect?: () => void` and renders an enabled `Cancel connect` button only when a cancellable connect is in flight. User cancel aborts with `Connection cancelled by user` and routes cleanup through the T1-49/T2-33 abort path. **Handshake cancellation follow-up shipped in `75f7ccf`:** `GrblController.connect(port, signal?)` now rejects promptly when the signal aborts during the welcome/settings probe window, clears connect timers, closes the serial port best-effort, nulls the active port, and returns controller state to `disconnected`. `MachineService.connectRealLaser` passes the same signal into `controllerRef.current.connect(ws, signal)`, so the UI Cancel button now covers port selection/open and the GRBL handshake. **Safe-disconnect follow-up shipped in `1010cb8`:** `MachineService` now owns the active connect abort controller/promise through `cancelActiveConnect(reason?)`, forwards any caller-provided signal into the service-owned signal, and waits for connect cleanup when cancelling. `ExecutionCoordinator.safeDisconnect` no longer early-returns for `connecting`; it calls `machineService.cancelActiveConnect(new Error('Connection cancelled by disconnect'))`, logs only if cancel cleanup fails, and skips the normal stop/disconnect path because no connected controller is available yet. T1-50 is fully closed. **Part A delivers the rapid-double-click protection:** `connecting` state added to `ConnectionPanelMain` and gating both `connectRealLaser` and `connectSimulator` (same race-shape with a MockSerialPort). Each handler short-circuits if `connecting === true` and uses try/finally to release the flag. `ConnectWizard` accepts an optional `connecting?: boolean` prop and renders both buttons as `disabled` with `'Connecting…'` label, `cursor: wait`, `opacity: 0.5`, and a defensive `onClick` that re-checks `connecting`. Defaults to `false` when omitted so any future caller without the prop stays in the safe (enabled) default. Pinned by `tests/connect-button-mutex.test.tsx` (26 behavioral/source contracts via JSDOM + React act: idle render, idle clicks fire, Cancel hidden while idle, connecting render disables connect buttons + swaps labels, enabled Cancel connect fires `onCancelConnect`, connecting clicks no-op, prop omitted defaults to enabled, and source pins for `connectAbortRef`, `new AbortController()`, signal propagation, and user-cancel abort reason). **Hardware verification: not required** (connection-cancel plumbing only; no g-code or machine-state change).
 
 **Code reference:** `src/ui/components/ConnectionPanelMain.tsx:542-555` (`connectRealLaser` UI handler 鈥?no mutex), `src/ui/components/connection/ConnectWizard.tsx:25-33` (Connect button 鈥?no `connecting` state).
 
@@ -10496,7 +10496,9 @@ The warning is informational 鈥?users with intentional unusual orders (e.g. cut
 
 ### T2-64 | Beginner-vs-Advanced mode toggle with safety gates differing per mode
 
-**Code reference:** No current beginner/advanced distinction in the codebase. T1-59 (frame gate) introduces the question: should advanced users be able to skip framing?
+**Status:** Shipped in `85ecd46` (focused MVP: persisted `UserMode`, pure gate policy, Settings toggle, and frame-before-start override wiring; deeper per-gate migrations remain follow-up scope).
+
+**Code reference:** `src/app/UserModeGates.ts` defines `UserMode` and the beginner/advanced gate policy. `src/ui/stores/appSettingsStore.ts` persists `userMode` with default `beginner`. `src/ui/components/AppSettingsModal.tsx` exposes the operator-mode toggle, and `src/ui/components/ConnectionPanelMain.tsx` consumes the policy so beginner mode requires Frame before Start while advanced mode can explicitly show `Start without framing`.
 
 **Problem:** Audit 4B Section 11: "the app currently sits in an awkward middle: too technical for beginners, not organized enough for experts." A user-mode toggle lets the app present strict gates to beginners (block Start until frame, require profile confirmed, show recovery cards prominently) while letting experienced users override gates with explicit acknowledgement.
 
@@ -12432,6 +12434,10 @@ For T2-88's first ship, lazy on-demand is the simplest and avoids the cost entir
 
 ---
 
+
+**Follow-up status:** Shipped in `0166216` (call-site migration). `App.tsx` now initializes `lastSavedSceneHashRef` from the initial scene hash, derives exit/autosave dirty checks through `isDirty(scene, lastSavedSceneHashRef.current)`, advances the hash only after autosave writes resolve, and updates the baseline on file/autosave/new-project loads. `useFileHandlers` no longer accepts dirty refs; confirmed saves call `markSceneSaved(scene)`, and New Project prompts from the derived dirty selector. Pinned by `tests/dirty-state-app-migration.test.ts`. **Hardware verification: not required** (persistence/UI state only; no g-code or controller behavior).
+
+---
 ### T2-89 | Server-side entitlement service 鈥?signed token issuance
 
 **Code reference:** Currently `EntitlementService.verifyGumroad` (EntitlementService.ts:252-312) calls `https://api.gumroad.com/v2/licenses/verify` directly from the client. No LaserForge-controlled server in the flow.
@@ -12502,6 +12508,8 @@ The Gumroad direct-verify path stays as a fallback for offline-grace scenarios w
 **Priority:** Tier 2 鈥?the real fix for the commercial-credibility gap. T1-77 ships the immediate stopgap (remove tester secret); T2-89 ships the structural fix.
 
 **Cross-check note (audit 5A):** Audit's Critical 2 + Priority 2.
+
+**Status:** Shipped in `47e6b74` (focused MVP - stack-agnostic server entitlement contract + pure activation/refresh issuance helpers; deployed server adapter and client token-preference wiring deferred). New `src/entitlements/ServerEntitlementService.ts` exports endpoint constants for `/entitlement/activate`, `/entitlement/refresh`, and `/entitlement/public-key`; request/response shapes; `GumroadLicenseVerifier` server-side dependency; `EntitlementBusinessRules` policy hook for manual revocation, seat/device limits, and plan flags; `ServerEntitlementSigner` private-key boundary; `activateServerEntitlement(...)`; `refreshServerEntitlement(...)`; and `normalizeLicenseCode(...)`. The helper normalizes license codes before verification, rejects blank codes before any Gumroad call, treats refunded/chargebacked/disputed Gumroad records as `revoked` without signing, applies LaserForge business-rule decisions before token issuance, signs T2-90-compatible `EntitlementTokenPayload` values with explicit features, server timestamps, jti, expiry, and optional `deviceId`, and refreshes existing verified payloads by rotating jti/expiry while preserving subject/features/device. Pinned by `tests/server-entitlement-service.test.ts` (29 contracts: endpoint paths, normalization, blank rejection, signed activation payload, revoked Gumroad no-sign path, business-rule denial, refresh rotation, and source-level pins that Gumroad verification and signing are explicit injected dependencies). **Out of scope (T2-89-followup):** actual Cloudflare/Vercel/Lambda adapter, secret storage, real Gumroad HTTP client on the server, public-key publication/CI key check, EntitlementService "prefer token if present" cache path, and eventual retirement of the client direct-Gumroad fallback. **Hardware verification: not required** (commercial entitlement logic only; no machine/controller behavior).
 
 ---
 
@@ -12981,6 +12989,8 @@ type LifecycleEvent =
 
 **Cross-check note (audit 5A):** Audit's Critical 9 + Priority 11.
 
+**Status:** Shipped in `239658e` (focused MVP - lifecycle event contract + revocation polling/state helpers; deployed polling and storage adapter wiring deferred). New `src/entitlements/EntitlementLifecycle.ts` exports `ENTITLEMENT_REVOCATIONS_PATH` (`/entitlement/revocations`), `EntitlementRevocation`, `RevocationPollState`, `EntitlementRevocationsResponse`, `LifecycleEvent` (verified/refunded/chargebacked/manually-revoked/plan-upgraded/plan-downgraded/expired), `mergeRevocationPollState(...)`, `findRevocationForPayload(...)`, `applyRevocationsToEntitlement(...)`, and `applyLifecycleEvent(...)`. The helper merges server revocation poll results into a local persisted set, dedupes by `jti`, advances `lastSeenRevocationAt`, immediately revokes the current token when its `jti` appears even if the user was in offline grace, clears paid features on revocation/expiry, and applies plan upgrades/downgrades by replacing the T2-92 feature list so `EntitlementService.canUse(feature)` reflects the new plan. Pinned by `tests/lifecycle-revocation.test.ts` (24 contracts: revocation endpoint constant, local merge/dedupe, current-token lookup, offline-grace override, plan downgrade feature replacement through T2-92, expiry state, and source-level lifecycle catalog pins). **Out of scope (T2-96-followup):** real `/entitlement/revocations?since=` HTTP client, persisted revocation-list adapter, polling cadence from `EntitlementService`, UI surfacing of lifecycle messages beyond existing T2-93 status copy, and server admin tooling for revocation events. **Hardware verification: not required** (commercial entitlement state only; no machine/controller behavior).
+
 ---
 
 ### T2-97 | Entitlement checks must never block safety controls
@@ -13113,6 +13123,8 @@ For T2-98's first ship, recommend Approach A even with the cost 鈥?catching a b
 
 **Cross-check note (audit 5B):** Audit's Critical 4 + Priority 1. Verified at .github/workflows/ci.yml.
 
+**Status:** Shipped in `d503c8a` (focused MVP - per-PR unsigned Windows/macOS installer build jobs added to CI; signing/notarization deferred to T2-99/T2-100). `.github/workflows/ci.yml` keeps the existing Ubuntu `test` job with `npm audit --omit=dev --audit-level=moderate`, `npm run build`, and `npm test`, and adds `build-windows` on `windows-latest` plus `build-macos` on `macos-latest`. Each platform job checks out code, uses `actions/setup-node@v4` with Node 20 and npm cache, runs `npm ci`, `npm run electron:compile`, `npm run build`, then the platform installer command (`npm run electron:build` or `npm run electron:build:mac`) and uploads `release/*.exe` / `release/*.dmg` via `actions/upload-artifact@v4` with `if-no-files-found: error` and 7-day retention. macOS PR builds set `CSC_IDENTITY_AUTO_DISCOVERY=false` so they remain unsigned until release signing is wired. Pinned by `tests/ci-installer-builds.test.ts` (19 contracts: existing Linux CI remains; Windows/macOS runner jobs exist; each runs install/compile/build/installer/upload steps; artifact patterns are platform-specific; PR CI does not expose signing/notarization secret env vars). **Out of scope (T2-98-followup):** debugging first remote runner failures if GitHub-hosted Windows/macOS expose packaging quirks not reproducible locally; signed release builds remain T2-99/T2-100. **Hardware verification: not required** (CI/release engineering only).
+
 ---
 
 ### T2-99 | Windows code signing 鈥?cert + Electron Builder env config + signed CI builds
@@ -13172,6 +13184,8 @@ The certificate is stored as a GitHub Actions secret (base64-encoded PFX). It's 
 **Priority:** Tier 2 鈥?commercial-release blocking. Cannot ship paid product Windows-side without this.
 
 **Cross-check note (audit 5B):** Audit's Critical 2 + Priority 3. Verified at package.json:44.
+
+**Status:** Shipped in df1f9cb (focused MVP — signed Windows release workflow and builder config; certificate acquisition and first real signature verification remain business/release tasks). New `.github/workflows/release-windows.yml` runs only on `v*` tags, requires `WIN_CERT_PFX_BASE64` and `WIN_CERT_PASSWORD` secrets, builds with `npx electron-builder --win --config scripts/signing/electron-builder.windows-signed.cjs --publish never`, and uploads `release/*.exe` as a 30-day `windows-signed-installer` artifact. New `scripts/signing/electron-builder.windows-signed.cjs` extends the package build config, enables `signAndEditExecutable`, pins `publisherName: 'LaserForge'`, and signs with SHA-256 while leaving the default package/PR build unsigned. Pinned by `tests/windows-signing-release-workflow.test.ts` (15 contracts: tag-only trigger, no PR exposure, Windows runner, secret names, early secret failure, signed config command, artifact upload, signed builder config, and PR CI secret isolation). **Out of scope:** obtaining EV/OV cert, storing real GitHub secrets, first `signtool verify /pa` proof on a produced release artifact, and SmartScreen reputation validation. **Hardware verification: not required** (release engineering only).
 
 ---
 
@@ -13269,6 +13283,8 @@ Electron Builder handles notarization automatically via `notarytool` when these 
 **Priority:** Tier 2 鈥?commercial-release blocking for macOS.
 
 **Cross-check note (audit 5B):** Audit's Critical 2 + Priority 4. Verified at package.json:54-58.
+
+**Status:** Shipped in d83d68e (focused MVP — tag-only signed/notarized macOS release workflow and builder config; Apple Developer enrollment, certificate secrets, and first Gatekeeper proof remain release tasks). New `.github/workflows/release-macos.yml` runs only on `v*` tags, requires `MAC_CERT_P12_BASE64`, `MAC_CERT_PASSWORD`, `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID`, builds with `npx electron-builder --mac --config scripts/signing/electron-builder.macos-signed.cjs --publish never`, and uploads `release/*.dmg` as a 30-day `macos-signed-notarized-dmg` artifact. New `scripts/signing/electron-builder.macos-signed.cjs` extends the package build config, enables hardened runtime, disables local Gatekeeper assess during build, pins `scripts/signing/entitlements.mac.plist`, supports optional `MAC_SIGNING_IDENTITY`, and enables notarization via `APPLE_TEAM_ID`. Pinned by `tests/macos-signing-notarization-workflow.test.ts` (23 contracts: tag-only trigger, no PR exposure, secret names, early secret failure, signed config command, artifact upload, hardened runtime, entitlements, notarization, identity override, and PR CI secret isolation). **Out of scope:** Apple Developer account setup, real certificate/notarization secret population, first clean fresh-mac launch verification, and universal x64/arm64 artifact strategy. **Hardware verification: not required** (release engineering only).
 
 ---
 
@@ -13394,6 +13410,8 @@ These manifests + the installers are uploaded to the GitHub Release. `electron-u
 
 **Cross-check note (audit 5B):** Audit's Critical 1 + Priority 5.
 
+**Status:** Shipped in b8b6761 (focused MVP — Electron auto-update infrastructure with signed-release publish metadata; visible update UI and first real release-feed validation deferred). Added `electron-updater` as a runtime dependency and package `build.publish` metadata for GitHub Releases (`stolkjohannjohann-sudo/LaserForge`) so electron-builder can emit update manifests for tagged releases. `electron/main.ts` imports `autoUpdater`, schedules `checkForUpdatesAndNotify()` 30 seconds after packaged startup, forwards checking/available/not-available/download-progress/downloaded/error events through `update:event`, catches network/update-check failures as non-fatal warnings, exposes `update:check`, and gates `update:install` so `quitAndInstall()` refuses while the renderer reports `jobRunning` or the main-process job wake lock is active. `electron/preload.ts` exposes `electronAPI.updates.check/install/onEvent`, with matching `ElectronAPI` types. Pinned by `tests/auto-update-infrastructure.test.ts` (26 contracts: dependency, GitHub publish config, delayed packaged-only check, forwarded events, non-fatal error path, manual check IPC, job-running install guard, preload bridge, unsubscribe, and global typings). **Out of scope:** renderer notification UI, release notes UI, first real GitHub Release manifest validation (`latest.yml` / `latest-mac.yml`), installer signature verification proof from a produced release, and rollback UI integration. **Hardware verification: not required** (release engineering only; install is explicitly blocked during active jobs).
+
 ---
 
 ### T2-102 | Rollback strategy 鈥?failed-launch detection + previous-version retention
@@ -13463,6 +13481,8 @@ The test gate: every release with a user-data migration must include a roll-forw
 **Priority:** Tier 2. Depends on T2-101 (auto-update) and T2-104 (migration framework).
 
 **Cross-check note (audit 5B):** Audit's Critical 7 + Priority 6.
+
+**Status:** Shipped in 468eaae (focused MVP — Layer 1 failed-launch detection; previous-version installer retention and rollback UI deferred until T2-101 auto-update/signing exists). New `electron/startupCrashLoop.ts` persists `startup-crash-loop.json` in userData with `bootInProgress`, consecutive failure count, last start/success/failure timestamps, and last failure reason. `beginStartupCrashLoopTracking()` marks a boot in progress and recovers a prior in-progress boot as a failed launch; `markStartupSuccessful()` clears the failure count after the renderer survives the stable window; `recordStartupCrash()` records main-process / renderer crash reasons. `electron/main.ts` calls the tracker on `app.whenReady`, marks success 10 seconds after `did-finish-load`, records `uncaughtExceptionMonitor`, `unhandledRejection`, and `render-process-gone`, and warns when three failed launches mean safe-mode / rollback UI should be offered. Pinned by `tests/rollback-crash-loop-detection.test.ts` (16 contracts: boot marker file written, three failed launches triggers safe mode on the next boot, successful boot clears count, explicit crash reason persists, main.ts wiring exists). **Out of scope:** previous-installer retention, invoking rollback installers, user-data rollback round trips, and visible recovery UI. **Hardware verification: not required** (startup bookkeeping only; no controller commands or emitted G-code changed).
 
 ---
 
@@ -13842,6 +13862,8 @@ This is significant work. T2-107 tracks the debt; the implementation might be sp
 **Cross-check note (audit 5B):** Audit's Startup verdict. Verified at electron/main.ts:81.
 
 **Status:** Shipped in 17b0fed (focused MVP — centralized policy builder + 3-mode union + audit predicates; main.ts integration + dependency audit deferred as T2-107-followup). New `src/security/CspPolicy.ts` exports `CspMode` (dev / compatible / strict), `CspDirective`, `CspPolicy`, `buildCspPolicy(mode)` (returns the directive list per mode — `compatible` includes `'unsafe-inline'` + `'unsafe-eval'` matching the pre-T2-107 baseline; `strict` removes both unsafe tokens from script-src AND removes `'unsafe-inline'` from style-src; `dev` keeps loose for Vite HMR), `serializeCsp(policy)` (canonical `directive value1 value2; ...` format with no trailing semicolon), `getDirective`, `directiveAllowsToken`, `policyForbidsUnsafeEval` and `policyForbidsUnsafeInlineStyles` (audit predicates), `pickCspMode({isDev, strictOverride?})` (dev wins always; otherwise strictOverride or 'compatible' default). Object-src 'none', frame-src 'none', base-uri 'self' are present in EVERY mode (those are XSS hard-stops independent of inline/eval). Resource sources (img-src data:/blob:/indexeddb:, font-src data:, connect-src ws:/wss:/https: for Falcon Wi-Fi, worker-src blob: for web workers) are present in every mode. Pinned by `tests/csp-policy.test.ts` (68 contracts: every directive present per mode; compatible matches pre-T2-107 baseline (includes both unsafe tokens); strict has no unsafe-eval + no unsafe-inline anywhere; predicates flag the right modes; object/frame defenses always-on; serialiseCsp format + no trailing semicolon; pickCspMode dev wins over strictOverride; round-trip audit of compatible mode against the existing electron/main.ts string; source-level pin). **Out of scope (T2-107-followup):** wiring `electron/main.ts:190-191` to call `serializeCsp(buildCspPolicy(pickCspMode(...)))` (mechanical change once dep audit is done); the dependency audit itself — confirm which packages need eval (Vite HMR pre-7.0 historically; some templating libraries; some math expression evaluators) and which need inline styles (CSS-in-JS); migrate those to nonces/hashes; flip prod default from `'compatible'` to `'strict'`. **Hardware verification: not required**.
+
+**T3-8 follow-up:** Main-process CSP wiring shipped in `dc3aaf9`. The source of truth moved to `electron/cspPolicy.ts` so `electron:compile` can consume it directly; `src/security/CspPolicy.ts` now re-exports the same policy for existing tests. Production now defaults to strict script CSP (no `'unsafe-eval'`, no script `'unsafe-inline'`). Style `'unsafe-inline'` remains intentionally allowed because the current React UI uses inline style attributes; removing that is a separate style/nonce migration.
 
 ---
 
@@ -14804,6 +14826,8 @@ grep -A 1 "ipcMain.handle" electron/main.ts | grep -B 1 -v "assertTrustedSender"
 
 **Status:** Shipped in 4f9ef6f (focused MVP — typed environment + pure trust evaluator + throwing-guard helper + UntrustedSenderError + checkHandlerCoverage CI helper; per-handler adoption deferred as T2-119-followup since it's a per-handler review across ~15 sites). New `src/security/TrustedSender.ts` exports `AppEnvironment` 3-kind union (packaged | dev w/ expectedDevOrigin | test), `SenderFrame`, `TrustReason` (7: packaged-file-url / dev-localhost-origin / test-environment / unknown-scheme / untrusted-origin / no-frame / frame-url-malformed), `TrustResult` discriminated union, `evaluateSenderTrust({env, frame})` pure evaluator with **canonical priority order** (test → trusted regardless; null frame → no-frame; non-string/empty url → frame-url-malformed; packaged + file:// → trusted, anything else → untrusted-origin; dev + matches expectedDevOrigin → trusted; dev + non-http(s)/file scheme → unknown-scheme; dev + http(s) origin mismatch → untrusted-origin), `UntrustedSenderError` typed-error class (carries observed URL + reason in message), `assertSenderTrustResult(result)`, `assertTrustedSenderFrame({env, frame})` single-call form (the audit's "apply at top of every handler" pattern), `describeTrustResult(result)` user-facing diagnostic copy, `HandlerCoverageReport` shape, `checkHandlerCoverage({source, guardName?, windowLines?})` CI helper that scans source text for `ipcMain.handle` lines + verifies a guard call within `windowLines` (default 5) — runs from a static read so the audit's grep test contract is enforceable in our suite without spawning grep. **Renderer-safe:** module is pure logic with no Electron import, so unit tests run under tsx without dragging in electron. The actual `ipcMain.handle` wiring lives in `electron/security.ts` (T2-119-followup). Pinned by `tests/ipc-sender-verification.test.ts` (63 contracts: packaged + file:// → trusted; packaged + http/https/devtools → untrusted; packaged + null frame → no-frame; dev + localhost match → trusted + wrong port → untrusted + file:// in dev → untrusted; dev + custom scheme → unknown-scheme; test + any URL + null frame → trusted; non-string url → frame-url-malformed; empty url → frame-url-malformed; assertSenderTrustResult throws on untrusted + no-throw on trusted; assertTrustedSenderFrame integration; UntrustedSenderError carries URL + reason in message; describeTrustResult trusted vs each refusal reason; checkHandlerCoverage all-guarded + bare-handler-flagged + custom guard name + flagged-snippet identifies handler; **THE audit's headline** — packaged file://, dev localhost, attacker domain rejected; source-level pin). **Out of scope (T2-119-followup):** writing `electron/security.ts` that calls `assertTrustedSenderFrame({env: app.isPackaged ? {kind:'packaged'} : {kind:'dev', expectedDevOrigin:'http://localhost:3000/'}, frame: event.senderFrame})` from a single `assertTrustedSender(event)` wrapper; applying that wrapper at the top of every `ipcMain.handle` site (~15 handlers in `electron/main.ts` covering storage / serial / dialog / falcon-wifi); CI integration of `checkHandlerCoverage` against electron/main.ts. **Hardware verification: not required**.
 
+**T3-9 follow-up:** Per-handler Electron adoption shipped in `68395bc`. `electron/security.ts` now provides the main-process wrapper, all current `electron/main.ts` and Falcon WiFi handlers call it, and `tests/ipc-attack-surface.test.ts` statically guards the coverage.
+
 ---
 
 ### T2-120 | Replace generic storage IPC with typed namespaced APIs
@@ -14891,6 +14915,8 @@ The renderer-side `Storage` adapter abstraction stays 鈥?it now wraps the typed
 **Priority:** Tier 2. Foundational. Refines T1-84 (which only scoped clear). Combined with T2-128 (per-namespace auth), closes the broad-storage class of issues.
 
 **Cross-check note (audit 5D):** Audit's Critical 12 + Priority 4.
+
+**Status:** Shipped in 01b205f (focused MVP — renderer-facing Electron storage IPC no longer exposes broad `storageGet` / `storageSet` / `storageRemove` / `storageList`; it exposes a typed `storage` namespace object instead). New `src/core/storage/StorageNamespaces.ts` routes known LaserForge keys into explicit namespaces (`deviceProfiles`, `materials`, `autosave`, `jobLogs`, `replays`, `entitlements`, `diagnostics`, `settings`). `FilesystemStorageAdapter` keeps the renderer `StorageAdapter` contract but routes every get/set/remove/list call through the matching namespace and preserves `list(prefix)` filtering. `electron/preload.ts` exposes namespaced storage scopes, while `electron/main.ts` registers namespaced storage handlers and rejects keys that do not belong to the requested namespace via `electron/storageNamespaces.ts`. Pinned by `tests/typed-storage-ipc.test.ts` (25 contracts: key routing, unknown-key rejection, adapter namespace calls, prefix-list filtering, broad preload exports removed, broad main handlers removed, typed namespace handlers registered, allow-list validation present) and updated `tests/storage-ipc-no-broad-clear.test.ts` (17 contracts; T1-84 bulk-clear guarantee plus T2-120 no-broad-storage guard shape). **Out of scope (T2-128):** deeper backend authorization inside `electron/storage.ts`, license-write service migration, and per-domain schema validation beyond namespace/key allow-lists. **Hardware verification: not required** (IPC/storage boundary only; no controller commands or emitted G-code changed).
 
 ---
 
@@ -14988,6 +15014,8 @@ For internal app paths (job streaming, jog, recovery flow) that need to send com
 
 **Cross-check note (audit 5D):** Audit's Critical 4 + Priority 5. Verified at electron/main.ts:256-261.
 
+**Status:** Closed in `e5cd8ae` (verified subsumed by T1-27/T2-35 removal). The vulnerable `serial:send` main-process IPC no longer exists, so there is no remaining generic main-process serial command path to classify. T1-27 removed the unused `window.electronAPI.sendGcode`/`serial:send` bypass, and T2-35 then removed the entire native Electron serial IPC subsystem (`serial:list`, `serial:connect`, `serial:disconnect`, `serial:send`, `electron/serial.ts`, and the production `serialport` dependency). Pinned by `tests/no-electron-sendgcode-export.test.ts` (19 contracts: no preload serial bridge exports, no serial IPC channel references in preload/main, no type declarations, `electron/serial.ts` deleted, and no production `src/` references to the old bridge). **Hardware verification: not required** (dead Electron IPC path; real controller path remains Web Serial through MachineService/GrblController).
+
 ---
 
 ### T2-122 | Typed serial command IPC 鈥?replace generic `sendGcode(arbitraryString)`
@@ -15061,6 +15089,8 @@ Job streaming uses `sendJobLine` (no classification 鈥?job lines are pre-valida
 **Priority:** Tier 2. Pairs with T2-121 (classifier). Together they replace the generic command surface with a typed surface.
 
 **Cross-check note (audit 5D):** Audit's Required Priority 5.
+
+**Status:** Closed in `e5cd8ae` (verified subsumed by T1-27/T2-35 removal). The generic `sendGcode(arbitraryString)` Electron IPC bridge this ticket intended to replace is gone. There is no `window.electronAPI.sendGcode`, no `serial:send` channel, no native serial module, and no production renderer reference to the removed bridge. The real controller command surface is Web Serial through MachineService/ExecutionCoordinator/GrblController, so typed Electron serial IPC handlers would be unused new surface area rather than a safety improvement. Pinned by `tests/no-electron-sendgcode-export.test.ts` (19 contracts). **Hardware verification: not required** (dead Electron IPC path; Web Serial controller behavior unchanged).
 
 ---
 
@@ -15531,6 +15561,8 @@ The generic `storageSet(key, value)` is removed entirely. There is no longer a c
 
 **Cross-check note (audit 5D):** Audit's Priority 4 (deep). Refines T1-84 + T2-120.
 
+**Status:** Shipped in 4e58783 (focused MVP — storage backend now requires an explicit namespace for every filesystem get/set/remove/list, and generic top-level `storageGet` / `storageSet` / `storageRemove` / `storageList` exports are gone). `electron/storage.ts` exposes `namespacedStorageGet`, `namespacedStorageSet`, `namespacedStorageRemove`, and `namespacedStorageList`; `createStorageFsBackend` exposes matching `namespaced*` methods. Each method validates the requested key with `electron/storageNamespaces.ts` before touching the file. `electron/main.ts` now calls only the namespaced helpers from its typed IPC handlers, so a future direct storage import has to carry namespace intent. Pinned by `tests/namespace-isolation.test.ts` (16 contracts: profile and entitlement keys stay isolated, cross-namespace read/write rejected, failed cross-write leaves existing license value unchanged, namespaced listing excludes other domains and preserves prefix filtering, generic exports absent, main imports namespaced helpers) plus updated `tests/storage-filesystem-unit.test.ts` (10 contracts for round-trip, overwrite, remove, namespace list, prefix list, Unicode, large values, clear). **Out of scope:** T2-127 size-limit enforcement in Electron handlers and deeper per-domain schema validation. **Hardware verification: not required** (filesystem storage boundary only; no controller commands or emitted G-code changed).
+
 ---
 
 ### T2-129 | Destructive `forceSafeState()` primitive — operator-initiated force-safe-state recovery + T1-29 acknowledgement integration
@@ -15634,6 +15666,18 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 ### T3-2 | Write the 5 critical missing tests
 
+**Status (partial):** Case 1 shipped in `93a3351` — added `tests/ui-start-job-end-to-end.test.ts`, which compiles a two-object scene, applies the same non-empty line filter used by the UI start path, streams through `GrblController.sendJob`, and asserts object lifecycle callbacks fire for both generated object IDs in marker order while marker comments are stripped before serial write. The master checklist remains open because case 5 still needs dedicated coverage.
+
+**Status (partial):** Case 2 shipped in `3c1d5af` — added `tests/template-safety-enforcement.test.ts`, a focused six-case guard for dangerous template/custom-G-code surfaces: custom start with `G91`, custom start with `M3 S1000`, footer omitting `M5`, footer with `G10 L2`, `$X` injection, and motion outside bed bounds.
+
+**Status (partial):** Case 3 shipped in `420e3fc` — added `tests/stale-gcode-blocks-start.test.ts`, which compiles a scene, mutates the design, attempts to start with the old ticket, and asserts the stale ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
+
+**Status (partial):** Case 4 shipped in `00ce691` — added `tests/profile-change-blocks-start.test.ts`, which compiles under a 400x400 profile, switches to a 300x300 profile, attempts to start with the old ticket, and asserts the stale-profile ticket is rejected before `executeJob`, active ticket state, or active canvas context can be set.
+
+**Status (partial):** Case 5 shipped in `4a30ad7` — added `tests/cable-yanked-mid-job.test.ts` and fixed `GrblController` transport-error handling so a serial `onError` mid-job aborts the job, closes the failed port best-effort, transitions to `disconnected`, notifies UI state listeners, preserves autosave, and allows reconnect-then-start on a fresh port.
+
+**Status:** Shipped in `4a30ad7` — all five critical T3-2 test files now exist and pass: UI start-job marker path, template safety enforcement, stale-scene start block, profile-change start block, and cable-yanked-mid-job recovery.
+
 **Problem:** Tests are strong but have a specific coverage gap: the UI-to-controller path is untested. This is why T0-1 lurked undetected.
 
 **Fix:** Add these tests. They're the top-priority gap closers.
@@ -15664,6 +15708,8 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 Alternative: delete it entirely. The README + directory structure + module-boundary lints (already present in `tsconfig` or ESLint rules) are sufficient.
 
+**Status:** Shipped in 1da30b0. `scripts/generate-project-map.mjs` now scans `src/` and `tests/`, rewrites `PROJECT_MAP.md` deterministically, and supports `--check` for drift detection. `package.json` exposes `project-map:generate` and `project-map:check`; `tests/project-map-generated.test.ts` pins the generated-map contract and runs under auto-discovered `npm test`.
+
 **Estimate:** 1 session for the generator; 15 min to delete.
 
 **Priority:** Tier 3 (hygiene).
@@ -15691,6 +15737,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Fix:** `electron-builder` ships with `electron-updater`. Wire it to a release server (GitHub Releases works for a start). On app start, check for updates. Offer download + install on next restart. Staged rollout (10% 鈫?50% 鈫?100%) if you want to be careful.
 
+**Status:** Shipped in 11d3104. T2-101 (`b8b6761`) added the Electron updater foundation: `electron-updater`, GitHub Releases publish metadata, packaged startup checks, update event forwarding, manual check/install IPC, and job-running install guard. T3-5 adds the missing renderer channel: `UpdateNotice` subscribes to `electronAPI.updates.onEvent`, surfaces available/download-progress/downloaded/error states, offers manual check, and disables "Restart to update" while a job is running. Pinned by `tests/update-notice-ui.test.tsx` plus existing `tests/auto-update-infrastructure.test.ts`. First signed release-feed validation still belongs to the release/signing process, not another app-side code path.
+
 **Estimate:** 2 sessions.
 
 **Priority:** Tier 3.
@@ -15703,6 +15751,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Fix:** Sentry has a free tier. Electron + Sentry SDK. Capture renderer errors, main-process errors, unhandled Promise rejections. Scrub PII (file paths, scene contents) before send. Include: error, stack, LaserForge version, controller type, OS.
 
+**Status:** Shipped in 6bbdf68 (privacy-first renderer crash-reporting foundation). `src/diagnostics/CrashReporter.ts` builds redacted crash payloads with app version, source, controller type, and OS; it stays disabled when `VITE_LASERFORGE_CRASH_DSN` is empty, and sends only through an injected/default transport when configured. `src/main.tsx` now installs global renderer error/rejection handlers and wraps the app in `AppErrorBoundary`, both reporting through the same redacted sink. Pinned by `tests/crash-reporting-privacy.test.ts` for opt-in behavior, file path/email/IP/license/project-name/binary redaction, and root wiring. Main-process remote crash submission and real Sentry project validation remain release-ops work once an account/DSN exists.
+
 **Estimate:** 1-2 sessions.
 
 **Priority:** Tier 3.
@@ -15710,6 +15760,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-7 | Backward-compat fixture corpus
+
+**Status:** Shipped in `021277d`. Added a checked-in project fixture corpus under `tests/fixtures/projects/` covering a current v1 cut project, a legacy-minimal score project, and a best-effort v1.1 multi-layer vector project. `tests/backward-compat-project-fixtures.test.ts` parses every fixture, validates the LaserForge v1 envelope, deserializes through `deserializeScene`, compiles, optimizes, and emits GRBL G-code with a laser-off command. This gives save/load/compiler migrations a pinned backward-compat safety net instead of relying on hand-opened sample files. `PROJECT_MAP.md` regenerated to include the fixtures and the new test. Hardware verification: not required (project file load/compile fixture coverage only).
 
 **Problem:** No pinned real-world project fixtures. Version N refactor that breaks loading of Version N-1 files has no safety net.
 
@@ -15722,6 +15774,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-8 | Electron CSP hardening
+
+**Status:** Shipped in `dc3aaf9`. `electron/main.ts` now builds the `Content-Security-Policy` header from `electron/cspPolicy.ts` instead of hard-coding the pre-audit unsafe header. Dev mode remains relaxed for Vite HMR; packaged production defaults to strict script CSP with no `'unsafe-eval'` and no script `'unsafe-inline'`, while style `'unsafe-inline'` is intentionally retained until the React inline-style/nonced-style migration is designed. `src/security/CspPolicy.ts` re-exports the same pure policy source so existing audit helpers keep a single contract. Pinned by `tests/electron-csp-integration.test.ts` plus the existing `tests/csp-policy.test.ts`. Hardware verification: not required (Electron shell header/security policy only).
 
 **Code reference:** `electron/main.ts:78-90`
 
@@ -15736,6 +15790,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-9 | Tighten IPC attack surface
+
+**Status:** Shipped in `68395bc`. Added `electron/security.ts` with a main-process `assertTrustedSender(event)` wrapper, then guarded every current `ipcMain.handle` entry in `electron/main.ts` and `electron/falcon-wifi/FalconWiFiService.ts` before input validation or privileged work. Packaged builds trust only `file://` sender frames; dev builds trust only the parsed `http://localhost:3000/` origin (no prefix lookalikes). `tests/ipc-attack-surface.test.ts` statically enforces guard coverage for both main and Falcon handlers so future IPC cannot be added bare. Existing typed storage and T2-119 sender-verification tests remain green. Hardware verification: not required (main-process IPC authorization only).
 
 **Code reference:** `electron/preload.ts`, `electron/main.ts` ipcMain handlers
 
@@ -15754,6 +15810,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-10 | Input file-format size limits
+
+**Status:** Shipped in `fa8b8f8`. Closed the remaining import-limit gap by adding `DXF_IMPORT_LIMITS` to `src/import/dxf/DxfParser.ts`: 50 MB file cap, 500K total entity cap, and 10K per-entity group cap. `parseDxf` now checks text size before splitting and rejects entity/group bombs with `DxfImportLimitError`; it also no longer counts the `SECTION` marker as a fake entity. Browser DXF file-input and drag/drop paths now call `assertDxfFileSize(file.size)` before `file.text()`, while Electron `dialog:open` aligns DXF to the same 50 MB cap. The image side of the ticket was already covered by T1-17/T1-35/T2-124: worker-based image prep, 4000 px import downsample, 50 MB image file cap, and decoded pixel/dimension limits remain pinned by existing tests. Hardware verification: not required (input validation/import parsing only).
 
 **Code references:**
 - `src/import/dxf/DxfParser.ts:17-76` (no size or entity count limits)
@@ -15776,6 +15834,8 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 ---
 
 ### T3-11 | Follow-up: burn-progress visual bugs
+
+**Status:** Shipped in `589b49b`. Object lifecycle markers now advance from the acknowledged GRBL line, not from `_drainQueue` send time: pending job records carry the marker and `_handleOk()` emits it only after the corresponding `ok`. This keeps the burn halo from jumping ahead of GRBL's planner buffer. The burned-object completion marker is also inset from `worldBounds.maxX/minY` by `transform.screenPx(2)` so edge objects do not draw the marker directly on the bed boundary. Pinned by `tests/burn-progress-ack-timing.test.ts`. Hardware verification: not required (visual progress timing and canvas marker placement only).
 
 **Code references:**
 - `src/controllers/grbl/GrblController.ts:831-833` (lifecycle fires on send, not ack)
@@ -19814,7 +19874,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-14 Max-update-depth crashes during fast vector resize (shipped + hardware-verified)
 - [x] T1-15 MachineService job lifecycle hardening (shipped; hardware sanity test pending)
 - [x] T1-16 Three render-loop crashes on load-another-job-after-complete (shipped + hardware-verified)
-- [ ] T1-17 Image import freezes the app — Passes 1-4a shipped 2026-04-30 (`023a341` + `0632b2b` + `b8f3dfb` + `05ce7b86`); Passes 4b/4c open
+- [ ] T1-17 Image import freezes the app — all implementation passes shipped (`023a341` + `0632b2b` + `b8f3dfb` + `05ce7b86` + `7bec4bc`); awaiting real 4-12MP photo UI-responsiveness verification before checklist close
 - [x] T1-18 Service-level test-fire deadman timeout — highest urgency safety (shipped pre-session)
 - [x] T1-19 Service-level approval tokens for dangerous commands (shipped 2026-04-30 in `1a78fdf`)
 - [x] T1-20 WCS normalization no-listener fallback hardening (shipped in `b0375fa`; close-out 2026-05-03)
@@ -19847,7 +19907,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-47 Register simulator-view-ymirror.test.ts + add registration drift guard (shipped 2026-05-02 in `037bfdd`; defensive guard retired 2026-05-05 — superseded by T2-22 auto-discovery which makes the "exists on disk but not registered" failure mode impossible by construction)
 - [x] T1-48 Remove `new Date()` from Output.createdAt for determinism (shipped 2026-05-02 in `69f1221`)
 - [x] T1-49 `MachineService.connectRealLaser` cleanup on partial-failure (shipped 2026-05-04 in `7cce3f0`)
-- [ ] T1-50 Connect button mutex / abortable connect — Part A in `d4e3e35`, Part B (interface stub) in `1f135d9`. Full abort propagation through WebSerialPort/GrblController is T2-32/T2-33 future work.
+- [x] T1-50 Connect button mutex / abortable connect — Part A in `d4e3e35`, Part B interface stub in `1f135d9`; WebSerialPort signal propagation in `164e6be`; UI cancel in `a72bc4a`; GrblController handshake cancellation in `75f7ccf`; safeDisconnect connecting-state cancellation in `1010cb8`.
 - [ ] T1-51 Strengthen GRBL handshake proof — reject raw `ok` as welcome — code shipped 2026-05-04 in `5b72000`, awaiting hardware verification on Falcon A1 Pro
 - [x] T1-52 Auto-detect must include `$30 → maxSpindle` — minimum scope shipped 2026-05-04 in `41310f4` (audit-extended `$32`/`$22`/`$20`/`$23` deferred)
 - [x] T1-53 Live `$30` overrides profile.maxSpindle when connected; mismatch is preflight blocker (closed 2026-05-04 as superseded by T1-33 in `a5dbe91`)
@@ -19958,7 +20018,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-62 Recovery cards — alarm / disconnect / frame-fail / E-stop / job-fail (Shipped — content layer per variant + GRBL alarm-code mapper + buildRecoveryCard router; React component deferred as T2-62-followup; refines T2-46)
 - T2-62 follow-up: React RecoveryCard + emergency-stop safety-state UI surface shipped in `8a37618`; alarm-state recovery-card routing + Unlock/Home/Frame action wiring shipped in `8f74144`; unexpected-disconnect recovery-card routing shipped in `87048f6`; frame-failed recovery-card routing shipped in `95bf63d`; job-failed recovery-card routing + Stop/Compile action wiring shipped in `a332cc8`.
 - [x] T2-63 Operation order preview with order warning (Shipped — analysis layer + cut-before-engrave detector + per-row formatter + ack predicate; ReadyToRunPanel display shipped with T2-58; acknowledgement/reorder controls deferred as T2-63-followup)
-- [ ] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (filed; foundation for several Phase 4B improvements)
+- [x] T2-64 Beginner-vs-Advanced mode toggle with safety gates differing per mode (Shipped - persisted UserMode + pure gate policy + Settings toggle + frame-before-start advanced override; deeper per-gate migrations deferred)
 - [x] T2-65 Central error reporter — `reportError({domain, severity, recovery, developerDetails})` (Shipped — ErrorReporter class + singleton + reportError + errorFromCatch + history; per-site migration deferred as T2-65-followup; refines T2-57)
 - [x] T2-66 `positionTrusted` state propagating from alarm/E-stop/disconnect/frame-fail (Shipped — type + transition + canStart predicate; MachineState wiring deferred as T2-66-followup; refines T2-44)
 - [x] T2-67 Job failure outcome enum (8 distinct outcomes) and finalization on every termination path (shipped 2026-04-25 in `a1bb80f`)
@@ -19982,21 +20042,21 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-85 Explicit `JobFingerprint` type 鈥?refines T2-51 (type + builder + diff helpers shipped 2026-05-05 in `9e755b7`; ValidatedJobTicket migration filed as T2-85-followup)
 - [x] T2-86 Explicit `FrameState` union type 鈥?refines T2-60 (type + helpers shipped 2026-05-05 in `b4769f0`; ConnectionPanelMain migration filed as T2-86-followup)
 - [x] T2-87 Explicit `RecoveryState` state machine (Shipped — 6-status union + per-step ack transitions + severity-ordered triggers + recoveryAllowsStart gate; canStart wiring deferred as T2-87-followup; composes T2-62/66/67)
-- [ ] T2-88 Hash-derived dirty state 鈥?replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; 17-site call-site migration filed as T2-88-followup)
-- [ ] T2-89 Server-side entitlement service with signed token issuance (filed; commercial-credibility foundation)
+- [x] T2-88 Hash-derived dirty state - replace manual `sceneIsDirtyRef` toggling (helper shipped 2026-05-05 in `bc6f7e0`; call-site migration shipped in `0166216`).
+- [x] T2-89 Server-side entitlement service with signed token issuance (focused MVP shipped; stack-agnostic contract + activation/refresh issuance helpers; deployed server/client token-preference wiring deferred)
 - [x] T2-90 Signed local entitlement token with public-key verification (Shipped — typed shape + base64url codec + format validators + verifier interface + replay/expiry/clock-skew/device-binding checks + InMemoryJtiStore; WebCrypto wiring deferred as T2-90-followup; depends on T2-89)
 - [x] T2-91 Feature enforcement registry — `FEATURE_MATRIX` per-feature `enforce` declarations (Shipped — `src/entitlements/FeatureMatrix.ts` + source-scanning enforcement test; foundation, pairs with T1-78)
 - [x] T2-92 Per-feature granular `canUse` — replace single `hasPro` boolean (Shipped — `EntitlementService.canUse` consumes its argument; new `EntitlementState.features?` field; legacy back-compat preserved; pairs with T2-89/T2-91)
 - [x] T2-93 License status enum 鈥?`LicenseStatus` first-class state machine (additive layer shipped 2026-05-05 in `e18e204`; legacy flat-`status` removal deferred to T2-93-followup)
 - [x] T2-94 Clock-tamper detection for offline grace (Shipped — detector + 4-kind tamper reasons + server-time-grace primitive; EntitlementService wiring deferred as T2-94-followup; depends on T2-89/T2-90 for full effect)
 - [ ] T2-95 Real trial model (filed; deferred until business-model decision)
-- [ ] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (filed; depends on T2-89)
+- [x] T2-96 Subscription/plan lifecycle support 鈥?revoked/cancelled/downgraded (focused MVP shipped; lifecycle event contract + revocation merge/apply helpers; polling/storage wiring deferred)
 - [x] T2-97 Entitlement checks must never block safety controls (shipped 2026-05-05 in `9a62d90` — `docs/SAFETY_GUARANTEES.md` + behavioral + static-guard tests)
-- [ ] T2-98 CI builds installers on Windows + macOS runners (filed; release-engineering foundation)
-- [ ] T2-99 Windows code signing + signed CI releases (filed; commercial-release blocking, depends on T2-98)
-- [ ] T2-100 macOS code signing + notarization + stapling (filed; commercial-release blocking)
-- [ ] T2-101 Auto-update infrastructure 鈥?`electron-updater` with signed releases (filed; depends on T2-98/99/100)
-- [ ] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (filed; depends on T2-101 + T2-104)
+- [x] T2-98 CI builds installers on Windows + macOS runners (focused MVP shipped; unsigned per-PR installer jobs + artifact upload)
+- [x] T2-99 Windows code signing + signed CI releases (Shipped — tag-only signed Windows release workflow + electron-builder signed config; cert acquisition and first signature verification remain release tasks)
+- [x] T2-100 macOS code signing + notarization + stapling (Shipped — tag-only signed/notarized macOS release workflow + hardened-runtime electron-builder config; Apple account/secrets and first Gatekeeper proof remain release tasks)
+- [x] T2-101 Auto-update infrastructure — `electron-updater` with signed releases (Shipped — dependency + GitHub publish metadata + packaged startup check + update event bridge + job-running install guard; visible UI and first feed validation deferred)
+- [x] T2-102 Rollback strategy 鈥?failed-launch detection + previous version retention (Shipped — Layer 1 failed-launch detector in Electron main; previous-installer retention and rollback UI deferred until T2-101/signing)
 - [x] T2-103 Release artifact integrity — SHA256 + SBOM + signed checksum (Shipped — checksum-format helpers + generator script; SBOM tooling + GPG signing wiring deferred as T2-103-followup; depends on T2-98)
 - [x] T2-104 Versioned user-data migration framework (Shipped — DataDomain (10) + DomainMigrationStep + Registry (chain validation) + migrateUserData runner + 2 typed errors; per-loader adoption deferred as T2-104-followup)
 - [x] T2-105 Startup diagnostics + safe mode + crash-loop recovery (Shipped — pure crash-loop detector with reconcileOnBoot for "host died silently"; Electron `electron/main.ts` wiring deferred as T2-105-followup; pairs with T2-102)
@@ -20014,29 +20074,29 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-117 Correlation IDs across systems (Shipped — type + generator + snapshot helpers in `src/diagnostics/CorrelationIds.ts`; subsystem propagation deferred as T2-117-followup)
 - [x] T2-118 Troubleshooting panel — `Help → Diagnostics` (Shipped — content layer with 5 typed sections + 5 common-issue guides + buildDiagnosticsPanel composer; React panel deferred as T2-118-followup)
 - [x] T2-119 IPC sender verification — `assertTrustedSender` in every handler (Shipped — typed environment + evaluator + assert helper + UntrustedSenderError + checkHandlerCoverage; per-handler adoption deferred as T2-119-followup; pairs with T1-89)
-- [ ] T2-120 Replace generic storage IPC with typed namespaced APIs (filed; foundational; refines T1-84)
-- [ ] T2-121 Main-process serial command classification enforcement (filed; pairs with T2-122)
-- [ ] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (filed; pairs with T2-121)
+- [x] T2-120 Replace generic storage IPC with typed namespaced APIs (Shipped — renderer-facing Electron storage now uses typed namespace scopes; generic storageGet/storageSet/storageRemove/storageList IPC removed; deeper backend authorization remains T2-128)
+- [x] T2-121 Main-process serial command classification enforcement (closed; vulnerable `serial:send` IPC removed by T1-27/T2-35, no main-process generic serial command path remains)
+- [x] T2-122 Typed serial command IPC 鈥?replace generic `sendGcode(string)` (closed; generic Electron `sendGcode` bridge removed by T1-27/T2-35, typed replacement would be unused surface)
 - [x] T2-123 SVG complexity limits — node count, depth, path tokens, segments (Shipped — limits + typed error + bump-and-assert helpers in `e137aea`; parser/converter wiring in `236ee5c`; pairs with T1-92)
 - [x] T2-124 Image pre-decode size + pixel limits (decompression bomb protection) (Shipped — limits + typed error + check helpers in `b751a1c`; useImport wiring in `83e724f`; pairs with T1-92)
 - [x] T2-125 Compiler/output layer enforces template validation (shipped in `412250c`; defense in depth for T1-91)
 - [x] T2-126 Falcon WiFi treated as untrusted telemetry — UI labels + safety boundary (Shipped — typed trust classifier + per-action policy gate + identity check + UI-badge + override-dialog copy; ConnectionPanelMain wiring deferred as T2-126-followup; pairs with T1-94)
 - [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
-- [ ] T2-128 Per-namespace storage authorization (filed; refines T1-84 + T2-120)
+- [x] T2-128 Per-namespace storage authorization (Shipped — Electron filesystem backend now requires namespace + validates key allow-lists before get/set/remove/list; generic storage helpers removed)
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
-- [ ] T3-2 Write the 5 critical missing tests
-- [ ] T3-3 Delete or auto-generate PROJECT_MAP
+- [x] T3-2 Write the 5 critical missing tests
+- [x] T3-3 Delete or auto-generate PROJECT_MAP
 - [ ] T3-4 Code-signed installer
-- [ ] T3-5 Auto-update channel
-- [ ] T3-6 Crash reporting
-- [ ] T3-7 Backward-compat fixture corpus
-- [ ] T3-8 Electron CSP hardening
-- [ ] T3-9 Tighten IPC attack surface
-- [ ] T3-10 Input file-format size limits
-- [ ] T3-11 Burn-progress lag + 鉁?position
+- [x] T3-5 Auto-update channel
+- [x] T3-6 Crash reporting
+- [x] T3-7 Backward-compat fixture corpus
+- [x] T3-8 Electron CSP hardening
+- [x] T3-9 Tighten IPC attack surface
+- [x] T3-10 Input file-format size limits
+- [x] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
 - [ ] T3-13 Active-edge-table fill scanline algorithm (filed; algorithmic improvement, upper-end users)
 - [ ] T3-14 Sampled / level-of-detail G-code preview (filed; large-job UX)

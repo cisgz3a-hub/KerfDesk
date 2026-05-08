@@ -47,6 +47,7 @@ const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 interface PendingLine {
   text: string;
   byteCount: number;
+  marker?: readonly string[] | null;
   system?: boolean;
 }
 
@@ -391,8 +392,9 @@ export class GrblController implements GrblControllerApi {
 
   // ─── LIFECYCLE ──────────────────────────────────────────────
 
-  async connect(port: SerialPortLike): Promise<void> {
+  async connect(port: SerialPortLike, signal?: AbortSignal): Promise<void> {
     if (this._port) throw new Error('Already connected. Disconnect first.');
+    signal?.throwIfAborted();
 
     this._maxSpindle = null;
     this._settingsQueried = false;
@@ -416,7 +418,8 @@ export class GrblController implements GrblControllerApi {
 
     return new Promise<void>((resolve, reject) => {
       let welcomeReceived = false;
-      let timeout: ReturnType<typeof setTimeout>;
+      let connectSettled = false;
+      let timeout: ReturnType<typeof setTimeout> | undefined;
       let probeI: ReturnType<typeof setTimeout> | undefined;
       let probeSettings: ReturnType<typeof setTimeout> | undefined;
       let probeWifi1: ReturnType<typeof setTimeout> | undefined;
@@ -436,7 +439,34 @@ export class GrblController implements GrblControllerApi {
         probeWifi3 = undefined;
       };
 
+      const cleanupConnectTimers = (): void => {
+        if (timeout !== undefined) {
+          clearTimeout(timeout);
+          timeout = undefined;
+        }
+        clearProbeTimers();
+      };
+
+      const abortReason = (): Error =>
+        signal?.reason instanceof Error ? signal.reason : new Error('Connection aborted by user');
+
+      const onAbort = (): void => {
+        if (connectSettled) return;
+        connectSettled = true;
+        cleanupConnectTimers();
+        this._stopStatusPolling();
+        if (this._port === port) {
+          void port.close().catch(() => { /* ignore abort cleanup close failures */ });
+          this._port = null;
+        }
+        this._updateStatus('disconnected');
+        reject(abortReason());
+      };
+
+      signal?.addEventListener('abort', onAbort, { once: true });
+
       port.onData((line) => {
+        if (connectSettled && !welcomeReceived) return;
         this._emitRawLine(line, 'rx');
 
         // USB: stay quiet until polled; `?` yields `<State|...>`. Only treat lines
@@ -469,9 +499,10 @@ export class GrblController implements GrblControllerApi {
           isGrblStatusWelcome;
 
         if (!welcomeReceived && isWelcome) {
+          connectSettled = true;
+          signal?.removeEventListener('abort', onAbort);
           welcomeReceived = true;
-          clearTimeout(timeout);
-          clearProbeTimers();
+          cleanupConnectTimers();
           // Never claim idle if the controller is already in motion (avoids overlapping streams).
           this._updateStatus(statusWelcome ?? 'idle');
           // T1-25: arm the safe-state handshake. The next status report
@@ -535,15 +566,15 @@ export class GrblController implements GrblControllerApi {
         for (const cb of this._errorListeners) {
           cb(-1, `Serial error: ${err.message}`);
         }
-        // Abort active job on serial error — don't wait for close
-        this._abortJob();
+        // T3-2 case 5 / T3-16: a serial transport error during a job is
+        // operationally a cable pull. Abort the stream, close the failed
+        // handle best-effort, and force disconnected so the UI cannot start
+        // another job on a dead port.
+        this._handleTransportDisconnect(true);
       });
 
       port.onClose(() => {
-        this._stopStatusPolling();
-        this._abortJob();
-        this._port = null;
-        this._updateStatus('disconnected');
+        this._handleTransportDisconnect(false);
       });
 
       port.write('\n');
@@ -568,7 +599,9 @@ export class GrblController implements GrblControllerApi {
           }
         }, 1000);
         timeout = setTimeout(() => {
-          clearProbeTimers();
+          connectSettled = true;
+          signal?.removeEventListener('abort', onAbort);
+          cleanupConnectTimers();
           this._stopStatusPolling();
           if (this._port) {
             // T2-31: close() is now async. setTimeout cannot await; chain
@@ -640,6 +673,32 @@ export class GrblController implements GrblControllerApi {
   }
 
   // ─── JOB EXECUTION ──────────────────────────────────────────
+
+  private _handleTransportDisconnect(closePort: boolean): void {
+    const port = this._port;
+    this._stopStatusPolling();
+    this._abortJob();
+    this._port = null;
+    this._maxSpindle = null;
+    this._settingsQueried = false;
+    this._awaitingSettingsOk = false;
+    this._awaitingWcsQueryOk = false;
+    this._currentG54 = null;
+    this._placementUncertain = false;
+    this._positionConfirmed = false;
+    this._safeStateCheckArmed = false;
+    if (this._safeStateWatchdog !== null) {
+      clearTimeout(this._safeStateWatchdog);
+      this._safeStateWatchdog = null;
+    }
+    this._unsafeAtConnect = null;
+    this._grblSettings.clear();
+    this._resetMachineSettingsCache();
+    this._updateStatus('disconnected');
+    if (closePort && port?.isOpen) {
+      void port.close().catch(() => { /* ignore transport-error cleanup close failures */ });
+    }
+  }
 
   async executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle> {
     if (output.kind !== 'gcode-lines') {
@@ -1487,6 +1546,9 @@ export class GrblController implements GrblControllerApi {
     if (!oldest.system) {
       this._linesAcknowledged++;
       this._recordAckTimestamp();
+      if (oldest.marker != null) {
+        this._emitObjectLifecycle(oldest.marker);
+      }
       this._emitProgress();
     }
 
@@ -1523,7 +1585,10 @@ export class GrblController implements GrblControllerApi {
       }
     }
 
-    this._state.errorCode = code;
+    // GRBL `error:N` is command-scoped. Only active-job errors become
+    // recoverable machine holds; idle/protocol errors should not poison
+    // Frame/Start gates after the controller is otherwise idle.
+    this._state.errorCode = wasJobRunning ? code : null;
     this._emitProgress();
 
     // T1-24: actively command the laser off — but ONLY if a job was
@@ -1766,12 +1831,8 @@ export class GrblController implements GrblControllerApi {
       if (byteCount > this._bufferAvailable) break;
 
       const marker = this._lineMarkers[this._queueIndex];
-      if (marker != null) {
-        this._emitObjectLifecycle(marker);
-      }
-
       this._writeLine(line);
-      this._pending.push({ text: line, byteCount });
+      this._pending.push({ text: line, byteCount, marker });
       this._bufferAvailable -= byteCount;
       this._queueIndex++;
       this._recordSendTimestamp();

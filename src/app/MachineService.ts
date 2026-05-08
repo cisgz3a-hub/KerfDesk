@@ -241,6 +241,8 @@ export class MachineService {
    */
   private _activeOperation: ActiveOperationState | null = null;
   private _operationSessionCounter = 0;
+  private _activeConnectAbortController: AbortController | null = null;
+  private _activeConnectPromise: Promise<void> | null = null;
 
   constructor(
     private readonly controllerRef: MutableRefObject<LaserController>,
@@ -1026,20 +1028,36 @@ export class MachineService {
 
   // ─── CONNECTION ─────────────────────────────────────────
 
+  async cancelActiveConnect(reason: Error = new Error('Connection cancelled by user')): Promise<boolean> {
+    const controller = this._activeConnectAbortController;
+    const activeConnect = this._activeConnectPromise;
+    if (!controller) return false;
+
+    if (!controller.signal.aborted) {
+      controller.abort(reason);
+    }
+
+    if (activeConnect) {
+      try {
+        await activeConnect;
+      } catch (err) {
+        if (!controller.signal.aborted) throw err;
+      }
+    }
+
+    return true;
+  }
+
   async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
-    // T1-50 Part B: accept an optional AbortSignal. The spec's full
-    // shape — propagating the signal through `WebSerialPort.requestAndOpen`
-    // and `GrblController.connect` so an in-flight open or handshake
-    // can be cancelled mid-air — needs API changes inside those classes
-    // and is filed as T2-32 / T2-33. For T1-50 we ship the interface
-    // stub plus `throwIfAborted` hooks at every await point: a caller
-    // that already aborted before calling, or that aborts during one
-    // of the underlying async steps, observes the throw at the next
-    // await boundary and triggers the T1-49 cleanup path. No
-    // production caller passes a signal yet, so this has zero
-    // behavioral effect today; future ConnectionManager work (T2-32)
-    // will plumb a real signal through.
+    // T1-50: accept an optional AbortSignal. T2-33 made
+    // WebSerialPort.requestAndOpen signal-aware; this service passes
+    // the same signal down so user-cancel during port selection/open
+    // uses the T1-49 cleanup path. GrblController.connect still checks
+    // at the service await boundary until its handshake is signal-aware.
     signal?.throwIfAborted();
+    if (this._activeConnectAbortController !== null) {
+      throw new Error('Connection already in progress');
+    }
     if (!WebSerialPort.isSupported()) {
       throw new Error('Web Serial not supported in this browser');
     }
@@ -1058,13 +1076,30 @@ export class MachineService {
     // rethrow so the UI's catch sees the original error. T1-50 Part B
     // adds `signal?.throwIfAborted()` at each await point so an
     // aborted signal routes through the same cleanup path.
+    const connectAbortController = new AbortController();
+    this._activeConnectAbortController = connectAbortController;
+    const forwardExternalAbort = (): void => {
+      connectAbortController.abort(signal?.reason instanceof Error ? signal.reason : new Error('Connection aborted by user'));
+    };
+    signal?.addEventListener('abort', forwardExternalAbort, { once: true });
+    const connectSignal = connectAbortController.signal;
+    let activeConnectResolve: () => void = () => {};
+    let activeConnectReject: (err: unknown) => void = () => {};
+    const activeConnect = new Promise<void>((resolve, reject) => {
+      activeConnectResolve = resolve;
+      activeConnectReject = reject;
+    });
+    void activeConnect.catch(() => {});
+    this._activeConnectPromise = activeConnect;
+
+    let connectError: unknown;
     let ws: WebSerialPort | null = null;
     try {
       ws = createSerialPort('web') as WebSerialPort;
-      await ws.requestAndOpen(baudRate);
-      signal?.throwIfAborted();
-      await this.controllerRef.current.connect(ws);
-      signal?.throwIfAborted();
+      await ws.requestAndOpen(baudRate, connectSignal);
+      connectSignal.throwIfAborted();
+      await this.controllerRef.current.connect(ws, connectSignal);
+      connectSignal.throwIfAborted();
       this.portRef.current = ws;
       this.state.isSimulator = false;
       // T1-22: fresh connection clears any stale unknown laser-safety state
@@ -1093,7 +1128,20 @@ export class MachineService {
       } catch {
         /* the controller may not be in a disconnectable state — fine */
       }
+      connectError = err;
+      activeConnectReject(err);
       throw err;
+    } finally {
+      if (connectError === undefined) {
+        activeConnectResolve();
+      }
+      signal?.removeEventListener('abort', forwardExternalAbort);
+      if (this._activeConnectAbortController === connectAbortController) {
+        this._activeConnectAbortController = null;
+      }
+      if (this._activeConnectPromise === activeConnect) {
+        this._activeConnectPromise = null;
+      }
     }
   }
 

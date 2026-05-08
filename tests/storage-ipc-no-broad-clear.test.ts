@@ -34,14 +34,36 @@ export {};
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { FilesystemStorageAdapter, type StorageIpc } from '../src/core/storage/FilesystemStorageAdapter';
+import {
+  FilesystemStorageAdapter,
+  type StorageIpc,
+  type StorageNamespaceIpc,
+} from '../src/core/storage/FilesystemStorageAdapter';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
+import { STORAGE_NAMESPACES } from '../src/core/storage/StorageNamespaces';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
 
 let passed = 0;
 let failed = 0;
+
+function makeScope(): StorageNamespaceIpc {
+  return {
+    get: () => Promise.resolve(null),
+    set: () => Promise.resolve(),
+    remove: () => Promise.resolve(),
+    list: () => Promise.resolve([]),
+  };
+}
+
+function makeStorageIpc(): StorageIpc {
+  return {
+    storage: Object.fromEntries(
+      STORAGE_NAMESPACES.map(namespace => [namespace, makeScope()]),
+    ) as StorageIpc['storage'],
+  };
+}
 
 function assert(cond: boolean, message: string): void {
   if (cond) {
@@ -98,12 +120,7 @@ void (async () => {
     // Build a stub IPC that satisfies the (now-narrower) StorageIpc
     // interface. The adapter's clear() doesn't consult the IPC at all
     // anymore — it rejects immediately — so the stubs below are minimal.
-    const stub: StorageIpc = {
-      storageGet: () => Promise.resolve(null),
-      storageSet: () => Promise.resolve(),
-      storageRemove: () => Promise.resolve(),
-      storageList: () => Promise.resolve([]),
-    };
+    const stub: StorageIpc = makeStorageIpc();
     const adapter = new FilesystemStorageAdapter(stub);
     let caught: Error | null = null;
     try {
@@ -153,22 +170,27 @@ void (async () => {
       !/typed\.storageClear/.test(codeOnly),
       'bootstrap.ts isStorageIpc no longer requires storageClear',
     );
-    // But the four other keys must still be required:
+    // T2-120: the broad four-key storage IPC was replaced with a typed
+    // namespace object; the guard must not look for generic storage methods.
     assert(
-      /typed\.storageGet/.test(codeOnly),
-      'bootstrap.ts isStorageIpc still requires storageGet',
+      !/typed\.storageGet/.test(codeOnly),
+      'bootstrap.ts isStorageIpc no longer requires broad storageGet',
     );
     assert(
-      /typed\.storageSet/.test(codeOnly),
-      'bootstrap.ts isStorageIpc still requires storageSet',
+      !/typed\.storageSet/.test(codeOnly),
+      'bootstrap.ts isStorageIpc no longer requires broad storageSet',
     );
     assert(
-      /typed\.storageRemove/.test(codeOnly),
-      'bootstrap.ts isStorageIpc still requires storageRemove',
+      !/typed\.storageRemove/.test(codeOnly),
+      'bootstrap.ts isStorageIpc no longer requires broad storageRemove',
     );
     assert(
-      /typed\.storageList/.test(codeOnly),
-      'bootstrap.ts isStorageIpc still requires storageList',
+      !/typed\.storageList/.test(codeOnly),
+      'bootstrap.ts isStorageIpc no longer requires broad storageList',
+    );
+    assert(
+      /typed\.storage/.test(codeOnly),
+      'bootstrap.ts isStorageIpc requires the typed storage namespace object',
     );
   }
 

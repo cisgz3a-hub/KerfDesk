@@ -87,6 +87,10 @@ void (async () => {
     await flush(50);
 
     assert(
+      ctrl.state.errorCode === null,
+      `idle error does not latch errorCode as a frame/start safety hold (got ${ctrl.state.errorCode})`,
+    );
+    assert(
       ctrl.state.status !== 'faulted_requires_inspection',
       'idle error → status is NOT faulted (no job to fault on)',
     );

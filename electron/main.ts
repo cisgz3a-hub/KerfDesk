@@ -1,8 +1,22 @@
 import { app, BrowserWindow, ipcMain, dialog, powerSaveBlocker, shell } from 'electron';
+import { autoUpdater } from 'electron-updater';
 import * as path from 'path';
 import * as fs from 'fs';
 import { registerFalconWiFiIpc, shutdownFalconWiFi } from './falcon-wifi';
-import { storageGet, storageSet, storageRemove, storageList } from './storage';
+import {
+  namespacedStorageGet,
+  namespacedStorageSet,
+  namespacedStorageRemove,
+  namespacedStorageList,
+} from './storage';
+import { STORAGE_NAMESPACES, isStorageKeyAllowed, type StorageNamespace } from './storageNamespaces';
+import {
+  beginStartupCrashLoopTracking,
+  markStartupSuccessful,
+  recordStartupCrash,
+} from './startupCrashLoop';
+import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
+import { assertTrustedSender } from './security';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -15,6 +29,15 @@ let mainWindow: BrowserWindow | null = null;
  * end-user benefit.
  */
 const isDev = !app.isPackaged;
+const DEV_SERVER_ORIGIN = 'http://localhost:3000';
+
+function isExpectedDevServerUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === DEV_SERVER_ORIGIN;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * DevTools control: open automatically for unpackaged dev runs, or when a
@@ -26,13 +49,23 @@ const isDev = !app.isPackaged;
  * has to be set deliberately.
  */
 const shouldOpenDevTools = isDev || process.env.ELECTRON_ENABLE_DEVTOOLS === '1';
+const UPDATE_CHECK_DELAY_MS = 30_000;
+
+type UpdateInstallResult =
+  | { ok: true }
+  | { ok: false; reason: 'not-packaged' | 'job-running' | 'install-failed'; message?: string };
+
+type UpdateCheckResult =
+  | { ok: true }
+  | { ok: false; reason: 'not-packaged' | 'check-failed'; message?: string };
 
 // T1-92: per-extension size caps applied before fs.readFileSync. Without
 // this, a 5 GB SVG selected from the dialog blocks the main process for
 // many seconds, allocates a 5 GB string, and ships it over IPC. Even a
 // well-meaning user with a misconfigured CAD exporter could freeze or
 // crash the app. Each cap is sized for legitimate content of that type:
-// SVG/DXF rarely exceed a few MB; G-code can be tens of MB for fine work
+// SVG rarely exceeds a few MB; DXF is allowed a larger import-boundary
+// cap because some CAD exports are verbose. G-code can be tens of MB for fine work
 // on a big bed; project JSON tracks scene + history at modest size.
 //
 // Note on .laserforge.json: path.extname("project.laserforge.json")
@@ -41,7 +74,7 @@ const shouldOpenDevTools = isDev || process.env.ELECTRON_ENABLE_DEVTOOLS === '1'
 const MAX_FILE_BYTES_BY_EXTENSION: Record<string, number> = {
   '.json':  50 * 1024 * 1024,
   '.svg':   25 * 1024 * 1024,
-  '.dxf':   25 * 1024 * 1024,
+  '.dxf':   50 * 1024 * 1024,
   '.gcode': 100 * 1024 * 1024,
   '.nc':    100 * 1024 * 1024,
   '.png':   100 * 1024 * 1024,
@@ -106,7 +139,7 @@ app.on('web-contents-created', (_, contents) => {
   });
 
   contents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isDevServer = isDev && isExpectedDevServerUrl(url);
     const isAppFile = !isDev && url.startsWith('file://');
     if (!isDevServer && !isAppFile) {
       event.preventDefault();
@@ -171,7 +204,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isDevServer = isDev && isExpectedDevServerUrl(url);
     const isAppFile = !isDev && url.startsWith('file://');
     if (!isDevServer && !isAppFile) {
       event.preventDefault();
@@ -179,24 +212,14 @@ function createWindow() {
   });
 
   // Content Security Policy — reduces XSS impact in the renderer
+  // T3-8: dev stays relaxed for Vite; packaged production removes unsafe
+  // script execution while preserving inline styles until the UI migration.
+  const cspHeader = serializeCsp(buildCspPolicy(pickCspMode({ isDev })));
   mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
-        'Content-Security-Policy': [
-          [
-            "default-src 'self'",
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            "style-src 'self' 'unsafe-inline'",
-            "img-src 'self' data: blob: indexeddb:",
-            "font-src 'self' data:",
-            "connect-src 'self' ws: wss: https:",
-            "worker-src 'self' blob:",
-            "object-src 'none'",
-            "frame-src 'none'",
-            "base-uri 'self'",
-          ].join('; '),
-        ],
+        'Content-Security-Policy': [cspHeader],
       },
     });
   });
@@ -214,6 +237,19 @@ function createWindow() {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 
+  // T2-102 Layer 1: after the renderer has loaded and stayed alive for a
+  // short stable window, clear the failed-launch marker. Until this fires,
+  // the next boot treats this launch as failed and can enter safe mode.
+  const startupWindow = mainWindow;
+  startupWindow.webContents.once('did-finish-load', () => {
+    const timer = setTimeout(() => {
+      if (mainWindow === startupWindow) {
+        markStartupSuccessful(app.getPath('userData'));
+      }
+    }, 10_000);
+    if (typeof timer.unref === 'function') timer.unref();
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
@@ -221,7 +257,78 @@ function createWindow() {
 
 registerFalconWiFiIpc(() => mainWindow);
 
-app.whenReady().then(createWindow);
+function recordMainProcessCrash(reason: string): void {
+  try {
+    recordStartupCrash(app.getPath('userData'), reason);
+  } catch (err) {
+    console.warn('[startup] failed to record startup crash', err);
+  }
+}
+
+process.on('uncaughtExceptionMonitor', (err) => {
+  recordMainProcessCrash(err.stack || err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+  recordMainProcessCrash(String(reason));
+});
+
+app.on('render-process-gone', (_event, _webContents, details) => {
+  recordMainProcessCrash(`renderer gone: ${details.reason} (${details.exitCode})`);
+});
+
+function sendUpdateEvent(kind: string, payload?: unknown): void {
+  mainWindow?.webContents.send('update:event', { kind, payload });
+}
+
+autoUpdater.on('checking-for-update', () => {
+  sendUpdateEvent('checking');
+});
+
+autoUpdater.on('update-available', (info) => {
+  sendUpdateEvent('available', info);
+});
+
+autoUpdater.on('update-not-available', (info) => {
+  sendUpdateEvent('not-available', info);
+});
+
+autoUpdater.on('download-progress', (progress) => {
+  sendUpdateEvent('download-progress', progress);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  sendUpdateEvent('downloaded', info);
+});
+
+autoUpdater.on('error', (err) => {
+  console.warn('[update] updater error', err);
+  sendUpdateEvent('error', err instanceof Error ? err.message : String(err));
+});
+
+function scheduleAutoUpdateCheck(): void {
+  if (isDev) return;
+  autoUpdater.autoDownload = true;
+  const timer = setTimeout(() => {
+    void autoUpdater.checkForUpdatesAndNotify().catch((err: unknown) => {
+      console.warn('[update] check failed', err);
+      sendUpdateEvent('error', err instanceof Error ? err.message : String(err));
+    });
+  }, UPDATE_CHECK_DELAY_MS);
+  if (typeof timer.unref === 'function') timer.unref();
+}
+
+app.whenReady().then(() => {
+  const startupStatus = beginStartupCrashLoopTracking(app.getPath('userData'));
+  if (startupStatus.shouldEnterSafeMode) {
+    console.warn(
+      `[startup] T2-102: ${startupStatus.consecutiveFailures} failed launches; `
+      + 'safe-mode / rollback UI should be offered.',
+    );
+  }
+  createWindow();
+  scheduleAutoUpdateCheck();
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
@@ -235,6 +342,10 @@ let safeShutdownDone = false;
 
 /** OS wake lock id while a job is active (see power:acquireJobWakeLock). */
 let jobWakeLockId: number | null = null;
+
+function isJobWakeLockActive(): boolean {
+  return jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId);
+}
 
 app.on('before-quit', (e) => {
   if (safeShutdownDone) return;
@@ -250,7 +361,8 @@ app.on('before-quit', (e) => {
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────
 
-ipcMain.handle('dialog:save', async (_event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:save', async (event, defaultName: string, content: string) => {
+  assertTrustedSender(event);
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
@@ -264,7 +376,8 @@ ipcMain.handle('dialog:save', async (_event, defaultName: string, content: strin
   return true;
 });
 
-ipcMain.handle('dialog:saveGcode', async (_event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:saveGcode', async (event, defaultName: string, content: string) => {
+  assertTrustedSender(event);
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
@@ -278,7 +391,8 @@ ipcMain.handle('dialog:saveGcode', async (_event, defaultName: string, content: 
   return true;
 });
 
-ipcMain.handle('dialog:open', async () => {
+ipcMain.handle('dialog:open', async (event) => {
+  assertTrustedSender(event);
   if (!mainWindow) return null;
   const result = await dialog.showOpenDialog(mainWindow, {
     filters: [
@@ -324,32 +438,45 @@ function assertNonEmptyString(value: unknown, label: string): asserts value is s
   }
 }
 
-function assertOptionalString(value: unknown, label: string): asserts value is string | undefined {
-  if (value != null && typeof value !== 'string') {
-    throw new Error(`Invalid ${label}`);
+function assertStorageNamespaceKey(namespace: StorageNamespace, key: string): void {
+  if (!isStorageKeyAllowed(namespace, key)) {
+    throw new Error(`Invalid storage key for ${namespace} namespace`);
   }
 }
 
-ipcMain.handle('storage:get', (_event, key: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  return storageGet(key);
-});
+function registerStorageNamespace(namespace: StorageNamespace): void {
+  const channelPrefix = `storage:${namespace}`;
+  ipcMain.handle(`${channelPrefix}:get`, (event, key: unknown) => {
+    assertTrustedSender(event);
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    return namespacedStorageGet(namespace, key);
+  });
 
-ipcMain.handle('storage:set', (_event, key: unknown, value: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  if (typeof value !== 'string') throw new Error('Invalid storage value');
-  storageSet(key, value);
-});
+  ipcMain.handle(`${channelPrefix}:set`, (event, key: unknown, value: unknown) => {
+    assertTrustedSender(event);
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    if (typeof value !== 'string') throw new Error('Invalid storage value');
+    namespacedStorageSet(namespace, key, value);
+  });
 
-ipcMain.handle('storage:remove', (_event, key: unknown) => {
-  assertNonEmptyString(key, 'storage key');
-  storageRemove(key);
-});
+  ipcMain.handle(`${channelPrefix}:remove`, (event, key: unknown) => {
+    assertTrustedSender(event);
+    assertNonEmptyString(key, 'storage key');
+    assertStorageNamespaceKey(namespace, key);
+    namespacedStorageRemove(namespace, key);
+  });
 
-ipcMain.handle('storage:list', (_event, prefix: unknown) => {
-  assertOptionalString(prefix, 'storage prefix');
-  return storageList(prefix);
-});
+  ipcMain.handle(`${channelPrefix}:list`, (event) => {
+    assertTrustedSender(event);
+    return namespacedStorageList(namespace);
+  });
+}
+
+for (const namespace of STORAGE_NAMESPACES) {
+  registerStorageNamespace(namespace);
+}
 
 // T1-84: storage:clear IPC was removed. The previous handler wiped every
 // .json file in the storage directory in one call — license, profiles,
@@ -365,7 +492,8 @@ ipcMain.handle('storage:list', (_event, prefix: unknown) => {
 // Chromium doesn't throttle our renderer, and the OS doesn't
 // sleep. Released on all job-end paths.
 
-ipcMain.handle('power:acquireJobWakeLock', () => {
+ipcMain.handle('power:acquireJobWakeLock', (event) => {
+  assertTrustedSender(event);
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     return jobWakeLockId;
   }
@@ -373,18 +501,56 @@ ipcMain.handle('power:acquireJobWakeLock', () => {
   return jobWakeLockId;
 });
 
-ipcMain.handle('power:releaseJobWakeLock', () => {
+ipcMain.handle('power:releaseJobWakeLock', (event) => {
+  assertTrustedSender(event);
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     powerSaveBlocker.stop(jobWakeLockId);
   }
   jobWakeLockId = null;
 });
 
+ipcMain.handle('update:check', async (event): Promise<UpdateCheckResult> => {
+  assertTrustedSender(event);
+  if (isDev) return { ok: false, reason: 'not-packaged' };
+  try {
+    await autoUpdater.checkForUpdatesAndNotify();
+    return { ok: true };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'check-failed',
+      message: err instanceof Error ? err.message : String(err),
+    };
+  }
+});
+
+ipcMain.handle(
+  'update:install',
+  (event, state?: { jobRunning?: boolean }): UpdateInstallResult => {
+    assertTrustedSender(event);
+    if (isDev) return { ok: false, reason: 'not-packaged' };
+    if (state?.jobRunning === true || isJobWakeLockActive()) {
+      return { ok: false, reason: 'job-running' };
+    }
+    try {
+      autoUpdater.quitAndInstall();
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        reason: 'install-failed',
+        message: err instanceof Error ? err.message : String(err),
+      };
+    }
+  },
+);
+
 // T2-35: Electron native serial IPC removed. The renderer uses Web Serial via
 // MachineService/GrblController; keeping a parallel serialport bridge exposed
 // unused connect/list/disconnect channels and confused the controller boundary.
 // T1-27's serial:send bypass removal is subsumed here: no serial:* IPC remains.
 
-ipcMain.handle('app:quit', () => {
+ipcMain.handle('app:quit', (event) => {
+  assertTrustedSender(event);
   app.quit();
 });

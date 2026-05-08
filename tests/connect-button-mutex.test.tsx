@@ -15,6 +15,9 @@
  * Run: npx tsx tests/connect-button-mutex.test.tsx
  */
 import { JSDOM } from 'jsdom';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { ConnectWizard } from '../src/ui/components/connection/ConnectWizard';
@@ -45,6 +48,7 @@ let root: Root | null = null;
 interface Counters {
   usb: number;
   sim: number;
+  cancel: number;
 }
 
 async function renderWizard(connecting: boolean): Promise<{ counters: Counters; container: HTMLDivElement }> {
@@ -53,13 +57,14 @@ async function renderWizard(connecting: boolean): Promise<{ counters: Counters; 
     await act(async () => { root!.unmount(); });
   }
   root = createRoot(container);
-  const counters: Counters = { usb: 0, sim: 0 };
+  const counters: Counters = { usb: 0, sim: 0, cancel: 0 };
   await act(async () => {
     root!.render(
-      React.createElement(ConnectWizard, {
+      React.createElement(ConnectWizard as React.ComponentType<any>, {
         webSerialSupported: true,
         onConnectUsb: () => { counters.usb += 1; },
         onConnectSimulator: () => { counters.sim += 1; },
+        onCancelConnect: () => { counters.cancel += 1; },
         connecting,
       }),
     );
@@ -76,6 +81,11 @@ function findSimButton(container: HTMLElement): HTMLButtonElement | null {
   return Array.from(container.querySelectorAll('button')).find(b =>
     /Use Simulator/i.test(b.textContent ?? '')
     || (b !== findUsbButton(container) && /Connecting/i.test(b.textContent ?? '')),
+  ) as HTMLButtonElement | undefined ?? null;
+}
+function findCancelButton(container: HTMLElement): HTMLButtonElement | null {
+  return Array.from(container.querySelectorAll('button')).find(b =>
+    /Cancel connect/i.test(b.textContent ?? ''),
   ) as HTMLButtonElement | undefined ?? null;
 }
 
@@ -97,6 +107,9 @@ async function run(): Promise<void> {
       assert(/Use Simulator/.test(sim!.textContent ?? ''),
         'idle: Simulator button shows "Use Simulator" label');
 
+      assert(findCancelButton(container) === null,
+        'idle: Cancel connect button is hidden');
+
       await act(async () => { usb!.click(); });
       assert(counters.usb === 1, 'idle: clicking USB fires onConnectUsb once');
       await act(async () => { sim!.click(); });
@@ -117,6 +130,10 @@ async function run(): Promise<void> {
       assert(/Connecting/.test(sim!.textContent ?? ''),
         'connecting: Simulator button label is "Connecting…"');
 
+      const cancel = findCancelButton(container);
+      assert(cancel !== null, 'connecting: Cancel connect button is rendered');
+      assert(cancel?.disabled === false, 'connecting: Cancel connect button stays enabled');
+
       // The mutex is enforced two ways:
       //   1. `disabled: true` — the browser ignores the click event.
       //   2. The onClick handler short-circuits if `connecting` is true,
@@ -126,6 +143,8 @@ async function run(): Promise<void> {
       await act(async () => { sim!.click(); });
       assert(counters.usb === 0, 'connecting: USB click does not invoke onConnectUsb');
       assert(counters.sim === 0, 'connecting: Simulator click does not invoke onConnectSimulator');
+      await act(async () => { cancel?.click(); });
+      assert(counters.cancel === 1, 'connecting: Cancel connect invokes onCancelConnect once');
     }
 
     // --- connecting prop omitted: defaults to false (safe default) ---
@@ -149,6 +168,20 @@ async function run(): Promise<void> {
       await act(async () => { usb!.click(); });
       assert(usbCount === 1,
         'connecting prop omitted: button click fires through to onConnectUsb');
+    }
+
+    // --- source pin: parent owns the AbortController and passes its signal ---
+    {
+      const here = path.dirname(fileURLToPath(import.meta.url));
+      const panelSource = fs.readFileSync(path.resolve(here, '../src/ui/components/ConnectionPanelMain.tsx'), 'utf8');
+      assert(/connectAbortRef\s*=\s*useRef<AbortController\s*\|\s*null>\(null\)/.test(panelSource),
+        'source pin: ConnectionPanelMain stores the active connect AbortController in a ref');
+      assert(/new AbortController\(\)/.test(panelSource),
+        'source pin: ConnectionPanelMain creates an AbortController for real USB connect');
+      assert(/connectRealLaser\(activeProfile\?\.baudRate\s*\?\?\s*115200,\s*connectAbortController\.signal\)/.test(panelSource),
+        'source pin: real USB connect passes AbortSignal to MachineService.connectRealLaser');
+      assert(/abort\(new Error\('Connection cancelled by user'\)\)/.test(panelSource),
+        'source pin: cancel UI aborts the in-flight USB connect with a user-cancel reason');
     }
   } finally {
     if (root) {

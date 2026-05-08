@@ -1,4 +1,4 @@
-import { useCallback, type MutableRefObject } from 'react';
+import { useCallback } from 'react';
 import { createScene, type Scene } from '../../core/scene/Scene';
 import { deserializeScene, serializeForAutosave } from '../../io/SceneSerializer';
 import { saveSceneToFile } from '../../io/FileIO';
@@ -8,8 +8,8 @@ export interface UseFileHandlersParams {
   scene: Scene;
   setSelectedIds: (ids: ReadonlySet<string>) => void;
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
-  sceneIsDirtyRef: MutableRefObject<boolean>;
-  lastSavedSceneRef: MutableRefObject<string>;
+  isSceneDirty: () => boolean;
+  markSceneSaved: (scene: Scene) => void;
   showAlert: (title: string, message: string) => Promise<unknown>;
   showConfirm: (title: string, message: string) => Promise<boolean>;
 }
@@ -27,20 +27,19 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
     scene,
     setSelectedIds,
     handleNewProject,
-    sceneIsDirtyRef,
-    lastSavedSceneRef,
+    isSceneDirty,
+    markSceneSaved,
     showAlert,
     showConfirm,
   } = params;
 
   const syncAutosaveAfterFileSave = useCallback(() => {
-    sceneIsDirtyRef.current = false;
     try {
       const json = serializeForAutosave(scene);
       writeAutosave(json);
-      lastSavedSceneRef.current = json;
+      markSceneSaved(scene);
     } catch { /* ignore */ }
-  }, [scene]);
+  }, [markSceneSaved, scene]);
 
   const handleKeyboardSave = useCallback(async () => {
     try {
@@ -85,13 +84,13 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
   }, [handleNewProject, showAlert]);
 
   const handleKeyboardNew = useCallback(async () => {
-    if (scene.objects.length > 0) {
+    if (isSceneDirty()) {
       const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
       if (!ok) return;
     }
     clearAutosave();
     handleNewProject(createScene(scene.canvas.width, scene.canvas.height, 'Untitled'), 'new');
-  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, handleNewProject, showConfirm]);
+  }, [scene.canvas.width, scene.canvas.height, isSceneDirty, handleNewProject, showConfirm]);
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());

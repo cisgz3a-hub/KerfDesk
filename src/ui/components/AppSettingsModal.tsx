@@ -6,6 +6,7 @@ import { MachineSettingsTab } from './settings/MachineSettingsTab';
 import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
 import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
 import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
+import { type UserMode } from '../../app/UserModeGates';
 
 export interface AppSettingsModalProps {
   open: boolean;
@@ -23,9 +24,27 @@ export interface AppSettingsModalProps {
   onUpdateCurrentFromScene: () => void;
   onDeleteProfile: (id: string) => void;
   onShowFontCredits: () => void;
+  userMode: UserMode;
+  onSetUserMode: (mode: UserMode) => void;
 }
 
 export function AppSettingsModal(props: AppSettingsModalProps): React.ReactElement {
+  const modeButton = (mode: UserMode, label: string) => React.createElement('button', {
+    type: 'button',
+    onClick: () => props.onSetUserMode(mode),
+    style: {
+      borderRadius: 6,
+      border: props.userMode === mode ? '1px solid #00d4ff' : '1px solid #252540',
+      background: props.userMode === mode ? 'rgba(0,212,255,0.12)' : '#0f1020',
+      color: props.userMode === mode ? '#00d4ff' : '#c0c0d0',
+      padding: '8px 12px',
+      cursor: 'pointer',
+      fontSize: 12,
+      fontWeight: 700,
+      fontFamily: "'DM Sans', system-ui, sans-serif",
+    },
+  }, label);
+
   return React.createElement(SettingsModal, {
     open: props.open,
     onClose: props.onClose,
@@ -56,6 +75,15 @@ export function AppSettingsModal(props: AppSettingsModalProps): React.ReactEleme
     }),
     aboutTab: React.createElement('div', null,
       React.createElement('h3', { style: { marginTop: 0 } }, 'LaserForge'),
+      React.createElement('div', { style: { margin: '0 0 18px' } },
+        React.createElement('div', {
+          style: { fontSize: 12, color: '#8888aa', marginBottom: 8, fontWeight: 700 },
+        }, 'Operator mode'),
+        React.createElement('div', { style: { display: 'flex', gap: 8 } },
+          modeButton('beginner', 'Beginner'),
+          modeButton('advanced', 'Advanced'),
+        ),
+      ),
       React.createElement('p', { style: { fontSize: 12, color: '#c0c0d0', lineHeight: 1.6 } },
         'Version: v0.1.0', React.createElement('br'),
         `License: ${tierDisplayName(entitlementService.getState().tier)}`,

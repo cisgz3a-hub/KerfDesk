@@ -53,6 +53,56 @@ void (async () => {
   console.log('\n=== execution-coordinator disconnect cleanup ===\n');
 
   {
+    let cancelConnectCalls = 0;
+    let stopCalls = 0;
+    let disconnectCalls = 0;
+    const mock = {
+      protocolName: 'mock',
+      state: { ...baseState, status: 'connecting' as const },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => { stopCalls++; },
+      emergencyStop: () => {},
+      sendCommand: () => {},
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+      safetyOff: async () => ({ stage: 'm5' as const }),
+      operations: operations(async () => ({ ok: true as const })),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
+    (svc as unknown as { cancelActiveConnect: (reason?: Error) => Promise<boolean> }).cancelActiveConnect = async (reason?: Error) => {
+      cancelConnectCalls++;
+      assert(reason instanceof Error && /disconnect/i.test(reason.message),
+        'connecting safeDisconnect passes a disconnect cancel reason');
+      return true;
+    };
+    const inner = svc.disconnect.bind(svc);
+    (svc as unknown as { disconnect: () => Promise<SafetyActionResult> }).disconnect = async () => {
+      disconnectCalls++;
+      return inner();
+    };
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect();
+    assert(cancelConnectCalls === 1, 'connecting status -> safeDisconnect cancels active connect');
+    assert(stopCalls === 0, 'connecting status -> safeDisconnect does not call stop');
+    assert(disconnectCalls === 0, 'connecting status -> safeDisconnect does not run normal disconnect');
+  }
+
+  {
     const sent: string[] = [];
     let portDisconnectCalls = 0;
     const mock = {

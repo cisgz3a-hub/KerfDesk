@@ -167,7 +167,7 @@ const baseline: FrameFreshnessInputs = {
     'frameFreshnessKey computed via helper');
   assert(/lastFrameKeyRef = useRef<string \| null>\(null\)/.test(panelSrc),
     'lastFrameKeyRef state declared');
-  assert(/hasFramed\.current = false;\s*setWorkflowVersion/.test(panelSrc),
+  assert(/hasFramed\.current = false;[\s\S]{0,120}setWorkflowVersion/.test(panelSrc),
     'hasFramed reset + workflowVersion bump on key change');
 }
 

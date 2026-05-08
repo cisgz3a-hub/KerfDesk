@@ -1,0 +1,30 @@
+{
+  "format": "laserforge",
+  "version": "1.0",
+  "appVersion": "fixture-legacy-minimal",
+  "scene": {
+    "id": "fixture-legacy-minimal-score",
+    "canvas": { "width": 300, "height": 200 },
+    "layers": [
+      {
+        "id": "layer-score",
+        "name": "Score",
+        "settings": {
+          "mode": "score",
+          "power": 12,
+          "speed": 1200
+        }
+      }
+    ],
+    "objects": [
+      {
+        "id": "obj-fold-line",
+        "type": "line",
+        "name": "Fold line",
+        "layerId": "layer-score",
+        "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "tx": 0, "ty": 0 },
+        "geometry": { "type": "line", "x1": 30, "y1": 80, "x2": 240, "y2": 80 }
+      }
+    ]
+  }
+}

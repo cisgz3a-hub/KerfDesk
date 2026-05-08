@@ -1,0 +1,54 @@
+{
+  "format": "laserforge",
+  "version": "1.0",
+  "appVersion": "fixture-v1-basic",
+  "scene": {
+    "id": "fixture-basic-cut",
+    "version": "1.0",
+    "canvas": { "width": 400, "height": 300, "origin": "top-left", "units": "mm" },
+    "layers": [
+      {
+        "id": "layer-cut",
+        "name": "Cut",
+        "color": "#E63E6D",
+        "visible": true,
+        "locked": false,
+        "output": true,
+        "order": 0,
+        "settings": {
+          "mode": "cut",
+          "power": { "min": 0, "max": 80 },
+          "speed": 150,
+          "airAssist": true
+        }
+      }
+    ],
+    "objects": [
+      {
+        "id": "obj-rect-box",
+        "type": "rect",
+        "name": "Box outline",
+        "layerId": "layer-cut",
+        "parentId": null,
+        "transform": { "a": 1, "b": 0, "c": 0, "d": 1, "tx": 20, "ty": 30 },
+        "geometry": { "type": "rect", "x": 0, "y": 0, "width": 80, "height": 50, "cornerRadius": 0 },
+        "visible": true,
+        "locked": false,
+        "powerScale": 1
+      }
+    ],
+    "material": null,
+    "startPosition": { "x": 0, "y": 0 },
+    "compileOptions": { "optimizeOrder": true },
+    "activeLayerId": "layer-cut",
+    "metadata": {
+      "name": "Fixture - Basic Cut",
+      "created": "2026-05-07T00:00:00.000Z",
+      "modified": "2026-05-07T00:00:00.000Z",
+      "author": "",
+      "notes": "T3-7 baseline fixture",
+      "deviceProfileId": null,
+      "materialPresetId": null
+    }
+  }
+}

@@ -1,0 +1,36 @@
+name: Windows Signed Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-windows-signed:
+    runs-on: windows-latest
+    env:
+      CSC_LINK: ${{ secrets.WIN_CERT_PFX_BASE64 }}
+      CSC_KEY_PASSWORD: ${{ secrets.WIN_CERT_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - name: Verify signing secrets
+        shell: pwsh
+        run: |
+          if (-not $env:CSC_LINK) { throw "WIN_CERT_PFX_BASE64 secret is required for signed Windows releases." }
+          if (-not $env:CSC_KEY_PASSWORD) { throw "WIN_CERT_PASSWORD secret is required for signed Windows releases." }
+      - run: npm ci
+      - run: npm run build
+      - run: npm run electron:compile
+      - run: npm run icons:ico
+      - name: Build signed Windows installer
+        run: npx electron-builder --win --config scripts/signing/electron-builder.windows-signed.cjs --publish never
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-signed-installer
+          path: release/*.exe
+          if-no-files-found: error
+          retention-days: 30

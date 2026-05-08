@@ -1,6 +1,7 @@
 import React from 'react';
 import { FontPicker } from './common/FontPicker';
 import { NumberInput } from './NumberInput';
+import { type TextOperationMode } from '../scene/TextOperationLayer';
 
 export interface AddTextDialogProps {
   showTextDialog: boolean;
@@ -10,6 +11,7 @@ export interface AddTextDialogProps {
   textSize: number;
   textBold: boolean;
   textItalic: boolean;
+  textOperationMode: TextOperationMode;
   textPreviewFontReady: boolean;
 
   setTextInput: (v: string) => void;
@@ -17,6 +19,7 @@ export interface AddTextDialogProps {
   setTextSize: (v: number) => void;
   setTextBold: (v: boolean) => void;
   setTextItalic: (v: boolean) => void;
+  setTextOperationMode: (v: TextOperationMode) => void;
 
   onClose: () => void;
   onSubmit: () => void;
@@ -33,16 +36,47 @@ export function AddTextDialog(props: AddTextDialogProps) {
     textSize,
     textBold,
     textItalic,
+    textOperationMode,
     textPreviewFontReady,
     setTextInput,
     setTextFont,
     setTextSize,
     setTextBold,
     setTextItalic,
+    setTextOperationMode,
     onClose,
     onSubmit,
     onShowFontCredits,
   } = props;
+  const operationNote = textOperationMode === 'engrave'
+    ? 'Safer default: marks the surface without cutting through.'
+    : 'Cuts through material. Use only when you want separated letters or outlines.';
+  const submitLabel = editingTextId
+    ? 'Update Text'
+    : textOperationMode === 'engrave'
+      ? 'Add Engrave Text'
+      : 'Add Cut Text';
+
+  const renderOperationButton = (mode: TextOperationMode, label: string) => {
+    const selected = textOperationMode === mode;
+    return React.createElement('button', {
+      type: 'button',
+      onClick: () => setTextOperationMode(mode),
+      style: {
+        flex: 1,
+        padding: '9px 10px',
+        background: selected ? 'rgba(0,212,255,0.12)' : '#0a0a14',
+        border: selected ? '1px solid #00d4ff' : '1px solid #252540',
+        borderRadius: 8,
+        color: selected ? '#00d4ff' : '#9a9ab8',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        fontFamily: "'DM Sans', system-ui, sans-serif",
+      },
+      'aria-pressed': selected,
+    }, label);
+  };
 
   return React.createElement('div', {
     style: {
@@ -94,6 +128,15 @@ export function AddTextDialog(props: AddTextDialogProps) {
             outline: 'none', resize: 'vertical' as const,
           },
         }),
+      ),
+
+      React.createElement('div', { style: { padding: '0 18px 12px' } },
+        React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 5 } }, 'How should this name run?'),
+        React.createElement('div', { style: { display: 'flex', gap: 8 } },
+          renderOperationButton('engrave', 'Engrave name'),
+          renderOperationButton('cut', 'Cut name'),
+        ),
+        React.createElement('div', { style: { fontSize: 10, color: '#777796', marginTop: 6 } }, operationNote),
       ),
 
       React.createElement('div', { style: { padding: '0 18px 12px', display: 'flex', gap: 8 } },
@@ -196,11 +239,13 @@ export function AddTextDialog(props: AddTextDialogProps) {
             fontSize: 13, fontWeight: 600, cursor: textInput.trim() ? 'pointer' : 'default',
             fontFamily: "'DM Sans', system-ui, sans-serif",
           },
-        }, editingTextId ? 'Update Text' : 'Add Text to Canvas'),
+        }, submitLabel),
 
         React.createElement('div', {
           style: { fontSize: 10, color: '#555570', marginTop: 8, textAlign: 'center' as const },
-        }, 'After adding, select the text and click "Convert to Path" before cutting'),
+        }, textOperationMode === 'cut'
+          ? 'Cut text follows the outline. Convert to Path later if you need node editing.'
+          : 'Text will be placed on an Engrave layer by default.'),
       ),
     ),
   );
