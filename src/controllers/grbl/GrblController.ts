@@ -1809,6 +1809,24 @@ export class GrblController implements GrblControllerApi {
       }
     }
 
+    // T1-111: clear the connect-time verdict once the controller has
+    // demonstrably recovered to a known-safe state (idle + FS 0,0).
+    // T1-25's contract for RAISING the verdict is a one-shot connect
+    // check (see block above; no re-arm in-session). T1-111 keeps that
+    // contract and only adds the symmetric CLEAR path: if the user
+    // recovers via Unlock ($X clears alarm → status returns to idle)
+    // or completes homing (post-home status → idle + FS 0,0) and the
+    // classifier now returns null, the verdict no longer reflects
+    // current reality. Pre-T1-111 the verdict was sticky for the
+    // entire session — clicking the on-screen Unlock recovery button
+    // cleared the alarm at the controller but left preflight blocking
+    // Start with "alarm state from previous session," forcing
+    // disconnect+reconnect to recover. CLEAR-only is safe wrt T1-25:
+    // it can never raise a new verdict, only release a stale one.
+    if (this._unsafeAtConnect != null && this._classifySafeStateReason() === null) {
+      this._unsafeAtConnect = null;
+    }
+
     for (const cb of this._stateListeners) {
       cb({ ...this._state });
     }

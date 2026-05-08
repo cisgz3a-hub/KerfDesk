@@ -6470,6 +6470,42 @@ Note `computeSceneBounds` in `bounds.ts:69` filters by `obj.visible && layer.vis
 
 ---
 
+### T1-111 | `_unsafeAtConnect` verdict must clear when controller recovers to a known-safe state
+
+**Code reference:** `src/controllers/grbl/GrblController.ts:1787-1810` (T1-25 first-status RAISE block); `src/controllers/grbl/GrblController.ts:2158-2179` (`_classifySafeStateReason`); `src/core/preflight/rules/MachinePreflight.ts:118-156` (`MACHINE_UNSAFE_AT_CONNECT` preflight blocker that consumes the verdict).
+
+**Problem:** Reported by Falcon A1 Pro tester 2026-05-08: "I can frame but I cannot press start button it keeps on saying controller is in alarm state from previous session. there was no previous session." Cross-checked against the live tree.
+
+T1-25 introduced a connect-time safe-state handshake: at the first status report after connect, `GrblController` classifies the controller state into one of `'alarm' | 'run' | 'hold' | 'check' | 'no-status-response' | 'unsafe-residual-spindle'` and stores it as `_unsafeAtConnect`. `MachinePreflight` blocks job start with `MACHINE_UNSAFE_AT_CONNECT` while the verdict is non-null. Recovery messages in the preflight blocker tell the user to do `$X` (Unlock) for alarm, soft-reset for run/hold, etc.
+
+The contract was deliberately one-shot for RAISING — "subsequent status reports during the session do not retrigger this — the contract is a connect-time check, not a continuous monitor." But there was no symmetric CLEAR. Once the verdict was set, it stayed sticky for the whole session even if the user followed the recovery instructions exactly. Path-of-pain:
+
+1. User power-cycles the laser. GRBL with `$22=1` (homing required) boots into Alarm.
+2. User clicks Connect. First status report: `<Alarm|...>`. Verdict = `'alarm'`.
+3. UI shows the recovery card: Unlock → Re-home → Re-frame.
+4. User clicks Unlock. `$X` clears the GRBL alarm at the firmware level; controller status returns to Idle.
+5. Preflight still sees `_unsafeAtConnect = { reason: 'alarm' }` and blocks Start with "Controller is in alarm state from the previous session."
+6. There was no previous session — GRBL just boots into alarm by default. The phrasing is wrong for the post-power-cycle case, and the only recovery is disconnect+reconnect.
+
+**Fix:** Add a symmetric CLEAR path in `_handleStatusReport`, after the existing T1-25 RAISE block. When `_unsafeAtConnect != null` AND `_classifySafeStateReason()` returns `null` (= idle + FS 0,0), set `_unsafeAtConnect = null`. This doesn't change T1-25's RAISE contract (still one-shot at first status, still gated by `_safeStateCheckArmed`); it only releases a verdict that no longer reflects current reality. Symmetric to the existing GRBL-side `$X` semantics: once the controller has demonstrably returned to safety, the software-side verdict drops too. CLEAR-only is safe wrt the original audit's threat model — it can never raise a new verdict, only release a stale one; mid-session alarm/hold transitions remain handled by their own listeners (T1-24 / safetyOff / pause), which is the correct path for those.
+
+**Tests:** `tests/connect-safe-state-clears-on-recovery.test.ts`:
+1. Alarm at connect → verdict captured (regression on T1-25).
+2. Status transitions to Idle + FS 0,0 → verdict clears.
+3. Hold at connect + recovery to idle → verdict clears.
+4. `unsafe-residual-spindle` at connect + recovery to FS 0,0 → verdict clears.
+5. T1-25 contract preserved: idle at connect → null verdict; mid-session alarm does NOT re-raise.
+6. Alarm at connect → recovery → mid-session alarm does NOT re-raise (CLEAR-only path).
+7. Source-pin: T1-111 marker, `_unsafeAtConnect = null` clear, gated on `_classifySafeStateReason() === null`.
+
+**Estimate:** 30 min including tests.
+
+**Priority:** Tier 1 — direct user-blocking bug. The recovery flow shipped with T1-25 is broken: it instructs the user to clear the alarm, then refuses to honor that recovery. Discovered immediately after T1-110 made the blocker visible enough to read; same hardware repro path as T1-109 + T1-110.
+
+**Status:** Shipped 2026-05-08 in `<TBD>`. Hardware verification by re-running the Falcon tester repro: power-cycle the laser → connect (verdict captures alarm) → click Unlock → verify Start button enables (verdict cleared by post-Unlock idle status report).
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
