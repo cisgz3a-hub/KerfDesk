@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 19 | 71 | Active quarter-scope backlog; T3-23 photo-style raster power-min warning shipped in this batch. |
+| Tier 3 | 20 | 70 | Active quarter-scope backlog; T3-25 bidirectional raw-row alternation shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16449,6 +16449,8 @@ For each, capture optimal speed/power/passes plus a 256-point luminance鈫抪owe
 
 ### T3-25 | Bidirectional row alternation by raw row index, not non-empty-row count
 
+**Status:** Shipped in `<TBD>` — bidirectional raster direction now uses the raw bitmap row parity instead of the count of non-empty emitted scanlines. Sparse rasters keep the same parity as the physical scan rows, while adjacent non-empty rows still alternate normally. Pinned by `tests/raster-bidirectional-row-parity.test.ts`. **Hardware verification: not required** (planner row-order correction only; no new command path or safety gate behavior changed).
+
 **Code reference:** `src/core/plan/RasterGenerator.ts:113` (`lineIndex++` only increments after non-empty row).
 
 **Problem:** Audit 2B Section 8.2: bidirectional direction alternation uses `lineIndex` which only increments for non-empty rows. So a sparse image where rows 1, 5, 10, 15 have content (with empty rows 2-4, 6-9, 11-14 between) produces directions LTR, RTL, LTR, RTL based on lineIndex 0,1,2,3 鈥?but on the physical machine, rows 1 and 5 are 4 row-pitches apart. If scanning offset compensation was calibrated assuming raw-row parity, the calibration is off.
@@ -20356,7 +20358,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
 - [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `681a178` — non-blocking grayscale/photo image minimum-power warning)
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
-- [ ] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count
+- [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `<TBD>` — sparse raster rows use physical row parity)
 - [ ] T3-26 Blue-noise / advanced halftone dithering modes
 - [ ] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn
 - [ ] T3-28 SVG inherited group styles applied at flatten time

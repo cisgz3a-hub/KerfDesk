@@ -84,7 +84,6 @@ export function generateRasterScanlines(
   if (!(pixelSizeX > 0) || !(pixelSizeY > 0)) return [];
 
   const scanlines: RasterScanline[] = [];
-  let lineIndex = 0;
 
   for (let row = 0; row < height; row++) {
     const y = position.y + row * pixelSizeY;
@@ -100,7 +99,7 @@ export function generateRasterScanlines(
 
     // Determine direction
     const direction: 'ltr' | 'rtl' =
-      settings.biDirectional && lineIndex % 2 === 1 ? 'rtl' : 'ltr';
+      settings.biDirectional && row % 2 === 1 ? 'rtl' : 'ltr';
 
     // Reverse segment order for right-to-left
     if (direction === 'rtl') {
@@ -114,7 +113,6 @@ export function generateRasterScanlines(
     }
 
     scanlines.push({ y, segments, direction });
-    lineIndex++;
   }
 
   return scanlines;
