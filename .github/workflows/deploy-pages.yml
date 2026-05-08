@@ -1,0 +1,61 @@
+name: Deploy Web App to GitHub Pages
+
+# T1-113: auto-deploy the web build on every push to master so the
+# tester always loads the latest code at
+# https://stolkjohannjohann-sudo.github.io/LaserForge/. Filed after
+# T1-112 (build stamp) made the stale-deploy problem diagnosable but
+# left the underlying friction in place.
+#
+# One-time manual prerequisite: repo Settings → Pages → Source must
+# be set to "GitHub Actions". This workflow cannot enable Pages on
+# the repo itself.
+#
+# Trigger choice (master-only, not the dev branch): CI gates the
+# merge to master, so master is the version that's been validated
+# enough to reach a tester. Dev-branch builds remain locally
+# verifiable via T1-112's build stamp on the canvas toolbar.
+
+on:
+  push:
+    branches: [master]
+  # Allow manual dispatch in case Pages was just enabled and master
+  # has no new push to retrigger.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Serialize in-flight deploys: only one Pages deploy runs at a time,
+# the latest queued push wins. Two rapid master pushes collapse to
+# one final state instead of racing.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

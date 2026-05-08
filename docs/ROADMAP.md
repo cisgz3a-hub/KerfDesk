@@ -6538,6 +6538,45 @@ There is no in-app indicator of which commit the tester is running. `__APP_VERSI
 
 ---
 
+### T1-113 | Auto-deploy web build to GitHub Pages on master push
+
+**Code reference:** `.github/workflows/` (existing `ci.yml`, `license-check.yml`, `release-windows.yml`, `release-macos.yml` — no web-deploy workflow exists); `vite.config.ts:7` (`base: './'` already produces path-relative asset URLs that work under any subpath).
+
+**Problem:** Every web fix in this session has hit the same trap: the tester loads a stale bundle and we burn ~30 min diagnosing why a freshly-shipped fix isn't visible. T1-112 (build stamp on the canvas) makes the staleness *visible*, but the underlying friction — that `git push` doesn't actually update what the tester sees — remains. The deploy is currently manual (whoever owns the host runs `npm run build` and copies `dist/` somewhere). For a solo-dev rapid-iteration repo with hardware testing, manual-deploy is the bottleneck.
+
+**Fix:** New `.github/workflows/deploy-pages.yml` that:
+
+1. Triggers on `push` to `master` (chosen over the dev branch for safety — CI gates the merge, and dev-branch builds are already verifiable locally via T1-112's stamp).
+2. Builds the web app via `npm ci && npm run build`.
+3. Uploads `dist/` as a GitHub Pages artifact (`actions/upload-pages-artifact@v3`).
+4. Deploys via `actions/deploy-pages@v4`. Concurrency-grouped on `pages` so two pushes in flight don't race.
+5. Permissions: `pages: write`, `id-token: write`. No additional secrets needed (Pages uses the workflow's GITHUB_TOKEN).
+
+The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. Vite already emits path-relative asset URLs (`base: './'`) so the bundle works under any subpath without code changes.
+
+**One-time prerequisite (manual, not in workflow):** repo Settings → Pages → Source: "GitHub Actions". The workflow itself can't enable Pages on the repo — only an admin can, on first run.
+
+**Tests:** `tests/deploy-pages-workflow.test.ts`:
+1. Source-pin `.github/workflows/deploy-pages.yml` exists.
+2. Source-pin: triggered on `push: branches: [master]` only.
+3. Source-pin: workflow declares `pages: write` and `id-token: write` permissions.
+4. Source-pin: workflow runs `npm ci`, `npm run build`, uploads `dist/`.
+5. Source-pin: uses `actions/deploy-pages@v4` for the deploy step.
+
+**Out of scope:**
+- Per-PR / per-branch preview deploys. The user-chosen trigger is master-only; preview deploys would need a different artifact path or a third-party service (Netlify / Cloudflare Pages).
+- Dev-branch auto-deploy. T1-112's build stamp is the manual-verification path for non-master commits.
+- Cache-busting headers. GH Pages defaults are sufficient because Vite's content-hashed bundle filenames invalidate themselves; T1-112's stamp catches the rare HTML-cached case.
+- Vite `base` change. `base: './'` already works; no rewrite needed.
+
+**Estimate:** ~30 min including tests + the one-time repo-settings note.
+
+**Priority:** Tier 1 — workflow accelerator. Each manual deploy round-trip costs real iteration time. Same severity class as T1-112 (the diagnostic) but addresses the cause rather than the symptom.
+
+**Status:** Shipped 2026-05-08 in `<T113>`. Hardware verification not required (CI/CD plumbing only). Manual prerequisite on first run: repo Settings → Pages → Source: GitHub Actions.
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
