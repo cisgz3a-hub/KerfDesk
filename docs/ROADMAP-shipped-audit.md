@@ -458,9 +458,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 
 ---
 
-## Tier 3 - 13 shipped, 76 open
+## Tier 3 - 14 shipped, 76 open
 
-### Shipped (13)
+### Shipped (14)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -477,6 +477,7 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-13 | Active-edge-table fill scanline algorithm | `generateFillRows` in `src/core/plan/FillGenerator.ts` now pre-buckets rotated edges by scanline row with `enterRow` / `leaveRow` metadata, maintains an `activeEdges` set as rows advance, and intersects only that active subset instead of the full edge pool. Pinned by `tests/fill-generator-active-edge-table.test.ts` plus existing compound fill, raster modal-M4, and pipeline tests. Hardware verification not required (planner algorithm/performance path; no controller command contract changes). | `1a2c2fb` |
 | T3-14 | Sampled / level-of-detail G-code preview | Added `src/ui/components/gcodePreviewModel.ts`, a pure lazy-line preview parser that avoids `gcode.split('\n')`, stores at most the capped sampled move set, and preserves full move counts, travel/cut counts, bounds, and duration estimates. `GcodePreview.tsx` now renders the sampled model and shows a sampled-preview note for large jobs. Pinned by `tests/gcode-preview-large-job-sampling.test.ts`. Worker-backed parsing and zoom-region detail remain deferred until user-scale previews still need them. | `e933099` |
 | T3-45 | Transport abstraction layer - Line / Byte / HttpJob transports | Added `src/transports/Transport.ts` with protocol-neutral `Transport`, `LineTransport`, `ByteTransport`, and `HttpJobTransport` contracts, runtime guards, transport capabilities, and job-upload handle metadata. `MockSerialPort` and `WebSerialPort` now expose the `LineTransport` surface while preserving the legacy `SerialPortLike` contract, so existing GRBL call sites and test stubs do not need to migrate in this slice. Pinned by `tests/transport-abstraction.test.ts` (26 contracts). **Hardware verification: not required** (type/API foundation over existing serial write paths; no controller execution path or emitted G-code changed). T2-30 remains blocked on Falcon WiFi protocol investigation and the real controller/job-execution implementation. | `6ac9cce` |
+| T3-92 | Go to last machine position control | Added session-local last job start position capture in `ConnectionPanelMain`, a pure `LastMachinePosition` helper that plans relative X/Y jogs from the current controller position back to that stored point, and a fixed Move Laser `Go to last position` button in `Jog`. The move uses `ExecutionCoordinator.jog` so the existing idle gate, operation mutex, simulator notification, and controller jog path remain in force; stored position clears on disconnect / emergency stop. Pinned by `tests/last-machine-position.test.ts` and `tests/connection-panel-go-to-last-position.test.ts`. **Hardware verification needed** on Falcon A1 Pro before release tagging. | `<TBD>` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
 ### Open (76)

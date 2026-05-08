@@ -19991,6 +19991,24 @@ Both the preflight rule (`MachinePreflight.ts`) and the new inline banner read f
 
 ---
 
+### T3-92 | Go to last machine position control
+
+**Code reference:** `src/ui/components/ConnectionPanelMain.tsx` (Move Laser zone / job start), `src/ui/components/connection/Jog.tsx` (jog pad), `src/app/LastMachinePosition.ts`.
+
+**Problem:** Diode users often repeat a burn at the same physical placement. If the controller or profile returns the head home after a completed job, the operator has to manually jog back to the exact head position used before the previous run. That is slow and error-prone; a few centimeters of manual mismatch can ruin repeat work.
+
+**Fix:** Add a LightBurn-style `Go to last position` control beside the jog pad. On accepted job start, capture the current trusted machine XY position as a session-local "last job start position." When the user clicks the control later, plan relative X/Y jogs from the current reported position back to that stored point and execute them through `ExecutionCoordinator.jog` at the existing jog feed rate. The feature is intentionally session-local and clears on disconnect or emergency stop so stale coordinates are not reused after trust is lost.
+
+**Tests:** `tests/last-machine-position.test.ts` covers capture, invalid-position rejection, tolerance/no-op handling, and relative jog planning. `tests/connection-panel-go-to-last-position.test.ts` pins the connection-panel wiring so the UI captures at job start, clears on disconnect, renders the button, and routes motion through `ExecutionCoordinator.jog`.
+
+**Estimate:** ~30 min. Pure helper + fixed Move Laser UI affordance + source pins.
+
+**Priority:** Tier 3. Operator workflow polish with physical-motion consequences; safe enough for a small ticket because it reuses the existing jog gate/mutex rather than adding a new raw G-code path.
+
+**Status:** Shipped in <TBD> — session-local last job start position capture plus a fixed Move Laser `Go to last position` button. Movement is planned as relative X/Y jogs and sent through `ExecutionCoordinator.jog`; no absolute-motion command, g-code generation, frame math, preflight, or start-gate contract changed. **Hardware verification needed** on Falcon A1 Pro: run a short job from a non-home head position, allow the machine/profile to return home, click `Go to last position`, and confirm the head returns to the prior job-start point without firing the laser.
+
+---
+
 ## Tier 4 鈥?Later
 
 ### T4-1 | Starter material preset library
@@ -20394,6 +20412,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-89 Production security build CI checks (filed; extends T1-81)
 - [ ] T3-90 Profile opt-in: auto-send M5 S0 after T1-25 safe-state handshake passes (filed; T1-25 follow-up)
 - [ ] T3-91 Inline UI for unsafe-at-connect reason in connection panel header (filed; T1-25 follow-up; pairs with T2-129)
+- [x] T3-92 Go to last machine position control (Shipped — session-local last job start position capture + relative jog return through ExecutionCoordinator.jog; hardware verification needed)
 
 ### Tier 4 (Later)
 - [ ] T4-1 through T4-9 鈥?see above

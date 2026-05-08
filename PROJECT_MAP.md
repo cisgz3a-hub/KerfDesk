@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 362 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 468 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 363 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 470 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,7 +23,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 38 | - |
+| `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 91 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 415 | - |
+| `tests/` | 417 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -77,6 +77,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/JobLogCheckpoint.ts`
 - `src/app/JobLogEventWindow.ts`
 - `src/app/JobSession.ts`
+- `src/app/LastMachinePosition.ts`
 - `src/app/MachineCommandGateway.ts`
 - `src/app/MachineSafetyState.ts`
 - `src/app/MachineService.ts`
@@ -560,6 +561,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/connection-generation-guard.test.ts`
 - `tests/connection-manager-fsm.test.ts`
 - `tests/connection-panel-emergency-stop-service.test.ts`
+- `tests/connection-panel-go-to-last-position.test.ts`
 - `tests/connection-panel-jog-visible-without-scroll.test.ts`
 - `tests/connection-panel-no-design-editing.test.ts`
 - `tests/connection-panel-offset-button-disabled.test.ts`
@@ -692,6 +694,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/jog-and-setorigin-state-after-confirm.test.ts`
 - `tests/kerf-presets.test.ts`
 - `tests/laser-mode-banner.test.tsx`
+- `tests/last-machine-position.test.ts`
 - `tests/license-status-machine.test.ts`
 - `tests/license-status-states.test.ts`
 - `tests/lifecycle-revocation.test.ts`

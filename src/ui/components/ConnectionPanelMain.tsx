@@ -33,6 +33,12 @@ import {
   currentModeFrameAnchorAllowsStart,
   type CurrentFrameAnchor,
 } from '../../app/CurrentFrameAnchor';
+import {
+  buildGoToLastPositionJogs,
+  captureLastJobStartPosition,
+  describeLastMachinePosition,
+  type LastMachinePosition,
+} from '../../app/LastMachinePosition';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { physicalBoundsFromWorkBounds } from '../../core/plan/MachineBounds';
@@ -340,6 +346,7 @@ export function ConnectionPanelMain({
   const [connectionRecoveryVisible, setConnectionRecoveryVisible] = useState(false);
   const [frameRecoveryTimeoutSec, setFrameRecoveryTimeoutSec] = useState<number | null>(null);
   const [jobFailedRecoveryMessage, setJobFailedRecoveryMessage] = useState<string | null>(null);
+  const [lastJobStartPosition, setLastJobStartPosition] = useState<LastMachinePosition | null>(null);
   // T1-50 Part A: UI mutex on Connect button. Without this, two
   // rapid clicks each call into `machineService.connectRealLaser()`,
   // each constructing a new WebSerialPort and racing on
@@ -509,6 +516,8 @@ export function ConnectionPanelMain({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
+  const currentMachinePosition = machinePosition
+    ?? (machineState ? { x: machineState.position.x, y: machineState.position.y } : null);
 
   useEffect(() => {
     if (!isConnected || isRunning || displayPaused) {
@@ -524,6 +533,7 @@ export function ConnectionPanelMain({
       return;
     }
 
+    setLastJobStartPosition(null);
     if (wasConnectedRef.current && !intentionalDisconnectRef.current) {
       setConnectionRecoveryVisible(true);
     }
@@ -565,6 +575,21 @@ export function ConnectionPanelMain({
       })
     : null;
   const canAutoFocus = gates?.baseSafe ?? false;
+  const lastPositionMoves = buildGoToLastPositionJogs({
+    current: currentMachinePosition,
+    target: lastJobStartPosition,
+  });
+  const canGoToLastPosition =
+    isConnected
+    && !isRunning
+    && !displayPaused
+    && (gates?.canJog ?? false)
+    && lastJobStartPosition != null
+    && currentMachinePosition != null
+    && lastPositionMoves.length > 0;
+  const lastPositionLabel = lastJobStartPosition
+    ? describeLastMachinePosition(lastJobStartPosition)
+    : 'No last job start position recorded';
 
   useEffect(() => {
     if (isConnected) {
@@ -899,6 +924,7 @@ export function ConnectionPanelMain({
     }
 
     portRef.current = null;
+    setLastJobStartPosition(null);
     setShowSimulator(false);
     clearMessages();
     onDisconnect?.();
@@ -970,6 +996,53 @@ export function ConnectionPanelMain({
     },
     [executionCoordinator, machineState?.status, setMessages],
   );
+
+  const handleGoToLastPosition = useCallback(async () => {
+    if (!lastJobStartPosition) {
+      setMessages(prev => [...prev, 'No last job start position recorded yet.']);
+      return;
+    }
+    if (!currentMachinePosition) {
+      setMessages(prev => [...prev, 'Cannot go to last position: current machine position is unknown.']);
+      return;
+    }
+    if (machineState?.status !== 'idle' || !(gates?.canJog ?? false)) {
+      setMessages(prev => [...prev,
+        `Go to last position declined: machine is "${machineState?.status ?? 'unknown'}", must be idle and safe to jog.`,
+      ]);
+      return;
+    }
+
+    const moves = buildGoToLastPositionJogs({
+      current: currentMachinePosition,
+      target: lastJobStartPosition,
+    });
+    if (moves.length === 0) {
+      setMessages(prev => [...prev, `Already at last position (${describeLastMachinePosition(lastJobStartPosition)}).`]);
+      return;
+    }
+
+    for (const move of moves) {
+      const result = await executionCoordinator.jog(move.axis, move.distance, 3000);
+      if (!result.ok) {
+        setMessages(prev => [...prev,
+          `Go to last position failed on ${move.axis}: ${result.reason ?? 'unknown'}. Check connection and machine state.`,
+        ]);
+        return;
+      }
+    }
+
+    hasJogged.current = true;
+    setWorkflowVersion(v => v + 1);
+    setMessages(prev => [...prev, `Moved to last position (${describeLastMachinePosition(lastJobStartPosition)}).`]);
+  }, [
+    currentMachinePosition,
+    executionCoordinator,
+    gates?.canJog,
+    lastJobStartPosition,
+    machineState?.status,
+    setMessages,
+  ]);
 
   const handleStartJob = async () => {
     if (!controllerRef.current) return;
@@ -1044,6 +1117,7 @@ export function ConnectionPanelMain({
       `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
     ]);
     setJobFailedRecoveryMessage(null);
+    const jobStartPosition = captureLastJobStartPosition(machinePosition ?? machineState?.position ?? null);
     try {
       const canvasContext = {
         canvasMoves: lastGcodeCompileResult.canvasMoves,
@@ -1057,6 +1131,9 @@ export function ConnectionPanelMain({
         notifySimulatorTx,
         canvasContext,
       });
+      if (jobStartPosition) {
+        setLastJobStartPosition(jobStartPosition);
+      }
       jobStoppedByUserRef.current = false;
       const t0 = Date.now();
       jobStartTimeRef.current = t0;
@@ -1907,6 +1984,9 @@ export function ConnectionPanelMain({
         setJogStep,
         onJog: handleJog,
         onHome: () => { void handleHome(); },
+        canGoToLastPosition,
+        lastPositionLabel,
+        onGoToLastPosition: () => { void handleGoToLastPosition(); },
         showFocus: showAutoFocus,
         canFocus: canAutoFocus,
         focusBusy: isAutoFocusing,
@@ -2515,6 +2595,7 @@ export function ConnectionPanelMain({
             );
             portRef.current = null;
             setIsPaused(false);
+            setLastJobStartPosition(null);
             setMessages(prev => [
               ...prev,
               result.accepted

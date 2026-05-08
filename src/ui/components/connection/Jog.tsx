@@ -5,6 +5,9 @@ interface JogProps {
   setJogStep: (step: number) => void;
   onJog: (axis: 'X' | 'Y', distance: number) => void;
   onHome: () => void;
+  canGoToLastPosition?: boolean;
+  lastPositionLabel?: string;
+  onGoToLastPosition?: () => void;
   showFocus?: boolean;
   canFocus?: boolean;
   focusBusy?: boolean;
@@ -36,6 +39,9 @@ export function Jog({
   setJogStep,
   onJog,
   onHome,
+  canGoToLastPosition = false,
+  lastPositionLabel = 'No last position',
+  onGoToLastPosition,
   showFocus = false,
   canFocus = false,
   focusBusy = false,
@@ -109,5 +115,26 @@ export function Jog({
         }, `${j}`),
       ),
     ),
+    React.createElement('button', {
+      type: 'button',
+      onClick: () => { onGoToLastPosition?.(); },
+      disabled: !canGoToLastPosition,
+      title: canGoToLastPosition
+        ? `Return to last job start position (${lastPositionLabel})`
+        : lastPositionLabel,
+      style: {
+        width: '100%',
+        marginTop: 6,
+        padding: '6px 7px',
+        fontSize: 10,
+        borderRadius: 5,
+        cursor: canGoToLastPosition ? 'pointer' : 'default',
+        fontFamily: font,
+        background: canGoToLastPosition ? 'rgba(0,212,255,0.08)' : 'transparent',
+        border: canGoToLastPosition ? '1px solid rgba(0,212,255,0.35)' : '1px solid #1a1a2e',
+        color: canGoToLastPosition ? '#00d4ff' : '#555570',
+        opacity: canGoToLastPosition ? 1 : 0.55,
+      },
+    }, 'Go to last position'),
   );
 }
