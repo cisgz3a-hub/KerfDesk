@@ -1,18 +1,21 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { generateId } from '../../core/types';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import {
+  textOperationModeForObject,
+  type TextOperationMode,
+} from '../scene/TextOperationLayer';
 import { NumberInput } from './NumberInput';
 
 interface VariableTextDialogProps {
   scene: Scene;
   sourceObject: SceneObject;
-  onGenerate: (objects: SceneObject[]) => void;
+  onGenerate: (objects: SceneObject[], operationMode: TextOperationMode) => void;
   onClose: () => void;
 }
 
 export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }: VariableTextDialogProps) {
-  void scene;
   const [startNumber, setStartNumber] = useState(1);
   const [endNumber, setEndNumber] = useState(10);
   const [prefix, setPrefix] = useState('');
@@ -21,6 +24,15 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
   const [cols, setCols] = useState(5);
   const [spacingX, setSpacingX] = useState(10);
   const [spacingY, setSpacingY] = useState(10);
+  const initialOperationMode = useMemo(
+    () => textOperationModeForObject(scene, sourceObject),
+    [scene, sourceObject],
+  );
+  const [operationMode, setOperationMode] = useState<TextOperationMode>(initialOperationMode);
+
+  useEffect(() => {
+    setOperationMode(initialOperationMode);
+  }, [initialOperationMode]);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
@@ -47,6 +59,26 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
     background: '#0a0a14', border: '1px solid #252540', borderRadius: 6,
     color: '#e0e0ec', fontSize: 12, outline: 'none', fontFamily: mono,
   };
+  const renderOperationButton = (mode: TextOperationMode, label: string) => {
+    const selected = operationMode === mode;
+    return React.createElement('button', {
+      type: 'button',
+      onClick: () => setOperationMode(mode),
+      style: {
+        flex: 1,
+        padding: '8px 10px',
+        background: selected ? 'rgba(0,212,255,0.12)' : '#0a0a14',
+        border: selected ? '1px solid #00d4ff' : '1px solid #252540',
+        borderRadius: 8,
+        color: selected ? '#00d4ff' : '#9a9ab8',
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: 'pointer',
+        fontFamily: font,
+      },
+      'aria-pressed': selected,
+    }, label);
+  };
 
   return React.createElement('div', {
     style: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, fontFamily: font },
@@ -68,6 +100,14 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
         !baseText.includes('{n}') && React.createElement('div', {
           style: { padding: '8px 12px', marginBottom: 12, background: 'rgba(255,170,50,0.08)', border: '1px solid rgba(255,170,50,0.2)', borderRadius: 6, fontSize: 10, color: '#ffaa32' },
         }, 'Tip: Use {n} in your text where the number should appear. Example: "Tag #{n}" → "Tag #1", "Tag #2"'),
+
+        React.createElement('div', { style: { marginBottom: 12 } },
+          React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 5 } }, 'How should these names run?'),
+          React.createElement('div', { style: { display: 'flex', gap: 8 } },
+            renderOperationButton('engrave', 'Engrave names'),
+            renderOperationButton('cut', 'Cut names'),
+          ),
+        ),
 
         React.createElement('div', { style: { display: 'flex', gap: 12, marginBottom: 12 } },
           React.createElement('div', { style: { flex: 1 } },
@@ -162,7 +202,7 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
                 visible: true, locked: false, powerScale: sourceObject.powerScale ?? 1.0, cutStartIndex: 0, _bounds: null, _worldTransform: null,
               } as any);
             }
-            onGenerate(objects);
+            onGenerate(objects, operationMode);
             onClose();
           },
           style: { width: '100%', padding: '10px', background: 'rgba(45,212,160,0.1)', border: '1px solid #2dd4a0', borderRadius: 8, color: '#2dd4a0', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: font },

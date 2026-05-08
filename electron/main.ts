@@ -29,6 +29,15 @@ let mainWindow: BrowserWindow | null = null;
  * end-user benefit.
  */
 const isDev = !app.isPackaged;
+const DEV_SERVER_ORIGIN = 'http://localhost:3000';
+
+function isExpectedDevServerUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === DEV_SERVER_ORIGIN;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * DevTools control: open automatically for unpackaged dev runs, or when a
@@ -130,7 +139,7 @@ app.on('web-contents-created', (_, contents) => {
   });
 
   contents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isDevServer = isDev && isExpectedDevServerUrl(url);
     const isAppFile = !isDev && url.startsWith('file://');
     if (!isDevServer && !isAppFile) {
       event.preventDefault();
@@ -195,7 +204,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+    const isDevServer = isDev && isExpectedDevServerUrl(url);
     const isAppFile = !isDev && url.startsWith('file://');
     if (!isDevServer && !isAppFile) {
       event.preventDefault();

@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import { type TextOperationMode } from '../scene/TextOperationLayer';
 import { useAppDialogsStore } from '../stores/appDialogsStore';
 
 export interface DialogState {
@@ -10,6 +11,7 @@ export interface DialogState {
   textSize: number;
   textBold: boolean;
   textItalic: boolean;
+  textOperationMode: TextOperationMode;
 
   showBoxGenerator: boolean;
   showVariableText: boolean;
@@ -38,6 +40,8 @@ export function useDialogs() {
   const setTextBold = useAppDialogsStore(s => s.setTextBold);
   const textItalic = useAppDialogsStore(s => s.textItalic);
   const setTextItalic = useAppDialogsStore(s => s.setTextItalic);
+  const textOperationMode = useAppDialogsStore(s => s.textOperationMode);
+  const setTextOperationMode = useAppDialogsStore(s => s.setTextOperationMode);
   const openTextEdit = useAppDialogsStore(s => s.openTextEdit);
   const closeTextDialog = useAppDialogsStore(s => s.closeTextDialog);
 
@@ -87,6 +91,8 @@ export function useDialogs() {
     setTextBold,
     textItalic,
     setTextItalic,
+    textOperationMode,
+    setTextOperationMode,
     openTextEdit,
     closeTextDialog,
 

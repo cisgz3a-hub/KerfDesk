@@ -20,6 +20,7 @@ function assert(condition: unknown, message: string): void {
   assert(state.textSize === 20, 'text size starts at default');
   assert(state.textBold === false, 'text bold starts off');
   assert(state.textItalic === false, 'text italic starts off');
+  assert(state.textOperationMode === 'engrave', 'text operation starts on engrave');
   assert(state.showMaterialTest === false, 'material test starts closed');
   assert(state.showCalibrateMaterial === false, 'calibrate material starts closed');
   assert(state.showMaterialLibrary === false, 'material library starts closed');
@@ -83,6 +84,7 @@ function assert(condition: unknown, message: string): void {
   store.getState().setTextSize(42);
   store.getState().setTextBold(true);
   store.getState().setTextItalic(true);
+  store.getState().setTextOperationMode('cut');
 
   const state = store.getState();
   assert(state.showTextDialog === true, 'text dialog opens manually');
@@ -92,6 +94,7 @@ function assert(condition: unknown, message: string): void {
   assert(state.textSize === 42, 'text size updates');
   assert(state.textBold === true, 'text bold updates');
   assert(state.textItalic === true, 'text italic updates');
+  assert(state.textOperationMode === 'cut', 'text operation updates');
 }
 
 {
@@ -107,7 +110,7 @@ function assert(condition: unknown, message: string): void {
       bold: true,
       italic: true,
     },
-  } as never);
+  } as never, 'cut');
 
   const opened = store.getState();
   assert(opened.showTextDialog === true, 'openTextEdit opens text dialog');
@@ -117,6 +120,7 @@ function assert(condition: unknown, message: string): void {
   assert(opened.textSize === 16, 'openTextEdit copies size');
   assert(opened.textBold === true, 'openTextEdit copies bold');
   assert(opened.textItalic === true, 'openTextEdit copies italic');
+  assert(opened.textOperationMode === 'cut', 'openTextEdit records current text operation');
 
   store.getState().closeTextDialog();
   const closed = store.getState();
@@ -124,6 +128,7 @@ function assert(condition: unknown, message: string): void {
   assert(closed.editingTextId === null, 'closeTextDialog clears editing id');
   assert(closed.textInput === '', 'closeTextDialog clears input');
   assert(closed.textFont === 'JetBrains Mono', 'closeTextDialog preserves chosen font');
+  assert(closed.textOperationMode === 'engrave', 'closeTextDialog resets next new text to engrave');
 }
 
 {

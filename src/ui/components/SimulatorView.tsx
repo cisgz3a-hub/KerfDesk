@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
-import { useFrontOriginYFlip as shouldFlipYForFrontOrigin } from '../../core/plan/MachineTransform';
+import { shouldFlipYForFrontOrigin } from '../../core/plan/MachineTransform';
 
 interface SimulatorViewProps {
   onSubscribe: (callback: (line: string) => void) => () => void;

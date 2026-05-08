@@ -23,7 +23,7 @@
 import {
   applyMachineTransform,
   transformPointToMachine,
-  useRightOriginXFlip,
+  shouldFlipXForRightOrigin,
   type MachineTransformOptions,
 } from '../src/core/plan/MachineTransform';
 import type { Plan } from '../src/core/plan/Plan';
@@ -42,12 +42,12 @@ function assert(c: boolean, m: string): void {
 
 console.log('\n=== T1-40 right-origin X-flip ===\n');
 
-// ── 1. useRightOriginXFlip helper classification ─────────────────
+// ── 1. shouldFlipXForRightOrigin helper classification ─────────────────
 {
-  assert(useRightOriginXFlip('front-right') === true, 'front-right → flipX = true');
-  assert(useRightOriginXFlip('rear-right') === true, 'rear-right → flipX = true');
-  assert(useRightOriginXFlip('front-left') === false, 'front-left → flipX = false (no change)');
-  assert(useRightOriginXFlip('rear-left') === false, 'rear-left → flipX = false (no change)');
+  assert(shouldFlipXForRightOrigin('front-right') === true, 'front-right → flipX = true');
+  assert(shouldFlipXForRightOrigin('rear-right') === true, 'rear-right → flipX = true');
+  assert(shouldFlipXForRightOrigin('front-left') === false, 'front-left → flipX = false (no change)');
+  assert(shouldFlipXForRightOrigin('rear-left') === false, 'rear-left → flipX = false (no change)');
 }
 
 // ── 2. transformPointToMachine: front-right mirrors X and flips Y ─

@@ -207,7 +207,7 @@ export function CalibrateMaterialDialog({
     setStage('review');
   };
 
-  const reviewPath = useMemo(() => {
+  const reviewPath = (() => {
     if (!analysisResult?.ok || analysisResult.curve.points.length === 0) return '';
     const width = 300;
     const height = 180;
@@ -218,7 +218,7 @@ export function CalibrateMaterialDialog({
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     });
     return pts.join(' ');
-  }, [analysisResult]);
+  })();
 
   return React.createElement('div', {
     style: {

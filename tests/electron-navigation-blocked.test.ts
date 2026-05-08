@@ -94,8 +94,18 @@ function decideWindowOpen(url: string): WindowOpenDecision {
 // ── Pure-logic mirror of will-navigate allowlist ────────────────────
 /** Mirror of the will-navigate handler. Returns true if the navigation
  *  should be allowed (not preventDefault'd). */
+const DEV_SERVER_ORIGIN = 'http://localhost:3000';
+
+function isExpectedDevServerUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === DEV_SERVER_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
 function navAllowed(url: string, isDev: boolean): boolean {
-  const isDevServer = isDev && url.startsWith('http://localhost:3000/');
+  const isDevServer = isDev && isExpectedDevServerUrl(url);
   const isAppFile = !isDev && url.startsWith('file://');
   return isDevServer || isAppFile;
 }
@@ -103,10 +113,12 @@ function navAllowed(url: string, isDev: boolean): boolean {
 // 3. Dev mode: dev server allowed, everything else blocked.
 {
   assert(navAllowed('http://localhost:3000/', true), 'dev: localhost:3000 root allowed');
+  assert(navAllowed('http://localhost:3000', true), 'dev: localhost:3000 origin allowed');
   assert(navAllowed('http://localhost:3000/index.html', true), 'dev: localhost:3000 path allowed');
   assert(!navAllowed('https://attacker.com', true), 'dev: external https blocked');
   assert(!navAllowed('http://localhost:3001/', true), 'dev: different port blocked');
   assert(!navAllowed('http://evil.localhost:3000/', true), 'dev: subdomain prefix-spoofing blocked');
+  assert(!navAllowed('http://localhost:3000.evil.test/index.html', true), 'dev: localhost prefix lookalike blocked');
   assert(!navAllowed('file:///etc/passwd', true), 'dev: file:// blocked (no packaged content in dev)');
   assert(!navAllowed('javascript:alert(1)', true), 'dev: javascript: blocked');
 }
@@ -201,12 +213,16 @@ function navAllowed(url: string, isDev: boolean): boolean {
     `both http:// and https:// prefix checks appear at least twice (got http=${httpPrefixHits}, https=${httpsPrefixHits})`,
   );
 
-  // 7. Verify the will-navigate allowlist references the dev server URL
-  //    and file:// scheme.
-  const localhostDevHits = (codeOnly.match(/localhost:3000\//g) ?? []).length;
+  // 7. Verify the will-navigate allowlist references the dev server origin
+  //    through parsed-origin comparison, plus the file:// scheme.
+  const localhostDevHits = (codeOnly.match(/localhost:3000/g) ?? []).length;
   assert(
     localhostDevHits >= 2,
-    `dev server URL ('http://localhost:3000/') referenced at least twice in nav guards (got ${localhostDevHits})`,
+    `dev server origin ('http://localhost:3000') referenced at least twice (got ${localhostDevHits})`,
+  );
+  assert(
+    /new URL\(url\)\.origin === DEV_SERVER_ORIGIN/.test(codeOnly),
+    'dev navigation allowlist compares parsed URL origins',
   );
   const fileSchemeHits = (codeOnly.match(/url\.startsWith\(['"]file:\/\/['"]\)/g) ?? []).length;
   assert(

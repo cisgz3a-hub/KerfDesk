@@ -4,6 +4,7 @@ import { type MaterialSuggestion } from '../../core/materials/MaterialFeedback';
 import { type Move } from '../../core/plan/Plan';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { type SettingsTab } from '../components/SettingsModal';
+import { type TextOperationMode } from '../scene/TextOperationLayer';
 
 export type { SettingsTab };
 
@@ -23,6 +24,7 @@ export interface AppDialogsState {
   textSize: number;
   textBold: boolean;
   textItalic: boolean;
+  textOperationMode: TextOperationMode;
   showMaterialTest: boolean;
   showCalibrateMaterial: boolean;
   showMaterialLibrary: boolean;
@@ -67,7 +69,8 @@ export interface AppDialogsActions {
   setTextSize: (size: number) => void;
   setTextBold: (bold: BooleanSetterValue) => void;
   setTextItalic: (italic: BooleanSetterValue) => void;
-  openTextEdit: (obj: SceneObject) => void;
+  setTextOperationMode: (mode: TextOperationMode) => void;
+  openTextEdit: (obj: SceneObject, mode?: TextOperationMode) => void;
   closeTextDialog: () => void;
   setShowMaterialTest: (show: BooleanSetterValue) => void;
   setShowCalibrateMaterial: (show: BooleanSetterValue) => void;
@@ -117,6 +120,7 @@ export const appDialogsInitialState: AppDialogsState = {
   textSize: 20,
   textBold: false,
   textItalic: false,
+  textOperationMode: 'engrave',
   showMaterialTest: false,
   showCalibrateMaterial: false,
   showMaterialLibrary: false,
@@ -214,7 +218,8 @@ export function createAppDialogsStore(
     setTextSize: (size) => set({ textSize: size }),
     setTextBold: (bold) => set(state => ({ textBold: resolveBoolean(bold, state.textBold) })),
     setTextItalic: (italic) => set(state => ({ textItalic: resolveBoolean(italic, state.textItalic) })),
-    openTextEdit: (obj) => {
+    setTextOperationMode: (mode) => set({ textOperationMode: mode }),
+    openTextEdit: (obj, mode = 'engrave') => {
       const geom = obj.geometry as TextGeometry;
       set({
         textInput: geom.text || '',
@@ -222,6 +227,7 @@ export function createAppDialogsStore(
         textSize: geom.fontSize || 20,
         textBold: geom.bold || false,
         textItalic: geom.italic || false,
+        textOperationMode: mode,
         editingTextId: obj.id,
         showTextDialog: true,
       });
@@ -230,6 +236,7 @@ export function createAppDialogsStore(
       showTextDialog: false,
       editingTextId: null,
       textInput: '',
+      textOperationMode: 'engrave',
     }),
     setShowMaterialTest: (show) => set(state => ({ showMaterialTest: resolveBoolean(show, state.showMaterialTest) })),
     setShowCalibrateMaterial: (show) => set(state => ({ showCalibrateMaterial: resolveBoolean(show, state.showCalibrateMaterial) })),

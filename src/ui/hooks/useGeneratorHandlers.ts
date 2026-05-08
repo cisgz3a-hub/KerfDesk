@@ -8,6 +8,10 @@ import { generateId } from '../../core/types';
 import { importSvgIntoScene } from '../../import/svg/SvgToScene';
 import { assertFeature } from '../../entitlements';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
+import {
+  assignObjectsToTextOperationLayer,
+  type TextOperationMode,
+} from '../scene/TextOperationLayer';
 
 export interface UseGeneratorHandlersParams {
   scene: Scene;
@@ -23,7 +27,7 @@ export interface GeneratorHandlers {
   handleGridArrayConfirm: (config: GridArrayConfig) => void;
   handleNestingApply: (newObjects: SceneObject[]) => void;
   handleBoxGenerate: (objects: SceneObject[]) => void;
-  handleVariableTextGenerate: (objects: SceneObject[]) => void;
+  handleVariableTextGenerate: (objects: SceneObject[], operationMode: TextOperationMode) => void;
   handleTemplateSelect: (template: Template) => Promise<void>;
 }
 
@@ -112,18 +116,24 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
       handleSceneCommit(newScene, action);
       setSelectedIds(new Set(objects.map(o => o.id)));
     },
-    [scene, handleSceneCommit],
+    [scene, handleSceneCommit, setSelectedIds],
   );
 
   const handleBoxGenerate = useCallback(
     (objects: SceneObject[]) => commitGeneratedObjects(objects, 'box-generate'),
     [commitGeneratedObjects],
   );
-  const handleVariableTextGenerate = useCallback((objects: SceneObject[]) => {
+  const handleVariableTextGenerate = useCallback((objects: SceneObject[], operationMode: TextOperationMode) => {
     // T1-78 Phase 2b: enforcement → assertFeature (throws EntitlementError).
     assertFeature('variable_text');
-    commitGeneratedObjects(objects, 'var-text-generate');
-  }, [commitGeneratedObjects]);
+    const assigned = assignObjectsToTextOperationLayer(scene, objects, operationMode);
+    const newScene = {
+      ...assigned.scene,
+      objects: [...assigned.scene.objects, ...assigned.objects],
+    };
+    handleSceneCommit(newScene, 'var-text-generate');
+    setSelectedIds(new Set(assigned.objects.map(o => o.id)));
+  }, [scene, handleSceneCommit, setSelectedIds]);
 
   const handleTemplateSelect = useCallback(async (template: Template) => {
     setShowTemplates(false);

@@ -1,6 +1,10 @@
 import { useState, useCallback, useRef } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import {
+  textOperationModeForObject,
+  type TextOperationMode,
+} from '../scene/TextOperationLayer';
 import { gatedFeature } from '../utils/proGate';
 
 interface ContextMenuItem {
@@ -31,6 +35,7 @@ export interface ContextMenuActions {
   setTextSize: (size: number) => void;
   setTextBold: (bold: boolean) => void;
   setTextItalic: (italic: boolean) => void;
+  setTextOperationMode: (mode: TextOperationMode) => void;
   setTextPlacementPt: (pt: { x: number; y: number } | null) => void;
   setShowVariableText: (show: boolean) => void;
   setVariableTextSource: (obj: SceneObject | null) => void;
@@ -105,6 +110,7 @@ export function useContextMenu(
             actions.setTextSize(geom.fontSize || 20);
             actions.setTextBold(geom.bold || false);
             actions.setTextItalic(geom.italic || false);
+            actions.setTextOperationMode(textOperationModeForObject(scene, obj));
             actions.setEditingTextId(obj.id);
             actions.setTextPlacementPt(null);
             actions.setSelectedIds(new Set([obj.id]));

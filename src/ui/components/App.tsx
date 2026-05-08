@@ -102,6 +102,10 @@ import { type SettingsTab } from './SettingsModal';
 import { AppSettingsModal } from './AppSettingsModal';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
 import { type UserMode } from '../../app/UserModeGates';
+import {
+  resolveTextOperationLayer,
+  textOperationModeForObject,
+} from '../scene/TextOperationLayer';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -609,20 +613,21 @@ export function App(): React.ReactElement {
   ]);
 
   const handleTextPlaced = useCallback(() => {
-    setTextPlacementHint('Tip: Select text and click "Convert to Path" before cutting');
+    setTextPlacementHint('Tip: Names default to Engrave. Choose Cut only when you want outlines.');
   }, []);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
     dialogs.setEditingTextId(null);
+    dialogs.setTextOperationMode('engrave');
     setTextPlacementPt({ x: world.x, y: world.y });
     dialogs.setShowTextDialog(true);
-  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog]);
+  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog, dialogs.setTextOperationMode]);
 
   const handleEditText = useCallback((obj: SceneObject) => {
-    dialogs.openTextEdit(obj);
+    dialogs.openTextEdit(obj, textOperationModeForObject(scene, obj));
     setTextPlacementPt(null);
     setSelectedIds(new Set([obj.id]));
-  }, [dialogs.openTextEdit]);
+  }, [dialogs.openTextEdit, scene]);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -764,13 +769,15 @@ export function App(): React.ReactElement {
     if (!dialogs.textInput.trim()) return;
 
     if (dialogs.editingTextId) {
+      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
       const newScene = {
-        ...scene,
-        objects: scene.objects.map(o =>
+        ...resolved.scene,
+        objects: resolved.scene.objects.map(o =>
           o.id === dialogs.editingTextId
             ? {
                 ...o,
                 name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
+                layerId: resolved.layerId,
                 geometry: {
                   ...(o.geometry as TextGeometry),
                   type: 'text' as const,
@@ -786,10 +793,9 @@ export function App(): React.ReactElement {
             : o
         ),
       };
-      handleSceneCommit(newScene, 'text-edit');
+      handleSceneCommit(newScene, 'text-edit', new Set([dialogs.editingTextId]));
     } else {
-      const layerId = scene.activeLayerId || scene.layers[0]?.id;
-      if (!layerId) return;
+      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
 
       const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
       const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
@@ -798,7 +804,7 @@ export function App(): React.ReactElement {
         id: generateId(),
         type: 'text',
         name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-        layerId,
+        layerId: resolved.layerId,
         parentId: null,
         transform: { ...IDENTITY_MATRIX, tx, ty },
         geometry: {
@@ -817,8 +823,8 @@ export function App(): React.ReactElement {
       };
 
       const newScene = {
-        ...scene,
-        objects: [...scene.objects, textObj],
+        ...resolved.scene,
+        objects: [...resolved.scene.objects, textObj],
       };
       // T2-79+: atomic — selection of the new text object rides into
       // the history entry's selectionAfter. Undo restores pre-add
@@ -838,6 +844,7 @@ export function App(): React.ReactElement {
     dialogs.textSize,
     dialogs.textBold,
     dialogs.textItalic,
+    dialogs.textOperationMode,
     dialogs.editingTextId,
     dialogs.closeTextDialog,
     textPlacementPt,
@@ -1286,6 +1293,7 @@ export function App(): React.ReactElement {
       setTextSize: dialogs.setTextSize,
       setTextBold: dialogs.setTextBold,
       setTextItalic: dialogs.setTextItalic,
+      setTextOperationMode: dialogs.setTextOperationMode,
       setTextPlacementPt,
       setShowVariableText: dialogs.setShowVariableText,
       setVariableTextSource: dialogs.setVariableTextSource,
@@ -1907,12 +1915,14 @@ export function App(): React.ReactElement {
         textSize: dialogs.textSize,
         textBold: dialogs.textBold,
         textItalic: dialogs.textItalic,
+        textOperationMode: dialogs.textOperationMode,
         textPreviewFontReady,
         setTextInput: dialogs.setTextInput,
         setTextFont: dialogs.setTextFont,
         setTextSize: dialogs.setTextSize,
         setTextBold: dialogs.setTextBold,
         setTextItalic: dialogs.setTextItalic,
+        setTextOperationMode: dialogs.setTextOperationMode,
         onClose: () => {
           dialogs.closeTextDialog();
           setTextPlacementPt(null);

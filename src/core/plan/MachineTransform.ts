@@ -51,7 +51,7 @@ export interface MachineTransformResult {
   returnPosition: { x: number; y: number };
 }
 
-export function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean {
+export function shouldFlipYForFrontOrigin(originCorner: MachineOriginCorner): boolean {
   return originCorner === 'front-left' || originCorner === 'front-right';
 }
 
@@ -60,8 +60,8 @@ export function useFrontOriginYFlip(originCorner: MachineOriginCorner): boolean 
 // canvas X (which we treat as "right of design origin") corresponds
 // to NEGATIVE machine X relative to the right-edge zero. Mirror via
 // machineX = bedWidthMm - canvasX (+ offset). Symmetric to
-// useFrontOriginYFlip's bedHeightMm-based Y mapping.
-export function useRightOriginXFlip(originCorner: MachineOriginCorner): boolean {
+// shouldFlipYForFrontOrigin's bedHeightMm-based Y mapping.
+export function shouldFlipXForRightOrigin(originCorner: MachineOriginCorner): boolean {
   return originCorner === 'front-right' || originCorner === 'rear-right';
 }
 
@@ -87,8 +87,8 @@ export function applyMachineTransform(
   const maxX = Number.isFinite(bounds.maxX) ? bounds.maxX : 0;
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
-  const flipY = useFrontOriginYFlip(options.originCorner);
-  const flipX = useRightOriginXFlip(options.originCorner);
+  const flipY = shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
@@ -202,8 +202,8 @@ export function transformPointToMachine(
   sceneBounds: { minX: number; minY: number; maxX: number; maxY: number },
   options: MachineTransformOptions,
 ): { x: number; y: number } {
-  const flipY = useFrontOriginYFlip(options.originCorner);
-  const flipX = useRightOriginXFlip(options.originCorner);
+  const flipY = shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm

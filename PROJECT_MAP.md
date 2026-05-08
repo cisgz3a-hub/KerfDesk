@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 356 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 449 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 357 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 451 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -39,14 +39,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/storage` | 2 | - |
 | `src/templates` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 138 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 139 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 396 | - |
+| `tests/` | 398 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -449,6 +449,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/safety/SafetyOutcomeMessages.ts`
 - `src/ui/scene/SceneCommitActions.ts`
 - `src/ui/scene/SceneTransaction.ts`
+- `src/ui/scene/TextOperationLayer.ts`
 - `src/ui/stores/activeJobCanvasStore.ts`
 - `src/ui/stores/appDialogsStore.ts`
 - `src/ui/stores/appSettingsStore.ts`
@@ -830,6 +831,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/test-grid-generator.test.ts`
 - `tests/tester-secret-not-in-source.test.ts`
 - `tests/tester-verification-no-secret.test.ts`
+- `tests/text-operation-dialog-wiring.test.ts`
+- `tests/text-operation-layer.test.ts`
 - `tests/text-outline-cache.test.ts`
 - `tests/text-property-edits-undoable.test.ts`
 - `tests/ticket-capability-snapshot-validation.test.ts`
