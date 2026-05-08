@@ -50,7 +50,7 @@ import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
 import type { StartReadiness, StartReadinessGate } from './connection/StartReadinessPanel';
 import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
-import { Workflow } from './connection/Workflow';
+import { JobPosition, WorkflowSteps } from './connection/Workflow';
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
@@ -1831,24 +1831,31 @@ export function ConnectionPanelMain({
     startBlockedReason: startReadiness.blockingGate?.failHeadline ?? null,
   };
 
-  const workflowSection = isConnected && React.createElement(React.Fragment, null,
-    React.createElement(Workflow, {
+  const saveOriginFromPanel = () => {
+    hasSetOrigin.current = true;
+    setWorkflowVersion(v => v + 1);
+    onSaveOrigin();
+  };
+
+  const jobPositionSection = isConnected && React.createElement(JobPosition, {
+    startMode,
+    onSelectMode,
+    startPositionStatus,
+    machinePositionKnown: !!machinePosition,
+    hasSetOrigin: hasSetOrigin.current,
+    isConnected,
+    onSaveOrigin: saveOriginFromPanel,
+  });
+
+  const workflowStepsSection = isConnected && React.createElement(React.Fragment, null,
+    React.createElement(WorkflowSteps, {
       startMode,
-      onSelectMode,
-      startPositionStatus,
-      machinePositionKnown: !!machinePosition,
       hasJogged: hasJogged.current,
       hasSetOrigin: hasSetOrigin.current,
       hasFramed: hasFramed.current,
       canStartJob,
       startJobDesc,
       estimatedTimeFormatted,
-      isConnected,
-      onSaveOrigin: () => {
-        hasSetOrigin.current = true;
-        setWorkflowVersion(v => v + 1);
-        onSaveOrigin();
-      },
     }),
   );
 
@@ -2405,6 +2412,7 @@ export function ConnectionPanelMain({
       safetyRecoveryCard,
       isConnected && profileSection,
       isConnected && !isRunning && !displayPaused && controlsSection,
+      isConnected && !isRunning && !displayPaused && jobPositionSection,
       isConnected && React.createElement('div', {
         style: {
           flex: 1,
@@ -2420,7 +2428,7 @@ export function ConnectionPanelMain({
           isConnected,
           isRunning,
           displayPaused,
-          workflowSection,
+          workflowStepsSection,
           layerOverviewSection,
           gcodeWarning,
           compileProgressSection,

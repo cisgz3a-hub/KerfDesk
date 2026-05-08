@@ -4,7 +4,7 @@ interface MoveControlsProps {
   isConnected: boolean;
   isRunning: boolean;
   displayPaused: boolean;
-  workflowSection: React.ReactNode;
+  workflowStepsSection: React.ReactNode;
   layerOverviewSection: React.ReactNode;
   gcodeWarning: React.ReactNode;
   compileProgressSection: React.ReactNode;
@@ -17,7 +17,7 @@ export function MoveControls(props: MoveControlsProps) {
     isConnected,
     isRunning,
     displayPaused,
-    workflowSection,
+    workflowStepsSection,
     layerOverviewSection,
     gcodeWarning,
     compileProgressSection,
@@ -28,7 +28,7 @@ export function MoveControls(props: MoveControlsProps) {
   return React.createElement(
     React.Fragment,
     null,
-    !isRunning && !displayPaused && workflowSection,
+    !isRunning && !displayPaused && workflowStepsSection,
     layerOverviewSection,
     gcodeWarning,
     compileProgressSection,
