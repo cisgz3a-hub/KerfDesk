@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 363 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 482 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 364 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 483 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 91 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 92 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 10 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 429 | - |
+| `tests/` | 430 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -198,6 +198,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/preflight/rules/OutputBoundsPreflight.ts`
 - `src/core/preflight/rules/RasterPreflight.ts`
 - `src/core/preflight/rules/ScenePreflight.ts`
+- `src/core/preflight/rules/SelfIntersectionPreflight.ts`
 - `src/core/preflight/rules/TemplatePreflight.ts`
 - `src/core/preflight/rules/sharedHelpers.ts`
 - `src/core/replay/JobReplay.ts`
@@ -775,6 +776,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/preflight-negative-coords.test.ts`
 - `tests/preflight-output-layer-filter.test.ts`
 - `tests/preflight-rejects-m4-without-laser-mode.test.ts`
+- `tests/preflight-self-intersection.test.ts`
 - `tests/preflight-template-validation.test.ts`
 - `tests/preflight-warning-confirm-includes-detail.test.ts`
 - `tests/preflight.test.ts`
