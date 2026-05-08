@@ -76,7 +76,7 @@ export function runDesignOutputLayerChecks(ctx: PreflightContext, out: Preflight
       const { outside, partial } = isObjectOutsideMaterial(obj, mat);
       if (outside) {
         out.push({
-          severity: 'error',
+          severity: 'warning',
           code: PREFLIGHT_CODES.DESIGN_OUTSIDE_MATERIAL_FULL,
           message: `Object "${obj.name || obj.id}" is completely outside the material area (${mat.width}×${mat.height}mm at ${mat.x}, ${mat.y}).`,
           objectId: obj.id,
@@ -92,15 +92,17 @@ export function runDesignOutputLayerChecks(ctx: PreflightContext, out: Preflight
     }
   }
 
-  for (const obj of outputObjects) {
-    const bed = { width: ctx.preflightBedWidthMm, height: ctx.preflightBedHeightMm };
-    if (isObjectOutsideBed(obj, bed)) {
-      out.push({
-        severity: 'error',
-        code: PREFLIGHT_CODES.DESIGN_OUTSIDE_BED,
-        message: `Object "${obj.name || obj.id}" is outside the laser bed travel area (${bed.width}×${bed.height}mm).`,
-        objectId: obj.id,
-      });
+  if (!ctx.machinePlanBounds) {
+    for (const obj of outputObjects) {
+      const bed = { width: ctx.preflightBedWidthMm, height: ctx.preflightBedHeightMm };
+      if (isObjectOutsideBed(obj, bed)) {
+        out.push({
+          severity: 'error',
+          code: PREFLIGHT_CODES.DESIGN_OUTSIDE_BED,
+          message: `Object "${obj.name || obj.id}" is outside the laser bed travel area (${bed.width}×${bed.height}mm).`,
+          objectId: obj.id,
+        });
+      }
     }
   }
 
@@ -189,21 +191,7 @@ export function runDesignOutputLayerChecks(ctx: PreflightContext, out: Preflight
     }
   }
 
-  if (outputLayers.length > 0) {
-    const modeLabel = (m: string) =>
-      m === 'cut' ? 'Cut' : m === 'engrave' ? 'Engrave' : m === 'score' ? 'Score' : m === 'image' ? 'Image' : m;
-    const lines = outputLayers.map(layer => {
-      const label = modeLabel(layer.settings.mode);
-      const p = layer.settings.passes;
-      const passWord = p === 1 ? '1 pass' : `${p} passes`;
-      return `${label}: "${layer.name}" — ${layer.settings.power.max}% power, ${layer.settings.speed} mm/min, ${passWord}`;
-    });
-    out.push({
-      severity: 'info',
-      code: PREFLIGHT_CODES.LAYER_OUTPUT_SUMMARIES,
-      message: `Layer laser settings (output layers). ${lines.join('\n')}`,
-    });
-  }
+  // Layer summaries belong in Ready-to-Run, not in the issue stream.
 }
 
 export function runSceneChecks(ctx: PreflightContext, out: PreflightResult[]): void {

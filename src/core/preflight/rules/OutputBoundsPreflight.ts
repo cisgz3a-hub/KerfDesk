@@ -6,6 +6,27 @@ import {
   negativeCoordPreflightSeverity,
 } from './sharedHelpers';
 
+function pushBedSizeMismatchIfNeeded(
+  ctx: PreflightContext,
+  profileBedWidth: number,
+  profileBedHeight: number,
+  out: PreflightResult[],
+): void {
+  if (ctx.liveMachineInfo?.bedWidthMm && ctx.liveMachineInfo?.bedHeightMm) {
+    const tol = 1;
+    if (
+      Math.abs(ctx.liveMachineInfo.bedWidthMm - profileBedWidth) > tol ||
+      Math.abs(ctx.liveMachineInfo.bedHeightMm - profileBedHeight) > tol
+    ) {
+      out.push({
+        severity: 'warning',
+        code: PREFLIGHT_CODES.BED_SIZE_MISMATCH,
+        message: `Profile bed size (${profileBedWidth}x${profileBedHeight}mm) does not match connected machine (${ctx.liveMachineInfo.bedWidthMm}x${ctx.liveMachineInfo.bedHeightMm}mm).`,
+      });
+    }
+  }
+}
+
 export function runOutputBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): void {
   const bounds = ctx.machinePlanBounds;
   if (!bounds) return;
@@ -127,6 +148,11 @@ export function runBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): 
     return;
   }
 
+  if (ctx.machinePlanBounds) {
+    pushBedSizeMismatchIfNeeded(ctx, profile.bedWidth, profile.bedHeight, out);
+    return;
+  }
+
   // T1-107: bed-bounds checks must ignore guide-layer objects. Layers
   // with output:false are visible on canvas but explicitly excluded
   // from the burn output.
@@ -168,17 +194,5 @@ export function runBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): 
     });
   }
 
-  if (ctx.liveMachineInfo?.bedWidthMm && ctx.liveMachineInfo?.bedHeightMm) {
-    const tol = 1;
-    if (
-      Math.abs(ctx.liveMachineInfo.bedWidthMm - profile.bedWidth) > tol ||
-      Math.abs(ctx.liveMachineInfo.bedHeightMm - profile.bedHeight) > tol
-    ) {
-      out.push({
-        severity: 'warning',
-        code: PREFLIGHT_CODES.BED_SIZE_MISMATCH,
-        message: `Profile bed size (${profile.bedWidth}x${profile.bedHeight}mm) does not match connected machine (${ctx.liveMachineInfo.bedWidthMm}x${ctx.liveMachineInfo.bedHeightMm}mm).`,
-      });
-    }
-  }
+  pushBedSizeMismatchIfNeeded(ctx, profile.bedWidth, profile.bedHeight, out);
 }

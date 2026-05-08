@@ -1772,14 +1772,25 @@ export function ConnectionPanelMain({
     () => analyzeOperationOrder(readyOperationRows),
     [readyOperationRows],
   );
-  const readyWarnings: ReadyToRunWarning[] = startReadiness.gates
-    .filter(gate => gate.status === 'fail')
-    .map(gate => ({
-      id: gate.id,
-      severity: 'blocker' as const,
-      text: gate.failHeadline ?? `${gate.label} is not ready`,
-      action: gate.failAction,
-    }));
+  const frameRecommended = !requireFrame && !hasFramed.current;
+  const readyWarnings: ReadyToRunWarning[] = [
+    ...startReadiness.gates
+      .filter(gate => gate.status === 'fail')
+      .map(gate => ({
+        id: gate.id,
+        severity: 'blocker' as const,
+        text: gate.failHeadline ?? `${gate.label} is not ready`,
+        action: gate.failAction,
+      })),
+    ...(frameRecommended
+      ? [{
+          id: 'framing-recommended',
+          severity: 'warning' as const,
+          text: 'Frame recommended before Start',
+          action: 'Use Frame to verify the burn area when setup or material placement changed',
+        }]
+      : []),
+  ];
   const readyBounds = lastGcodeCompileResult?.machinePlanBounds ?? machinePlanBounds ?? frameMachineBounds;
   const readyToRunData: ReadyToRunPanelData = {
     machine: {
@@ -1811,7 +1822,9 @@ export function ConnectionPanelMain({
     position: {
       startModeLabel: readyStartModeLabel(startMode),
       originLabel: startPositionStatus,
-      frameStatusLabel: hasFramed.current ? 'Frame complete' : 'Frame required before Start',
+      frameStatusLabel: hasFramed.current
+        ? 'Frame complete'
+        : (requireFrame ? 'Frame required before Start' : 'Frame recommended before Start'),
     },
     warnings: readyWarnings,
     canStartJob,
