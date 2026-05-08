@@ -16171,6 +16171,8 @@ The user opens the preview tab to verify their compiled job before running it. F
 
 **Cross-check note (audit 2E):** Audit's Priority 7. Verified.
 
+**Status:** Shipped in `<TBD>`. Added a pure sampled preview model in `src/ui/components/gcodePreviewModel.ts` and wired `GcodePreview` to store/render a capped move set instead of splitting and storing every G-code line. Large previews keep full move counts, travel/cut counts, bounds, and duration estimates while the canvas draws a sampled representation plus a visible "Sampled preview" note. Pinned by `tests/gcode-preview-large-job-sampling.test.ts`. Follow-up if real users still hit preview limits: move the same pure parser behind a Web Worker and add zoom-region detail rendering.
+
 ---
 
 ### T3-15 | Spool-based G-code output (AsyncIterable streaming)
@@ -20314,7 +20316,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
 - [x] T3-13 Active-edge-table fill scanline algorithm (Shipped — `generateFillRows` now uses scanline edge buckets + active row edge set; behavior pinned by fill/compound/pipeline tests)
-- [ ] T3-14 Sampled / level-of-detail G-code preview (filed; large-job UX)
+- [x] T3-14 Sampled / level-of-detail G-code preview (Shipped — sampled preview model + capped rendered moves; worker/zoom-region refinement deferred until needed)
 - [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)

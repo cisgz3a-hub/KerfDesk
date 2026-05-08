@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { buildGcodePreviewModel } from './gcodePreviewModel';
 
 interface GcodePreviewProps {
   gcode: string;
@@ -14,66 +15,10 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
   const [playProgress, setPlayProgress] = useState(0);
   const [playSpeed, setPlaySpeed] = useState(1);
 
-  // Parse all moves once
-  const parsedMoves = useMemo(() => {
-    if (!gcode) return [];
-    const moves: Array<{ fromX: number; fromY: number; toX: number; toY: number; type: 'rapid' | 'cut'; time: number }> = [];
-    let x = 0;
-    let y = 0;
-    let feedRate = 1000;
-    let totalTime = 0;
-    let modalRapid = true;
-
-    for (const line of gcode.split('\n')) {
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith(';')) continue;
-
-      const gMatch = trimmed.match(/^G\s*(\d+)/i);
-      if (gMatch) {
-        const gNum = parseInt(gMatch[1], 10);
-        modalRapid = gNum === 0;
-      }
-
-      const fMatch = trimmed.match(/F([\d.]+)/);
-      if (fMatch) feedRate = parseFloat(fMatch[1]);
-
-      const xMatch = trimmed.match(/X([-\d.]+)/);
-      const yMatch = trimmed.match(/Y([-\d.]+)/);
-
-      if (xMatch || yMatch) {
-        const nx = xMatch ? parseFloat(xMatch[1]) : x;
-        const ny = yMatch ? parseFloat(yMatch[1]) : y;
-        const dist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
-        const isRapid = modalRapid;
-        const speed = isRapid ? 5000 : (feedRate || 1000);
-        const moveTime = dist > 0 ? (dist / speed) * 60 : 0;
-        totalTime += moveTime;
-
-        moves.push({ fromX: x, fromY: y, toX: nx, toY: ny, type: isRapid ? 'rapid' : 'cut', time: totalTime });
-        x = nx;
-        y = ny;
-      }
-    }
-    return moves;
-  }, [gcode]);
-
-  const totalDuration = parsedMoves.length > 0 ? parsedMoves[parsedMoves.length - 1].time : 0;
-
-  // Compute bounds from all moves
-  const bounds = useMemo(() => {
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const m of parsedMoves) {
-      minX = Math.min(minX, m.fromX, m.toX);
-      minY = Math.min(minY, m.fromY, m.toY);
-      maxX = Math.max(maxX, m.fromX, m.toX);
-      maxY = Math.max(maxY, m.fromY, m.toY);
-    }
-    if (!isFinite(minX)) return { minX: 0, minY: 0, maxX: 100, maxY: 100 };
-    return { minX, minY, maxX, maxY };
-  }, [parsedMoves]);
+  const previewModel = useMemo(() => buildGcodePreviewModel(gcode), [gcode]);
+  const parsedMoves = previewModel.moves;
+  const totalDuration = previewModel.totalDuration;
+  const bounds = previewModel.bounds;
 
   const renderFrame = useCallback((progress: number) => {
     const canvas = canvasRef.current;
@@ -208,26 +153,33 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     }
 
     // Stats overlay
-    const travelCount = parsedMoves.filter(m => m.type === 'rapid').length;
-    const cutCount = parsedMoves.filter(m => m.type === 'cut').length;
-    const completedMoves = parsedMoves.filter(m => m.time <= currentTime).length;
-
+    const completedMoves = Math.min(
+      previewModel.totalMoveCount,
+      Math.round(progress * previewModel.totalMoveCount),
+    );
+    const overlayHeight = previewModel.isSampled ? 82 : 64;
+    const overlayY = ch - overlayHeight - 8;
     ctx.fillStyle = 'rgba(8, 8, 15, 0.85)';
-    ctx.fillRect(8, ch - 72, 220, 64);
+    ctx.fillRect(8, overlayY, 260, overlayHeight);
     ctx.font = '11px JetBrains Mono, monospace';
 
     ctx.fillStyle = 'rgba(100, 100, 130, 0.6)';
-    ctx.fillText(`Travel: ${travelCount}  Cut: ${cutCount}`, 14, ch - 56);
+    ctx.fillText(`Travel: ${previewModel.travelCount}  Cut: ${previewModel.cutCount}`, 14, overlayY + 16);
 
     ctx.fillStyle = '#8888aa';
-    ctx.fillText(`Progress: ${completedMoves}/${parsedMoves.length} moves`, 14, ch - 40);
+    ctx.fillText(`Progress: ${completedMoves}/${previewModel.totalMoveCount} moves`, 14, overlayY + 32);
 
     const elapsed = currentTime;
     const mins = Math.floor(elapsed / 60);
     const secs = Math.round(elapsed % 60);
     ctx.fillStyle = '#00d4ff';
-    ctx.fillText(`Time: ${mins}m ${secs}s / ${Math.floor(totalDuration / 60)}m ${Math.round(totalDuration % 60)}s`, 14, ch - 24);
-  }, [parsedMoves, bounds, totalDuration]);
+    ctx.fillText(`Time: ${mins}m ${secs}s / ${Math.floor(totalDuration / 60)}m ${Math.round(totalDuration % 60)}s`, 14, overlayY + 48);
+
+    if (previewModel.isSampled) {
+      ctx.fillStyle = '#ffaa33';
+      ctx.fillText(`Sampled preview: ${parsedMoves.length}/${previewModel.totalMoveCount} moves`, 14, overlayY + 66);
+    }
+  }, [parsedMoves, bounds, totalDuration, previewModel]);
 
   // Canvas size + DPR (logical coords for renderFrame)
   useEffect(() => {

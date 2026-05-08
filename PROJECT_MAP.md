@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 361 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 467 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 362 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 468 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -40,14 +40,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 141 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 142 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 414 | - |
+| `tests/` | 415 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -412,6 +412,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/falcon-wifi/FalconWiFiStatusPanel.tsx`
 - `src/ui/components/falcon-wifi/falconIpc.ts`
 - `src/ui/components/falcon-wifi/index.ts`
+- `src/ui/components/gcodePreviewModel.ts`
 - `src/ui/components/materials/CalibrateMaterialDialog.tsx`
 - `src/ui/components/settings/CalibrationSettingsTab.tsx`
 - `src/ui/components/settings/GcodeSettingsTab.tsx`
@@ -645,6 +646,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/frame-idle-timeout-dynamic.test.ts`
 - `tests/frame-required-before-start.test.ts`
 - `tests/frame-state-transitions.test.ts`
+- `tests/gcode-preview-large-job-sampling.test.ts`
 - `tests/gcode-relative-mode.test.ts`
 - `tests/gcode-relative-return-template.test.ts`
 - `tests/gcode-settings-custom-start-end-wiring.test.ts`
