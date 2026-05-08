@@ -42,7 +42,6 @@ import {
 } from '../renderers/SimulationRenderer';
 import { type ToolType } from './ToolBar';
 import { CanvasRenderer } from './canvas/CanvasRenderer';
-import { BuildStamp } from './BuildStamp';
 import { geometryToPoints } from '../../core/job/JobCompiler';
 import { type JobProgress } from '../../controllers/ControllerInterface';
 import { type Move } from '../../core/plan/Plan';
@@ -1868,12 +1867,6 @@ export function CanvasViewport({
       hasSelectedText: quickActions.hasSelectedText,
       handleTextToPath: quickActions.handleTextToPath,
     }),
-
-    // T1-112: build stamp (commit hash + ISO date) so the tester can
-    // confirm at a glance which deployment is loaded. Sits above the
-    // bottom status bar (renderOverlay draws into the canvas itself
-    // at the bottom 22px), so this overlay is positioned at bottom: 28.
-    React.createElement(BuildStamp),
   );
 }
 

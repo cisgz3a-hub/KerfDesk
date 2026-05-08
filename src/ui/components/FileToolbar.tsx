@@ -22,6 +22,7 @@ import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene } from '../../io/SceneSerializer';
 import { clearAutosave } from '../../app/autosavePersistence';
 import { TestGridDialog } from './TestGridDialog';
+import { BuildStamp } from './BuildStamp';
 // ─── PROPS ───────────────────────────────────────────────────────
 
 export interface FileToolbarProps {
@@ -447,6 +448,10 @@ export function FileToolbar({
       }, showToolpathPreview ? '👁 Preview ON' : '👁 Preview')
       : null,
     spacer(),
+    // T1-112 follow-up: build stamp inline in the toolbar, immediately
+    // before Settings so the tester can read the deployed commit at a
+    // glance without scrolling the canvas.
+    React.createElement(BuildStamp),
     onOpenSettings
       ? toolbarBtn('⚙ Settings', 'Machine and application settings', () => onOpenSettings('machine'))
       : null,

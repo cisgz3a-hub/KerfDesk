@@ -55,27 +55,30 @@ export function BuildStamp(): React.ReactElement {
 
   const label = date ? `v${commit} · ${date}` : `v${commit}`;
 
+  // T1-112 follow-up: inline rendering. Initially shipped as an
+  // absolute-positioned canvas overlay (bottom-right), but the
+  // tester reported they couldn't see the bottom of the canvas in
+  // their layout. Now an inline button so the parent picks the
+  // location — currently mounted in FileToolbar next to Settings.
   return React.createElement('button', {
     type: 'button',
     'data-testid': 'build-stamp',
     'data-build-commit': commit,
     onClick: handleClick,
-    title: 'Click to copy commit hash',
+    title: `Build ${commit}${date ? ` · ${date}` : ''} — click to copy commit hash`,
     style: {
-      position: 'absolute' as const,
-      right: 8,
-      bottom: 28,
-      padding: '2px 6px',
+      padding: '4px 8px',
       background: 'transparent',
-      border: 'none',
-      color: copied ? '#2dd4a0' : '#555570',
+      border: '1px solid #252540',
+      borderRadius: 4,
+      color: copied ? '#2dd4a0' : '#7a7a90',
       fontFamily: font,
-      fontSize: 9,
-      lineHeight: 1.2,
+      fontSize: 10,
+      lineHeight: '20px',
+      height: 28,
       cursor: 'pointer',
       userSelect: 'none' as const,
-      pointerEvents: 'auto' as const,
-      zIndex: 5,
+      flexShrink: 0,
     },
   }, copied ? 'copied!' : label);
 }

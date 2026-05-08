@@ -81,19 +81,32 @@ async function run(): Promise<void> {
     'global.d.ts declares __BUILD_TIME__: string');
 }
 
-// 4. CanvasViewport mounts BuildStamp
+// 4. FileToolbar mounts BuildStamp next to Settings
+//    (originally bottom-right of canvas; moved 2026-05-08 because the
+//    tester couldn't see the bottom of the viewport in their layout.
+//    Toolbar placement is more discoverable.)
 {
   const src = fs.readFileSync(
-    path.join(repoRoot, 'src/ui/components/CanvasViewport.tsx'),
+    path.join(repoRoot, 'src/ui/components/FileToolbar.tsx'),
     'utf8',
   );
   assert(
     /import\s*\{\s*BuildStamp\s*\}\s*from\s*['"]\.\/BuildStamp['"]/.test(src),
-    'CanvasViewport imports BuildStamp',
+    'FileToolbar imports BuildStamp',
   );
   assert(
-    /React\.createElement\(BuildStamp\)/.test(src),
-    'CanvasViewport mounts <BuildStamp /> in the viewport wrapper',
+    /React\.createElement\(BuildStamp\)[\s\S]{0,200}onOpenSettings/.test(src),
+    'FileToolbar mounts <BuildStamp /> immediately before the Settings button',
+  );
+  // Also ensure the canvas viewport no longer mounts it (avoid
+  // double-rendering after the relocation).
+  const cvSrc = fs.readFileSync(
+    path.join(repoRoot, 'src/ui/components/CanvasViewport.tsx'),
+    'utf8',
+  );
+  assert(
+    !/BuildStamp/.test(cvSrc),
+    'CanvasViewport no longer references BuildStamp (toolbar owns it post-relocation)',
   );
 }
 
