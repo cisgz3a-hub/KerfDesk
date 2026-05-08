@@ -1585,7 +1585,10 @@ export class GrblController implements GrblControllerApi {
       }
     }
 
-    this._state.errorCode = code;
+    // GRBL `error:N` is command-scoped. Only active-job errors become
+    // recoverable machine holds; idle/protocol errors should not poison
+    // Frame/Start gates after the controller is otherwise idle.
+    this._state.errorCode = wasJobRunning ? code : null;
     this._emitProgress();
 
     // T1-24: actively command the laser off — but ONLY if a job was
