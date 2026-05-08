@@ -224,10 +224,15 @@ console.log('\n=== sendJob — bounds precheck ===');
   let threw = false;
   try {
     await ctrl.sendJob(longJob);
-  } catch {
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : String(e);
+    assert(
+      msg.includes('X=9999.000') && msg.includes('400'),
+      `bad coord after line 500 rejected with bounds message: ${msg}`,
+    );
     threw = true;
   }
-  assert(!threw, 'bad coord only after line 500 → not scanned, job accepted');
+  assert(threw, 'T1-108: bad coord only after line 500 is rejected by full scan');
   if (ctrl.isJobRunning) {
     while (ctrl.isJobRunning) {
       port.injectResponse('ok');

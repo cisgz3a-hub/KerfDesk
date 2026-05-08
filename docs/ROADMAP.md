@@ -55,13 +55,13 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-07, branch `codex/t2-64-user-mode-gates`.
+**Snapshot date:** 2026-05-08, branch `master`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
-| Tier 1 | 83 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
+| Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
 
 ### Historical audit classification
@@ -6364,6 +6364,24 @@ A layer can have `visible: true` (drawn on canvas) but `output: false` (excluded
 **Priority:** Tier 1 — corrects two preflight error-severity gates that produce false positives. The bed-bounds false-positive in particular blocks Start for legitimate jobs with guide layers.
 
 **Status:** Shipped 2026-05-02 in `95911e3`.
+
+---
+
+### T1-108 | Controller bounds full scan removes the 500-line cap
+
+**Code reference:** `src/controllers/grbl/GrblController.ts` (`_checkJobBounds`), `tests/controller-bounds-full-scan.test.ts`, `tests/controller-bounds-recheck.test.ts`.
+
+**Problem:** The imported 2026-05-08 audit (`LaserForge_Codex_Implementation_Roadmap (1).md`, LF-R1-03) correctly identified a safety regression in the T1-2/T1-44 controller bounds work: `_checkJobBounds` still scanned only the first 500 lines. T1-44 improved relative-mode simulation but explicitly preserved the cap. A stale, raw, or hand-edited job with an out-of-bounds `G0/G1` after the cap could pass the final controller-layer defense.
+
+**Fix:** Remove the `MAX_LINES = 500` cap and inspect every motion line before accepting the job. The scan remains conservative: if bed dimensions are unknown it skips as before, and if a relative move is reached before a confirmed head position it refuses rather than guessing. The rationale is intentionally simple: for controller-side safety validation, accepting an unscanned late motion is worse than taking longer or refusing.
+
+**Tests:** `tests/controller-bounds-full-scan.test.ts` covers absolute and relative out-of-bounds moves after the first 500 lines, and source-pins the absence of `MAX_LINES`. `tests/controller-bounds-recheck.test.ts` flips the previous "bad coordinate after line 500 is accepted" case to require rejection.
+
+**Estimate:** 20 min including tests.
+
+**Priority:** Tier 1 - safety. This closes the exact LF-R1-03 audit hole without changing emitted G-code or machine-control semantics.
+
+**Status:** Shipped 2026-05-08 in `<TBD>`.
 
 ---
 
@@ -19954,6 +19972,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-92 `dialog:open` enforce file size limit by extension (shipped pre-session)
 - [x] T1-93 `dialog:open` return basename only, not full path (shipped pre-session)
 - [x] T1-94 Falcon WS practical frame size cap (256 KB / 1 MB) (shipped pre-session)
+- [x] T1-108 Controller bounds full scan removes the 500-line cap (shipped 2026-05-08 in `<TBD>`)
 
 ### Tier 2 (This month)
 - [x] T2-1 Validated Job Ticket (all 5 phases shipped; checklist catch-up)

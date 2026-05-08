@@ -787,8 +787,11 @@ export class GrblController implements GrblControllerApi {
 
   /**
    * Scan job lines for G0/G1 X/Y moves that exceed the controller's known bed
-   * extents. Returns null on pass, error string on fail. Only the first 500
-   * lines are considered (O(n) cap).
+   * extents. Returns null on pass, error string on fail.
+   *
+   * T1-108: all lines are inspected. This is deliberately O(n): silently
+   * accepting an out-of-bounds move after an arbitrary cap is worse than
+   * refusing slowly.
    *
    * T1-44: relative-mode (G91) lines are simulated from the controller's
    * current head position (`_state.position`) instead of being skipped.
@@ -811,14 +814,13 @@ export class GrblController implements GrblControllerApi {
 
     const EPS = 0.01;
     let relative = false;
-    const MAX_LINES = 500;
 
     // T1-44: simulated cursor for relative-mode tracking. Seeded from the last
     // confirmed status report; only consulted when a relative move is reached.
     let curX = this._state.position.x;
     let curY = this._state.position.y;
 
-    for (let i = 0; i < lines.length && i < MAX_LINES; i++) {
+    for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       if (/^G91\b/i.test(line)) {
         relative = true;
