@@ -6506,6 +6506,38 @@ The contract was deliberately one-shot for RAISING — "subsequent status report
 
 ---
 
+### T1-112 | Build stamp on canvas (commit hash + build time) so testers can detect stale deployments
+
+**Code reference:** `vite.config.ts` (existing `__APP_VERSION__` define from package.json:version, mirror pattern); `src/types/global.d.ts:7` (existing T1-72 global declaration); `src/ui/components/CanvasViewport.tsx:1832-1870` (viewport return wrapper, where the overlay mounts).
+
+**Problem:** Diagnosed live during T1-111 follow-up. The Falcon A1 Pro tester reported "controller is in alarm state from previous session" after T1-111 was supposed to fix it. Root cause: their deployed `dist/` bundle was `index-D8tYClt0.js` — the pre-T1-109 build. None of T1-109, T1-110, or T1-111 were actually loaded. Diagnosis ate ~30 minutes of round-trips: hard reload, clear storage, DevTools network tab, comparing bundle filename to local build hash. The whole session was operating on the assumption that the tester was running the latest code.
+
+There is no in-app indicator of which commit the tester is running. `__APP_VERSION__` exists (from `package.json.version`) but it's only bumped on releases — every push between releases looks identical. For a solo-dev rapid-iteration repo with hardware testing, "which commit is on the tester's screen right now" is a load-bearing question that needs a one-glance answer.
+
+**Fix:** Auto-stamp the build with the short git commit hash + build ISO date at `npm run build` time via Vite `define` (no manual bump). Render the stamp as a tiny bottom-right overlay on the canvas viewport. Click to copy to clipboard so the tester can paste the hash back to the dev.
+
+1. **`vite.config.ts`** runs `git rev-parse --short HEAD` and `git log -1 --format=%cI` at config-load time, exposes them as `__BUILD_COMMIT__` and `__BUILD_TIME__` via `define`. Falls back to `'dev'` and `new Date().toISOString()` when not in a git tree (so `npm run dev` and CI without checkout history don't break the build).
+2. **`src/types/global.d.ts`** mirrors the T1-72 declaration pattern: adds `declare const __BUILD_COMMIT__: string;` and `declare const __BUILD_TIME__: string;`.
+3. **`src/ui/components/BuildStamp.tsx`** (new): tiny component that reads both globals (with `typeof` guards), renders absolute-positioned bottom-right inside its container, font ~9pt, color `#555570`, text `vCOMMIT · YYYY-MM-DD`. Clicking copies the commit hash to clipboard and flashes a brief "copied" ack.
+4. **`CanvasViewport.tsx`** mounts `<BuildStamp />` as the last child of the viewport wrapper div so it overlays on top of the canvas.
+
+**Tests:** `tests/build-stamp.test.tsx`:
+1. Source-pin `vite.config.ts` declares `__BUILD_COMMIT__` and `__BUILD_TIME__` in the `define` block.
+2. Source-pin `src/types/global.d.ts` declares both globals at module scope.
+3. Source-pin `vite.config.ts` falls back to `'dev'` when `git rev-parse` fails (try/catch around the exec).
+4. Behavioral: BuildStamp renders the commit hash text when globals are defined.
+5. Behavioral: BuildStamp renders `dev` when globals are `'dev'` (graceful fallback for `npm run dev`).
+6. Behavioral: clicking the stamp invokes `navigator.clipboard.writeText` with the commit hash.
+7. Source-pin: `CanvasViewport.tsx` mounts `BuildStamp` inside the viewport wrapper.
+
+**Estimate:** ~45 min including tests.
+
+**Priority:** Tier 1 — workflow / safety-adjacent. Stale deployments masked T1-111 for a hardware-testing iteration; the cost of misdiagnosis on a real laser is non-trivial. The fix is one-time mechanical work and unblocks future testers from the same trap.
+
+**Status:** Shipped 2026-05-08 in `<TBD>`. Hardware verification not required (UI overlay only; no g-code, machine-state, or gating-logic change).
+
+---
+
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)

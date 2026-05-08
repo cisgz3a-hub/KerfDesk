@@ -231,6 +231,7 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
 |---|---|---|
 | T1-23 | Pause must emit explicit M5 (or document firmware proof) | needs modal-state subsystem |
 | T1-25 | Reconnect safe-state handshake | 1-2 sessions |
+| T1-112 | Build stamp on canvas (commit hash + build time) | 45 min |
 
 ### Tier 1 not yet re-verified individually
 
