@@ -173,6 +173,7 @@ export interface MachineOperationApi {
     startMode: GcodeStartMode;
     laserMode: 'off' | 'dot';
     maxSpindle: number;
+    frameDotFeedRateMmPerMin?: number;
     crosshairAfterFrame?: boolean;
     onCommand?: (line: string) => void;
     lineDelayMs?: number;

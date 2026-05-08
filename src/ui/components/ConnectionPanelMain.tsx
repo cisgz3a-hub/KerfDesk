@@ -14,7 +14,11 @@ import {
   confirmPreflightForJobStart,
 } from '../../core/preflight/confirmPreflightForJobStart';
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
-import { type DeviceProfile, type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import {
+  resolveFrameDotFeedRate,
+  type DeviceProfile,
+  type MachineOriginCorner,
+} from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
@@ -1327,11 +1331,13 @@ export function ConnectionPanelMain({
     ]);
 
     const maxSpindle = activeProfile?.maxSpindle ?? 1000;
+    const frameDotFeedRateMmPerMin = resolveFrameDotFeedRate(activeProfile);
 
     const result = await executionCoordinator.frameDot({
       sceneBounds,
       transformOpts,
       maxSpindle,
+      frameDotFeedRateMmPerMin,
     });
 
     if (!result.ok) {

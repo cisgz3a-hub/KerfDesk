@@ -150,6 +150,8 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
       numberField('Max acceleration Y', 'maxAccelY', 50, 'mm/s²', 'GRBL $121'),
       numberField('Max acceleration (fallback)', 'maxAccelMmPerS2', 50, 'mm/s²',
         'Used when X/Y values unknown'),
+      numberField('Frame-dot feed rate', 'frameDotFeedRate', 100, 'mm/min',
+        'Speed for Frame + Mark Center laser-dot moves'),
       numberField('Max feed rate (legacy)', 'maxFeedRate', 100, 'mm/min',
         'Fallback rapid speed ceiling'),
     ),

@@ -202,6 +202,7 @@ export class ExecutionCoordinator {
     sceneBounds: AABB;
     transformOpts: MachineTransformOptions;
     maxSpindle: number;
+    frameDotFeedRateMmPerMin?: number;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
   }): Promise<FrameResult> {
@@ -210,6 +211,7 @@ export class ExecutionCoordinator {
       transformOpts: args.transformOpts,
       laserMode: 'dot',
       maxSpindle: args.maxSpindle,
+      frameDotFeedRateMmPerMin: args.frameDotFeedRateMmPerMin,
       idleTimeoutMs: args.idleTimeoutMs,
       withCrosshair: args.withCrosshair ?? true,
     });
@@ -220,6 +222,7 @@ export class ExecutionCoordinator {
     transformOpts: MachineTransformOptions;
     laserMode: 'off' | 'dot';
     maxSpindle?: number;
+    frameDotFeedRateMmPerMin?: number;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
   }): Promise<FrameResult> {
@@ -236,7 +239,14 @@ export class ExecutionCoordinator {
       return { ok: false, reason: 'operation-busy' };
     }
 
-    const { sceneBounds, transformOpts, laserMode, maxSpindle = 1000, withCrosshair = false } = args;
+    const {
+      sceneBounds,
+      transformOpts,
+      laserMode,
+      maxSpindle = 1000,
+      frameDotFeedRateMmPerMin,
+      withCrosshair = false,
+    } = args;
     const corners = buildFrameCorners(sceneBounds, transformOpts);
 
     // T1-21: frame-dot emits M4 before the final M5. If the streaming
@@ -248,6 +258,7 @@ export class ExecutionCoordinator {
         startMode: transformOpts.startMode,
         laserMode,
         maxSpindle,
+        frameDotFeedRateMmPerMin,
         crosshairAfterFrame: withCrosshair,
         onCommand: line => this.notifySimulator(line),
         lineDelayMs: 50,

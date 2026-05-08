@@ -61,6 +61,8 @@ export function getProfileConnectionKind(p: DeviceProfile | null | undefined): D
   return p?.connection?.kind ?? 'serial';
 }
 
+export const DEFAULT_FRAME_DOT_FEED_RATE = 3000;
+
 export interface DeviceProfile {
   id: string;
   name: string;
@@ -82,6 +84,8 @@ export interface DeviceProfile {
   // GRBL settings
   maxFeedRate: number;     // mm/min
   maxSpindle: number;      // S-value (usually 255 or 1000)
+  /** Low-power frame-dot / mark-center move feed rate. Defaults to 3000 mm/min. */
+  frameDotFeedRate?: number;
   /** Optional per-axis max rate from GRBL ($110/$111). */
   maxRateX?: number;
   maxRateY?: number;
@@ -195,11 +199,20 @@ function applyProfileBackfills(p: DeviceProfile): DeviceProfile {
   const profile: DeviceProfile = {
     ...p,
     returnToOrigin: p.returnToOrigin ?? true,
+    frameDotFeedRate: p.frameDotFeedRate ?? DEFAULT_FRAME_DOT_FEED_RATE,
     originCorner:
       (p as DeviceProfile).originCorner
       ?? (p.invertY === false ? 'rear-left' : 'front-left'),
   };
   return backfillGcodeTemplateNames(backfillFalconAutofocus(profile));
+}
+
+export function resolveFrameDotFeedRate(
+  profile: Pick<DeviceProfile, 'frameDotFeedRate'> | null | undefined,
+): number {
+  const value = profile?.frameDotFeedRate;
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
+  return DEFAULT_FRAME_DOT_FEED_RATE;
 }
 
 async function migrateDeviceProfilesFromLocalStorage(): Promise<void> {
@@ -387,6 +400,7 @@ export function createBlankProfile(name: string): DeviceProfile {
     originCorner: 'front-left',
     maxFeedRate: 6000,
     maxSpindle: 1000,
+    frameDotFeedRate: DEFAULT_FRAME_DOT_FEED_RATE,
     homingEnabled: false,
     softLimitsEnabled: false,
     invertY: true,

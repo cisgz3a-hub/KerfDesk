@@ -201,6 +201,7 @@ export function useAppDeviceProfiles({
     target.maxRateY = previous.maxRateY;
     target.maxAccelX = previous.maxAccelX;
     target.maxAccelY = previous.maxAccelY;
+    target.frameDotFeedRate = previous.frameDotFeedRate;
     if (previous.suppressWcsConsent) target.suppressWcsConsent = true;
     if (previous.stopOnError === false) target.stopOnError = false;
   }, []);

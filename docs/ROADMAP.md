@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 16 | 74 | Active quarter-scope backlog; T3-20 header modal baseline shipped in this batch. |
+| Tier 3 | 17 | 73 | Active quarter-scope backlog; T3-21 configurable frame-dot feed rate shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16373,6 +16373,8 @@ Trivial change. Two lines added to the default header.
 
 **Priority:** Tier 3 鈥?UX polish.
 
+**Status:** Shipped in `<TBD>` — frame-dot and mark-center G1 moves now use `frameDotFeedRate` from the active device profile, defaulting to 3000 mm/min for compatibility. Machine Settings exposes the override, profile backfills/preservation keep it durable, and tests pin the UI-to-controller-to-GRBL handoff.
+
 ---
 
 ### T3-22 | Tolerance-based grayscale segment merge in raster
@@ -20346,7 +20348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
-- [ ] T3-21 Frame-dot hardcoded F3000 should follow profile / settings
+- [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `<TBD>` — configurable profile/settings frame-dot feed rate)
 - [ ] T3-22 Tolerance-based grayscale segment merge in raster
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)

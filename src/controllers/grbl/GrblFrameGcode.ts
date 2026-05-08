@@ -5,9 +5,23 @@ export interface GrblFrameGcodeOpts {
   laserMode: 'off' | 'dot';
   maxSpindle: number;
   crosshairAfterFrame?: boolean;
+  frameDotFeedRateMmPerMin?: number;
 }
 
 const CROSSHAIR_HALF_ARM_MM = 5;
+const DEFAULT_FRAME_DOT_FEED_RATE_MM_PER_MIN = 3000;
+
+function resolveFrameDotFeedRate(feedRateMmPerMin: number | undefined): number {
+  if (typeof feedRateMmPerMin === 'number' && Number.isFinite(feedRateMmPerMin) && feedRateMmPerMin > 0) {
+    return feedRateMmPerMin;
+  }
+  return DEFAULT_FRAME_DOT_FEED_RATE_MM_PER_MIN;
+}
+
+function formatFeedRate(feedRateMmPerMin: number): string {
+  if (Number.isInteger(feedRateMmPerMin)) return String(feedRateMmPerMin);
+  return feedRateMmPerMin.toFixed(3).replace(/\.?0+$/, '');
+}
 
 export function buildGrblFrameGcode(
   corners: readonly { x: number; y: number }[],
@@ -15,6 +29,7 @@ export function buildGrblFrameGcode(
 ): string[] {
   const eps = 0.0005;
   const { startMode, laserMode, maxSpindle, crosshairAfterFrame = false } = opts;
+  const frameDotFeed = formatFeedRate(resolveFrameDotFeedRate(opts.frameDotFeedRateMmPerMin));
   const frameDotS = Math.max(0, Math.round(0.005 * maxSpindle));
   const centroid = (() => {
     if (corners.length < 4) return null;
@@ -38,7 +53,7 @@ export function buildGrblFrameGcode(
       const dy = c.y - prev.y;
       if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
         if (laserMode === 'dot') {
-          out.push(`G1 X${dx.toFixed(3)} Y${dy.toFixed(3)} F3000`);
+          out.push(`G1 X${dx.toFixed(3)} Y${dy.toFixed(3)} F${frameDotFeed}`);
         } else {
           out.push(`G0 X${dx.toFixed(3)} Y${dy.toFixed(3)}`);
         }
@@ -54,11 +69,11 @@ export function buildGrblFrameGcode(
       out.push(`G0 X${dxToRightTip.toFixed(3)} Y${dyToRightTip.toFixed(3)}`);
       if (laserMode === 'dot') {
         out.push(`M4 S${frameDotS}`);
-        out.push(`G1 X${(-2 * H).toFixed(3)} Y${(0).toFixed(3)} F3000`);
-        out.push(`G1 X${H.toFixed(3)} Y${(0).toFixed(3)} F3000`);
-        out.push(`G1 X${(0).toFixed(3)} Y${H.toFixed(3)} F3000`);
-        out.push(`G1 X${(0).toFixed(3)} Y${(-2 * H).toFixed(3)} F3000`);
-        out.push(`G1 X${(0).toFixed(3)} Y${H.toFixed(3)} F3000`);
+        out.push(`G1 X${(-2 * H).toFixed(3)} Y${(0).toFixed(3)} F${frameDotFeed}`);
+        out.push(`G1 X${H.toFixed(3)} Y${(0).toFixed(3)} F${frameDotFeed}`);
+        out.push(`G1 X${(0).toFixed(3)} Y${H.toFixed(3)} F${frameDotFeed}`);
+        out.push(`G1 X${(0).toFixed(3)} Y${(-2 * H).toFixed(3)} F${frameDotFeed}`);
+        out.push(`G1 X${(0).toFixed(3)} Y${H.toFixed(3)} F${frameDotFeed}`);
       } else {
         out.push(`G0 X${(-2 * H).toFixed(3)} Y${(0).toFixed(3)}`);
         out.push(`G0 X${H.toFixed(3)} Y${(0).toFixed(3)}`);
@@ -80,7 +95,7 @@ export function buildGrblFrameGcode(
   out.push(laserMode === 'dot' ? `M4 S${frameDotS}` : 'M5 S0');
   for (const c of corners) {
     if (laserMode === 'dot') {
-      out.push(`G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F3000`);
+      out.push(`G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F${frameDotFeed}`);
     } else {
       out.push(`G0 X${c.x.toFixed(3)} Y${c.y.toFixed(3)}`);
     }
@@ -91,11 +106,11 @@ export function buildGrblFrameGcode(
     out.push(`G0 X${(centroid.x + H).toFixed(3)} Y${centroid.y.toFixed(3)}`);
     if (laserMode === 'dot') {
       out.push(`M4 S${frameDotS}`);
-      out.push(`G1 X${(centroid.x - H).toFixed(3)} Y${centroid.y.toFixed(3)} F3000`);
-      out.push(`G1 X${centroid.x.toFixed(3)} Y${centroid.y.toFixed(3)} F3000`);
-      out.push(`G1 X${centroid.x.toFixed(3)} Y${(centroid.y + H).toFixed(3)} F3000`);
-      out.push(`G1 X${centroid.x.toFixed(3)} Y${(centroid.y - H).toFixed(3)} F3000`);
-      out.push(`G1 X${centroid.x.toFixed(3)} Y${centroid.y.toFixed(3)} F3000`);
+      out.push(`G1 X${(centroid.x - H).toFixed(3)} Y${centroid.y.toFixed(3)} F${frameDotFeed}`);
+      out.push(`G1 X${centroid.x.toFixed(3)} Y${centroid.y.toFixed(3)} F${frameDotFeed}`);
+      out.push(`G1 X${centroid.x.toFixed(3)} Y${(centroid.y + H).toFixed(3)} F${frameDotFeed}`);
+      out.push(`G1 X${centroid.x.toFixed(3)} Y${(centroid.y - H).toFixed(3)} F${frameDotFeed}`);
+      out.push(`G1 X${centroid.x.toFixed(3)} Y${centroid.y.toFixed(3)} F${frameDotFeed}`);
     } else {
       out.push(`G0 X${(centroid.x - H).toFixed(3)} Y${centroid.y.toFixed(3)}`);
       out.push(`G0 X${centroid.x.toFixed(3)} Y${centroid.y.toFixed(3)}`);

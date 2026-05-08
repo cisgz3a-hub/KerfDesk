@@ -40,6 +40,7 @@ function mergePreservedProfileFields(target: DeviceProfile, previous: DeviceProf
   target.maxRateY = previous.maxRateY;
   target.maxAccelX = previous.maxAccelX;
   target.maxAccelY = previous.maxAccelY;
+  target.frameDotFeedRate = previous.frameDotFeedRate;
 }
 
 export interface UseWizardHandlersParams {

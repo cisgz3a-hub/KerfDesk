@@ -168,6 +168,14 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
       message: `maxFeedRate must be a positive finite number (got ${String(profile.maxFeedRate)}).`,
     });
   }
+  if (profile.frameDotFeedRate != null && !isPositiveFinite(profile.frameDotFeedRate)) {
+    issues.push({
+      field: 'frameDotFeedRate',
+      severity: 'error',
+      code: 'PROFILE_FRAME_DOT_FEED_RATE_INVALID',
+      message: `frameDotFeedRate must be a positive finite number when set (got ${String(profile.frameDotFeedRate)}).`,
+    });
+  }
   if (profile.maxRateX != null && !isPositiveFinite(profile.maxRateX)) {
     issues.push({
       field: 'maxRateX',

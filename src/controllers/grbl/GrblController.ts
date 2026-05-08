@@ -167,6 +167,7 @@ export class GrblController implements GrblControllerApi {
       startMode: 'absolute' | 'current';
       laserMode: 'off' | 'dot';
       maxSpindle: number;
+      frameDotFeedRateMmPerMin?: number;
       crosshairAfterFrame?: boolean;
       onCommand?: (line: string) => void;
       lineDelayMs?: number;
@@ -175,6 +176,7 @@ export class GrblController implements GrblControllerApi {
         startMode: args.startMode,
         laserMode: args.laserMode,
         maxSpindle: args.maxSpindle,
+        frameDotFeedRateMmPerMin: args.frameDotFeedRateMmPerMin,
         crosshairAfterFrame: args.crosshairAfterFrame,
       });
       for (let i = 0; i < lines.length; i++) {
