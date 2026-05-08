@@ -7,7 +7,7 @@
  * shows each one's current state, and (when failing) the user-facing
  * action to fix it.
  */
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 const font = "'DM Sans', system-ui, sans-serif";
 
@@ -71,8 +71,40 @@ function statusColor(status: GateStatus): string {
   }
 }
 
+/**
+ * T1-110: gates whose failure means the user just took an action
+ * that invalidated readiness (framed, then jogged; framed, then
+ * the head moved; etc.). For these, the panel auto-expands so the
+ * user immediately sees the explanation instead of having to click
+ * "why?" — pre-T1-110 the disabled Start looked invisible AND the
+ * reason was hidden one click away. Setup-state gates
+ * (`controllerConnected`, `gcodeCompiled`, etc.) stay collapsed by
+ * default; they're long-lived states the user already knows about.
+ */
+const AUTO_EXPAND_GATE_IDS: ReadonlySet<StartReadinessGate['id']> = new Set([
+  'currentModeAnchor',
+  'framing',
+  'frameControls',
+]);
+
 export function StartReadinessPanel({ readiness }: Props): React.ReactElement | null {
-  const [expanded, setExpanded] = useState(false);
+  const blockingGateId = readiness.blockingGate?.id ?? null;
+  const shouldAutoExpand =
+    blockingGateId != null && AUTO_EXPAND_GATE_IDS.has(blockingGateId);
+  const [expanded, setExpanded] = useState(shouldAutoExpand);
+
+  // T1-110: re-evaluate auto-expand on every blocking-gate transition.
+  // Manual collapse during the same gate persists (no spam re-open),
+  // but a new "you invalidated readiness" event re-expands.
+  const prevGateIdRef = useRef<string | null>(blockingGateId);
+  useEffect(() => {
+    if (blockingGateId !== prevGateIdRef.current) {
+      prevGateIdRef.current = blockingGateId;
+      if (blockingGateId != null && AUTO_EXPAND_GATE_IDS.has(blockingGateId)) {
+        setExpanded(true);
+      }
+    }
+  }, [blockingGateId]);
 
   // When ready, the green Start button is its own affirmation.
   if (readiness.ready) return null;

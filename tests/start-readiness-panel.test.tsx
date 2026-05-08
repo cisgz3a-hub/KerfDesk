@@ -89,21 +89,25 @@ async function run(): Promise<void> {
   }
 
   {
-    const failingGate = makeGate('framing', 'fail', {
-      label: 'Job framed',
-      failHeadline: 'Frame not done since last design change',
-      failAction: 'Click Frame to confirm where the laser will burn',
+    // T1-110: gcodeFresh is NOT in AUTO_EXPAND_GATE_IDS, so this
+    // case still verifies the collapsed-by-default UX. The
+    // currentModeAnchor / framing / frameControls auto-expand
+    // behavior is pinned in tests/start-readiness-auto-expand.test.tsx.
+    const failingGate = makeGate('gcodeFresh', 'fail', {
+      label: 'G-code matches current design',
+      failHeadline: 'Design changed since last compile',
+      failAction: 'Click ↻ Update above to recompile',
     });
     const { container, root } = await renderPanel({
       ready: false,
       blockingGate: failingGate,
-      gates: allOkGates.map(g => g.id === 'framing' ? failingGate : g),
+      gates: allOkGates.map(g => g.id === 'gcodeFresh' ? failingGate : g),
     });
     const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLElement | null;
     const list = container.querySelector('[data-testid="start-readiness-list"]');
     assert(
-      toggle?.textContent?.includes('Frame not done since last design change') === true && list == null,
-      'collapsed state shows first-failing-gate headline and hides the list',
+      toggle?.textContent?.includes('Design changed since last compile') === true && list == null,
+      'collapsed state shows first-failing-gate headline and hides the list (non-auto-expand gate)',
     );
     await cleanup(root);
   }
@@ -162,15 +166,17 @@ async function run(): Promise<void> {
   }
 
   {
-    const failingGate = makeGate('framing', 'fail', {
-      label: 'Job framed',
-      failHeadline: 'Frame not done',
-      failAction: 'Click Frame',
+    // T1-110: gcodeFresh is NOT in AUTO_EXPAND_GATE_IDS so the
+    // panel mounts collapsed; clicking toggle expands.
+    const failingGate = makeGate('gcodeFresh', 'fail', {
+      label: 'G-code matches current design',
+      failHeadline: 'Design changed since last compile',
+      failAction: 'Click ↻ Update above to recompile',
     });
     const { container, root } = await renderPanel({
       ready: false,
       blockingGate: failingGate,
-      gates: allOkGates.map(g => g.id === 'framing' ? failingGate : g),
+      gates: allOkGates.map(g => g.id === 'gcodeFresh' ? failingGate : g),
     });
     const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLButtonElement;
     await act(async () => { toggle.click(); });

@@ -69,12 +69,17 @@ export function Controls({
           onClick: () => { onStartJob(); },
           disabled: !canStartJob,
           style: {
+            // T1-110: disabled-state contrast bumped so the button
+            // remains visibly distinguishable from the sidebar bg
+            // (#1a1a2e). Pre-T1-110 disabled was #333355 on #1a1a2e
+            // — the button blended into the panel and users read
+            // it as "no Start button" instead of "Start disabled."
             flex: 2, padding: '12px', fontSize: 14, fontWeight: 700,
             borderRadius: 8, cursor: canStartJob ? 'pointer' : 'default',
             fontFamily: font,
             background: canStartJob ? 'rgba(45,212,160,0.12)' : '#1a1a2e',
-            border: canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
-            color: canStartJob ? '#2dd4a0' : '#333355',
+            border: canStartJob ? '1px solid #2dd4a0' : '1px solid #3a3a55',
+            color: canStartJob ? '#2dd4a0' : '#8888a0',
           },
         }, startButtonLabel ?? `▶ START${isSimulator ? ' (Sim)' : ''}`),
       ),
