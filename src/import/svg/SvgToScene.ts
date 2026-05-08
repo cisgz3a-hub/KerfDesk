@@ -32,7 +32,7 @@ import {
   type Geometry,
 } from '../../core/scene/SceneObject';
 import { type Layer, createLayer } from '../../core/scene/Layer';
-import { type SvgElement, parseSvg } from './SvgParser';
+import { type SvgElement, type SvgImportWarning, parseSvg } from './SvgParser';
 
 type SvgColorMode = 'cut' | 'engrave' | 'score';
 import { parsePathData } from './PathParser';
@@ -57,6 +57,28 @@ export function importSvgToScene(
   svgString: string,
   name: string = 'SVG Import'
 ): Scene {
+  return importSvgToSceneWithReport(svgString, name).scene;
+}
+
+export interface SvgSceneImportReport {
+  scene: Scene;
+  warnings: SvgImportWarning[];
+}
+
+export function formatSvgImportWarnings(warnings: readonly SvgImportWarning[]): string {
+  if (warnings.length === 0) return '';
+  return warnings.map(warning => {
+    const examples = warning.examples?.length
+      ? ` Examples: ${warning.examples.map(text => `"${text}"`).join(', ')}.`
+      : '';
+    return `${warning.message}${examples}`;
+  }).join('\n\n');
+}
+
+export function importSvgToSceneWithReport(
+  svgString: string,
+  name: string = 'SVG Import',
+): SvgSceneImportReport {
   const parsed = parseSvg(svgString);
 
   // Canvas size comes from unit-converted dimensions
@@ -83,7 +105,7 @@ export function importSvgToScene(
     }
   }
 
-  return { ...scene, layers: currentLayers, objects };
+  return { scene: { ...scene, layers: currentLayers, objects }, warnings: parsed.warnings };
 }
 
 /**
@@ -102,6 +124,15 @@ export function importSvgIntoScene(
   layerId: string,
   options?: Partial<ImportOptions>
 ): Scene {
+  return importSvgIntoSceneWithReport(svgString, scene, layerId, options).scene;
+}
+
+export function importSvgIntoSceneWithReport(
+  svgString: string,
+  scene: Scene,
+  layerId: string,
+  options?: Partial<ImportOptions>,
+): SvgSceneImportReport {
   const parsed = parseSvg(svgString, {
     unitMode: options?.svgUnitMode,
   });
@@ -127,7 +158,7 @@ export function importSvgIntoScene(
     if (obj) objects.push(obj);
   }
 
-  if (objects.length === 0) return scene;
+  if (objects.length === 0) return { scene, warnings: parsed.warnings };
 
   // Apply placement if options provided
   if (options) {
@@ -162,13 +193,16 @@ export function importSvgIntoScene(
   }
 
   return {
-    ...scene,
-    layers: currentLayers,
-    objects: [...scene.objects, ...objects],
-    metadata: {
-      ...scene.metadata,
-      modified: new Date().toISOString(),
+    scene: {
+      ...scene,
+      layers: currentLayers,
+      objects: [...scene.objects, ...objects],
+      metadata: {
+        ...scene.metadata,
+        modified: new Date().toISOString(),
+      },
     },
+    warnings: parsed.warnings,
   };
 }
 

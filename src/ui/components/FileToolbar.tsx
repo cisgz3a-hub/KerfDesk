@@ -15,7 +15,7 @@
 import React, { useRef, useCallback, useState } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
-import { importSvgIntoScene } from '../../import/svg/SvgToScene';
+import { formatSvgImportWarnings, importSvgIntoSceneWithReport } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
@@ -152,7 +152,7 @@ export function FileToolbar({
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
       if (!layerId) return;
 
-      const updated = importSvgIntoScene(svgString, scene, layerId, {
+      const svgReport = importSvgIntoSceneWithReport(svgString, scene, layerId, {
         mode: 'fit',
         allowScaleUp: false,
         targetBounds: scene.material
@@ -170,8 +170,12 @@ export function FileToolbar({
           },
       });
 
-      onSceneChange(updated);
-      onSceneCommit(updated);
+      onSceneChange(svgReport.scene);
+      onSceneCommit(svgReport.scene);
+      const warningMessage = formatSvgImportWarnings(svgReport.warnings);
+      if (warningMessage) {
+        await showAlert('SVG Import Warning', warningMessage);
+      }
     } catch (e) {
       console.error('SVG import failed:', e);
       await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);

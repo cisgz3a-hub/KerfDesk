@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, type DragEvent } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
-import { importSvgIntoScene } from '../../import/svg/SvgToScene';
+import { formatSvgImportWarnings, importSvgIntoSceneWithReport } from '../../import/svg/SvgToScene';
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { deserializeScene } from '../../io/SceneSerializer';
@@ -315,7 +315,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
           const text = await file.text();
           const layerId = scene.activeLayerId || scene.layers[0]?.id;
           if (!layerId) return;
-          const updated = importSvgIntoScene(text, scene, layerId, {
+          const svgReport = importSvgIntoSceneWithReport(text, scene, layerId, {
             mode: 'fit',
             allowScaleUp: false,
             targetBounds: scene.material
@@ -332,7 +332,11 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
                   maxY: scene.canvas.height,
                 },
           });
-          handleSceneCommit(updated, 'svg-import');
+          handleSceneCommit(svgReport.scene, 'svg-import');
+          const warningMessage = formatSvgImportWarnings(svgReport.warnings);
+          if (warningMessage) {
+            await showAlertRef.current('SVG Import Warning', warningMessage);
+          }
         } else if (name.endsWith('.dxf')) {
           assertDxfFileSize(file.size);
           const text = await file.text();

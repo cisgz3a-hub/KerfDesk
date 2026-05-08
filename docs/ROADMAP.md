@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 21 | 69 | Active quarter-scope backlog; T3-26 blue-noise dithering shipped in this batch. |
+| Tier 3 | 22 | 68 | Active quarter-scope backlog; T3-27 SVG text import warning shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16495,6 +16495,8 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 ### T3-27 | SVG `<text>` element import 鈥?convert to outlines or warn
 
+**Status:** Shipped in `<TBD>` — Stage 1 warning path. `parseSvg` now reports skipped `<text>` elements, `SvgToScene` exposes report-returning import helpers while keeping the legacy `Scene` return API, and the toolbar plus drag/drop SVG import paths show a user warning with examples and "Convert text to outlines" guidance. Pinned by `tests/svg-text-import-warning.test.ts`. **Hardware verification: not required** (import warning/reporting only; no G-code, motion, or safety gate behavior changed).
+
 **Code reference:** `src/import/svg/SvgParser.ts:183-186` (RENDERABLE_TAGS missing `text`).
 
 **Problem:** Audit 2C confirmed: SVG `<text>` elements are silently skipped during import. Real-world SVGs from Illustrator/Inkscape/Figma often contain live text (logos with company names, signs with text labels). Users importing them lose the text without warning.
@@ -20362,7 +20364,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
-- [ ] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn
+- [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `<TBD>` — text skip warning/report path)
 - [ ] T3-28 SVG inherited group styles applied at flatten time
 - [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support

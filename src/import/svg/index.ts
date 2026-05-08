@@ -8,7 +8,14 @@
  * Last updated: SVG Import feature
  */
 
-export { importSvgToScene as importSVG, importSvgIntoScene } from './SvgToScene';
+export {
+  importSvgToScene as importSVG,
+  importSvgToSceneWithReport,
+  importSvgIntoScene,
+  importSvgIntoSceneWithReport,
+  formatSvgImportWarnings,
+  type SvgSceneImportReport,
+} from './SvgToScene';
 export { parsePathData } from './PathParser';
 export { parseTransform, multiplyMatrix } from './TransformParser';
 export {
@@ -17,6 +24,8 @@ export {
   parseLengthMm,
   detectSvgUnits,
   type SvgElement,
+  type SvgImportWarning,
+  type SvgImportWarningCode,
   type SvgParseResult,
   type ParsedLength,
   type ParseSvgOptions,

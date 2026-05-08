@@ -29,6 +29,15 @@ export interface SvgElement {
   worldTransform: Matrix3x2;       // Accumulated transform (groups × own)
 }
 
+export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED';
+
+export interface SvgImportWarning {
+  code: SvgImportWarningCode;
+  count: number;
+  message: string;
+  examples?: string[];
+}
+
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
 /**
@@ -45,6 +54,7 @@ export interface ParseSvgOptions {
 
 export interface SvgParseResult {
   elements: SvgElement[];
+  warnings: SvgImportWarning[];
   viewBox: { x: number; y: number; width: number; height: number } | null;
   widthMm: number;         // Physical width in mm
   heightMm: number;        // Physical height in mm
@@ -52,7 +62,7 @@ export interface SvgParseResult {
 }
 
 const EMPTY_RESULT: SvgParseResult = {
-  elements: [], viewBox: null, widthMm: 400, heightMm: 400, svgUnits: 'px',
+  elements: [], warnings: [], viewBox: null, widthMm: 400, heightMm: 400, svgUnits: 'px',
 };
 
 /**
@@ -95,10 +105,11 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
 
   // Traverse and collect elements with root transform applied
   const elements: SvgElement[] = [];
+  const textSkips: SvgTextSkipReport = { count: 0, examples: [] };
   const context = emptyParseContext();
-  traverse(svgRoot, rootTransform, elements, context, 0, 0);
+  traverse(svgRoot, rootTransform, elements, context, 0, 0, textSkips);
 
-  return { elements, viewBox, widthMm, heightMm, svgUnits };
+  return { elements, warnings: buildSvgWarnings(textSkips), viewBox, widthMm, heightMm, svgUnits };
 }
 
 /**
@@ -188,6 +199,11 @@ const RENDERABLE_TAGS = new Set([
   'polyline', 'polygon', 'path',
 ]);
 
+interface SvgTextSkipReport {
+  count: number;
+  examples: string[];
+}
+
 function traverse(
   node: Element,
   parentTransform: Matrix3x2,
@@ -195,6 +211,7 @@ function traverse(
   context: SvgParseContext,
   depth: number,
   transformDepth: number,
+  textSkips: SvgTextSkipReport,
 ): void {
   const childNodes = node.childNodes;
   if (!childNodes) return;
@@ -219,15 +236,40 @@ function traverse(
 
     if (tag === 'g' || tag === 'svg') {
       // Group: recurse with accumulated transform
-      traverse(child, worldTransform, output, context, childDepth, childTransformDepth);
+      traverse(child, worldTransform, output, context, childDepth, childTransformDepth, textSkips);
+    } else if (tag === 'text') {
+      recordTextSkip(child, textSkips);
     } else if (RENDERABLE_TAGS.has(tag)) {
       // Renderable element: extract attributes
       context.renderableCount = bumpAndAssert(context.renderableCount, 'MAX_RENDERABLE');
       const attrs = extractAttributes(child);
       output.push({ tag, attrs, worldTransform });
     }
-    // Skip: text, defs, style, clipPath, mask, etc.
+    // Skip: defs, style, clipPath, mask, etc.
   }
+}
+
+function recordTextSkip(node: Element, report: SvgTextSkipReport): void {
+  report.count++;
+  const text = String((node as unknown as { textContent?: string }).textContent ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (text && report.examples.length < 3) {
+    report.examples.push(text.slice(0, 80));
+  }
+}
+
+function buildSvgWarnings(textSkips: SvgTextSkipReport): SvgImportWarning[] {
+  if (textSkips.count === 0) return [];
+  const noun = textSkips.count === 1 ? 'text element' : 'text elements';
+  return [{
+    code: 'SVG_TEXT_SKIPPED',
+    count: textSkips.count,
+    message:
+      `${textSkips.count} ${noun} skipped during SVG import. ` +
+      'Convert text to outlines in your design tool before re-importing.',
+    examples: textSkips.examples,
+  }];
 }
 
 // ─── ATTRIBUTE EXTRACTION ────────────────────────────────────────
