@@ -6381,7 +6381,7 @@ A layer can have `visible: true` (drawn on canvas) but `output: false` (excluded
 
 **Priority:** Tier 1 - safety. This closes the exact LF-R1-03 audit hole without changing emitted G-code or machine-control semantics.
 
-**Status:** Shipped 2026-05-08 in `<TBD>`.
+**Status:** Shipped 2026-05-08 in `3ece76e`.
 
 ---
 
@@ -19972,7 +19972,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-92 `dialog:open` enforce file size limit by extension (shipped pre-session)
 - [x] T1-93 `dialog:open` return basename only, not full path (shipped pre-session)
 - [x] T1-94 Falcon WS practical frame size cap (256 KB / 1 MB) (shipped pre-session)
-- [x] T1-108 Controller bounds full scan removes the 500-line cap (shipped 2026-05-08 in `<TBD>`)
+- [x] T1-108 Controller bounds full scan removes the 500-line cap (shipped 2026-05-08 in `3ece76e`)
 
 ### Tier 2 (This month)
 - [x] T2-1 Validated Job Ticket (all 5 phases shipped; checklist catch-up)
