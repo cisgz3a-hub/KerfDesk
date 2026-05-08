@@ -6502,7 +6502,7 @@ The contract was deliberately one-shot for RAISING — "subsequent status report
 
 **Priority:** Tier 1 — direct user-blocking bug. The recovery flow shipped with T1-25 is broken: it instructs the user to clear the alarm, then refuses to honor that recovery. Discovered immediately after T1-110 made the blocker visible enough to read; same hardware repro path as T1-109 + T1-110.
 
-**Status:** Shipped 2026-05-08 in `<TBD>`. Hardware verification by re-running the Falcon tester repro: power-cycle the laser → connect (verdict captures alarm) → click Unlock → verify Start button enables (verdict cleared by post-Unlock idle status report).
+**Status:** Shipped 2026-05-08 in `5665c56`. Hardware verification by re-running the Falcon tester repro: power-cycle the laser → connect (verdict captures alarm) → click Unlock → verify Start button enables (verdict cleared by post-Unlock idle status report).
 
 ---
 
