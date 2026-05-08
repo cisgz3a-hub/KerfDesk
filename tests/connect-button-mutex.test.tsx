@@ -74,12 +74,12 @@ async function renderWizard(connecting: boolean): Promise<{ counters: Counters; 
 
 function findUsbButton(container: HTMLElement): HTMLButtonElement | null {
   return Array.from(container.querySelectorAll('button')).find(b =>
-    /Connect via USB/i.test(b.textContent ?? '') || /Connecting/i.test(b.textContent ?? ''),
+    /USB laser/i.test(b.textContent ?? '') || /Connecting/i.test(b.textContent ?? ''),
   ) as HTMLButtonElement | undefined ?? null;
 }
 function findSimButton(container: HTMLElement): HTMLButtonElement | null {
   return Array.from(container.querySelectorAll('button')).find(b =>
-    /Use Simulator/i.test(b.textContent ?? '')
+    /Simulator/i.test(b.textContent ?? '')
     || (b !== findUsbButton(container) && /Connecting/i.test(b.textContent ?? '')),
   ) as HTMLButtonElement | undefined ?? null;
 }
@@ -102,10 +102,10 @@ async function run(): Promise<void> {
       assert(sim !== null, 'idle: Simulator button rendered');
       assert(usb!.disabled === false, 'idle: USB button is enabled');
       assert(sim!.disabled === false, 'idle: Simulator button is enabled');
-      assert(/Connect via USB/.test(usb!.textContent ?? ''),
-        'idle: USB button shows "Connect via USB" label');
-      assert(/Use Simulator/.test(sim!.textContent ?? ''),
-        'idle: Simulator button shows "Use Simulator" label');
+      assert(/USB laser/.test(usb!.textContent ?? ''),
+        'idle: USB button shows "USB laser" label');
+      assert(/Simulator/.test(sim!.textContent ?? ''),
+        'idle: Simulator button shows "Simulator" label');
 
       assert(findCancelButton(container) === null,
         'idle: Cancel connect button is hidden');

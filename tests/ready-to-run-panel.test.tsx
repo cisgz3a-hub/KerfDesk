@@ -64,7 +64,7 @@ const baseData: ReadyToRunPanelData = {
     ],
   },
   position: {
-    startModeLabel: 'From laser head',
+    startModeLabel: 'Start from laser head',
     originLabel: 'Job starts at current head position',
     frameStatusLabel: 'Frame complete',
   },
@@ -101,7 +101,7 @@ async function run(): Promise<void> {
     const { container, root } = await renderPanel(baseData);
     const text = container.textContent ?? '';
     assert(
-      text.includes('Ready to Run') &&
+      text.includes('Job Review') &&
         text.includes('Machine') &&
         text.includes('Job') &&
         text.includes('Material') &&
@@ -109,6 +109,10 @@ async function run(): Promise<void> {
         text.includes('Warnings') &&
         text.includes('Operation order'),
       'renders all top-level preflight sections',
+    );
+    assert(
+      container.querySelector('[data-testid="ready-to-run-start"]') === null,
+      'does not render a duplicate Start button inside the review panel',
     );
     await cleanup(root);
   }
@@ -120,9 +124,8 @@ async function run(): Promise<void> {
       startBlockedReason: 'Frame not done since last design change',
     };
     const { container, root } = await renderPanel(blocked);
-    const start = container.querySelector('[data-testid="ready-to-run-start"]') as HTMLButtonElement | null;
     assert(
-      start?.disabled === true &&
+      container.querySelector('[data-testid="ready-to-run-start"]') === null &&
         container.textContent?.includes('Frame not done since last design change') === true,
       'disables Start with the blocking reason when canStartJob is false',
     );
@@ -134,21 +137,19 @@ async function run(): Promise<void> {
     const { container, root } = await renderPanel(baseData, () => { starts++; });
     const focus = container.querySelector('[data-testid="ready-to-run-reminder-focus"]') as HTMLInputElement | null;
     const holdDown = container.querySelector('[data-testid="ready-to-run-reminder-hold-down"]') as HTMLInputElement | null;
-    const start = container.querySelector('[data-testid="ready-to-run-start"]') as HTMLButtonElement | null;
     await act(async () => {
       focus?.click();
-      start?.click();
       root.render(React.createElement(ReadyToRunPanel, { data: baseData, onStartJob: () => { starts++; }, startLabel: 'START (Sim)' }));
     });
     const focusAfter = container.querySelector('[data-testid="ready-to-run-reminder-focus"]') as HTMLInputElement | null;
     const holdDownAfter = container.querySelector('[data-testid="ready-to-run-reminder-hold-down"]') as HTMLInputElement | null;
     assert(
-      starts === 1 &&
-        start?.disabled === false &&
+      starts === 0 &&
+        container.querySelector('[data-testid="ready-to-run-start"]') === null &&
         focusAfter?.checked === true &&
         holdDown?.checked === false &&
         holdDownAfter?.checked === false,
-      'material reminders do not block Start and checkbox state persists across rerenders',
+      'material reminders stay local to the review panel and checkbox state persists across rerenders',
     );
     await cleanup(root);
   }

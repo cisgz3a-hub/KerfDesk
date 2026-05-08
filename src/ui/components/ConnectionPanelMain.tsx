@@ -96,9 +96,9 @@ function formatJobTime(seconds: number): string {
 
 function readyStartModeLabel(mode: GcodeStartMode): string {
   switch (mode) {
-    case 'absolute': return 'Bed coordinates';
-    case 'current': return 'From laser head';
-    case 'savedOrigin': return 'From saved origin';
+    case 'absolute': return 'Use canvas position';
+    case 'current': return 'Start from laser head';
+    case 'savedOrigin': return 'Use saved zero point';
   }
 }
 
@@ -1853,41 +1853,48 @@ export function ConnectionPanelMain({
   );
 
   const controlsSection = isConnected && React.createElement('div', {
-    style: { padding: '12px 16px', borderBottom: '1px solid #1a1a2e', display: 'flex', gap: 16, flexShrink: 0 },
+    style: { padding: '10px 16px 12px', borderBottom: '1px solid #1a1a2e', flexShrink: 0 },
   },
-    React.createElement(Jog, {
-      jogStep,
-      setJogStep,
-      onJog: handleJog,
-      onHome: () => { void handleHome(); },
-      showFocus: showAutoFocus,
-      canFocus: canAutoFocus,
-      focusBusy: isAutoFocusing,
-      onFocus: () => { void handleAutoFocus(); },
-    }),
-    isAutoFocusing && React.createElement('div', {
-      style: { fontSize: 10, color: '#00d4ff', alignSelf: 'center' },
-    }, 'Focusing...'),
-    React.createElement(MachineControls, {
-      isAlarm: machineState?.status === 'alarm',
-      // T2-12 part 2: faulted is its own halt-state with its own
-      // recovery affordance (Acknowledge fault, not Unlock).
-      isFaulted: machineState?.status === 'faulted_requires_inspection',
-      isRunning,
-      canFrame,
-      // T1-30: test-fire gate now reads from the centralized helper
-      // (canTestFire). Pre-T1-30 it aliased canFrame; pre-T1-104 it
-      // didn't even gate on idle state. Identical to canFrameSafe today
-      // but kept as a separate gate so per-operation refinements don't
-      // touch the MachineControls prop shape.
-      canFire: gates?.canTestFire ?? false,
-      isTestFiring,
-      onUnlock: handleUnlock,
-      onAcknowledgeFault: () => { void handleAcknowledgeFault(); },
-      onTestFireBegin: beginTestFire,
-      onTestFireEnd: endTestFire,
-      onFrameDot: () => { void handleFrameDot(); },
-    }),
+    React.createElement('div', {
+      style: { fontSize: 10, color: '#777798', marginBottom: 8, textTransform: 'uppercase' as const, letterSpacing: 0, fontWeight: 700 },
+    }, 'Move Laser'),
+    React.createElement('div', {
+      style: { display: 'flex', gap: 16 },
+    },
+      React.createElement(Jog, {
+        jogStep,
+        setJogStep,
+        onJog: handleJog,
+        onHome: () => { void handleHome(); },
+        showFocus: showAutoFocus,
+        canFocus: canAutoFocus,
+        focusBusy: isAutoFocusing,
+        onFocus: () => { void handleAutoFocus(); },
+      }),
+      isAutoFocusing && React.createElement('div', {
+        style: { fontSize: 10, color: '#00d4ff', alignSelf: 'center' },
+      }, 'Focusing...'),
+      React.createElement(MachineControls, {
+        isAlarm: machineState?.status === 'alarm',
+        // T2-12 part 2: faulted is its own halt-state with its own
+        // recovery affordance (Acknowledge fault, not Unlock).
+        isFaulted: machineState?.status === 'faulted_requires_inspection',
+        isRunning,
+        canFrame,
+        // T1-30: test-fire gate now reads from the centralized helper
+        // (canTestFire). Pre-T1-30 it aliased canFrame; pre-T1-104 it
+        // didn't even gate on idle state. Identical to canFrameSafe today
+        // but kept as a separate gate so per-operation refinements don't
+        // touch the MachineControls prop shape.
+        canFire: gates?.canTestFire ?? false,
+        isTestFiring,
+        onUnlock: handleUnlock,
+        onAcknowledgeFault: () => { void handleAcknowledgeFault(); },
+        onTestFireBegin: beginTestFire,
+        onTestFireEnd: endTestFire,
+        onFrameDot: () => { void handleFrameDot(); },
+      }),
+    ),
   );
 
   const layerOverviewRows: React.ReactNode[] = [];
@@ -2396,6 +2403,7 @@ export function ConnectionPanelMain({
       frameRecoveryCard,
       jobFailedRecoveryCard,
       safetyRecoveryCard,
+      isConnected && profileSection,
       isConnected && !isRunning && !displayPaused && controlsSection,
       isConnected && React.createElement('div', {
         style: {
@@ -2407,7 +2415,6 @@ export function ConnectionPanelMain({
           flexDirection: 'column' as const,
         },
       },
-        profileSection,
         readyToRunSection,
         React.createElement(MoveControls, {
           isConnected,

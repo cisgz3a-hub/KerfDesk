@@ -31,36 +31,36 @@ console.log('\n=== T1-61 start-mode-labels ===\n');
 
 // The new shape: each entry has short + long + tooltip.
 assert(
-  /short:\s*'Bed coordinates'/.test(workflowSrc),
-  "absolute mode short label is 'Bed coordinates'",
+  /short:\s*'Use canvas position'/.test(workflowSrc),
+  "absolute mode short label is 'Use canvas position'",
 );
 assert(
-  /short:\s*'From laser head'/.test(workflowSrc),
-  "current mode short label is 'From laser head'",
+  /short:\s*'Start from laser head'/.test(workflowSrc),
+  "current mode short label is 'Start from laser head'",
 );
 assert(
-  /short:\s*'From saved origin'/.test(workflowSrc),
-  "savedOrigin mode short label is 'From saved origin'",
+  /short:\s*'Use saved zero point'/.test(workflowSrc),
+  "savedOrigin mode short label is 'Use saved zero point'",
 );
 
 // Long-form descriptions exist for each mode (sentence-shaped: contain
 // at least one verb-like phrase).
 assert(
-  /long:\s*'Use absolute machine coordinates\./.test(workflowSrc),
+  /long:\s*'Burn where the design sits on the bed grid\.'/.test(workflowSrc),
   'absolute mode has long-form description',
 );
 assert(
-  /long:\s*'Use the current laser head position/.test(workflowSrc),
+  /long:\s*'Jog the laser to the start corner, then run from there\.'/.test(workflowSrc),
   'current mode has long-form description',
 );
 assert(
-  /long:\s*'Use the saved origin point/.test(workflowSrc),
+  /long:\s*'Use a marked fixture point for repeat jobs\.'/.test(workflowSrc),
   'savedOrigin mode has long-form description',
 );
 
 // Tooltips exist for each mode and carry the audit's "best for" framing.
 assert(
-  /tooltip:\s*'Best for: repeating jobs at fixed bed positions/.test(workflowSrc),
+  /tooltip:\s*'Best for: repeatable bed-grid jobs after homing/.test(workflowSrc),
   'absolute mode tooltip carries when-to-use guidance',
 );
 assert(
@@ -68,7 +68,7 @@ assert(
   'current mode tooltip carries when-to-use guidance',
 );
 assert(
-  /tooltip:\s*'Best for: repeating jobs in a known fixture position/.test(workflowSrc),
+  /tooltip:\s*'Best for: fixtures and repeat jobs/.test(workflowSrc),
   'savedOrigin mode tooltip carries when-to-use guidance',
 );
 
@@ -91,6 +91,11 @@ assert(
 assert(
   /selectedMode\.long/.test(workflowSrc),
   "selected mode's long-form description is rendered into the panel",
+);
+
+assert(
+  /\}, 'Job Position'\)/.test(workflowSrc),
+  "workflow section heading is 'Job Position'",
 );
 
 // Legacy emoji-only labels are gone.

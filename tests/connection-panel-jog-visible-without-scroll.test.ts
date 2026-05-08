@@ -8,6 +8,7 @@ function assert(condition: unknown, message: string): void {
 const root = process.cwd();
 const panel = readFileSync(resolve(root, 'src/ui/components/ConnectionPanelMain.tsx'), 'utf-8');
 const moveControls = readFileSync(resolve(root, 'src/ui/components/MoveControls.tsx'), 'utf-8');
+const consolePanel = readFileSync(resolve(root, 'src/ui/components/ConsolePanel.tsx'), 'utf-8');
 
 const renderBlock = panel.slice(panel.indexOf('React.createElement(ConnectionControls'), panel.indexOf('React.createElement(JobControls'));
 const scrollIndex = renderBlock.indexOf("overflowY: 'auto' as const");
@@ -19,3 +20,9 @@ assert(controlsIndex >= 0, 'ConnectionPanelMain renders controlsSection in the f
 assert(controlsIndex < scrollIndex, 'jog/test-fire controls render before the scrollable content');
 assert(!/controlsSection,/.test(moveControlsCall), 'MoveControls call no longer receives controlsSection');
 assert(!/controlsSection/.test(moveControls), 'MoveControls no longer owns the jog/test-fire controls');
+assert(panel.indexOf('EMERGENCY STOP') > scrollIndex, 'emergency stop remains outside the scrollable content');
+assert(/Move Laser/.test(panel), 'fixed movement zone is explicitly labeled Move Laser');
+assert(/Run Job/.test(readFileSync(resolve(root, 'src/ui/components/connection/Controls.tsx'), 'utf-8')), 'fixed job footer is explicitly labeled Run Job');
+assert(/Advanced machine details/.test(consolePanel), 'ConsolePanel exposes advanced machine details disclosure');
+assert(/useState\(false\)/.test(consolePanel), 'advanced machine details are collapsed by default');
+assert(/aria-expanded/.test(consolePanel), 'advanced machine details disclosure exposes aria-expanded');

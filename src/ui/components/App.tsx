@@ -1363,18 +1363,8 @@ export function App(): React.ReactElement {
   }, [handleContextMenu]);
 
   const handleConnect = useCallback(async () => {
-    try {
-      const gc = await compileGcode(scene);
-      if (!gc) {
-        await showAlert('No Objects', 'No objects to process. Add objects to an output layer first.');
-      }
-      setCurrentGcode(gc);
-    } catch (err) {
-      console.error('G-code build failed:', err);
-      setCurrentGcode(null);
-    }
     dialogs.setShowConnection(true);
-  }, [scene, compileGcode, showAlert, dialogs]);
+  }, [dialogs]);
 
   const handleToolbarDisconnect = useCallback(async () => {
     try {

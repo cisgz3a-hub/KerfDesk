@@ -44,6 +44,16 @@ export function Controls({
       flexShrink: 0,
     },
   },
+    React.createElement('div', {
+      style: {
+        fontSize: 10,
+        color: '#777798',
+        marginBottom: 7,
+        textTransform: 'uppercase' as const,
+        letterSpacing: 0,
+        fontWeight: 700,
+      },
+    }, 'Run Job'),
     !isRunning && !displayPaused && React.createElement('div', {
       style: { display: 'flex', flexDirection: 'column' as const, gap: 6 },
     },

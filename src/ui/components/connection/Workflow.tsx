@@ -109,21 +109,21 @@ export function Workflow(props: WorkflowProps) {
   }> = [
     {
       mode: 'absolute',
-      short: 'Bed coordinates',
-      long: 'Use absolute machine coordinates. Job position is fixed in machine space.',
-      tooltip: 'Best for: repeating jobs at fixed bed positions. Requires homed machine and a known bed origin.',
+      short: 'Use canvas position',
+      long: 'Burn where the design sits on the bed grid.',
+      tooltip: 'Best for: repeatable bed-grid jobs after homing. The canvas position maps to the machine bed.',
     },
     {
       mode: 'current',
-      short: 'From laser head',
-      long: 'Use the current laser head position as the job origin. The job starts where the head is right now.',
-      tooltip: 'Best for: one-off jobs on placed material. Jog the laser to the desired start corner first.',
+      short: 'Start from laser head',
+      long: 'Jog the laser to the start corner, then run from there.',
+      tooltip: 'Best for: one-off jobs on placed material. Move the laser head to the intended start corner first.',
     },
     {
       mode: 'savedOrigin',
-      short: 'From saved origin',
-      long: 'Use the saved origin point. Job is offset from a previously marked machine position.',
-      tooltip: 'Best for: repeating jobs in a known fixture position. Save the origin once, then frame and run from it.',
+      short: 'Use saved zero point',
+      long: 'Use a marked fixture point for repeat jobs.',
+      tooltip: 'Best for: fixtures and repeat jobs. Save the zero point once, then frame and run from it.',
     },
   ];
 
@@ -134,7 +134,7 @@ export function Workflow(props: WorkflowProps) {
   },
     React.createElement('div', {
       style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const, letterSpacing: 1 },
-    }, 'Start Position'),
+    }, 'Job Position'),
     React.createElement('div', { style: { display: 'flex', gap: 3, marginBottom: 6 } },
       ...modes.map(m =>
         React.createElement('button', {

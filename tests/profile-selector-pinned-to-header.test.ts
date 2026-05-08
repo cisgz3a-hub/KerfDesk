@@ -97,17 +97,18 @@ assert(
   );
 }
 
-// 6. profileSection is a sibling of MoveControls (both rendered inside
-//    the same panel-body wrapper), not inside it.
+// 6. profileSection is in the fixed Machine zone above the scroll body,
+//    so users can confirm the profile without scrolling through job details.
 {
-  const bodyStart = src.indexOf("isConnected && React.createElement('div', {\n        style: {\n          flex: 1,");
-  assert(bodyStart > 0, 'panel body wrapper found');
-  // profileSection comma should appear inside this body wrapper.
-  const bodyEnd = src.indexOf('React.createElement(JobControls,', bodyStart);
-  const body = src.slice(bodyStart, bodyEnd);
+  const renderStart = src.indexOf('React.createElement(ConnectionControls');
+  const scrollBodyIdx = src.indexOf("overflowY: 'auto' as const", renderStart);
+  const profileRenderIdx = src.indexOf('isConnected && profileSection', renderStart);
+  assert(renderStart > 0, 'main render tree found');
+  assert(scrollBodyIdx > 0, 'scrollable panel body found');
+  assert(profileRenderIdx > 0, 'profileSection is referenced in the JSX tree');
   assert(
-    /profileSection,/.test(body),
-    'profileSection is a child of the scrollable panel-body wrapper (sibling of MoveControls + ConsolePanel)',
+    profileRenderIdx < scrollBodyIdx,
+    'profileSection renders in the fixed Machine zone before the scrollable body',
   );
 }
 

@@ -146,8 +146,6 @@ function displayOperationRow(rowData: OrderAnalysis['rows'][number]): string {
 
 export function ReadyToRunPanel({
   data,
-  startLabel = 'START',
-  onStartJob,
 }: Props): React.ReactElement {
   const [checkedReminders, setCheckedReminders] = useState<Record<string, boolean>>({});
   const orderNeedsAck = orderRequiresAcknowledgement(data.job.operationAnalysis);
@@ -179,30 +177,23 @@ export function ReadyToRunPanel({
       React.createElement('div', { style: { minWidth: 0 } },
         React.createElement('div', {
           style: { color: '#2dd4a0', fontSize: 13, fontWeight: 800 },
-        }, 'Ready to Run'),
+        }, 'Job Review'),
         React.createElement('div', {
           style: { color: '#777798', fontSize: 10, marginTop: 2 },
-        }, data.canStartJob ? 'Final review complete' : startDisabledReason),
+        }, data.canStartJob ? 'Review the job, then use the main Start button below' : startDisabledReason),
       ),
-      React.createElement('button', {
-        type: 'button',
-        'data-testid': 'ready-to-run-start',
-        onClick: onStartJob,
-        disabled: !data.canStartJob,
+      React.createElement('div', {
         style: {
           flexShrink: 0,
-          minWidth: 120,
-          padding: '10px 14px',
-          borderRadius: 8,
-          cursor: data.canStartJob ? 'pointer' : 'default',
-          fontFamily: font,
-          fontSize: 12,
-          fontWeight: 800,
-          background: data.canStartJob ? 'rgba(45,212,160,0.14)' : '#161626',
-          border: data.canStartJob ? '1px solid #2dd4a0' : '1px solid #252540',
+          padding: '6px 9px',
+          borderRadius: 999,
+          fontSize: 10,
+          fontWeight: 700,
           color: data.canStartJob ? '#2dd4a0' : '#555570',
+          border: data.canStartJob ? '1px solid rgba(45,212,160,0.35)' : '1px solid rgba(255,212,68,0.28)',
+          background: data.canStartJob ? 'rgba(45,212,160,0.08)' : 'rgba(255,212,68,0.06)',
         },
-      }, startLabel),
+      }, data.canStartJob ? 'Ready' : 'Needs attention'),
     ),
     React.createElement('div', {
       style: {
