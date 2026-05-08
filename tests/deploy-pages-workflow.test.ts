@@ -75,6 +75,10 @@ const src = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, 'utf8') 
 // 5. Deploy step uses actions/deploy-pages@v4
 {
   assert(
+    /deploy:\s*[\s\S]*?if:\s*\$\{\{\s*vars\.ENABLE_GITHUB_PAGES_DEPLOY\s*==\s*'true'\s*\}\}/.test(src),
+    'deploy job is gated by ENABLE_GITHUB_PAGES_DEPLOY',
+  );
+  assert(
     /actions\/deploy-pages@v4/.test(src),
     'deploy step uses actions/deploy-pages@v4',
   );

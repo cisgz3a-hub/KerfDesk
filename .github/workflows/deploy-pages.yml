@@ -8,7 +8,9 @@ name: Deploy Web App to GitHub Pages
 #
 # One-time manual prerequisite: repo Settings → Pages → Source must
 # be set to "GitHub Actions". This workflow cannot enable Pages on
-# the repo itself.
+# the repo itself. Set repo variable ENABLE_GITHUB_PAGES_DEPLOY=true
+# after Pages is available; otherwise the deploy job stays skipped so
+# unsupported plans do not make every master push red.
 #
 # Trigger choice (master-only, not the dev branch): CI gates the
 # merge to master, so master is the version that's been validated
@@ -51,6 +53,7 @@ jobs:
           path: dist
 
   deploy:
+    if: ${{ vars.ENABLE_GITHUB_PAGES_DEPLOY == 'true' }}
     needs: build
     runs-on: ubuntu-latest
     environment:
