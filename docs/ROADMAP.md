@@ -16554,7 +16554,7 @@ Then `getSvgElementColor` consults `inheritedStyle` if the element has no direct
 
 ### T3-29 | Open path ordering within cut operations 鈥?score-before-cut
 
-**Status:** Shipped in `<TBD>` — Cut operations now plan open paths before closed cutout paths, even when `insideFirst` is disabled, so score-like lines placed on a Cut layer run before part-release cuts. Closed cutouts still retain inside-first containment ordering after the open-path partition. Pinned by `tests/cut-open-paths-before-closed.test.ts` plus planner/pipeline regressions. **Hardware verification: not required** (planner ordering correction only; no new machine commands, controller state, or safety gate behavior changed).
+**Status:** Shipped in `89118b9` — Cut operations now plan open paths before closed cutout paths, even when `insideFirst` is disabled, so score-like lines placed on a Cut layer run before part-release cuts. Closed cutouts still retain inside-first containment ordering after the open-path partition. Pinned by `tests/cut-open-paths-before-closed.test.ts` plus planner/pipeline regressions. **Hardware verification: not required** (planner ordering correction only; no new machine commands, controller state, or safety gate behavior changed).
 
 **Code reference:** `src/core/plan/PlanOptimizer.ts:833-839` (open paths appended after closed paths within an operation).
 
@@ -20370,7 +20370,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
 - [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
 - [x] T3-28 SVG inherited group styles applied at flatten time (Shipped in `85e5971` — group presentation styles now survive flattening)
-- [x] T3-29 Open path ordering within cut operations 鈥?score-before-cut (Shipped in `<TBD>` — cut open paths run before closed cutouts)
+- [x] T3-29 Open path ordering within cut operations 鈥?score-before-cut (Shipped in `89118b9` — cut open paths run before closed cutouts)
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
 - [ ] T3-31 Self-intersection detection and repair for fill/cut
 - [ ] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation
