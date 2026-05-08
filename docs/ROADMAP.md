@@ -16373,7 +16373,7 @@ Trivial change. Two lines added to the default header.
 
 **Priority:** Tier 3 鈥?UX polish.
 
-**Status:** Shipped in `<TBD>` — frame-dot and mark-center G1 moves now use `frameDotFeedRate` from the active device profile, defaulting to 3000 mm/min for compatibility. Machine Settings exposes the override, profile backfills/preservation keep it durable, and tests pin the UI-to-controller-to-GRBL handoff.
+**Status:** Shipped in `54ff72e` — frame-dot and mark-center G1 moves now use `frameDotFeedRate` from the active device profile, defaulting to 3000 mm/min for compatibility. Machine Settings exposes the override, profile backfills/preservation keep it durable, and tests pin the UI-to-controller-to-GRBL handoff.
 
 ---
 
@@ -20348,7 +20348,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
-- [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `<TBD>` — configurable profile/settings frame-dot feed rate)
+- [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
 - [ ] T3-22 Tolerance-based grayscale segment merge in raster
 - [ ] T3-23 Warn when powerMin > 0 with photo-style image content
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
