@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 24 | 66 | Active quarter-scope backlog; T3-29 cut open-path ordering shipped in this batch. |
+| Tier 3 | 25 | 65 | Active quarter-scope backlog; T3-30 SVG use/defs support and unsupported-feature warnings shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16580,6 +16580,8 @@ Option 2 is opinionated but matches typical CAM expectations. Option 1 is non-in
 
 ### T3-30 | SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
 
+**Status:** Shipped in `<TBD>` — Stage 1 support resolves `<use>` references to `<defs>` geometry, including referenced groups, `href` / `xlink:href`, use-level transforms, x/y offsets, and inherited stroke/fill style for color-to-layer mapping. The importer now also warns when unsupported `clipPath`, `mask`, or CSS `<style>` rules are present instead of silently implying full fidelity. Full clipping, masking, and CSS selector application remain future deep geometry/CSS work. Pinned by `tests/svg-use-defs-import.test.ts`, `tests/svg-unsupported-feature-warning.test.ts`, and existing SVG regression tests. **Hardware verification: not required** (SVG import parsing/reporting only; no G-code, motion, controller, or safety gate behavior changed).
+
 **Code reference:** `src/import/svg/SvgParser.ts:212` (comment "Skip: text, defs, style, clipPath, mask, etc.").
 
 **Problem:** Audit 2C: production SVGs from Illustrator/Inkscape/Figma frequently contain:
@@ -20371,7 +20373,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
 - [x] T3-28 SVG inherited group styles applied at flatten time (Shipped in `85e5971` — group presentation styles now survive flattening)
 - [x] T3-29 Open path ordering within cut operations 鈥?score-before-cut (Shipped in `89118b9` — cut open paths run before closed cutouts)
-- [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
+- [x] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support (Shipped in `<TBD>` — use/defs support plus clip/mask/style warnings; full clip/mask/CSS remains future deep work)
 - [ ] T3-31 Self-intersection detection and repair for fill/cut
 - [ ] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation
 - [ ] T3-33 Scene renderer overlay model matches MachineTransform (depends on T1-40 stage 2)

@@ -30,7 +30,7 @@ export interface SvgElement {
   computedStyle: SvgComputedStyle; // Inherited presentation style at flatten time
 }
 
-export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED';
+export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED' | 'SVG_FEATURE_UNSUPPORTED';
 
 export interface SvgComputedStyle {
   stroke?: string;
@@ -42,6 +42,7 @@ export interface SvgImportWarning {
   code: SvgImportWarningCode;
   count: number;
   message: string;
+  feature?: string;
   examples?: string[];
 }
 
@@ -115,9 +116,18 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
   const textSkips: SvgTextSkipReport = { count: 0, examples: [] };
   const context = emptyParseContext();
   const rootStyle = mergeSvgStyles({}, svgRoot);
-  traverse(svgRoot, rootTransform, rootStyle, elements, context, 0, 0, textSkips);
+  const definitions = collectSvgDefinitions(svgRoot);
+  const unsupportedFeatures = collectUnsupportedFeatures(svgRoot);
+  traverse(svgRoot, rootTransform, rootStyle, elements, context, 0, 0, textSkips, definitions, []);
 
-  return { elements, warnings: buildSvgWarnings(textSkips), viewBox, widthMm, heightMm, svgUnits };
+  return {
+    elements,
+    warnings: buildSvgWarnings(textSkips, unsupportedFeatures),
+    viewBox,
+    widthMm,
+    heightMm,
+    svgUnits,
+  };
 }
 
 /**
@@ -212,6 +222,12 @@ interface SvgTextSkipReport {
   examples: string[];
 }
 
+interface SvgUnsupportedFeatureReport {
+  feature: string;
+  count: number;
+  examples: string[];
+}
+
 function traverse(
   node: Element,
   parentTransform: Matrix3x2,
@@ -221,42 +237,207 @@ function traverse(
   depth: number,
   transformDepth: number,
   textSkips: SvgTextSkipReport,
+  definitions: Map<string, Element>,
+  useStack: readonly string[],
 ): void {
   const childNodes = node.childNodes;
   if (!childNodes) return;
 
   for (let i = 0; i < childNodes.length; i++) {
     const child = childNodes[i] as Element;
-    if (!child.tagName) continue;  // Skip text nodes
-
-    context.nodeCount = bumpAndAssert(context.nodeCount, 'MAX_NODES');
-    const childDepth = depth + 1;
-    assertSvgLimit('MAX_DEPTH', childDepth);
-
-    const tag = child.tagName.toLowerCase().replace(/^svg:/, '');
-    const transformAttr = child.getAttribute('transform');
-    const childTransformDepth = transformAttr ? transformDepth + 1 : transformDepth;
-    assertSvgLimit('MAX_TRANSFORM_DEPTH', childTransformDepth);
-    context.depth = childDepth;
-    context.transformDepth = childTransformDepth;
-
-    const ownTransform = parseTransform(transformAttr);
-    const worldTransform = multiplyMatrix(parentTransform, ownTransform);
-    const computedStyle = mergeSvgStyles(parentStyle, child);
-
-    if (tag === 'g' || tag === 'svg') {
-      // Group: recurse with accumulated transform
-      traverse(child, worldTransform, computedStyle, output, context, childDepth, childTransformDepth, textSkips);
-    } else if (tag === 'text') {
-      recordTextSkip(child, textSkips);
-    } else if (RENDERABLE_TAGS.has(tag)) {
-      // Renderable element: extract attributes
-      context.renderableCount = bumpAndAssert(context.renderableCount, 'MAX_RENDERABLE');
-      const attrs = extractAttributes(child);
-      output.push({ tag, attrs, worldTransform, computedStyle: { ...computedStyle } });
-    }
-    // Skip: defs, style, clipPath, mask, etc.
+    visitSvgElement(
+      child,
+      parentTransform,
+      parentStyle,
+      output,
+      context,
+      depth,
+      transformDepth,
+      textSkips,
+      definitions,
+      useStack,
+    );
   }
+}
+
+function visitSvgElement(
+  child: Element,
+  parentTransform: Matrix3x2,
+  parentStyle: SvgComputedStyle,
+  output: SvgElement[],
+  context: SvgParseContext,
+  depth: number,
+  transformDepth: number,
+  textSkips: SvgTextSkipReport,
+  definitions: Map<string, Element>,
+  useStack: readonly string[],
+): void {
+  if (!child.tagName) return;  // Skip text nodes
+
+  context.nodeCount = bumpAndAssert(context.nodeCount, 'MAX_NODES');
+  const childDepth = depth + 1;
+  assertSvgLimit('MAX_DEPTH', childDepth);
+
+  const tag = child.tagName.toLowerCase().replace(/^svg:/, '');
+  const transformAttr = child.getAttribute('transform');
+  const childTransformDepth = transformAttr ? transformDepth + 1 : transformDepth;
+  assertSvgLimit('MAX_TRANSFORM_DEPTH', childTransformDepth);
+  context.depth = childDepth;
+  context.transformDepth = childTransformDepth;
+
+  const ownTransform = parseTransform(transformAttr);
+  const worldTransform = multiplyMatrix(parentTransform, ownTransform);
+  const computedStyle = mergeSvgStyles(parentStyle, child);
+
+  if (tag === 'defs') {
+    return;
+  }
+
+  if (tag === 'g' || tag === 'svg' || tag === 'symbol') {
+    // Group: recurse with accumulated transform
+    traverse(
+      child,
+      worldTransform,
+      computedStyle,
+      output,
+      context,
+      childDepth,
+      childTransformDepth,
+      textSkips,
+      definitions,
+      useStack,
+    );
+  } else if (tag === 'use') {
+    resolveUseElement(
+      child,
+      worldTransform,
+      computedStyle,
+      output,
+      context,
+      childDepth,
+      childTransformDepth,
+      textSkips,
+      definitions,
+      useStack,
+    );
+  } else if (tag === 'text') {
+    recordTextSkip(child, textSkips);
+  } else if (RENDERABLE_TAGS.has(tag)) {
+    // Renderable element: extract attributes
+    context.renderableCount = bumpAndAssert(context.renderableCount, 'MAX_RENDERABLE');
+    const attrs = extractAttributes(child);
+    output.push({ tag, attrs, worldTransform, computedStyle: { ...computedStyle } });
+  }
+  // Skip: style, clipPath, mask, etc.
+}
+
+function resolveUseElement(
+  useNode: Element,
+  useTransform: Matrix3x2,
+  useStyle: SvgComputedStyle,
+  output: SvgElement[],
+  context: SvgParseContext,
+  depth: number,
+  transformDepth: number,
+  textSkips: SvgTextSkipReport,
+  definitions: Map<string, Element>,
+  useStack: readonly string[],
+): void {
+  const refId = getUseReferenceId(useNode);
+  if (!refId || useStack.includes(refId)) return;
+  const referenced = definitions.get(refId);
+  if (!referenced) return;
+
+  const translatedTransform = multiplyMatrix(useTransform, usePositionTransform(useNode));
+  visitSvgElement(
+    referenced,
+    translatedTransform,
+    useStyle,
+    output,
+    context,
+    depth,
+    transformDepth,
+    textSkips,
+    definitions,
+    [...useStack, refId],
+  );
+}
+
+function collectSvgDefinitions(root: Element): Map<string, Element> {
+  const definitions = new Map<string, Element>();
+
+  function visit(node: Element): void {
+    if (!node.tagName) return;
+    const id = node.getAttribute('id');
+    if (id) definitions.set(id, node);
+    const childNodes = node.childNodes;
+    if (!childNodes) return;
+    for (let i = 0; i < childNodes.length; i++) {
+      visit(childNodes[i] as Element);
+    }
+  }
+
+  visit(root);
+  return definitions;
+}
+
+function collectUnsupportedFeatures(root: Element): SvgUnsupportedFeatureReport[] {
+  const reports = new Map<string, SvgUnsupportedFeatureReport>();
+
+  function record(feature: string, example?: string | null): void {
+    const report = reports.get(feature) || { feature, count: 0, examples: [] };
+    report.count++;
+    const cleaned = example?.replace(/\s+/g, ' ').trim();
+    if (cleaned && report.examples.length < 3) report.examples.push(cleaned.slice(0, 80));
+    reports.set(feature, report);
+  }
+
+  function visit(node: Element): void {
+    if (!node.tagName) return;
+    const tag = node.tagName.toLowerCase().replace(/^svg:/, '');
+    const id = node.getAttribute('id');
+    if (tag === 'clippath') record('clipPath', id ? `#${id}` : null);
+    if (tag === 'mask') record('mask', id ? `#${id}` : null);
+    if (tag === 'style') {
+      record('<style>', String((node as unknown as { textContent?: string }).textContent ?? ''));
+    }
+    const clipPath = node.getAttribute('clip-path');
+    if (clipPath) record('clipPath', clipPath);
+    const mask = node.getAttribute('mask');
+    if (mask) record('mask', mask);
+
+    const childNodes = node.childNodes;
+    if (!childNodes) return;
+    for (let i = 0; i < childNodes.length; i++) {
+      visit(childNodes[i] as Element);
+    }
+  }
+
+  visit(root);
+  return [...reports.values()];
+}
+
+function getUseReferenceId(node: Element): string | null {
+  const raw = node.getAttribute('href')
+    || node.getAttribute('xlink:href')
+    || (node as unknown as { getAttributeNS?: (namespace: string, localName: string) => string | null })
+      .getAttributeNS?.('http://www.w3.org/1999/xlink', 'href');
+  if (!raw) return null;
+  const trimmed = raw.trim();
+  if (trimmed.startsWith('#')) return trimmed.slice(1);
+  const urlMatch = trimmed.match(/^url\(#(.+)\)$/);
+  return urlMatch ? urlMatch[1] : null;
+}
+
+function usePositionTransform(node: Element): Matrix3x2 {
+  return {
+    a: 1,
+    b: 0,
+    c: 0,
+    d: 1,
+    tx: parseFloat(node.getAttribute('x') || '0') || 0,
+    ty: parseFloat(node.getAttribute('y') || '0') || 0,
+  };
 }
 
 function mergeSvgStyles(parentStyle: SvgComputedStyle, node: Element): SvgComputedStyle {
@@ -301,17 +482,50 @@ function recordTextSkip(node: Element, report: SvgTextSkipReport): void {
   }
 }
 
-function buildSvgWarnings(textSkips: SvgTextSkipReport): SvgImportWarning[] {
-  if (textSkips.count === 0) return [];
-  const noun = textSkips.count === 1 ? 'text element' : 'text elements';
-  return [{
-    code: 'SVG_TEXT_SKIPPED',
-    count: textSkips.count,
-    message:
-      `${textSkips.count} ${noun} skipped during SVG import. ` +
-      'Convert text to outlines in your design tool before re-importing.',
-    examples: textSkips.examples,
-  }];
+function buildSvgWarnings(
+  textSkips: SvgTextSkipReport,
+  unsupportedFeatures: SvgUnsupportedFeatureReport[],
+): SvgImportWarning[] {
+  const warnings: SvgImportWarning[] = [];
+  if (textSkips.count > 0) {
+    const noun = textSkips.count === 1 ? 'text element' : 'text elements';
+    warnings.push({
+      code: 'SVG_TEXT_SKIPPED',
+      count: textSkips.count,
+      message:
+        `${textSkips.count} ${noun} skipped during SVG import. ` +
+        'Convert text to outlines in your design tool before re-importing.',
+      examples: textSkips.examples,
+    });
+  }
+
+  for (const report of unsupportedFeatures) {
+    warnings.push({
+      code: 'SVG_FEATURE_UNSUPPORTED',
+      feature: report.feature,
+      count: report.count,
+      message: unsupportedFeatureMessage(report.feature, report.count),
+      examples: report.examples,
+    });
+  }
+
+  return warnings;
+}
+
+function unsupportedFeatureMessage(feature: string, count: number): string {
+  if (feature === 'clipPath') {
+    return `${count} SVG clipPath reference${count === 1 ? '' : 's'} found. ` +
+      'Clipping is not applied during import; convert clipped artwork to real paths before importing.';
+  }
+  if (feature === 'mask') {
+    return `${count} SVG mask reference${count === 1 ? '' : 's'} found. ` +
+      'Masks are not applied during import; flatten masked artwork before importing.';
+  }
+  if (feature === '<style>') {
+    return `${count} SVG <style> block${count === 1 ? '' : 's'} found. ` +
+      'CSS rules are not applied during import; use presentation attributes or inline styles on shapes.';
+  }
+  return `${count} unsupported SVG ${feature} feature${count === 1 ? '' : 's'} found during import.`;
 }
 
 // ─── ATTRIBUTE EXTRACTION ────────────────────────────────────────
