@@ -36,7 +36,7 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | 0 | 4 | **4** | 0 | 0 | **100%** |
 | 1 | 94 | ~37 confirmed (Gate 1 cluster + verified-this-session + T1-6, T1-19 closed 2026-04-30; T1-17 partial — pass 1 shipped) | 6 | 3 confirmed | est. ~96% |
 | 2 | 127 | **9** | **3** | **115** | ~9% |
-| 3 | 89 | **2** | 0 | **87** | ~2% |
+| 3 | 89 | **12** | 0 | **77** | ~13% |
 | 4 | 9 | **2** | 0 | **7** | ~22% |
 | **Total** | **323** | ~49 | 6 | ~210 confirmed-or-likely | 鈥?|
 
@@ -458,9 +458,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 
 ---
 
-## Tier 3 - 11 shipped, 78 open
+## Tier 3 - 12 shipped, 77 open
 
-### Shipped (11)
+### Shipped (12)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -474,12 +474,13 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-9 | Tighten IPC attack surface | Added `electron/security.ts` with `assertTrustedSender(event)` and guarded every current `ipcMain.handle` in `electron/main.ts` plus `electron/falcon-wifi/FalconWiFiService.ts`. Packaged builds trust only `file://` sender frames; dev trusts only parsed `http://localhost:3000/` origin. `tests/ipc-attack-surface.test.ts` enforces guard coverage for main and Falcon handlers; existing T2-119 and typed-storage IPC tests stay green. | `68395bc` |
 | T3-10 | Input file-format size limits | Added DXF import limits in `src/import/dxf/DxfParser.ts`: 50 MB file cap, 500K entity cap, and 10K per-entity group cap, with typed `DxfImportLimitError`. Browser DXF file-input and drag/drop paths now check `file.size` before `file.text()`, Electron DXF dialog cap aligns to 50 MB, and the existing image worker/downsample/decompression-bomb protections remain pinned. `tests/import-limits.test.ts` covers the DXF limits; related dialog/image/pipeline tests remain green. | `fa8b8f8` |
 | T3-11 | Burn-progress visual bugs | Moved GRBL object lifecycle emission from send time to ack time by carrying line markers on pending job records and emitting from `_handleOk()` after the matching `ok`. Also inset the burned-object marker inside object bounds in `SceneRenderer.ts`. Pinned by `tests/burn-progress-ack-timing.test.ts`; controller streaming regressions remain green. | `589b49b` |
+| T3-13 | Active-edge-table fill scanline algorithm | `generateFillRows` in `src/core/plan/FillGenerator.ts` now pre-buckets rotated edges by scanline row with `enterRow` / `leaveRow` metadata, maintains an `activeEdges` set as rows advance, and intersects only that active subset instead of the full edge pool. Pinned by `tests/fill-generator-active-edge-table.test.ts` plus existing compound fill, raster modal-M4, and pipeline tests. Hardware verification not required (planner algorithm/performance path; no controller command contract changes). | `<TBD>` |
 | T3-45 | Transport abstraction layer - Line / Byte / HttpJob transports | Added `src/transports/Transport.ts` with protocol-neutral `Transport`, `LineTransport`, `ByteTransport`, and `HttpJobTransport` contracts, runtime guards, transport capabilities, and job-upload handle metadata. `MockSerialPort` and `WebSerialPort` now expose the `LineTransport` surface while preserving the legacy `SerialPortLike` contract, so existing GRBL call sites and test stubs do not need to migrate in this slice. Pinned by `tests/transport-abstraction.test.ts` (26 contracts). **Hardware verification: not required** (type/API foundation over existing serial write paths; no controller execution path or emitted G-code changed). T2-30 remains blocked on Falcon WiFi protocol investigation and the real controller/job-execution implementation. | `6ac9cce` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### Open (78)
+### Open (77)
 
-T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-13 (active-edge-table fill scanline), T3-14 (sampled G-code preview), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-18 (output validator semantic scan), T3-19, T3-20, T3-21 (frame-dot F3000 hardcoded), T3-22, T3-23, T3-24, T3-25, T3-26, T3-27, T3-28, T3-29, T3-30, T3-31, T3-32, T3-33, T3-34, T3-35, T3-36, T3-37, T3-38, T3-39, T3-40, T3-41, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-49, T3-50 (device identity verification on connect), T3-51, T3-52, T3-53, T3-54, T3-55, T3-56, T3-57, T3-58, T3-59, T3-60, T3-61, T3-62, T3-63, T3-64, T3-65, T3-66, T3-67 (canonical bounds selectors), T3-68 (debug state graph + transition log; scaffolding ready in `SceneTransaction.ts:94,95,152-154,271,283`; emitter not wired), T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks).
+T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-14 (sampled G-code preview), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-18 (output validator semantic scan), T3-19, T3-20, T3-21 (frame-dot F3000 hardcoded), T3-22, T3-23, T3-24, T3-25, T3-26, T3-27, T3-28, T3-29, T3-30, T3-31, T3-32, T3-33, T3-34, T3-35, T3-36, T3-37, T3-38, T3-39, T3-40, T3-41, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-49, T3-50 (device identity verification on connect), T3-51, T3-52, T3-53, T3-54, T3-55, T3-56, T3-57, T3-58, T3-59, T3-60, T3-61, T3-62, T3-63, T3-64, T3-65, T3-66, T3-67 (canonical bounds selectors), T3-68 (debug state graph + transition log; scaffolding ready in `SceneTransaction.ts:94,95,152-154,271,283`; emitter not wired), T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks).
 
 ---
 

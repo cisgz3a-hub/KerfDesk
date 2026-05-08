@@ -9,7 +9,7 @@
  *             1. Rotate geometry by -angle (work in axis-aligned space)
  *             2. Compute bounding box
  *             3. Cast horizontal rays at `interval` spacing
- *             4. Find intersections with all polygon edges
+ *             4. Maintain active scanline edges for the current row
  *             5. Sort intersections, pair with even-odd rule
  *             6. Create line segments between pairs
  *             7. Rotate segments back by +angle
@@ -218,11 +218,27 @@ export function generateFillRows(
 
   const rows: FillScanlineRow[] = [];
   const startY = minY + safeInterval / 2;
+  const rowCount = spanY > 0 ? Math.ceil((maxY - startY) / safeInterval) : 0;
+  const buckets = buildScanlineEdgeBuckets(rotatedEdges, startY, safeInterval, rowCount);
+  let activeEdges: ScanlineEdge[] = [];
   let rowIndex = initialRowIndex;
   const os = Math.max(0, settings.overscanning);
 
-  for (let y = startY; y < maxY; y += safeInterval) {
-    const intersections = findIntersections(rotatedEdges, y);
+  for (let scanlineIndex = 0; scanlineIndex < rowCount; scanlineIndex++) {
+    const y = startY + scanlineIndex * safeInterval;
+    const leaving = buckets.removeAt[scanlineIndex];
+    if (leaving.length > 0) {
+      const leavingSet = new Set(leaving);
+      activeEdges = activeEdges.filter(edge => !leavingSet.has(edge));
+    }
+
+    const entering = buckets.addAt[scanlineIndex];
+    if (entering.length > 0) {
+      activeEdges.push(...entering);
+    }
+
+    // T3-13: scan only the row's active edge set, not the full geometry pool.
+    const intersections = findActiveIntersections(activeEdges, y);
     if (intersections.length < 2) continue;
     intersections.sort((a, b) => a - b);
 
@@ -347,6 +363,11 @@ interface Edge {
   x2: number; y2: number;
 }
 
+interface ScanlineEdge extends Edge {
+  enterRow: number;
+  leaveRow: number;
+}
+
 /**
  * Extract all edges from closed FlatPaths.
  * Each consecutive pair of coordinates forms an edge.
@@ -404,6 +425,52 @@ function findIntersections(edges: Edge[], y: number): number[] {
     const t = (y - y1) / (y2 - y1);
     const x = edge.x1 + t * (edge.x2 - edge.x1);
     intersections.push(x);
+  }
+
+  return intersections;
+}
+
+// ─── ACTIVE EDGE TABLE ────────────────────────────────────────────
+
+function buildScanlineEdgeBuckets(
+  edges: Edge[],
+  startY: number,
+  interval: number,
+  rowCount: number,
+): { addAt: ScanlineEdge[][]; removeAt: ScanlineEdge[][] } {
+  const addAt = Array.from({ length: rowCount }, () => [] as ScanlineEdge[]);
+  const removeAt = Array.from({ length: rowCount }, () => [] as ScanlineEdge[]);
+  if (rowCount <= 0 || interval <= 0) {
+    return { addAt, removeAt };
+  }
+
+  for (const edge of edges) {
+    if (edge.y1 === edge.y2) continue;
+
+    const yMin = Math.min(edge.y1, edge.y2);
+    const yMax = Math.max(edge.y1, edge.y2);
+    const enterRow = Math.max(0, Math.ceil((yMin - startY) / interval));
+    const leaveRow = Math.min(rowCount, Math.ceil((yMax - startY) / interval));
+
+    if (enterRow >= leaveRow || leaveRow <= 0 || enterRow >= rowCount) continue;
+
+    const scanlineEdge: ScanlineEdge = { ...edge, enterRow, leaveRow };
+    addAt[enterRow].push(scanlineEdge);
+    if (leaveRow < rowCount) {
+      removeAt[leaveRow].push(scanlineEdge);
+    }
+  }
+
+  return { addAt, removeAt };
+}
+
+function findActiveIntersections(activeEdges: readonly ScanlineEdge[], y: number): number[] {
+  const intersections: number[] = [];
+
+  for (const edge of activeEdges) {
+    if (y < Math.min(edge.y1, edge.y2) || y >= Math.max(edge.y1, edge.y2)) continue;
+    const t = (y - edge.y1) / (edge.y2 - edge.y1);
+    intersections.push(edge.x1 + t * (edge.x2 - edge.x1));
   }
 
   return intersections;

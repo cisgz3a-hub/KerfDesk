@@ -16137,6 +16137,8 @@ Complexity becomes O((scanlines + edges) log edges), which for 50k edges + 4k sc
 
 **Cross-check note (audit 2E):** Audit's Priority 5. Verified. Real but not urgent.
 
+**Status:** Shipped in `<TBD>`. `generateFillRows` now builds scanline edge buckets with per-edge `enterRow` / `leaveRow` metadata, maintains an `activeEdges` set per row, and intersects only the active row subset instead of rescanning the full rotated edge pool for every scanline. Existing fill behavior is pinned for rectangle, disjoint-segment, compound-fill, raster, and pipeline paths by `tests/fill-generator-active-edge-table.test.ts`, `tests/compound-fill-generator.test.ts`, `tests/raster-output-uses-modal-m4.test.ts`, and `tests/pipeline.test.ts`. Hardware verification: not required (algorithmic planner/performance change; no controller command contract changes).
+
 ---
 
 ### T3-14 | Sampled / level-of-detail G-code preview
@@ -20311,7 +20313,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-10 Input file-format size limits
 - [x] T3-11 Burn-progress lag + 鉁?position
 - [ ] T3-12 Hardware-in-the-loop safety verification suite (filed; future, requires hardware build-out)
-- [ ] T3-13 Active-edge-table fill scanline algorithm (filed; algorithmic improvement, upper-end users)
+- [x] T3-13 Active-edge-table fill scanline algorithm (Shipped — `generateFillRows` now uses scanline edge buckets + active row edge set; behavior pinned by fill/compound/pipeline tests)
 - [ ] T3-14 Sampled / level-of-detail G-code preview (filed; large-job UX)
 - [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
