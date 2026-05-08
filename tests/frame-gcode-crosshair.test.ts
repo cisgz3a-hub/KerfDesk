@@ -164,15 +164,12 @@ console.log('\n=== frame-gcode crosshair ===\n');
       'G91',
       'G21',
       'M4 S5',
-      // T1-39: first move now traces the previously-skipped
-      // (0,0) → corners[0] = (0, 100) segment.
-      'G1 X0.000 Y100.000 F3000',
       'G1 X100.000 Y0.000 F3000',
-      'G1 X0.000 Y-100.000 F3000',
-      'G1 X-100.000 Y0.000 F3000',
       'G1 X0.000 Y100.000 F3000',
+      'G1 X-100.000 Y0.000 F3000',
+      'G1 X0.000 Y-100.000 F3000',
       'M5 S0',
-      'G0 X55.000 Y-50.000',
+      'G0 X55.000 Y50.000',
       'M4 S5',
       'G1 X-10.000 Y0.000 F3000',
       'G1 X5.000 Y0.000 F3000',
@@ -180,13 +177,10 @@ console.log('\n=== frame-gcode crosshair ===\n');
       'G1 X0.000 Y-10.000 F3000',
       'G1 X0.000 Y5.000 F3000',
       'M5 S0',
-      // T1-39: head ends at centroid (50, 50) after the crosshair X+Y
-      // arms; the negated centroid returns it to physical start so
-      // burn-after-frame is not doubly offset.
       'G0 X-50.000 Y-50.000',
       'G90',
     ],
-    'current/dot crosshair: relative rectangle and center mark — T1-39 first move + return-to-origin',
+    'current/dot crosshair: relative rectangle and center mark in local orientation',
   );
   assert(dotWithCrosshairRel[0] === 'G91', 'current/dot crosshair: starts in relative mode');
   assert(dotWithCrosshairRel.at(-1) === 'G90', 'current/dot crosshair: restores absolute mode');

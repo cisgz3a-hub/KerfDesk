@@ -74,8 +74,8 @@ void (async () => {
     savedOrigin: { x: 100, y: 75 },
   });
   assert(
-    gcode.includes('G0 X0.000 Y20.000'),
-    'savedOrigin compile: first rapid matches design-local WCS origin (not saved canvas 100,75)',
+    gcode.includes('G0 X0.000 Y0.000'),
+    'savedOrigin compile: first rapid starts at design-local WCS origin (not saved canvas 100,75)',
   );
   assert(
     !gcode.includes('G0 X100.000 Y95.000'),

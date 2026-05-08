@@ -1,9 +1,14 @@
 /**
  * Transforms a Plan from canvas coordinates (Y-down) to machine coordinates for GRBL.
- * Front-origin machines (e.g. $23=3): machineY = bedHeightMm - canvasY (+ offset).
- * Rear-origin: machineY = canvasY (+ offset) — canvas Y-down matches machine Y from back.
+ * Absolute bed placement maps the on-screen bed grid into machine coordinates:
+ * front-origin machines use machineY = bedHeightMm - canvasY (+ offset), while
+ * rear-origin machines use machineY = canvasY (+ offset).
  *
- * Pipeline position: Plan → [applyMachineTransform] → TransformedPlan → strategy.generate → Output
+ * Local workpiece modes (`current` and `savedOrigin`) keep the artwork's local
+ * orientation. The user has already chosen the physical anchor in those modes,
+ * so applying the bed-origin mirror again would burn local text upside down.
+ *
+ * Pipeline position: Plan -> [applyMachineTransform] -> TransformedPlan -> strategy.generate -> Output
  */
 
 import { type Plan, type PlannedOperation, type Move } from './Plan';
@@ -65,6 +70,10 @@ export function shouldFlipXForRightOrigin(originCorner: MachineOriginCorner): bo
   return originCorner === 'front-right' || originCorner === 'rear-right';
 }
 
+function shouldUseBedOriginMapping(startMode: GcodeStartMode): boolean {
+  return startMode === 'absolute';
+}
+
 /**
  * Transform all move coordinates in a Plan from canvas space to machine space.
  * Returns a new Plan (original is not mutated) plus the transform parameters
@@ -87,8 +96,9 @@ export function applyMachineTransform(
   const maxX = Number.isFinite(bounds.maxX) ? bounds.maxX : 0;
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
-  const flipY = shouldFlipYForFrontOrigin(options.originCorner);
-  const flipX = shouldFlipXForRightOrigin(options.originCorner);
+  const useBedOriginMapping = shouldUseBedOriginMapping(options.startMode);
+  const flipY = useBedOriginMapping && shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = useBedOriginMapping && shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
@@ -202,8 +212,9 @@ export function transformPointToMachine(
   sceneBounds: { minX: number; minY: number; maxX: number; maxY: number },
   options: MachineTransformOptions,
 ): { x: number; y: number } {
-  const flipY = shouldFlipYForFrontOrigin(options.originCorner);
-  const flipX = shouldFlipXForRightOrigin(options.originCorner);
+  const useBedOriginMapping = shouldUseBedOriginMapping(options.startMode);
+  const flipY = useBedOriginMapping && shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = useBedOriginMapping && shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
