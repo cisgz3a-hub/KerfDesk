@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 22 | 68 | Active quarter-scope backlog; T3-27 SVG text import warning shipped in this batch. |
+| Tier 3 | 23 | 67 | Active quarter-scope backlog; T3-28 SVG inherited group styles shipped in this batch. |
 
 ### Historical audit classification
 
@@ -16517,6 +16517,8 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 ### T3-28 | SVG inherited group styles applied at flatten time
 
+**Status:** Shipped in `<TBD>` — `parseSvg` now carries a computed style context while flattening groups, so inherited `stroke`, `fill`, and `stroke-width` survive alongside inherited transforms. `SvgToScene` uses that computed style for color-to-layer mapping, while retaining fallback support for raw element attrs/style. Pinned by `tests/svg-inherited-group-styles.test.ts` plus existing SVG import/placement/complexity/text-warning tests. **Hardware verification: not required** (SVG import style mapping only; no G-code, motion, controller, or safety gate behavior changed).
+
 **Code reference:** `src/import/svg/SvgToScene.ts:178` (comment "Group inheritance is not available after flattening"), `src/import/svg/SvgParser.ts:200-211` (transform inheritance works; style does not).
 
 **Problem:** Audit 2C: SVG group transforms ARE inherited (via `worldTransform = multiplyMatrix(parentTransform, ownTransform)` at SvgParser:202), but style attributes (stroke, fill, stroke-width) are NOT. A `<g stroke="red">` containing paths without local stroke values flattens to paths with no stroke color, then color鈫抣ayer-mode mapping picks the default (typically engrave) rather than the intended cut layer.
@@ -20365,7 +20367,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
 - [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
-- [ ] T3-28 SVG inherited group styles applied at flatten time
+- [x] T3-28 SVG inherited group styles applied at flatten time (Shipped in `<TBD>` — group presentation styles now survive flattening)
 - [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
 - [ ] T3-31 Self-intersection detection and repair for fill/cut

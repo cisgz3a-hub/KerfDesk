@@ -23,6 +23,7 @@ export {
   parseLength,
   parseLengthMm,
   detectSvgUnits,
+  type SvgComputedStyle,
   type SvgElement,
   type SvgImportWarning,
   type SvgImportWarningCode,

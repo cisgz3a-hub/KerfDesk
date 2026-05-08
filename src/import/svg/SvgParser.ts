@@ -27,9 +27,16 @@ export interface SvgElement {
   tag: string;                     // 'rect', 'circle', 'path', etc.
   attrs: Record<string, string>;   // Raw attribute values
   worldTransform: Matrix3x2;       // Accumulated transform (groups × own)
+  computedStyle: SvgComputedStyle; // Inherited presentation style at flatten time
 }
 
 export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED';
+
+export interface SvgComputedStyle {
+  stroke?: string;
+  fill?: string;
+  strokeWidth?: string;
+}
 
 export interface SvgImportWarning {
   code: SvgImportWarningCode;
@@ -107,7 +114,8 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
   const elements: SvgElement[] = [];
   const textSkips: SvgTextSkipReport = { count: 0, examples: [] };
   const context = emptyParseContext();
-  traverse(svgRoot, rootTransform, elements, context, 0, 0, textSkips);
+  const rootStyle = mergeSvgStyles({}, svgRoot);
+  traverse(svgRoot, rootTransform, rootStyle, elements, context, 0, 0, textSkips);
 
   return { elements, warnings: buildSvgWarnings(textSkips), viewBox, widthMm, heightMm, svgUnits };
 }
@@ -207,6 +215,7 @@ interface SvgTextSkipReport {
 function traverse(
   node: Element,
   parentTransform: Matrix3x2,
+  parentStyle: SvgComputedStyle,
   output: SvgElement[],
   context: SvgParseContext,
   depth: number,
@@ -233,20 +242,53 @@ function traverse(
 
     const ownTransform = parseTransform(transformAttr);
     const worldTransform = multiplyMatrix(parentTransform, ownTransform);
+    const computedStyle = mergeSvgStyles(parentStyle, child);
 
     if (tag === 'g' || tag === 'svg') {
       // Group: recurse with accumulated transform
-      traverse(child, worldTransform, output, context, childDepth, childTransformDepth, textSkips);
+      traverse(child, worldTransform, computedStyle, output, context, childDepth, childTransformDepth, textSkips);
     } else if (tag === 'text') {
       recordTextSkip(child, textSkips);
     } else if (RENDERABLE_TAGS.has(tag)) {
       // Renderable element: extract attributes
       context.renderableCount = bumpAndAssert(context.renderableCount, 'MAX_RENDERABLE');
       const attrs = extractAttributes(child);
-      output.push({ tag, attrs, worldTransform });
+      output.push({ tag, attrs, worldTransform, computedStyle: { ...computedStyle } });
     }
     // Skip: defs, style, clipPath, mask, etc.
   }
+}
+
+function mergeSvgStyles(parentStyle: SvgComputedStyle, node: Element): SvgComputedStyle {
+  const merged: SvgComputedStyle = { ...parentStyle };
+  applyStyleValue(merged, 'stroke', node.getAttribute('stroke'));
+  applyStyleValue(merged, 'fill', node.getAttribute('fill'));
+  applyStyleValue(merged, 'strokeWidth', node.getAttribute('stroke-width'));
+  applyStyleAttribute(merged, node.getAttribute('style'));
+  return merged;
+}
+
+function applyStyleAttribute(target: SvgComputedStyle, style: string | null): void {
+  if (!style) return;
+  for (const declaration of style.split(';')) {
+    const separator = declaration.indexOf(':');
+    if (separator === -1) continue;
+    const property = declaration.slice(0, separator).trim().toLowerCase();
+    const value = declaration.slice(separator + 1);
+    if (property === 'stroke') applyStyleValue(target, 'stroke', value);
+    if (property === 'fill') applyStyleValue(target, 'fill', value);
+    if (property === 'stroke-width') applyStyleValue(target, 'strokeWidth', value);
+  }
+}
+
+function applyStyleValue(
+  target: SvgComputedStyle,
+  key: keyof SvgComputedStyle,
+  value: string | null,
+): void {
+  const normalized = value?.trim();
+  if (!normalized || normalized.toLowerCase() === 'inherit') return;
+  target[key] = normalized;
 }
 
 function recordTextSkip(node: Element, report: SvgTextSkipReport): void {

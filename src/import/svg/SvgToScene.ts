@@ -209,20 +209,27 @@ export function importSvgIntoSceneWithReport(
 // ─── SVG COLOR → LAYER MODE ──────────────────────────────────────
 
 /**
- * Extract stroke/fill from flattened SvgElement (attribute or style).
- * Group inheritance is not available after flattening; colors should be on each shape or in style.
+ * Extract stroke/fill from flattened SvgElement.
+ * `computedStyle` carries inherited group presentation styles; the fallback
+ * keeps older manually constructed SvgElement values working.
  */
 function getSvgElementColor(el: SvgElement, attr: 'stroke' | 'fill'): string | null {
+  const computed = el.computedStyle?.[attr];
+  if (computed && computed !== 'inherit') return computed;
+
+  const fromStyle = getInlineStyleValue(el.attrs['style'], attr);
+  if (fromStyle && fromStyle !== 'inherit') return fromStyle;
+
   const direct = el.attrs[attr];
   if (direct && direct !== 'inherit') return direct;
 
-  const style = el.attrs['style'];
-  if (style) {
-    const match = style.match(new RegExp(`${attr}\\s*:\\s*([^;]+)`, 'i'));
-    if (match) return match[1].trim();
-  }
-
   return null;
+}
+
+function getInlineStyleValue(style: string | undefined, attr: 'stroke' | 'fill'): string | null {
+  if (!style) return null;
+  const match = style.match(new RegExp(`${attr}\\s*:\\s*([^;]+)`, 'i'));
+  return match ? match[1].trim() : null;
 }
 
 /**
