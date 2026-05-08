@@ -16449,7 +16449,7 @@ For each, capture optimal speed/power/passes plus a 256-point luminance鈫抪owe
 
 ### T3-25 | Bidirectional row alternation by raw row index, not non-empty-row count
 
-**Status:** Shipped in `<TBD>` — bidirectional raster direction now uses the raw bitmap row parity instead of the count of non-empty emitted scanlines. Sparse rasters keep the same parity as the physical scan rows, while adjacent non-empty rows still alternate normally. Pinned by `tests/raster-bidirectional-row-parity.test.ts`. **Hardware verification: not required** (planner row-order correction only; no new command path or safety gate behavior changed).
+**Status:** Shipped in `17a3457` — bidirectional raster direction now uses the raw bitmap row parity instead of the count of non-empty emitted scanlines. Sparse rasters keep the same parity as the physical scan rows, while adjacent non-empty rows still alternate normally. Pinned by `tests/raster-bidirectional-row-parity.test.ts`. **Hardware verification: not required** (planner row-order correction only; no new command path or safety gate behavior changed).
 
 **Code reference:** `src/core/plan/RasterGenerator.ts:113` (`lineIndex++` only increments after non-empty row).
 
@@ -20358,7 +20358,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
 - [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `681a178` — non-blocking grayscale/photo image minimum-power warning)
 - [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
-- [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `<TBD>` — sparse raster rows use physical row parity)
+- [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [ ] T3-26 Blue-noise / advanced halftone dithering modes
 - [ ] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn
 - [ ] T3-28 SVG inherited group styles applied at flatten time
