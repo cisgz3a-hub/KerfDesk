@@ -4,9 +4,20 @@
  * No native Node.js modules required.
  */
 
+import {
+  LINE_TRANSPORT_CAPABILITIES,
+  type TransportOpenOptions,
+  type Unsubscribe,
+} from '../transports/Transport';
 import { type SerialPortLike } from './SerialPort';
 
 export class WebSerialPort implements SerialPortLike {
+  readonly kind = 'web-serial';
+  readonly capabilities = {
+    ...LINE_TRANSPORT_CAPABILITIES,
+    userGestureOpenRequired: true,
+  };
+
   private _port: SerialPort | null = null;
   private _reader: ReadableStreamDefaultReader | null = null;
   private _writer: WritableStreamDefaultWriter | null = null;
@@ -22,6 +33,10 @@ export class WebSerialPort implements SerialPortLike {
   static isSupported(): boolean {
     if (typeof navigator === 'undefined') return false;
     return 'serial' in navigator;
+  }
+
+  async open(options?: TransportOpenOptions): Promise<void> {
+    await this.requestAndOpen(options?.baudRate ?? 115200, options?.signal);
   }
 
   /**
@@ -133,16 +148,45 @@ export class WebSerialPort implements SerialPortLike {
     await this._writer.write(new Uint8Array([byte]));
   }
 
-  onData(callback: (line: string) => void): void {
+  async writeLine(line: string): Promise<void> {
+    await this.writeCritical(line.endsWith('\n') ? line : `${line}\n`);
+  }
+
+  async writeCriticalLine(line: string): Promise<void> {
+    await this.writeCritical(line.endsWith('\n') ? line : `${line}\n`);
+  }
+
+  writeRealtimeByte(byte: number): void {
+    this.writeByte(byte);
+  }
+
+  async writeCriticalRealtimeByte(byte: number): Promise<void> {
+    await this.writeByteCritical(byte);
+  }
+
+  onLine(callback: (line: string) => void): Unsubscribe {
+    return this.onData(callback);
+  }
+
+  onData(callback: (line: string) => void): Unsubscribe {
     this._dataCallback = callback;
+    return () => {
+      if (this._dataCallback === callback) this._dataCallback = null;
+    };
   }
 
-  onError(callback: (error: Error) => void): void {
+  onError(callback: (error: Error) => void): Unsubscribe {
     this._errorCallback = callback;
+    return () => {
+      if (this._errorCallback === callback) this._errorCallback = null;
+    };
   }
 
-  onClose(callback: () => void): void {
+  onClose(callback: () => void): Unsubscribe {
     this._closeCallback = callback;
+    return () => {
+      if (this._closeCallback === callback) this._closeCallback = null;
+    };
   }
 
   // T2-31: async close. `isOpen` flips to false synchronously at entry

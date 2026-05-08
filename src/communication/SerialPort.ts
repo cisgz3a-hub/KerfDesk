@@ -4,6 +4,14 @@
  * In tests, backed by a mock.
  */
 
+import {
+  LINE_TRANSPORT_CAPABILITIES,
+  type TransportCapabilities,
+  type TransportKind,
+  type TransportOpenOptions,
+  type Unsubscribe,
+} from '../transports/Transport';
+
 export interface SerialPortLike {
   write(data: string): void;
   writeByte(byte: number): void;
@@ -50,6 +58,9 @@ export interface SerialPortLike {
  * Mock serial port for testing. Simulates GRBL responses.
  */
 export class MockSerialPort implements SerialPortLike {
+  readonly kind = 'mock-serial';
+  readonly capabilities = LINE_TRANSPORT_CAPABILITIES;
+
   private _isOpen = false;
   private _dataCallback: ((line: string) => void) | null = null;
   private _errorCallback: ((error: Error) => void) | null = null;
@@ -85,7 +96,7 @@ export class MockSerialPort implements SerialPortLike {
 
   get isOpen(): boolean { return this._isOpen; }
 
-  open(): void {
+  async open(_options?: TransportOpenOptions): Promise<void> {
     this._isOpen = true;
     this.injectResponse("Grbl 1.1h ['$' for help]");
   }
@@ -168,9 +179,46 @@ export class MockSerialPort implements SerialPortLike {
     this.writeByte(byte);
   }
 
-  onData(callback: (line: string) => void): void { this._dataCallback = callback; }
-  onError(callback: (error: Error) => void): void { this._errorCallback = callback; }
-  onClose(callback: () => void): void { this._closeCallback = callback; }
+  async writeLine(line: string): Promise<void> {
+    this.write(line.endsWith('\n') ? line : `${line}\n`);
+  }
+
+  async writeCriticalLine(line: string): Promise<void> {
+    await this.writeCritical(line.endsWith('\n') ? line : `${line}\n`);
+  }
+
+  writeRealtimeByte(byte: number): void {
+    this.writeByte(byte);
+  }
+
+  async writeCriticalRealtimeByte(byte: number): Promise<void> {
+    await this.writeByteCritical(byte);
+  }
+
+  onLine(callback: (line: string) => void): Unsubscribe {
+    return this.onData(callback);
+  }
+
+  onData(callback: (line: string) => void): Unsubscribe {
+    this._dataCallback = callback;
+    return () => {
+      if (this._dataCallback === callback) this._dataCallback = null;
+    };
+  }
+
+  onError(callback: (error: Error) => void): Unsubscribe {
+    this._errorCallback = callback;
+    return () => {
+      if (this._errorCallback === callback) this._errorCallback = null;
+    };
+  }
+
+  onClose(callback: () => void): Unsubscribe {
+    this._closeCallback = callback;
+    return () => {
+      if (this._closeCallback === callback) this._closeCallback = null;
+    };
+  }
 
   // T2-31: async close. The mock has nothing to await — the in-memory
   // state flips synchronously and the close callback fires immediately,

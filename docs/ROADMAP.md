@@ -16979,6 +16979,8 @@ interface HttpJobTransport extends Transport {
 
 **Cross-check note (audit 3A):** Audit's section 7. Verified `SerialPortLike` is the only transport contract.
 
+**Status:** Shipped in `6ac9cce` (focused foundation for T2-30). Added protocol-neutral `Transport`, `LineTransport`, `ByteTransport`, and `HttpJobTransport` contracts in `src/transports/Transport.ts` with runtime guards and shared line-transport capabilities. `MockSerialPort` and `WebSerialPort` now expose the `LineTransport` surface (`kind`, `capabilities`, `open`, `writeLine`, critical-line/realtime-byte aliases, and unsubscribe-capable line/error/close listeners) while preserving the legacy `SerialPortLike` contract so current GRBL call sites and test stubs do not need to migrate in this slice. Pinned by `tests/transport-abstraction.test.ts` (26 contracts). **Hardware verification: not required** (type/API foundation over existing serial write paths; no controller execution path or emitted G-code changed). `T2-30` remains blocked on Falcon WiFi protocol investigation and the real controller/job-execution implementation.
+
 ---
 
 ### T3-46 | Profile schema split 鈥?Device / Controller / Transport / Output
@@ -20130,7 +20132,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
 - [ ] T3-44 Generic progress model 鈥?line/byte/percent/device-reported (filed; depends on T2-24)
-- [ ] T3-45 Transport abstraction layer 鈥?Line/Byte/HttpJob transports (filed; foundation for T2-30 and any non-serial controller)
+- [x] T3-45 Transport abstraction layer 鈥?Line/Byte/HttpJob transports (Shipped — focused foundation in `6ac9cce`; real Falcon WiFi controller remains T2-30)
 - [ ] T3-46 Profile schema split 鈥?Device / Controller / Transport / Output (filed; quality-of-life for multi-controller)
 - [ ] T3-47 Generic safety operations API 鈥?capability-gated pause/stop/laserOff/testFire (filed; depends on T2-26, overlaps T2-12)
 - [ ] T3-48 `navigator.serial.getPorts()` device-reuse flow (filed; UX, depends on T2-31, T3-46)
