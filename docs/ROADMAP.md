@@ -16517,7 +16517,7 @@ Optional follow-on: classical halftone screening (clustered-dot patterns at user
 
 ### T3-28 | SVG inherited group styles applied at flatten time
 
-**Status:** Shipped in `<TBD>` — `parseSvg` now carries a computed style context while flattening groups, so inherited `stroke`, `fill`, and `stroke-width` survive alongside inherited transforms. `SvgToScene` uses that computed style for color-to-layer mapping, while retaining fallback support for raw element attrs/style. Pinned by `tests/svg-inherited-group-styles.test.ts` plus existing SVG import/placement/complexity/text-warning tests. **Hardware verification: not required** (SVG import style mapping only; no G-code, motion, controller, or safety gate behavior changed).
+**Status:** Shipped in `85e5971` — `parseSvg` now carries a computed style context while flattening groups, so inherited `stroke`, `fill`, and `stroke-width` survive alongside inherited transforms. `SvgToScene` uses that computed style for color-to-layer mapping, while retaining fallback support for raw element attrs/style. Pinned by `tests/svg-inherited-group-styles.test.ts` plus existing SVG import/placement/complexity/text-warning tests. **Hardware verification: not required** (SVG import style mapping only; no G-code, motion, controller, or safety gate behavior changed).
 
 **Code reference:** `src/import/svg/SvgToScene.ts:178` (comment "Group inheritance is not available after flattening"), `src/import/svg/SvgParser.ts:200-211` (transform inheritance works; style does not).
 
@@ -20367,7 +20367,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
 - [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
-- [x] T3-28 SVG inherited group styles applied at flatten time (Shipped in `<TBD>` — group presentation styles now survive flattening)
+- [x] T3-28 SVG inherited group styles applied at flatten time (Shipped in `85e5971` — group presentation styles now survive flattening)
 - [ ] T3-29 Open path ordering within cut operations 鈥?score-before-cut
 - [ ] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support
 - [ ] T3-31 Self-intersection detection and repair for fill/cut
