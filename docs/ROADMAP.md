@@ -6431,7 +6431,7 @@ Note `computeSceneBounds` in `bounds.ts:69` filters by `obj.visible && layer.vis
 
 **Priority:** Tier 1 — frame motion goes beyond the burn area and potentially off-bed. Same severity class as T1-39, T1-40, T1-42 (frame ≠ burn). Hardware verification by re-running the Falcon tester repro: design the same scene with a guide layer, frame in Origin mode, confirm frame outline matches the engraving area only.
 
-**Status:** Open.
+**Status:** Code shipped 2026-05-08 in `<TBD>`, awaiting hardware verification. **Hardware verification needed — Falcon A1 Pro front-origin burn test.** Master checklist remains `[ ]` until tester confirms the frame outline matches the engraving area when a visible guide layer is present.
 
 ---
 

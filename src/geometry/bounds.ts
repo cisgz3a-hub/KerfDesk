@@ -86,6 +86,34 @@ export function computeSceneBounds(scene: Scene): AABB {
   return bounds;
 }
 
+// T1-109: canonical "what will burn" bounds. Same predicate the
+// JobCompiler's getOutputLayers (l.visible && l.output) +
+// objectsOnLayerInSceneOrder (o.visible) apply, so frame motion
+// derived from these bounds matches the compiled job's geometry.
+//
+// computeSceneBounds is intentionally separate — viewport rendering
+// (SceneRenderer) and SVG import positioning (SvgToScene) need full
+// scene bounds including guide / reference layers (output: false).
+export function computeOutputBounds(scene: Scene): AABB {
+  let bounds = emptyAABB();
+
+  const outputLayerIds = new Set(
+    scene.layers.filter(l => l.visible && l.output).map(l => l.id)
+  );
+
+  for (const obj of scene.objects) {
+    if (!obj.visible) continue;
+    if (!outputLayerIds.has(obj.layerId)) continue;
+
+    const objBounds = computeObjectBounds(obj);
+    if (isValidBounds(objBounds)) {
+      bounds = mergeAABB(bounds, objBounds);
+    }
+  }
+
+  return bounds;
+}
+
 /**
  * Compute world-space AABB for a single SceneObject.
  * Applies the object's transform matrix to geometry bounds.

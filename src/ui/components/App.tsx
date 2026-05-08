@@ -76,7 +76,7 @@ import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
-import { computeObjectBounds } from '../../geometry/bounds';
+import { computeOutputBounds } from '../../geometry/bounds';
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
@@ -152,19 +152,16 @@ export function App(): React.ReactElement {
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
 
-  const sceneBounds = useMemo(() => {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const obj of scene.objects) {
-      if (!obj.visible) continue;
-      const b = computeObjectBounds(obj);
-      if (!b) continue;
-      minX = Math.min(minX, b.minX);
-      minY = Math.min(minY, b.minY);
-      maxX = Math.max(maxX, b.maxX);
-      maxY = Math.max(maxY, b.maxY);
-    }
-    return { minX, minY, maxX, maxY };
-  }, [scene.objects]);
+  // T1-109: scene bounds for the framing path must match what the
+  // JobCompiler will actually emit — visible objects on visible &&
+  // output layers. Pre-T1-109 this iterated `scene.objects` filtered
+  // only by `obj.visible`, which inflated the frame box to include
+  // guide / reference layers (output: false) and could push the
+  // frame off-bed even though the burn area was inside.
+  const sceneBounds = useMemo(
+    () => computeOutputBounds(scene),
+    [scene],
+  );
 
   const canvasSize = useViewportStore(s => s.canvasSize);
   const setCanvasSize = useViewportStore(s => s.setCanvasSize);
