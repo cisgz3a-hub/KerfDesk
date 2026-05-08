@@ -35,6 +35,7 @@ import {
 } from '../../app/CurrentFrameAnchor';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
 import { computeGcodeOffset, type GcodeStartMode } from '../../core/output/GcodeOrigin';
+import { physicalBoundsFromWorkBounds } from '../../core/plan/MachineBounds';
 import { SimulatorView } from './SimulatorView';
 import { ConnectionControls } from './ConnectionControls';
 import { MoveControls } from './MoveControls';
@@ -474,6 +475,8 @@ export function ConnectionPanelMain({
       controllerRef.current?.getFirmwareLaserModeEnabled?.(),
       typeof ctrlMaxSpindle === 'number' && ctrlMaxSpindle > 0 ? ctrlMaxSpindle : undefined,
       unsafeAtConnect != null ? unsafeAtConnect.reason : null,
+      startMode,
+      savedOrigin,
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
@@ -498,6 +501,8 @@ export function ConnectionPanelMain({
     preflightPlanMaxY,
     preflightGcodeHeaderTemplate,
     compiledJobTicket,
+    startMode,
+    savedOrigin,
   ]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
@@ -771,6 +776,23 @@ export function ConnectionPanelMain({
     sceneBounds.minY,
     sceneBounds.maxX,
     sceneBounds.maxY,
+  ]);
+
+  const framePhysicalBounds = useMemo(() => {
+    const workOrigin =
+      startMode === 'current'
+        ? machineState?.position ?? null
+        : startMode === 'savedOrigin'
+          ? savedOrigin
+          : null;
+    return physicalBoundsFromWorkBounds(frameMachineBounds, startMode, workOrigin);
+  }, [
+    frameMachineBounds,
+    startMode,
+    machineState?.position?.x,
+    machineState?.position?.y,
+    savedOrigin?.x,
+    savedOrigin?.y,
   ]);
 
   // T1-104 + T1-30: exact-idle gate via the centralized helper. Frame,
@@ -1060,10 +1082,10 @@ export function ConnectionPanelMain({
     // post-transform machine-space corners that the frame motion
     // actually traces. Pre-T1-42, this read the un-flipped workFrame
     // and could disagree with reality on front-origin machines.
-    const x1 = frameMachineBounds.minX;
-    const y1 = frameMachineBounds.minY;
-    const x2 = frameMachineBounds.maxX;
-    const y2 = frameMachineBounds.maxY;
+    const x1 = framePhysicalBounds.minX;
+    const y1 = framePhysicalBounds.minY;
+    const x2 = framePhysicalBounds.maxX;
+    const y2 = framePhysicalBounds.maxY;
 
     // T1-42 + audit Finding 2D-09: hard-block off-bed motion. Frame
     // is the user's chance to verify burn area before committing —
@@ -1102,7 +1124,7 @@ export function ConnectionPanelMain({
       return ok;
     }
     return true;
-  }, [frameMachineBounds, bedWidth, bedHeight, showAlert, showConfirm]);
+  }, [framePhysicalBounds, bedWidth, bedHeight, showAlert, showConfirm]);
 
   const handleFrameSafe = useCallback(async () => {
     if (!canFrame) return;

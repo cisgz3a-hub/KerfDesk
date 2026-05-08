@@ -1,8 +1,7 @@
 /**
- * Local workpiece modes (current head and saved zero) must not mirror the
- * artwork inside the local job box. Bed-origin mirroring belongs to absolute
- * canvas-position mode, where we map the on-screen bed grid to machine
- * coordinates. In local modes the user has already chosen the physical anchor.
+ * Local workpiece modes (current head and saved zero) keep the user's physical
+ * anchor, but must still follow the machine's axis signs. On front-origin
+ * machines, canvas-down motion from the anchor is negative machine/work Y.
  *
  * Run: npx tsx tests/local-origin-transform-preserves-orientation.test.ts
  */
@@ -63,14 +62,14 @@ function moveTargets(result: ReturnType<typeof applyMachineTransform>) {
     .map(m => m.to);
 }
 
-console.log('\n=== local-origin transform preserves orientation ===\n');
+console.log('\n=== local-origin transform follows machine axis signs ===\n');
 
 {
   const result = applyMachineTransform(plan, opts({ startMode: 'current' }));
   const targets = moveTargets(result);
-  assert(result.flipY === false, 'current/front-left reports no bed Y mirror');
+  assert(result.flipY === true, 'current/front-left reports front-origin Y sign flip');
   assertClose(targets[0].y, 0, 'current/front-left top point stays at local Y0');
-  assertClose(targets[1].y, 50, 'current/front-left lower point stays below top point');
+  assertClose(targets[1].y, -50, 'current/front-left lower point moves negative machine Y');
   assertClose(targets[2].x, 100, 'current/front-left right point stays right of left point');
 }
 
@@ -80,9 +79,9 @@ console.log('\n=== local-origin transform preserves orientation ===\n');
     savedOrigin: { x: 0, y: 0 },
   }));
   const targets = moveTargets(result);
-  assert(result.flipY === false, 'savedOrigin/front-left reports no bed Y mirror');
+  assert(result.flipY === true, 'savedOrigin/front-left reports front-origin Y sign flip');
   assertClose(targets[0].y, 0, 'savedOrigin/front-left top point stays at local Y0');
-  assertClose(targets[1].y, 50, 'savedOrigin/front-left lower point stays below top point');
+  assertClose(targets[1].y, -50, 'savedOrigin/front-left lower point moves negative work Y');
 }
 
 {
@@ -97,7 +96,7 @@ console.log('\n=== local-origin transform preserves orientation ===\n');
     opts({ startMode: 'current' }),
   );
   assertClose(topLeft.y, 0, 'transformPointToMachine current top-left local Y0');
-  assertClose(bottomLeft.y, 50, 'transformPointToMachine current bottom-left local Y50');
+  assertClose(bottomLeft.y, -50, 'transformPointToMachine current bottom-left local Y-50');
 }
 
 {
@@ -107,9 +106,9 @@ console.log('\n=== local-origin transform preserves orientation ===\n');
     bedWidthMm: 400,
   }));
   const targets = moveTargets(result);
-  assert(result.flipY === false, 'current/front-right reports no bed Y mirror');
+  assert(result.flipY === true, 'current/front-right reports front-origin Y sign flip');
   assertClose(targets[0].x, 0, 'current/front-right left point stays at local X0');
-  assertClose(targets[2].x, 100, 'current/front-right right point stays right of left point');
+  assertClose(targets[2].x, -100, 'current/front-right right point moves negative machine X');
 }
 
 {

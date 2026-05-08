@@ -4,9 +4,10 @@
  * front-origin machines use machineY = bedHeightMm - canvasY (+ offset), while
  * rear-origin machines use machineY = canvasY (+ offset).
  *
- * Local workpiece modes (`current` and `savedOrigin`) keep the artwork's local
- * orientation. The user has already chosen the physical anchor in those modes,
- * so applying the bed-origin mirror again would burn local text upside down.
+ * Local workpiece modes (`current` and `savedOrigin`) keep the user's chosen
+ * physical anchor, but still follow the machine axis directions. On front-origin
+ * machines, canvas-down motion must become negative local/work Y from that
+ * anchor; otherwise head-origin text burns upside down.
  *
  * Pipeline position: Plan -> [applyMachineTransform] -> TransformedPlan -> strategy.generate -> Output
  */
@@ -47,7 +48,8 @@ export interface MachineTransformResult {
   offsetY: number;
   /**
    * Reference Y used when flipY is true: machineY = flipReferenceY - canvasY + offsetY.
-   * Equals physical bed height for front-left / front-right.
+   * Equals physical bed height for absolute front-origin placement, or the design
+   * minY for local workpiece modes.
    */
   flipReferenceY: number;
   /** True when Y is mirrored into machine space (front-left / front-right). */
@@ -74,6 +76,10 @@ function shouldUseBedOriginMapping(startMode: GcodeStartMode): boolean {
   return startMode === 'absolute';
 }
 
+function shouldUseLocalAxisMapping(startMode: GcodeStartMode): boolean {
+  return startMode === 'current' || startMode === 'savedOrigin';
+}
+
 /**
  * Transform all move coordinates in a Plan from canvas space to machine space.
  * Returns a new Plan (original is not mutated) plus the transform parameters
@@ -97,8 +103,10 @@ export function applyMachineTransform(
   const maxY = Number.isFinite(bounds.maxY) ? bounds.maxY : 0;
 
   const useBedOriginMapping = shouldUseBedOriginMapping(options.startMode);
-  const flipY = useBedOriginMapping && shouldFlipYForFrontOrigin(options.originCorner);
-  const flipX = useBedOriginMapping && shouldFlipXForRightOrigin(options.originCorner);
+  const useLocalAxisMapping = shouldUseLocalAxisMapping(options.startMode);
+  const useMachineAxisMapping = useBedOriginMapping || useLocalAxisMapping;
+  const flipY = useMachineAxisMapping && shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = useMachineAxisMapping && shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
@@ -112,12 +120,12 @@ export function applyMachineTransform(
     );
   }
   const bedW = options.bedWidthMm ?? 0;
-  const flipReferenceY = flipY ? bedH : maxY;
-  const flipReferenceX = flipX ? bedW : maxX;
+  const flipReferenceY = flipY ? (useBedOriginMapping ? bedH : minY) : maxY;
+  const flipReferenceX = flipX ? (useBedOriginMapping ? bedW : minX) : maxX;
 
   const offsetDesignMin = {
-    minX: flipX ? bedW - maxX : minX,
-    minY: flipY ? bedH - maxY : minY,
+    minX: flipX ? (useBedOriginMapping ? bedW - maxX : 0) : minX,
+    minY: flipY ? (useBedOriginMapping ? bedH - maxY : 0) : minY,
   };
 
   const offset = computeGcodeOffset(
@@ -213,8 +221,10 @@ export function transformPointToMachine(
   options: MachineTransformOptions,
 ): { x: number; y: number } {
   const useBedOriginMapping = shouldUseBedOriginMapping(options.startMode);
-  const flipY = useBedOriginMapping && shouldFlipYForFrontOrigin(options.originCorner);
-  const flipX = useBedOriginMapping && shouldFlipXForRightOrigin(options.originCorner);
+  const useLocalAxisMapping = shouldUseLocalAxisMapping(options.startMode);
+  const useMachineAxisMapping = useBedOriginMapping || useLocalAxisMapping;
+  const flipY = useMachineAxisMapping && shouldFlipYForFrontOrigin(options.originCorner);
+  const flipX = useMachineAxisMapping && shouldFlipXForRightOrigin(options.originCorner);
   const bedH =
     Number.isFinite(options.bedHeightMm) && options.bedHeightMm > 0
       ? options.bedHeightMm
@@ -225,12 +235,12 @@ export function transformPointToMachine(
     );
   }
   const bedW = options.bedWidthMm ?? 0;
-  const flipReferenceY = flipY ? bedH : sceneBounds.maxY;
-  const flipReferenceX = flipX ? bedW : sceneBounds.maxX;
+  const flipReferenceY = flipY ? (useBedOriginMapping ? bedH : sceneBounds.minY) : sceneBounds.maxY;
+  const flipReferenceX = flipX ? (useBedOriginMapping ? bedW : sceneBounds.minX) : sceneBounds.maxX;
 
   const offsetDesignMin = {
-    minX: flipX ? bedW - sceneBounds.maxX : sceneBounds.minX,
-    minY: flipY ? bedH - sceneBounds.maxY : sceneBounds.minY,
+    minX: flipX ? (useBedOriginMapping ? bedW - sceneBounds.maxX : 0) : sceneBounds.minX,
+    minY: flipY ? (useBedOriginMapping ? bedH - sceneBounds.maxY : 0) : sceneBounds.minY,
   };
 
   const offset = computeGcodeOffset(

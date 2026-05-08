@@ -57,6 +57,81 @@ console.log('\n=== Preflight bounds guardrails ===');
 
 {
   const s = sceneWithRect();
+  const headAtWorkpiece = {
+    ...idle,
+    position: { x: 100, y: 100, z: 0 },
+  };
+  const r = runPreflightSummary(
+    s,
+    null,
+    headAtWorkpiece,
+    400,
+    300,
+    { minX: 0, maxX: 50, minY: -50, maxY: 0 },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'current',
+  );
+  assert(
+    !r.issues.some(i => i.id === 'output-negative-y'),
+    'current/head local negative Y offset by current machine position does not block',
+  );
+  assert(r.canStart, 'current/head local negative Y can start when physical bounds stay on bed');
+}
+
+{
+  const s = sceneWithRect();
+  const r = runPreflightSummary(
+    s,
+    null,
+    idle,
+    400,
+    300,
+    { minX: 0, maxX: 50, minY: -50, maxY: 0 },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'savedOrigin',
+    { x: 100, y: 100 },
+  );
+  assert(
+    !r.issues.some(i => i.id === 'output-negative-y'),
+    'saved-zero local negative Y offset by saved origin does not block',
+  );
+  assert(r.canStart, 'saved-zero local negative Y can start when physical bounds stay on bed');
+}
+
+{
+  const s = sceneWithRect();
+  const headNearFront = {
+    ...idle,
+    position: { x: 100, y: 20, z: 0 },
+  };
+  const r = runPreflightSummary(
+    s,
+    null,
+    headNearFront,
+    400,
+    300,
+    { minX: 0, maxX: 50, minY: -50, maxY: 0 },
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    'current',
+  );
+  assert(
+    r.issues.some(i => i.id === 'output-negative-y' && i.severity === 'blocker'),
+    'current/head still blocks when physical relative bounds cross the front edge',
+  );
+  assert(!r.canStart, 'current/head physical negative bed crossing blocks start');
+}
+
+{
+  const s = sceneWithRect();
   const r = runPreflightSummary(s, null, idle, 400, 300, { minX: -2, maxX: 10, minY: -4, maxY: 10 });
   assert(r.issues.filter(i => i.id === 'output-negative-x' || i.id === 'output-negative-y').length === 2, 'both axes negative → two blockers');
 }

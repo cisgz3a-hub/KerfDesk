@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 360 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 465 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 361 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 466 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 38 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 90 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 91 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 10 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 412 | - |
+| `tests/` | 413 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -173,6 +173,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/plan/FillGenerator.ts`
 - `src/core/plan/GcodeTemplateValidator.ts`
 - `src/core/plan/GcodeTemplates.ts`
+- `src/core/plan/MachineBounds.ts`
 - `src/core/plan/MachineTransform.ts`
 - `src/core/plan/OperationOrderer.ts`
 - `src/core/plan/PathOptimizer.ts`
@@ -579,6 +580,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/crash-reporting-privacy.test.ts`
 - `tests/critical-event-preservation.test.ts`
 - `tests/csp-policy.test.ts`
+- `tests/current-head-front-origin-orientation.test.ts`
 - `tests/current-mode-frame-anchor.test.ts`
 - `tests/customstart-mode-reassertion.test.ts`
 - `tests/delete-marks-dirty.test.ts`

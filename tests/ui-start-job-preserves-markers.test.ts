@@ -78,6 +78,10 @@ async function run(): Promise<void> {
   await ctrl.connect(port);
   await flush(30);
   await flush(30);
+  // This test validates marker propagation, not machine placement. Head-mode
+  // jobs use relative motion from the current head, so seed a safe physical
+  // head position before the controller's fresh-status bounds check.
+  port.nextStatusQueryResponse = '<Idle|MPos:50.000,100.000,0.000|WPos:50.000,100.000,0.000|FS:0,0>';
 
   const nonEmptyEvents: { ids: string[] }[] = [];
   ctrl.onObjectLifecycle?.((activeObjectIds: readonly string[]) => {

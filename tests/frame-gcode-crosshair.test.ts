@@ -165,11 +165,11 @@ console.log('\n=== frame-gcode crosshair ===\n');
       'G21',
       'M4 S5',
       'G1 X100.000 Y0.000 F3000',
-      'G1 X0.000 Y100.000 F3000',
-      'G1 X-100.000 Y0.000 F3000',
       'G1 X0.000 Y-100.000 F3000',
+      'G1 X-100.000 Y0.000 F3000',
+      'G1 X0.000 Y100.000 F3000',
       'M5 S0',
-      'G0 X55.000 Y50.000',
+      'G0 X55.000 Y-50.000',
       'M4 S5',
       'G1 X-10.000 Y0.000 F3000',
       'G1 X5.000 Y0.000 F3000',
@@ -177,10 +177,10 @@ console.log('\n=== frame-gcode crosshair ===\n');
       'G1 X0.000 Y-10.000 F3000',
       'G1 X0.000 Y5.000 F3000',
       'M5 S0',
-      'G0 X-50.000 Y-50.000',
+      'G0 X-50.000 Y50.000',
       'G90',
     ],
-    'current/dot crosshair: relative rectangle and center mark in local orientation',
+    'current/dot crosshair: relative rectangle and center mark follow front-origin axis signs',
   );
   assert(dotWithCrosshairRel[0] === 'G91', 'current/dot crosshair: starts in relative mode');
   assert(dotWithCrosshairRel.at(-1) === 'G90', 'current/dot crosshair: restores absolute mode');

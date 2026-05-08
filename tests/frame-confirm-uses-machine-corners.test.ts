@@ -14,7 +14,8 @@
  *      that match the corners' bounding box (Y is flipped).
  *   2. Source-level pin on ConnectionPanelMain: `workFrame` is
  *      gone, `frameMachineBounds` reads through buildFrameCorners,
- *      `confirmFrameBounds` consumes `frameMachineBounds`, and
+ *      `framePhysicalBounds` offsets local work bounds for head/saved-zero
+ *      modes, `confirmFrameBounds` consumes `framePhysicalBounds`, and
  *      off-bed bounds trigger a showAlert (block) rather than the
  *      old warn-and-continue confirm.
  *
@@ -86,6 +87,8 @@ console.log('\n=== T1-42 frame-confirm uses machine corners ===\n');
     'workFrame useMemo is removed (replaced by frameMachineBounds)');
   assert(/const\s+frameMachineBounds\s*=\s*useMemo/.test(src),
     'frameMachineBounds useMemo is defined');
+  assert(/const\s+framePhysicalBounds\s*=\s*useMemo/.test(src),
+    'framePhysicalBounds useMemo is defined');
 
   // Find the frameMachineBounds memo body and verify it uses
   // buildFrameCorners.
@@ -98,19 +101,28 @@ console.log('\n=== T1-42 frame-confirm uses machine corners ===\n');
   assert(/bedWidthMm:\s*bedWidth/.test(memoBody),
     'frameMachineBounds memo passes bedWidthMm (T1-40 right-origin support)');
 
+  const physicalStart = src.indexOf('const framePhysicalBounds = useMemo');
+  assert(physicalStart >= 0, 'framePhysicalBounds memo block locatable');
+  const physicalEnd = src.indexOf('}, [', physicalStart);
+  const physicalBody = src.slice(physicalStart, physicalEnd);
+  assert(/physicalBoundsFromWorkBounds\(/.test(physicalBody),
+    'framePhysicalBounds offsets local frame bounds into physical machine bounds');
+  assert(/frameMachineBounds/.test(physicalBody),
+    'framePhysicalBounds consumes frameMachineBounds');
+
   // confirmFrameBounds body: consumes frameMachineBounds, blocks
   // off-bed via showAlert, keeps the coverage-only warning as
   // showConfirm.
   const confStart = src.indexOf('const confirmFrameBounds = useCallback');
   assert(confStart >= 0, 'confirmFrameBounds is defined');
-  const confEnd = src.indexOf('}, [frameMachineBounds', confStart);
-  assert(confEnd > confStart, 'confirmFrameBounds dep array starts with frameMachineBounds');
+  const confEnd = src.indexOf('}, [framePhysicalBounds', confStart);
+  assert(confEnd > confStart, 'confirmFrameBounds dep array starts with framePhysicalBounds');
   const confBody = src.slice(confStart, confEnd);
 
-  assert(/frameMachineBounds\.minX/.test(confBody),
-    'confirmFrameBounds reads frameMachineBounds.minX (NOT workFrame.minX)');
-  assert(/frameMachineBounds\.maxY/.test(confBody),
-    'confirmFrameBounds reads frameMachineBounds.maxY (NOT workFrame.maxY)');
+  assert(/framePhysicalBounds\.minX/.test(confBody),
+    'confirmFrameBounds reads framePhysicalBounds.minX (physical bed check)');
+  assert(/framePhysicalBounds\.maxY/.test(confBody),
+    'confirmFrameBounds reads framePhysicalBounds.maxY (physical bed check)');
   assert(!/workFrame\./.test(confBody),
     'confirmFrameBounds no longer references workFrame');
 

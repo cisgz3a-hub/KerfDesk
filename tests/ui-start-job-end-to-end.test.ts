@@ -78,6 +78,10 @@ async function run(): Promise<void> {
   port.open();
   await controller.connect(port);
   await flush(60);
+  // Head-mode G-code is relative to the current laser head. This test is
+  // about marker/lifecycle propagation, so park the simulated head safely
+  // inside the bed before sendJob performs its fresh-status bounds check.
+  port.nextStatusQueryResponse = '<Idle|MPos:50.000,100.000,0.000|WPos:50.000,100.000,0.000|FS:0,0>';
 
   const lifecycleOrder: string[] = [];
   controller.onObjectLifecycle?.((activeIds: readonly string[]) => {

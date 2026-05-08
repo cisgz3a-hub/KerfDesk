@@ -124,12 +124,18 @@ void (async () => {
   // T1-32 / T1-33 / T1-55 preflight rules see a fully populated
   // liveMachineInfo and don't flag the test scene as "connected with
   // missing $30" / "$32 unknown" etc. Pre-T1-55 these args were absent.
+  const headAtWorkpiece: MachineState = {
+    ...idle,
+    position: { x: 50, y: 50, z: 0 },
+  };
   const preflight = runPreflightSummary(
-    scene2, r2?.gcode ?? null, idle, 400, 300, r2?.machinePlanBounds ?? null,
+    scene2, r2?.gcode ?? null, headAtWorkpiece, 400, 300, r2?.machinePlanBounds ?? null,
     /* firmwareHomingFromMachine */ false,
     /* firmwareLaserModeFromMachine */ true,
     /* firmwareMaxSpindleFromMachine */ 1000,
     /* firmwareUnsafeAtConnect */ null,
+    'current',
+    r2?.ticket.savedOrigin ?? null,
   );
   assert(preflight.canStart, 'preflight can start for compile scene');
 

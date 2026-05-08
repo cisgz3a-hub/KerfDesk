@@ -1,7 +1,7 @@
 /**
- * Current/head frame mode uses local workpiece coordinates. Front-origin bed
- * mirroring is intentionally not applied here; the user has already jogged the
- * laser to the physical anchor.
+ * Current/head frame mode uses local workpiece coordinates from the user's
+ * anchor, while still following machine axis signs. On front-origin machines,
+ * the lower canvas edge is a negative relative Y move from the head.
  *
  * Run: npx tsx tests/frame-current-mode-emits-first-move.test.ts
  */
@@ -46,7 +46,7 @@ function sumDeltas(lines: readonly string[]): { x: number; y: number } {
   return { x, y };
 }
 
-console.log('\n=== frame current-mode local orientation ===\n');
+console.log('\n=== frame current-mode local machine-axis orientation ===\n');
 
 {
   const sceneBounds = { minX: 10, minY: 20, maxX: 110, maxY: 70 };
@@ -63,8 +63,8 @@ console.log('\n=== frame current-mode local orientation ===\n');
     `front-origin current: corners[0] is local origin, got (${corners[0].x}, ${corners[0].y})`,
   );
   assert(
-    Math.abs(corners[2].x - 100) < 0.001 && Math.abs(corners[2].y - 50) < 0.001,
-    `front-origin current: lower-right stays at (100, 50), got (${corners[2].x}, ${corners[2].y})`,
+    Math.abs(corners[2].x - 100) < 0.001 && Math.abs(corners[2].y + 50) < 0.001,
+    `front-origin current: lower-right uses negative Y (100, -50), got (${corners[2].x}, ${corners[2].y})`,
   );
 
   const lines = buildFrameGcode(corners, {
@@ -82,6 +82,14 @@ console.log('\n=== frame current-mode local orientation ===\n');
     assert(
       Math.abs(firstMove.x - 100) < 0.001 && Math.abs(firstMove.y - 0) < 0.001,
       `front-origin current: first move traces top edge, got (${firstMove.x}, ${firstMove.y})`,
+    );
+  }
+  const secondMove = parseDelta(moves[1]);
+  assert(secondMove !== null, 'front-origin current: second move parses');
+  if (secondMove) {
+    assert(
+      Math.abs(secondMove.x - 0) < 0.001 && Math.abs(secondMove.y + 50) < 0.001,
+      `front-origin current: second move goes negative Y, got (${secondMove.x}, ${secondMove.y})`,
     );
   }
 

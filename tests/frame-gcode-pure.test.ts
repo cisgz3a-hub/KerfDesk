@@ -49,11 +49,11 @@ console.log('\n=== frame-gcode pure (golden) ===\n');
     [
       { x: 0, y: 0 },
       { x: 100, y: 0 },
-      { x: 100, y: 100 },
-      { x: 0, y: 100 },
+      { x: 100, y: -100 },
+      { x: 0, y: -100 },
       { x: 0, y: 0 },
     ],
-    'buildFrameCorners current/head keeps local orientation',
+    'buildFrameCorners current/head follows front-origin axis signs',
   );
 
   const safe = buildFrameGcode(corners, {
@@ -68,13 +68,13 @@ console.log('\n=== frame-gcode pure (golden) ===\n');
       'G21',
       'M5 S0',
       'G0 X100.000 Y0.000',
-      'G0 X0.000 Y100.000',
-      'G0 X-100.000 Y0.000',
       'G0 X0.000 Y-100.000',
+      'G0 X-100.000 Y0.000',
+      'G0 X0.000 Y100.000',
       'M5 S0',
       'G90',
     ],
-    'frame safe current mode - local orientation',
+    'frame safe current mode - front-origin axis signs',
   );
 
   const dot = buildFrameGcode(corners, {
@@ -89,13 +89,13 @@ console.log('\n=== frame-gcode pure (golden) ===\n');
       'G21',
       'M4 S5',
       'G1 X100.000 Y0.000 F3000',
-      'G1 X0.000 Y100.000 F3000',
-      'G1 X-100.000 Y0.000 F3000',
       'G1 X0.000 Y-100.000 F3000',
+      'G1 X-100.000 Y0.000 F3000',
+      'G1 X0.000 Y100.000 F3000',
       'M5 S0',
       'G90',
     ],
-    'frame dot current mode - local orientation',
+    'frame dot current mode - front-origin axis signs',
   );
 }
 

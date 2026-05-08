@@ -5,6 +5,7 @@ import {
   NEGATIVE_COORD_SETTINGS_HINT,
   negativeCoordPreflightSeverity,
 } from './sharedHelpers';
+import { physicalBoundsFromWorkBounds } from '../../plan/MachineBounds';
 
 function pushBedSizeMismatchIfNeeded(
   ctx: PreflightContext,
@@ -28,8 +29,13 @@ function pushBedSizeMismatchIfNeeded(
 }
 
 export function runOutputBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): void {
-  const bounds = ctx.machinePlanBounds;
-  if (!bounds) return;
+  const rawBounds = ctx.machinePlanBounds;
+  if (!rawBounds) return;
+  const bounds = physicalBoundsFromWorkBounds(
+    rawBounds,
+    ctx.startMode,
+    ctx.workOriginMachinePosition,
+  );
 
   const bedW = ctx.liveMachineInfo?.bedWidthMm ?? ctx.profile?.bedWidth;
   const bedH = ctx.liveMachineInfo?.bedHeightMm ?? ctx.profile?.bedHeight;

@@ -4,6 +4,7 @@
 import { createBlankProfile, getActiveProfile, type DeviceProfile } from '../devices/DeviceProfile';
 import type { Scene } from '../scene/Scene';
 import type { ValidatedJobTicket } from '../job/ValidatedJobTicket';
+import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { MachineState, MachineStatus } from '../../controllers/ControllerInterface';
 import { runMachineStateChecks } from './rules/MachineStatePreflight';
 import { runSceneChecks, runDesignOutputLayerChecks } from './rules/ScenePreflight';
@@ -147,6 +148,12 @@ export interface PreflightContext {
   gcodeHeaderPreview?: string;
   /** When set, GRBL-style machine status for job-start guardrails. */
   machineStatus?: MachineStatus | null;
+  startMode?: GcodeStartMode;
+  /**
+   * Physical machine coordinate for local work zero. For head mode this is the
+   * current machine position; for saved-zero mode this is the saved origin.
+   */
+  workOriginMachinePosition?: { x: number; y: number } | null;
   machineAlarmCode?: number | null;
   hasGcode?: boolean;
   /** Machine-space plan bounds from applyMachineTransform (preferred over scene bounds for output checks). */
@@ -362,6 +369,8 @@ export function runPreflightSummary(
     | 'no-status-response'
     | 'unsafe-residual-spindle'
     | null,
+  startMode: GcodeStartMode = 'absolute',
+  savedOriginForPreflight?: { x: number; y: number } | null,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
@@ -382,6 +391,13 @@ export function runPreflightSummary(
     optimizeOrderEnabled: scene.compileOptions?.optimizeOrder !== false,
     connectedToMachine: machineState != null,
     machineStatus: machineState?.status ?? null,
+    startMode,
+    workOriginMachinePosition:
+      startMode === 'current'
+        ? machineState?.position ?? null
+        : startMode === 'savedOrigin'
+          ? savedOriginForPreflight ?? null
+          : null,
     machineAlarmCode: machineState?.alarmCode ?? null,
     hasGcode: gcode != null && gcode.length > 0,
     machinePlanBounds: machinePlanBounds ?? null,
