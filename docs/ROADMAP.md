@@ -6466,7 +6466,7 @@ Note `computeSceneBounds` in `bounds.ts:69` filters by `obj.visible && layer.vis
 
 **Priority:** Tier 1 — workflow blocker. The user-experienced symptom is "the app's broken / Start gone" for what's actually intentional safety gating that lacks user-visible explanation.
 
-**Status:** Shipped 2026-05-08 in `<TBD>`. Hardware verification not required — UI affordance only (disabled-Start contrast + auto-expand readiness panel for user-invalidated gates); no change to g-code emission, machine-state mutation, or gating logic; the 0.25mm Head-mode anchor tolerance is unchanged.
+**Status:** Shipped 2026-05-08 in `04bc24c`. Hardware verification not required — UI affordance only (disabled-Start contrast + auto-expand readiness panel for user-invalidated gates); no change to g-code emission, machine-state mutation, or gating logic; the 0.25mm Head-mode anchor tolerance is unchanged.
 
 ---
 
