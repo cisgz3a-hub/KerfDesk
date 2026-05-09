@@ -18807,7 +18807,7 @@ This appears as a one-time pre-connect dialog (skippable for users who've connec
 
 **Code reference:** T1-45 (compile complexity gate) addresses the upper limit. T3-72 is the user-visible summary that appears for ALL jobs, not just ones at the gate threshold.
 
-**Status:** Shipped in `<TBD>`. Added `src/app/JobComplexitySummary.ts` to count non-comment G-code commands, reuse existing plan/time stats, summarize raster DPI/fill spacing, format travel/burn distance, classify Low/Medium/High complexity, and surface informational dense-raster/long-job/high-command-count warnings. `ReadyToRunPanel` now renders a Job complexity section without changing compile, preflight, frame, start, or controller behavior. Pinned by `tests/job-complexity-summary.test.ts` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (review UI only).
+**Status:** Shipped in `131e32c`. Added `src/app/JobComplexitySummary.ts` to count non-comment G-code commands, reuse existing plan/time stats, summarize raster DPI/fill spacing, format travel/burn distance, classify Low/Medium/High complexity, and surface informational dense-raster/long-job/high-command-count warnings. `ReadyToRunPanel` now renders a Job complexity section without changing compile, preflight, frame, start, or controller behavior. Pinned by `tests/job-complexity-summary.test.ts` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (review UI only).
 
 **Problem:** Audit 4B Priority 10 + Section 13 ("Why is the job huge/slow?"): users need to understand whether their job will take 2 minutes or 2 hours, whether the raster density is reasonable, what the dominant operation is.
 
@@ -20512,7 +20512,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
 - [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `b3766cf` - Ready-to-Run job layout mini-map)
 - [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
-- [x] T3-72 Job complexity user-facing summary (Shipped in `<TBD>` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
+- [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
 - [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
