@@ -13,6 +13,10 @@ import {
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
 import { confirmLargeProjectLoad, parseSceneFile } from '../../io/LargeProjectHandling';
+import {
+  ProjectChecksumLoadCancelledError,
+  confirmProjectChecksumMismatch,
+} from '../../io/ProjectIntegrity';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
@@ -329,7 +333,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         if (name.endsWith('.laserforge.json') || name.endsWith('.json')) {
           const proceed = await confirmLargeProjectLoad(file.size, showConfirmRef.current);
           if (!proceed) return;
-          const loaded = await parseSceneFile(file);
+          const loaded = await parseSceneFile(file, {
+            confirmChecksumMismatch: result => confirmProjectChecksumMismatch(result, showConfirmRef.current),
+          });
           const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
           handleNewProject(annotated, 'file');
           const imageReport = formatMissingImageReferenceReport(validation);
@@ -377,6 +383,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
           }
         }
       } catch (err) {
+        if (err instanceof ProjectChecksumLoadCancelledError) return;
         console.error('Drop import failed:', err);
       }
     },

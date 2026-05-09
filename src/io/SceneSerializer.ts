@@ -21,17 +21,26 @@ import { type Scene } from '../core/scene/Scene';
 import { type SceneObject, type Geometry } from '../core/scene/SceneObject';
 import { type Layer } from '../core/scene/Layer';
 import { defaultLaserSettings, type LaserSettings, type LayerMode } from '../core/scene/Layer';
+import {
+  PROJECT_CHECKSUM_ALGORITHM,
+  ProjectChecksumMismatchError,
+  buildSceneChecksum,
+  validateSceneFileChecksum,
+} from './ProjectIntegrity';
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
 const APP_VERSION: string =
   typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '0.0.0-tsx-fallback';
+const CURRENT_FILE_FORMAT_VERSION = '1.2';
 
 interface SceneFile {
   format: 'laserforge';
-  version: '1.0';         // File format version (for migration)
+  version: '1.2';         // File format version (for migration)
   appVersion: string;      // App version that wrote this file (for debugging)
   scene: SerializedScene;
+  checksumAlgorithm: typeof PROJECT_CHECKSUM_ALGORITHM;
+  checksum: string;
 }
 
 interface SerializedScene {
@@ -59,7 +68,22 @@ interface SerializedScene {
  * - Pretty-prints with 2-space indent for human readability
  */
 export function serializeScene(scene: Scene): string {
-  const cleaned: SerializedScene = {
+  const cleaned = buildSerializedScene(scene);
+
+  const file: SceneFile = {
+    format: 'laserforge',
+    version: CURRENT_FILE_FORMAT_VERSION,
+    appVersion: APP_VERSION,
+    scene: cleaned,
+    checksumAlgorithm: PROJECT_CHECKSUM_ALGORITHM,
+    checksum: buildSceneChecksum(cleaned),
+  };
+
+  return JSON.stringify(file, null, 2);
+}
+
+function buildSerializedScene(scene: Scene): SerializedScene {
+  return {
     id: scene.id,
     version: scene.version,
     canvas: scene.canvas,
@@ -75,15 +99,6 @@ export function serializeScene(scene: Scene): string {
       modified: new Date().toISOString(),
     },
   };
-
-  const file: SceneFile = {
-    format: 'laserforge',
-    version: '1.0',
-    appVersion: APP_VERSION,
-    scene: cleaned,
-  };
-
-  return JSON.stringify(file, null, 2);
 }
 
 /**
@@ -92,28 +107,15 @@ export function serializeScene(scene: Scene): string {
  * data is preserved — unlike historical localStorage autosave, there is no 5MB quota.
  */
 export function serializeForAutosave(scene: Scene): string {
-  const cleaned: SerializedScene = {
-    id: scene.id,
-    version: scene.version,
-    canvas: scene.canvas,
-    layers: scene.layers,
-    objects: scene.objects.map((o) => encodeImageBuffers(stripObjectCache(o))),
-    material: scene.material,
-    startPosition: scene.startPosition,
-    machine: scene.machine,
-    compileOptions: scene.compileOptions,
-    activeLayerId: scene.activeLayerId,
-    metadata: {
-      ...scene.metadata,
-      modified: new Date().toISOString(),
-    },
-  };
+  const cleaned = buildSerializedScene(scene);
 
   const file: SceneFile = {
     format: 'laserforge',
-    version: '1.0',
+    version: CURRENT_FILE_FORMAT_VERSION,
     appVersion: APP_VERSION,
     scene: cleaned,
+    checksumAlgorithm: PROJECT_CHECKSUM_ALGORITHM,
+    checksum: buildSceneChecksum(cleaned),
   };
 
   return JSON.stringify(file);
@@ -132,6 +134,26 @@ export function serializeForAutosave(scene: Scene): string {
  * @throws Error if JSON is invalid or required fields are missing
  */
 export function deserializeScene(json: string): Scene {
+  return buildSceneFromParsedEnvelope(parseSceneEnvelope(json));
+}
+
+export interface DeserializeSceneOptions {
+  allowChecksumMismatch?: boolean;
+}
+
+export function deserializeSceneWithIntegrity(
+  json: string,
+  options: DeserializeSceneOptions = {},
+): Scene {
+  const parsed = parseSceneEnvelope(json);
+  const checksum = validateSceneFileChecksum(parsed);
+  if (checksum.kind === 'mismatch' && !options.allowChecksumMismatch) {
+    throw new ProjectChecksumMismatchError(checksum);
+  }
+  return buildSceneFromParsedEnvelope(parsed);
+}
+
+function parseSceneEnvelope(json: string): any {
   let parsed: any;
 
   try {
@@ -161,13 +183,15 @@ export function deserializeScene(json: string): Scene {
   }
 
   const vDisplay = parsed.version == null || parsed.version === '' ? '1.0' : String(parsed.version);
-  if (vDisplay !== '1.0') {
+  const currentMinor = fileFormatMinor(CURRENT_FILE_FORMAT_VERSION);
+  const loadedMinor = fileFormatMinor(vDisplay);
+  if (Number.isFinite(loadedMinor) && loadedMinor > currentMinor) {
     console.warn(
-      `[LaserForge] Loading file format ${vDisplay} as 1.0-compatible (best-effort). Re-save the project to normalize the file header.`,
+      `[LaserForge] Loading future file format ${vDisplay} as ${CURRENT_FILE_FORMAT_VERSION}-compatible (best-effort). Re-save the project to normalize the file header.`,
     );
   }
 
-  return buildSceneFromParsedEnvelope(parsed);
+  return parsed;
 }
 
 /**
@@ -277,6 +301,14 @@ function fileFormatMajor(version: unknown): number {
   const s = String(version).trim();
   const m = /^(\d+)/.exec(s);
   if (!m) return NaN;
+  return parseInt(m[1], 10);
+}
+
+function fileFormatMinor(version: unknown): number {
+  if (version == null || version === '') return 0;
+  const s = String(version).trim();
+  const m = /^\d+\.(\d+)/.exec(s);
+  if (!m) return 0;
   return parseInt(m[1], 10);
 }
 

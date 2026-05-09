@@ -383,7 +383,7 @@ console.log('\n=== Test: File Format Structure ===');
 
 const formatJson = JSON.parse(serializeScene(scene1));
 assert(formatJson.format === 'laserforge', 'Format: envelope has format field');
-assert(formatJson.version === '1.0', 'Format: envelope has version field');
+assert(formatJson.version === '1.2', 'Format: envelope has version field');
 assert(typeof formatJson.scene === 'object', 'Format: envelope has scene field');
 assert(formatJson.scene.id === scene1.id, 'Format: scene.id present');
 
@@ -394,7 +394,7 @@ console.log('\n=== Test: App Version ===');
 const versionJson = JSON.parse(serializeScene(scene1));
 assert(typeof versionJson.appVersion === 'string', 'appVersion: present in file');
 assert(versionJson.appVersion.length > 0, 'appVersion: non-empty');
-assert(versionJson.version === '1.0', 'version: file format version still 1.0');
+assert(versionJson.version === '1.2', 'version: file format version bumped to 1.2');
 
 // ─── TEST: NaN / INFINITY TRANSFORM REJECTION ────────────────────
 

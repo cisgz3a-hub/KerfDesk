@@ -1,5 +1,11 @@
 import type { Scene } from '../core/scene/Scene';
-import { deserializeScene } from './SceneSerializer';
+import {
+  ProjectChecksumLoadCancelledError,
+  ProjectChecksumMismatchError,
+  confirmProjectChecksumMismatch,
+  type ProjectChecksumResult,
+} from './ProjectIntegrity';
+import { deserializeSceneWithIntegrity } from './SceneSerializer';
 import type {
   SceneParseWorkerRequest,
   SceneParseWorkerResponse,
@@ -19,6 +25,10 @@ let sceneParseWorkerKnownBroken = false;
 let sceneParseRequestSeq = 0;
 
 class SceneParseWorkerResponseError extends Error {}
+
+export interface ParseSceneFileOptions {
+  confirmChecksumMismatch?: (result: Extract<ProjectChecksumResult, { kind: 'mismatch' }>) => Promise<boolean>;
+}
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -80,17 +90,48 @@ export function projectLoadParsePlan(fileSizeBytes: number): ProjectLoadParsePla
   return { kind: 'worker' };
 }
 
-export async function parseSceneFile(file: Pick<File, 'size' | 'text'>): Promise<Scene> {
+export async function parseSceneFile(
+  file: Pick<File, 'size' | 'text'>,
+  options: ParseSceneFileOptions = {},
+): Promise<Scene> {
   const json = await file.text();
-  if (projectLoadParsePlan(file.size).kind === 'worker') {
+  try {
+    return await parseSceneJson(json, file.size, false);
+  } catch (error) {
+    if (!(error instanceof ProjectChecksumMismatchError)) throw error;
+    if (!options.confirmChecksumMismatch) throw error;
+    const proceed = await options.confirmChecksumMismatch(error.result);
+    if (!proceed) throw new ProjectChecksumLoadCancelledError();
+    return parseSceneJson(json, file.size, true);
+  }
+}
+
+export function confirmProjectFileChecksumMismatch(
+  result: Extract<ProjectChecksumResult, { kind: 'mismatch' }>,
+  showConfirm: ConfirmDialog,
+): Promise<boolean> {
+  return confirmProjectChecksumMismatch(result, showConfirm);
+}
+
+async function parseSceneJson(
+  json: string,
+  fileSizeBytes: number,
+  allowChecksumMismatch: boolean,
+): Promise<Scene> {
+  if (projectLoadParsePlan(fileSizeBytes).kind === 'worker') {
     try {
-      return await parseSceneInWorker(json);
+      return await parseSceneInWorker(json, allowChecksumMismatch);
     } catch (error) {
-      if (error instanceof SceneParseWorkerResponseError) throw error;
+      if (
+        error instanceof SceneParseWorkerResponseError
+        || error instanceof ProjectChecksumMismatchError
+      ) {
+        throw error;
+      }
       sceneParseWorkerKnownBroken = true;
     }
   }
-  return deserializeScene(json);
+  return deserializeSceneWithIntegrity(json, { allowChecksumMismatch });
 }
 
 function getSceneParseWorker(): Worker | null {
@@ -112,12 +153,12 @@ function getSceneParseWorker(): Worker | null {
   }
 }
 
-function parseSceneInWorker(json: string): Promise<Scene> {
+function parseSceneInWorker(json: string, allowChecksumMismatch: boolean): Promise<Scene> {
   const worker = getSceneParseWorker();
   if (!worker) return Promise.reject(new Error('Scene parse worker unavailable'));
 
   const id = `scene-parse-${++sceneParseRequestSeq}`;
-  const request: SceneParseWorkerRequest = { id, json };
+  const request: SceneParseWorkerRequest = { id, json, allowChecksumMismatch };
 
   return new Promise<Scene>((resolve, reject) => {
     const cleanup = () => {
@@ -131,6 +172,8 @@ function parseSceneInWorker(json: string): Promise<Scene> {
       cleanup();
       if (response.ok) {
         resolve(response.scene);
+      } else if (response.errorKind === 'checksum-mismatch' && response.checksum) {
+        reject(new ProjectChecksumMismatchError(response.checksum));
       } else {
         reject(new SceneParseWorkerResponseError(response.error));
       }

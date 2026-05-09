@@ -10,6 +10,10 @@ import {
   confirmLargeProjectSave,
   parseSceneFile,
 } from '../../io/LargeProjectHandling';
+import {
+  ProjectChecksumLoadCancelledError,
+  confirmProjectChecksumMismatch,
+} from '../../io/ProjectIntegrity';
 import { saveSceneToFile } from '../../io/FileIO';
 import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 import { estimateSceneBytes } from '../history/estimateSceneBytes';
@@ -87,7 +91,9 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       try {
         const proceed = await confirmLargeProjectLoad(file.size, showConfirm);
         if (!proceed) return;
-        const loadedScene = await parseSceneFile(file);
+        const loadedScene = await parseSceneFile(file, {
+          confirmChecksumMismatch: result => confirmProjectChecksumMismatch(result, showConfirm),
+        });
         const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loadedScene);
         handleNewProject(annotated, 'file');
         const imageReport = formatMissingImageReferenceReport(validation);
@@ -95,6 +101,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
           await showAlert('Missing Images', imageReport);
         }
       } catch (err) {
+        if (err instanceof ProjectChecksumLoadCancelledError) return;
         await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
       }
     };

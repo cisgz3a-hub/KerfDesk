@@ -29,6 +29,10 @@ import {
   parseSceneFile,
 } from '../../io/LargeProjectHandling';
 import {
+  ProjectChecksumLoadCancelledError,
+  confirmProjectChecksumMismatch,
+} from '../../io/ProjectIntegrity';
+import {
   formatMissingImageReferenceReport,
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
@@ -302,7 +306,9 @@ export function FileToolbar({
         if (openInputRef.current) openInputRef.current.value = '';
         return;
       }
-      const loaded = await parseSceneFile(file);
+      const loaded = await parseSceneFile(file, {
+        confirmChecksumMismatch: result => confirmProjectChecksumMismatch(result, showConfirm),
+      });
       const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
       onNewProject(annotated, 'file');
       const imageReport = formatMissingImageReferenceReport(validation);
@@ -310,6 +316,7 @@ export function FileToolbar({
         await showAlert('Missing Images', imageReport);
       }
     } catch (e) {
+      if (e instanceof ProjectChecksumLoadCancelledError) return;
       console.error('Failed to open file:', e);
       await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
     }

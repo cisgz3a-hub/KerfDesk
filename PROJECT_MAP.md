@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 386 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 529 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 530 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -34,7 +34,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/geometry` | 9 | - |
 | `src/import` | 16 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
-| `src/io` | 11 | migrations, validation |
+| `src/io` | 12 | migrations, validation |
 | `src/onboarding` | 1 | - |
 | `src/runtime` | 2 | - |
 | `src/security` | 3 | - |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 464 | - |
+| `tests/` | 465 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -315,6 +315,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/io/ImageReferenceValidation.ts`
 - `src/io/ImageStore.ts`
 - `src/io/LargeProjectHandling.ts`
+- `src/io/ProjectIntegrity.ts`
 - `src/io/SceneParseWorker.ts`
 - `src/io/SceneSerializer.ts`
 - `src/io/SvgExporter.ts`
@@ -573,6 +574,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/calibration-analyzer.test.ts`
 - `tests/calibration-grid.test.ts`
 - `tests/capability-value-resolution.test.ts`
+- `tests/checksum-validation.test.ts`
 - `tests/ci-installer-builds.test.ts`
 - `tests/clock-tamper.test.ts`
 - `tests/command-classifier.test.ts`
