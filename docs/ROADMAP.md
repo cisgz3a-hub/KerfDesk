@@ -15871,7 +15871,7 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Priority:** Tier 2. Hardware compatibility and supportability fix for a real tester profile. This intentionally does not try to repair firmware homing yet; deeper homing/origin tuning waits for the tester's GRBL settings dump and physical home-corner confirmation.
 
-**Status:** Shipped in <TBD>. **Hardware verification not required for this MVP** (profile defaults, UI gating, and diagnostics copyout only; no new homing command or job-start transform path). Hardware verification is required before enabling homing or bed-grid defaults for this machine.
+**Status:** Shipped in 618fcad. **Hardware verification not required for this MVP** (profile defaults, UI gating, and diagnostics copyout only; no new homing command or job-start transform path). Hardware verification is required before enabling homing or bed-grid defaults for this machine.
 
 ---
 
@@ -20380,7 +20380,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
 - [x] T2-128 Per-namespace storage authorization (Shipped — Electron filesystem backend now requires namespace + validates key allow-lists before get/set/remove/list; generic storage helpers removed)
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
-- [x] T2-130 PRT4040 GRBL router-laser compatibility profile and diagnostics (Shipped in <TBD> — conservative manual-zero profile + Home disabled until homing verified + safe GRBL diagnostics copyout)
+- [x] T2-130 PRT4040 GRBL router-laser compatibility profile and diagnostics (Shipped in `618fcad` — conservative manual-zero profile + Home disabled until homing verified + safe GRBL diagnostics copyout)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
