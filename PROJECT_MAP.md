@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 378 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 522 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 379 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 524 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 146 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 147 | browser, components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 457 | - |
+| `tests/` | 459 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -353,6 +353,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 ### `src/ui`
 
+- `src/ui/browser/BrowserCompatibility.ts`
 - `src/ui/components/AddTextDialog.tsx`
 - `src/ui/components/App.tsx`
 - `src/ui/components/AppDragDropOverlay.tsx`
@@ -556,6 +557,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/box-library-filtering.test.tsx`
 - `tests/box-library.test.ts`
 - `tests/box-preset-preview-model.test.ts`
+- `tests/browser-compatibility.test.ts`
 - `tests/build-stamp.test.tsx`
 - `tests/burn-moves-2d.test.ts`
 - `tests/burn-progress-ack-timing.test.ts`
@@ -580,6 +582,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/compound-output-boundary.test.ts`
 - `tests/compound-path-model.test.ts`
 - `tests/connect-abort-signal.test.ts`
+- `tests/connect-browser-guidance.test.tsx`
 - `tests/connect-button-mutex.test.tsx`
 - `tests/connect-button-opens-panel-without-compile.test.ts`
 - `tests/connect-cleanup-on-partial-failure.test.ts`

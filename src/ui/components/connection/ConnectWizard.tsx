@@ -1,10 +1,18 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
+import {
+  browserLabel,
+  detectBrowserCompatibility,
+  markConnectBrowserGuidanceAcknowledged,
+  shouldShowConnectBrowserGuidance,
+  type BrowserCompatibility,
+} from '../../browser/BrowserCompatibility';
 
 interface ConnectWizardProps {
   webSerialSupported: boolean;
   onConnectUsb: () => void;
   onConnectSimulator: () => void;
   onCancelConnect?: () => void;
+  browserCompatibility?: BrowserCompatibility;
   /**
    * T1-50 Part A: while true, machine-choice buttons are disabled so a rapid
    * double-click cannot start a second concurrent connect.
@@ -31,8 +39,19 @@ export function ConnectWizard({
   onConnectUsb,
   onConnectSimulator,
   onCancelConnect,
+  browserCompatibility,
   connecting = false,
 }: ConnectWizardProps) {
+  const compatibility = useMemo(
+    () => browserCompatibility ?? detectBrowserCompatibility({ hasWebSerial: webSerialSupported }),
+    [browserCompatibility, webSerialSupported],
+  );
+  const [showBrowserGuidance, setShowBrowserGuidance] = useState(() => shouldShowConnectBrowserGuidance());
+  const dismissBrowserGuidance = () => {
+    markConnectBrowserGuidanceAcknowledged();
+    setShowBrowserGuidance(false);
+  };
+
   return React.createElement('div', {
     style: {
       padding: '24px 18px',
@@ -52,6 +71,69 @@ export function ConnectWizard({
       React.createElement('div', {
         style: { fontSize: 11, color: '#8888aa', marginTop: 4, lineHeight: 1.4 },
       }, 'Connect a USB laser or practice safely in the simulator.'),
+    ),
+    !webSerialSupported && React.createElement('div', {
+      'data-testid': 'connect-browser-warning',
+      style: {
+        width: '100%',
+        padding: '12px',
+        background: 'rgba(255, 212, 68, 0.08)',
+        border: '1px solid rgba(255, 212, 68, 0.35)',
+        borderRadius: 8,
+        fontSize: 11,
+        color: '#d8c984',
+        lineHeight: 1.45,
+      },
+    },
+      React.createElement('div', {
+        style: { color: '#ffd444', fontSize: 12, fontWeight: 800, marginBottom: 5 },
+      }, 'Browser check'),
+      React.createElement('div', null, `You're using ${browserLabel(compatibility)}.`),
+      React.createElement('div', { style: { marginTop: 5 } },
+        'USB laser connection needs Web Serial. Use Chrome, Edge, Opera, or the packaged LaserForge app for a real machine.',
+      ),
+      React.createElement('div', { style: { marginTop: 5, color: '#aaa06b' } },
+        'You can continue here in simulator mode to explore safely.',
+      ),
+    ),
+    webSerialSupported && showBrowserGuidance && React.createElement('div', {
+      'data-testid': 'connect-browser-guidance',
+      style: {
+        width: '100%',
+        padding: '12px',
+        background: 'rgba(0, 212, 255, 0.07)',
+        border: '1px solid rgba(0, 212, 255, 0.24)',
+        borderRadius: 8,
+        fontSize: 11,
+        color: '#a9dceb',
+        lineHeight: 1.45,
+      },
+    },
+      React.createElement('div', {
+        style: { color: '#00d4ff', fontSize: 12, fontWeight: 800, marginBottom: 5 },
+      }, 'Connecting your laser'),
+      React.createElement('ol', {
+        style: { margin: 0, paddingLeft: 18 },
+      },
+        React.createElement('li', null, 'Connect the USB cable and power on the machine.'),
+        React.createElement('li', null, 'Close other laser or CNC software using the serial port.'),
+        React.createElement('li', null, 'Click USB laser and choose the laser port in the browser permission popup.'),
+      ),
+      React.createElement('button', {
+        type: 'button',
+        onClick: dismissBrowserGuidance,
+        style: {
+          marginTop: 8,
+          padding: '5px 9px',
+          borderRadius: 6,
+          border: '1px solid rgba(0, 212, 255, 0.35)',
+          background: 'rgba(0, 212, 255, 0.08)',
+          color: '#88e9ff',
+          fontFamily: font,
+          fontSize: 10,
+          cursor: 'pointer',
+        },
+      }, 'Got it'),
     ),
     webSerialSupported && React.createElement('button', {
       type: 'button',
@@ -90,18 +172,6 @@ export function ConnectWizard({
         color: '#ff6685',
       },
     }, 'Cancel connect'),
-    !webSerialSupported && React.createElement('div', {
-      style: {
-        width: '100%',
-        padding: '10px 12px',
-        background: '#0a0a14',
-        border: '1px solid #252540',
-        borderRadius: 8,
-        fontSize: 11,
-        color: '#8888aa',
-        lineHeight: 1.4,
-      },
-    }, 'USB connect requires Chrome, Edge, Electron, or another Chromium browser with Web Serial support.'),
     React.createElement('button', {
       type: 'button',
       onClick: () => { if (!connecting) onConnectSimulator(); },
