@@ -1,10 +1,9 @@
 name: Deploy Web App to GitHub Pages
 
-# T1-113: auto-deploy the web build on every push to master so the
-# tester always loads the latest code at
-# https://stolkjohannjohann-sudo.github.io/LaserForge/. Filed after
-# T1-112 (build stamp) made the stale-deploy problem diagnosable but
-# left the underlying friction in place.
+# T1-113: deploy the web build to GitHub Pages when explicitly requested.
+# Keeping this manual avoids consuming Actions minutes on every master push
+# while preserving the tester deployment path at
+# https://stolkjohannjohann-sudo.github.io/LaserForge/.
 #
 # One-time manual prerequisite: repo Settings → Pages → Source must
 # be set to "GitHub Actions". This workflow cannot enable Pages on
@@ -12,16 +11,7 @@ name: Deploy Web App to GitHub Pages
 # after Pages is available; otherwise the deploy job stays skipped so
 # unsupported plans do not make every master push red.
 #
-# Trigger choice (master-only, not the dev branch): CI gates the
-# merge to master, so master is the version that's been validated
-# enough to reach a tester. Dev-branch builds remain locally
-# verifiable via T1-112's build stamp on the canvas toolbar.
-
 on:
-  push:
-    branches: [master]
-  # Allow manual dispatch in case Pages was just enabled and master
-  # has no new push to retrigger.
   workflow_dispatch:
 
 permissions:
@@ -33,11 +23,12 @@ permissions:
 # the latest queued push wins. Two rapid master pushes collapse to
 # one final state instead of racing.
 concurrency:
-  group: pages
+  group: pages-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
+    if: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -53,7 +44,7 @@ jobs:
           path: dist
 
   deploy:
-    if: ${{ vars.ENABLE_GITHUB_PAGES_DEPLOY == 'true' }}
+    if: ${{ vars.ENABLE_GITHUB_PAGES_DEPLOY == 'true' && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main') }}
     needs: build
     runs-on: ubuntu-latest
     environment:

@@ -1,9 +1,13 @@
 name: CI
 
 on:
-  push:
-    branches: [master, main]
   pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
@@ -25,8 +29,9 @@ jobs:
       - run: npm test
 
   build-windows:
-    # T2-98: prove the real Windows installer path on every PR.
+    # T2-98: prove the real Windows installer path on demand.
     # Signing is deliberately left for T2-99 release builds.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,8 +51,9 @@ jobs:
           retention-days: 7
 
   build-macos:
-    # T2-98: prove the real macOS installer path on every PR.
+    # T2-98: prove the real macOS installer path on demand.
     # T2-100 adds signing/notarization secrets for release builds.
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: macos-latest
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false

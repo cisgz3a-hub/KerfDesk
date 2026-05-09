@@ -1,12 +1,18 @@
 name: License Compliance Check
 
 on:
-  push:
-    branches: [master, main]
   pull_request:
     branches: [master, main]
-  schedule:
-    - cron: '0 8 * * 1'
+    paths:
+      - package.json
+      - package-lock.json
+      - scripts/license-check.mjs
+      - .github/workflows/license-check.yml
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   license-check:
@@ -31,12 +37,12 @@ jobs:
       - name: Run license check
         run: npm run license-check
 
-      - name: Generate license report (on failure or push)
-        if: always()
+      - name: Generate license report (on failure or manual run)
+        if: ${{ failure() || github.event_name == 'workflow_dispatch' }}
         run: npm run license-check:report
 
       - name: Upload license report as artifact
-        if: always()
+        if: ${{ failure() || github.event_name == 'workflow_dispatch' }}
         uses: actions/upload-artifact@v7
         with:
           name: license-report
