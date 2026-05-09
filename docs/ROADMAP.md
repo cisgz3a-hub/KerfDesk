@@ -16840,7 +16840,7 @@ test('saved-origin lifecycle: reconnect after unclean disconnect blocks', async 
 
 **Cross-check note (audit 2F):** Audit's section 6.2 / Gate E. Verified.
 
-**Status:** Shipped in `<TBD>` — added `tests/saved-origin-wcs-lifecycle.test.ts` covering unchanged live G54 verification, WCS-normalize drift blocking, approved console `G10` invalidation, approved console `G92` invalidation, blocked-console-command non-invalidation, and the `ConnectionPanelMain` job-start verification hook. `MachineService.sendCommand` now clears the saved-origin G54 snapshot after an approved user console `G10` or `G92` reaches the controller, so raw coordinate-frame mutations cannot leave saved-origin trust alive. **Hardware verification: not required** (service trust-state invalidation and regression coverage only; no new command, motion, G-code, or controller execution path).
+**Status:** Shipped in `d4274ce` — added `tests/saved-origin-wcs-lifecycle.test.ts` covering unchanged live G54 verification, WCS-normalize drift blocking, approved console `G10` invalidation, approved console `G92` invalidation, blocked-console-command non-invalidation, and the `ConnectionPanelMain` job-start verification hook. `MachineService.sendCommand` now clears the saved-origin G54 snapshot after an approved user console `G10` or `G92` reaches the controller, so raw coordinate-frame mutations cannot leave saved-origin trust alive. **Hardware verification: not required** (service trust-state invalidation and regression coverage only; no new command, motion, G-code, or controller execution path).
 
 ---
 
@@ -20392,7 +20392,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-34 Stripe-based raster G-code emission (memory bound; depends on T3-15)
 - [x] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks (Shipped in `1441da5` — fill-row LRU cache added; processed-raster reuse already present from T1-17; final output chunk cache deferred to T3-15 streaming/spool output)
 - [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `129656b` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
-- [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `<TBD>` — lifecycle regression plus console G10/G92 saved-origin invalidation)
+- [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
 - [ ] T3-38 Fill-with-holes geometric correctness test (filed; depends on T1-36, T2-15, T2-18, T2-19)
 - [ ] T3-39 Malformed-input test suite (filed; depends on T2-18)
 - [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
