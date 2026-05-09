@@ -14,6 +14,16 @@ export const FRAME_IDLE_POLL_MS = 200;
  */
 export const FRAME_IDLE_TIMEOUT_MS = 60_000;
 
+export type FrameIdleWaitFailureReason =
+  | 'idle-timeout'
+  | 'machine-alarm'
+  | 'disconnected'
+  | 'cancelled';
+
+export type FrameIdleWaitResult =
+  | { ok: true }
+  | { ok: false; reason: FrameIdleWaitFailureReason };
+
 /**
  * T1-98: dynamic frame idle timeout based on actual corner travel.
  *
@@ -45,15 +55,33 @@ export async function waitForGrblIdle(
   ctrl: LaserController,
   timeoutMs: number = FRAME_IDLE_TIMEOUT_MS,
 ): Promise<boolean> {
+  return (await waitForGrblIdleResult(ctrl, timeoutMs)).ok;
+}
+
+/**
+ * T3-73: same idle wait as {@link waitForGrblIdle}, but preserves the
+ * operator-relevant failure reason for frame recovery copy.
+ */
+export async function waitForGrblIdleResult(
+  ctrl: LaserController,
+  timeoutMs: number = FRAME_IDLE_TIMEOUT_MS,
+  signal?: AbortSignal,
+): Promise<FrameIdleWaitResult> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
+    if (signal?.aborted) return { ok: false, reason: 'cancelled' };
     try {
       ctrl.requestStatusReport();
     } catch {
       /* disconnected */
     }
-    if (ctrl.state.status === 'idle') return true;
+    const status = ctrl.state.status;
+    if (status === 'idle') return { ok: true };
+    if (status === 'alarm') return { ok: false, reason: 'machine-alarm' };
+    if (status === 'disconnected') return { ok: false, reason: 'disconnected' };
     await new Promise<void>(r => setTimeout(r, FRAME_IDLE_POLL_MS));
   }
-  return false;
+  return signal?.aborted
+    ? { ok: false, reason: 'cancelled' }
+    : { ok: false, reason: 'idle-timeout' };
 }

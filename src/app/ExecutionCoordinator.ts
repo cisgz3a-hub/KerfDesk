@@ -8,7 +8,7 @@ import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners } from './frameGcode';
-import { waitForGrblIdle } from './grblIdlePoll';
+import { waitForGrblIdleResult } from './grblIdlePoll';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
 
@@ -27,6 +27,17 @@ export interface ExecutionCoordinatorDeps {
   readonly testFireDeadmanMs?: number;
 }
 
+export type FrameResultReason =
+  | 'no-controller'
+  | 'idle-timeout'
+  | 'command-blocked'
+  | 'command-failed'
+  | 'machine-alarm'
+  | 'disconnected'
+  | 'cancelled'
+  | 'unknown'
+  | 'operation-busy';
+
 export interface FrameResult {
   ok: boolean;
   /**
@@ -36,11 +47,17 @@ export interface FrameResult {
    * - 'idle-timeout': GRBL did not report idle within the timeout.
    * - 'command-blocked': command emission threw partway through corner streaming.
    *   A subset of frame commands may have physically executed; the rest did not.
+   * - 'command-failed': alias retained for roadmap taxonomy; current controller
+   *   adapters return 'command-blocked' for this path.
+   * - 'machine-alarm': controller entered alarm while LaserForge waited for idle.
+   * - 'disconnected': connection dropped while LaserForge waited for idle.
+   * - 'cancelled': caller's AbortSignal fired before/during frame execution.
+   * - 'unknown': unexpected frame adapter error; `error` carries diagnostics.
    * - 'operation-busy' (T2-11): another machine operation (test-fire, autofocus,
    *   set-origin, jog, or another frame) holds the service-layer mutex. Caller
    *   should wait for that operation to complete and retry.
    */
-  reason?: 'no-controller' | 'idle-timeout' | 'command-blocked' | 'operation-busy';
+  reason?: FrameResultReason;
   /**
    * T1-103: when `reason === 'command-blocked'`, the original error message
    * surfaced to the UI for the messages console. Empty string if no message
@@ -52,6 +69,11 @@ export interface FrameResult {
    * corner-stream line that threw.
    */
   blockedAtLine?: number;
+  /**
+   * T3-73: diagnostic text for `reason === 'unknown'` and future
+   * non-command-specific failure paths.
+   */
+  error?: string;
 }
 
 /**
@@ -63,6 +85,10 @@ export interface FrameResult {
  */
 export const TEST_FIRE_DEADMAN_MS = 5000;
 export const TEST_FIRE_POWER_PERCENT = 5;
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
 
 /**
  * Central entry for machine execution paths (jobs, jogging, framing, etc.).
@@ -184,6 +210,7 @@ export class ExecutionCoordinator {
     transformOpts: MachineTransformOptions;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
+    signal?: AbortSignal;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
@@ -191,6 +218,7 @@ export class ExecutionCoordinator {
       laserMode: 'off',
       idleTimeoutMs: args.idleTimeoutMs,
       withCrosshair: args.withCrosshair ?? true,
+      signal: args.signal,
     });
   }
 
@@ -205,6 +233,7 @@ export class ExecutionCoordinator {
     frameDotFeedRateMmPerMin?: number;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
+    signal?: AbortSignal;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
@@ -214,6 +243,7 @@ export class ExecutionCoordinator {
       frameDotFeedRateMmPerMin: args.frameDotFeedRateMmPerMin,
       idleTimeoutMs: args.idleTimeoutMs,
       withCrosshair: args.withCrosshair ?? true,
+      signal: args.signal,
     });
   }
 
@@ -225,7 +255,9 @@ export class ExecutionCoordinator {
     frameDotFeedRateMmPerMin?: number;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
+    signal?: AbortSignal;
   }): Promise<FrameResult> {
+    if (args.signal?.aborted) return { ok: false, reason: 'cancelled' };
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
     // T2-11: acquire the mutex BEFORE any side-effect (notifySimulator,
@@ -253,6 +285,7 @@ export class ExecutionCoordinator {
     // sequence returns early (T1-103 command-blocked) or throws before
     // the trailing M5, force the laser modal state off before returning.
     try {
+      if (args.signal?.aborted) return { ok: false, reason: 'cancelled' };
       const frameResult = await ctrl.operations.frame({
         corners,
         startMode: transformOpts.startMode,
@@ -263,6 +296,7 @@ export class ExecutionCoordinator {
         onCommand: line => this.notifySimulator(line),
         lineDelayMs: 50,
       });
+      if (args.signal?.aborted) return { ok: false, reason: 'cancelled' };
       if (!frameResult.ok) {
         const msg = frameResult.message ?? frameResult.reason;
         console.warn('[Command blocked]', msg);
@@ -274,10 +308,16 @@ export class ExecutionCoordinator {
         };
       }
 
-      const idleOk = await waitForGrblIdle(ctrl, args.idleTimeoutMs);
-      if (!idleOk) return { ok: false, reason: 'idle-timeout' };
+      const idleResult = await waitForGrblIdleResult(ctrl, args.idleTimeoutMs, args.signal);
+      if (!idleResult.ok) return { ok: false, reason: idleResult.reason };
 
       return { ok: true };
+    } catch (err: unknown) {
+      return {
+        ok: false,
+        reason: 'unknown',
+        error: errorMessage(err),
+      };
     } finally {
       if (laserMode === 'dot') {
         try {

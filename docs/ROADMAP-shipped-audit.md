@@ -462,9 +462,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 
 ---
 
-## Tier 3 - 55 shipped, 37 open
+## Tier 3 - 56 shipped, 36 open
 
-### Shipped (55)
+### Shipped (56)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -521,12 +521,13 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-70 | Origin and start-mode mini-map | Added `src/ui/components/connection/JobLayoutMiniMap.tsx`, rendered inside the Ready-to-Run position section. The SVG shows bed, optional material, job bounds, frame bounds, active origin corner, and mode-specific head/saved-zero markers. `ConnectionPanelMain` passes existing bed/material/machine-position/saved-origin/frame-bound data; no G-code generation, frame math, preflight, or controller behavior changed. Pinned by `tests/job-layout-minimap.test.tsx` and `tests/ready-to-run-panel.test.tsx`. **Hardware verification not required** (display-only review diagram). | `b3766cf` |
 | T3-71 | Web Serial / browser compatibility proactive guidance | Added `src/ui/browser/BrowserCompatibility.ts` for browser family/version detection, Web Serial capability checks, and one-time connect-guidance acknowledgement. `ConnectWizard` now shows a proactive unsupported-browser warning with Chrome/Edge/Opera/package-app guidance and simulator fallback, plus a dismissible USB cable/permission checklist when Web Serial is available. Pinned by `tests/browser-compatibility.test.ts`, `tests/connect-browser-guidance.test.tsx`, and the connection-panel layout guard. **Hardware verification not required** (guidance only; no transport/controller behavior changed). | `eea9b13` |
 | T3-72 | Job complexity user-facing summary | Added `src/app/JobComplexitySummary.ts` to count non-comment G-code commands, reuse compile plan/time stats, summarize raster DPI/fill spacing, format travel/burn distance, classify Low/Medium/High complexity, and emit informational dense-raster/long-job/high-command-count warnings. `ReadyToRunPanel` now renders the Job complexity section in the final job review. Pinned by `tests/job-complexity-summary.test.ts` and `tests/ready-to-run-panel.test.tsx`. **Hardware verification not required** (review UI only; no compile/motion/controller behavior changed). | `131e32c` |
+| T3-73 | FrameResult reason expansion | Expanded `ExecutionCoordinator.FrameResult.reason` with `machine-alarm`, `disconnected`, `cancelled`, `unknown`, and the documented `command-failed` alias while preserving existing `command-blocked` and `operation-busy` behavior. Added `waitForGrblIdleResult()` for specific frame idle-wait recovery reasons and `src/app/FrameResultMessages.ts` for reason-specific Safe Frame / Laser Dot copy. Pinned by `tests/frame-result-reasons.test.ts`, `tests/run-frame-fail-fast-on-blocked-command.test.ts`, and `tests/execution-coordinator-unlock-home-frame.test.ts`. **Hardware verification not required** (typed result and UI-copy layer only; frame motion/controller commands unchanged). | `<TBD>` |
 | T3-92 | Go to last machine position control | Added session-local last job start position capture in `ConnectionPanelMain`, a pure `LastMachinePosition` helper that plans relative X/Y jogs from the current controller position back to that stored point, and a fixed Move Laser `Go to last position` button in `Jog`. The move uses `ExecutionCoordinator.jog` so the existing idle gate, operation mutex, simulator notification, and controller jog path remain in force; stored position clears on disconnect / emergency stop. Pinned by `tests/last-machine-position.test.ts` and `tests/connection-panel-go-to-last-position.test.ts`. **Hardware verification needed** on Falcon A1 Pro before release tagging. | `e4a9f54` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### Open (37)
+### Open (36)
 
-T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
+T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
 
 ---
 

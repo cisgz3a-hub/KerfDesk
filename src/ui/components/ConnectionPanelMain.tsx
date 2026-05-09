@@ -22,11 +22,12 @@ import {
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
+import { describeFrameFailure } from '../../app/FrameResultMessages';
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
 import { computeFrameFreshnessKey } from '../../app/computeFrameFreshnessKey';
-import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
+import { ExecutionCoordinator, type FrameResult } from '../../app/ExecutionCoordinator';
 import { type CompileGcodeResult, type CompileProgress } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
 import {
@@ -147,6 +148,16 @@ function buildReadyOperationRows(scene: Scene): OperationRow[] {
     });
   }
   return rows;
+}
+
+function frameFailureLogLine(
+  result: FrameResult,
+  frameLabel: string,
+  idleTimeoutSeconds?: number,
+): string {
+  const description = describeFrameFailure(result, frameLabel, idleTimeoutSeconds);
+  const details = description.details ? ` Details: ${description.details}` : '';
+  return `⚠ ${description.title}: ${description.message} ${description.recovery}${details}`;
 }
 
 function playCompletionBeep(): void {
@@ -1272,21 +1283,9 @@ export function ConnectionPanelMain({
     const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs });
 
     if (!result.ok) {
-      setFrameRecoveryTimeoutSec(Math.round(idleTimeoutMs / 1000));
-      if (result.reason === 'idle-timeout') {
-        setMessages(prev => [...prev,
-          `⚠ Frame (Safe): machine did not reach idle within ${Math.round(idleTimeoutMs / 1000)}s — check machine state`,
-        ]);
-      } else if (result.reason === 'command-blocked') {
-        // T1-103: a command threw partway through corner streaming. The
-        // frame is incomplete, so hasFramed must not be set.
-        const lineNum = (result.blockedAtLine ?? 0) + 1;
-        setMessages(prev => [...prev,
-          `⚠ Frame (Safe): command blocked at line ${lineNum} — ${result.blockedError ?? 'unknown reason'}. Frame incomplete; retry after resolving controller state.`,
-        ]);
-      } else if (result.reason === 'no-controller') {
-        setMessages(prev => [...prev, '⚠ Frame (Safe): no controller connection']);
-      }
+      const timeoutSec = Math.round(idleTimeoutMs / 1000);
+      setFrameRecoveryTimeoutSec(timeoutSec);
+      setMessages(prev => [...prev, frameFailureLogLine(result, 'Frame (Safe)', timeoutSec)]);
       return;
     }
 
@@ -1350,16 +1349,7 @@ export function ConnectionPanelMain({
 
     if (!result.ok) {
       setFrameRecoveryTimeoutSec(15);
-      if (result.reason === 'idle-timeout') {
-        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): machine did not reach idle in time — check machine state']);
-      } else if (result.reason === 'command-blocked') {
-        const lineNum = (result.blockedAtLine ?? 0) + 1;
-        setMessages(prev => [...prev,
-          `⚠ Frame (Laser Dot): command blocked at line ${lineNum} — ${result.blockedError ?? 'unknown reason'}. Retry after resolving controller state.`,
-        ]);
-      } else if (result.reason === 'no-controller') {
-        setMessages(prev => [...prev, '⚠ Frame (Laser Dot): no controller connection']);
-      }
+      setMessages(prev => [...prev, frameFailureLogLine(result, 'Frame (Laser Dot)', 15)]);
       return;
     }
 

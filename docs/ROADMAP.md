@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 55 | 37 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, and T3-72 job complexity summary shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 56 | 36 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, and T3-73 frame failure reasons shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18860,6 +18860,8 @@ These don't block Start (T1-45 is the actual gate); they inform.
 
 ### T3-73 | `FrameResult.reason` expansion to specific failure types
 
+**Status:** Shipped in `<TBD>`. Expanded `FrameResult.reason` to include `machine-alarm`, `disconnected`, `cancelled`, and `unknown` while preserving existing `command-blocked`/`operation-busy` behavior. Added `waitForGrblIdleResult()` so frame idle waiting returns specific recovery reasons, added `src/app/FrameResultMessages.ts` for reason-specific UI copy, and routed Safe Frame / Laser Dot failure messages through that helper. Pinned by `tests/frame-result-reasons.test.ts` plus existing frame fail-fast and coordinator frame tests. Hardware verification: not required for the typed detection/copy layer; existing frame hardware gates remain unchanged.
+
 **Code reference:** `src/app/ExecutionCoordinator.ts:25-28` 鈥?current `reason?: 'no-controller' | 'idle-timeout'`. T1-65 adds `'command-failed'`; T3-73 fills the rest.
 
 **Problem:** Audit 4C Required Priority 8: frame failure has multiple distinct causes that map to different recovery actions:
@@ -20513,7 +20515,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `b3766cf` - Ready-to-Run job layout mini-map)
 - [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
 - [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
-- [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
+- [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `<TBD>` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
 - [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
