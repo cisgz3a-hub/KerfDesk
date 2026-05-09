@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 45 | 47 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, and T3-62 Ruida safety design shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 46 | 46 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, and T3-63 fake WebSerial byte-stream harness shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18309,6 +18309,8 @@ Pairs with the simulator framework (T2-48): the fake transport hooks reads/write
 
 **Priority:** Tier 3. Pairs with T3-54 (lifecycle tests) and T2-49 (virtual time). Depends on T2-48 (simulator framework) for the firmware-state-aware fake.
 
+**Status:** Shipped in `<TBD>` - added `tests/harness/fakeWebSerial.ts` with `FakeNavigatorSerial` and `FakeSerialPort` browser-API fakes, controlled read chunk scheduling, reader done/error injection, writer rejection injection, requestPort rejection, navigator event listeners, and optional `SimulatedControllerDevice` bridging. Added `tests/web-serial-byte-stream-harness.test.ts` to exercise the real `WebSerialPort` read/write path for split status reports, CR/LF split `ok`, multiple lines per read, reader done close, reader rejection normalization, write rejection surfacing, and GRBL simulator-backed writes. **Hardware verification not required** (test harness only; no production controller, G-code, or machine motion changed).
+
 **Cross-check note (audit 3E):** Audit's Critical 2 + section 3.2 + P0 fake WebSerial.
 
 ---
@@ -20483,7 +20485,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-60 Disconnect-stops-job capability gating (Shipped in `4324ece` - non-host-stream controllers must abort before disconnect)
 - [x] T3-61 Per-controller-family safety regression tests (Shipped in `288ae17` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
 - [x] T3-62 Ruida controller safety stub 鈥?design before implementation (Shipped in `f24ef82` - design doc only; no production Ruida controller added)
-- [ ] T3-63 Fake WebSerial byte-stream harness with chunking realism (filed; refines T3-54, depends on T2-48)
+- [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `<TBD>` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
 - [ ] T3-64 Fake Electron serialport test harness (filed; conditional on T2-35 keep-decision)
 - [ ] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (filed; required before T2-30 ships)
 - [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
