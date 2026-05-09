@@ -17706,7 +17706,7 @@ Hardware verification (manual):
 
 **Cross-check note (audit 3B):** Audit's section 11 + P2.
 
-**Status:** Shipped in `<TBD>` - App renderer lifecycle safety now covers both `beforeunload` and `pagehide`. The handler skips disconnected/connecting states, attempts `ctrl.stop()` plus `executionCoordinator.emergencyLaserOff()`, and only shows a browser close confirmation when a job was running. Pinned by `tests/renderer-lifecycle-safety.test.ts`. Hardware verification needed before release tagging: start a small supervised job, close/reload the page, and confirm motion/laser stop promptly.
+**Status:** Shipped in `78cc734` - App renderer lifecycle safety now covers both `beforeunload` and `pagehide`. The handler skips disconnected/connecting states, attempts `ctrl.stop()` plus `executionCoordinator.emergencyLaserOff()`, and only shows a browser close confirmation when a job was running. Pinned by `tests/renderer-lifecycle-safety.test.ts`. Hardware verification needed before release tagging: start a small supervised job, close/reload the page, and confirm motion/laser stop promptly.
 
 ---
 
@@ -20460,7 +20460,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-49 `navigator.serial` connect/disconnect event handling (Shipped in `66c3e7c` - active WebSerial port listens for navigator disconnect and routes physical unplug through onClose)
 - [ ] T3-50 Device identity verification on connect 鈥?require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
 - [ ] T3-51 Reconnect-same-machine verification (filed; depends on T3-50, T3-46)
-- [x] T3-52 Browser lifecycle cleanup - beforeunload / pagehide (Shipped in `<TBD>` - renderer lifecycle handler attempts stop + laser-off on beforeunload and pagehide)
+- [x] T3-52 Browser lifecycle cleanup - beforeunload / pagehide (Shipped in `78cc734` - renderer lifecycle handler attempts stop + laser-off on beforeunload and pagehide)
 - [ ] T3-53 `requestStatusReport` write-failure normalization in polling loop (filed; depends on T2-32)
 - [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
