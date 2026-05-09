@@ -28,7 +28,8 @@ const workflow = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 're
 const signedConfig = fs.readFileSync(path.join(repoRoot, 'scripts', 'signing', 'electron-builder.windows-signed.cjs'), 'utf8');
 const ci = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
 
-assert(/tags:\s*\n\s*-\s*'v\*'/.test(workflow), 'signed workflow only runs for version tags');
+assert(/on:\s*[\s\S]*?workflow_dispatch:/.test(workflow), 'signed workflow has manual dispatch');
+assert(!/\n\s+push:/.test(workflow), 'signed workflow does not run automatically for version tags');
 assert(!/pull_request/.test(workflow), 'signed workflow is not exposed to pull requests');
 assert(/runs-on:\s+windows-latest/.test(workflow), 'signed workflow uses a Windows runner');
 assert(/CSC_LINK:\s*\$\{\{\s*secrets\.WIN_CERT_PFX_BASE64\s*\}\}/.test(workflow), 'workflow reads certificate from WIN_CERT_PFX_BASE64 secret');

@@ -1,5 +1,5 @@
 /**
- * T2-100: signed and notarized macOS release workflow stays tag-only.
+ * T2-100: signed and notarized macOS release workflow stays manual-only.
  *
  * Run: npx tsx tests/macos-signing-notarization-workflow.test.ts
  */
@@ -29,7 +29,8 @@ const signedConfig = fs.readFileSync(path.join(repoRoot, 'scripts', 'signing', '
 const entitlements = fs.readFileSync(path.join(repoRoot, 'scripts', 'signing', 'entitlements.mac.plist'), 'utf8');
 const ci = fs.readFileSync(path.join(repoRoot, '.github', 'workflows', 'ci.yml'), 'utf8');
 
-assert(/tags:\s*\n\s*-\s*'v\*'/.test(workflow), 'signed workflow only runs for version tags');
+assert(/on:\s*[\s\S]*?workflow_dispatch:/.test(workflow), 'signed workflow has manual dispatch');
+assert(!/\n\s+push:/.test(workflow), 'signed workflow does not run automatically for version tags');
 assert(!/pull_request/.test(workflow), 'signed workflow is not exposed to pull requests');
 assert(/runs-on:\s+macos-latest/.test(workflow), 'signed workflow uses a macOS runner');
 assert(/CSC_LINK:\s*\$\{\{\s*secrets\.MAC_CERT_P12_BASE64\s*\}\}/.test(workflow), 'workflow reads certificate from MAC_CERT_P12_BASE64 secret');
