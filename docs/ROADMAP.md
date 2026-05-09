@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 60 | 32 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, T3-76 large-project save/load guard, and T3-77 project integrity checksum shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 61 | 31 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, T3-76 large-project save/load guard, T3-77 project integrity checksum, and T3-78 persistence stress suite shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -19201,6 +19201,8 @@ Same logic for autosave records (T2-69 already includes `checksum` field).
 
 ### T3-78 | Save/load stress test suite
 
+**Status:** Shipped in `<TBD>`. Added `tests/persistence-stress/persistence-stress.test.ts`, a cross-cutting persistence regression suite covering 1000-object roundtrip, raster payload roundtrip, orphan-layer repair report, duplicate-ID repair report, corrupted transform rejection, missing IndexedDB image annotation, legacy 1.x envelope migration, device-profile snapshot mismatch, material-preset snapshot mismatch, autosave previous-slot fallback after corrupt current slot, and presence of the autosave dirty-state failure regression. Hardware verification: not required (test coverage only).
+
 **Code reference:** New `tests/persistence-stress/`. Refines T3-40 (perf/stress with cancellation from audit 1F).
 
 **Problem:** Audit 4D Required Priority 12 lists specific stress scenarios that should have tests:
@@ -20528,7 +20530,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
 - [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
-- [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
+- [x] T3-78 Save/load stress test suite (Shipped in `<TBD>` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)

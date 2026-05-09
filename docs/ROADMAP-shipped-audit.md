@@ -462,9 +462,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 
 ---
 
-## Tier 3 - 60 shipped, 32 open
+## Tier 3 - 61 shipped, 31 open
 
-### Shipped (60)
+### Shipped (61)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -526,12 +526,13 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-75 | Image reference validation on load | Added `src/io/ImageReferenceValidation.ts` to detect `indexeddb://` image references, validate them against `ImageStore.hasImage`, tolerate image-store lookup failures by reporting missing refs, format a user-facing recovery report, and annotate missing image objects with `missingSource` / `missingSourceId`. File open, keyboard open, drag/drop project import, autosave recovery, and `loadSceneFromFile` now validate after deserialize; `SceneRenderer` renders an explicit `Missing image` placeholder. Pinned by `tests/image-reference-validation.test.ts`. **Hardware verification not required** (project-load validation and canvas placeholder only). | `99f352b` |
 | T3-76 | Large-project save/load guard | Added `src/io/LargeProjectHandling.ts` and `src/io/SceneParseWorker.ts` for 50 MB save/load confirmations, 5 MB parser-worker routing, and a shared `parseSceneFile()` path with main-thread fallback. Toolbar Save/Open, keyboard Save/Open, drag/drop project import, and `loadSceneFromFile` now use the shared warnings/parser path. Pinned by `tests/large-project-handling.test.ts`. **Hardware verification not required** (file I/O UX and parsing only). | `ca5027f` |
 | T3-77 | Project integrity checksum | Added `src/io/ProjectIntegrity.ts` for canonical JSON, renderer-safe SHA-256, versioned checksum markers, validation results, mismatch warning copy, and typed mismatch/cancel errors. `serializeScene` / `serializeForAutosave` now emit file format `1.2` with `checksumAlgorithm` and `checksum`; `deserializeSceneWithIntegrity`, `parseSceneFile`, and `SceneParseWorker` enforce validation with explicit retry-after-consent. Toolbar Open, keyboard Open, and drag/drop project import prompt on mismatch and quietly cancel when declined. Pinned by `tests/checksum-validation.test.ts`. **Hardware verification not required** (project-file integrity and load UX only). | `3a92a63` |
+| T3-78 | Save/load stress test suite | Added `tests/persistence-stress/persistence-stress.test.ts`, covering 1000-object roundtrip, raster payload roundtrip, orphan-layer and duplicate-ID repair reports, corrupted transform rejection, missing IndexedDB image annotation, legacy 1.x envelope migration, device-profile and material-preset drift detection, autosave previous-slot fallback, and the autosave dirty-state failure regression's continued presence. **Hardware verification not required** (test coverage only). | `<TBD>` |
 | T3-92 | Go to last machine position control | Added session-local last job start position capture in `ConnectionPanelMain`, a pure `LastMachinePosition` helper that plans relative X/Y jogs from the current controller position back to that stored point, and a fixed Move Laser `Go to last position` button in `Jog`. The move uses `ExecutionCoordinator.jog` so the existing idle gate, operation mutex, simulator notification, and controller jog path remain in force; stored position clears on disconnect / emergency stop. Pinned by `tests/last-machine-position.test.ts` and `tests/connection-panel-go-to-last-position.test.ts`. **Hardware verification needed** on Falcon A1 Pro before release tagging. | `e4a9f54` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### Open (32)
+### Open (31)
 
-T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
+T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
 
 ---
 
