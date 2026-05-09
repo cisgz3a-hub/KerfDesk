@@ -60,6 +60,7 @@ function freshValid(): DeviceProfile {
   p.maxFeedRate = 6000;
   p.baudRate = 115200;
   p.originCorner = 'front-left';
+  p.homeCorner = 'front-left';
   p.watts = 5;
   return p;
 }
@@ -145,6 +146,24 @@ function freshValid(): DeviceProfile {
     p.originCorner = corner;
     const r = validateProfile(p);
     assert(r.ok, `originCorner=${corner} accepted`);
+  }
+}
+
+{
+  const p = freshValid();
+  // Force-cast to bypass the type system (simulates storage edit / migration).
+  (p as unknown as { homeCorner: string }).homeCorner = 'sideways';
+  const r = validateProfile(p);
+  assert(!r.ok, 'homeCorner="sideways" rejected');
+  assert(findIssue(r, 'homeCorner'), 'homeCorner issue raised');
+}
+
+{
+  for (const corner of ['front-left', 'rear-left', 'front-right', 'rear-right'] as const) {
+    const p = freshValid();
+    p.homeCorner = corner;
+    const r = validateProfile(p);
+    assert(r.ok, `homeCorner=${corner} accepted`);
   }
 }
 

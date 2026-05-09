@@ -80,6 +80,12 @@ export interface DeviceProfile {
   bedHeight: number;
   /** Where (0,0) sits after homing — default front-left (e.g. Wainlux $23=3). */
   originCorner: MachineOriginCorner;
+  /**
+   * Physical corner the head searches when Home ($H) runs. This may differ
+   * from `originCorner` on machines with workspace offsets or negative
+   * coordinates, so G-code transforms must continue to use `originCorner`.
+   */
+  homeCorner?: MachineOriginCorner;
 
   // GRBL settings
   maxFeedRate: number;     // mm/min
@@ -204,6 +210,7 @@ function applyProfileBackfills(p: DeviceProfile): DeviceProfile {
       (p as DeviceProfile).originCorner
       ?? (p.invertY === false ? 'rear-left' : 'front-left'),
   };
+  profile.homeCorner = p.homeCorner ?? profile.originCorner;
   return backfillGcodeTemplateNames(backfillFalconAutofocus(profile));
 }
 
@@ -398,6 +405,7 @@ export function createBlankProfile(name: string): DeviceProfile {
     bedWidth: 400,
     bedHeight: 400,
     originCorner: 'front-left',
+    homeCorner: 'front-left',
     maxFeedRate: 6000,
     maxSpindle: 1000,
     frameDotFeedRate: DEFAULT_FRAME_DOT_FEED_RATE,
@@ -523,6 +531,7 @@ export function createFalconSerialProfile(name: string = 'Creality Falcon A1 Pro
     bedWidth: 400,
     bedHeight: 400,
     originCorner: 'front-left',
+    homeCorner: 'front-left',
     invertY: true,
     maxFeedRate: 6000,
     maxSpindle: 1000,
@@ -556,6 +565,7 @@ export function createPrt4040RouterLaserProfile(
     bedWidth: 400,
     bedHeight: 400,
     originCorner: 'rear-right',
+    homeCorner: 'rear-right',
     invertY: false,
     maxFeedRate: 1500,
     maxSpindle: 1000,

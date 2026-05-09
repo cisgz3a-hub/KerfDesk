@@ -1588,6 +1588,7 @@ export function App(): React.ReactElement {
       initialMachineWatts: scene.machine?.watts,
       initialMachineType: scene.machine?.type,
       initialOriginCorner: activeProfile?.originCorner,
+      initialHomeCorner: activeProfile?.homeCorner,
       initialHomingEnabled: activeProfile?.homingEnabled,
       initialMaxSpindle: activeProfile?.maxSpindle,
     }),

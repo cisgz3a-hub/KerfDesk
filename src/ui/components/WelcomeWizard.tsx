@@ -17,6 +17,7 @@ export interface WizardResult {
   /** Future-proof; only `grbl` is used today. */
   controllerType: 'grbl';
   originCorner: MachineOriginCorner;
+  homeCorner: MachineOriginCorner;
   homingEnabled: boolean;
   maxSpindle: number;
   /**
@@ -43,11 +44,13 @@ export interface WelcomeWizardProps {
   initialMachineWatts?: string;
   initialMachineType?: string;
   initialOriginCorner?: MachineOriginCorner;
+  initialHomeCorner?: MachineOriginCorner;
   initialHomingEnabled?: boolean;
   initialMaxSpindle?: number;
 }
 
 type MachineKind = 'diode' | 'co2' | 'fiber';
+type HomeCornerChoice = MachineOriginCorner | 'same-as-origin';
 
 function parseMachineKind(t: string | undefined): MachineKind {
   if (t === 'co2' || t === 'fiber' || t === 'diode') return t;
@@ -112,6 +115,7 @@ export function WelcomeWizard({
   initialMachineWatts,
   initialMachineType,
   initialOriginCorner,
+  initialHomeCorner,
   initialHomingEnabled,
   initialMaxSpindle,
 }: WelcomeWizardProps) {
@@ -150,6 +154,9 @@ export function WelcomeWizard({
   );
   const [originCorner, setOriginCorner] = useState<MachineOriginCorner>(
     initialOriginCorner ?? 'front-left',
+  );
+  const [homeCorner, setHomeCorner] = useState<HomeCornerChoice>(
+    initialHomeCorner ?? 'same-as-origin',
   );
   const [homingEnabled, setHomingEnabled] = useState(initialHomingEnabled ?? false);
   const [maxSpindle, setMaxSpindle] = useState(
@@ -249,6 +256,8 @@ export function WelcomeWizard({
     fontWeight: 500,
     color: selected ? '#00d4ff' : '#e0e0ec',
   });
+  const resolvedHomeCorner: MachineOriginCorner =
+    homeCorner === 'same-as-origin' ? originCorner : homeCorner;
 
   const renderStep = () => {
     switch (step) {
@@ -285,10 +294,12 @@ export function WelcomeWizard({
                   setMachinePresetKey(m.presetKey);
                   if (m.presetKey === 'prt4040-router-laser') {
                     setOriginCorner('rear-right');
+                    setHomeCorner('same-as-origin');
                     setHomingEnabled(false);
                     setMaxSpindle(1000);
                   } else if (m.presetKey === 'falcon-a1-pro') {
                     setOriginCorner('front-left');
+                    setHomeCorner('same-as-origin');
                     setHomingEnabled(true);
                     setMaxSpindle(1000);
                   }
@@ -304,7 +315,7 @@ export function WelcomeWizard({
             }),
           ),
           React.createElement('div', {
-            onClick: () => { setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
+            onClick: () => { setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); setHomeCorner('same-as-origin'); },
             style: { ...cardStyle(customBed), marginTop: 8, display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center' },
           },
             React.createElement('span', { style: { color: customBed ? '#00d4ff' : '#8888aa', fontSize: 12 } }, 'Custom size:'),
@@ -315,7 +326,7 @@ export function WelcomeWizard({
               integer: true,
               inputMode: 'numeric',
               defaultValue: bedW,
-              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
+              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); setHomeCorner('same-as-origin'); },
               style: { ...inputStyle, width: 70 },
               onChange: (v: number) => {
                 setBedW(v);
@@ -324,6 +335,7 @@ export function WelcomeWizard({
                 setMachineWatts('');
                 setMachineType('diode');
                 setMachinePresetKey(undefined);
+                setHomeCorner('same-as-origin');
               },
               onCommit: (v: number) => {
                 setBedW(v);
@@ -332,6 +344,7 @@ export function WelcomeWizard({
                 setMachineWatts('');
                 setMachineType('diode');
                 setMachinePresetKey(undefined);
+                setHomeCorner('same-as-origin');
               },
             }),
             React.createElement('span', { style: { color: '#555570' } }, '×'),
@@ -342,7 +355,7 @@ export function WelcomeWizard({
               integer: true,
               inputMode: 'numeric',
               defaultValue: bedH,
-              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); },
+              onClick: (e: React.MouseEvent<HTMLInputElement>) => { e.stopPropagation(); setCustomBed(true); setMachineName('Custom'); setMachineWatts(''); setMachineType('diode'); setMachinePresetKey(undefined); setHomeCorner('same-as-origin'); },
               style: { ...inputStyle, width: 70 },
               onChange: (v: number) => {
                 setBedH(v);
@@ -351,6 +364,7 @@ export function WelcomeWizard({
                 setMachineWatts('');
                 setMachineType('diode');
                 setMachinePresetKey(undefined);
+                setHomeCorner('same-as-origin');
               },
               onCommit: (v: number) => {
                 setBedH(v);
@@ -359,6 +373,7 @@ export function WelcomeWizard({
                 setMachineWatts('');
                 setMachineType('diode');
                 setMachinePresetKey(undefined);
+                setHomeCorner('same-as-origin');
               },
             }),
             React.createElement('span', { style: { color: '#555570', fontSize: 11 } }, 'mm'),
@@ -373,7 +388,7 @@ export function WelcomeWizard({
             "How is your machine configured? If you're not sure, the defaults are safe.",
           ),
           React.createElement('div', { style: { marginBottom: 20 } },
-            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Origin corner (machine zero)'),
+            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Where is machine zero (X0 Y0)?'),
             React.createElement('div', {
               style: {
                 display: 'grid',
@@ -402,7 +417,44 @@ export function WelcomeWizard({
               }, 'Front-right'),
             ),
             React.createElement('p', { style: { color: '#555570', fontSize: 10, marginTop: 8, textAlign: 'center' } },
-              'Most diode lasers use Front-left. CNC routers often use Rear-right.',
+              'This is where your machine reports X0 Y0. LaserForge uses it to orient the canvas, framing, and G-code.',
+            ),
+          ),
+          React.createElement('div', { style: { marginBottom: 20 } },
+            React.createElement('label', { style: { ...inputLabel, marginBottom: 8, display: 'block' } }, 'Where does Home move the laser?'),
+            React.createElement('div', {
+              style: {
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: 6,
+                maxWidth: 280,
+                margin: '0 auto',
+                aspectRatio: '1.4 / 1',
+              },
+            },
+              React.createElement('div', {
+                onClick: () => setHomeCorner('same-as-origin'),
+                style: pickCardStyle(homeCorner === 'same-as-origin'),
+              }, 'Same as zero'),
+              React.createElement('div', {
+                onClick: () => setHomeCorner('rear-right'),
+                style: pickCardStyle(resolvedHomeCorner === 'rear-right' && homeCorner !== 'same-as-origin'),
+              }, 'Rear-right'),
+              React.createElement('div', {
+                onClick: () => setHomeCorner('front-left'),
+                style: pickCardStyle(resolvedHomeCorner === 'front-left' && homeCorner !== 'same-as-origin'),
+              }, 'Front-left'),
+              React.createElement('div', {
+                onClick: () => setHomeCorner('rear-left'),
+                style: pickCardStyle(resolvedHomeCorner === 'rear-left' && homeCorner !== 'same-as-origin'),
+              }, 'Rear-left'),
+              React.createElement('div', {
+                onClick: () => setHomeCorner('front-right'),
+                style: pickCardStyle(resolvedHomeCorner === 'front-right' && homeCorner !== 'same-as-origin'),
+              }, 'Front-right'),
+            ),
+            React.createElement('p', { style: { color: '#555570', fontSize: 10, marginTop: 8, textAlign: 'center' } },
+              'This describes the physical Home direction. It does not change GRBL $23 automatically.',
             ),
           ),
           React.createElement('div', { style: { marginBottom: 20 } },
@@ -556,8 +608,12 @@ export function WelcomeWizard({
               React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, `${bedW} × ${bedH} mm`),
             ),
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
-              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Origin'),
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Machine zero'),
               React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, originCorner.replace(/-/g, ' ')),
+            ),
+            React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
+              React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Home corner'),
+              React.createElement('span', { style: { color: '#e0e0ec', fontSize: 11, fontFamily: mono } }, resolvedHomeCorner.replace(/-/g, ' ')),
             ),
             React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: 8 } },
               React.createElement('span', { style: { color: '#8888aa', fontSize: 11 } }, 'Auto-home'),
@@ -672,6 +728,7 @@ export function WelcomeWizard({
                 machineType: machineType || 'diode',
                 controllerType: 'grbl',
                 originCorner,
+                homeCorner: homeCorner === 'same-as-origin' ? originCorner : homeCorner,
                 homingEnabled,
                 maxSpindle,
                 machinePresetKey,

@@ -22,6 +22,7 @@ export interface AppRecoverySetupProps {
   initialMachineWatts?: string;
   initialMachineType?: string;
   initialOriginCorner?: MachineOriginCorner;
+  initialHomeCorner?: MachineOriginCorner;
   initialHomingEnabled?: boolean;
   initialMaxSpindle?: number;
 }
@@ -76,6 +77,7 @@ export function AppRecoverySetup(props: AppRecoverySetupProps): React.ReactEleme
       initialMachineWatts: props.initialMachineWatts,
       initialMachineType: props.initialMachineType,
       initialOriginCorner: props.initialOriginCorner,
+      initialHomeCorner: props.initialHomeCorner,
       initialHomingEnabled: props.initialHomingEnabled,
       initialMaxSpindle: props.initialMaxSpindle,
     }),

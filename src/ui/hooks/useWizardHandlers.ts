@@ -138,6 +138,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
         bedWidth: result.bedWidth,
         bedHeight: result.bedHeight,
         originCorner: result.originCorner,
+        homeCorner: result.homeCorner,
         homingEnabled: result.homingEnabled,
         softLimitsEnabled: result.homingEnabled,
         maxSpindle: result.maxSpindle,
@@ -174,6 +175,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       profile.bedWidth = result.bedWidth;
       profile.bedHeight = result.bedHeight;
       profile.originCorner = result.originCorner;
+      profile.homeCorner = result.homeCorner;
       profile.homingEnabled = result.homingEnabled;
       profile.softLimitsEnabled = result.homingEnabled;
       profile.maxSpindle = result.maxSpindle;

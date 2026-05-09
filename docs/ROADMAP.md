@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 126 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
 | Tier 3 | 36 | 56 | Active quarter-scope backlog; T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
@@ -15877,6 +15877,22 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 ---
 
+### T2-131 | Setup wizard home-corner selection
+
+**Code reference:** `src/core/devices/DeviceProfile.ts` (`homeCorner`), `src/core/devices/homeCorner.ts` (GRBL `$23` to home-corner inference), `src/ui/components/WelcomeWizard.tsx` (machine-zero vs Home-corner questions), `src/ui/components/settings/MachineSettingsTab.tsx` (editable coordinate settings), and `src/ui/hooks/useAppDeviceProfiles.ts` (auto-detect copy-in).
+
+**Problem:** The setup wizard only asked for one corner. That conflated two different machine facts: where the controller reports machine zero (`originCorner`) and which physical corner `$H` homes toward (`homeCorner`). On CNC-router/laser hybrids like the PRT4040, those can differ because of GRBL homing direction masks, work offsets, negative workspace, or machine-specific limit-switch wiring. If the app treats them as one setting, the canvas/G-code orientation can be right while the Home UI and operator guidance are wrong.
+
+**Fix:** Add `homeCorner` as profile metadata, default it to `originCorner` for legacy profiles, and pin Falcon / PRT4040 defaults explicitly. The setup wizard now asks separately "Where is machine zero (X0 Y0)?" and "Where does Home move the laser?", with "Same as zero" as the default. Auto-detect maps GRBL `$23` to a home corner when the controller reports it, but LaserForge does not automatically rewrite `$23`; firmware changes remain a deliberate operator action. Machine settings exposes both corners so testers can correct profiles without rerunning the whole wizard.
+
+**Tests:** `tests/home-corner-wizard-profile.test.ts` and expanded `tests/profile-validation.test.ts`.
+
+**Priority:** Tier 2. Hardware compatibility and operator-trust fix; completes the setup half of the PRT4040 homing/origin investigation without changing G-code generation, frame math, or machine transforms.
+
+**Status:** Shipped in <TBD>. **Hardware verification not required for this MVP** (profile metadata, setup UI, settings UI, and read-only `$23` interpretation only; no homing command, `$23` write, G-code transform, or frame/start behavior changed).
+
+---
+
 ## Tier 3 鈥?This quarter
 
 ### T3-1 | Autosave to IndexedDB / filesystem
@@ -20383,6 +20399,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-128 Per-namespace storage authorization (Shipped — Electron filesystem backend now requires namespace + validates key allow-lists before get/set/remove/list; generic storage helpers removed)
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
 - [x] T2-130 PRT4040 GRBL router-laser compatibility profile and diagnostics (Shipped in `618fcad` — conservative manual-zero profile + Home disabled until homing verified + safe GRBL diagnostics copyout)
+
+- [x] T2-131 Setup wizard home-corner selection (Shipped in `<TBD>` - separate machine-zero and Home-corner profile metadata + setup/settings UI + GRBL `$23` read-only inference)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)

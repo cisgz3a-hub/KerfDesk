@@ -148,6 +148,14 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
       message: `originCorner must be one of front-left | rear-left | front-right | rear-right (got ${String(profile.originCorner)}).`,
     });
   }
+  if (profile.homeCorner != null && !VALID_ORIGIN_CORNERS.has(profile.homeCorner as MachineOriginCorner)) {
+    issues.push({
+      field: 'homeCorner',
+      severity: 'error',
+      code: 'PROFILE_HOME_CORNER_INVALID',
+      message: `homeCorner must be one of front-left | rear-left | front-right | rear-right when set (got ${String(profile.homeCorner)}).`,
+    });
+  }
 
   // ── maxSpindle ──
   if (!isPositiveFinite(profile.maxSpindle, MAX_SPINDLE)) {

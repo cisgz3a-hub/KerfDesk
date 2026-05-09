@@ -12,6 +12,7 @@ import {
   setActiveProfileId,
   type DeviceProfile,
 } from '../../core/devices/DeviceProfile';
+import { inferHomeCornerFromGrblHomingDir } from '../../core/devices/homeCorner';
 import { type Scene } from '../../core/scene/Scene';
 import {
   initializeMaterialLibrary,
@@ -33,6 +34,7 @@ interface GrblMachineInfoForProfile {
   readonly maxAccelX: number;
   readonly maxAccelY: number;
   readonly maxSpindle: number;
+  readonly homingDir: number;
 }
 
 interface WcsConsentPayload {
@@ -262,6 +264,9 @@ export function useAppDeviceProfiles({
       maxSpindle: grblMachineInfo.maxSpindle > 0
         ? grblMachineInfo.maxSpindle
         : current.maxSpindle,
+      homeCorner: inferHomeCornerFromGrblHomingDir(grblMachineInfo.homingDir)
+        ?? current.homeCorner
+        ?? current.originCorner,
     });
   }, [grblMachineInfo, updateActiveProfile]);
 

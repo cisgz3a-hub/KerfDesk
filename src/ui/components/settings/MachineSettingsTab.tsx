@@ -2,7 +2,7 @@
  * @copyright (c) 2025 LaserForge. All rights reserved.
  */
 import React from 'react';
-import type { DeviceProfile } from '../../../core/devices/DeviceProfile';
+import type { DeviceProfile, MachineOriginCorner } from '../../../core/devices/DeviceProfile';
 
 export interface MachineSettingsTabProps {
   activeProfile: DeviceProfile | null;
@@ -37,6 +37,12 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
   };
   const hintStyle: React.CSSProperties = { fontSize: 10, color: '#666' };
   const stopOnErrorChecked = activeProfile.stopOnError !== false;
+  const cornerOptions: Array<{ value: MachineOriginCorner; label: string }> = [
+    { value: 'front-left', label: 'Front left' },
+    { value: 'front-right', label: 'Front right' },
+    { value: 'rear-left', label: 'Rear left' },
+    { value: 'rear-right', label: 'Rear right' },
+  ];
 
   const rerunSection = onReRunSetup && React.createElement('div', {
     style: {
@@ -108,6 +114,27 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     );
   };
 
+  const cornerField = (
+    label: string,
+    field: 'originCorner' | 'homeCorner',
+    value: MachineOriginCorner,
+    hint: string,
+  ) => React.createElement('div', { style: fieldRowStyle },
+    React.createElement('label', { style: labelStyle }, label),
+    React.createElement('select', {
+      value,
+      style: inputStyle,
+      onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+        onUpdateProfile({ [field]: e.target.value as MachineOriginCorner } as Partial<DeviceProfile>);
+      },
+    },
+      cornerOptions.map(option => React.createElement('option', { key: option.value, value: option.value },
+        option.label,
+      )),
+    ),
+    React.createElement('div', { style: hintStyle }, hint),
+  );
+
   return React.createElement('div', null,
     rerunSection,
     canAutoDetect && React.createElement('div', {
@@ -135,6 +162,14 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
       React.createElement('div', { style: sectionTitleStyle }, 'Bed dimensions'),
       numberField('Bed width', 'bedWidth', 1, 'mm', 'GRBL $130'),
       numberField('Bed height', 'bedHeight', 1, 'mm', 'GRBL $131'),
+    ),
+
+    React.createElement('div', { style: sectionStyle },
+      React.createElement('div', { style: sectionTitleStyle }, 'Coordinates'),
+      cornerField('Machine zero corner', 'originCorner', activeProfile.originCorner,
+        'Where the controller reports X0 Y0. Used for canvas, Frame, Start, and G-code orientation.'),
+      cornerField('Home corner', 'homeCorner', activeProfile.homeCorner ?? activeProfile.originCorner,
+        'Physical corner the head seeks when Home runs. Does not rewrite GRBL $23.'),
     ),
 
     React.createElement('div', { style: sectionStyle },

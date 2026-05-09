@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 367 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 502 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 368 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 503 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 93 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 94 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 11 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 440 | - |
+| `tests/` | 441 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -140,6 +140,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/box/panelModel.ts`
 - `src/core/devices/ActiveProfileStore.ts`
 - `src/core/devices/DeviceProfile.ts`
+- `src/core/devices/homeCorner.ts`
 - `src/core/devices/profileSnapshot.ts`
 - `src/core/devices/validateProfile.ts`
 - `src/core/geometry/CompoundPath.ts`
@@ -680,6 +681,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/history-entry-metadata.test.ts`
 - `tests/history-memory-budget.test.ts`
 - `tests/history.test.ts`
+- `tests/home-corner-wizard-profile.test.ts`
 - `tests/image-decompression-bomb.test.ts`
 - `tests/image-import-max-dim-cap.test.ts`
 - `tests/image-prep-grayscale-equivalence.test.ts`

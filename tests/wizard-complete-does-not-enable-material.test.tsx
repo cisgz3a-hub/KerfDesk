@@ -83,6 +83,7 @@ function wizardResult(): WizardResult {
     machineType: 'diode',
     controllerType: 'grbl',
     originCorner: 'front-left',
+    homeCorner: 'front-left',
     homingEnabled: true,
     maxSpindle: 1000,
   };
