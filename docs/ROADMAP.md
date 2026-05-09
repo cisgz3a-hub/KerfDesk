@@ -55,7 +55,7 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-08, branch `master`.
+**Snapshot date:** 2026-05-09, branch `master`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 33 | 57 | Active quarter-scope backlog; T3-39 malformed-input suite shipped; output-chunk cache deferred to streaming work. |
+| Tier 3 | 35 | 57 | Active quarter-scope backlog; T3-40 performance/stress suite shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -16971,6 +16971,8 @@ Mark these with `test.skip` or a `failingExpectedUntil` annotation, with clear c
 
 **Cross-check note (audit 2F):** Audit's section 8 / Gate F / P1.
 
+**Status:** Shipped in `b4769f0` - added `tests/perf/` coverage for large-raster complexity gating, checkerboard raster cancellation during output, 50,000-segment vector determinism, dense hatch-fill scanline caps, text-outline stress/cache invalidation, repeated edit/export boundedness, and explicit skipped blockers for T3-15 million-line streaming/export.
+
 ---
 
 ### T3-41 | Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks
@@ -20399,7 +20401,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
 - [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
 - [x] T3-39 Malformed-input test suite (Shipped in `a28eec8` — malformed SVG/image/settings/template/extreme-coordinate suite)
-- [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
+- [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `b4769f0` — bounded perf suite with T3-15 streaming blockers documented)
 - [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
