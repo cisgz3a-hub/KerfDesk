@@ -16343,7 +16343,7 @@ Currently the existing `GcodeTemplateValidator` covers templates only. The plan'
 
 **Priority:** Tier 3. Defense-in-depth on top of T1-32 ($32 check), T1-43 (mode reassertion), T2-14 (safety wrapper). Each catches a different class of failure; this catches generation bugs that the other layers don't.
 
-**Status:** Shipped in `<TBD>` - Added final emitted G-code semantic preflight validation in `src/core/preflight/rules/OutputValidator.ts`, wired through `runPreflight` / `runPreflightSummary` via `PreflightContext.emittedGcode`. Blocks unsafe modal ordering (laser on before safe setup), rapid moves with laser active, missing final `M5`, spindle values above profile/live max, non-positive feed rates, unsupported GRBL commands, and lines beyond GRBL's 127-character buffer limit. Pinned by `tests/output-gcode-semantic-preflight.test.ts` plus preflight regressions. Hardware verification: not required (preflight validation only; no emitted G-code, motion, controller, or start-mode behavior changed).
+**Status:** Shipped in `4f57f01` - Added final emitted G-code semantic preflight validation in `src/core/preflight/rules/OutputValidator.ts`, wired through `runPreflight` / `runPreflightSummary` via `PreflightContext.emittedGcode`. Blocks unsafe modal ordering (laser on before safe setup), rapid moves with laser active, missing final `M5`, spindle values above profile/live max, non-positive feed rates, unsupported GRBL commands, and lines beyond GRBL's 127-character buffer limit. Pinned by `tests/output-gcode-semantic-preflight.test.ts` plus preflight regressions. Hardware verification: not required (preflight validation only; no emitted G-code, motion, controller, or start-mode behavior changed).
 
 ---
 
@@ -20422,7 +20422,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
-- [x] T3-18 Output validator semantic scan over emitted G-code (Shipped in `<TBD>` - final emitted G-code preflight validator with modal laser-state, spindle/feed, unsupported-command, and GRBL line-length checks)
+- [x] T3-18 Output validator semantic scan over emitted G-code (Shipped in `4f57f01` - final emitted G-code preflight validator with modal laser-state, spindle/feed, unsupported-command, and GRBL line-length checks)
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
