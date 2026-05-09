@@ -16971,7 +16971,7 @@ Mark these with `test.skip` or a `failingExpectedUntil` annotation, with clear c
 
 **Cross-check note (audit 2F):** Audit's section 8 / Gate F / P1.
 
-**Status:** Shipped in `b4769f0` - added `tests/perf/` coverage for large-raster complexity gating, checkerboard raster cancellation during output, 50,000-segment vector determinism, dense hatch-fill scanline caps, text-outline stress/cache invalidation, repeated edit/export boundedness, and explicit skipped blockers for T3-15 million-line streaming/export.
+**Status:** Shipped in `6dec8a8` - added `tests/perf/` coverage for large-raster complexity gating, checkerboard raster cancellation during output, 50,000-segment vector determinism, dense hatch-fill scanline caps, text-outline stress/cache invalidation, repeated edit/export boundedness, and explicit skipped blockers for T3-15 million-line streaming/export.
 
 ---
 
@@ -20401,7 +20401,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
 - [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
 - [x] T3-39 Malformed-input test suite (Shipped in `a28eec8` — malformed SVG/image/settings/template/extreme-coordinate suite)
-- [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `b4769f0` — bounded perf suite with T3-15 streaming blockers documented)
+- [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `6dec8a8` — bounded perf suite with T3-15 streaming blockers documented)
 - [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
