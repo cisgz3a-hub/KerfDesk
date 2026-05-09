@@ -34,6 +34,7 @@ import { useClipboard } from '../hooks/useClipboard';
 import { useImport } from '../hooks/useImport';
 import { useCompileManager } from '../hooks/useCompileManager';
 import { useConnectionHandlers } from '../hooks/useConnectionHandlers';
+import { useSettingsLiveCapabilities } from '../hooks/useSettingsLiveCapabilities';
 import { useWizardHandlers, getSetupStorageKey } from '../hooks/useWizardHandlers';
 import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
@@ -293,9 +294,9 @@ export function App(): React.ReactElement {
   const grblMachineInfo = useMemo(() => {
     const c = grbl.controller;
     if (!c || !(c instanceof GrblController)) return null;
-    const info = c.getMachineInfo();
-    return info;
+    return c.getMachineInfo();
   }, [grbl.controller, grbl.machineState]);
+  const settingsLiveCapabilities = useSettingsLiveCapabilities(grbl.controller, grbl.machineState);
 
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
   const {
@@ -1891,6 +1892,7 @@ export function App(): React.ReactElement {
       activeProfile,
       onUpdateProfile: updateActiveProfile,
       canAutoDetect: !!grblMachineInfo,
+      liveCapabilities: settingsLiveCapabilities,
       onAutoDetect: handleAutoDetectMachine,
       onReRunSetup: () => {
         closeSettings();

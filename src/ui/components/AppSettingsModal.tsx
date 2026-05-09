@@ -2,7 +2,10 @@ import React from 'react';
 import { type DeviceProfile } from '../../core/devices/DeviceProfile';
 import { entitlementService, tierDisplayName } from '../../entitlements';
 import { SettingsModal, type SettingsTab } from './SettingsModal';
-import { MachineSettingsTab } from './settings/MachineSettingsTab';
+import {
+  MachineSettingsTab,
+  type MachineSettingsLiveCapabilities,
+} from './settings/MachineSettingsTab';
 import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
 import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
 import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
@@ -15,6 +18,7 @@ export interface AppSettingsModalProps {
   activeProfile: DeviceProfile | null;
   onUpdateProfile: (updates: Partial<DeviceProfile>) => void;
   canAutoDetect: boolean;
+  liveCapabilities?: MachineSettingsLiveCapabilities | null;
   onAutoDetect: () => void;
   onReRunSetup: () => void;
   profiles: DeviceProfile[];
@@ -53,6 +57,7 @@ export function AppSettingsModal(props: AppSettingsModalProps): React.ReactEleme
       activeProfile: props.activeProfile,
       onUpdateProfile: props.onUpdateProfile,
       canAutoDetect: props.canAutoDetect,
+      liveCapabilities: props.liveCapabilities,
       onAutoDetect: props.onAutoDetect,
       autoDetecting: false,
       onReRunSetup: props.onReRunSetup,

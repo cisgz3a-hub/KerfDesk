@@ -3,6 +3,28 @@
  */
 import React from 'react';
 import type { DeviceProfile, MachineOriginCorner } from '../../../core/devices/DeviceProfile';
+import {
+  confidenceLabel,
+  resolveCapabilityValue,
+  type CapabilityValue,
+} from '../../../controllers/CapabilityValue';
+
+export interface MachineSettingsLiveCapabilities {
+  bedWidth?: number | null;
+  bedHeight?: number | null;
+  maxSpindle?: number | null;
+  laserMode?: boolean | null;
+  homingEnabled?: boolean | null;
+}
+
+interface MachineCapabilityRow {
+  id: string;
+  label: string;
+  valueText: string;
+  chipText: string;
+  confidence: CapabilityValue<unknown>['confidence'];
+  detail: string;
+}
 
 export interface MachineSettingsTabProps {
   activeProfile: DeviceProfile | null;
@@ -10,12 +32,137 @@ export interface MachineSettingsTabProps {
   canAutoDetect: boolean;
   onAutoDetect: () => void;
   autoDetecting?: boolean;
+  liveCapabilities?: MachineSettingsLiveCapabilities | null;
   /** Opens the welcome / setup wizard (e.g. re-run initial machine questions). */
   onReRunSetup?: () => void;
 }
 
+function finitePositive(v: number | null | undefined): number | undefined {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : undefined;
+}
+
+function chipText(v: CapabilityValue<unknown>): string {
+  if (v.confidence === 'manual') return 'Profile only';
+  return confidenceLabel(v.confidence);
+}
+
+function detailText(v: CapabilityValue<unknown>, grblSetting: string): string {
+  switch (v.confidence) {
+    case 'verified':
+      return `Verified from GRBL ${grblSetting}`;
+    case 'manual':
+      return 'Connect to verify live controller settings';
+    case 'fallback':
+      return 'Default value';
+    case 'unknown':
+      return 'Settings not read yet';
+  }
+}
+
+function rowFromCapability<T>(args: {
+  id: string;
+  label: string;
+  value: CapabilityValue<T>;
+  grblSetting: string;
+  format: (value: T) => string;
+}): MachineCapabilityRow {
+  return {
+    id: args.id,
+    label: args.label,
+    valueText: args.value.value == null ? 'Unknown' : args.format(args.value.value),
+    chipText: chipText(args.value as CapabilityValue<unknown>),
+    confidence: args.value.confidence,
+    detail: detailText(args.value as CapabilityValue<unknown>, args.grblSetting),
+  };
+}
+
+function boolLabel(value: boolean): string {
+  return value ? 'Enabled' : 'Disabled';
+}
+
+export function buildMachineSettingsCapabilityRows(
+  profile: DeviceProfile,
+  liveCapabilities: MachineSettingsLiveCapabilities | null | undefined,
+  now = Date.now(),
+): MachineCapabilityRow[] {
+  // T3-58: UI confidence is resolved from live firmware first, then saved
+  // profile. This keeps the visible settings honest: verified values are
+  // labelled as such, profile-only values ask the user to connect, and values
+  // with no profile source stay unknown.
+  const bedWidth = resolveCapabilityValue({
+    firmware: finitePositive(liveCapabilities?.bedWidth),
+    profile: finitePositive(profile.bedWidth),
+    now,
+  });
+  const bedHeight = resolveCapabilityValue({
+    firmware: finitePositive(liveCapabilities?.bedHeight),
+    profile: finitePositive(profile.bedHeight),
+    now,
+  });
+  const maxSpindle = resolveCapabilityValue({
+    firmware: finitePositive(liveCapabilities?.maxSpindle),
+    profile: finitePositive(profile.maxSpindle),
+    now,
+  });
+  const laserMode = resolveCapabilityValue<boolean>({
+    firmware: liveCapabilities?.laserMode ?? undefined,
+    now,
+  });
+  const homingEnabled = resolveCapabilityValue({
+    firmware: liveCapabilities?.homingEnabled ?? undefined,
+    profile: profile.homingEnabled,
+    now,
+  });
+
+  return [
+    rowFromCapability({
+      id: 'bed-width',
+      label: 'Bed width',
+      value: bedWidth,
+      grblSetting: '$130/$131',
+      format: value => `${value} mm`,
+    }),
+    rowFromCapability({
+      id: 'bed-height',
+      label: 'Bed height',
+      value: bedHeight,
+      grblSetting: '$130/$131',
+      format: value => `${value} mm`,
+    }),
+    rowFromCapability({
+      id: 'max-spindle',
+      label: 'Max spindle',
+      value: maxSpindle,
+      grblSetting: '$30',
+      format: value => `${value}`,
+    }),
+    rowFromCapability({
+      id: 'laser-mode',
+      label: 'Laser mode',
+      value: laserMode,
+      grblSetting: '$32',
+      format: boolLabel,
+    }),
+    rowFromCapability({
+      id: 'homing',
+      label: 'Homing',
+      value: homingEnabled,
+      grblSetting: '$22',
+      format: boolLabel,
+    }),
+  ];
+}
+
 export function MachineSettingsTab(props: MachineSettingsTabProps) {
-  const { activeProfile, onUpdateProfile, canAutoDetect, onAutoDetect, autoDetecting, onReRunSetup } = props;
+  const {
+    activeProfile,
+    onUpdateProfile,
+    canAutoDetect,
+    onAutoDetect,
+    autoDetecting,
+    liveCapabilities,
+    onReRunSetup,
+  } = props;
 
   if (!activeProfile) {
     return React.createElement('div', { style: { color: '#888', fontSize: 13 } },
@@ -37,6 +184,7 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
   };
   const hintStyle: React.CSSProperties = { fontSize: 10, color: '#666' };
   const stopOnErrorChecked = activeProfile.stopOnError !== false;
+  const capabilityRows = buildMachineSettingsCapabilityRows(activeProfile, liveCapabilities);
   const cornerOptions: Array<{ value: MachineOriginCorner; label: string }> = [
     { value: 'front-left', label: 'Front left' },
     { value: 'front-right', label: 'Front right' },
@@ -135,6 +283,66 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     React.createElement('div', { style: hintStyle }, hint),
   );
 
+  const capabilityChipStyle = (confidence: MachineCapabilityRow['confidence']): React.CSSProperties => {
+    const colors = {
+      verified: { border: 'rgba(20,210,135,0.45)', bg: 'rgba(20,210,135,0.12)', fg: '#7ef0b6' },
+      manual: { border: 'rgba(255,190,70,0.45)', bg: 'rgba(255,190,70,0.12)', fg: '#ffd36a' },
+      fallback: { border: 'rgba(255,80,110,0.45)', bg: 'rgba(255,80,110,0.12)', fg: '#ff7890' },
+      unknown: { border: 'rgba(150,150,180,0.35)', bg: 'rgba(150,150,180,0.08)', fg: '#aaaac0' },
+    }[confidence];
+    return {
+      display: 'inline-flex',
+      justifyContent: 'center',
+      minWidth: 78,
+      padding: '3px 8px',
+      border: `1px solid ${colors.border}`,
+      background: colors.bg,
+      color: colors.fg,
+      borderRadius: 999,
+      fontSize: 10,
+      fontWeight: 700,
+    };
+  };
+
+  const capabilitySection = React.createElement('div', {
+    style: sectionStyle,
+    'data-testid': 'machine-capability-confidence',
+  },
+    React.createElement('div', { style: sectionTitleStyle }, 'Capability confidence'),
+    React.createElement('div', {
+      style: {
+        display: 'grid',
+        gap: 8,
+        padding: 10,
+        background: '#0a0a14',
+        border: '1px solid #252540',
+        borderRadius: 6,
+      },
+    },
+      capabilityRows.map(row => React.createElement('div', {
+        key: row.id,
+        style: {
+          display: 'grid',
+          gridTemplateColumns: '120px minmax(70px, 1fr) 90px',
+          gap: 10,
+          alignItems: 'center',
+        },
+      },
+        React.createElement('div', { style: labelStyle }, row.label),
+        React.createElement('div', { style: { color: '#e0e0ec', fontSize: 12, fontWeight: 700 } }, row.valueText),
+        React.createElement('div', { style: capabilityChipStyle(row.confidence) }, row.chipText),
+        React.createElement('div', {
+          style: {
+            gridColumn: '2 / 4',
+            color: '#777792',
+            fontSize: 10,
+            lineHeight: 1.35,
+          },
+        }, row.detail),
+      )),
+    ),
+  );
+
   return React.createElement('div', null,
     rerunSection,
     canAutoDetect && React.createElement('div', {
@@ -145,7 +353,7 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
       },
     },
       React.createElement('div', { style: { fontSize: 12 } },
-        'Machine is connected. Pull bed size, max rates, and acceleration from live GRBL settings.'),
+        'Machine is connected. Pull bed size, max spindle, laser mode, homing state, max rates, and acceleration from live GRBL settings.'),
       React.createElement('button', {
         onClick: onAutoDetect,
         disabled: autoDetecting,
@@ -157,6 +365,8 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
         },
       }, autoDetecting ? 'Detecting...' : 'Auto-detect from machine'),
     ),
+
+    capabilitySection,
 
     React.createElement('div', { style: sectionStyle },
       React.createElement('div', { style: sectionTitleStyle }, 'Bed dimensions'),

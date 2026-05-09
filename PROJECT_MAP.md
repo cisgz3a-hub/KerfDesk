@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 369 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 508 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 370 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 509 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -40,14 +40,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 142 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 143 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 446 | - |
+| `tests/` | 447 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -458,6 +458,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/hooks/usePersistentBoxPreferences.ts`
 - `src/ui/hooks/useQuickActionHandlers.ts`
 - `src/ui/hooks/useSceneOperations.ts`
+- `src/ui/hooks/useSettingsLiveCapabilities.ts`
 - `src/ui/hooks/useWizardHandlers.ts`
 - `src/ui/pages/BoxStudioPage.tsx`
 - `src/ui/recovery/RecoveryCard.tsx`
@@ -732,6 +733,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/machine-service-sendcommand-uses-gateway-policy.test.ts`
 - `tests/machine-service-start-validated-job.test.ts`
 - `tests/machine-service-user-sendcommand.test.ts`
+- `tests/machine-settings-capability-indicators.test.ts`
 - `tests/machine-settings-stop-on-error-toggle.test.ts`
 - `tests/machine-start-store.test.ts`
 - `tests/macos-icon-size.test.ts`
