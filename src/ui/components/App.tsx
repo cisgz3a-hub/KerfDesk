@@ -417,9 +417,9 @@ export function App(): React.ReactElement {
     }
   }, [activeProfile, setStartMode]);
 
-  // Safety: clean stop on page unload — soft reset path + laser off; no disconnect (port dies with the page).
+  // T3-52: best-effort stop + laser-off on page exit; browser owns port teardown.
   useEffect(() => {
-    const handler = (e: BeforeUnloadEvent) => {
+    const handler = (e: BeforeUnloadEvent | PageTransitionEvent) => {
       const ctrl = grbl.controllerRef.current;
       if (!ctrl) return;
       const status = ctrl.state.status;
@@ -433,14 +433,16 @@ export function App(): React.ReactElement {
       }
       void machineUi.executionCoordinator.emergencyLaserOff();
 
-      if (jobWasRunning) {
-        e.preventDefault();
-        e.returnValue = 'A laser job was running. The laser has been stopped. Are you sure you want to close?';
+      if (jobWasRunning && e.type === 'beforeunload') {
+        const beforeUnload = e as BeforeUnloadEvent;
+        beforeUnload.preventDefault();
+        beforeUnload.returnValue = 'A laser job was running. The laser has been stopped. Are you sure you want to close?';
       }
     };
 
     window.addEventListener('beforeunload', handler);
-    return () => window.removeEventListener('beforeunload', handler);
+    window.addEventListener('pagehide', handler);
+    return () => { window.removeEventListener('beforeunload', handler); window.removeEventListener('pagehide', handler); };
   }, [machineUi.executionCoordinator]);
 
   const handleSaveOrigin = useCallback(async () => {
