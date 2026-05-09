@@ -2084,8 +2084,26 @@ export class GrblController implements GrblControllerApi {
   private _startStatusPolling(): void {
     this._stopStatusPolling();
     this._pollTimer = setInterval(() => {
-      this.requestStatusReport();
+      this._pollStatus();
     }, STATUS_POLL_INTERVAL);
+  }
+
+  // T3-53: status-poll realtime writes can fail outside port.onError.
+  private _pollStatus(): void {
+    try {
+      this.requestStatusReport();
+    } catch (err: unknown) {
+      this._handleStatusPollFailure(err);
+    }
+  }
+
+  private _handleStatusPollFailure(err: unknown): void {
+    this._stopStatusPolling();
+    const message = err instanceof Error ? err.message : String(err);
+    for (const cb of this._errorListeners) {
+      cb(-1, `Status polling failed: ${message}`);
+    }
+    this._handleTransportDisconnect(true);
   }
 
   private _stopStatusPolling(): void {

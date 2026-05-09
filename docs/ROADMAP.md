@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 39 | 53 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, and T3-52 renderer lifecycle safety shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 40 | 52 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, and T3-53 status-poll failure normalization shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -17756,6 +17756,8 @@ Plus: track consecutive status-report failures. After N (e.g. 3) consecutive fai
 
 **Cross-check note (audit 3B):** Audit's section 9.3.
 
+**Status:** Shipped in `<TBD>` - `GrblController` routes periodic status polling through `_pollStatus()`, catches realtime `?` write failures, emits one normalized controller error, stops the poll interval, aborts any active job, and closes/disconnects the failed transport best-effort through the existing transport-disconnect cleanup. Pinned by `tests/poll-status-failure-normalized.test.ts`. Out of scope: true `device-lost` state for silent-but-successful writes still waits for live ConnectionManager migration.
+
 ---
 
 ### T3-54 | Connection lifecycle test suite
@@ -20461,7 +20463,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-50 Device identity verification on connect 鈥?require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
 - [ ] T3-51 Reconnect-same-machine verification (filed; depends on T3-50, T3-46)
 - [x] T3-52 Browser lifecycle cleanup - beforeunload / pagehide (Shipped in `78cc734` - renderer lifecycle handler attempts stop + laser-off on beforeunload and pagehide)
-- [ ] T3-53 `requestStatusReport` write-failure normalization in polling loop (filed; depends on T2-32)
+- [x] T3-53 `requestStatusReport` write-failure normalization in polling loop (Shipped in `<TBD>` - poll write failures stop polling and disconnect once)
 - [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
 - [ ] T3-56 Conservative unknown-capability handling (filed; depends on T2-38, T2-40, generalizes T1-55)
