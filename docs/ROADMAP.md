@@ -18196,7 +18196,7 @@ test('failed emergency stop transitions to unsafeUnknown and blocks subsequent c
 
 **Cross-check note (audit 3D):** Audit's P1 safety regression tests.
 
-**Status:** Shipped in `<TBD>` - focused MVP: added `tests/safety-controller-matrix/unknown-controller-safety.test.ts` as the first safety-controller matrix slice. It pins unknown/non-GRBL controller behavior so job start, test fire, frame-dot, pause, and resume are refused unless the controller advertises explicit capability. `canExecuteOperation('job-start', ...)` now requires an executable output format instead of treating job start as always app-level. The matrix also pins unsupported safety-op refusals, failed emergency/test-fire/laser-off transitions to `unsafeUnknown`, command blocking while unsafe, existing GRBL realtime-byte coverage (`0x21`, `0x7e`, `0x18`), GRBL disconnect best-effort `M5 S0`, and coordinator-owned test-fire deadman coverage. **Hardware verification not required** (capability gates and tests only; current GRBL output/controller commands are unchanged).
+**Status:** Shipped in `288ae17` - focused MVP: added `tests/safety-controller-matrix/unknown-controller-safety.test.ts` as the first safety-controller matrix slice. It pins unknown/non-GRBL controller behavior so job start, test fire, frame-dot, pause, and resume are refused unless the controller advertises explicit capability. `canExecuteOperation('job-start', ...)` now requires an executable output format instead of treating job start as always app-level. The matrix also pins unsupported safety-op refusals, failed emergency/test-fire/laser-off transitions to `unsafeUnknown`, command blocking while unsafe, existing GRBL realtime-byte coverage (`0x21`, `0x7e`, `0x18`), GRBL disconnect best-effort `M5 S0`, and coordinator-owned test-fire deadman coverage. **Hardware verification not required** (capability gates and tests only; current GRBL output/controller commands are unchanged).
 
 ---
 
@@ -20479,7 +20479,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-58 UI verified / unknown / stale capability indicators (Shipped in `ec6b224` - Machine Settings shows verified/profile-only/unknown capability confidence)
 - [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)
 - [x] T3-60 Disconnect-stops-job capability gating (Shipped in `4324ece` - non-host-stream controllers must abort before disconnect)
-- [x] T3-61 Per-controller-family safety regression tests (Shipped in `<TBD>` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
+- [x] T3-61 Per-controller-family safety regression tests (Shipped in `288ae17` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
 - [ ] T3-62 Ruida controller safety stub 鈥?design before implementation (filed; design doc only)
 - [ ] T3-63 Fake WebSerial byte-stream harness with chunking realism (filed; refines T3-54, depends on T2-48)
 - [ ] T3-64 Fake Electron serialport test harness (filed; conditional on T2-35 keep-decision)
