@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 40 | 52 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, and T3-53 status-poll failure normalization shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 41 | 51 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, and T3-56 conservative unknown `$32` handling shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -17917,6 +17917,8 @@ The "explicit manual mode" escape hatch (audit Finding 7.1): a settings option "
 
 **Cross-check note (audit 3C):** Audit's Finding 7.1 + Critical 5 + Priority 7. Verified five fallback-to-default locations.
 
+**Status:** Shipped in `<TBD>` - focused MVP: connected real hardware now blocks M4 dynamic-power output when the controller has not reported laser mode `$32`, while verified `$32=1`, non-M4 output, and offline/export workflows remain allowed. `runPreflightSummary` also no longer treats a disconnected/connecting `MachineState` object as connected hardware. Pinned by `tests/conservative-unknown-capability-handling.test.ts`. Existing T1-55 already blocks unknown `$30`; broader CapabilityValue integration for bed dimensions, homing, identity, and trust-profile overrides remains deferred to the T2-38/T2-40 followups and T3-57/T3-58.
+
 ---
 
 ### T3-57 | Expand preflight mismatch rules 鈥?`$30` / `$32` / `$22` / `$110/$111` / `$120/$121` / firmware version
@@ -20466,7 +20468,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-53 `requestStatusReport` write-failure normalization in polling loop (Shipped in `ca7629f` - poll write failures stop polling and disconnect once)
 - [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
-- [ ] T3-56 Conservative unknown-capability handling (filed; depends on T2-38, T2-40, generalizes T1-55)
+- [x] T3-56 Conservative unknown-capability handling (Shipped in `<TBD>` - connected M4 output now blocks until `$32` laser mode is known)
 - [ ] T3-57 Expand preflight mismatch rules ($22, $110/$111, $120/$121, model identity) (filed; depends on T2-25, T2-38, T3-50)
 - [ ] T3-58 UI verified / unknown / stale capability indicators (filed; depends on T2-38)
 - [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)

@@ -69,6 +69,8 @@ export const PREFLIGHT_CODES = {
   ACCEL_AWARE_NO_ACCEL_PARAM: 'ACCEL_AWARE_NO_ACCEL_PARAM',
   /** T1-32: M4 dynamic-mode job emitted against a controller reporting $32=0 (CNC/spindle mode). */
   MACHINE_LASER_MODE_DISABLED: 'MACHINE_LASER_MODE_DISABLED',
+  /** T3-56: connected controller has not reported $32; M4 dynamic-power output is unsafe until verified. */
+  MACHINE_LASER_MODE_UNKNOWN: 'MACHINE_LASER_MODE_UNKNOWN',
   /** T1-33: profile.maxSpindle disagrees with controller $30 by more than 5% — over-power risk. */
   MACHINE_MAXSPINDLE_MISMATCH: 'MACHINE_MAXSPINDLE_MISMATCH',
   /** T1-55: connected to a controller that has not yet reported $30 — laser-on operations refuse. */
@@ -411,7 +413,10 @@ export function runPreflightSummary(
     preflightBedWidthMm,
     preflightBedHeightMm,
     optimizeOrderEnabled: scene.compileOptions?.optimizeOrder !== false,
-    connectedToMachine: machineState != null,
+    connectedToMachine:
+      machineState != null &&
+      machineState.status !== 'disconnected' &&
+      machineState.status !== 'connecting',
     machineStatus: machineState?.status ?? null,
     startMode,
     workOriginMachinePosition:

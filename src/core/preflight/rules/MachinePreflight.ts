@@ -39,6 +39,26 @@ export function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]):
   //   - gcode does not contain M4: the job uses M3 / no spindle command, $32 doesn't
   //     matter for the danger this rule guards against
   const liveLaserMode = ctx.liveMachineInfo?.laserMode;
+  // T3-56: if we are connected to real hardware and the final output uses M4,
+  // unknown $32 is not safe enough. Offline/export/simulator paths may use
+  // profile defaults, but a connected controller must verify laser mode before
+  // dynamic-power output can run.
+  if (
+    ctx.connectedToMachine === true &&
+    ctx.hasGcode === true &&
+    liveLaserMode === undefined &&
+    ctx.outputUsesM4
+  ) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_LASER_MODE_UNKNOWN,
+      message:
+        'Connected to a controller that has not reported laser mode ($32). ' +
+        'This job uses M4 dynamic power, which is only safe after verifying $32=1. ' +
+        'Wait for settings detection to complete, or disconnect and reconnect.',
+    });
+  }
+
   if (liveLaserMode === false && ctx.outputUsesM4) {
     out.push({
       severity: 'error',
