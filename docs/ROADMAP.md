@@ -18751,7 +18751,7 @@ For origin corner (T1-60 / T2-58 surfaces this in the header), the diagram can a
 
 **Code reference:** Currently the app surfaces "Web Serial unsupported" reactively when the user tries to connect on an unsupported browser. No guidance up front.
 
-**Status:** Shipped in `<TBD>`. Added `src/ui/browser/BrowserCompatibility.ts` for browser family/version detection, Web Serial capability checks, and one-time connect-guidance acknowledgement. `ConnectWizard` now proactively explains unsupported browser cases (Firefox/Safari/etc. with simulator fallback) and shows a dismissible USB connection checklist in supported browsers. Pinned by `tests/browser-compatibility.test.ts`, `tests/connect-browser-guidance.test.tsx`, and the connection-panel layout guard. Hardware verification: not required (connect-panel guidance only; no transport/controller behavior changed).
+**Status:** Shipped in `eea9b13`. Added `src/ui/browser/BrowserCompatibility.ts` for browser family/version detection, Web Serial capability checks, and one-time connect-guidance acknowledgement. `ConnectWizard` now proactively explains unsupported browser cases (Firefox/Safari/etc. with simulator fallback) and shows a dismissible USB connection checklist in supported browsers. Pinned by `tests/browser-compatibility.test.ts`, `tests/connect-browser-guidance.test.tsx`, and the connection-panel layout guard. Hardware verification: not required (connect-panel guidance only; no transport/controller behavior changed).
 
 **Problem:** Audit 4B Section 3.4: first-run users on Firefox/Safari hit a wall when they try to connect. They should be told before they try.
 
@@ -20509,7 +20509,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `578391a` - bounded TransitionLog plus dev-only state graph installer)
 - [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
 - [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `b3766cf` - Ready-to-Run job layout mini-map)
-- [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `<TBD>` - browser detector plus proactive Connect guidance)
+- [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
 - [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
 - [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
