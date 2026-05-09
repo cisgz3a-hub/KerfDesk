@@ -129,8 +129,19 @@ function operationCapabilityRequirement(
       return { supported: caps.operations.canEmergencyStop, detail: 'Controller does not support emergency stop.' };
     case 'wcs-normalize':
     case 'raw-console':
-    case 'job-start':
       return { supported: true, detail: '' };  // app-level operations, not capability-gated
+    case 'job-start': {
+      const hasExecutableOutput =
+        caps.output.supportsGcode
+        || caps.output.supportsBinary
+        || caps.output.formats.includes('gcode-text')
+        || caps.output.formats.includes('gcode-binary')
+        || caps.output.formats.includes('native-binary');
+      return {
+        supported: hasExecutableOutput,
+        detail: 'Controller does not advertise an executable job output format.',
+      };
+    }
   }
 }
 

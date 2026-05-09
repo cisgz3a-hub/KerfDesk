@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 370 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 510 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 511 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -53,6 +53,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `tests/helpers` | 7 | - |
 | `tests/malformed` | 5 | - |
 | `tests/perf` | 3 | - |
+| `tests/safety-controller-matrix` | 1 | - |
 | `tests/simulators` | 4 | - |
 
 ## Source Files
@@ -1012,6 +1013,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/perf/large-job-stress.test.ts`
 - `tests/perf/streaming-expected-blockers.test.ts`
 - `tests/perf/text-outline-stress.test.ts`
+
+### `tests/safety-controller-matrix`
+
+- `tests/safety-controller-matrix/unknown-controller-safety.test.ts`
 
 ### `tests/simulators`
 
