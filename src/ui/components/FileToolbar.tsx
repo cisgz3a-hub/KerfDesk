@@ -24,6 +24,10 @@ import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
 import { deserializeScene } from '../../io/SceneSerializer';
+import {
+  formatMissingImageReferenceReport,
+  validateAndAnnotateImageReferences,
+} from '../../io/ImageReferenceValidation';
 import { clearAutosave } from '../../app/autosavePersistence';
 import { TestGridDialog } from './TestGridDialog';
 import { BuildStamp } from './BuildStamp';
@@ -288,7 +292,12 @@ export function FileToolbar({
     try {
       const text = await file.text();
       const loaded = deserializeScene(text);
-      onNewProject(loaded, 'file');
+      const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
+      onNewProject(annotated, 'file');
+      const imageReport = formatMissingImageReferenceReport(validation);
+      if (imageReport) {
+        await showAlert('Missing Images', imageReport);
+      }
     } catch (e) {
       console.error('Failed to open file:', e);
       await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);

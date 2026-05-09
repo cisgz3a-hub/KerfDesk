@@ -9,6 +9,10 @@ import {
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { deserializeScene } from '../../io/SceneSerializer';
+import {
+  formatMissingImageReferenceReport,
+  validateAndAnnotateImageReferences,
+} from '../../io/ImageReferenceValidation';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
@@ -320,7 +324,12 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         if (name.endsWith('.laserforge.json') || name.endsWith('.json')) {
           const text = await file.text();
           const loaded = deserializeScene(text);
-          handleNewProject(loaded, 'file');
+          const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
+          handleNewProject(annotated, 'file');
+          const imageReport = formatMissingImageReferenceReport(validation);
+          if (imageReport) {
+            await showAlertRef.current('Missing Images', imageReport);
+          }
         } else if (name.endsWith('.svg')) {
           const text = await file.text();
           const layerId = scene.activeLayerId || scene.layers[0]?.id;

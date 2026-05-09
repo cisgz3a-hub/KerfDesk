@@ -118,6 +118,9 @@ export interface ImageGeometry {
   gamma?: number;
   invert?: boolean;
   adjustedData?: Uint8Array;
+  /** T3-75: load-time state for indexeddb:// refs that no longer resolve. */
+  missingSource?: boolean;
+  missingSourceId?: string;
   /** Set when applying dithering from the properties panel */
   ditherMode?: import('../../import/Dithering').DitherMode;
   /**

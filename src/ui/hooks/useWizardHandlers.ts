@@ -1,6 +1,10 @@
 import { useCallback, type RefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { deserializeScene } from '../../io/SceneSerializer';
+import {
+  formatMissingImageReferenceReport,
+  validateAndAnnotateImageReferences,
+} from '../../io/ImageReferenceValidation';
 import { readAutosave } from '../../app/autosavePersistence';
 import {
   createBlankProfile,
@@ -107,7 +111,12 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     }
     try {
       const recovered = deserializeScene(payload.json);
-      handleNewProject(recovered, 'autosave');
+      const { scene: annotated, validation } = await validateAndAnnotateImageReferences(recovered);
+      handleNewProject(annotated, 'autosave');
+      const imageReport = formatMissingImageReferenceReport(validation);
+      if (imageReport) {
+        await showAlert('Missing Images', imageReport);
+      }
       setShowRecover(false);
       setRecoverAutosaveTimeLabel?.(null);
     } catch (e) {

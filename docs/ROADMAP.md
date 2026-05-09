@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 57 | 35 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, and T3-74 structured log events shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 58 | 34 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, and T3-75 image-reference validation shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18985,6 +18985,8 @@ Filter chips persist across sessions 鈥?power users can pin "Machine errors onl
 
 ### T3-75 | Image reference resolvability check on load + missing-image UI state
 
+**Status:** Shipped in `<TBD>`. Added `src/io/ImageReferenceValidation.ts` to detect `indexeddb://` image references, validate them against `ImageStore.hasImage`, tolerate image-store lookup failures by reporting the affected object as missing, format a user-facing recovery report, and annotate missing image objects with `missingSource` / `missingSourceId`. Project Open paths (`FileToolbar`, keyboard file handlers, drag/drop project import, autosave recovery, and `loadSceneFromFile`) now validate and annotate image refs after deserialize; missing refs load as placeholder rectangles and surface a clear “re-import images” alert instead of failing later. `SceneRenderer` now renders a `Missing image` placeholder for annotated objects. Pinned by `tests/image-reference-validation.test.ts`. Hardware verification: not required (project-load validation and canvas placeholder only).
+
 **Code reference:** Image objects can reference images via `indexeddb://...` URIs. Loader does not check if the reference resolves before completing the load.
 
 **Problem:** Audit 4D Required Priority 10: a project may reference an image stored in IndexedDB. If the image store data was cleared (browser cleared site data, IndexedDB corruption, manual user action), the project loads with image objects pointing nowhere. Render/compile fails far from the load site.
@@ -20519,7 +20521,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
 - [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
-- [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
+- [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `<TBD>` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)

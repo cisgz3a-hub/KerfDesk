@@ -1209,6 +1209,23 @@ function drawGeometry(
     case 'image': {
       if (!forObject) break;
 
+      if ((geom as ImageGeometry).missingSource === true) {
+        const dpi = 96;
+        const physicalWidth = (geom.originalWidth / dpi) * 25.4;
+        const physicalHeight = (geom.originalHeight / dpi) * 25.4;
+        ctx.save();
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, physicalWidth, physicalHeight);
+        ctx.lineWidth = transform.screenPx(1);
+        ctx.strokeStyle = '#ff4466';
+        ctx.strokeRect(0, 0, physicalWidth, physicalHeight);
+        ctx.fillStyle = '#ff88a0';
+        ctx.font = `${transform.screenPx(10)}px monospace`;
+        ctx.fillText('Missing image', transform.screenPx(4), physicalHeight / 2);
+        ctx.restore();
+        break;
+      }
+
       let loadSrc = geom.src;
       if (geom.src.startsWith('indexeddb://')) {
         const resolved = getIdbResolved(geom.src);

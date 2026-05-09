@@ -1,6 +1,10 @@
 import { useCallback } from 'react';
 import { createScene, type Scene } from '../../core/scene/Scene';
 import { deserializeScene, serializeForAutosave } from '../../io/SceneSerializer';
+import {
+  formatMissingImageReferenceReport,
+  validateAndAnnotateImageReferences,
+} from '../../io/ImageReferenceValidation';
 import { saveSceneToFile } from '../../io/FileIO';
 import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
 
@@ -75,7 +79,12 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       try {
         const text = await file.text();
         const loadedScene = deserializeScene(text);
-        handleNewProject(loadedScene, 'file');
+        const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loadedScene);
+        handleNewProject(annotated, 'file');
+        const imageReport = formatMissingImageReferenceReport(validation);
+        if (imageReport) {
+          await showAlert('Missing Images', imageReport);
+        }
       } catch (err) {
         await showAlert('Import Failed', 'Import failed: ' + (err as Error).message);
       }
