@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 37 | 55 | Active quarter-scope backlog; T3-18 output semantic validator and T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 38 | 54 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, and T3-49 serial disconnect handling shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -17541,6 +17541,8 @@ Combine with T3-16 (heartbeat) for defense-in-depth: navigator event is the fast
 
 **Cross-check note (audit 3B):** Audit's section 3.5.
 
+**Status:** Shipped in `<TBD>` - `WebSerialPort` now registers a `navigator.serial` disconnect listener for the active browser serial port and routes matching physical-unplug events through the existing `onClose` path. Disconnect events for other ports are ignored, listener cleanup is idempotent on normal close or device-loss close, and Web Serial typings now include connect/disconnect listener signatures. Pinned by `tests/serial-navigator-disconnect.test.ts` plus WebSerial connect/cleanup regressions. Hardware verification needed before release tagging: while connected to a real Falcon/GRBL controller, physically unplug USB and confirm the connection panel flips disconnected promptly.
+
 ---
 
 ### T3-50 | Device identity verification on connect 鈥?require `$I` firmware response
@@ -20453,7 +20455,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-46 Profile schema split 鈥?Device / Controller / Transport / Output (filed; quality-of-life for multi-controller)
 - [ ] T3-47 Generic safety operations API 鈥?capability-gated pause/stop/laserOff/testFire (filed; depends on T2-26, overlaps T2-12)
 - [ ] T3-48 `navigator.serial.getPorts()` device-reuse flow (filed; UX, depends on T2-31, T3-46)
-- [ ] T3-49 `navigator.serial` connect/disconnect event handling (filed; pairs with T3-16)
+- [x] T3-49 `navigator.serial` connect/disconnect event handling (Shipped in `<TBD>` - active WebSerial port listens for navigator disconnect and routes physical unplug through onClose)
 - [ ] T3-50 Device identity verification on connect 鈥?require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
 - [ ] T3-51 Reconnect-same-machine verification (filed; depends on T3-50, T3-46)
 - [ ] T3-52 Browser lifecycle cleanup 鈥?beforeunload / pagehide (filed; safety gap)

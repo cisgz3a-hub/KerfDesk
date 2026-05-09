@@ -23,6 +23,7 @@ export class WebSerialPort implements SerialPortLike {
   private _writer: WritableStreamDefaultWriter | null = null;
   private _isOpen = false;
   private _readLoopActive = false;
+  private _navigatorDisconnectHandler: ((event: Event & { port?: SerialPort }) => void) | null = null;
 
   private _dataCallback: ((line: string) => void) | null = null;
   private _errorCallback: ((error: Error) => void) | null = null;
@@ -85,6 +86,7 @@ export class WebSerialPort implements SerialPortLike {
       this._writer = writer;
       this._reader = reader;
       this._isOpen = true;
+      this._attachNavigatorDisconnectListener(port);
       this._startReadLoop();
     } catch (e) {
       // Unwind in reverse order. Each unwind step is best-effort; we
@@ -199,6 +201,7 @@ export class WebSerialPort implements SerialPortLike {
   async close(): Promise<void> {
     this._readLoopActive = false;
     this._isOpen = false;
+    this._detachNavigatorDisconnectListener();
 
     const port = this._port;
 
@@ -248,6 +251,68 @@ export class WebSerialPort implements SerialPortLike {
       this._port = null;
     }
 
+    this._closeCallback?.();
+  }
+
+  private _navigatorSerialEventTarget(): {
+    addEventListener?: (type: 'disconnect', callback: (event: Event & { port?: SerialPort }) => void) => void;
+    removeEventListener?: (type: 'disconnect', callback: (event: Event & { port?: SerialPort }) => void) => void;
+  } | null {
+    if (typeof navigator === 'undefined' || !('serial' in navigator)) return null;
+    return (navigator as unknown as { serial?: unknown }).serial as {
+      addEventListener?: (type: 'disconnect', callback: (event: Event & { port?: SerialPort }) => void) => void;
+      removeEventListener?: (type: 'disconnect', callback: (event: Event & { port?: SerialPort }) => void) => void;
+    } | null;
+  }
+
+  private _attachNavigatorDisconnectListener(port: SerialPort): void {
+    // T3-49: WebSerial exposes a navigator-level disconnect event that
+    // fires when the OS observes USB removal. Hooking it here feeds the
+    // existing onClose path faster than waiting for read/write failure.
+    this._detachNavigatorDisconnectListener();
+    if (this._port !== port) return;
+    const serial = this._navigatorSerialEventTarget();
+    if (typeof serial?.addEventListener !== 'function') return;
+    const handler = (event: Event & { port?: SerialPort }) => this._handleNavigatorDisconnect(event);
+    this._navigatorDisconnectHandler = handler;
+    serial.addEventListener('disconnect', handler);
+  }
+
+  private _detachNavigatorDisconnectListener(): void {
+    const handler = this._navigatorDisconnectHandler;
+    if (!handler) return;
+    this._navigatorDisconnectHandler = null;
+    const serial = this._navigatorSerialEventTarget();
+    if (typeof serial?.removeEventListener === 'function') {
+      serial.removeEventListener('disconnect', handler);
+    }
+  }
+
+  private _handleNavigatorDisconnect(event: Event & { port?: SerialPort }): void {
+    if (!this._port) return;
+    const eventPort = event.port;
+    if (eventPort && eventPort !== this._port) return;
+
+    this._readLoopActive = false;
+    this._isOpen = false;
+    this._detachNavigatorDisconnectListener();
+
+    const reader = this._reader;
+    this._reader = null;
+    if (reader) {
+      void reader.cancel().catch(() => { /* ignore */ }).finally(() => {
+        try { reader.releaseLock(); } catch { /* ignore */ }
+      });
+    }
+    if (this._writer) {
+      try {
+        this._writer.releaseLock();
+      } catch {
+        /* ignore */
+      }
+      this._writer = null;
+    }
+    this._port = null;
     this._closeCallback?.();
   }
 

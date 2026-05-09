@@ -37,10 +37,18 @@ declare global {
     close(): Promise<void>;
   }
 
+  interface SerialConnectionEvent extends Event {
+    readonly port: SerialPort;
+  }
+
   interface Navigator {
     readonly serial: {
       requestPort(): Promise<SerialPort>;
       getPorts(): Promise<SerialPort[]>;
+      addEventListener(type: 'connect', listener: (event: SerialConnectionEvent) => void): void;
+      addEventListener(type: 'disconnect', listener: (event: SerialConnectionEvent) => void): void;
+      removeEventListener(type: 'connect', listener: (event: SerialConnectionEvent) => void): void;
+      removeEventListener(type: 'disconnect', listener: (event: SerialConnectionEvent) => void): void;
     };
   }
 }
