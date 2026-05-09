@@ -19201,7 +19201,7 @@ Same logic for autosave records (T2-69 already includes `checksum` field).
 
 ### T3-78 | Save/load stress test suite
 
-**Status:** Shipped in `<TBD>`. Added `tests/persistence-stress/persistence-stress.test.ts`, a cross-cutting persistence regression suite covering 1000-object roundtrip, raster payload roundtrip, orphan-layer repair report, duplicate-ID repair report, corrupted transform rejection, missing IndexedDB image annotation, legacy 1.x envelope migration, device-profile snapshot mismatch, material-preset snapshot mismatch, autosave previous-slot fallback after corrupt current slot, and presence of the autosave dirty-state failure regression. Hardware verification: not required (test coverage only).
+**Status:** Shipped in `8ad1f6d`. Added `tests/persistence-stress/persistence-stress.test.ts`, a cross-cutting persistence regression suite covering 1000-object roundtrip, raster payload roundtrip, orphan-layer repair report, duplicate-ID repair report, corrupted transform rejection, missing IndexedDB image annotation, legacy 1.x envelope migration, device-profile snapshot mismatch, material-preset snapshot mismatch, autosave previous-slot fallback after corrupt current slot, and presence of the autosave dirty-state failure regression. Hardware verification: not required (test coverage only).
 
 **Code reference:** New `tests/persistence-stress/`. Refines T3-40 (perf/stress with cancellation from audit 1F).
 
@@ -20530,7 +20530,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
 - [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
-- [x] T3-78 Save/load stress test suite (Shipped in `<TBD>` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
+- [x] T3-78 Save/load stress test suite (Shipped in `8ad1f6d` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
