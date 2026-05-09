@@ -61,6 +61,96 @@ export interface FillSettings {
   overscanning: number;     // mm extension beyond boundary
 }
 
+// T3-35: Fill rows are pure but expensive for dense closed paths. Cache the
+// generated rows by path fingerprint + fill settings, bounded by LRU so repeat
+// recompiles or cross-hatch passes do not keep rebuilding identical rows.
+const FILL_ROWS_CACHE_MAX = 64;
+const fillRowsCache = new Map<string, FillScanlineRow[]>();
+let fillRowsCacheHits = 0;
+let fillRowsCacheMisses = 0;
+
+function clonePoint(p: Point): Point {
+  return { x: p.x, y: p.y };
+}
+
+function cloneFillRows(rows: readonly FillScanlineRow[]): FillScanlineRow[] {
+  return rows.map(row => ({
+    segments: row.segments.map(segment => ({
+      actualFrom: clonePoint(segment.actualFrom),
+      actualTo: clonePoint(segment.actualTo),
+    })),
+    overscanFrom: clonePoint(row.overscanFrom),
+    overscanTo: clonePoint(row.overscanTo),
+  }));
+}
+
+function fillRowsCacheGet(key: string): FillScanlineRow[] | null {
+  const cached = fillRowsCache.get(key);
+  if (!cached) {
+    fillRowsCacheMisses++;
+    return null;
+  }
+  fillRowsCache.delete(key);
+  fillRowsCache.set(key, cached);
+  fillRowsCacheHits++;
+  return cloneFillRows(cached);
+}
+
+function fillRowsCacheSet(key: string, rows: readonly FillScanlineRow[]): void {
+  fillRowsCache.delete(key);
+  fillRowsCache.set(key, cloneFillRows(rows));
+  while (fillRowsCache.size > FILL_ROWS_CACHE_MAX) {
+    const oldestKey = fillRowsCache.keys().next().value;
+    if (oldestKey === undefined) break;
+    fillRowsCache.delete(oldestKey);
+  }
+}
+
+function formatCacheNumber(value: number): string {
+  if (!Number.isFinite(value)) return String(value);
+  const normalized = Object.is(value, -0) ? 0 : value;
+  return normalized.toFixed(6).replace(/\.?0+$/, '');
+}
+
+function flatPathCacheKey(path: FlatPath): string {
+  return `${path.closed ? '1' : '0'}:${Array.from(path.coords, formatCacheNumber).join(',')}`;
+}
+
+export function buildFillRowsCacheKey(
+  paths: readonly FlatPath[],
+  settings: FillSettings,
+  initialRowIndex: number = 0,
+): string {
+  const pathKey = paths
+    .filter(path => path.closed)
+    .map(flatPathCacheKey)
+    .join('|');
+  return [
+    'fillRows:v1',
+    `i=${formatCacheNumber(settings.interval)}`,
+    `a=${formatCacheNumber(settings.angle)}`,
+    `b=${settings.biDirectional ? 1 : 0}`,
+    `o=${formatCacheNumber(settings.overscanning)}`,
+    `r=${initialRowIndex}`,
+    `p=${pathKey}`,
+  ].join(';');
+}
+
+export function __resetFillRowsCacheForTest(): void {
+  fillRowsCache.clear();
+  fillRowsCacheHits = 0;
+  fillRowsCacheMisses = 0;
+}
+
+export function __getFillRowsCacheStatsForTest(): { hits: number; misses: number; size: number; max: number } {
+  return {
+    hits: fillRowsCacheHits,
+    misses: fillRowsCacheMisses,
+    size: fillRowsCache.size,
+    max: FILL_ROWS_CACHE_MAX,
+  };
+}
+
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
 /**
@@ -180,6 +270,20 @@ export function generateFillScanlines(
  * stops, so the machine maintains constant velocity across the entire row.
  */
 export function generateFillRows(
+  paths: FlatPath[],
+  settings: FillSettings,
+  initialRowIndex: number = 0,
+): FillScanlineRow[] {
+  const cacheKey = buildFillRowsCacheKey(paths, settings, initialRowIndex);
+  const cached = fillRowsCacheGet(cacheKey);
+  if (cached) return cached;
+
+  const rows = generateFillRowsUncached(paths, settings, initialRowIndex);
+  fillRowsCacheSet(cacheKey, rows);
+  return rows;
+}
+
+function generateFillRowsUncached(
   paths: FlatPath[],
   settings: FillSettings,
   initialRowIndex: number = 0,

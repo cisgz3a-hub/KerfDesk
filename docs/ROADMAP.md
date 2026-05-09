@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 28 | 62 | Active quarter-scope backlog; T3-33 machine-origin overlay now follows MachineTransform. |
+| Tier 3 | 29 | 61 | Active quarter-scope backlog; T3-35 fill-row cache shipped; output-chunk cache deferred to streaming work. |
 
 ### Historical audit classification
 
@@ -16717,6 +16717,8 @@ This requires the streaming output infrastructure from T3-15 to land first (or a
 
 **Priority:** Tier 3 鈥?performance.
 
+**Status:** Shipped in `<TBD>` — added a bounded LRU cache for generated fill rows keyed by closed-path fingerprint, fill settings, and initial row parity. Cache values are cloned at the boundary so planner callers cannot mutate cached geometry. The processed-raster cache path already exists via T1-17 Pass 4b/4c (`processedData` + `processedSettings` reuse and worker warming); final output chunk caching remains deferred to T3-15 streaming/spool output because caching materialized G-code chunks in the current pipeline is higher-risk and lower-value. Pinned by `tests/fill-rows-cache.test.ts` plus fill/planner/pipeline regressions; no G-code semantics, frame math, controller, or safety gate behavior changed.
+
 ---
 
 ### T3-36 | Frame-vs-burn equivalence test suite
@@ -20384,7 +20386,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation (Shipped in `f4ac114` — viewBox-only SVG imports prompt for laser-convention mm sizing versus SVG-spec px sizing and remember the last choice)
 - [x] T3-33 Scene renderer overlay model matches MachineTransform (Shipped in `b6f0ca3` — absolute bed-origin marker resolves through `transformPointToMachine` for all origin corners)
 - [ ] T3-34 Stripe-based raster G-code emission (memory bound; depends on T3-15)
-- [ ] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks
+- [x] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks (Shipped in `<TBD>` — fill-row LRU cache added; processed-raster reuse already present from T1-17; final output chunk cache deferred to T3-15 streaming/spool output)
 - [ ] T3-36 Frame-vs-burn equivalence test suite (filed; depends on T1-39/40/42, T2-18, T2-19)
 - [ ] T3-37 Saved-origin / WCS lifecycle test (filed; depends on T1-41, T1-29, T2-13)
 - [ ] T3-38 Fill-with-holes geometric correctness test (filed; depends on T1-36, T2-15, T2-18, T2-19)
