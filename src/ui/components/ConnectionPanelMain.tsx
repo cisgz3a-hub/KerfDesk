@@ -21,6 +21,7 @@ import {
 } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
+import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
@@ -1918,7 +1919,14 @@ export function ConnectionPanelMain({
           : !preflight?.canStart
             ? 'Fix issues below first'
             : 'Prepare job';
-  const estimatedTimeFormatted = gcode ? estimateJobTime(gcode).formatted : null;
+  const jobTimeEstimate = useMemo(() => gcode ? estimateJobTime(gcode) : null, [gcode]);
+  const estimatedTimeFormatted = jobTimeEstimate?.formatted ?? null;
+  const jobComplexitySummary = useMemo(() => buildJobComplexitySummary({
+    gcodeText: gcode,
+    estimatedTimeSeconds: jobTimeEstimate?.totalSeconds ?? null,
+    planStats: lastGcodeCompileResult?.machineTransform.plan.stats ?? null,
+    scene,
+  }), [gcode, jobTimeEstimate?.totalSeconds, lastGcodeCompileResult?.machineTransform.plan.stats, scene]);
   const readyOperationRows = useMemo(() => buildReadyOperationRows(scene), [scene]);
   const readyOperationAnalysis = useMemo(
     () => analyzeOperationOrder(readyOperationRows),
@@ -1959,6 +1967,7 @@ export function ConnectionPanelMain({
       boundsLabel: `X${fmtMm(readyBounds.minX)} Y${fmtMm(readyBounds.minY)} to X${fmtMm(readyBounds.maxX)} Y${fmtMm(readyBounds.maxY)}`,
       estimatedTimeLabel: estimatedTimeFormatted,
       operationAnalysis: readyOperationAnalysis,
+      complexity: jobComplexitySummary,
     },
     material: {
       label: scene.material?.name ?? 'No material selected',

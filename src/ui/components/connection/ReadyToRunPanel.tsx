@@ -11,6 +11,7 @@ import {
   summaryLine,
   type OrderAnalysis,
 } from '../../../app/OperationOrder';
+import type { JobComplexitySummary } from '../../../app/JobComplexitySummary';
 import { JobLayoutMiniMap, type JobLayoutMiniMapData } from './JobLayoutMiniMap';
 
 const font = "'DM Sans', system-ui, sans-serif";
@@ -29,6 +30,7 @@ export interface ReadyToRunJobSummary {
   boundsLabel: string;
   estimatedTimeLabel: string | null;
   operationAnalysis: OrderAnalysis;
+  complexity: JobComplexitySummary | null;
 }
 
 export interface ReadyToRunMaterialReminder {
@@ -146,6 +148,18 @@ function displayOperationRow(rowData: OrderAnalysis['rows'][number]): string {
   );
 }
 
+function renderComplexityWarning(warning: JobComplexitySummary['warnings'][number]): React.ReactElement {
+  return React.createElement('div', {
+    key: warning.kind,
+    style: {
+      marginTop: 6,
+      color: '#ffd444',
+      fontSize: 10,
+      lineHeight: 1.35,
+    },
+  }, warning.message);
+}
+
 export function ReadyToRunPanel({
   data,
 }: Props): React.ReactElement {
@@ -216,6 +230,20 @@ export function ReadyToRunPanel({
         row('Bounds', data.job.boundsLabel),
         row('Estimated', data.job.estimatedTimeLabel),
       ), 'ready-to-run-section-job'),
+      section('Job complexity', React.createElement(React.Fragment, null,
+        row('Commands', data.job.complexity?.commandCountLabel ?? null),
+        row('Estimated', data.job.complexity?.estimatedTimeLabel ?? data.job.estimatedTimeLabel),
+        row('Raster', data.job.complexity?.rasterDpiLabel ?? null),
+        row('Fill spacing', data.job.complexity?.fillSpacingLabel ?? null),
+        row('Travel distance', data.job.complexity?.travelDistanceLabel ?? null),
+        row('Burn distance', data.job.complexity?.burnDistanceLabel ?? null),
+        row('Complexity', data.job.complexity?.complexity ?? null),
+        data.job.complexity != null &&
+          data.job.complexity.warnings.length > 0 &&
+          React.createElement('div', { style: { marginTop: 8 } },
+            data.job.complexity.warnings.map(renderComplexityWarning),
+          ),
+      ), 'ready-to-run-section-job-complexity'),
       section('Material', React.createElement(React.Fragment, null,
         row('Material', data.material.label),
         row('Size', data.material.sizeLabel),

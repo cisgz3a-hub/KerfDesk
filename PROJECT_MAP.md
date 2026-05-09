@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 379 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 524 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 380 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 525 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,7 +23,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 39 | - |
+| `src/app` | 40 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 96 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 459 | - |
+| `tests/` | 460 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -79,6 +79,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/ErrorReporter.ts`
 - `src/app/ExecutionCoordinator.ts`
 - `src/app/FrameState.ts`
+- `src/app/JobComplexitySummary.ts`
 - `src/app/JobExecutionSession.ts`
 - `src/app/JobLogCheckpoint.ts`
 - `src/app/JobLogEventWindow.ts`
@@ -722,6 +723,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/ipc-sender-verification.test.ts`
 - `tests/job-checkpoint.test.ts`
 - `tests/job-compiler-curve-flatness.test.ts`
+- `tests/job-complexity-summary.test.ts`
 - `tests/job-execution-session.test.ts`
 - `tests/job-fingerprint.test.ts`
 - `tests/job-layout-minimap.test.tsx`

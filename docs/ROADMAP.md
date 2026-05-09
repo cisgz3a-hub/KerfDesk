@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 54 | 38 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, and T3-71 browser compatibility guidance shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 55 | 37 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, and T3-72 job complexity summary shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18807,6 +18807,8 @@ This appears as a one-time pre-connect dialog (skippable for users who've connec
 
 **Code reference:** T1-45 (compile complexity gate) addresses the upper limit. T3-72 is the user-visible summary that appears for ALL jobs, not just ones at the gate threshold.
 
+**Status:** Shipped in `<TBD>`. Added `src/app/JobComplexitySummary.ts` to count non-comment G-code commands, reuse existing plan/time stats, summarize raster DPI/fill spacing, format travel/burn distance, classify Low/Medium/High complexity, and surface informational dense-raster/long-job/high-command-count warnings. `ReadyToRunPanel` now renders a Job complexity section without changing compile, preflight, frame, start, or controller behavior. Pinned by `tests/job-complexity-summary.test.ts` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (review UI only).
+
 **Problem:** Audit 4B Priority 10 + Section 13 ("Why is the job huge/slow?"): users need to understand whether their job will take 2 minutes or 2 hours, whether the raster density is reasonable, what the dominant operation is.
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Priority 10 + Section 13.
@@ -20510,7 +20512,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
 - [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `b3766cf` - Ready-to-Run job layout mini-map)
 - [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
-- [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
+- [x] T3-72 Job complexity user-facing summary (Shipped in `<TBD>` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
 - [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)

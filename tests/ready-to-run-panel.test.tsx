@@ -49,6 +49,27 @@ const baseData: ReadyToRunPanelData = {
     summaryLabel: '3 operations',
     boundsLabel: 'X0.0 Y0.0 to X120.0 Y80.0',
     estimatedTimeLabel: '3:42',
+    complexity: {
+      commandCount: 18420,
+      commandCountLabel: '18,420',
+      estimatedTimeSeconds: 1335,
+      estimatedTimeLabel: '22:15',
+      rasterDpiEquivalent: 300,
+      rasterDpiLabel: '300 DPI equivalent',
+      fillSpacingMm: 0.05,
+      fillSpacingLabel: '0.050 mm',
+      travelDistanceMm: 12400,
+      travelDistanceLabel: '12.4 m',
+      burnDistanceMm: 8200,
+      burnDistanceLabel: '8.2 m',
+      complexity: 'High',
+      warnings: [
+        {
+          kind: 'dense-raster',
+          message: 'Raster/fill spacing is very dense. Increasing spacing toward 0.10 mm can cut job time sharply.',
+        },
+      ],
+    },
     operationAnalysis: analyzeOperationOrder([
       { index: 1, layerName: 'Engrave text', kind: 'engrave', powerPercent: 35, feedRateMmPerMin: 2500, passes: 1 },
       { index: 2, layerName: 'Score fold', kind: 'score', powerPercent: 15, feedRateMmPerMin: 1800, passes: 1 },
@@ -119,6 +140,10 @@ async function run(): Promise<void> {
         text.includes('Position') &&
         text.includes('Warnings') &&
         text.includes('Operation order') &&
+        text.includes('Job complexity') &&
+        text.includes('18,420') &&
+        text.includes('300 DPI equivalent') &&
+        text.includes('12.4 m') &&
         container.querySelector('[data-testid="job-layout-mini-map"]') != null,
       'renders all top-level preflight sections',
     );
