@@ -18674,7 +18674,7 @@ Stores call `transitionLog.emit(...)` on every meaningful state change. Bug repo
 
 **Code reference:** Currently the WelcomeWizard collects setup values then drops the user into the empty canvas. No guided first-burn experience exists.
 
-**Status:** Shipped in `<TBD>` (focused MVP). Added a first-run guide shown after setup completion unless the persistent completion marker exists. The guide loads a 20 mm low-power score test scene, opens the existing machine panel for focus/jog/set-zero/frame/start controls instead of duplicating unsafe controls, and can be skipped/finished so it does not return on fresh sessions. Pinned by `tests/first-run-guide.test.ts`, `tests/first-run-guide-wiring.test.ts`, and existing dialogs/App size guards. Out of scope: automated command execution from inside the guide; operators still use the existing safety-gated machine panel. Hardware verification: recommended before release tagging because this is a first-run UX flow, but no new machine commands or G-code transforms were introduced.
+**Status:** Shipped in `714566f` (focused MVP). Added a first-run guide shown after setup completion unless the persistent completion marker exists. The guide loads a 20 mm low-power score test scene, opens the existing machine panel for focus/jog/set-zero/frame/start controls instead of duplicating unsafe controls, and can be skipped/finished so it does not return on fresh sessions. Pinned by `tests/first-run-guide.test.ts`, `tests/first-run-guide-wiring.test.ts`, and existing dialogs/App size guards. Out of scope: automated command execution from inside the guide; operators still use the existing safety-gated machine panel. Hardware verification: recommended before release tagging because this is a first-run UX flow, but no new machine commands or G-code transforms were introduced.
 
 **Problem:** Audit 4B Section 3.1 + Priority 6: "a new user should not be dropped into the full app after setup. They should be guided through a safe first job."
 
@@ -20503,7 +20503,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `0ada8e3` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
 - [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
 - [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `578391a` - bounded TransitionLog plus dev-only state graph installer)
-- [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `<TBD>` - first-run guide plus 20 mm low-power test scene)
+- [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
 - [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
 - [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
