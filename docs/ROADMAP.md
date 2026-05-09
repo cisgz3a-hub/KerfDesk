@@ -18387,7 +18387,7 @@ Audit's required tests (P1 list) become writable:
 
 **Priority:** Tier 3. Conditional on T2-35 decision: if removing the Electron serial subsystem, T3-64 is obsolete.
 
-**Status:** Closed in `<TBD>` as obsolete. T2-35 chose removal, not completion: `electron/serial.ts`, native Electron serial IPC channels, preload bridge exports, type declarations, the production `serialport` dependency, and native serial packaging assumptions are gone. The old harness target no longer exists, and adding a fake serialport harness would preserve a dead parallel controller surface rather than improve the active Web Serial path. Evidence is pinned by `tests/no-electron-sendgcode-export.test.ts` and `tests/native-deps-prebuild-check.test.ts`. **Hardware verification not required** (docs/ledger close-out for deleted dead code; real controller path remains Web Serial).
+**Status:** Closed in `162bc6a` as obsolete. T2-35 chose removal, not completion: `electron/serial.ts`, native Electron serial IPC channels, preload bridge exports, type declarations, the production `serialport` dependency, and native serial packaging assumptions are gone. The old harness target no longer exists, and adding a fake serialport harness would preserve a dead parallel controller surface rather than improve the active Web Serial path. Evidence is pinned by `tests/no-electron-sendgcode-export.test.ts` and `tests/native-deps-prebuild-check.test.ts`. **Hardware verification not required** (docs/ledger close-out for deleted dead code; real controller path remains Web Serial).
 
 **Cross-check note (audit 3E):** Audit's section 3.3 + Critical 3 + P1.
 
@@ -20488,7 +20488,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-61 Per-controller-family safety regression tests (Shipped in `288ae17` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
 - [x] T3-62 Ruida controller safety stub 鈥?design before implementation (Shipped in `f24ef82` - design doc only; no production Ruida controller added)
 - [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `7a1e045` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
-- [x] T3-64 Fake Electron serialport test harness (Closed in `<TBD>` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
+- [x] T3-64 Fake Electron serialport test harness (Closed in `162bc6a` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
 - [ ] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (filed; required before T2-30 ships)
 - [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
 - [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
