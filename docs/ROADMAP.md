@@ -17756,7 +17756,7 @@ Plus: track consecutive status-report failures. After N (e.g. 3) consecutive fai
 
 **Cross-check note (audit 3B):** Audit's section 9.3.
 
-**Status:** Shipped in `<TBD>` - `GrblController` routes periodic status polling through `_pollStatus()`, catches realtime `?` write failures, emits one normalized controller error, stops the poll interval, aborts any active job, and closes/disconnects the failed transport best-effort through the existing transport-disconnect cleanup. Pinned by `tests/poll-status-failure-normalized.test.ts`. Out of scope: true `device-lost` state for silent-but-successful writes still waits for live ConnectionManager migration.
+**Status:** Shipped in `ca7629f` - `GrblController` routes periodic status polling through `_pollStatus()`, catches realtime `?` write failures, emits one normalized controller error, stops the poll interval, aborts any active job, and closes/disconnects the failed transport best-effort through the existing transport-disconnect cleanup. Pinned by `tests/poll-status-failure-normalized.test.ts`. Out of scope: true `device-lost` state for silent-but-successful writes still waits for live ConnectionManager migration.
 
 ---
 
@@ -20463,7 +20463,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-50 Device identity verification on connect 鈥?require `$I` firmware response (filed; depends on T2-32, builds on T1-51)
 - [ ] T3-51 Reconnect-same-machine verification (filed; depends on T3-50, T3-46)
 - [x] T3-52 Browser lifecycle cleanup - beforeunload / pagehide (Shipped in `78cc734` - renderer lifecycle handler attempts stop + laser-off on beforeunload and pagehide)
-- [x] T3-53 `requestStatusReport` write-failure normalization in polling loop (Shipped in `<TBD>` - poll write failures stop polling and disconnect once)
+- [x] T3-53 `requestStatusReport` write-failure normalization in polling loop (Shipped in `ca7629f` - poll write failures stop polling and disconnect once)
 - [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
 - [ ] T3-56 Conservative unknown-capability handling (filed; depends on T2-38, T2-40, generalizes T1-55)
