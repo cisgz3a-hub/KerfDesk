@@ -10,7 +10,8 @@
  *
  * Run: npx tsx tests/frame-bounds-output-layer-filter.test.ts
  */
-import { computeOutputBounds, computeSceneBounds } from '../src/geometry/bounds';
+import { computeSceneBounds } from '../src/geometry/bounds';
+import { selectSceneBounds } from '../src/core/scene/bounds';
 import { createScene } from '../src/core/scene/Scene';
 import { createLayer, type Layer } from '../src/core/scene/Layer';
 import { createRect, type SceneObject } from '../src/core/scene/SceneObject';
@@ -66,7 +67,7 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
       makeRect('G1', guide.id, 0, 0, 500, 500),      // guide 0..500 (much larger)
     ],
   );
-  const out = computeOutputBounds(scene);
+  const out = selectSceneBounds(scene, 'output');
   assert(
     out.minX === 50 && out.minY === 50 && out.maxX === 150 && out.maxY === 100,
     'output:true engrave + output:false guide → bounds match engrave only (not the guide)',
@@ -90,7 +91,7 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
       makeRect('B', guide2.id, 200, 200, 50, 50),
     ],
   );
-  const out = computeOutputBounds(scene);
+  const out = selectSceneBounds(scene, 'output');
   assert(
     !Number.isFinite(out.minX) || out.minX > out.maxX,
     'all output:false → empty AABB (no inflation)',
@@ -108,7 +109,7 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
       makeRect('H', hiddenEngrave.id, 100, 100, 200, 200), // would inflate if not filtered
     ],
   );
-  const out = computeOutputBounds(scene);
+  const out = selectSceneBounds(scene, 'output');
   assert(
     out.minX === 10 && out.minY === 10 && out.maxX === 30 && out.maxY === 30,
     'hidden layer (visible:false) ignored even when output:true',
@@ -121,7 +122,7 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
   const visibleObj = makeRect('V', layer.id, 10, 10, 20, 20);
   const hiddenObj = { ...makeRect('H', layer.id, 100, 100, 200, 200), visible: false };
   const scene = buildScene([layer], [visibleObj, hiddenObj]);
-  const out = computeOutputBounds(scene);
+  const out = selectSceneBounds(scene, 'output');
   assert(
     out.minX === 10 && out.minY === 10 && out.maxX === 30 && out.maxY === 30,
     'hidden object (obj.visible:false) ignored even on visible+output layer',
@@ -133,8 +134,8 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
   const appPath = path.resolve(__dirname, '..', 'src', 'ui', 'components', 'App.tsx');
   const src = fs.readFileSync(appPath, 'utf8');
   assert(
-    src.includes('computeOutputBounds(scene)'),
-    'App.tsx imports and uses computeOutputBounds(scene)',
+    src.includes("selectSceneBounds(scene, 'output')"),
+    "App.tsx uses selectSceneBounds(scene, 'output')",
   );
   assert(
     !/for\s+\(const\s+obj\s+of\s+scene\.objects\)\s*\{[\s\S]{0,80}if\s+\(!obj\.visible\)\s+continue;[\s\S]{0,200}computeObjectBounds\(obj\)/.test(src),
@@ -157,7 +158,7 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
     ],
   );
 
-  const out = computeOutputBounds(scene);
+  const out = selectSceneBounds(scene, 'output');
 
   // Mirror getOutputLayers + objectsOnLayerInSceneOrder predicate
   const outputLayerIds = new Set(scene.layers.filter(l => l.visible && l.output).map(l => l.id));
@@ -167,11 +168,11 @@ console.log('\n=== T1-109 frame bounds filter by layer.output ===\n');
     'compile-side filter (mirror) selects exactly 1 object: a1',
   );
 
-  // The bounds returned by computeOutputBounds must equal the AABB
+  // The bounds returned by selectSceneBounds(scene, 'output') must equal the AABB
   // of that compile-side set, by construction.
   assert(
     out.minX === 10 && out.minY === 10 && out.maxX === 50 && out.maxY === 50,
-    'computeOutputBounds AABB matches the JobCompiler compile-side set AABB',
+    "selectSceneBounds(scene, 'output') AABB matches the JobCompiler compile-side set AABB",
   );
 }
 

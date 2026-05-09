@@ -77,7 +77,7 @@ import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
-import { computeOutputBounds } from '../../geometry/bounds';
+import { selectSceneBounds } from '../../core/scene/bounds';
 import { resolveFrameSceneBounds } from '../../app/frameGcode';
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
@@ -164,7 +164,7 @@ export function App(): React.ReactElement {
   // guide / reference layers (output: false) and could push the
   // frame off-bed even though the burn area was inside.
   const outputSceneBounds = useMemo(
-    () => computeOutputBounds(scene),
+    () => selectSceneBounds(scene, 'output'),
     [scene],
   );
 

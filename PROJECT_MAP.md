@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 370 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 517 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 371 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 518 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 95 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 96 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 11 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 452 | - |
+| `tests/` | 453 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -213,6 +213,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/scene/Scene.ts`
 - `src/core/scene/SceneObject.ts`
 - `src/core/scene/SceneOps.ts`
+- `src/core/scene/bounds.ts`
 - `src/core/scene/index.ts`
 - `src/core/scene/layerModeTransition.ts`
 - `src/core/storage/FilesystemStorageAdapter.ts`
@@ -850,6 +851,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/saved-origin-wcs-lifecycle.test.ts`
 - `tests/savedorigin-not-compile-invalidating.test.ts`
 - `tests/scanning-offset.test.ts`
+- `tests/scene-bounds-selectors.test.ts`
 - `tests/scene-canvas-machine-coord-check.test.ts`
 - `tests/scene-commit-actions-wired.test.ts`
 - `tests/scene-history-store.test.ts`

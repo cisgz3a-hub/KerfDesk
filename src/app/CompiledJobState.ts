@@ -17,6 +17,7 @@
  * T2-51-followup since it touches App.tsx + ConnectionPanelMain.tsx
  * + every preflight caller.
  */
+import { type AABB } from '../core/types';
 
 /**
  * Minimal shape of CompileGcodeResult. The actual production type
@@ -25,7 +26,8 @@
  */
 export interface CompileResultLike {
   gcode: string;
-  machinePlanBounds: { minX: number; minY: number; maxX: number; maxY: number };
+  machinePlanBounds: AABB;
+  canvasPlanBounds?: AABB;
   ticket: { ticketId: string };
   /** Optional fields the result may carry — not part of the contract. */
   [k: string]: unknown;
@@ -77,8 +79,16 @@ export function selectGcode(s: CompiledJobState): string | null {
 
 export function selectMachinePlanBounds(
   s: CompiledJobState,
-): CompileResultLike['machinePlanBounds'] | null {
+): AABB | null {
+  return selectCompiledMachineBounds(s);
+}
+
+export function selectCompiledMachineBounds(s: CompiledJobState): AABB | null {
   return s.status === 'ready' ? s.result.machinePlanBounds : null;
+}
+
+export function selectCompiledCanvasBounds(s: CompiledJobState): AABB | null {
+  return s.status === 'ready' ? s.result.canvasPlanBounds ?? null : null;
 }
 
 export function selectTicket(s: CompiledJobState): { ticketId: string } | null {
