@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 46 | 46 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, and T3-63 fake WebSerial byte-stream harness shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 47 | 45 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, and T3-64 obsolete Electron serial harness close-out shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18387,6 +18387,8 @@ Audit's required tests (P1 list) become writable:
 
 **Priority:** Tier 3. Conditional on T2-35 decision: if removing the Electron serial subsystem, T3-64 is obsolete.
 
+**Status:** Closed in `<TBD>` as obsolete. T2-35 chose removal, not completion: `electron/serial.ts`, native Electron serial IPC channels, preload bridge exports, type declarations, the production `serialport` dependency, and native serial packaging assumptions are gone. The old harness target no longer exists, and adding a fake serialport harness would preserve a dead parallel controller surface rather than improve the active Web Serial path. Evidence is pinned by `tests/no-electron-sendgcode-export.test.ts` and `tests/native-deps-prebuild-check.test.ts`. **Hardware verification not required** (docs/ledger close-out for deleted dead code; real controller path remains Web Serial).
+
 **Cross-check note (audit 3E):** Audit's section 3.3 + Critical 3 + P1.
 
 ---
@@ -20486,7 +20488,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-61 Per-controller-family safety regression tests (Shipped in `288ae17` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
 - [x] T3-62 Ruida controller safety stub 鈥?design before implementation (Shipped in `f24ef82` - design doc only; no production Ruida controller added)
 - [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `7a1e045` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
-- [ ] T3-64 Fake Electron serialport test harness (filed; conditional on T2-35 keep-decision)
+- [x] T3-64 Fake Electron serialport test harness (Closed in `<TBD>` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
 - [ ] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (filed; required before T2-30 ships)
 - [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
 - [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
