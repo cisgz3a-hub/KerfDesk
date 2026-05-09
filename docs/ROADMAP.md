@@ -15889,7 +15889,7 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Priority:** Tier 2. Hardware compatibility and operator-trust fix; completes the setup half of the PRT4040 homing/origin investigation without changing G-code generation, frame math, or machine transforms.
 
-**Status:** Shipped in <TBD>. **Hardware verification not required for this MVP** (profile metadata, setup UI, settings UI, and read-only `$23` interpretation only; no homing command, `$23` write, G-code transform, or frame/start behavior changed).
+**Status:** Shipped in 6d956b2. **Hardware verification not required for this MVP** (profile metadata, setup UI, settings UI, and read-only `$23` interpretation only; no homing command, `$23` write, G-code transform, or frame/start behavior changed).
 
 ---
 
@@ -20400,7 +20400,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
 - [x] T2-130 PRT4040 GRBL router-laser compatibility profile and diagnostics (Shipped in `618fcad` — conservative manual-zero profile + Home disabled until homing verified + safe GRBL diagnostics copyout)
 
-- [x] T2-131 Setup wizard home-corner selection (Shipped in `<TBD>` - separate machine-zero and Home-corner profile metadata + setup/settings UI + GRBL `$23` read-only inference)
+- [x] T2-131 Setup wizard home-corner selection (Shipped in `6d956b2` - separate machine-zero and Home-corner profile metadata + setup/settings UI + GRBL `$23` read-only inference)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
