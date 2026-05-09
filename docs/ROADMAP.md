@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 36 | 56 | Active quarter-scope backlog; T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 37 | 55 | Active quarter-scope backlog; T3-18 output semantic validator and T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -16343,6 +16343,8 @@ Currently the existing `GcodeTemplateValidator` covers templates only. The plan'
 
 **Priority:** Tier 3. Defense-in-depth on top of T1-32 ($32 check), T1-43 (mode reassertion), T2-14 (safety wrapper). Each catches a different class of failure; this catches generation bugs that the other layers don't.
 
+**Status:** Shipped in `<TBD>` - Added final emitted G-code semantic preflight validation in `src/core/preflight/rules/OutputValidator.ts`, wired through `runPreflight` / `runPreflightSummary` via `PreflightContext.emittedGcode`. Blocks unsafe modal ordering (laser on before safe setup), rapid moves with laser active, missing final `M5`, spindle values above profile/live max, non-positive feed rates, unsupported GRBL commands, and lines beyond GRBL's 127-character buffer limit. Pinned by `tests/output-gcode-semantic-preflight.test.ts` plus preflight regressions. Hardware verification: not required (preflight validation only; no emitted G-code, motion, controller, or start-mode behavior changed).
+
 ---
 
 ### T3-19 | Document recommendation: prefer saved-origin absolute mode for production runs
@@ -20420,7 +20422,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
 - [ ] T3-16 WebSerial cable-pull recovery (status-poll heartbeat + write-failure escalation)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
-- [ ] T3-18 Output validator 鈥?semantic scan over emitted G-code
+- [x] T3-18 Output validator semantic scan over emitted G-code (Shipped in `<TBD>` - final emitted G-code preflight validator with modal laser-state, spindle/feed, unsupported-command, and GRBL line-length checks)
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
 - [x] T3-20 Add G17 plane-select and G94 feed-mode to header baseline (Shipped in `8c82e91` — non-removable G-code header modal baseline)
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)

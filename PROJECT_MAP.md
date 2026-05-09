@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 368 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 503 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 369 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 504 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 94 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 95 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 11 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 441 | - |
+| `tests/` | 442 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -200,6 +200,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/preflight/rules/MachineStatePreflight.ts`
 - `src/core/preflight/rules/OptimizationPreflight.ts`
 - `src/core/preflight/rules/OutputBoundsPreflight.ts`
+- `src/core/preflight/rules/OutputValidator.ts`
 - `src/core/preflight/rules/RasterPreflight.ts`
 - `src/core/preflight/rules/ScenePreflight.ts`
 - `src/core/preflight/rules/SelfIntersectionPreflight.ts`
@@ -764,6 +765,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/operation-ordering.test.ts`
 - `tests/origin-mode-wcs-zero.test.ts`
 - `tests/output-deterministic-with-clock-injection.test.ts`
+- `tests/output-gcode-semantic-preflight.test.ts`
 - `tests/output-marker-encoding.test.ts`
 - `tests/output-progress-cancel.test.ts`
 - `tests/output-safety-wrapper-non-removable.test.ts`

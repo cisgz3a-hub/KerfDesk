@@ -25,6 +25,7 @@ import { runDuplicateGeometryChecks } from './rules/DuplicateGeometryPreflight';
 import { runSelfIntersectionChecks } from './rules/SelfIntersectionPreflight';
 import { runCompileComplexityChecks } from './rules/CompileComplexityPreflight';
 import { runGeometryValidityChecks } from './rules/GeometryValidityPreflight';
+import { runOutputGcodeSemanticChecks } from './rules/OutputValidator';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -104,6 +105,13 @@ export const PREFLIGHT_CODES = {
   OUTPUT_NEGATIVE_Y: 'OUTPUT_NEGATIVE_Y',
   OUTPUT_EXCEEDS_BED_X: 'OUTPUT_EXCEEDS_BED_X',
   OUTPUT_EXCEEDS_BED_Y: 'OUTPUT_EXCEEDS_BED_Y',
+  OUTPUT_LASER_ON_BEFORE_SETUP: 'OUTPUT_LASER_ON_BEFORE_SETUP',
+  OUTPUT_RAPID_WITH_LASER_ON: 'OUTPUT_RAPID_WITH_LASER_ON',
+  OUTPUT_LASER_LEFT_ON: 'OUTPUT_LASER_LEFT_ON',
+  OUTPUT_SPINDLE_EXCEEDS_MAX: 'OUTPUT_SPINDLE_EXCEEDS_MAX',
+  OUTPUT_FEED_INVALID: 'OUTPUT_FEED_INVALID',
+  OUTPUT_UNSUPPORTED_COMMAND: 'OUTPUT_UNSUPPORTED_COMMAND',
+  OUTPUT_LINE_TOO_LONG: 'OUTPUT_LINE_TOO_LONG',
   GCODE_TRAVEL_NEGATIVE_X: 'GCODE_TRAVEL_NEGATIVE_X',
   GCODE_TRAVEL_NEGATIVE_Y: 'GCODE_TRAVEL_NEGATIVE_Y',
   GCODE_TRAVEL_EXCEED_X: 'GCODE_TRAVEL_EXCEED_X',
@@ -173,6 +181,8 @@ export interface PreflightContext {
   connectedToMachine?: boolean;
   /** When `machinePlanBounds` is absent, optional G-code text for travel XY bounds scan only. */
   gcodeTravelScan?: string | null;
+  /** Final emitted G-code text for T3-18 semantic safety validation. */
+  emittedGcode?: string | null;
   /**
    * T1-32: precomputed flag for "the compiled output emits M4 dynamic-power somewhere."
    * Set at the runPreflightSummary boundary by scanning the gcode once. Drives the
@@ -200,6 +210,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runMachineChecks(ctx, results);
   runTemplateChecks(ctx, results);
   runGcodeTemplateSemanticValidation(ctx, results);
+  runOutputGcodeSemanticChecks(ctx, results);
   runRasterChecks(ctx, results);
   runOptimizationChecks(ctx, results);
   runDuplicateGeometryChecks(ctx, results);
@@ -413,6 +424,7 @@ export function runPreflightSummary(
     hasGcode: gcode != null && gcode.length > 0,
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
+    emittedGcode: gcode,
     outputUsesM4: gcode != null && /\bM4\b/i.test(gcode),
     gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {
