@@ -462,9 +462,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 
 ---
 
-## Tier 3 - 50 shipped, 42 open
+## Tier 3 - 51 shipped, 41 open
 
-### Shipped (50)
+### Shipped (51)
 
 | Ticket | What | Evidence | Hash |
 |---|---|---|---|
@@ -516,12 +516,13 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-65 | Fake Falcon Wi-Fi device server with scenario scripts | Added `tests/harness/fakeFalconServer.ts`, a local Falcon HTTP + WebSocket protocol fake with scriptable endpoint responses, delays, failures, WebSocket events, connection modes, and reconnect-scenario hooks. Added `tests/falcon-wifi-fake-server.test.ts` to exercise the real `FalconHttpClient` and `FalconWebSocket` against the fake for identity endpoints, work state/progress, device status, malformed JSON, HTTP errors, snapshot/printer/alarm WebSocket events, malformed WebSocket payloads, and handshake rejection. Added `electron/falcon-wifi/FalconNetworkTarget.ts` so production clients keep default Falcon ports for plain IPs while tests can use `host:port` ephemeral targets. **Hardware verification not required** (test harness + additive target parsing only; no production Falcon command execution added). | `2d2ea96` |
 | T3-66 | CI suite lane separation | `scripts/run-tests.mjs` keeps `npm test` as the all-suite command while adding `--lane` filtering for `unit`, `output`, `controller-sim`, `transport-sim`, `sim`, and `perf`, plus `--list` for cheap CI/debug inspection. `package.json` exposes `test:unit`, `test:output`, `test:sim`, and `test:perf`. `tests/test-runner-lanes.test.ts` pins lane classification for output/golden, simulator, transport-harness, and perf suites. **Hardware verification not required** (test runner and package-script workflow only). | `0ada8e3` |
 | T3-67 | Canonical bounds selectors | Added `src/core/scene/bounds.ts` with `selectSceneBounds(scene, mode)` for `visible`, `output`, `selected`, and `all` bounds; added `selectCompiledMachineBounds` and `selectCompiledCanvasBounds` to `CompiledJobState`; routed `App.tsx` output/frame bounds through the canonical scene selector. Pinned by `tests/scene-bounds-selectors.test.ts`. **Hardware verification not required** (pure bounds selection and UI source routing only). | `4b5359a` |
+| T3-68 | Debug state graph + named transition log | Added `src/debug/TransitionLog.ts` with a bounded `TransitionLog`, typed `StateTransition` events, and scene-transaction-to-named-event mapping. Added `src/debug/StateGraph.ts` with a dev-only `window.__LASERFORGE_STATE__` getter installer. `App.tsx` installs live project/editor debug snapshots and routes scene transactions into the transition log. Pinned by `tests/debug-state-graph-transition-log.test.ts` and existing scene-transaction tests. **Hardware verification not required** (developer-only debug surface; no machine commands or G-code changed). | `<TBD>` |
 | T3-92 | Go to last machine position control | Added session-local last job start position capture in `ConnectionPanelMain`, a pure `LastMachinePosition` helper that plans relative X/Y jogs from the current controller position back to that stored point, and a fixed Move Laser `Go to last position` button in `Jog`. The move uses `ExecutionCoordinator.jog` so the existing idle gate, operation mutex, simulator notification, and controller jog path remain in force; stored position clears on disconnect / emergency stop. Pinned by `tests/last-machine-position.test.ts` and `tests/connection-panel-go-to-last-position.test.ts`. **Hardware verification needed** on Falcon A1 Pro before release tagging. | `e4a9f54` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### Open (42)
+### Open (41)
 
-T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-68 (debug state graph + transition log; scaffolding ready in `SceneTransaction.ts:94,95,152-154,271,283`; emitter not wired), T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
+T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-16 (WebSerial cable-pull recovery), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-42, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-69, T3-70, T3-71, T3-72, T3-73, T3-74, T3-75, T3-76, T3-77, T3-78, T3-79, T3-80, T3-81, T3-83, T3-84 (Linux packaging 鈥?only if business decides), T3-85 (installer QA matrix), T3-86 (native module packaging smoke test 鈥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
 
 ---
 
@@ -610,6 +611,6 @@ After those close, every Tier 1 ticket I have evidence for is shipped. We then e
 - Tier 1 tickets in the range T1-2, T1-3, T1-4, T1-26 through T1-58 (excluding the explicitly verified ones) were not individually re-probed in this audit. The prior session's batch audit covered most of them; spot-check before assuming any specific T1-X is shipped.
 - "Partial" classifications are subjective. Bias is conservative: if a ticket has clear remaining scope, it's partial.
 - Tickets that ship as a side effect of higher-priority work aren't credited explicitly. Example: T2-3 widening `requireFeature` use will likely close T2-91 (FEATURE_MATRIX) too; that won't show up here until the later commit explicitly addresses it.
-- Future tickets that are scaffolded but not wired (T2-77 with `capturedRevisionId`, T3-68 with `transitionLog` plumbed but no emitter) are counted as **open**, not partial. Scaffolding has value but it's preparation, not shipping.
+- Future tickets that are scaffolded but not wired (for example, T2-77 with `capturedRevisionId`) are counted as **open**, not partial. Scaffolding has value but it's preparation, not shipping.
 - The Tier 2 / Tier 3 / Tier 4 numbers above are lower bounds. As I find more work shipped without explicit T-markers, the shipped column grows.
 - Hash columns marked "pre-session" mean: shipped before the audit window; commit hash not in my context. Not a quality issue; just unrecoverable from this static probe.

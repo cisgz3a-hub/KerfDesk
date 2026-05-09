@@ -24,6 +24,8 @@ import { type Scene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
+import { installAppDebugStateGraph } from '../../debug/AppDebugState';
+import { transitionFromSceneTransaction, transitionLog } from '../../debug/TransitionLog';
 import { FileToolbar } from './FileToolbar';
 import { buildAppFileToolbarProps } from './appFileToolbarProps';
 import { AppDragDropOverlay } from './AppDragDropOverlay';
@@ -179,6 +181,15 @@ export function App(): React.ReactElement {
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
   }, [selectedIds]);
+
+  useEffect(() => {
+    installAppDebugStateGraph({
+      sceneRef,
+      selectedIdsRef,
+      hashScene: hashSceneForPersistence,
+    });
+  }, []);
+
   const activeTool = useEditorStore(s => s.activeTool);
   const setActiveTool = useEditorStore(s => s.setActiveTool);
   const isDragOver = useAppDialogsStore(s => s.isDragOver);
@@ -695,41 +706,10 @@ export function App(): React.ReactElement {
     resetHistory(scene, { action: 'init' });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // T2-76 step 2 of 8: wire the unified scene-mutation function. Step 2
-  // only instantiates it against existing primitives; no caller is
-  // migrated yet, so this binding is intentionally unreferenced until
-  // step 3 starts routing handleSceneCommit through it.
-  //
-  // Captured-identity stability: React state setters
-  // (setScene/setSelectedIds/setGcodeStale/bumpHistoryVersion) are stable
-  // by React's contract. setGcodeStale comes from
-  // useCompileManager's return object so its identity is not guaranteed
-  // stable across renders; including it in the dep array matches the
-  // applyHistoryScene precedent below.
-  //
-  // notifyDirty: no-op after T2-88-followup. Dirty state is derived from
-  // `isDirty(scene, lastSavedSceneHashRef.current)`, so mutation sites no
-  // longer maintain a manual boolean.
-  //
-  // invalidate.frame: bumps setHistoryVersion. The sole reader is
-  // ConnectionPanelMain which resets hasFramed.current on bumps. Once
-  // step 3 routes handleSceneCommit through this function, edits will
-  // also reset hasFramed - semantically correct (frame action IS
-  // invalidated by edits) and matches the existing scene-change useEffect
-  // pattern. Comment update on the ConnectionPanelMain side is deferred
-  // to step 3.
-  //
-  // invalidate.preflight: no-op. preflightRef does not exist in this
-  // build; preflight recomputation is currently driven by a useEffect on
-  // `scene`. T2-76 design risk 4 documents this; centralization is a
-  // separate later cleanup.
-  //
-  // transitionLog: omitted. T3-68 will wire an emitter; until then the
-  // function uses its optional-chain fallback.
-  //
-  // Note: this binding is unreferenced through step 2 by design (steps
-  // 3-7 migrate callers). No active lint rule in this project flags
-  // unused locals, so no disable directive is needed.
+  // Central scene-transaction bridge. Dirty state remains hash-derived,
+  // frame invalidation is version-based, and preflight still recomputes
+  // from scene changes. The debug transition log observes these commits
+  // without changing mutation semantics.
   const commitSceneTransaction: CommitSceneTransaction = useMemo(
     () => makeCommitSceneTransaction({
       setScene,
@@ -739,16 +719,18 @@ export function App(): React.ReactElement {
       },
       setSelectedIds: (ids) => setSelectedIds(ids),
       notifyDirty: () => { /* dirty is hash-derived; see T2-88 */ },
-      // T2-78: read-through-ref so SceneTransaction can record
-      // selectionBefore on history entries without rebuilding this
-      // useMemo every time the user clicks something. selectedIdsRef
-      // is kept in sync with the selectedIds state by a useEffect at
-      // declaration; this lambda always reads the freshest value.
+      // Read through the ref so transaction history sees fresh selection
+      // without rebuilding this memo on every click.
       getSelection: () => selectedIdsRef.current,
       invalidate: {
         compile: () => setGcodeStale(true),
         frame: bumpHistoryVersion,
         preflight: () => { /* no-op: see comment above */ },
+      },
+      transitionLog: {
+        emit: (event) => {
+          transitionLog.emit(transitionFromSceneTransaction(event));
+        },
       },
     }),
     [setGcodeStale, bumpHistoryVersion, pushHistory, resetHistory],
@@ -1236,9 +1218,8 @@ export function App(): React.ReactElement {
   // union pairs kind='history' with direction='undo'|'redo'. The
   // caller knows; this function is the seam where the two paths share
   // behavior, so we surface the parameter rather than hardcode it.
-  // Currently only consumed by the (no-op) transitionLog optional
-  // chain; T3-68 will wire a real emitter and the tag will become
-  // visible in the log.
+  // Recorded in the debug transition log so undo and redo remain named
+  // transitions when inspecting dev state.
   const applyHistoryScene = useCallback(
     (nextScene: Scene, direction: 'undo' | 'redo', selectionAfter?: ReadonlySet<string>) => {
       commitSceneTransaction(

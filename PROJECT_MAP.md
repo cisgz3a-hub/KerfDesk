@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 371 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 518 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 374 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 519 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -27,6 +27,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 96 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/debug` | 3 | - |
 | `src/diagnostics` | 11 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -47,7 +48,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 453 | - |
+| `tests/` | 454 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -226,6 +227,12 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/storage/storage.ts`
 - `src/core/tools/TestGridGenerator.ts`
 - `src/core/types.ts`
+
+### `src/debug`
+
+- `src/debug/AppDebugState.ts`
+- `src/debug/StateGraph.ts`
+- `src/debug/TransitionLog.ts`
 
 ### `src/diagnostics`
 
@@ -601,6 +608,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/current-mode-frame-anchor.test.ts`
 - `tests/customstart-mode-reassertion.test.ts`
 - `tests/cut-open-paths-before-closed.test.ts`
+- `tests/debug-state-graph-transition-log.test.ts`
 - `tests/delete-marks-dirty.test.ts`
 - `tests/dependency-security-scan.test.ts`
 - `tests/deploy-pages-workflow.test.ts`

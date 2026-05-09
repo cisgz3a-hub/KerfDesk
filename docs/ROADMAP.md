@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 50 | 42 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, and T3-67 canonical bounds selectors shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 51 | 41 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, and T3-68 debug state graph/transition log shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18570,6 +18570,8 @@ All bounds-consuming code routes through these. Tests prove the rules.
 
 **Code reference:** Currently no central debug surface for state. Refs and React state are scattered.
 
+**Status:** Shipped in `<TBD>`. Added `src/debug/TransitionLog.ts` with a bounded in-memory `TransitionLog`, typed `StateTransition` events, and `transitionFromSceneTransaction()` for mapping scene transactions to named debug events. Added `src/debug/StateGraph.ts` with a dev-only `installDebugStateGraph()` getter for `window.__LASERFORGE_STATE__`; `App.tsx` installs project/editor snapshots and routes scene transactions into the named transition log. Pinned by `tests/debug-state-graph-transition-log.test.ts` plus existing scene-transaction tests. Hardware verification: not required (developer-only debug surface; no machine commands or G-code changed).
+
 **Problem:** Audit Debuggability section + Required Fix. Debugging a state-architecture issue (like T1-56) requires reading multiple components, refs, and effects to figure out which state value is wrong. There's no central place to inspect "the current app state" or "what transitions just happened."
 
 **Identified by:** Audit 4A (2026-04-26, ChatGPT) Debuggability section + Required Fix.
@@ -20498,7 +20500,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `2d2ea96` - local HTTP/WebSocket fake plus real Falcon client tests)
 - [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `0ada8e3` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
 - [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
-- [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
+- [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `<TBD>` - bounded TransitionLog plus dev-only state graph installer)
 - [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
 - [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
