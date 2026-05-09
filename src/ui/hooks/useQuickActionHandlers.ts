@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
+import { remapClonedParentIds } from '../../core/scene/SceneOps';
 import { generateId } from '../../core/types';
 
 export interface UseQuickActionHandlersParams {
@@ -31,29 +32,22 @@ export function useQuickActionHandlers(params: UseQuickActionHandlersParams): Qu
     if (selectedIds.size === 0) return;
     const newIds = new Set<string>();
     const clones: typeof scene.objects = [];
-    const parentIdMap = new Map<string, string>();
+    const oldToNewId = new Map<string, string>();
     for (const obj of scene.objects) {
       if (!selectedIds.has(obj.id)) continue;
       const newId = generateId();
       newIds.add(newId);
-      let newParentId = obj.parentId;
-      if (obj.parentId) {
-        if (!parentIdMap.has(obj.parentId)) {
-          parentIdMap.set(obj.parentId, generateId());
-        }
-        newParentId = parentIdMap.get(obj.parentId)!;
-      }
+      oldToNewId.set(obj.id, newId);
       clones.push({
         ...obj,
         id: newId,
-        parentId: newParentId,
         name: obj.name + ' copy',
         transform: { ...obj.transform, tx: obj.transform.tx + 5, ty: obj.transform.ty + 5 },
         _bounds: null,
         _worldTransform: null,
       });
     }
-    const newScene = { ...scene, objects: [...scene.objects, ...clones] };
+    const newScene = { ...scene, objects: [...scene.objects, ...remapClonedParentIds(clones, oldToNewId)] };
     handleSceneCommit(newScene);
     setSelectedIds(newIds);
   }, [scene, selectedIds, handleSceneCommit]);

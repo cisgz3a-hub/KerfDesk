@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject } from '../../core/scene/SceneObject';
+import { remapClonedParentIds } from '../../core/scene/SceneOps';
 import { type GridArrayConfig } from '../components/GridArrayDialog';
 import { type Template } from '../../templates/TemplateLibrary';
 import { computeObjectBounds } from '../../geometry/bounds';
@@ -69,24 +70,16 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
 
         const dx = col * stepX;
         const dy = row * stepY;
-        const parentIdMap = new Map<string, string>();
+        const oldToNewId = new Map<string, string>();
+        const cellClones: typeof scene.objects = [];
 
         for (const obj of selected) {
           const newId = generateId();
+          oldToNewId.set(obj.id, newId);
 
-          let newParentId = obj.parentId;
-          if (obj.parentId) {
-            const mapKey = `${obj.parentId}_${row}_${col}`;
-            if (!parentIdMap.has(mapKey)) {
-              parentIdMap.set(mapKey, generateId());
-            }
-            newParentId = parentIdMap.get(mapKey)!;
-          }
-
-          allClones.push({
+          cellClones.push({
             ...obj,
             id: newId,
-            parentId: newParentId,
             name: obj.name,
             powerScale: obj.powerScale ?? 1,
             transform: { ...obj.transform, tx: obj.transform.tx + dx, ty: obj.transform.ty + dy },
@@ -94,6 +87,7 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
             _worldTransform: null,
           });
         }
+        allClones.push(...remapClonedParentIds(cellClones, oldToNewId));
       }
     }
 

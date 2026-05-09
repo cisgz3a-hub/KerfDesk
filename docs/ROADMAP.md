@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 61 | 31 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, T3-76 large-project save/load guard, T3-77 project integrity checksum, and T3-78 persistence stress suite shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 62 | 30 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, T3-76 large-project save/load guard, T3-77 project integrity checksum, T3-78 persistence stress suite, and T3-79 group/ungroup parent graph integrity shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -19259,6 +19259,8 @@ Some scenarios (large raster, many objects) overlap with T3-40 (general perf/str
 
 ### T3-79 | Group / ungroup explicit command model with parent-graph integrity verification
 
+**Status:** Shipped in `<TBD>`. Added explicit pure `groupObjects` / `ungroupObjects` scene operations, structural group marker objects, `validateParentGraph`, `repairParentGraph`, and safe cloned-parent remapping. Paste, quick duplicate, array clone, and duplicate commands now stop creating synthetic parent ids that do not correspond to copied group objects. Pinned by `tests/group-ungroup-integrity.test.ts`. Hardware verification: not required (scene model/editor integrity only).
+
 **Code reference:** `parentId` field on scene objects (Scene.ts), clipboard handling that remaps parentIds during paste. No dedicated group/ungroup command in the parts of the codebase audit 4E inspected.
 
 **Problem:** Audit 4E Group/ungroup section: the codebase has parentId fields and some parent handling, but no robust explicit group/ungroup command model. The risks listed:
@@ -20531,7 +20533,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
 - [x] T3-78 Save/load stress test suite (Shipped in `8ad1f6d` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
-- [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
+- [x] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (Shipped in `<TBD>` — explicit group/ungroup scene ops, parent graph validation/repair, and safe clone parent-id remapping)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
 - [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)

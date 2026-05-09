@@ -29,6 +29,10 @@ export {
   deleteObjects,
   duplicateObjects,
   moveToLayer,
+  groupObjects,
+  ungroupObjects,
+  validateParentGraph,
+  repairParentGraph,
 } from '../../core/scene/SceneOps';
 
 // ─── ADD OBJECT ──────────────────────────────────────────────────

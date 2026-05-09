@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 531 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 532 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 465 | - |
+| `tests/` | 466 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -718,6 +718,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/grbl-marker-lifecycle.test.ts`
 - `tests/grbl-request-work-offsets.test.ts`
 - `tests/grbl-system-line-tagging.test.ts`
+- `tests/group-ungroup-integrity.test.ts`
 - `tests/history-entry-metadata.test.ts`
 - `tests/history-memory-budget.test.ts`
 - `tests/history.test.ts`
