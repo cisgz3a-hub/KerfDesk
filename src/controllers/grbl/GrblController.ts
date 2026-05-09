@@ -1213,7 +1213,11 @@ export class GrblController implements GrblControllerApi {
 
     return await new Promise<void>((resolve, reject) => {
       let completed = false;
+      let commandSent = false;
+      let commandAcknowledged = false;
       let sawActiveState = false;
+      let unsubState: Unsubscribe = () => {};
+      let unsubRaw: Unsubscribe = () => {};
       // T1-28: timeout and alarm paths must trigger safety-off before
       // rejecting. Autofocus moves the Z-axis against a probe; if the
       // firmware hangs (probe pin floating, Z-stage stuck, mechanical
@@ -1241,7 +1245,12 @@ export class GrblController implements GrblControllerApi {
         unsubRaw();
       };
 
-      const unsubState = this.onStateChange((next) => {
+      const resolveSuccess = (): void => {
+        cleanup();
+        resolve();
+      };
+
+      unsubState = this.onStateChange((next) => {
         if (next.status === 'alarm') {
           cleanup();
           // T1-28: alarm during autofocus → safety-off before reject.
@@ -1253,24 +1262,47 @@ export class GrblController implements GrblControllerApi {
           sawActiveState = true;
           return;
         }
-        if (sawActiveState && next.status === 'idle') {
-          cleanup();
-          resolve();
+        if ((sawActiveState || commandAcknowledged) && next.status === 'idle') {
+          resolveSuccess();
         }
       });
-      const unsubRaw = this.onRawLine((line, direction) => {
+      unsubRaw = this.onRawLine((line, direction) => {
         if (direction !== 'rx') return;
+        if (commandSent && line === 'ok') {
+          commandAcknowledged = true;
+          try {
+            this.requestStatusReport();
+          } catch {
+            /* timeout path will surface disconnected/stale ports */
+          }
+          return;
+        }
+        if (commandSent && line.startsWith('error:')) {
+          cleanup();
+          reject(new Error(`Autofocus command rejected: ${line}`));
+          return;
+        }
         if (!(line.startsWith('<') && line.endsWith('>'))) return;
         const token = line.slice(1, -1).split('|')[0]?.toLowerCase() ?? '';
         // Falcon firmware can emit non-standard states during $HZ1; treat any
         // non-idle/non-alarm status token as active so success doesn't false-timeout.
         if (token.length > 0 && token !== 'idle' && !token.startsWith('alarm')) {
           sawActiveState = true;
+          return;
+        }
+        // Some Falcon firmwares acknowledge $HZ1 and only report Idle after
+        // the internal focus cycle completes, without exposing a distinct
+        // Run/Home/Focus status. Treat ack + post-command Idle as success so
+        // a physically successful autofocus does not surface a false failure.
+        if (commandAcknowledged && token === 'idle') {
+          resolveSuccess();
         }
       });
 
       try {
         this._writeLine(command);
+        commandSent = true;
+        this.requestStatusReport();
       } catch (err: unknown) {
         cleanup();
         reject(err instanceof Error ? err : new Error(String(err)));

@@ -256,22 +256,42 @@ async function testGrblRunAutoFocus(): Promise<void> {
   }
 
   {
-    const { ctrl } = await connectGrbl();
+    const { ctrl, port } = await connectGrbl();
+    const p = ctrl.runAutoFocus('$HZ1', 120);
+    await flush();
+    port.injectResponse('<Idle|MPos:0.000,0.000,-8.000|FS:0,0>');
+    let resolved = false;
+    let error: Error | null = null;
+    try {
+      await p;
+      resolved = true;
+    } catch (e: unknown) {
+      error = e instanceof Error ? e : new Error(String(e));
+    }
+    assert(
+      resolved,
+      `resolves when autofocus command acknowledges and post-command status is idle${error ? ` (got ${error.message})` : ''}`,
+    );
+    await ctrl.disconnect();
+  }
+
+  {
+    const { ctrl, port } = await connectGrbl();
+    port.blockStatusQueryResponse = true;
     let timedOut = false;
     try {
       await ctrl.runAutoFocus('$HZ1', 30);
     } catch (e: unknown) {
       timedOut = e instanceof Error && e.message.includes('timed out');
     }
-    assert(timedOut, 'rejects on timeout when no active status is observed');
+    assert(timedOut, 'rejects on timeout when no usable status is observed after command acknowledgement');
     await ctrl.disconnect();
   }
 
   {
     const { ctrl, port } = await connectGrbl();
+    port.nextStatusQueryResponse = '<Alarm|MPos:0.000,0.000,0.000|FS:0,0>';
     const p = ctrl.runAutoFocus('$HZ1', 1000);
-    await flush();
-    port.injectResponse('<Alarm|MPos:0.000,0.000,0.000|FS:0,0>');
     let alarmRejected = false;
     try {
       await p;
