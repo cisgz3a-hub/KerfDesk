@@ -18471,7 +18471,7 @@ T2-30 (Falcon WiFi as real LaserController) depends on this infrastructure 鈥?w
 
 ### T3-66 | CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf
 
-**Status:** Shipped in `<TBD>`. `scripts/run-tests.mjs` now keeps `npm test` as the all-suite command while adding `--lane` filtering for `unit`, `output`, `controller-sim`, `transport-sim`, `sim`, and `perf`, plus `--list` for cheap CI/debug inspection. `package.json` exposes `test:unit`, `test:output`, `test:sim`, and `test:perf`. Lane selection is pinned by `tests/test-runner-lanes.test.ts`, including output/golden, simulator, transport-harness, and perf classification. Hardware verification: not required (test runner and package-script workflow only).
+**Status:** Shipped in `0ada8e3`. `scripts/run-tests.mjs` now keeps `npm test` as the all-suite command while adding `--lane` filtering for `unit`, `output`, `controller-sim`, `transport-sim`, `sim`, and `perf`, plus `--list` for cheap CI/debug inspection. `package.json` exposes `test:unit`, `test:output`, `test:sim`, and `test:perf`. Lane selection is pinned by `tests/test-runner-lanes.test.ts`, including output/golden, simulator, transport-harness, and perf classification. Hardware verification: not required (test runner and package-script workflow only).
 
 **Code reference:** Current `scripts/run-tests.mjs` runs all tests as one suite. Refines T2-22 (standardize test runner from audit 2F).
 
@@ -20494,7 +20494,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `7a1e045` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
 - [x] T3-64 Fake Electron serialport test harness (Closed in `162bc6a` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
 - [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `2d2ea96` - local HTTP/WebSocket fake plus real Falcon client tests)
-- [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `<TBD>` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
+- [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `0ada8e3` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
 - [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
 - [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
 - [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
