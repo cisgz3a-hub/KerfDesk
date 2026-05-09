@@ -1,7 +1,7 @@
 /**
- * T1-113: GitHub Pages auto-deploy workflow exists and is wired
- * correctly. Source-pin only — we don't run the workflow itself
- * here; that happens in GitHub Actions on push to master.
+ * T1-113 follow-up: GitHub Pages deploy workflow exists and remains
+ * available on demand without consuming Actions minutes on every push.
+ * Source-pin only; we don't run the workflow itself here.
  *
  * Run: npx tsx tests/deploy-pages-workflow.test.ts
  */
@@ -14,10 +14,10 @@ let failed = 0;
 function assert(cond: boolean, msg: string): void {
   if (cond) {
     passed++;
-    console.log(`  ✓ ${msg}`);
+    console.log(`  PASS ${msg}`);
   } else {
     failed++;
-    console.error(`  ✗ ${msg}`);
+    console.error(`  FAIL ${msg}`);
   }
 }
 
@@ -26,43 +26,41 @@ const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const workflowPath = path.join(repoRoot, '.github/workflows/deploy-pages.yml');
 
-console.log('\n=== T1-113 Pages auto-deploy workflow ===\n');
+console.log('\n=== T1-113 Pages deploy workflow ===\n');
 
-// 1. Workflow file exists
+// 1. Workflow file exists.
 assert(fs.existsSync(workflowPath), '.github/workflows/deploy-pages.yml exists');
 
 const src = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, 'utf8') : '';
 
-// 2. Triggered on push to master only (with optional manual dispatch).
-//    The user-confirmed trigger choice was "On push to master only";
-//    pin it so a future edit can't silently widen the trigger to dev
-//    branches.
+// 2. Manual-only trigger. The May 2026 CI-minute cleanup intentionally
+//    stopped automatic Pages builds on every push while preserving an
+//    explicit deploy button in GitHub Actions.
 {
-  // Match the YAML shape: `on:\n  push:\n    branches: [master]`.
-  // Tolerant of either inline or block list form.
-  const hasPushMaster =
-    /on:\s*[\s\S]*?push:\s*[\s\S]*?branches:\s*\[\s*master\s*\]/m.test(src) ||
-    /on:\s*[\s\S]*?push:\s*[\s\S]*?branches:\s*-\s*master/m.test(src);
-  assert(hasPushMaster, 'workflow triggers on push to master');
+  assert(/on:\s*[\s\S]*?workflow_dispatch:/.test(src), 'workflow has manual dispatch');
 
-  // Make sure it does NOT trigger on push to other branches (e.g.
-  // claude/*, main, '**') — that would re-introduce stale-deploy
-  // races and contradict the user's choice.
   assert(
-    !/branches:\s*\[\s*['"]?\*\*['"]?\s*\]/.test(src) &&
-      !/branches:\s*\[\s*claude/.test(src) &&
-      !/branches:\s*\[\s*main\s*[,\]]/.test(src),
-    'workflow does not trigger on dev / wildcard branches',
+    !/\n\s+push:/.test(src) &&
+      !/\n\s+pull_request:/.test(src) &&
+      !/\n\s+schedule:/.test(src) &&
+      !/\n\s+deployment:/.test(src),
+    'workflow has no automatic push / PR / schedule / deployment trigger',
+  );
+
+  assert(
+    /github\.ref\s*==\s*'refs\/heads\/master'/.test(src) &&
+      /github\.ref\s*==\s*'refs\/heads\/main'/.test(src),
+    'manual deploy is branch-gated to master/main',
   );
 }
 
-// 3. Permissions: pages: write + id-token: write
+// 3. Permissions: pages: write + id-token: write.
 {
   assert(/pages:\s*write/.test(src), 'permissions: pages: write declared');
   assert(/id-token:\s*write/.test(src), 'permissions: id-token: write declared');
 }
 
-// 4. Build steps: npm ci + npm run build + upload dist
+// 4. Build steps: npm ci + npm run build + upload dist.
 {
   assert(/run:\s*npm ci\b/.test(src), 'workflow runs `npm ci`');
   assert(/run:\s*npm run build\b/.test(src), 'workflow runs `npm run build`');
@@ -72,11 +70,11 @@ const src = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, 'utf8') 
   );
 }
 
-// 5. Deploy step uses actions/deploy-pages@v4
+// 5. Deploy step uses actions/deploy-pages@v4 and remains opt-in.
 {
   assert(
-    /deploy:\s*[\s\S]*?if:\s*\$\{\{\s*vars\.ENABLE_GITHUB_PAGES_DEPLOY\s*==\s*'true'\s*\}\}/.test(src),
-    'deploy job is gated by ENABLE_GITHUB_PAGES_DEPLOY',
+    /deploy:\s*[\s\S]*?if:\s*\$\{\{[\s\S]*?vars\.ENABLE_GITHUB_PAGES_DEPLOY\s*==\s*'true'[\s\S]*?github\.ref\s*==\s*'refs\/heads\/master'[\s\S]*?github\.ref\s*==\s*'refs\/heads\/main'[\s\S]*?\}\}/.test(src),
+    'deploy job is gated by ENABLE_GITHUB_PAGES_DEPLOY and master/main',
   );
   assert(
     /actions\/deploy-pages@v4/.test(src),
@@ -84,8 +82,7 @@ const src = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, 'utf8') 
   );
 }
 
-// 6. Concurrency group on pages so two rapid master pushes don't
-//    race. cancel-in-progress is reasonable so the latest push wins.
+// 6. Concurrency group on pages so two rapid manual dispatches do not race.
 {
   assert(
     /concurrency:\s*[\s\S]*?group:\s*pages/.test(src),
