@@ -19118,7 +19118,7 @@ This is a larger task (Worker setup, message protocol, fallback if worker fails)
 
 ### T3-77 | Project integrity checksum
 
-**Status:** Shipped in `<TBD>`. Added `src/io/ProjectIntegrity.ts` with stable canonical JSON, a renderer-safe SHA-256 implementation, versioned checksum algorithm marker, checksum validation results, mismatch warning copy, and typed mismatch/cancel errors. `serializeScene` and `serializeForAutosave` now write file format `1.2` with `checksumAlgorithm` and `checksum` fields. `deserializeSceneWithIntegrity` enforces checksum validation for file-load paths while preserving the tolerant `deserializeScene` / repair-report path for migrations and tests. `parseSceneFile` and `SceneParseWorker` enforce integrity, can retry after explicit user consent, and UI open/import paths treat mismatch cancellation as a quiet cancel. Pinned by `tests/checksum-validation.test.ts`. Hardware verification: not required (project-file integrity and load UX only).
+**Status:** Shipped in `3a92a63`. Added `src/io/ProjectIntegrity.ts` with stable canonical JSON, a renderer-safe SHA-256 implementation, versioned checksum algorithm marker, checksum validation results, mismatch warning copy, and typed mismatch/cancel errors. `serializeScene` and `serializeForAutosave` now write file format `1.2` with `checksumAlgorithm` and `checksum` fields. `deserializeSceneWithIntegrity` enforces checksum validation for file-load paths while preserving the tolerant `deserializeScene` / repair-report path for migrations and tests. `parseSceneFile` and `SceneParseWorker` enforce integrity, can retry after explicit user consent, and UI open/import paths treat mismatch cancellation as a quiet cancel. Pinned by `tests/checksum-validation.test.ts`. Hardware verification: not required (project-file integrity and load UX only).
 
 **Code reference:** Currently no checksum on saved files or autosave records.
 
@@ -20527,7 +20527,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
 - [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
 - [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
-- [x] T3-77 Project integrity checksum (Shipped in `<TBD>` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
+- [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
