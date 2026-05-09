@@ -18570,7 +18570,7 @@ All bounds-consuming code routes through these. Tests prove the rules.
 
 **Code reference:** Currently no central debug surface for state. Refs and React state are scattered.
 
-**Status:** Shipped in `<TBD>`. Added `src/debug/TransitionLog.ts` with a bounded in-memory `TransitionLog`, typed `StateTransition` events, and `transitionFromSceneTransaction()` for mapping scene transactions to named debug events. Added `src/debug/StateGraph.ts` with a dev-only `installDebugStateGraph()` getter for `window.__LASERFORGE_STATE__`; `App.tsx` installs project/editor snapshots and routes scene transactions into the named transition log. Pinned by `tests/debug-state-graph-transition-log.test.ts` plus existing scene-transaction tests. Hardware verification: not required (developer-only debug surface; no machine commands or G-code changed).
+**Status:** Shipped in `578391a`. Added `src/debug/TransitionLog.ts` with a bounded in-memory `TransitionLog`, typed `StateTransition` events, and `transitionFromSceneTransaction()` for mapping scene transactions to named debug events. Added `src/debug/StateGraph.ts` with a dev-only `installDebugStateGraph()` getter for `window.__LASERFORGE_STATE__`; `App.tsx` installs project/editor snapshots and routes scene transactions into the named transition log. Pinned by `tests/debug-state-graph-transition-log.test.ts` plus existing scene-transaction tests. Hardware verification: not required (developer-only debug surface; no machine commands or G-code changed).
 
 **Problem:** Audit Debuggability section + Required Fix. Debugging a state-architecture issue (like T1-56) requires reading multiple components, refs, and effects to figure out which state value is wrong. There's no central place to inspect "the current app state" or "what transitions just happened."
 
@@ -20500,7 +20500,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `2d2ea96` - local HTTP/WebSocket fake plus real Falcon client tests)
 - [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `0ada8e3` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
 - [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
-- [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `<TBD>` - bounded TransitionLog plus dev-only state graph installer)
+- [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `578391a` - bounded TransitionLog plus dev-only state graph installer)
 - [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
 - [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
