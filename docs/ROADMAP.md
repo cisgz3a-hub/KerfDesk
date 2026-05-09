@@ -19259,7 +19259,7 @@ Some scenarios (large raster, many objects) overlap with T3-40 (general perf/str
 
 ### T3-79 | Group / ungroup explicit command model with parent-graph integrity verification
 
-**Status:** Shipped in `<TBD>`. Added explicit pure `groupObjects` / `ungroupObjects` scene operations, structural group marker objects, `validateParentGraph`, `repairParentGraph`, and safe cloned-parent remapping. Paste, quick duplicate, array clone, and duplicate commands now stop creating synthetic parent ids that do not correspond to copied group objects. Pinned by `tests/group-ungroup-integrity.test.ts`. Hardware verification: not required (scene model/editor integrity only).
+**Status:** Shipped in `15c9181`. Added explicit pure `groupObjects` / `ungroupObjects` scene operations, structural group marker objects, `validateParentGraph`, `repairParentGraph`, and safe cloned-parent remapping. Paste, quick duplicate, array clone, and duplicate commands now stop creating synthetic parent ids that do not correspond to copied group objects. Pinned by `tests/group-ungroup-integrity.test.ts`. Hardware verification: not required (scene model/editor integrity only).
 
 **Code reference:** `parentId` field on scene objects (Scene.ts), clipboard handling that remaps parentIds during paste. No dedicated group/ungroup command in the parts of the codebase audit 4E inspected.
 
@@ -20533,7 +20533,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
 - [x] T3-78 Save/load stress test suite (Shipped in `8ad1f6d` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
-- [x] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (Shipped in `<TBD>` — explicit group/ungroup scene ops, parent graph validation/repair, and safe clone parent-id remapping)
+- [x] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (Shipped in `15c9181` — explicit group/ungroup scene ops, parent graph validation/repair, and safe clone parent-id remapping)
 - [ ] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (filed; depends on T1-73 through T2-83)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
 - [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)
