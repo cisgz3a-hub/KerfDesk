@@ -16,6 +16,10 @@ import React, { useRef, useCallback, useState } from 'react';
 import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { formatSvgImportWarnings, importSvgIntoSceneWithReport } from '../../import/svg/SvgToScene';
+import {
+  chooseSvgUnitModeForImport,
+  type SvgUnitChoiceOption,
+} from '../../import/svg/SvgUnitChoice';
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
@@ -35,6 +39,12 @@ export interface FileToolbarProps {
   onNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
+  showChoice: (
+    title: string,
+    message: string,
+    choices: readonly SvgUnitChoiceOption[],
+    details?: string,
+  ) => Promise<string | null>;
   onConnect?: () => void;
   /** Disconnect laser (toolbar); shown when connected. */
   onDisconnect?: () => void | Promise<void>;
@@ -88,6 +98,7 @@ export function FileToolbar({
   onNewProject,
   showAlert,
   showConfirm,
+  showChoice,
   onConnect,
   onDisconnect,
   onExit,
@@ -151,10 +162,16 @@ export function FileToolbar({
       const svgString = await file.text();
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
       if (!layerId) return;
+      const svgUnitMode = await chooseSvgUnitModeForImport(svgString, showChoice);
+      if (svgUnitMode === null) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+      }
 
       const svgReport = importSvgIntoSceneWithReport(svgString, scene, layerId, {
         mode: 'fit',
         allowScaleUp: false,
+        svgUnitMode,
         targetBounds: scene.material
           ? {
             minX: scene.material.x,
@@ -185,7 +202,7 @@ export function FileToolbar({
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit, showAlert]);
+  }, [scene, onSceneChange, onSceneCommit, showAlert, showChoice]);
 
   const handleImportImageClick = useCallback(() => {
     imageInputRef.current?.click();

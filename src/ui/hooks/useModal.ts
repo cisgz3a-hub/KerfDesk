@@ -9,6 +9,14 @@ type ModalInternal =
       resolve: () => void;
     }
   | {
+      variant: 'choice';
+      title: string;
+      message: string;
+      details?: string;
+      choices: readonly ModalChoiceOption[];
+      resolve: (value: string | null) => void;
+    }
+  | {
       variant: 'confirm';
       title: string;
       message: string;
@@ -33,6 +41,13 @@ type ModalInternal =
       resolve: (result: { ok: boolean; checkboxChecked: boolean }) => void;
     };
 
+export interface ModalChoiceOption {
+  value: string;
+  label: string;
+  primary?: boolean;
+  color?: string;
+}
+
 export function useModal() {
   const [modal, setModal] = useState<ModalInternal | null>(null);
 
@@ -55,6 +70,24 @@ export function useModal() {
         title,
         message,
         details,
+        resolve,
+      });
+    });
+  }, []);
+
+  const showChoice = useCallback((
+    title: string,
+    message: string,
+    choices: readonly ModalChoiceOption[],
+    details?: string,
+  ): Promise<string | null> => {
+    return new Promise(resolve => {
+      setModal({
+        variant: 'choice',
+        title,
+        message,
+        details,
+        choices,
         resolve,
       });
     });
@@ -103,6 +136,7 @@ export function useModal() {
       if (!m) return null;
       if (m.variant === 'confirmWithCheckbox') m.resolve({ ok: false, checkboxChecked: false });
       else if (m.variant === 'confirm') m.resolve(false);
+      else if (m.variant === 'choice') m.resolve(null);
       else if (m.variant === 'prompt') m.resolve(null);
       else m.resolve();
       return null;
@@ -133,6 +167,14 @@ export function useModal() {
     });
   }, []);
 
+  const finishChoice = useCallback((value: string | null) => {
+    setModal(m => {
+      if (!m || m.variant !== 'choice') return null;
+      m.resolve(value);
+      return null;
+    });
+  }, []);
+
   const finishConfirmWithCheckbox = useCallback(
     (result: { ok: boolean; checkboxChecked: boolean }) => {
       setModal(m => {
@@ -148,11 +190,13 @@ export function useModal() {
     modal,
     showAlert,
     showConfirm,
+    showChoice,
     showConfirmWithCheckbox,
     showPrompt,
     dismissModal,
     finishAlert,
     finishConfirm,
+    finishChoice,
     finishConfirmWithCheckbox,
     finishPrompt,
   };

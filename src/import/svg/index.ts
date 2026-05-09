@@ -32,3 +32,15 @@ export {
   type ParseSvgOptions,
   type SvgUnitMode,
 } from './SvgParser';
+export {
+  SVG_UNIT_MODE_PREFERENCE_KEY,
+  buildSvgUnitChoicePrompt,
+  chooseSvgUnitModeForImport,
+  detectViewBoxOnlySvgUnitAmbiguity,
+  getStoredSvgUnitMode,
+  setStoredSvgUnitMode,
+  type SvgUnitChoiceDialog,
+  type SvgUnitChoiceOption,
+  type SvgUnitChoicePrompt,
+  type SvgViewBoxOnlyUnitAmbiguity,
+} from './SvgUnitChoice';

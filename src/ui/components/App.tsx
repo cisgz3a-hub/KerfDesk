@@ -127,11 +127,13 @@ export function App(): React.ReactElement {
     modal,
     showAlert,
     showConfirm,
+    showChoice,
     showConfirmWithCheckbox,
     showPrompt,
     dismissModal,
     finishAlert,
     finishConfirm,
+    finishChoice,
     finishConfirmWithCheckbox,
     finishPrompt,
   } = useModal();
@@ -1112,6 +1114,7 @@ export function App(): React.ReactElement {
     handleNewProject,
     setIsDragOver,
     showAlert,
+    showChoice,
   });
 
   const {
@@ -1483,6 +1486,7 @@ export function App(): React.ReactElement {
       onAfterSuccessfulFileSave: syncAutosaveAfterFileSave,
       showAlert,
       showConfirm,
+      showChoice,
       onConnect: handleConnect,
       onDisconnect: handleToolbarDisconnect,
       onSetup: () => dialogs.setShowSetup(true),
@@ -1936,6 +1940,13 @@ export function App(): React.ReactElement {
         : undefined,
       buttons: modal.variant === 'alert'
         ? [{ label: 'OK', action: finishAlert, primary: true }]
+        : modal.variant === 'choice'
+          ? modal.choices.map(choice => ({
+              label: choice.label,
+              action: () => finishChoice(choice.value),
+              primary: choice.primary,
+              color: choice.color,
+            }))
         : modal.variant === 'confirm'
           ? [
               { label: 'Cancel', action: () => finishConfirm(false) },

@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 364 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 483 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 365 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 484 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -31,7 +31,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
-| `src/import` | 15 | dxf, image, svg, trace |
+| `src/import` | 16 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
 | `src/io` | 8 | migrations, validation |
 | `src/runtime` | 2 | - |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 430 | - |
+| `tests/` | 431 | - |
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -277,6 +277,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/import/svg/SvgComplexityLimits.ts`
 - `src/import/svg/SvgParser.ts`
 - `src/import/svg/SvgToScene.ts`
+- `src/import/svg/SvgUnitChoice.ts`
 - `src/import/svg/TransformParser.ts`
 - `src/import/svg/index.ts`
 - `src/import/trace/ImageTracerAdapter.ts`
@@ -867,6 +868,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/svg-text-import-warning.test.ts`
 - `tests/svg-unsupported-feature-warning.test.ts`
 - `tests/svg-use-defs-import.test.ts`
+- `tests/svg-viewbox-unit-choice.test.ts`
 - `tests/t2-26-operation-routing-static-guard.test.ts`
 - `tests/template-safety-enforcement.test.ts`
 - `tests/template-validator.test.ts`
