@@ -20,7 +20,9 @@ export type ConnectionPanelProps = Omit<
   | 'coordinatorSimulatorNotifyRef'
   | 'outcomeReplaySection'
   | 'messages'
+  | 'messageEvents'
   | 'appendMessage'
+  | 'appendLogEvent'
   | 'replaceMessages'
   | 'clearMessages'
   | 'isSimulator'
@@ -119,7 +121,9 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
   const {
     service: machineService,
     messages,
+    messageEvents,
     appendMessage,
+    appendLogEvent,
     replaceMessages,
     clearMessages,
     appendConsoleLine,
@@ -174,7 +178,9 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
     coordinatorSimulatorNotifyRef: machineUi.coordinatorSimulatorNotifyRef,
     outcomeReplaySection,
     messages,
+    messageEvents,
     appendMessage,
+    appendLogEvent,
     replaceMessages,
     clearMessages,
     isSimulator,

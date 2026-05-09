@@ -3,6 +3,7 @@ import { type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { MachineService, type BurnState } from '../../app/MachineService';
+import { type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { ExecutionCoordinator } from '../../app/ExecutionCoordinator';
 
 interface UseMachineServiceArgs {
@@ -38,6 +39,7 @@ export function useMachineService(args: UseMachineServiceArgs) {
   );
 
   const [messages, setMessages] = useState<string[]>([]);
+  const [messageEvents, setMessageEvents] = useState(() => service.getState().messageEvents);
   const [isSimulator, setIsSimulator] = useState(false);
   const [burnState, setBurnState] = useState<BurnState>(() => service.getBurnState());
 
@@ -57,7 +59,16 @@ export function useMachineService(args: UseMachineServiceArgs) {
 
   const appendMessage = (message: string) => {
     service.appendMessage(message);
-    setMessages(service.getState().messages);
+    const state = service.getState();
+    setMessages(state.messages);
+    setMessageEvents(state.messageEvents);
+  };
+
+  const appendLogEvent = (event: StructuredLogEventInput) => {
+    service.appendLogEvent(event);
+    const state = service.getState();
+    setMessages(state.messages);
+    setMessageEvents(state.messageEvents);
   };
 
   const replaceMessages = useCallback(
@@ -65,6 +76,7 @@ export function useMachineService(args: UseMachineServiceArgs) {
       setMessages(prev => {
         const resolved = typeof next === 'function' ? next(prev) : next;
         service.setMessages(resolved);
+        setMessageEvents(service.getState().messageEvents);
         return [...resolved];
       });
     },
@@ -73,7 +85,9 @@ export function useMachineService(args: UseMachineServiceArgs) {
 
   const clearMessages = () => {
     service.clearMessages();
-    setMessages(service.getState().messages);
+    const state = service.getState();
+    setMessages(state.messages);
+    setMessageEvents(state.messageEvents);
   };
 
   const setSimulator = (next: boolean) => {
@@ -93,7 +107,9 @@ export function useMachineService(args: UseMachineServiceArgs) {
     executionCoordinator,
     coordinatorSimulatorNotifyRef,
     messages,
+    messageEvents,
     appendMessage,
+    appendLogEvent,
     replaceMessages,
     clearMessages,
     appendConsoleLine,

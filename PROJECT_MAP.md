@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 381 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 526 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 383 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 527 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,7 +23,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 41 | - |
+| `src/app` | 42 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 96 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 147 | browser, components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 148 | browser, components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 461 | - |
+| `tests/` | 462 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -96,6 +96,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/ProjectRuntimeReset.ts`
 - `src/app/SafetyActionResult.ts`
 - `src/app/SafetyStateMachine.ts`
+- `src/app/StructuredMessageLog.ts`
 - `src/app/StructuredRxTxEntry.ts`
 - `src/app/UserModeGates.ts`
 - `src/app/autosavePersistence.ts`
@@ -435,6 +436,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/connection/ReadyToRunPanel.tsx`
 - `src/ui/components/connection/StartReadinessPanel.tsx`
 - `src/ui/components/connection/StatusBar.tsx`
+- `src/ui/components/connection/StructuredLogPanel.tsx`
 - `src/ui/components/connection/Workflow.tsx`
 - `src/ui/components/connection/jobModePlanSummary.ts`
 - `src/ui/components/falcon-wifi/FalconAlarmToast.tsx`
@@ -915,6 +917,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/storage-singleton.test.ts`
 - `tests/storage-size-limits.test.ts`
 - `tests/streaming-health.test.ts`
+- `tests/structured-log-events.test.ts`
 - `tests/structured-rx-tx-entries.test.ts`
 - `tests/support-bundle.test.ts`
 - `tests/svg-complexity-limits.test.ts`

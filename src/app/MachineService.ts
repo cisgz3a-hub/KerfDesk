@@ -51,6 +51,13 @@ import {
   type CommandClassification,
   type CommandSeverity,
 } from './MachineCommandGateway';
+import {
+  formatStructuredLogEventForLegacy,
+  legacyMessageToStructuredLogEvent,
+  normalizeStructuredLogEvent,
+  type StructuredLogEvent,
+  type StructuredLogEventInput,
+} from './StructuredMessageLog';
 
 export interface BurnState {
   readonly activeIds: ReadonlySet<string>;
@@ -127,6 +134,7 @@ function emptyBurnState(): BurnState {
 export interface MachineServiceState {
   isSimulator: boolean;
   messages: string[];
+  messageEvents: StructuredLogEvent[];
 }
 
 export interface JobRecordingSink {
@@ -180,6 +188,7 @@ export class MachineService {
   private state: MachineServiceState = {
     isSimulator: false,
     messages: [],
+    messageEvents: [],
   };
 
   private burnState: BurnState = emptyBurnState();
@@ -305,19 +314,31 @@ export class MachineService {
     return {
       isSimulator: this.state.isSimulator,
       messages: [...this.state.messages],
+      messageEvents: [...this.state.messageEvents],
     };
   }
 
   appendMessage(message: string): void {
+    const event = legacyMessageToStructuredLogEvent(message);
     this.state.messages = [...this.state.messages, message];
+    this.state.messageEvents = [...this.state.messageEvents, event];
+  }
+
+  appendLogEvent(input: StructuredLogEventInput): StructuredLogEvent {
+    const event = normalizeStructuredLogEvent(input);
+    this.state.messages = [...this.state.messages, formatStructuredLogEventForLegacy(event)];
+    this.state.messageEvents = [...this.state.messageEvents, event];
+    return event;
   }
 
   setMessages(messages: string[]): void {
     this.state.messages = [...messages];
+    this.state.messageEvents = messages.map(message => legacyMessageToStructuredLogEvent(message));
   }
 
   clearMessages(): void {
     this.state.messages = [];
+    this.state.messageEvents = [];
   }
 
   setSimulator(isSimulator: boolean): void {

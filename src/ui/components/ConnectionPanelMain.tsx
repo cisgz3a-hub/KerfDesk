@@ -21,6 +21,7 @@ import {
 } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
+import { type StructuredLogEvent, type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
 import { describeFrameFailure } from '../../app/FrameResultMessages';
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
@@ -284,7 +285,9 @@ export interface ConnectionPanelMainProps {
   coordinatorSimulatorNotifyRef: MutableRefObject<(line: string) => void>;
   outcomeReplaySection: React.ReactNode;
   messages: string[];
+  messageEvents?: StructuredLogEvent[];
   appendMessage: (message: string) => void;
+  appendLogEvent?: (event: StructuredLogEventInput) => void;
   replaceMessages: (next: string[] | ((prev: string[]) => string[])) => void;
   clearMessages: () => void;
   isSimulator: boolean;
@@ -336,6 +339,7 @@ export function ConnectionPanelMain({
   coordinatorSimulatorNotifyRef,
   outcomeReplaySection,
   messages,
+  messageEvents = [],
   appendMessage,
   replaceMessages,
   clearMessages,
@@ -390,7 +394,6 @@ export function ConnectionPanelMain({
   useEffect(() => {
     setMessagesRef.current = setMessages;
   }, [setMessages]);
-  const logRef = useRef<HTMLDivElement>(null);
   const simulatorListenersRef = useRef(new Set<(line: string) => void>());
   const jobStartTimeRef = useRef<number | null>(null);
   const jobProgressRef = useRef<JobProgress | null>(null);
@@ -470,11 +473,6 @@ export function ConnectionPanelMain({
 
   const font = "'DM Sans', system-ui, sans-serif";
   const mono = "'JetBrains Mono', monospace";
-
-  // Auto-scroll log
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [messages]);
 
   const preflightMachinePresent = machineState != null;
   const preflightMachineStatus = machineState?.status ?? null;
@@ -2427,8 +2425,7 @@ export function ConnectionPanelMain({
         onLoadLog: (entries: string[]) => setMessages(entries),
         showConfirm,
       }),
-      productionMode && React.createElement('div', {
-        ref: logRef,
+      false && productionMode && React.createElement('div', {
         style: {
           minHeight: 60, maxHeight: 100, padding: '6px 8px', background: '#08080f', borderRadius: 6,
           border: '1px solid #1a1a2e', overflow: 'auto', fontFamily: mono, fontSize: 9, lineHeight: 1.45,
@@ -2454,7 +2451,7 @@ export function ConnectionPanelMain({
               }, msg),
             ),
       ),
-      !productionMode && messages.length > 0 && React.createElement('div', {
+      false && !productionMode && messages.length > 0 && React.createElement('div', {
         style: { fontSize: 10, color: '#555570', lineHeight: 1.4 },
       }, React.createElement('span', {
         style: {
@@ -2557,6 +2554,7 @@ export function ConnectionPanelMain({
     sendUserCommand: sendCmd,
     advancedSection: advancedMachineDetailsSection,
     simulatorView,
+    messageEvents,
   });
 
   // ─── Render ─────────────────────────────────────────────

@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 56 | 36 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, and T3-73 frame failure reasons shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 57 | 35 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, and T3-74 structured log events shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18931,6 +18931,8 @@ function frameFailureMessage(reason: FrameResult['reason']): { title, message, r
 
 ### T3-74 | Structured log events with severity, domain, recovery 鈥?replace string-based message log
 
+**Status:** Shipped in `<TBD>`. Added `src/app/StructuredMessageLog.ts` with `StructuredLogEvent`, domain/severity filters, warning-or-higher severity filtering, legacy string conversion, UserFacingError adapter, recovery/developer-detail expansion formatting, and legacy string formatting for old consumers. `MachineService` now dual-writes `messages` and `messageEvents`; `appendMessage(string)` remains compatible and creates info-level structured events, while new callers can use `appendLogEvent(...)`. `useMachineService`, `ConnectionPanel`, and `ConsolePanel` pass structured events into a filterable `StructuredLogPanel` with persisted domain/severity filters and expandable details. Pinned by `tests/structured-log-events.test.ts`. Hardware verification: not required (diagnostic/log UI only).
+
 **Code reference:** Currently `appendMessage(string)` is the only message API. Refines T2-65 (reportError) with a richer event format for the log itself.
 
 **Problem:** Audit 4C Logging problem 4: messages are strings, not structured events. This means:
@@ -20516,7 +20518,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
 - [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
-- [ ] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (filed; depends on T2-65)
+- [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `<TBD>` — structured message events + MachineService dual-write + filterable/persisted log panel)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)

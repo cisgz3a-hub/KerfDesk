@@ -2,6 +2,8 @@ import React from 'react';
 import { ConsoleInput } from './ConsoleInput';
 import { type LaserController } from '../../controllers/ControllerInterface';
 import { buildSafeGrblDiagnosticsRequest } from '../../diagnostics/GrblDiagnostics';
+import { type StructuredLogEvent } from '../../app/StructuredMessageLog';
+import { StructuredLogPanel } from './connection/StructuredLogPanel';
 
 interface ConsolePanelProps {
   isConnected: boolean;
@@ -10,6 +12,7 @@ interface ConsolePanelProps {
   sendUserCommand: (cmd: string) => void | Promise<void>;
   advancedSection: React.ReactNode;
   simulatorView: React.ReactNode;
+  messageEvents: readonly StructuredLogEvent[];
 }
 
 export function ConsolePanel({
@@ -19,6 +22,7 @@ export function ConsolePanel({
   sendUserCommand,
   advancedSection,
   simulatorView,
+  messageEvents,
 }: ConsolePanelProps) {
   const [diagnosticsCopyState, setDiagnosticsCopyState] = React.useState<string | null>(null);
 
@@ -46,6 +50,7 @@ export function ConsolePanel({
       },
     },
     advancedSection,
+    React.createElement(StructuredLogPanel, { events: messageEvents }),
     React.createElement('div', {
       style: {
         margin: '10px 0',
