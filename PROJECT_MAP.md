@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 377 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 521 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 378 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 522 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 145 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 146 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 456 | - |
+| `tests/` | 457 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -425,6 +425,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/connection/ConnectionDetailsPanel.tsx`
 - `src/ui/components/connection/Controls.tsx`
 - `src/ui/components/connection/Issues.tsx`
+- `src/ui/components/connection/JobLayoutMiniMap.tsx`
 - `src/ui/components/connection/Jog.tsx`
 - `src/ui/components/connection/MachineControls.tsx`
 - `src/ui/components/connection/Progress.tsx`
@@ -720,6 +721,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/job-compiler-curve-flatness.test.ts`
 - `tests/job-execution-session.test.ts`
 - `tests/job-fingerprint.test.ts`
+- `tests/job-layout-minimap.test.tsx`
 - `tests/job-log-quota.test.ts`
 - `tests/job-mode-plan-summary.test.ts`
 - `tests/job-outcome-enum-failed-to-start.test.ts`

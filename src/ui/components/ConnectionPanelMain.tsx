@@ -1977,6 +1977,24 @@ export function ConnectionPanelMain({
       frameStatusLabel: hasFramed.current
         ? 'Frame complete'
         : (requireFrame ? 'Frame required before Start' : 'Frame recommended before Start'),
+      layout: {
+        bedWidth,
+        bedHeight,
+        startMode,
+        originCorner,
+        materialBounds: scene.material && scene.material.enabled !== false
+          ? {
+              minX: scene.material.x,
+              minY: scene.material.y,
+              maxX: scene.material.x + scene.material.width,
+              maxY: scene.material.y + scene.material.height,
+            }
+          : null,
+        jobBounds: readyBounds,
+        frameBounds: framePhysicalBounds,
+        savedOrigin,
+        headPosition: machinePosition,
+      },
     },
     warnings: readyWarnings,
     canStartJob,

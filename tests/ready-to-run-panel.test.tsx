@@ -67,6 +67,17 @@ const baseData: ReadyToRunPanelData = {
     startModeLabel: 'Start from laser head',
     originLabel: 'Job starts at current head position',
     frameStatusLabel: 'Frame complete',
+    layout: {
+      bedWidth: 400,
+      bedHeight: 400,
+      startMode: 'current',
+      originCorner: 'front-left',
+      materialBounds: { minX: 20, minY: 30, maxX: 220, maxY: 180 },
+      jobBounds: { minX: 0, minY: 0, maxX: 120, maxY: 80 },
+      frameBounds: { minX: 0, minY: 0, maxX: 120, maxY: 80 },
+      headPosition: { x: 10, y: 20 },
+      savedOrigin: null,
+    },
   },
   warnings: [
     { id: 'air', severity: 'warning', text: 'Air assist is off' },
@@ -107,7 +118,8 @@ async function run(): Promise<void> {
         text.includes('Material') &&
         text.includes('Position') &&
         text.includes('Warnings') &&
-        text.includes('Operation order'),
+        text.includes('Operation order') &&
+        container.querySelector('[data-testid="job-layout-mini-map"]') != null,
       'renders all top-level preflight sections',
     );
     assert(

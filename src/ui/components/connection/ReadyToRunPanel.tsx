@@ -11,6 +11,7 @@ import {
   summaryLine,
   type OrderAnalysis,
 } from '../../../app/OperationOrder';
+import { JobLayoutMiniMap, type JobLayoutMiniMapData } from './JobLayoutMiniMap';
 
 const font = "'DM Sans', system-ui, sans-serif";
 const mono = "'JetBrains Mono', monospace";
@@ -46,6 +47,7 @@ export interface ReadyToRunPositionSummary {
   startModeLabel: string;
   originLabel: string;
   frameStatusLabel: string;
+  layout?: JobLayoutMiniMapData | null;
 }
 
 export interface ReadyToRunWarning {
@@ -254,6 +256,7 @@ export function ReadyToRunPanel({
         row('Start mode', data.position.startModeLabel),
         row('Origin', data.position.originLabel),
         row('Frame', data.position.frameStatusLabel),
+        data.position.layout && React.createElement(JobLayoutMiniMap, { data: data.position.layout }),
       ), 'ready-to-run-section-position'),
     ),
     section('Operation order', React.createElement('div', null,

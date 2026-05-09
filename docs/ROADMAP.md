@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 52 | 40 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, and T3-69 guided first-run test shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 53 | 39 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, and T3-70 job layout mini-map shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18714,6 +18714,8 @@ User can exit to the main app at any step (the test scene is discarded). When th
 
 **Code reference:** T1-61 adds clearer text labels for start modes. T3-70 adds the visual layer.
 
+**Status:** Shipped in `<TBD>`. Added `JobLayoutMiniMap` in the Ready-to-Run review panel, showing the bed, optional material rectangle, job extent, frame extent, active `0,0` origin corner, and mode-specific head/saved-zero marker. `ConnectionPanelMain` feeds it from existing bed/material/machine position/saved origin/frame bounds values; no G-code generation, frame math, preflight, or controller behavior changed. Pinned by `tests/job-layout-minimap.test.tsx` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (display-only review diagram).
+
 **Problem:** Audit 4B Section 3.2 + Section 8: origin/start-mode is fundamentally a spatial concept. Text labels help; diagrams help more. A mini-map of bed + material + design + origin + frame rectangle communicates the spatial relationship in a glance.
 
 **Identified by:** Audit 4B (2026-04-26, ChatGPT) Section 3.2 + Section 8 + Priority 4 detail (mini diagrams).
@@ -20504,7 +20506,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
 - [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `578391a` - bounded TransitionLog plus dev-only state graph installer)
 - [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
-- [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
+- [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `<TBD>` - Ready-to-Run job layout mini-map)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
 - [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
