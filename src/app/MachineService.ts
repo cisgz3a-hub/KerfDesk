@@ -85,6 +85,25 @@ export type ActiveOperationKind =
   | 'autoFocus'
   | 'setOrigin';
 
+type DisconnectStopsJobValue = boolean | 'unknown';
+
+type DisconnectSafetyAwareController = LaserController & {
+  capabilities?: {
+    safety?: {
+      disconnectStopsJob?: DisconnectStopsJobValue;
+    };
+  };
+  safetyOps?: {
+    abortJob?: (urgency: 'urgent') => Promise<SafetyActionResult>;
+  };
+};
+
+function controllerDisconnectStopsJob(ctrl: LaserController): DisconnectStopsJobValue {
+  const declared = (ctrl as DisconnectSafetyAwareController).capabilities?.safety?.disconnectStopsJob;
+  if (declared === true || declared === false || declared === 'unknown') return declared;
+  return ctrl.family === 'grbl' || ctrl.family === 'gcode-line-stream' ? true : 'unknown';
+}
+
 /**
  * T2-11: snapshot of the active operation. `null` means no operation is
  * currently held; T1-30's gate map will read this via
@@ -1151,6 +1170,9 @@ export class MachineService {
 
   async disconnect(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
+    const gatedResult = ctrl ? await this._guardDisconnectStopsJob(ctrl) : null;
+    if (gatedResult) return gatedResult;
+
     let result = makeDisconnectResult();
     try {
       if (ctrl) {
@@ -1188,6 +1210,39 @@ export class MachineService {
       clearUnsafePriorState();
     }
     return this._recordSafetyResult(result);
+  }
+
+  private async _guardDisconnectStopsJob(ctrl: LaserController): Promise<SafetyActionResult | null> {
+    // T3-60: GRBL is host-streamed, so disconnecting the port stops the line
+    // stream. Uploaded-file/native controllers may continue running after the
+    // host disappears, so a running job must be aborted before closing.
+    if (!ctrl.isJobRunning) return null;
+    const disconnectStopsJob = controllerDisconnectStopsJob(ctrl);
+    if (disconnectStopsJob === true) return null;
+
+    const abortJob = (ctrl as DisconnectSafetyAwareController).safetyOps?.abortJob;
+    if (!abortJob) {
+      return this._recordSafetyResult(makeDisconnectResult({
+        accepted: false,
+        message:
+          'Cannot safely disconnect: controller may continue running after disconnect ' +
+          'and no native abort is available. Inspect machine before retry.',
+      }));
+    }
+
+    try {
+      const abortResult = await abortJob('urgent');
+      if (abortResult.accepted) return null;
+      return this._recordSafetyResult(makeDisconnectResult({
+        accepted: false,
+        message: `Cannot safely disconnect: ${abortResult.message ?? 'job stop failed'}. Inspect machine before retry.`,
+      }));
+    } catch (err: unknown) {
+      return this._recordSafetyResult(makeDisconnectResult({
+        accepted: false,
+        message: `Cannot safely disconnect: ${err instanceof Error ? err.message : String(err)}. Inspect machine before retry.`,
+      }));
+    }
   }
 
   async emergencyStop(): Promise<SafetyActionResult> {
