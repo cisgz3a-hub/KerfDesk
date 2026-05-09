@@ -18931,7 +18931,7 @@ function frameFailureMessage(reason: FrameResult['reason']): { title, message, r
 
 ### T3-74 | Structured log events with severity, domain, recovery 鈥?replace string-based message log
 
-**Status:** Shipped in `<TBD>`. Added `src/app/StructuredMessageLog.ts` with `StructuredLogEvent`, domain/severity filters, warning-or-higher severity filtering, legacy string conversion, UserFacingError adapter, recovery/developer-detail expansion formatting, and legacy string formatting for old consumers. `MachineService` now dual-writes `messages` and `messageEvents`; `appendMessage(string)` remains compatible and creates info-level structured events, while new callers can use `appendLogEvent(...)`. `useMachineService`, `ConnectionPanel`, and `ConsolePanel` pass structured events into a filterable `StructuredLogPanel` with persisted domain/severity filters and expandable details. Pinned by `tests/structured-log-events.test.ts`. Hardware verification: not required (diagnostic/log UI only).
+**Status:** Shipped in `134926a`. Added `src/app/StructuredMessageLog.ts` with `StructuredLogEvent`, domain/severity filters, warning-or-higher severity filtering, legacy string conversion, UserFacingError adapter, recovery/developer-detail expansion formatting, and legacy string formatting for old consumers. `MachineService` now dual-writes `messages` and `messageEvents`; `appendMessage(string)` remains compatible and creates info-level structured events, while new callers can use `appendLogEvent(...)`. `useMachineService`, `ConnectionPanel`, and `ConsolePanel` pass structured events into a filterable `StructuredLogPanel` with persisted domain/severity filters and expandable details. Pinned by `tests/structured-log-events.test.ts`. Hardware verification: not required (diagnostic/log UI only).
 
 **Code reference:** Currently `appendMessage(string)` is the only message API. Refines T2-65 (reportError) with a richer event format for the log itself.
 
@@ -20518,7 +20518,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-71 Web Serial / browser compatibility proactive guidance (Shipped in `eea9b13` - browser detector plus proactive Connect guidance)
 - [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
-- [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `<TBD>` — structured message events + MachineService dual-write + filterable/persisted log panel)
+- [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
 - [ ] T3-75 Image reference resolvability check on load + missing-image UI state (filed; depends on T2-74)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
