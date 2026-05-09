@@ -19046,7 +19046,7 @@ The objects load 鈥?they just render as placeholder rectangles with a "missing"
 
 ### T3-76 | Save/load size warnings + chunked parsing for large projects
 
-**Status:** Shipped in `<TBD>`. Added `src/io/LargeProjectHandling.ts` with a 50 MB warning threshold, 5 MB parser-worker threshold, shared warning copy, and `parseSceneFile()` that routes large project JSON through `SceneParseWorker.ts` with a main-thread fallback. Save/Open from `FileToolbar`, keyboard Open/Save, drag/drop project import, and `loadSceneFromFile` now use the shared guard/parser path, so raster-heavy files ask before expensive operations and large loads avoid synchronous `JSON.parse` when browser workers are available. Pinned by `tests/large-project-handling.test.ts`. Hardware verification: not required (file I/O UX and parsing only; no machine/controller behavior changed).
+**Status:** Shipped in `ca5027f`. Added `src/io/LargeProjectHandling.ts` with a 50 MB warning threshold, 5 MB parser-worker threshold, shared warning copy, and `parseSceneFile()` that routes large project JSON through `SceneParseWorker.ts` with a main-thread fallback. Save/Open from `FileToolbar`, keyboard Open/Save, drag/drop project import, and `loadSceneFromFile` now use the shared guard/parser path, so raster-heavy files ask before expensive operations and large loads avoid synchronous `JSON.parse` when browser workers are available. Pinned by `tests/large-project-handling.test.ts`. Hardware verification: not required (file I/O UX and parsing only; no machine/controller behavior changed).
 
 **Code reference:** Currently no size warning. `file.text()` + `JSON.parse(json)` block the main thread for arbitrarily large files.
 
@@ -20524,7 +20524,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
 - [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
 - [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
-- [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `<TBD>` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
+- [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `ca5027f` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)
