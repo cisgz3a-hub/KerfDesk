@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 366 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 498 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 367 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 502 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -27,7 +27,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
 | `src/core` | 93 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
-| `src/diagnostics` | 10 | - |
+| `src/diagnostics` | 11 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
@@ -47,7 +47,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 436 | - |
+| `tests/` | 440 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
@@ -229,6 +229,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/diagnostics/CorrelationIds.ts`
 - `src/diagnostics/CrashLoopDetector.ts`
 - `src/diagnostics/CrashReporter.ts`
+- `src/diagnostics/GrblDiagnostics.ts`
 - `src/diagnostics/Redaction.ts`
 - `src/diagnostics/StorageHealth.ts`
 - `src/diagnostics/SupportBundle.ts`
@@ -671,6 +672,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/gcode-templates.test.ts`
 - `tests/geometry-deep-validation.test.ts`
 - `tests/grbl-connect-abort-signal.test.ts`
+- `tests/grbl-diagnostics-commands.test.ts`
 - `tests/grbl-handshake-rejects-bare-ok.test.ts`
 - `tests/grbl-marker-lifecycle.test.ts`
 - `tests/grbl-request-work-offsets.test.ts`
@@ -796,6 +798,9 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/project-profile-snapshot.test.ts`
 - `tests/project-runtime-reset.test.ts`
 - `tests/property-geometry.test.ts`
+- `tests/prt4040-connection-home-gate.test.ts`
+- `tests/prt4040-router-laser-profile.test.ts`
+- `tests/prt4040-wizard-and-start-mode.test.ts`
 - `tests/raster-bidirectional-row-parity.test.ts`
 - `tests/raster-buffers-out-of-history.test.ts`
 - `tests/raster-grayscale-merge-tolerance.test.ts`

@@ -5,6 +5,7 @@ import { readAutosave } from '../../app/autosavePersistence';
 import {
   createBlankProfile,
   createFalconSerialProfile,
+  createPrt4040RouterLaserProfile,
   getActiveProfile,
   saveDeviceProfile,
   setActiveProfileId,
@@ -138,6 +139,16 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
         maxSpindle: result.maxSpindle,
         invertY,
       };
+      if (result.machinePresetKey === 'prt4040-router-laser') {
+        updated.brand = 'PRTCNC';
+        updated.model = 'PRT4040 router + laser';
+        updated.maxFeedRate = 1500;
+        updated.returnToOrigin = false;
+        updated.autoFocusSupported = false;
+        updated.autoFocusCommand = undefined;
+        updated.autoFocusTimeoutMs = undefined;
+        updated.allowsNegativeWorkspace = true;
+      }
       mergePreservedProfileFields(updated, existing);
       saveDeviceProfile(updated);
       setActiveProfileId(existing.id);
@@ -151,6 +162,8 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       const profile =
         result.machinePresetKey === 'falcon-a1-pro'
           ? createFalconSerialProfile(result.machineName || 'Creality Falcon A1 Pro')
+          : result.machinePresetKey === 'prt4040-router-laser'
+            ? createPrt4040RouterLaserProfile(result.machineName || 'PRTCNC PRT4040')
           : createBlankProfile(result.machineName || 'My Laser');
       profile.machineType = machineTypeSafe;
       profile.watts = wattsParsed;

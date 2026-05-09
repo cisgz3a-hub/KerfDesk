@@ -5,6 +5,7 @@ interface JogProps {
   setJogStep: (step: number) => void;
   onJog: (axis: 'X' | 'Y', distance: number) => void;
   onHome: () => void;
+  canHome?: boolean;
   canGoToLastPosition?: boolean;
   lastPositionLabel?: string;
   onGoToLastPosition?: () => void;
@@ -39,6 +40,7 @@ export function Jog({
   setJogStep,
   onJog,
   onHome,
+  canHome = true,
   canGoToLastPosition = false,
   lastPositionLabel = 'No last position',
   onGoToLastPosition,
@@ -71,9 +73,18 @@ export function Jog({
       },
       React.createElement('button', {
         type: 'button',
-        onClick: () => { onHome(); },
-        title: 'Home machine (\u0024H)',
-        style: { ...jogCellStyle, background: 'rgba(255,212,68,0.06)', fontSize: 14 },
+        onClick: () => { if (canHome) onHome(); },
+        disabled: !canHome,
+        title: canHome
+          ? 'Home machine (\u0024H)'
+          : 'Home disabled for this profile. Enable homing only after limit switches and GRBL $22/$23 settings are verified.',
+        style: {
+          ...jogCellStyle,
+          background: 'rgba(255,212,68,0.06)',
+          fontSize: 14,
+          opacity: canHome ? 1 : 0.42,
+          cursor: canHome ? 'pointer' : 'default',
+        },
       }, '⌂'),
       showFocus && React.createElement('button', {
         type: 'button',

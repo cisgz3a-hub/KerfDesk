@@ -62,7 +62,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
+| Tier 2 | 126 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile shipped; T2-6 App split and T2-95 trial decision remain open. |
 | Tier 3 | 36 | 56 | Active quarter-scope backlog; T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
@@ -15859,6 +15859,22 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 ---
 
+### T2-130 | PRT4040 GRBL router-laser compatibility profile and diagnostics
+
+**Code reference:** `src/core/devices/DeviceProfile.ts` (`createPrt4040RouterLaserProfile`), `src/ui/components/WelcomeWizard.tsx` (preset card), `src/ui/components/ConnectionPanelMain.tsx` / `src/ui/components/connection/Jog.tsx` (Home gate), `src/diagnostics/GrblDiagnostics.ts` (safe copyout).
+
+**Problem:** A PRTCNC PRT4040 CNC router with a laser attachment behaves differently from the Falcon diode gantry defaults: homing and limit switches may not match, bed-position jobs can push into limits, post-job return moves can be unsafe, and autofocus is not a known supported capability. Treating it like a Falcon makes the tester fight the machine before we even have the controller settings dump.
+
+**Fix:** Add a dedicated conservative `PRTCNC PRT4040` profile that starts with manual-zero assumptions: 400 x 400 mm bed, rear-right origin, `homingEnabled=false`, `softLimitsEnabled=false`, `returnToOrigin=false`, `autoFocusSupported=false`, `maxFeedRate=1500`, `maxSpindle=1000`, and `allowsNegativeWorkspace=true`. The setup wizard exposes the preset and the app nudges that profile toward `Start from laser head`. Home is disabled unless the active profile explicitly enables homing. Advanced machine details include a safe GRBL diagnostics copy action for `$I`, `$$`, `$G`, `$#`, and `?`; it never includes `$H`.
+
+**Tests:** `tests/prt4040-router-laser-profile.test.ts`, `tests/prt4040-wizard-and-start-mode.test.ts`, `tests/prt4040-connection-home-gate.test.ts`, and `tests/grbl-diagnostics-commands.test.ts`.
+
+**Priority:** Tier 2. Hardware compatibility and supportability fix for a real tester profile. This intentionally does not try to repair firmware homing yet; deeper homing/origin tuning waits for the tester's GRBL settings dump and physical home-corner confirmation.
+
+**Status:** Shipped in <TBD>. **Hardware verification not required for this MVP** (profile defaults, UI gating, and diagnostics copyout only; no new homing command or job-start transform path). Hardware verification is required before enabling homing or bed-grid defaults for this machine.
+
+---
+
 ## Tier 3 鈥?This quarter
 
 ### T3-1 | Autosave to IndexedDB / filesystem
@@ -20364,6 +20380,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T2-127 Storage value size limits per-key (Shipped — `NAMESPACE_LIMITS` + checkSaveAllowed + StorageLimitError; typed-IPC integration deferred as T2-127-followup; pairs with T2-120)
 - [x] T2-128 Per-namespace storage authorization (Shipped — Electron filesystem backend now requires namespace + validates key allow-lists before get/set/remove/list; generic storage helpers removed)
 - [x] T2-129 Destructive `forceSafeState()` primitive — operator-initiated recovery + T1-29 acknowledgement integration (Shipped — result type + evaluator + offer predicate + confirmation copy; GrblController port-level orchestration deferred as T2-129-followup with hardware verification; T1-25 follow-up)
+- [x] T2-130 PRT4040 GRBL router-laser compatibility profile and diagnostics (Shipped in <TBD> — conservative manual-zero profile + Home disabled until homing verified + safe GRBL diagnostics copyout)
 
 ### Tier 3 (This quarter)
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)

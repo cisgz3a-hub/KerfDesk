@@ -536,6 +536,53 @@ export function createFalconSerialProfile(name: string = 'Creality Falcon A1 Pro
   };
 }
 
+/**
+ * Create a conservative profile for PRTCNC PRT4040 CNC routers fitted with a
+ * laser module. These machines can be GRBL-compatible, but their homing,
+ * limit-switch, and coordinate assumptions are closer to CNC routers than
+ * Falcon-style diode gantries. Start in manual-zero mode until the real
+ * controller settings are known.
+ */
+export function createPrt4040RouterLaserProfile(
+  name: string = 'PRTCNC PRT4040',
+): DeviceProfile {
+  const base = createBlankProfile(name);
+  return {
+    ...base,
+    brand: 'PRTCNC',
+    model: 'PRT4040 router + laser',
+    machineType: 'diode',
+    watts: 20,
+    bedWidth: 400,
+    bedHeight: 400,
+    originCorner: 'rear-right',
+    invertY: false,
+    maxFeedRate: 1500,
+    maxSpindle: 1000,
+    baudRate: 115200,
+    homingEnabled: false,
+    softLimitsEnabled: false,
+    returnToOrigin: false,
+    autoFocusSupported: false,
+    autoFocusCommand: undefined,
+    autoFocusTimeoutMs: undefined,
+    allowsNegativeWorkspace: true,
+  };
+}
+
+export function isPrt4040RouterLaserProfile(
+  profile: DeviceProfile | null | undefined,
+): boolean {
+  if (!profile) return false;
+  return profile.brand === 'PRTCNC' && /PRT\s*4040|PRT4040/i.test(profile.model);
+}
+
+export function shouldDefaultStartModeToCurrentForProfile(
+  profile: DeviceProfile | null | undefined,
+): boolean {
+  return isPrt4040RouterLaserProfile(profile);
+}
+
 /** Create a profile from current scene machine settings */
 export function profileFromScene(name: string, scene: Scene): DeviceProfile {
   const profile = createBlankProfile(name);

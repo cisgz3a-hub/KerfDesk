@@ -22,9 +22,9 @@ export interface WizardResult {
   /**
    * Optional machine preset identifier. When set, the wizard handler uses a
    * brand-specific profile factory instead of `createBlankProfile`.
-   * Currently only 'falcon-a1-pro' is recognized.
+   * Currently Falcon A1 Pro and PRTCNC PRT4040 are recognized.
    */
-  machinePresetKey?: 'falcon-a1-pro';
+  machinePresetKey?: 'falcon-a1-pro' | 'prt4040-router-laser';
 }
 
 export interface WelcomeWizardProps {
@@ -62,11 +62,14 @@ const MACHINES: {
   watts: string;
   desc: string;
   type: MachineKind;
-  presetKey?: 'falcon-a1-pro';
+  presetKey?: 'falcon-a1-pro' | 'prt4040-router-laser';
 }[] = [
   { name: 'Creality Falcon A1 Pro', icon: '🎯', w: 400, h: 400, watts: '20W',
     desc: 'USB connection, autofocus supported', type: 'diode',
     presetKey: 'falcon-a1-pro' },
+  { name: 'PRTCNC PRT4040', icon: '4040', w: 400, h: 400, watts: '20/40W',
+    desc: 'CNC router laser, manual zero recommended', type: 'diode',
+    presetKey: 'prt4040-router-laser' },
   { name: 'Small Diode', icon: '🔹', w: 200, h: 200, watts: '5-10W', desc: 'Atomstack, Ortur, Sculpfun S9', type: 'diode' },
   { name: 'Medium Diode', icon: '🔷', w: 400, h: 400, watts: '10-20W', desc: 'xTool D1 Pro, Sculpfun S30', type: 'diode' },
   { name: 'Large Diode', icon: '🟦', w: 800, h: 400, watts: '20-40W', desc: 'Large format diode laser', type: 'diode' },
@@ -140,7 +143,9 @@ export function WelcomeWizard({
   const [machineType, setMachineType] = useState<MachineKind>(
     parseMachineKind(initialMachineType ?? bedPresetMatch?.type),
   );
-  const [machinePresetKey, setMachinePresetKey] = useState<'falcon-a1-pro' | undefined>(
+  const [machinePresetKey, setMachinePresetKey] = useState<
+    'falcon-a1-pro' | 'prt4040-router-laser' | undefined
+  >(
     bedPresetMatch?.presetKey,
   );
   const [originCorner, setOriginCorner] = useState<MachineOriginCorner>(
@@ -278,6 +283,15 @@ export function WelcomeWizard({
                   setBedW(m.w); setBedH(m.h); setCustomBed(false);
                   setMachineName(m.name); setMachineWatts(m.watts); setMachineType(m.type);
                   setMachinePresetKey(m.presetKey);
+                  if (m.presetKey === 'prt4040-router-laser') {
+                    setOriginCorner('rear-right');
+                    setHomingEnabled(false);
+                    setMaxSpindle(1000);
+                  } else if (m.presetKey === 'falcon-a1-pro') {
+                    setOriginCorner('front-left');
+                    setHomingEnabled(true);
+                    setMaxSpindle(1000);
+                  }
                 },
                 style: cardStyle(isSelected),
               },

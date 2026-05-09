@@ -580,6 +580,13 @@ export function ConnectionPanelMain({
       })
     : null;
   const canAutoFocus = gates?.baseSafe ?? false;
+  const canHome =
+    isConnected
+    && activeProfile?.homingEnabled === true
+    && activeOperation === null
+    && machineState != null
+    && machineState.status !== 'run'
+    && machineState.status !== 'hold';
   const lastPositionMoves = buildGoToLastPositionJogs({
     current: currentMachinePosition,
     target: lastJobStartPosition,
@@ -1363,9 +1370,16 @@ export function ConnectionPanelMain({
   }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
 
   const handleHome = useCallback(async () => {
+    if (!canHome) {
+      setMessages(prev => [
+        ...prev,
+        'Home disabled for this profile. Use manual zero until homing settings are verified.',
+      ]);
+      return;
+    }
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
     if (ok) await executionCoordinator.home();
-  }, [showConfirm, executionCoordinator]);
+  }, [canHome, showConfirm, executionCoordinator, setMessages]);
 
   const handleAutoFocus = useCallback(async () => {
     if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
@@ -2011,6 +2025,7 @@ export function ConnectionPanelMain({
         setJogStep,
         onJog: handleJog,
         onHome: () => { void handleHome(); },
+        canHome,
         canGoToLastPosition,
         lastPositionLabel,
         onGoToLastPosition: () => { void handleGoToLastPosition(); },
