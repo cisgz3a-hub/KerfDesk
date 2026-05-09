@@ -18,6 +18,10 @@
     "project-map:generate": "node scripts/generate-project-map.mjs",
     "project-map:check": "node scripts/generate-project-map.mjs --check",
     "test": "node scripts/run-tests.mjs",
+    "test:unit": "node scripts/run-tests.mjs --lane=unit",
+    "test:output": "node scripts/run-tests.mjs --lane=output",
+    "test:sim": "node scripts/run-tests.mjs --lane=sim",
+    "test:perf": "node scripts/run-tests.mjs --lane=perf",
     "prepare": "husky"
   },
   "keywords": [],

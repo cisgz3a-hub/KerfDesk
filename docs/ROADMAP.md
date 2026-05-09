@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 48 | 44 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, and T3-65 fake Falcon WiFi server shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 49 | 43 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, and T3-66 CI suite lane separation shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18471,6 +18471,8 @@ T2-30 (Falcon WiFi as real LaserController) depends on this infrastructure 鈥?w
 
 ### T3-66 | CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf
 
+**Status:** Shipped in `<TBD>`. `scripts/run-tests.mjs` now keeps `npm test` as the all-suite command while adding `--lane` filtering for `unit`, `output`, `controller-sim`, `transport-sim`, `sim`, and `perf`, plus `--list` for cheap CI/debug inspection. `package.json` exposes `test:unit`, `test:output`, `test:sim`, and `test:perf`. Lane selection is pinned by `tests/test-runner-lanes.test.ts`, including output/golden, simulator, transport-harness, and perf classification. Hardware verification: not required (test runner and package-script workflow only).
+
 **Code reference:** Current `scripts/run-tests.mjs` runs all tests as one suite. Refines T2-22 (standardize test runner from audit 2F).
 
 **Problem:** Audit's Required P2: separate test categories so failures are identifiable. Currently all 119 (T1-47 makes it 120) test files run in one batch; a failure in `tests/preflight-bounds.test.ts` looks the same as a failure in `tests/streaming-health.test.ts` looks the same as a (future) failure in `tests/perf/large-raster.test.ts`.
@@ -20492,7 +20494,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `7a1e045` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
 - [x] T3-64 Fake Electron serialport test harness (Closed in `162bc6a` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
 - [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `2d2ea96` - local HTTP/WebSocket fake plus real Falcon client tests)
-- [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
+- [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `<TBD>` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
 - [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
 - [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
 - [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
