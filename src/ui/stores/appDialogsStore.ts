@@ -52,6 +52,7 @@ export interface AppDialogsState {
   showTemplates: boolean;
   showMaterial: boolean;
   showSetup: boolean;
+  showFirstRunGuide: boolean;
   showRecover: boolean;
   recoverAutosaveTimeLabel: string | null;
   toastSuggestion: ToastSuggestionState | null;
@@ -100,6 +101,7 @@ export interface AppDialogsActions {
   setShowTemplates: (show: BooleanSetterValue) => void;
   setShowMaterial: (show: BooleanSetterValue) => void;
   setShowSetup: (show: BooleanSetterValue) => void;
+  setShowFirstRunGuide: (show: BooleanSetterValue) => void;
   setShowRecover: (show: BooleanSetterValue) => void;
   setRecoverAutosaveTimeLabel: (label: string | null) => void;
   setToastSuggestion: (suggestion: ToastSuggestionState | null) => void;
@@ -148,6 +150,7 @@ export const appDialogsInitialState: AppDialogsState = {
   showTemplates: false,
   showMaterial: false,
   showSetup: false,
+  showFirstRunGuide: false,
   showRecover: false,
   recoverAutosaveTimeLabel: null,
   toastSuggestion: null,
@@ -266,6 +269,7 @@ export function createAppDialogsStore(
     setShowTemplates: (show) => set(state => ({ showTemplates: resolveBoolean(show, state.showTemplates) })),
     setShowMaterial: (show) => set(state => ({ showMaterial: resolveBoolean(show, state.showMaterial) })),
     setShowSetup: (show) => set(state => ({ showSetup: resolveBoolean(show, state.showSetup) })),
+    setShowFirstRunGuide: (show) => set(state => ({ showFirstRunGuide: resolveBoolean(show, state.showFirstRunGuide) })),
     setShowRecover: (show) => set(state => ({ showRecover: resolveBoolean(show, state.showRecover) })),
     setRecoverAutosaveTimeLabel: (label) => set({ recoverAutosaveTimeLabel: label }),
     setToastSuggestion: (suggestion) => set({ toastSuggestion: suggestion }),

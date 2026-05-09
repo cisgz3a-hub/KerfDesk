@@ -22,6 +22,7 @@ export interface DialogState {
   showTemplates: boolean;
   showMaterial: boolean;
   showSetup: boolean;
+  showFirstRunGuide: boolean;
   showFeedback: boolean;
 }
 
@@ -63,6 +64,8 @@ export function useDialogs() {
   const setShowMaterial = useAppDialogsStore(s => s.setShowMaterial);
   const showSetup = useAppDialogsStore(s => s.showSetup);
   const setShowSetup = useAppDialogsStore(s => s.setShowSetup);
+  const showFirstRunGuide = useAppDialogsStore(s => s.showFirstRunGuide);
+  const setShowFirstRunGuide = useAppDialogsStore(s => s.setShowFirstRunGuide);
   const showFeedback = useAppDialogsStore(s => s.showFeedback);
   const setShowFeedback = useAppDialogsStore(s => s.setShowFeedback);
 
@@ -116,6 +119,8 @@ export function useDialogs() {
     setShowMaterial,
     showSetup,
     setShowSetup,
+    showFirstRunGuide,
+    setShowFirstRunGuide,
     showFeedback,
     setShowFeedback,
   };

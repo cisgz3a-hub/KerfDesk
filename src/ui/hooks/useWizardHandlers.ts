@@ -11,6 +11,7 @@ import {
   setActiveProfileId,
   type DeviceProfile,
 } from '../../core/devices/DeviceProfile';
+import { shouldShowFirstRunGuide } from '../../onboarding/FirstRunGuide';
 import { type WizardResult } from '../components/WelcomeWizard';
 import { type ViewportActions } from '../components/CanvasViewport';
 
@@ -54,6 +55,7 @@ export interface UseWizardHandlersParams {
   handleSceneCommit: (newScene: Scene) => void;
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setShowSetup: (show: boolean) => void;
+  setShowFirstRunGuide?: (show: boolean) => void;
   setShowRecover: (show: boolean) => void;
   setRecoverAutosaveTimeLabel?: (label: string | null) => void;
   viewportActionsRef: RefObject<ViewportActions | null>;
@@ -75,6 +77,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     handleSceneCommit,
     handleNewProject,
     setShowSetup,
+    setShowFirstRunGuide,
     setShowRecover,
     setRecoverAutosaveTimeLabel,
     viewportActionsRef,
@@ -206,7 +209,10 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
 
     // Fit to bed after a tick
     setTimeout(() => viewportActionsRef.current?.fitToBed(), 100);
-  }, [scene, handleSceneCommit, setShowSetup, refreshProfiles]);
+    if (shouldShowFirstRunGuide()) {
+      setShowFirstRunGuide?.(true);
+    }
+  }, [scene, handleSceneCommit, setShowSetup, setShowFirstRunGuide, refreshProfiles]);
 
   const handleWizardSkip = useCallback(() => {
     setShowSetup(false);

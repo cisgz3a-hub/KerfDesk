@@ -30,6 +30,7 @@ import { FileToolbar } from './FileToolbar';
 import { buildAppFileToolbarProps } from './appFileToolbarProps';
 import { AppDragDropOverlay } from './AppDragDropOverlay';
 import { AppRecoverySetup } from './AppRecoverySetup';
+import { AppFirstRunGuideBridge } from './AppFirstRunGuideBridge';
 import { AppModal } from './AppModal';
 import { useModal } from '../hooks/useModal';
 import { useClipboard } from '../hooks/useClipboard';
@@ -1142,6 +1143,7 @@ export function App(): React.ReactElement {
     handleSceneCommit,
     handleNewProject,
     setShowSetup: dialogs.setShowSetup,
+    setShowFirstRunGuide: dialogs.setShowFirstRunGuide,
     setShowRecover,
     setRecoverAutosaveTimeLabel,
     viewportActionsRef,
@@ -1575,6 +1577,10 @@ export function App(): React.ReactElement {
       initialHomeCorner: activeProfile?.homeCorner,
       initialHomingEnabled: activeProfile?.homingEnabled,
       initialMaxSpindle: activeProfile?.maxSpindle,
+    }),
+    React.createElement(AppFirstRunGuideBridge, {
+      scene,
+      onSceneCommit: handleSceneCommit,
     }),
 
     React.createElement('div', {

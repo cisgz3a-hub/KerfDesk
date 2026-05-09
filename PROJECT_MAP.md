@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 374 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 519 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 377 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 521 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -35,20 +35,21 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/import` | 16 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
 | `src/io` | 8 | migrations, validation |
+| `src/onboarding` | 1 | - |
 | `src/runtime` | 2 | - |
 | `src/security` | 3 | - |
 | `src/storage` | 2 | - |
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 143 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 145 | components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 454 | - |
+| `tests/` | 456 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
@@ -316,6 +317,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/io/migrations/MigrationPipeline.ts`
 - `src/io/validation/geometryValidation.ts`
 
+### `src/onboarding`
+
+- `src/onboarding/FirstRunGuide.ts`
+
 ### `src/runtime`
 
 - `src/runtime/RecoveryState.ts`
@@ -351,6 +356,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/AddTextDialog.tsx`
 - `src/ui/components/App.tsx`
 - `src/ui/components/AppDragDropOverlay.tsx`
+- `src/ui/components/AppFirstRunGuideBridge.tsx`
 - `src/ui/components/AppModal.tsx`
 - `src/ui/components/AppRecoverySetup.tsx`
 - `src/ui/components/AppSettingsModal.tsx`
@@ -367,6 +373,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/ContextMenu.tsx`
 - `src/ui/components/DeviceProfileSelector.tsx`
 - `src/ui/components/FileToolbar.tsx`
+- `src/ui/components/FirstRunGuide.tsx`
 - `src/ui/components/FontCreditsDialog.tsx`
 - `src/ui/components/GcodePreview.tsx`
 - `src/ui/components/GcodeTemplateEditor.tsx`
@@ -662,6 +669,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/fill-generator-active-edge-table.test.ts`
 - `tests/fill-rows-cache.test.ts`
 - `tests/fill-with-holes.test.ts`
+- `tests/first-run-guide-wiring.test.ts`
+- `tests/first-run-guide.test.ts`
 - `tests/flattening-tolerance-by-operation.test.ts`
 - `tests/fonts.test.ts`
 - `tests/footer-m5-appended-at-send.test.ts`
