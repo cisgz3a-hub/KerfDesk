@@ -15873,7 +15873,7 @@ async forceSafeState(opts: { timeoutMs?: number } = {}): Promise<{
 
 **Status:** Shipped in 618fcad. **Hardware verification not required for this MVP** (profile defaults, UI gating, and diagnostics copyout only; no new homing command or job-start transform path). Hardware verification is required before enabling homing or bed-grid defaults for this machine.
 
-**Follow-up:** Shipped in <TBD> — deeper PRT4040 / LightBurn / GRBL review confirmed the conservative manual-zero defaults. Hardened setup wizard watt parsing so slash/range labels read the first numeric watt value (`20/40W` or `20-40W` -> `20`) instead of concatenating digits into an invalid `2040W` profile.
+**Follow-up:** Shipped in b287708 — deeper PRT4040 / LightBurn / GRBL review confirmed the conservative manual-zero defaults. Hardened setup wizard watt parsing so slash/range labels read the first numeric watt value (`20/40W` or `20-40W` -> `20`) instead of concatenating digits into an invalid `2040W` profile.
 
 ---
 
