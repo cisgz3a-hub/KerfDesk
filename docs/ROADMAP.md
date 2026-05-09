@@ -18039,7 +18039,7 @@ Audit's Finding 10.3 (unsupported operations not systematically hidden) is close
 
 **Cross-check note (audit 3C):** Audit's Findings 10.1, 10.2, 10.3.
 
-**Status:** Shipped in `<TBD>` - focused MVP: Machine Settings now renders a `Capability confidence` section for bed width, bed height, max spindle, laser mode, and homing. Live GRBL values from `$130/$131`, `$30`, `$32`, and `$22` are marked `Verified`; saved-profile values are marked `Profile only`; missing controller-only values such as laser mode are marked `Unknown`. The auto-detect copy now explicitly mentions max spindle, laser mode, and homing state. Pinned by `tests/machine-settings-capability-indicators.test.ts`; stale-capability age indicators and mismatch-side-by-side UI remain deferred to the broader T3-57/T3-59 capability followups.
+**Status:** Shipped in `ec6b224` - focused MVP: Machine Settings now renders a `Capability confidence` section for bed width, bed height, max spindle, laser mode, and homing. Live GRBL values from `$130/$131`, `$30`, `$32`, and `$22` are marked `Verified`; saved-profile values are marked `Profile only`; missing controller-only values such as laser mode are marked `Unknown`. The auto-detect copy now explicitly mentions max spindle, laser mode, and homing state. Pinned by `tests/machine-settings-capability-indicators.test.ts`; stale-capability age indicators and mismatch-side-by-side UI remain deferred to the broader T3-57/T3-59 capability followups.
 
 ---
 
@@ -20472,7 +20472,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
 - [x] T3-56 Conservative unknown-capability handling (Shipped in `ebd614c` - connected M4 output now blocks until `$32` laser mode is known)
 - [ ] T3-57 Expand preflight mismatch rules ($22, $110/$111, $120/$121, model identity) (filed; depends on T2-25, T2-38, T3-50)
-- [x] T3-58 UI verified / unknown / stale capability indicators (Shipped in `<TBD>` - Machine Settings shows verified/profile-only/unknown capability confidence)
+- [x] T3-58 UI verified / unknown / stale capability indicators (Shipped in `ec6b224` - Machine Settings shows verified/profile-only/unknown capability confidence)
 - [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)
 - [ ] T3-60 Disconnect-stops-job capability gating (filed; depends on T2-42, T2-43)
 - [ ] T3-61 Per-controller-family safety regression tests (filed; refines T3-43)
