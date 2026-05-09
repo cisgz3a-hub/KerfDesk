@@ -18134,7 +18134,7 @@ For GRBL (`disconnectStopsJob: true`), the path is unchanged 鈥?current behavio
 
 **Cross-check note (audit 3D):** Audit's Scenario 8 + Finding 2.7.
 
-**Status:** Shipped in `<TBD>` - focused MVP: `MachineService.disconnect()` now checks `capabilities.safety.disconnectStopsJob` before closing a running controller. GRBL/line-stream controllers keep the legacy path; file-upload/native/unknown controllers must expose a native `safetyOps.abortJob('urgent')` and have it accepted before LaserForge sends laser-off and closes transport. If native abort is missing or refused, disconnect is blocked and the port ref is kept so the host can still control the machine. Pinned by `tests/disconnect-stops-job-gating.test.ts` plus existing disconnect transaction, ExecutionCoordinator disconnect, and controller safety capability regressions. **Hardware verification not required** for this guard itself because current GRBL behavior is unchanged; future non-GRBL controller integrations must verify their native abort adapter.
+**Status:** Shipped in `4324ece` - focused MVP: `MachineService.disconnect()` now checks `capabilities.safety.disconnectStopsJob` before closing a running controller. GRBL/line-stream controllers keep the legacy path; file-upload/native/unknown controllers must expose a native `safetyOps.abortJob('urgent')` and have it accepted before LaserForge sends laser-off and closes transport. If native abort is missing or refused, disconnect is blocked and the port ref is kept so the host can still control the machine. Pinned by `tests/disconnect-stops-job-gating.test.ts` plus existing disconnect transaction, ExecutionCoordinator disconnect, and controller safety capability regressions. **Hardware verification not required** for this guard itself because current GRBL behavior is unchanged; future non-GRBL controller integrations must verify their native abort adapter.
 
 ---
 
@@ -20476,7 +20476,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-57 Expand preflight mismatch rules ($22, $110/$111, $120/$121, model identity) (filed; depends on T2-25, T2-38, T3-50)
 - [x] T3-58 UI verified / unknown / stale capability indicators (Shipped in `ec6b224` - Machine Settings shows verified/profile-only/unknown capability confidence)
 - [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)
-- [x] T3-60 Disconnect-stops-job capability gating (Shipped in `<TBD>` - non-host-stream controllers must abort before disconnect)
+- [x] T3-60 Disconnect-stops-job capability gating (Shipped in `4324ece` - non-host-stream controllers must abort before disconnect)
 - [ ] T3-61 Per-controller-family safety regression tests (filed; refines T3-43)
 - [ ] T3-62 Ruida controller safety stub 鈥?design before implementation (filed; design doc only)
 - [ ] T3-63 Fake WebSerial byte-stream harness with chunking realism (filed; refines T3-54, depends on T2-48)
