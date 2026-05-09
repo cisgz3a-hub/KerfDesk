@@ -1131,6 +1131,7 @@ export function App(): React.ReactElement {
     handleNewProject,
     setIsDragOver,
     showAlert,
+    showConfirm,
     showChoice,
   });
 

@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 58 | 34 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, and T3-75 image-reference validation shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 59 | 33 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, and T3-76 large-project save/load guard shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -19046,6 +19046,8 @@ The objects load 鈥?they just render as placeholder rectangles with a "missing"
 
 ### T3-76 | Save/load size warnings + chunked parsing for large projects
 
+**Status:** Shipped in `<TBD>`. Added `src/io/LargeProjectHandling.ts` with a 50 MB warning threshold, 5 MB parser-worker threshold, shared warning copy, and `parseSceneFile()` that routes large project JSON through `SceneParseWorker.ts` with a main-thread fallback. Save/Open from `FileToolbar`, keyboard Open/Save, drag/drop project import, and `loadSceneFromFile` now use the shared guard/parser path, so raster-heavy files ask before expensive operations and large loads avoid synchronous `JSON.parse` when browser workers are available. Pinned by `tests/large-project-handling.test.ts`. Hardware verification: not required (file I/O UX and parsing only; no machine/controller behavior changed).
+
 **Code reference:** Currently no size warning. `file.text()` + `JSON.parse(json)` block the main thread for arbitrarily large files.
 
 **Problem:** Audit 4D Large project findings: image-heavy projects can produce JSON files in the 10-100 MB range (base64 inflates binary by ~33%). Parsing this synchronously freezes the UI for seconds. No warning before the operation.
@@ -20522,7 +20524,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
 - [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
 - [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
-- [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
+- [x] T3-76 Save/load size warnings + chunked parsing for large projects (Shipped in `<TBD>` — large save/load confirmations plus shared scene-file parser with worker attempt and main-thread fallback)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
 - [ ] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (filed; pairs with T2-78)

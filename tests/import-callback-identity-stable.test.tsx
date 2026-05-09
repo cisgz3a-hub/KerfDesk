@@ -50,6 +50,7 @@ const noopDeps: UseImportDeps = {
   handleNewProject: () => {},
   setIsDragOver: () => {},
   showAlert: () => Promise.resolve(),
+  showConfirm: () => Promise.resolve(true),
   showChoice: () => Promise.resolve('laser'),
 };
 

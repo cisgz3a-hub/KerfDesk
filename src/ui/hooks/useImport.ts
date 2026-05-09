@@ -8,11 +8,11 @@ import {
 } from '../../import/svg/SvgUnitChoice';
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
-import { deserializeScene } from '../../io/SceneSerializer';
 import {
   formatMissingImageReferenceReport,
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
+import { confirmLargeProjectLoad, parseSceneFile } from '../../io/LargeProjectHandling';
 import { storeImage } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
@@ -50,6 +50,7 @@ export interface UseImportDeps {
   handleNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
   setIsDragOver: (v: boolean) => void;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
+  showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   showChoice: (
     title: string,
     message: string,
@@ -59,7 +60,7 @@ export interface UseImportDeps {
 }
 
 export function useImport(scene: Scene, deps: UseImportDeps) {
-  const { handleSceneCommit, handleNewProject, setIsDragOver, showAlert, showChoice } = deps;
+  const { handleSceneCommit, handleNewProject, setIsDragOver, showAlert, showConfirm, showChoice } = deps;
 
   // T1-17 Pass 3: keep a live ref to scene so importImageUnified can read
   // the current scene without listing it in its useCallback deps. Without
@@ -74,6 +75,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
   useEffect(() => {
     showAlertRef.current = showAlert;
   }, [showAlert]);
+  const showConfirmRef = useRef(showConfirm);
+  useEffect(() => {
+    showConfirmRef.current = showConfirm;
+  }, [showConfirm]);
 
   /**
    * Build a scene with one new image object (layer + grayscale + placement).
@@ -322,8 +327,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
 
       try {
         if (name.endsWith('.laserforge.json') || name.endsWith('.json')) {
-          const text = await file.text();
-          const loaded = deserializeScene(text);
+          const proceed = await confirmLargeProjectLoad(file.size, showConfirmRef.current);
+          if (!proceed) return;
+          const loaded = await parseSceneFile(file);
           const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
           handleNewProject(annotated, 'file');
           const imageReport = formatMissingImageReferenceReport(validation);

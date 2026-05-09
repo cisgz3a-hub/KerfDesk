@@ -23,12 +23,17 @@ import {
 import { importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
-import { deserializeScene } from '../../io/SceneSerializer';
+import {
+  confirmLargeProjectLoad,
+  confirmLargeProjectSave,
+  parseSceneFile,
+} from '../../io/LargeProjectHandling';
 import {
   formatMissingImageReferenceReport,
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
 import { clearAutosave } from '../../app/autosavePersistence';
+import { estimateSceneBytes } from '../history/estimateSceneBytes';
 import { TestGridDialog } from './TestGridDialog';
 import { BuildStamp } from './BuildStamp';
 // ─── PROPS ───────────────────────────────────────────────────────
@@ -259,6 +264,8 @@ export function FileToolbar({
 
   const handleSave = useCallback(async () => {
     try {
+      const proceed = await confirmLargeProjectSave(estimateSceneBytes(scene), showConfirm);
+      if (!proceed) return;
       await saveSceneToFile(scene);
     } catch (e) {
       await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
@@ -290,8 +297,12 @@ export function FileToolbar({
     if (!file) return;
 
     try {
-      const text = await file.text();
-      const loaded = deserializeScene(text);
+      const proceed = await confirmLargeProjectLoad(file.size, showConfirm);
+      if (!proceed) {
+        if (openInputRef.current) openInputRef.current.value = '';
+        return;
+      }
+      const loaded = await parseSceneFile(file);
       const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loaded);
       onNewProject(annotated, 'file');
       const imageReport = formatMissingImageReferenceReport(validation);
@@ -306,7 +317,7 @@ export function FileToolbar({
     if (openInputRef.current) {
       openInputRef.current.value = '';
     }
-  }, [onNewProject, showAlert]);
+  }, [onNewProject, showAlert, showConfirm]);
 
   const handleGenerateGcode = useCallback(async () => {
     try {

@@ -1,12 +1,18 @@
 import { useCallback } from 'react';
 import { createScene, type Scene } from '../../core/scene/Scene';
-import { deserializeScene, serializeForAutosave } from '../../io/SceneSerializer';
+import { serializeForAutosave } from '../../io/SceneSerializer';
 import {
   formatMissingImageReferenceReport,
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
+import {
+  confirmLargeProjectLoad,
+  confirmLargeProjectSave,
+  parseSceneFile,
+} from '../../io/LargeProjectHandling';
 import { saveSceneToFile } from '../../io/FileIO';
 import { writeAutosave, clearAutosave } from '../../app/autosavePersistence';
+import { estimateSceneBytes } from '../history/estimateSceneBytes';
 
 export interface UseFileHandlersParams {
   scene: Scene;
@@ -47,6 +53,8 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
 
   const handleKeyboardSave = useCallback(async () => {
     try {
+      const proceed = await confirmLargeProjectSave(estimateSceneBytes(scene), showConfirm);
+      if (!proceed) return;
       await saveSceneToFile(scene);
     } catch (e) {
       await showAlert('Save Failed', 'Save failed: ' + (e as Error).message);
@@ -77,8 +85,9 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
       try {
-        const text = await file.text();
-        const loadedScene = deserializeScene(text);
+        const proceed = await confirmLargeProjectLoad(file.size, showConfirm);
+        if (!proceed) return;
+        const loadedScene = await parseSceneFile(file);
         const { scene: annotated, validation } = await validateAndAnnotateImageReferences(loadedScene);
         handleNewProject(annotated, 'file');
         const imageReport = formatMissingImageReferenceReport(validation);
@@ -90,7 +99,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
       }
     };
     input.click();
-  }, [handleNewProject, showAlert]);
+  }, [handleNewProject, showAlert, showConfirm]);
 
   const handleKeyboardNew = useCallback(async () => {
     if (isSceneDirty()) {

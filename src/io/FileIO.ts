@@ -15,9 +15,10 @@
  */
 
 import { type Scene } from '../core/scene/Scene';
-import { serializeScene, deserializeScene } from './SceneSerializer';
+import { serializeScene } from './SceneSerializer';
 import { getImage } from './ImageStore';
 import { validateAndAnnotateImageReferences } from './ImageReferenceValidation';
+import { parseSceneFile } from './LargeProjectHandling';
 
 // ─── SAVE ────────────────────────────────────────────────────────
 
@@ -91,8 +92,7 @@ export function loadSceneFromFile(): Promise<Scene | null> {
       }
 
       try {
-        const text = await file.text();
-        const scene = deserializeScene(text);
+        const scene = await parseSceneFile(file);
         const annotated = await validateAndAnnotateImageReferences(scene);
         resolve(annotated.scene);
       } catch (e) {
