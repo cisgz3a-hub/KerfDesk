@@ -44,6 +44,11 @@ function mergePreservedProfileFields(target: DeviceProfile, previous: DeviceProf
   target.frameDotFeedRate = previous.frameDotFeedRate;
 }
 
+export function parseWizardWatts(machineWatts?: string): number {
+  const firstNumber = (machineWatts || '10').match(/\d+/)?.[0] || '10';
+  return parseInt(firstNumber, 10) || 10;
+}
+
 export interface UseWizardHandlersParams {
   scene: Scene;
   handleSceneCommit: (newScene: Scene) => void;
@@ -117,8 +122,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     try { localStorage.setItem(getSetupStorageKey(), 'true'); } catch { /* ignore */ }
 
     // Apply wizard results to scene
-    const wattsRaw = result.machineWatts || '10';
-    const wattsParsed = parseInt(wattsRaw.split(/[-]/)[0]?.replace(/\D/g, '') || '10', 10) || 10;
+    const wattsParsed = parseWizardWatts(result.machineWatts);
     const mt = result.machineType || 'diode';
     const machineTypeSafe = mt === 'co2' || mt === 'fiber' || mt === 'diode' ? mt : 'diode';
     const invertY = result.originCorner === 'front-left' || result.originCorner === 'front-right';

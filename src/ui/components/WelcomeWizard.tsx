@@ -67,7 +67,7 @@ const MACHINES: {
   { name: 'Creality Falcon A1 Pro', icon: '🎯', w: 400, h: 400, watts: '20W',
     desc: 'USB connection, autofocus supported', type: 'diode',
     presetKey: 'falcon-a1-pro' },
-  { name: 'PRTCNC PRT4040', icon: '4040', w: 400, h: 400, watts: '20/40W',
+  { name: 'PRTCNC PRT4040', icon: '4040', w: 400, h: 400, watts: '20-40W',
     desc: 'CNC router laser, manual zero recommended', type: 'diode',
     presetKey: 'prt4040-router-laser' },
   { name: 'Small Diode', icon: '🔹', w: 200, h: 200, watts: '5-10W', desc: 'Atomstack, Ortur, Sculpfun S9', type: 'diode' },
