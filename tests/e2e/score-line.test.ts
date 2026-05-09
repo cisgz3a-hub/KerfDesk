@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeScoreLineScene } from './fixtures/scoreLine';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -26,10 +27,18 @@ console.log('\n=== E2E: score-line ===');
 try {
   const scene = makeScoreLineScene();
   const gcode = compileSceneToGcode(scene, { startMode: 'current' });
+  const { analysis } = assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'relative',
+    expectedBurnWidth: 160,
+    expectedBurnHeight: 0,
+    minBurnSegments: 1,
+  });
 
-  assert(gcode.includes('G21'), 'Includes G21');
   assert(gcode.includes('Score'), 'Comment references Score layer');
-  assert(gcode.includes('F2200') || gcode.includes('F2199') || gcode.includes('F2201'), 'Uses score-class feed (~2200 mm/min)');
+  assert(
+    analysis.burnSegments.some(segment => segment.feed != null && Math.abs(segment.feed - 2200) <= 1),
+    'Uses score-class feed (~2200 mm/min)',
+  );
 
   expectMatchesSnapshot(gcode, 'score-line.gcode');
   passed++;

@@ -7,6 +7,7 @@ import './helpers/e2eDeterministicIds';
 import { makeTextBundledInterScene } from './fixtures/textBundledInter';
 import { compileSceneToGcode } from './helpers/compileToGcode';
 import { prepareSceneForCompile } from './helpers/prepareSceneForCompile';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -32,8 +33,10 @@ console.log('\n=== E2E: text-bundled-inter ===');
     const g1Count = (s: string) => (s.match(/^G1 /gm) ?? []).length;
     const gcode = compileSceneToGcode(scene, { startMode: 'current' });
 
-    assert(gcode.includes('G21'), 'Includes G21');
-    assert(gcode.includes('M4'), 'Includes M4');
+    assertSemanticGcode(gcode, assert, {
+      expectedDistanceMode: 'relative',
+      minBurnSegments: 40,
+    });
     assert(g1Count(gcode) >= 40, `Many G1 segments from glyph outlines (got ${g1Count(gcode)})`);
 
     expectMatchesSnapshot(gcode, 'text-bundled-inter.gcode');

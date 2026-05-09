@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeCircleCutScene } from './fixtures/circleCut';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -28,7 +29,13 @@ try {
   const gcode = compileSceneToGcode(scene, { startMode: 'current' });
   const g1Count = (gcode.match(/^G1 /gm) ?? []).length;
 
-  assert(gcode.includes('G21'), 'Includes G21');
+  assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'relative',
+    expectedBurnWidth: 80,
+    expectedBurnHeight: 60,
+    minBurnSegments: 24,
+    tolerance: 0.5,
+  });
   assert(g1Count >= 24, `Ellipse tessellation yields many G1 segments (got ${g1Count})`);
 
   expectMatchesSnapshot(gcode, 'circle-cut.gcode');

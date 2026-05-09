@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 35 | 57 | Active quarter-scope backlog; T3-40 performance/stress suite shipped; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 36 | 56 | Active quarter-scope backlog; T3-41 semantic E2E assertions shipped; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -17017,6 +17017,8 @@ Audit's table from section 3 lists semantic assertions per fixture. Apply each.
 
 **Cross-check note (audit 2F):** Audit's section 3 / P0. Pattern matches the audit's recommendation exactly.
 
+**Status:** Shipped in `b4769f0` - added a shared semantic E2E assertion helper that parses emitted G-code, analyzes burn bounds, and pins modal/safety invariants across every `tests/e2e/*.test.ts` snapshot fixture. The guard test `tests/e2e-semantic-assertions.test.ts` now fails if a new E2E snapshot fixture skips the semantic helper or if the helper stops using the parser/analyzer. **Hardware verification: not required** (test-only regression coverage; no emitted G-code, motion, controller, or safety gate behavior changed).
+
 ---
 
 ### T3-42 | Dialect-specific preflight / template validators
@@ -20402,7 +20404,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
 - [x] T3-39 Malformed-input test suite (Shipped in `a28eec8` — malformed SVG/image/settings/template/extreme-coordinate suite)
 - [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `6dec8a8` — bounded perf suite with T3-15 streaming blockers documented)
-- [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
+- [x] T3-41 Snapshot semantic-assertion pairing éˆ¥?every snapshot test gets parsed checks (Shipped in `b4769f0`; semantic parser/analyzer assertions now paired with every E2E snapshot)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
 - [ ] T3-44 Generic progress model 鈥?line/byte/percent/device-reported (filed; depends on T2-24)

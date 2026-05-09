@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeLargeScene } from './fixtures/largeScene';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 
 const MAX_MS = 2000;
 const MIN_LINES = 800;
@@ -37,7 +38,10 @@ console.log(`  ℹ Compiled 100 objects in ${elapsed.toFixed(0)} ms, ${lineCount
 assert(elapsed < MAX_MS, `Compile time under ${MAX_MS} ms (got ${elapsed.toFixed(0)})`);
 assert(lineCount >= MIN_LINES, `Line count >= ${MIN_LINES} (got ${lineCount})`);
 assert(lineCount <= MAX_LINES, `Line count <= ${MAX_LINES} (got ${lineCount})`);
-assert(gcode.includes('M4'), 'Contains M4 (laser on)');
+assertSemanticGcode(gcode, assert, {
+  expectedDistanceMode: 'relative',
+  minBurnSegments: 100,
+});
 assert(gcode.includes('M2'), 'Contains M2 (program end)');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed`);

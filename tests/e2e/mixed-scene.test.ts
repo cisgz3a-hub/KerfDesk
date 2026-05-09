@@ -7,6 +7,7 @@ import './helpers/e2eDeterministicIds';
 import { makeMixedScene } from './fixtures/mixedScene';
 import { compileSceneToGcode } from './helpers/compileToGcode';
 import { prepareSceneForCompile } from './helpers/prepareSceneForCompile';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -29,6 +30,10 @@ console.log('\n=== E2E: mixed-scene ===');
     let scene = makeMixedScene();
     scene = await prepareSceneForCompile(scene);
     const gcode = compileSceneToGcode(scene, { startMode: 'current' });
+    assertSemanticGcode(gcode, assert, {
+      expectedDistanceMode: 'relative',
+      minBurnSegments: 20,
+    });
 
     const engraveIdx = gcode.indexOf('; --- Engrave');
     const cutIdx = gcode.indexOf('; --- Cut');

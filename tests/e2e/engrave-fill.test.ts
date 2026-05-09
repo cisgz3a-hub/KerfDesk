@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeEngraveFillScene } from './fixtures/engraveFill';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -27,8 +28,14 @@ try {
   const scene = makeEngraveFillScene();
   const gcode = compileSceneToGcode(scene, { startMode: 'current' });
   const lines = gcode.split('\n').length;
+  assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'relative',
+    expectedBurnWidth: 40,
+    expectedBurnHeight: 29.9,
+    minBurnSegments: 80,
+    tolerance: 0.25,
+  });
 
-  assert(gcode.includes('G21'), 'Includes G21');
   assert(gcode.includes('Engrave'), 'Comment references Engrave layer');
   assert(lines > 80, `Raster fill yields many lines (got ${lines})`);
   assert(/^G1 .*F\d+.*S\d+/m.test(gcode), 'Has raster-style G1 F S lines');

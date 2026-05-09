@@ -10,6 +10,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeRectangleCutScene } from './fixtures/rectangleCut';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -32,10 +33,12 @@ try {
   const gcode = compileSceneToGcode(scene, { startMode: 'current' });
 
   // Structural checks that don't require a snapshot — fast-fail before diff.
-  assert(gcode.includes('G21'), 'Includes G21 (mm mode)');
-  assert(gcode.includes('G90'), 'Includes G90 (absolute coords)');
-  assert(gcode.includes('M4'), 'Includes M4 (dynamic laser)');
-  assert(gcode.includes('M5'), 'Includes M5 (laser off)');
+  assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'relative',
+    expectedBurnWidth: 40,
+    expectedBurnHeight: 20,
+    minBurnSegments: 4,
+  });
 
   // Byte-level snapshot — catches all subtler regressions.
   expectMatchesSnapshot(gcode, 'rectangle-cut.gcode');

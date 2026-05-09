@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 366 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 496 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 498 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -47,8 +47,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 435 | - |
-| `tests/e2e` | 39 | fixtures, helpers, snapshots |
+| `tests/` | 436 | - |
+| `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
 | `tests/malformed` | 5 | - |
@@ -609,6 +609,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/disconnect-transaction.test.ts`
 - `tests/dither-cache-key-content-hash.test.ts`
 - `tests/dither-serpentine.test.ts`
+- `tests/e2e-semantic-assertions.test.ts`
 - `tests/editor-store.test.ts`
 - `tests/electron-csp-integration.test.ts`
 - `tests/electron-navigation-blocked.test.ts`
@@ -942,6 +943,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/e2e/helpers/compileToGcode.ts`
 - `tests/e2e/helpers/e2eDeterministicIds.ts`
 - `tests/e2e/helpers/prepareSceneForCompile.ts`
+- `tests/e2e/helpers/semanticGcodeAssertions.ts`
 - `tests/e2e/helpers/snapshot.ts`
 - `tests/e2e/helpers/textFixtureObject.ts`
 - `tests/e2e/large-scene.test.ts`

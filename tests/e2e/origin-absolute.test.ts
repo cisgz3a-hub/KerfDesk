@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeOriginAbsoluteScene } from './fixtures/originAbsolute';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -27,9 +28,13 @@ try {
   const scene = makeOriginAbsoluteScene();
   const gcode = compileSceneToGcode(scene, { startMode: 'absolute' });
 
-  assert(gcode.includes('G21'), 'Includes G21');
-  assert(gcode.includes('G90'), 'Includes G90');
-  assert(gcode.includes('M4'), 'Includes M4');
+  assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'absolute',
+    initialMotionMustBeLaserOff: true,
+    expectedBurnWidth: 40,
+    expectedBurnHeight: 20,
+    minBurnSegments: 4,
+  });
 
   expectMatchesSnapshot(gcode, 'origin-absolute.gcode');
   passed++;

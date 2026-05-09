@@ -6,6 +6,7 @@ import './helpers/e2eDeterministicIds';
 
 import { makeMultiPassCutScene } from './fixtures/multiPassCut';
 import { compileSceneToGcode } from './helpers/compileToGcode';
+import { assertSemanticGcode } from './helpers/semanticGcodeAssertions';
 import { expectMatchesSnapshot } from './helpers/snapshot';
 
 let passed = 0;
@@ -27,6 +28,13 @@ try {
   const scene = makeMultiPassCutScene();
   const gcode = compileSceneToGcode(scene, { startMode: 'current' });
 
+  assertSemanticGcode(gcode, assert, {
+    expectedDistanceMode: 'relative',
+    expectedBurnWidth: 40,
+    expectedBurnHeight: 20,
+    minBurnSegments: 12,
+    expectedMidJobLaserOff: 2,
+  });
   assert(gcode.includes('pass 3/3'), 'Shows third pass marker in comments');
   assert((gcode.match(/\bM4\b/g) ?? []).length >= 3, 'At least three laser-on cycles for three passes');
 
