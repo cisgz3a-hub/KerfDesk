@@ -18510,7 +18510,7 @@ Tests declare their lane via filename convention (`tests/perf/*.test.ts`, `tests
 
 ### T3-67 | Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds`
 
-**Status:** Shipped in `<TBD>`. Added `src/core/scene/bounds.ts` with a single `selectSceneBounds(scene, mode)` selector for `visible`, `output`, `selected`, and `all` bounds. Added compiled-result bounds selectors in `CompiledJobState` for ready-state machine and canvas plan bounds. `App.tsx` now routes output/frame bounds through `selectSceneBounds(scene, 'output')` instead of importing `computeOutputBounds` directly. Pinned by `tests/scene-bounds-selectors.test.ts`. Hardware verification: not required (pure bounds selection and UI source routing only).
+**Status:** Shipped in `4b5359a`. Added `src/core/scene/bounds.ts` with a single `selectSceneBounds(scene, mode)` selector for `visible`, `output`, `selected`, and `all` bounds. Added compiled-result bounds selectors in `CompiledJobState` for ready-state machine and canvas plan bounds. `App.tsx` now routes output/frame bounds through `selectSceneBounds(scene, 'output')` instead of importing `computeOutputBounds` directly. Pinned by `tests/scene-bounds-selectors.test.ts`. Hardware verification: not required (pure bounds selection and UI source routing only).
 
 **Code reference:** Bounds are computed in multiple places: `App.tsx` `sceneBounds` useMemo, `ConnectionPanelMain.tsx` derives sceneBounds from props, `src/core/preflight/` recomputes object bounds, `PipelineService` recomputes plan bounds, scene objects cache `_bounds` on themselves.
 
@@ -20497,7 +20497,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-64 Fake Electron serialport test harness (Closed in `162bc6a` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
 - [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `2d2ea96` - local HTTP/WebSocket fake plus real Falcon client tests)
 - [x] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (Shipped in `0ada8e3` - `run-tests.mjs --lane` filtering plus `test:unit` / `test:output` / `test:sim` / `test:perf` scripts)
-- [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `<TBD>` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
+- [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
 - [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
 - [ ] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (filed; depends on T2-58)
 - [ ] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (filed; depends on T2-58)
