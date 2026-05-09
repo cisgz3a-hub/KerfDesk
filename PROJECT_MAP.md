@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 365 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 488 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 366 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 493 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -26,7 +26,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/app` | 39 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 11 | grbl |
-| `src/core` | 92 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 93 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/diagnostics` | 10 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
@@ -51,6 +51,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `tests/e2e` | 39 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
 | `tests/helpers` | 7 | - |
+| `tests/malformed` | 5 | - |
 | `tests/simulators` | 4 | - |
 
 ## Source Files
@@ -191,6 +192,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/preflight/confirmPreflightForJobStart.ts`
 - `src/core/preflight/rules/CompileComplexityPreflight.ts`
 - `src/core/preflight/rules/DuplicateGeometryPreflight.ts`
+- `src/core/preflight/rules/GeometryValidityPreflight.ts`
 - `src/core/preflight/rules/LayerSettingsPreflight.ts`
 - `src/core/preflight/rules/MachinePreflight.ts`
 - `src/core/preflight/rules/MachineStatePreflight.ts`
@@ -977,6 +979,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/helpers/imageFixtures.ts`
 - `tests/helpers/parseGcode.ts`
 - `tests/helpers/propertyTesting.ts`
+
+### `tests/malformed`
+
+- `tests/malformed/bad-image.test.ts`
+- `tests/malformed/bad-settings.test.ts`
+- `tests/malformed/bad-svg.test.ts`
+- `tests/malformed/bad-template.test.ts`
+- `tests/malformed/extreme-coordinates.test.ts`
 
 ### `tests/simulators`
 

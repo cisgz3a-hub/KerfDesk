@@ -11,7 +11,17 @@ export function runLayerChecks(ctx: PreflightContext, out: PreflightResult[]): v
     const layerObjects = scene.objects.filter(obj => obj.layerId === layer.id && obj.visible);
     if (layerObjects.length === 0) continue;
 
-    if (layer.settings.power.max <= 0) {
+    const powerMin = layer.settings.power.min;
+    const powerMax = layer.settings.power.max;
+    if (!Number.isFinite(powerMin) || !Number.isFinite(powerMax) || powerMin > powerMax) {
+      out.push({
+        severity: 'error',
+        code: PREFLIGHT_CODES.LAYER_POWER_RANGE_INVALID,
+        message: `Layer "${layer.name}" has an invalid power range (${powerMin}%-${powerMax}%).`,
+        layerId: layer.id,
+        fix: { label: 'Set power to 50%', action: { type: 'setLayerPower', layerId: layer.id, power: maxSpindle * 0.5 } },
+      });
+    } else if (layer.settings.power.max <= 0) {
       out.push({
         severity: 'error',
         code: PREFLIGHT_CODES.LAYER_POWER_ZERO,
@@ -29,7 +39,15 @@ export function runLayerChecks(ctx: PreflightContext, out: PreflightResult[]): v
     }
 
     const speed = layer.settings.speed;
-    if (speed === 0) {
+    if (!Number.isFinite(speed)) {
+      out.push({
+        severity: 'error',
+        code: PREFLIGHT_CODES.LAYER_SPEED_INVALID,
+        message: `Layer "${layer.name}" has an invalid speed (${speed}).`,
+        layerId: layer.id,
+        fix: { label: 'Set speed to 3000', action: { type: 'setLayerSpeed', layerId: layer.id, speed: 3000 } },
+      });
+    } else if (speed === 0) {
       out.push({
         severity: 'error',
         code: PREFLIGHT_CODES.LAYER_SPEED_ZERO,

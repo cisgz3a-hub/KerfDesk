@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 125 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 32 | 58 | Active quarter-scope backlog; T3-38 fill-with-holes regression net shipped; output-chunk cache deferred to streaming work. |
+| Tier 3 | 33 | 57 | Active quarter-scope backlog; T3-39 malformed-input suite shipped; output-chunk cache deferred to streaming work. |
 
 ### Historical audit classification
 
@@ -16929,6 +16929,8 @@ Each file enumerates malformed inputs and asserts safe handling. Use parser (T2-
 
 **Cross-check note (audit 2F):** Audit's section 9 / Gate G / P1.
 
+**Status:** Shipped in `<TBD>`. Added `tests/malformed/` with `bad-svg`, `bad-image`, `bad-settings`, `bad-template`, and `extreme-coordinates` coverage. The suite asserts malformed SVG paths do not corrupt output, unsupported `foreignObject` warns while preserving safe geometry, huge finite SVG coordinates are blocked by bed/design preflight, manual NaN/Infinity geometry is blocked by `GEOMETRY_NONFINITE`, zero-size/no-data images do not emit G-code, huge images trip the compile-complexity blocker before heavy allocation, invalid DPI / zero speed / NaN speed / zero fill interval / negative overscan are sanitized during compile, impossible power ranges block preflight, and unsafe custom templates reject missing M5, `$X`, laser-on-without-motion, out-of-bed motion, and `F0`. Production guardrails added: SVG `foreignObject` unsupported-feature warnings, non-finite geometry preflight, layer power/speed validity checks, and finite compiler setting clamps. **Hardware verification: not required** (validation/test/preflight/compiler sanitization only; no controller command path or normal emitted G-code geometry changed).
+
 ---
 
 ### T3-40 | Performance / stress test suite with cancellation gates
@@ -20396,7 +20398,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `129656b` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
 - [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
 - [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
-- [ ] T3-39 Malformed-input test suite (filed; depends on T2-18)
+- [x] T3-39 Malformed-input test suite (Shipped — robustness suite in `<TBD>`)
 - [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
 - [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)

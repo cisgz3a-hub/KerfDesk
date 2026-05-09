@@ -121,6 +121,12 @@ function isPlausibleMachineAccel(value: number | null | undefined): boolean {
   );
 }
 
+function clampFiniteNumber(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 /**
  * Picks an acceleration (mm/s²) for acceleration-aware raster power. Controller value wins if
  * sensible; else profile; else 1000. A warning is emitted when the controller reported a value
@@ -478,8 +484,12 @@ function resolveSettings(
     jobOpts?.strategySupportsDynamicLaserPower
       ? false
       : userRequestedAccelAwarePower;
-  const minPowerRatioAccel =
-    s.minPowerRatioAccel ?? profile?.minPowerRatioAccel ?? 0.1;
+  const minPowerRatioAccel = clampFiniteNumber(
+    s.minPowerRatioAccel ?? profile?.minPowerRatioAccel,
+    0,
+    1,
+    0.1,
+  );
   const grayscalePowerMergeTolerance =
     typeof s.image.grayscalePowerMergeTolerance === 'number' && Number.isFinite(s.image.grayscalePowerMergeTolerance)
       ? Math.max(0, Math.min(100, s.image.grayscalePowerMergeTolerance))
@@ -506,7 +516,7 @@ function resolveSettings(
       ? Math.max(0.01, Number.isFinite(rawIv) && rawIv > 0 ? rawIv : 0.1)
       : 0;
 
-  const resolvedSpeed = Math.max(MIN_LASER_SPEED, Math.min(MAX_LASER_SPEED, s.speed));
+  const resolvedSpeed = clampFiniteNumber(s.speed, MIN_LASER_SPEED, MAX_LASER_SPEED, MIN_LASER_SPEED);
   const smartOverscanEnabled = s.smartOverscanEnabled ?? profile?.smartOverscanEnabled ?? true;
   let overscanning: number;
   if (smartOverscanEnabled) {
@@ -535,6 +545,11 @@ function resolveSettings(
   recordDropped(entitlementPolicy, 'lead_in', !entitlementPolicy.allowLeadIn && s.cut.leadIn > 0);
   recordDropped(entitlementPolicy, 'cross_hatch', !entitlementPolicy.allowCrossHatch && crossHatchActive);
 
+  const resolvedPowerMax = clampFiniteNumber(s.power.max, 0, 100, 0);
+  const resolvedPowerMin = Math.min(
+    clampFiniteNumber(s.power.min, 0, 100, 0),
+    resolvedPowerMax,
+  );
   const fillMode =
     crossHatchActive && !entitlementPolicy.allowCrossHatch
       ? 'line'
@@ -542,31 +557,31 @@ function resolveSettings(
   const tabCount =
     entitlementPolicy.allowTabs
       ? s.tabs?.enabled === true
-        ? Math.max(0, Math.floor(Number(s.tabs?.count) || 0))
-        : Math.max(0, Math.floor(s.cut.tabCount))
+        ? Math.floor(clampFiniteNumber(s.tabs?.count, 0, 99, 0))
+        : Math.floor(clampFiniteNumber(s.cut.tabCount, 0, 99, 0))
       : 0;
   const tabWidth =
     entitlementPolicy.allowTabs
       ? s.tabs?.enabled === true
-        ? Math.max(0, Number(s.tabs?.width) || 0)
-        : Math.max(0, s.cut.tabWidth)
+        ? clampFiniteNumber(s.tabs?.width, 0, Number.MAX_SAFE_INTEGER, 0)
+        : clampFiniteNumber(s.cut.tabWidth, 0, Number.MAX_SAFE_INTEGER, 0)
       : 0;
 
   return {
-    powerMin: Math.max(0, Math.min(100, s.power.min)),
-    powerMax: Math.max(0, Math.min(100, s.power.max)),
+    powerMin: resolvedPowerMin,
+    powerMax: resolvedPowerMax,
     speed: resolvedSpeed,
-    passes: Math.max(1, Math.min(99, s.passes)),
-    zStepPerPass: s.zStepPerPass,
+    passes: Math.floor(clampFiniteNumber(s.passes, 1, 99, 1)),
+    zStepPerPass: Number.isFinite(Number(s.zStepPerPass)) ? Number(s.zStepPerPass) : 0,
 
     fillInterval: engraveFillInterval,
-    fillAngle: s.fill.angle % 360,
+    fillAngle: Number.isFinite(Number(s.fill.angle)) ? Number(s.fill.angle) % 360 : 0,
     fillMode,
     fillBiDirectional: s.fill.biDirectional !== false,
     overscanning,
 
-    overcut: entitlementPolicy.allowOvercut ? Math.max(0, s.cut.overcut) : 0,
-    leadIn: entitlementPolicy.allowLeadIn ? Math.max(0, s.cut.leadIn) : 0,
+    overcut: entitlementPolicy.allowOvercut ? clampFiniteNumber(s.cut.overcut, 0, Number.MAX_SAFE_INTEGER, 0) : 0,
+    leadIn: entitlementPolicy.allowLeadIn ? clampFiniteNumber(s.cut.leadIn, 0, Number.MAX_SAFE_INTEGER, 0) : 0,
     tabCount,
     tabWidth,
     insideFirst: s.cut.insideFirst,

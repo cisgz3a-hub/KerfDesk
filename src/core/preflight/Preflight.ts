@@ -24,6 +24,7 @@ import { runOptimizationChecks } from './rules/OptimizationPreflight';
 import { runDuplicateGeometryChecks } from './rules/DuplicateGeometryPreflight';
 import { runSelfIntersectionChecks } from './rules/SelfIntersectionPreflight';
 import { runCompileComplexityChecks } from './rules/CompileComplexityPreflight';
+import { runGeometryValidityChecks } from './rules/GeometryValidityPreflight';
 
 export type PreflightSeverity = 'error' | 'warning' | 'info';
 
@@ -58,6 +59,8 @@ export const PREFLIGHT_CODES = {
   MISSING_MAX_SPINDLE: 'MISSING_MAX_SPINDLE',
   MISSING_BED_SIZE: 'MISSING_BED_SIZE',
   LAYER_POWER_HIGH: 'LAYER_POWER_HIGH',
+  LAYER_POWER_RANGE_INVALID: 'LAYER_POWER_RANGE_INVALID',
+  LAYER_SPEED_INVALID: 'LAYER_SPEED_INVALID',
   LAYER_SPEED_HIGH: 'LAYER_SPEED_HIGH',
   LAYER_SPEED_LOW: 'LAYER_SPEED_LOW',
   OVERSCAN_EXCEEDS_BED: 'OVERSCAN_EXCEEDS_BED',
@@ -75,6 +78,8 @@ export const PREFLIGHT_CODES = {
   GEOMETRY_DUPLICATE: 'GEOMETRY_DUPLICATE',
   /** T3-31: closed vector geometry crosses itself and can break fill/cut planning. */
   GEOMETRY_SELF_INTERSECTION: 'GEOMETRY_SELF_INTERSECTION',
+  /** T3-39: corrupted/manual scene geometry has NaN or Infinity coordinates. */
+  GEOMETRY_NONFINITE: 'GEOMETRY_NONFINITE',
   /** T1-45: compile complexity gate — info / warning / blocker depending on estimated G-code line count + memory footprint. */
   COMPILE_COMPLEXITY_INFO: 'COMPILE_COMPLEXITY_INFO',
   COMPILE_COMPLEXITY_WARN: 'COMPILE_COMPLEXITY_WARN',
@@ -186,6 +191,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   const results: PreflightResult[] = [];
   runMachineStateChecks(ctx, results);
   runSceneChecks(ctx, results);
+  runGeometryValidityChecks(ctx, results);
   runDesignOutputLayerChecks(ctx, results);
   runOutputBoundsChecks(ctx, results);
   runGcodeTravelBoundsChecks(ctx, results);

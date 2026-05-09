@@ -398,6 +398,7 @@ function collectUnsupportedFeatures(root: Element): SvgUnsupportedFeatureReport[
     const id = node.getAttribute('id');
     if (tag === 'clippath') record('clipPath', id ? `#${id}` : null);
     if (tag === 'mask') record('mask', id ? `#${id}` : null);
+    if (tag === 'foreignobject') record('foreignObject', id ? `#${id}` : null);
     if (tag === 'style') {
       record('<style>', String((node as unknown as { textContent?: string }).textContent ?? ''));
     }
