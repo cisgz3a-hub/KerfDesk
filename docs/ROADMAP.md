@@ -16929,7 +16929,7 @@ Each file enumerates malformed inputs and asserts safe handling. Use parser (T2-
 
 **Cross-check note (audit 2F):** Audit's section 9 / Gate G / P1.
 
-**Status:** Shipped in `<TBD>`. Added `tests/malformed/` with `bad-svg`, `bad-image`, `bad-settings`, `bad-template`, and `extreme-coordinates` coverage. The suite asserts malformed SVG paths do not corrupt output, unsupported `foreignObject` warns while preserving safe geometry, huge finite SVG coordinates are blocked by bed/design preflight, manual NaN/Infinity geometry is blocked by `GEOMETRY_NONFINITE`, zero-size/no-data images do not emit G-code, huge images trip the compile-complexity blocker before heavy allocation, invalid DPI / zero speed / NaN speed / zero fill interval / negative overscan are sanitized during compile, impossible power ranges block preflight, and unsafe custom templates reject missing M5, `$X`, laser-on-without-motion, out-of-bed motion, and `F0`. Production guardrails added: SVG `foreignObject` unsupported-feature warnings, non-finite geometry preflight, layer power/speed validity checks, and finite compiler setting clamps. **Hardware verification: not required** (validation/test/preflight/compiler sanitization only; no controller command path or normal emitted G-code geometry changed).
+**Status:** Shipped in `a28eec8`. Added `tests/malformed/` with `bad-svg`, `bad-image`, `bad-settings`, `bad-template`, and `extreme-coordinates` coverage. The suite asserts malformed SVG paths do not corrupt output, unsupported `foreignObject` warns while preserving safe geometry, huge finite SVG coordinates are blocked by bed/design preflight, manual NaN/Infinity geometry is blocked by `GEOMETRY_NONFINITE`, zero-size/no-data images do not emit G-code, huge images trip the compile-complexity blocker before heavy allocation, invalid DPI / zero speed / NaN speed / zero fill interval / negative overscan are sanitized during compile, impossible power ranges block preflight, and unsafe custom templates reject missing M5, `$X`, laser-on-without-motion, out-of-bed motion, and `F0`. Production guardrails added: SVG `foreignObject` unsupported-feature warnings, non-finite geometry preflight, layer power/speed validity checks, and finite compiler setting clamps. **Hardware verification: not required** (validation/test/preflight/compiler sanitization only; no controller command path or normal emitted G-code geometry changed).
 
 ---
 
@@ -20398,7 +20398,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `129656b` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
 - [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
 - [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
-- [x] T3-39 Malformed-input test suite (Shipped — robustness suite in `<TBD>`)
+- [x] T3-39 Malformed-input test suite (Shipped in `a28eec8` — malformed SVG/image/settings/template/extreme-coordinate suite)
 - [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
 - [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
 - [ ] T3-42 Dialect-specific preflight / template validators (filed; depends on T2-25, T2-29)
