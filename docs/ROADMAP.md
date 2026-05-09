@@ -16651,7 +16651,7 @@ Both modes are correct under their assumptions. The problem is users don't alway
 
 **Priority:** Tier 3 鈥?UX.
 
-**Status:** Shipped in `<TBD>` — viewBox-only SVG imports now prompt for laser-convention mm sizing versus SVG-spec px sizing, defaulting to the user's previous choice. File-toolbar and drag/drop SVG imports pass the selected `svgUnitMode` into the existing parser; explicit-size SVG imports keep their current behavior. Pinned by `tests/svg-viewbox-unit-choice.test.ts`; no G-code generation, frame math, preflight, or motion behavior changed.
+**Status:** Shipped in `f4ac114` — viewBox-only SVG imports now prompt for laser-convention mm sizing versus SVG-spec px sizing, defaulting to the user's previous choice. File-toolbar and drag/drop SVG imports pass the selected `svgUnitMode` into the existing parser; explicit-size SVG imports keep their current behavior. Pinned by `tests/svg-viewbox-unit-choice.test.ts`; no G-code generation, frame math, preflight, or motion behavior changed.
 
 ---
 
@@ -20379,7 +20379,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-29 Open path ordering within cut operations 鈥?score-before-cut (Shipped in `89118b9` — cut open paths run before closed cutouts)
 - [x] T3-30 SVG `<clipPath>` / `<mask>` / `<use>` / `<defs>` support (Shipped in `5d7787e` — use/defs support plus clip/mask/style warnings; full clip/mask/CSS remains future deep work)
 - [x] T3-31 Self-intersection detection and repair for fill/cut (Shipped in `9bf1f3f` — warning-only self-intersection detection; repair remains future geometry work)
-- [x] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation (Shipped in `<TBD>` — viewBox-only SVG imports prompt for laser-convention mm sizing versus SVG-spec px sizing and remember the last choice)
+- [x] T3-32 SVG viewBox-only unit interpretation 鈥?UX disambiguation (Shipped in `f4ac114` — viewBox-only SVG imports prompt for laser-convention mm sizing versus SVG-spec px sizing and remember the last choice)
 - [ ] T3-33 Scene renderer overlay model matches MachineTransform (depends on T1-40 stage 2)
 - [ ] T3-34 Stripe-based raster G-code emission (memory bound; depends on T3-15)
 - [ ] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks
