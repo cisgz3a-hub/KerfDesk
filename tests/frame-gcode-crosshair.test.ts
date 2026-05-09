@@ -54,8 +54,9 @@ console.log('\n=== frame-gcode crosshair ===\n');
     [
       'G90',
       'G21',
+      'M5 S0',
+      'G0 X0.000 Y300.000',
       'M4 S5',
-      'G1 X0.000 Y300.000 F3000',
       'G1 X100.000 Y300.000 F3000',
       'G1 X100.000 Y200.000 F3000',
       'G1 X0.000 Y200.000 F3000',
@@ -87,8 +88,9 @@ console.log('\n=== frame-gcode crosshair ===\n');
     [
       'G90',
       'G21',
+      'M5 S0',
+      'G0 X0.000 Y300.000',
       'M4 S5',
-      'G1 X0.000 Y300.000 F3000',
       'G1 X100.000 Y300.000 F3000',
       'G1 X100.000 Y200.000 F3000',
       'G1 X0.000 Y200.000 F3000',
@@ -107,13 +109,17 @@ console.log('\n=== frame-gcode crosshair ===\n');
   );
 
   const firstM5Idx = dotWithCrosshair.indexOf('M5 S0');
-  assert(firstM5Idx > 0, 'absolute/dot crosshair: first M5 found');
+  assert(firstM5Idx === 2, 'absolute/dot crosshair: starts with laser-off before first-corner rapid');
+  assert(dotWithCrosshair[firstM5Idx + 1] === 'G0 X0.000 Y300.000',
+    'absolute/dot crosshair: first-corner traverse happens with laser off');
+  const rectangleM5Idx = dotWithCrosshair.indexOf('M5 S0', firstM5Idx + 1);
+  assert(rectangleM5Idx > firstM5Idx, 'absolute/dot crosshair: rectangle M5 found');
   assert(
-    dotWithCrosshair[firstM5Idx + 1]!.startsWith('G0'),
+    dotWithCrosshair[rectangleM5Idx + 1]!.startsWith('G0'),
     'absolute/dot crosshair: traverse to center mark happens with laser off',
   );
-  assert(dotWithCrosshair[firstM5Idx + 2] === 'M4 S5', 'absolute/dot crosshair: laser is re-enabled after traverse');
-  assert(dotWithCrosshair.filter(line => line === 'M5 S0').length === 2, 'absolute/dot crosshair: rectangle and crosshair both end with M5');
+  assert(dotWithCrosshair[rectangleM5Idx + 2] === 'M4 S5', 'absolute/dot crosshair: laser is re-enabled after traverse');
+  assert(dotWithCrosshair.filter(line => line === 'M5 S0').length === 3, 'absolute/dot crosshair: initial safe-off, rectangle M5, and crosshair M5 are emitted');
   assert(dotWithCrosshair.at(-1) === 'M5 S0', 'absolute/dot crosshair: laser off at end');
 }
 
@@ -196,7 +202,7 @@ console.log('\n=== frame-gcode crosshair ===\n');
     crosshairAfterFrame: true,
   });
   assertEq(
-    dotWithCrosshair.find(line => line.startsWith('G0')),
+    dotWithCrosshair.find(line => line === 'G0 X115.000 Y260.000'),
     'G0 X115.000 Y260.000',
     'wide bounds: traverse uses transformed geometric centroid plus right arm',
   );

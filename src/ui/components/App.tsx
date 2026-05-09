@@ -77,6 +77,7 @@ import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { computeOutputBounds } from '../../geometry/bounds';
+import { resolveFrameSceneBounds } from '../../app/frameGcode';
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
@@ -160,7 +161,7 @@ export function App(): React.ReactElement {
   // only by `obj.visible`, which inflated the frame box to include
   // guide / reference layers (output: false) and could push the
   // frame off-bed even though the burn area was inside.
-  const sceneBounds = useMemo(
+  const outputSceneBounds = useMemo(
     () => computeOutputBounds(scene),
     [scene],
   );
@@ -345,6 +346,18 @@ export function App(): React.ReactElement {
     outputFormat: 'grbl',
     isJobRunning: grbl.isJobRunning,
   });
+
+  // T3-36: framing prefers fresh compiled canvas-plan bounds when they
+  // exist. Raw object output bounds remain the fallback for no/stale G-code.
+  const sceneBounds = useMemo(
+    () => resolveFrameSceneBounds({
+      outputBounds: outputSceneBounds,
+      compiledCanvasPlanBounds:
+        !gcodeStale && currentGcode && lastResult ? lastResult.canvasPlanBounds : null,
+      hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
+    }),
+    [outputSceneBounds, gcodeStale, currentGcode, lastResult],
+  );
 
   useEffect(() => {
     if (grbl.isJobRunning && !wasJobRunningRef.current) {

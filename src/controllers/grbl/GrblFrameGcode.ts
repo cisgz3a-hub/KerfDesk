@@ -91,9 +91,16 @@ export function buildGrblFrameGcode(
     return out;
   }
 
-  const out: string[] = ['G90', 'G21'];
-  out.push(laserMode === 'dot' ? `M4 S${frameDotS}` : 'M5 S0');
-  for (const c of corners) {
+  const out: string[] = ['G90', 'G21', 'M5 S0'];
+  if (corners.length > 0) {
+    const first = corners[0]!;
+    out.push(`G0 X${first.x.toFixed(3)} Y${first.y.toFixed(3)}`);
+  }
+  if (laserMode === 'dot') {
+    out.push(`M4 S${frameDotS}`);
+  }
+  for (let i = corners.length > 0 ? 1 : 0; i < corners.length; i++) {
+    const c = corners[i]!;
     if (laserMode === 'dot') {
       out.push(`G1 X${c.x.toFixed(3)} Y${c.y.toFixed(3)} F${frameDotFeed}`);
     } else {
