@@ -26,6 +26,7 @@ import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
+import { transformPointToMachine } from '../../core/plan/MachineTransform';
 import { type BurnState } from '../../app/MachineService';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
@@ -173,6 +174,8 @@ export interface SceneMachineOverlayOptions {
 
 type SceneBounds = { minX: number; minY: number; maxX: number; maxY: number };
 
+const DEFAULT_MACHINE_OVERLAY_BED_HEIGHT_MM = 300;
+
 export interface MachineOriginMarker {
   x: number;
   y: number;
@@ -229,13 +232,64 @@ function hasSceneBounds(sceneBounds: SceneBounds): boolean {
   );
 }
 
+function positiveFinite(value: number | undefined): number | null {
+  return Number.isFinite(value) && (value as number) > 0 ? (value as number) : null;
+}
+
+function resolveBedOriginMarker(options: SceneMachineOverlayOptions): MachineOriginMarker | null {
+  const originCorner = options.originCorner ?? 'front-left';
+  const bedHeightMm = positiveFinite(options.bedHeightMm) ?? DEFAULT_MACHINE_OVERLAY_BED_HEIGHT_MM;
+  const bedWidthMm = positiveFinite(options.bedWidthMm);
+
+  if ((originCorner === 'front-right' || originCorner === 'rear-right') && bedWidthMm == null) {
+    return null;
+  }
+
+  const transformOptions = {
+    startMode: 'absolute' as const,
+    savedOrigin: null,
+    originCorner,
+    bedHeightMm,
+    ...(bedWidthMm != null ? { bedWidthMm } : {}),
+  };
+  const transformBounds = {
+    minX: 0,
+    minY: 0,
+    maxX: bedWidthMm ?? 0,
+    maxY: bedHeightMm,
+  };
+  const candidates = [
+    { x: 0, y: 0 },
+    { x: 0, y: bedHeightMm },
+    ...(bedWidthMm != null
+      ? [
+          { x: bedWidthMm, y: 0 },
+          { x: bedWidthMm, y: bedHeightMm },
+        ]
+      : []),
+  ];
+
+  let best = candidates[0];
+  let bestScore = Infinity;
+  for (const candidate of candidates) {
+    const machine = transformPointToMachine(candidate, transformBounds, transformOptions);
+    const score = Math.abs(machine.x) + Math.abs(machine.y);
+    if (score < bestScore) {
+      best = candidate;
+      bestScore = score;
+    }
+  }
+
+  return { x: best.x, y: best.y, label: 'Bed origin' };
+}
+
 export function resolveMachineOriginMarker(
   sceneBounds: SceneBounds,
   options: SceneMachineOverlayOptions,
 ): MachineOriginMarker | null {
   switch (options.startMode) {
     case 'absolute':
-      return { x: 0, y: 0, label: 'Bed origin' };
+      return resolveBedOriginMarker(options);
     case 'current':
       if (!hasSceneBounds(sceneBounds)) return null;
       return { x: sceneBounds.minX, y: sceneBounds.minY, label: 'Head start' };

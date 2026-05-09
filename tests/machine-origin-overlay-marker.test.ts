@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
+import { transformPointToMachine, type MachineTransformOptions } from '../src/core/plan/MachineTransform';
 import { resolveMachineOriginMarker } from '../src/ui/renderers/SceneRenderer';
 
 const designBounds = { minX: 24, minY: 36, maxX: 120, maxY: 90 };
@@ -17,15 +18,62 @@ assert.deepEqual(
   'saved-origin mode without a saved origin draws no green canvas marker',
 );
 
+function assertMarkerMapsToMachineZero(opts: MachineTransformOptions): void {
+  const marker = resolveMachineOriginMarker(designBounds, opts);
+  assert.ok(marker, `${opts.originCorner} absolute mode resolves a marker`);
+  assert.equal(marker.label, 'Bed origin', `${opts.originCorner} marker label`);
+  const machine = transformPointToMachine(marker, designBounds, opts);
+  assert.ok(Math.abs(machine.x) < 0.001, `${opts.originCorner} marker maps to machine X0 (got ${machine.x})`);
+  assert.ok(Math.abs(machine.y) < 0.001, `${opts.originCorner} marker maps to machine Y0 (got ${machine.y})`);
+}
+
 assert.deepEqual(
   resolveMachineOriginMarker(designBounds, {
     startMode: 'absolute',
+    savedOrigin: null,
+    originCorner: 'rear-left',
     bedWidthMm: 400,
     bedHeightMm: 300,
   }),
   { x: 0, y: 0, label: 'Bed origin' },
-  'absolute mode marks only the bed origin',
+  'absolute rear-left marks the top-left bed origin',
 );
+
+assert.deepEqual(
+  resolveMachineOriginMarker(designBounds, {
+    startMode: 'absolute',
+    savedOrigin: null,
+    originCorner: 'front-left',
+    bedWidthMm: 400,
+    bedHeightMm: 300,
+  }),
+  { x: 0, y: 300, label: 'Bed origin' },
+  'absolute front-left marks the bottom-left bed origin',
+);
+
+assertMarkerMapsToMachineZero({
+  startMode: 'absolute',
+  savedOrigin: null,
+  originCorner: 'front-left',
+  bedWidthMm: 400,
+  bedHeightMm: 300,
+});
+
+assertMarkerMapsToMachineZero({
+  startMode: 'absolute',
+  savedOrigin: null,
+  originCorner: 'front-right',
+  bedWidthMm: 400,
+  bedHeightMm: 300,
+});
+
+assertMarkerMapsToMachineZero({
+  startMode: 'absolute',
+  savedOrigin: null,
+  originCorner: 'rear-right',
+  bedWidthMm: 400,
+  bedHeightMm: 300,
+});
 
 assert.deepEqual(
   resolveMachineOriginMarker(designBounds, {
@@ -66,6 +114,10 @@ assert.ok(backgroundStart > overlayStart, 'renderSceneBackground follows renderM
 const overlayBody = source.slice(overlayStart, backgroundStart);
 
 assert.ok(overlayBody.includes('resolveMachineOriginMarker'), 'overlay rendering uses the marker resolver');
+assert.ok(
+  source.includes('transformPointToMachine'),
+  'SceneRenderer imports the same transformPointToMachine helper used for frame and G-code math',
+);
 assert.ok(
   !/strokeRect\s*\(/.test(overlayBody),
   'job-position overlay no longer draws a large reachable-area rectangle',
