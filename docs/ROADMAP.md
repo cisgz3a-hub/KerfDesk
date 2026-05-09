@@ -16767,7 +16767,7 @@ That's 3 脳 4 脳 5 = 60 test cases minimum. Most will reuse fixtures. The matr
 
 **Cross-check note (audit 2F):** Audit's section 6.1 / P1.
 
-**Status:** Shipped in `<TBD>` — added a 60-case frame-vs-burn equivalence matrix across start modes, origin corners, and representative scenes. The frame source now prefers fresh compiled canvas-plan bounds when available, so raster/overscan jobs frame the emitted burn envelope instead of the raw image rectangle. Absolute frame-dot now rapids to the first corner with the laser off before enabling low-power dot trace, preventing a stray origin-to-corner burn line. Pinned by `tests/frame-vs-burn-equivalence.test.ts` plus updated frame-gcode crosshair goldens. **Hardware verification needed** on Falcon A1 Pro before release tagging: run safe frame and frame-dot on an absolute-position nonzero design and confirm no laser mark appears before the first frame corner.
+**Status:** Shipped in `129656b` — added a 60-case frame-vs-burn equivalence matrix across start modes, origin corners, and representative scenes. The frame source now prefers fresh compiled canvas-plan bounds when available, so raster/overscan jobs frame the emitted burn envelope instead of the raw image rectangle. Absolute frame-dot now rapids to the first corner with the laser off before enabling low-power dot trace, preventing a stray origin-to-corner burn line. Pinned by `tests/frame-vs-burn-equivalence.test.ts` plus updated frame-gcode crosshair goldens. **Hardware verification needed** on Falcon A1 Pro before release tagging: run safe frame and frame-dot on an absolute-position nonzero design and confirm no laser mark appears before the first frame corner.
 
 ---
 
@@ -20389,7 +20389,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-33 Scene renderer overlay model matches MachineTransform (Shipped in `b6f0ca3` — absolute bed-origin marker resolves through `transformPointToMachine` for all origin corners)
 - [ ] T3-34 Stripe-based raster G-code emission (memory bound; depends on T3-15)
 - [x] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks (Shipped in `1441da5` — fill-row LRU cache added; processed-raster reuse already present from T1-17; final output chunk cache deferred to T3-15 streaming/spool output)
-- [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `<TBD>` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
+- [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `129656b` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
 - [ ] T3-37 Saved-origin / WCS lifecycle test (filed; depends on T1-41, T1-29, T2-13)
 - [ ] T3-38 Fill-with-holes geometric correctness test (filed; depends on T1-36, T2-15, T2-18, T2-19)
 - [ ] T3-39 Malformed-input test suite (filed; depends on T2-18)
