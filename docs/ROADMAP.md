@@ -18985,7 +18985,7 @@ Filter chips persist across sessions 鈥?power users can pin "Machine errors onl
 
 ### T3-75 | Image reference resolvability check on load + missing-image UI state
 
-**Status:** Shipped in `<TBD>`. Added `src/io/ImageReferenceValidation.ts` to detect `indexeddb://` image references, validate them against `ImageStore.hasImage`, tolerate image-store lookup failures by reporting the affected object as missing, format a user-facing recovery report, and annotate missing image objects with `missingSource` / `missingSourceId`. Project Open paths (`FileToolbar`, keyboard file handlers, drag/drop project import, autosave recovery, and `loadSceneFromFile`) now validate and annotate image refs after deserialize; missing refs load as placeholder rectangles and surface a clear “re-import images” alert instead of failing later. `SceneRenderer` now renders a `Missing image` placeholder for annotated objects. Pinned by `tests/image-reference-validation.test.ts`. Hardware verification: not required (project-load validation and canvas placeholder only).
+**Status:** Shipped in `99f352b`. Added `src/io/ImageReferenceValidation.ts` to detect `indexeddb://` image references, validate them against `ImageStore.hasImage`, tolerate image-store lookup failures by reporting the affected object as missing, format a user-facing recovery report, and annotate missing image objects with `missingSource` / `missingSourceId`. Project Open paths (`FileToolbar`, keyboard file handlers, drag/drop project import, autosave recovery, and `loadSceneFromFile`) now validate and annotate image refs after deserialize; missing refs load as placeholder rectangles and surface a clear “re-import images” alert instead of failing later. `SceneRenderer` now renders a `Missing image` placeholder for annotated objects. Pinned by `tests/image-reference-validation.test.ts`. Hardware verification: not required (project-load validation and canvas placeholder only).
 
 **Code reference:** Image objects can reference images via `indexeddb://...` URIs. Loader does not check if the reference resolves before completing the load.
 
@@ -20521,7 +20521,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-72 Job complexity user-facing summary (Shipped in `131e32c` — Ready-to-Run Job complexity section with command count, estimate, raster/fill density, travel/burn distance, Low/Medium/High classification, and informational warnings)
 - [x] T3-73 `FrameResult.reason` expansion to specific failure types (Shipped in `31f5764` — typed frame failure taxonomy plus reason-specific Safe Frame / Laser Dot recovery copy)
 - [x] T3-74 Structured log events with severity, domain, recovery 鈥?replace string-based message log (Shipped in `134926a` — structured message events + MachineService dual-write + filterable/persisted log panel)
-- [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `<TBD>` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
+- [x] T3-75 Image reference resolvability check on load + missing-image UI state (Shipped in `99f352b` — indexeddb image ref validation, missing-image annotation, load alerts, and placeholder rendering)
 - [ ] T3-76 Save/load size warnings + chunked parsing for large projects (filed; UX for raster-heavy projects)
 - [ ] T3-77 Project integrity checksum (filed; depends on T2-73 for version bump)
 - [ ] T3-78 Save/load stress test suite (filed; refines T3-40, depends on T1-68 through T3-77)
