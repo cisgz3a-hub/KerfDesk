@@ -22,6 +22,7 @@ import type {
   FalconDeviceModuleStatus,
 } from './FalconWiFiTypes';
 import { FALCON_STATE, type FalconStateNumber } from './FalconWiFiEnums';
+import { resolveFalconTarget } from './FalconNetworkTarget';
 
 const HTTP_PORT = 8080;
 const HTTP_TIMEOUT_MS = 10_000;
@@ -43,14 +44,15 @@ function httpRequest(
 ): Promise<RawResponse> {
   return new Promise((resolve, reject) => {
     const bodyBuf = body === null ? null : Buffer.from(body, 'utf8');
+    const target = resolveFalconHttpTarget(ip);
     const req = http.request(
       {
-        hostname: ip,
-        port: HTTP_PORT,
+        hostname: target.host,
+        port: target.port,
         method,
         path,
         headers: {
-          Host: `${ip}:${HTTP_PORT}`,
+          Host: target.hostHeader,
           Connection: 'Keep-Alive',
           'Accept-Encoding': 'identity',
           'User-Agent': 'LaserForge',
@@ -81,6 +83,10 @@ function httpRequest(
     if (bodyBuf) req.write(bodyBuf);
     req.end();
   });
+}
+
+export function resolveFalconHttpTarget(ip: string): ReturnType<typeof resolveFalconTarget> {
+  return resolveFalconTarget(ip, HTTP_PORT);
 }
 
 /** Perform a GET and return the parsed envelope; throws on timeout, network, or non-2xx. */

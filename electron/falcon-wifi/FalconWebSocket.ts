@@ -24,6 +24,7 @@ import net from 'node:net';
 import crypto from 'node:crypto';
 
 import type { FalconWsEvent, FalconDeviceModuleStatus } from './FalconWiFiTypes';
+import { resolveFalconTarget } from './FalconNetworkTarget';
 
 const WS_PORT = 11111;
 const WS_PATH = '/';
@@ -44,6 +45,10 @@ const HANDSHAKE_TIMEOUT_MS = 10_000;
 // buffer growth from a malicious local-network actor.
 const MAX_WS_FRAME_BYTES = 256 * 1024;
 const MAX_WS_BUFFER_BYTES = 1024 * 1024;
+
+export function resolveFalconWsTarget(ip: string): ReturnType<typeof resolveFalconTarget> {
+  return resolveFalconTarget(ip, WS_PORT);
+}
 
 /** Public handle returned to callers so they can gracefully close. */
 export interface FalconWsHandle {
@@ -272,6 +277,7 @@ export function connectFalconWebSocket(
   const open = () => {
     if (state.closed) return;
     emit({ kind: 'connection', state: 'connecting' });
+    const target = resolveFalconWsTarget(ip);
     const key = crypto.randomBytes(16).toString('base64');
     state.expectedAccept = crypto
       .createHash('sha1')
@@ -280,11 +286,11 @@ export function connectFalconWebSocket(
     state.buffer = Buffer.alloc(0);
     state.handshakeComplete = false;
 
-    const socket = net.connect(WS_PORT, ip, () => {
+    const socket = net.connect(target.port, target.host, () => {
       if (state.closed) return;
       socket.write(
         `GET ${WS_PATH} HTTP/1.1\r\n` +
-          `Host: ${ip}:${WS_PORT}\r\n` +
+          `Host: ${target.hostHeader}\r\n` +
           'Upgrade: websocket\r\n' +
           'Connection: Upgrade\r\n' +
           `Sec-WebSocket-Key: ${key}\r\n` +

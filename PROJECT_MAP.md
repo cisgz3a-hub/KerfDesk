@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 370 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 514 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 516 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -47,10 +47,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 450 | - |
+| `tests/` | 451 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/fixtures` | 3 | projects |
-| `tests/harness` | 1 | - |
+| `tests/harness` | 2 | - |
 | `tests/helpers` | 7 | - |
 | `tests/malformed` | 5 | - |
 | `tests/perf` | 3 | - |
@@ -643,6 +643,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/failed-start-persists-log.test.ts`
 - `tests/falcon-autofocus-heal.test.ts`
 - `tests/falcon-serial-profile.test.ts`
+- `tests/falcon-wifi-fake-server.test.ts`
 - `tests/falcon-wifi-trust.test.ts`
 - `tests/falcon-ws-frame-cap.test.ts`
 - `tests/family-agnostic-ticket.test.ts`
@@ -995,6 +996,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 ### `tests/harness`
 
+- `tests/harness/fakeFalconServer.ts`
 - `tests/harness/fakeWebSerial.ts`
 
 ### `tests/helpers`

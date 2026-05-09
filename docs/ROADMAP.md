@@ -63,7 +63,7 @@ The master checklist at the bottom of this file is the current source of truth:
 |---|---:|---:|---|
 | Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
 | Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 47 | 45 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, and T3-64 obsolete Electron serial harness close-out shipped/closed; million-line streaming remains deferred to T3-15. |
+| Tier 3 | 48 | 44 | Active quarter-scope backlog; T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, and T3-65 fake Falcon WiFi server shipped/closed; million-line streaming remains deferred to T3-15. |
 
 ### Historical audit classification
 
@@ -18463,6 +18463,8 @@ T2-30 (Falcon WiFi as real LaserController) depends on this infrastructure 鈥?w
 
 **Priority:** Tier 3. Required before T2-30 (Falcon WiFi controller) ships unless we accept "test only on hardware." Filed at T3 because T2-30 itself is at T2 鈥?when T2-30 work begins, T3-65 should be promoted.
 
+**Status:** Shipped in `<TBD>` - added `tests/harness/fakeFalconServer.ts`, a local Falcon HTTP + WebSocket protocol fake with scriptable endpoint responses, delays, failures, WebSocket events, connection modes, and reconnect-scenario hooks. Added `tests/falcon-wifi-fake-server.test.ts` to exercise the real `FalconHttpClient` and `FalconWebSocket` against the fake for identity endpoints, work state/progress, device status, malformed JSON, HTTP errors, snapshot/printer/alarm WebSocket events, malformed WebSocket payloads, and handshake rejection. Added `electron/falcon-wifi/FalconNetworkTarget.ts` so production clients keep default Falcon ports for plain IPs while tests can use `host:port` ephemeral targets. **Hardware verification not required** (test harness + additive target parsing only; no production Falcon command execution added).
+
 **Cross-check note (audit 3E):** Audit's section 3.4 + Critical 4 + P1.
 
 ---
@@ -20489,7 +20491,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-62 Ruida controller safety stub 鈥?design before implementation (Shipped in `f24ef82` - design doc only; no production Ruida controller added)
 - [x] T3-63 Fake WebSerial byte-stream harness with chunking realism (Shipped in `7a1e045` - reusable fake navigator.serial harness plus WebSerialPort chunking/rejection tests)
 - [x] T3-64 Fake Electron serialport test harness (Closed in `162bc6a` as obsolete - T2-35 removed the native Electron serial bridge and production `serialport` dependency)
-- [ ] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (filed; required before T2-30 ships)
+- [x] T3-65 Fake Falcon Wi-Fi device server with scenario scripts (Shipped in `<TBD>` - local HTTP/WebSocket fake plus real Falcon client tests)
 - [ ] T3-66 CI suite lane separation 鈥?unit / output / controller-sim / transport-sim / perf (filed; refines T2-22)
 - [ ] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (filed; pairs with T2-51)
 - [ ] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (filed; depends on T2-51, T2-52, T2-53)
