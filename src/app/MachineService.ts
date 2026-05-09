@@ -118,6 +118,10 @@ export interface JobRecordingSink {
 const APPROVAL_TOKEN_TTL_MS = 30_000;
 const MAX_CONSUMED_APPROVAL_NONCES = 512;
 
+function mutatesWorkCoordinateSystem(command: string): boolean {
+  return /^G10(?![0-9])/i.test(command) || /^G92(?![0-9])/i.test(command);
+}
+
 function safetyResultForStateMachine(result: SafetyActionResult): SafetyResultLike {
   const action: SafetyResultLike['action'] =
     result.action === 'abortJob' ? 'stop' : result.action;
@@ -1310,10 +1314,19 @@ export class MachineService {
     source: 'internal' | 'user' = 'internal',
     approvalToken?: ApprovalToken,
   ): Promise<void> {
+    const classification =
+      source === 'user' ? classifyUserCommand(command) : null;
     new MachineCommandGateway(this.controllerRef.current).sendCommand(command, source, approvalToken, {
       consumedApprovalNonces: this.consumedApprovalNonces,
       pruneConsumedApprovalNonces: (now: number) => this.pruneConsumedApprovalNonces(now),
     });
+    // T3-37: a user-approved raw console G10 or G92 changes the coordinate
+    // frame outside the tracked Set Origin flow. Clear the saved-origin G54
+    // snapshot only after the command passes the approval gate and reaches
+    // the controller; blocked commands should not invalidate trusted state.
+    if (classification && mutatesWorkCoordinateSystem(classification.command)) {
+      this._savedOriginG54Snapshot = null;
+    }
   }
 
   async autoFocus(): Promise<{ ok: true } | { ok: false; error: string }> {
