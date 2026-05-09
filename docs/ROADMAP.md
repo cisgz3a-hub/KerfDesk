@@ -16884,7 +16884,7 @@ For each, compile to G-code, parse, extract burn segments, assert:
 
 **Cross-check note (audit 2F):** Audit's section 5 / Gate D / P0 #3.
 
-**Status:** Shipped in `<TBD>`. Added `tests/fill-with-holes.test.ts`, compiling real compound-path fill scenes for donut-square, circular ring, letter-B-like, and hole-with-island fixtures. The test parses emitted G-code burn segments and samples each segment to assert material containment, excluded-hole avoidance, bounded segment counts, and island fill preservation. It runs both line fill and entitled cross-hatch so the second fill angle cannot regress independently. **Hardware verification: not required** (test-only regression coverage; no emitted G-code, motion, controller, or safety gate behavior changed).
+**Status:** Shipped in `41926e2`. Added `tests/fill-with-holes.test.ts`, compiling real compound-path fill scenes for donut-square, circular ring, letter-B-like, and hole-with-island fixtures. The test parses emitted G-code burn segments and samples each segment to assert material containment, excluded-hole avoidance, bounded segment counts, and island fill preservation. It runs both line fill and entitled cross-hatch so the second fill angle cannot regress independently. **Hardware verification: not required** (test-only regression coverage; no emitted G-code, motion, controller, or safety gate behavior changed).
 
 ---
 
@@ -20395,7 +20395,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-35 Cache invalidation strategies 鈥?processed raster, fill rows, output chunks (Shipped in `1441da5` — fill-row LRU cache added; processed-raster reuse already present from T1-17; final output chunk cache deferred to T3-15 streaming/spool output)
 - [x] T3-36 Frame-vs-burn equivalence test suite (Shipped in `129656b` — 60-case frame-vs-burn matrix plus compiled frame-source bounds)
 - [x] T3-37 Saved-origin / WCS lifecycle test (Shipped in `d4274ce` — lifecycle regression plus console G10/G92 saved-origin invalidation)
-- [x] T3-38 Fill-with-holes geometric correctness test (Shipped — regression net in `<TBD>`)
+- [x] T3-38 Fill-with-holes geometric correctness test (Shipped in `41926e2` — compound fill hole/island regression net)
 - [ ] T3-39 Malformed-input test suite (filed; depends on T2-18)
 - [ ] T3-40 Performance / stress test suite with cancellation gates (filed; depends on T1-45, T2-17, T3-15)
 - [ ] T3-41 Snapshot semantic-assertion pairing 鈥?every snapshot test gets parsed checks (filed; depends on T2-18, T2-19)
