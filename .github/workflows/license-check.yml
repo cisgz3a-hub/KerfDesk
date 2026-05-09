@@ -1,17 +1,10 @@
 name: License Compliance Check
 
 on:
-  pull_request:
-    branches: [master, main]
-    paths:
-      - package.json
-      - package-lock.json
-      - scripts/license-check.mjs
-      - .github/workflows/license-check.yml
   workflow_dispatch:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -23,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
@@ -43,7 +36,7 @@ jobs:
 
       - name: Upload license report as artifact
         if: ${{ failure() || github.event_name == 'workflow_dispatch' }}
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v4
         with:
           name: license-report
           path: licenses-report.csv

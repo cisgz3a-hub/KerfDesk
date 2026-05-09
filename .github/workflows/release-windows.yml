@@ -1,9 +1,6 @@
 name: Windows Signed Release
 
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
 
 concurrency:
