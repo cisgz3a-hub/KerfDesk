@@ -18714,7 +18714,7 @@ User can exit to the main app at any step (the test scene is discarded). When th
 
 **Code reference:** T1-61 adds clearer text labels for start modes. T3-70 adds the visual layer.
 
-**Status:** Shipped in `<TBD>`. Added `JobLayoutMiniMap` in the Ready-to-Run review panel, showing the bed, optional material rectangle, job extent, frame extent, active `0,0` origin corner, and mode-specific head/saved-zero marker. `ConnectionPanelMain` feeds it from existing bed/material/machine position/saved origin/frame bounds values; no G-code generation, frame math, preflight, or controller behavior changed. Pinned by `tests/job-layout-minimap.test.tsx` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (display-only review diagram).
+**Status:** Shipped in `b3766cf`. Added `JobLayoutMiniMap` in the Ready-to-Run review panel, showing the bed, optional material rectangle, job extent, frame extent, active `0,0` origin corner, and mode-specific head/saved-zero marker. `ConnectionPanelMain` feeds it from existing bed/material/machine position/saved origin/frame bounds values; no G-code generation, frame math, preflight, or controller behavior changed. Pinned by `tests/job-layout-minimap.test.tsx` and `tests/ready-to-run-panel.test.tsx`. Hardware verification: not required (display-only review diagram).
 
 **Problem:** Audit 4B Section 3.2 + Section 8: origin/start-mode is fundamentally a spatial concept. Text labels help; diagrams help more. A mini-map of bed + material + design + origin + frame rectangle communicates the spatial relationship in a glance.
 
@@ -20506,7 +20506,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-67 Canonical bounds selectors 鈥?`selectSceneBounds`, `selectCompiledMachineBounds` (Shipped in `4b5359a` - `selectSceneBounds` plus compiled machine/canvas bounds selectors)
 - [x] T3-68 Debug state graph + named transition log 鈥?`window.__LASERFORGE_STATE__` (Shipped in `578391a` - bounded TransitionLog plus dev-only state graph installer)
 - [x] T3-69 Guided first-run test job 鈥?placement 鈫?focus 鈫?jog 鈫?frame 鈫?low-power test 鈫?confirm (Shipped in `714566f` - first-run guide plus 20 mm low-power test scene)
-- [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `<TBD>` - Ready-to-Run job layout mini-map)
+- [x] T3-70 Origin & start-mode visual diagrams (mini-map of bed + material + design + origin + frame) (Shipped in `b3766cf` - Ready-to-Run job layout mini-map)
 - [ ] T3-71 Web Serial / browser compatibility proactive guidance (filed; first-run UX win)
 - [ ] T3-72 Job complexity user-facing summary (filed; depends on T2-58, complements T1-45)
 - [ ] T3-73 `FrameResult.reason` expansion to specific failure types (filed; refines T1-65)
