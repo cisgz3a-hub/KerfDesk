@@ -316,8 +316,17 @@ void (async () => {
     'ConnectionPanelMain subscribes to onWiFiOverrideChange');
   assert(/getConnectionTrust\(\)/.test(panelSrc),
     'ConnectionPanelMain reads getConnectionTrust()');
-  assert(/connectionTrust/.test(panelSrc),
-    'ConnectionPanelMain registers a connectionTrust readiness gate');
+  // T1-129: the connectionTrust gate moved to the pure
+  // buildStartReadiness helper. Source-pin against the helper
+  // module instead; ConnectionPanelMain just delegates to it.
+  const buildSrc = readFileSync(
+    resolve(repoRoot, 'src/ui/components/connection/buildStartReadiness.ts'),
+    'utf-8',
+  );
+  assert(/id: 'connectionTrust'/.test(buildSrc),
+    'buildStartReadiness registers a connectionTrust readiness gate (moved from inline IIFE in T1-129)');
+  assert(/buildStartReadiness/.test(panelSrc),
+    'ConnectionPanelMain delegates readiness derivation to buildStartReadiness');
 
   const gateSrc = readFileSync(
     resolve(repoRoot, 'src/ui/components/connection/StartReadinessPanel.tsx'),
