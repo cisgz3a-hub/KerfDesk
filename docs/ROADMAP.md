@@ -15967,7 +15967,7 @@ Alternative: delete it entirely. The README + directory structure + module-bound
 
 **Problem:** Installer is unsigned. Windows SmartScreen warns "unknown publisher." macOS Gatekeeper refuses to open without a right-click-Open workaround. Serious users won't run unsigned binaries on production machines.
 
-**Status:** Infrastructure shipped in `<TBD>` 2026-05-10. Pre-existing `scripts/signing/electron-builder.{windows,macos}-signed.cjs` + `entitlements.mac.plist` were dormant — no npm script wired them in, no env-var validator, no operator docs. This slice closes those gaps:
+**Status:** Infrastructure shipped in `b380623` 2026-05-10. Pre-existing `scripts/signing/electron-builder.{windows,macos}-signed.cjs` + `entitlements.mac.plist` were dormant — no npm script wired them in, no env-var validator, no operator docs. This slice closes those gaps:
 
 - New npm scripts `electron:build:signed:win` and `electron:build:signed:mac` run the env validator first, then `electron-builder --config` against the signed builder configs. Unsigned `electron:build` / `electron:build:mac` remain for local dev.
 - New `scripts/signing/validate-signing-env.mjs` validates per-platform env vars (Windows: `WIN_CSC_LINK` / `CSC_LINK` + `WIN_CSC_KEY_PASSWORD` / `CSC_KEY_PASSWORD`; macOS: `MAC_SIGNING_IDENTITY` + `APPLE_ID` + `APPLE_APP_SPECIFIC_PASSWORD` + `APPLE_TEAM_ID`). Empty env exits 1 with each missing var named + a pointer to the docs.
@@ -20517,7 +20517,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-1 Autosave to IndexedDB/fs (closed pre-session — IndexedDb + Filesystem adapters in src/core/storage/)
 - [x] T3-2 Write the 5 critical missing tests
 - [x] T3-3 Delete or auto-generate PROJECT_MAP
-- [ ] T3-4 Code-signed installer (infrastructure shipped in `<TBD>` 2026-05-10 — `npm run electron:build:signed:{win,mac}` plus `validate-signing-env.mjs` + `docs/CODE-SIGNING.md`; awaits actual EV cert purchase + Apple Developer ID provisioning before a signed release goes out)
+- [ ] T3-4 Code-signed installer (infrastructure shipped in `b380623` 2026-05-10 — `npm run electron:build:signed:{win,mac}` plus `validate-signing-env.mjs` + `docs/CODE-SIGNING.md`; awaits actual EV cert purchase + Apple Developer ID provisioning before a signed release goes out)
 - [x] T3-5 Auto-update channel
 - [x] T3-6 Crash reporting
 - [x] T3-7 Backward-compat fixture corpus
