@@ -142,6 +142,11 @@ export function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]):
   //
   //   alarm                   → previous session ended in alarm; clear via $X.
   //   run / hold              → firmware thinks a job is active; soft-reset.
+  //   door                    → safety interlock is active (lid open / e-stop /
+  //                              door switch); close the interlock and let the
+  //                              controller return to idle, then reconnect.
+  //                              T1-followup-safety-door: distinct from hold so
+  //                              the recovery action is "close door", not "$X".
   //   check                   → check-mode is on; toggle off via $C.
   //   no-status-response      → wedged firmware or dead cable; power-cycle.
   //   unsafe-residual-spindle → idle but FS spindle != 0; modal M3/M4
@@ -160,6 +165,8 @@ export function runMachineChecks(ctx: PreflightContext, out: PreflightResult[]):
         'Controller appears to be running a job from before this session. Soft-reset (Ctrl-X / 0x18) and reconnect.',
       hold:
         'Controller is in feed-hold from the previous session. Cycle-start (~) or soft-reset, then reconnect.',
+      door:
+        'Safety door / interlock is active. Close the door (or release the e-stop), wait for the controller to return to idle, and reconnect.',
       check:
         'Controller is in check mode ($C). Toggle check mode off, then reconnect.',
       'no-status-response':

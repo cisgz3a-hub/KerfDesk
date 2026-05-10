@@ -20,6 +20,17 @@ export type MachineStatus =
   | 'alarm'
   | 'homing'
   | 'check'
+  // T1-followup-safety-door: GRBL `Door` reports indicate the safety
+  // interlock is active (door open, e-stop, lid switch, etc). Pre-T1-
+  // followup-safety-door the live status parser silently dropped
+  // `<Door|...>` reports and `_classifySafeStateReason` carried an
+  // explicit `'door' is intentionally not classified` carve-out, so
+  // a live door-open event during idle would not block job start /
+  // jog / frame / test-fire. Now `door` is a first-class status
+  // recognized by `_handleStatusReport`, `MachinePreflight`,
+  // `_classifySafeStateReason`, and the OperationGate / safety-state
+  // surfaces.
+  | 'door'
   // T2-12 part 2: software-synthesized state when an error occurs
   // during an active job. Distinct from 'alarm' (which is hardware-
   // reported by GRBL and recoverable via $X). Faulted means the
@@ -334,7 +345,7 @@ export interface GrblControllerApi extends GcodeLineController {
    * refuse machine control until the user reconnects from a known-safe state.
    */
   getUnsafeAtConnect?(): {
-    reason: 'alarm' | 'run' | 'hold' | 'check' | 'no-status-response' | 'unsafe-residual-spindle';
+    reason: 'alarm' | 'run' | 'hold' | 'door' | 'check' | 'no-status-response' | 'unsafe-residual-spindle';
     capturedAt: number;
     status: MachineStatus;
     alarmCode: number | null;

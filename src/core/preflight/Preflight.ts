@@ -98,6 +98,7 @@ export const PREFLIGHT_CODES = {
   MACHINE_ALARM: 'MACHINE_ALARM',
   MACHINE_FAULTED: 'MACHINE_FAULTED',
   MACHINE_HOLD: 'MACHINE_HOLD',
+  MACHINE_DOOR: 'MACHINE_DOOR',
   MACHINE_RUNNING: 'MACHINE_RUNNING',
   MACHINE_HOMING: 'MACHINE_HOMING',
   MACHINE_NOT_IDLE: 'MACHINE_NOT_IDLE',
@@ -159,6 +160,7 @@ export interface PreflightContext {
       | 'alarm'
       | 'run'
       | 'hold'
+      | 'door'
       | 'check'
       | 'no-status-response'
       | 'unsafe-residual-spindle'
@@ -389,6 +391,7 @@ export function runPreflightSummary(
     | 'alarm'
     | 'run'
     | 'hold'
+    | 'door'
     | 'check'
     | 'no-status-response'
     | 'unsafe-residual-spindle'

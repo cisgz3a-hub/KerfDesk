@@ -46,6 +46,19 @@ export function runMachineStateChecks(ctx: PreflightContext, out: PreflightResul
       message: 'Machine is paused. Resume or stop before starting a new job.',
     });
   }
+  if (st === 'door') {
+    // T1-followup-safety-door: GRBL `<Door|...>` reports the safety
+    // interlock is active (door open, e-stop pressed, lid switch
+    // tripped, etc). Pre-fix this state fell through to the
+    // MACHINE_NOT_IDLE warning bucket — start was technically
+    // discouraged but not blocked. Now blocked: no job, frame, jog,
+    // or test-fire can begin while the interlock is open.
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.MACHINE_DOOR,
+      message: 'Safety door / interlock is active. Close the door or release the e-stop, then wait for the controller to return to idle before starting a job.',
+    });
+  }
   if (st === 'run') {
     out.push({
       severity: 'error',
@@ -65,6 +78,7 @@ export function runMachineStateChecks(ctx: PreflightContext, out: PreflightResul
     st !== 'alarm' &&
     st !== 'faulted_requires_inspection' &&
     st !== 'hold' &&
+    st !== 'door' &&
     st !== 'run' &&
     st !== 'homing'
   ) {

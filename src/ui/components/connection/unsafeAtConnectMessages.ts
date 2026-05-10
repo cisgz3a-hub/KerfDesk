@@ -66,6 +66,19 @@ export function describeUnsafeAtConnect(
         actionLabel: 'Reconnect',
         actionKind: 'reconnect',
       };
+    case 'door':
+      // T1-followup-safety-door: distinct headline + recovery action so
+      // the user sees "close the door" rather than the generic hold
+      // text. Action is reconnect because the door state typically
+      // resolves once the user closes the lid; reconnecting captures
+      // a fresh verdict against the post-close idle state.
+      return {
+        headline: 'Safety interlock open',
+        detail:
+          'GRBL is reporting the door / lid / e-stop interlock as active. Job start, frame, jog, and test-fire are blocked until the interlock clears. Close the door (or release the e-stop) and wait for the controller to return to idle, then reconnect.',
+        actionLabel: 'Reconnect',
+        actionKind: 'reconnect',
+      };
     case 'check':
       return {
         headline: 'Controller in check mode',

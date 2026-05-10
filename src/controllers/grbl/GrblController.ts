@@ -111,6 +111,13 @@ export type UnsafeAtConnectReason =
   | 'alarm'
   | 'run'
   | 'hold'
+  // T1-followup-safety-door: connect verdict for a controller whose
+  // first status report is `<Door|...>`. Treated like alarm/hold from
+  // the start-gate's perspective — the door must close and the
+  // controller must return to idle before any motion or laser command
+  // is allowed. Distinct from `hold` because the recovery action is
+  // "close door / release e-stop", not "$X unlock".
+  | 'door'
   | 'check'
   | 'no-status-response'
   | 'unsafe-residual-spindle';
@@ -1836,10 +1843,20 @@ export class GrblController implements GrblControllerApi {
     if (parts.length === 0) return;
 
     const stateStr = parts[0].toLowerCase();
+    // T1-followup-safety-door: door is a first-class status. GRBL emits
+    // `Door`, `Door:0`, `Door:1`, and (rarely) `Door:2`/`Door:3` to
+    // signal subphases of the interlock cycle (parking, restoring,
+    // door-still-ajar). Treat all `door:*` variants as status `door`
+    // and let the safety preflight / OperationGate decide what to
+    // block. `door` matching takes precedence over the prefix `door`
+    // → `hold` mapping in machineStatusFromGrblReportToken so a live
+    // open-interlock event doesn't show up as a feed-hold.
     const statusMap: Record<string, MachineStatus> = {
       idle: 'idle', run: 'run', hold: 'hold',
       'hold:0': 'hold', 'hold:1': 'hold',
       alarm: 'alarm', home: 'homing', check: 'check',
+      door: 'door', 'door:0': 'door', 'door:1': 'door',
+      'door:2': 'door', 'door:3': 'door',
     };
     const newStatus = statusMap[stateStr];
     if (newStatus && this._state.status !== 'disconnected' && this._state.status !== 'connecting') {
@@ -2412,6 +2429,12 @@ export class GrblController implements GrblControllerApi {
     if (status === 'alarm') return 'alarm';
     if (status === 'run') return 'run';
     if (status === 'hold') return 'hold';
+    // T1-followup-safety-door: door support in `_handleStatusReport` is
+    // shipped, so a live `<Door|...>` first report after connect now
+    // produces a distinct unsafe-at-connect verdict. Recovery is
+    // user-action ("close the door / release the e-stop"), not host-
+    // initiated ($X unlock or M5).
+    if (status === 'door') return 'door';
     if (status === 'check') return 'check';
     if (status === 'idle') {
       if (this._state.spindleSpeed !== 0 || this._state.feedRate !== 0) {
@@ -2419,14 +2442,9 @@ export class GrblController implements GrblControllerApi {
       }
       return null;
     }
-    // The 'door' GRBL status is intentionally not classified here: the
-    // controller's status-map parser (in _handleStatusReport) doesn't
-    // recognize the `<Door|...>` token today, so _state.status never
-    // becomes 'door' even when the firmware reports it. If door support
-    // is added to the parser, this classifier should also raise a
-    // distinct reason. homing / connecting / disconnected / faulted →
-    // no verdict (homing is a user-initiated startup cycle; faulted is
-    // T2-12 territory and has its own gate).
+    // homing / connecting / disconnected / faulted → no verdict
+    // (homing is a user-initiated startup cycle; faulted is T2-12
+    // territory and has its own gate).
     return null;
   }
 
