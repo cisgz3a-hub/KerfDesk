@@ -17824,6 +17824,8 @@ Each test file is small. The harness needs:
 
 **Cross-check note (audit 3B):** Audit's section 14. Comprehensive test list verified absent in current tests/.
 
+**Status:** Shipped in `<TBD>` — coverage-manifest slice. Added `tests/connection-lifecycle/connection-lifecycle-coverage.test.ts`, a regression-roundup that maps every audit 3B section-14 scenario to the existing per-ticket test file plus required-content markers per file. The 16 scenarios cover P0 #1–#10 (permission denial / open failure / writer / reader acquisition / handshake timeout / double connect / disconnect during connect / GRBL handshake abort / reconnect-while-close-pending / stale read loop / writer rejection during disconnect — enabling tickets T1-49, T1-50, T1-51, T2-31, T2-33, T2-34, T1-22) and P1 #11–#18 (handshake proof, device identity, reconnect comparator, navigator disconnect event, read-loop done/error/idempotency, status-poll write-failure normalization, cable-pull heartbeat, renderer lifecycle safety, getPorts device-reuse — enabling tickets T1-51, T3-50, T3-51, T3-49, T3-53, T3-16, T3-52, T3-48). Each row asserts the test file exists and contains required content markers (ticket id + scenario-specific symbols) so a regression that silently deletes or renames a file fails this manifest with a one-step diagnosis. Also pins T2-35's removal of the obsolete `electron-serial-bridge.test.ts` and asserts the manifest file itself carries the T3-54 / "audit 3B section 14" markers. 54/54 contracts. **Out of scope (future T3-54 slices):** behavioral roundup that exercises every scenario end-to-end in a single suite (would duplicate per-ticket tests; not worth the maintenance cost). The audit's "P1 Electron serial (4)" category is intentionally not covered because T2-35 chose removal — a negative-pin asserts the obsolete file does not return. The "P1 WiFi (3)" category is gated on T2-30 / T3-17 which have not shipped. **Hardware verification not required** (test-coverage roundup; no production behavior changed).
+
 ---
 
 ### T3-55 | Falcon autofocus profile-heal must check live firmware version before enabling
@@ -20530,7 +20532,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-51 Reconnect-same-machine verification (Shipped — pure-comparator slice in `<TBD>`; `src/controllers/IdentityComparison.ts` ships verdict-categorized comparator + makeIdentitySnapshot; storage persistence and ConnectionManager wiring deferred to follow-ups)
 - [x] T3-52 Browser lifecycle cleanup - beforeunload / pagehide (Shipped in `78cc734` - renderer lifecycle handler attempts stop + laser-off on beforeunload and pagehide)
 - [x] T3-53 `requestStatusReport` write-failure normalization in polling loop (Shipped in `ca7629f` - poll write failures stop polling and disconnect once)
-- [ ] T3-54 Connection lifecycle test suite (filed; regression protection for T1-49 through T3-53)
+- [x] T3-54 Connection lifecycle test suite (Shipped — coverage-manifest slice in `<TBD>`; `tests/connection-lifecycle/connection-lifecycle-coverage.test.ts` maps every audit 3B section-14 scenario to its enabling-ticket's existing test file with required-content markers)
 - [ ] T3-55 Falcon autofocus profile-heal must check live firmware version (filed; depends on T3-50)
 - [x] T3-56 Conservative unknown-capability handling (Shipped in `ebd614c` - connected M4 output now blocks until `$32` laser mode is known)
 - [ ] T3-57 Expand preflight mismatch rules ($22, $110/$111, $120/$121, model identity) (filed; depends on T2-25, T2-38, T3-50)
