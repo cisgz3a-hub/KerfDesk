@@ -177,10 +177,21 @@ export function validateEmittedGcode(
         rawLine,
       );
     }
-    if (hasMotionWord && state.motionMode === 'G0' && laserOn) {
+    // T1-17-followup-preflight: only block G0-with-laser-on for M3
+    // (constant-power) mode. M4 dynamic-power mode has GRBL auto-zero
+    // the laser during rapids regardless of the commanded S — that's
+    // exactly the contract T1-31's raster strategy relies on (one M4
+    // S0 at start, alternating G1 burns and G0 rapids between
+    // scanlines, one M5 at end). A 12 MP photo import + raster compile
+    // produced 1023 of these false-positive blockers on real hardware
+    // (Falcon A1 Pro, 2026-05-12) because the validator was unaware
+    // of M4's auto-zero behavior. M3 + G0-with-non-zero-S remains a
+    // genuine block: under constant-power mode the laser would fire
+    // at full S during the rapid.
+    if (hasMotionWord && state.motionMode === 'G0' && laserOn && state.laserMode === 'M3') {
       push(
         PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON,
-        'Rapid G0 motion occurs while M3/M4 and non-zero S are active.',
+        'Rapid G0 motion occurs while M3 (constant-power) and non-zero S are active. The laser fires at full S during the rapid; switch to M4 dynamic-power mode or insert M5 / S0 before the rapid.',
         lineNumber,
         rawLine,
       );

@@ -78,10 +78,21 @@ console.log('\n=== T3-18 emitted G-code semantic preflight ===\n');
 {
   assert(codes('M4 S500\nG21\nG90\nG1 X10 F1000\nM5').includes(PREFLIGHT_CODES.OUTPUT_LASER_ON_BEFORE_SETUP),
     'laser-on before modal setup is blocked');
-  assert(codes('G21\nG90\nM4 S500\nG0 X10 Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
-    'rapid move with laser modal active is blocked');
-  assert(codes('G21\nG17\nG90\nG94\nM5\nM4S500\nG0X10Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
-    'compact GRBL words are parsed before rapid laser checks');
+  // T1-17-followup-preflight: G0-with-non-zero-S in M3 (constant-power)
+  // mode IS dangerous and stays blocked.
+  assert(codes('G21\nG90\nM3 S500\nG0 X10 Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
+    'M3 + rapid move with non-zero S is blocked (constant-power dangerous case)');
+  assert(codes('G21\nG17\nG90\nG94\nM5\nM3S500\nG0X10Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
+    'compact GRBL words are parsed before rapid laser checks (M3 case)');
+  // T1-17-followup-preflight: M4 dynamic-power mode auto-zeros laser
+  // on G0 rapids regardless of commanded S — that's the contract
+  // T1-31's raster strategy relies on. M4 + G0 + non-zero S must NOT
+  // be flagged. A 12 MP photo raster import surfaced 1023 false-
+  // positive blockers when this rule fired on M4 output.
+  assert(!codes('G21\nG90\nM4 S500\nG0 X10 Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
+    'M4 dynamic-power + rapid move + non-zero S is NOT blocked (auto-zero case)');
+  assert(!codes('G21\nG17\nG90\nG94\nM5\nM4S500\nG0X10Y10\nM5').includes(PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON),
+    'M4 + compact GRBL words + rapid is NOT blocked');
   assert(codes('G21\nG90\nM4 S500\nG1 X10 F1000').includes(PREFLIGHT_CODES.OUTPUT_LASER_LEFT_ON),
     'job ending with laser modal active is blocked');
   assert(codes('G21\nG90\nM4 S1200\nG1 X10 F1000\nM5').includes(PREFLIGHT_CODES.OUTPUT_SPINDLE_EXCEEDS_MAX),
@@ -95,7 +106,8 @@ console.log('\n=== T3-18 emitted G-code semantic preflight ===\n');
 }
 
 {
-  const results = runPreflight(makeCtx('G21\nG90\nM4 S500\nG0 X5 Y5\nM5'));
+  // T1-17-followup-preflight: severity pin uses M3 (the still-blocking case).
+  const results = runPreflight(makeCtx('G21\nG90\nM3 S500\nG0 X5 Y5\nM5'));
   const finding = results.find(r => r.code === PREFLIGHT_CODES.OUTPUT_RAPID_WITH_LASER_ON);
   assert(finding?.severity === 'error', 'runPreflight wires output semantic validator as blocking');
 }
