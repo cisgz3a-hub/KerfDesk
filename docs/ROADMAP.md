@@ -16294,7 +16294,7 @@ This is partially addressed by T1-29 (persisted unsafe-prior-state flag) 鈥?on 
 
 **Priority:** Tier 3. Defense-in-depth on top of T1-29 and T1-22; not urgent but real.
 
-**Status:** Shipped in `<TBD>` — `GrblController` now treats running-job status silence as a cable-pull signal: while streaming, the polling loop sends one realtime `?` heartbeat at a time, waits 250ms for a status report, and requires two consecutive missed replies before routing through the same failed-transport path used by status write failures. That path aborts the active stream, closes the failed port best-effort, transitions to `disconnected`, and emits a status-heartbeat error for the UI/recovery layer. Existing WebSerial navigator-disconnect and transport-error paths remain unchanged. Pinned by `tests/webserial-cable-pull-heartbeat.test.ts` plus polling/fresh-start/cable-yank regressions. **Hardware verification needed** before release tagging: pull USB during a low-power test job and verify the UI moves to disconnected/recovery promptly.
+**Status:** Shipped in `896c144` — `GrblController` now treats running-job status silence as a cable-pull signal: while streaming, the polling loop sends one realtime `?` heartbeat at a time, waits 250ms for a status report, and requires two consecutive missed replies before routing through the same failed-transport path used by status write failures. That path aborts the active stream, closes the failed port best-effort, transitions to `disconnected`, and emits a status-heartbeat error for the UI/recovery layer. Existing WebSerial navigator-disconnect and transport-error paths remain unchanged. Pinned by `tests/webserial-cable-pull-heartbeat.test.ts` plus polling/fresh-start/cable-yank regressions. **Hardware verification needed** before release tagging: pull USB during a low-power test job and verify the UI moves to disconnected/recovery promptly.
 
 ---
 
@@ -20476,7 +20476,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-13 Active-edge-table fill scanline algorithm (Shipped — `generateFillRows` now uses scanline edge buckets + active row edge set; behavior pinned by fill/compound/pipeline tests)
 - [x] T3-14 Sampled / level-of-detail G-code preview (Shipped — sampled preview model + capped rendered moves; worker/zoom-region refinement deferred until needed)
 - [ ] T3-15 Spool-based G-code output (AsyncIterable streaming) (filed; architectural 鈥?multi-week, Tier 3 by design)
-- [x] T3-16 WebSerial cable-pull recovery (Shipped in `<TBD>` — running-job status heartbeat detects two missed replies, aborts the stream, closes the failed port, and reports a cable-pull-style transport failure)
+- [x] T3-16 WebSerial cable-pull recovery (Shipped in `896c144` — running-job status heartbeat detects two missed replies, aborts the stream, closes the failed port, and reports a cable-pull-style transport failure)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
 - [x] T3-18 Output validator semantic scan over emitted G-code (Shipped in `4f57f01` - final emitted G-code preflight validator with modal laser-state, spindle/feed, unsupported-command, and GRBL line-length checks)
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
