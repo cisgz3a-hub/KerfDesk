@@ -158,6 +158,85 @@ function isUnsafeStopOnErrorOverrideToken(
   );
 }
 
+/**
+ * T1-117: reasons the WCS-verification path can declare unknown.
+ *
+ * Pre-T1-117 the controller treated every one of these as "looks
+ * baseline" and silently ran applyWcsNormalization, rewriting G54
+ * and $10 without user consent. Post-T1-117 each one fail-closes
+ * the start-job gate via `_placementUncertain = true`.
+ */
+export type WcsUncertainReason =
+  | 'missing_g54'         // [G54:...] line never arrived in response to $#.
+  | 'malformed_g54'       // [G54:...] line had unparseable coordinates (NaN).
+  | 'missing_status_mask' // $10 was not in the cached settings dump.
+  | 'malformed_status_mask'; // $10 was present but parseInt yielded NaN.
+
+/**
+ * T1-117: discriminated union for the WCS-verification verdict. The
+ * three cases drive `_emitWcsConsentNeeded`:
+ *
+ * - `verified-zero`: both G54 and $10 are explicitly the GRBL baseline
+ *   (G54=0,0,0 and $10=0). `applyWcsNormalization` runs without
+ *   prompting because there's nothing to overwrite.
+ * - `verified-nonzero`: both reads succeeded and at least one is
+ *   non-baseline. Emits a consent payload to the UI listener (T1-20).
+ * - `unknown`: at least one read is missing or malformed. Refuse to
+ *   auto-apply; mark placement-uncertain.
+ */
+export type WcsConsentVerdict =
+  | { kind: 'verified-zero' }
+  | { kind: 'verified-nonzero'; g54: { x: number; y: number; z: number } | null; statusMask: number }
+  | { kind: 'unknown'; reason: WcsUncertainReason };
+
+const WCS_BASELINE_TOLERANCE = 0.0005;
+
+/**
+ * T1-117: pure classifier for the inputs to the WCS consent flow.
+ * Exported so tests can pin every fail-closed branch without
+ * mounting the full controller.
+ */
+export function classifyWcsConsentInputs(
+  g54: { x: number; y: number; z: number } | null,
+  statusMaskRaw: string | null,
+): WcsConsentVerdict {
+  // Order: surface the most concrete reason first. The G54 read goes
+  // before the $10 read because G54 is the larger source of risk —
+  // an unknown G54 with a known $10=0 still risks overwriting a
+  // workspace offset the user actually set; flagging the G54 cause
+  // gives them a more actionable diagnostic.
+  if (g54 == null) {
+    return { kind: 'unknown', reason: 'missing_g54' };
+  }
+  if (
+    !Number.isFinite(g54.x)
+    || !Number.isFinite(g54.y)
+    || !Number.isFinite(g54.z)
+  ) {
+    return { kind: 'unknown', reason: 'malformed_g54' };
+  }
+
+  if (statusMaskRaw == null) {
+    return { kind: 'unknown', reason: 'missing_status_mask' };
+  }
+  const parsed = parseInt(statusMaskRaw, 10);
+  if (!Number.isFinite(parsed)) {
+    return { kind: 'unknown', reason: 'malformed_status_mask' };
+  }
+  const statusMask = parsed;
+
+  const g54IsZero =
+    Math.abs(g54.x) < WCS_BASELINE_TOLERANCE
+    && Math.abs(g54.y) < WCS_BASELINE_TOLERANCE
+    && Math.abs(g54.z) < WCS_BASELINE_TOLERANCE;
+  const maskIsZero = statusMask === 0;
+
+  if (g54IsZero && maskIsZero) {
+    return { kind: 'verified-zero' };
+  }
+  return { kind: 'verified-nonzero', g54, statusMask };
+}
+
 export type UnsafeAtConnectReason =
   | 'alarm'
   | 'run'
@@ -397,6 +476,15 @@ export class GrblController implements GrblControllerApi {
    */
   private _placementUncertain = false;
   /**
+   * T1-117: when `_placementUncertain` becomes true via the WCS-
+   * verification fail-closed path, this records WHY (missing G54
+   * line, malformed coordinate parse, missing $10, malformed mask
+   * parse). Surfaced via `getPlacementUncertainReason()` for UI
+   * banners + support diagnostics. Cleared alongside
+   * `_placementUncertain` itself.
+   */
+  private _lastPlacementUncertainReason: WcsUncertainReason | null = null;
+  /**
    * T1-20: opt-in for tests / headless callers that need the pre-T1-20
    * auto-apply behavior on no-listener fallback. Default false (production
    * safety > test convenience). See `_emitWcsPayload`.
@@ -458,6 +546,19 @@ export class GrblController implements GrblControllerApi {
    */
   getPlacementUncertain(): boolean {
     return this._placementUncertain;
+  }
+
+  /**
+   * T1-117: returns the reason that `_placementUncertain` is true, when
+   * known. The T1-20 no-listener fallback path returns `null` (the
+   * uncertainty is structural — the listener race — not data-driven).
+   * The T1-117 WCS-verification fail-closed path returns one of
+   * `'missing_g54' | 'malformed_g54' | 'missing_status_mask' |
+   * 'malformed_status_mask'` so the UI banner / support log can name
+   * the specific GRBL response shape that triggered the gate.
+   */
+  getPlacementUncertainReason(): WcsUncertainReason | null {
+    return this._lastPlacementUncertainReason;
   }
 
   /**
@@ -781,6 +882,7 @@ export class GrblController implements GrblControllerApi {
     this._buildOptions = null;
     // T1-20: nothing to be uncertain about when not connected.
     this._placementUncertain = false;
+    this._lastPlacementUncertainReason = null;
     // T1-44: position is no longer trustworthy after disconnect; relative-mode
     // bounds checks must wait for a fresh status report before accepting jobs.
     this._positionConfirmed = false;
@@ -815,6 +917,7 @@ export class GrblController implements GrblControllerApi {
     this._firmwareVersion = null;
     this._buildOptions = null;
     this._placementUncertain = false;
+    this._lastPlacementUncertainReason = null;
     this._positionConfirmed = false;
     this._safeStateCheckArmed = false;
     if (this._safeStateWatchdog !== null) {
@@ -1488,6 +1591,7 @@ export class GrblController implements GrblControllerApi {
     // path in _emitWcsConsentNeeded, the placement question is now
     // resolved.
     this._placementUncertain = false;
+    this._lastPlacementUncertainReason = null;
     console.log(
       '[GRBL] Machine: ' +
         this._bedWidth +
@@ -1510,6 +1614,7 @@ export class GrblController implements GrblControllerApi {
     // existing WCS / mask state in place. They've made the decision -
     // placement is no longer uncertain from the controller's POV.
     this._placementUncertain = false;
+    this._lastPlacementUncertainReason = null;
     for (const cb of this._stateListeners) {
       cb({ ...this._state });
     }
@@ -1583,22 +1688,54 @@ export class GrblController implements GrblControllerApi {
   }
 
   private _emitWcsConsentNeeded(): void {
+    // T1-117: pre-fix this method conflated "verified zero" with
+    // "unknown, defaulted to zero". The pattern was:
+    //
+    //   parsed = maskRaw != null ? parseInt(maskRaw, 10) : 0;
+    //   mask = Number.isFinite(parsed) ? parsed : 0;
+    //   g54IsZero = g54 ? <approx-zero check> : true;
+    //
+    // i.e. a missing $10 setting → mask=0; malformed parse → mask=0;
+    // missing/malformed [G54:...] line (so this._currentG54 === null
+    // because _tryParseG54WcsLine only assigns when every coordinate
+    // is finite) → g54IsZero=true. Combined: any unknown defaults to
+    // "looks like baseline" and the controller silently
+    // applyWcsNormalization()'d without user consent, normalizing
+    // a real machine WCS the user may have wanted to preserve.
+    //
+    // Now: verified-zero requires BOTH explicit reads. Anything that
+    // can't be classified as verified-zero or verified-nonzero is
+    // treated as unknown → fail closed: mark _placementUncertain so
+    // the start-job gate refuses motion, and do NOT call
+    // applyWcsNormalization. Recovery is the same disconnect →
+    // reconnect → consent flow that T1-20 introduced for the
+    // nonzero-without-listener case.
     const g54 = this._currentG54;
     const maskRaw = this._grblSettings.get(10);
-    const parsed = maskRaw != null ? parseInt(maskRaw, 10) : 0;
-    const mask = Number.isFinite(parsed) ? parsed : 0;
+    const verdict = classifyWcsConsentInputs(g54, maskRaw ?? null);
 
-    const g54IsZero = g54
-      ? Math.abs(g54.x) < 0.0005 && Math.abs(g54.y) < 0.0005 && Math.abs(g54.z) < 0.0005
-      : true;
-    const maskIsZero = mask === 0;
-
-    if (g54IsZero && maskIsZero) {
+    if (verdict.kind === 'verified-zero') {
       this.applyWcsNormalization();
       return;
     }
 
-    this._emitWcsPayload(g54, mask);
+    if (verdict.kind === 'unknown') {
+      console.warn(
+        `[GrblController] T1-117: WCS state unknown after $# (reason: ${verdict.reason}). `
+        + 'Refusing to auto-apply WCS normalization. Job start blocked until the user '
+        + 'disconnects, addresses the underlying state, and reconnects.',
+      );
+      this._placementUncertain = true;
+      this._lastPlacementUncertainReason = verdict.reason;
+      for (const cb of this._stateListeners) {
+        cb({ ...this._state });
+      }
+      return;
+    }
+
+    // verdict.kind === 'verified-nonzero': established existing
+    // T1-20 path — emit a consent payload to the UI listener.
+    this._emitWcsPayload(verdict.g54, verdict.statusMask);
   }
 
   private _emitWcsPayload(
