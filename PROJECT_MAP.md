@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 534 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 535 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 466 | - |
+| `tests/` | 467 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/end-to-end-workflows` | 1 | - |
 | `tests/fixtures` | 3 | projects |
@@ -985,6 +985,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/wcs-no-listener-headless-flag.test.ts`
 - `tests/web-serial-byte-stream-harness.test.ts`
 - `tests/web-serial-partial-open-cleanup.test.ts`
+- `tests/webserial-cable-pull-heartbeat.test.ts`
 - `tests/windows-signing-release-workflow.test.ts`
 - `tests/wizard-complete-does-not-enable-material.test.tsx`
 
