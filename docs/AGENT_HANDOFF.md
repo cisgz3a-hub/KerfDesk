@@ -9,19 +9,18 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `2f1174a` (`test(capability): T3-59 capability regression coverage
-  manifest`). Always verify live HEAD with `git log --oneline -1`
+  `30fb369` (`feat(ipc): T3-88 IPC fuzz coverage manifest + dialog
+  handler guards`). Always verify live HEAD with `git log --oneline -1`
   before editing.
-- Last shipped roadmap item: `T3-59` capability regression coverage
-  manifest. Recent slices: T3-57 capability-mismatch rules in
-  `5103ecb`, T3-55 Falcon autofocus firmware gate in `88d9e20`, T3-54
-  connection-lifecycle coverage manifest in `4d75922`, T3-51 identity
-  comparator in `06a2941`, T3-50 device identity capture in `7cd31e0`,
-  T3-48 device-reuse flow in `56d87ff`, T3-47 safety-routing audit in
-  `01f0948`, T3-46 split-profile schema in `72f30b5`, T3-44 generic
-  progress model in `aa08f44`, T3-43 controller-matrix in `5d19289`.
-- Next roadmap item: `T3-83` Tamper-resistance test suite (T3-60..T3-82
-  already shipped per master checklist).
+- Last shipped roadmap item: `T3-88` IPC fuzz coverage manifest. This
+  session shipped a 10-ticket run: T3-50 / T3-51 / T3-54 / T3-55 / T3-57
+  / T3-59 / T3-83 / T3-86 / T3-87 / T3-88, on top of an earlier 5-ticket
+  run (T3-43 / T3-44 / T3-46 / T3-47 / T3-48). Hashes are filled in
+  the master checklist + shipped audit.
+- Next roadmap item: `T3-89` Production security build CI checks
+  (extends T1-81); other open T3 items still gated on external work
+  (T3-84 business decision, T3-85 release-time QA, T3-90 / T3-91
+  T1-25 dependency).
 
 ## What To Read First
 
@@ -91,13 +90,13 @@ follow-up commit rather than re-opening the master-checklist line.
 
 ## Expected Next Step
 
-Continue strict roadmap order with **T3-83 — Tamper-resistance
-test suite**. The headline change is incremental: ship a test
-slice that pins the entitlement-tamper protections that are
-already in place (token signature verification, clock-tamper
-detection, monkey-patch resistance), and explicitly deferred for
-work that depends on Tier-2 entitlement tickets (T2-89 / T2-90 /
-T2-94) not yet shipped.
+Continue strict roadmap order with **T3-89 — Production security
+build CI checks (extends T1-81)**. The headline change is wiring
+mechanical CI gates that catch the kinds of regressions T1-81
+already detects in source (`__forceProUnlock`, source maps in
+production, dev-only IPC handlers in preload, relaxed CSP). T1-81
+already has the verifier; T3-89 extends to a CI-runnable set of
+checks plus a GitHub Actions workflow.
 
 Hardware verification still owed before release tagging:
 - T3-48 device-reuse flow: connect, disconnect, reconnect on
@@ -108,3 +107,23 @@ Hardware verification still owed before release tagging:
 - T3-55 Falcon autofocus firmware gate: once a profile-load
   caller threads the live firmware version through, confirm
   autofocus is correctly gated on a known-old firmware build.
+
+This session's 10-ticket run was deliberate-foundation slices. Many
+landed only the contract surface (types + comparators + selectors)
+with explicit caller-migration follow-ups deferred. Watch for
+those in future sessions:
+
+  - T3-44 progress emission: `GrblController` emit + UI render.
+  - T3-46 split-profile storage migration when a non-GRBL
+    profile lands.
+  - T3-50 mandatory-fail handshake when T2-32 ConnectionManager
+    lands.
+  - T3-51 IdentitySnapshot persistence + ConnectionManager wiring.
+  - T3-55 profile-load callers thread live firmware version.
+  - T3-57 `runPreflight` threads `getDeviceIdentity` through
+    `PreflightContext`.
+  - T3-83 signed-token / clock-rollback / monkey-patch defenses
+    once T2-90 / T2-91 / T2-94 ship.
+  - T3-86 Playwright runner once T2-98 CI runners land.
+  - T3-87 wire selectors into `JobLog.ts` / `JobReplay.ts`.
+  - T3-88 behavioral end-to-end fuzz once T2-122 typed-IPC.
