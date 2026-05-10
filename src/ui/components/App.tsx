@@ -26,6 +26,7 @@ import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scen
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { installAppDebugStateGraph } from '../../debug/AppDebugState';
 import { transitionFromSceneTransaction, transitionLog } from '../../debug/TransitionLog';
+import { useTraceStormProbe } from '../../debug/traceStormProbe';
 import { FileToolbar } from './FileToolbar';
 import { buildAppFileToolbarProps } from './appFileToolbarProps';
 import { AppDragDropOverlay } from './AppDragDropOverlay';
@@ -129,6 +130,11 @@ function filterValidIds(ids: ReadonlySet<string>, scene: Scene): Set<string> {
 }
 
 export function App(): React.ReactElement {
+  // T1-17-followup-trace-probe: counts App-level commits during a trace
+  // session so we can pin which component committed the most. No-op
+  // outside a session.
+  useTraceStormProbe('App');
+
   const {
     modal,
     showAlert,

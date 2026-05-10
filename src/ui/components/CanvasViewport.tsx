@@ -47,6 +47,7 @@ import { type JobProgress } from '../../controllers/ControllerInterface';
 import { type Move } from '../../core/plan/Plan';
 import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type BurnState } from '../../app/MachineService';
+import { useTraceStormProbe } from '../../debug/traceStormProbe';
 import { QuickActions } from './QuickActions';
 
 function defaultCursorForTool(activeTool: ToolType): string {
@@ -424,6 +425,12 @@ export function CanvasViewport({
   onActivateLayer,
   burnState = null,
 }: CanvasViewportProps) {
+  // T1-17-followup-trace-probe: counts CanvasViewport commits during a
+  // trace session. The 1000+-subPath traced output puts heavy paint
+  // pressure on this component, so its commit count is the most useful
+  // signal for ranking the storm cause.
+  useTraceStormProbe('CanvasViewport');
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [viewport, setViewport] = useState<ViewportState>(() =>
     fitBedInViewport(scene.canvas.width, scene.canvas.height, width, height),

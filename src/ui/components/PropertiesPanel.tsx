@@ -30,6 +30,12 @@ import { isProUnlocked } from './TrialGuard';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
 import { DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE } from '../../core/plan/RasterGenerator';
+import {
+  endProbeSession,
+  setTraceStormProbeEnabled,
+  startProbeSession,
+  useTraceStormProbe,
+} from '../../debug/traceStormProbe';
 
 export interface ObjectPropertiesTabProps {
   scene: Scene;
@@ -47,6 +53,10 @@ export interface ObjectPropertiesTabProps {
 
 /** Object properties UI (embedded in LayerPanel Object tab). */
 export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onSceneChange, onSelectionChange, showAlert, handleTextToPath, onEditText, productionMode = false }: ObjectPropertiesTabProps) {
+  // T1-17-followup-trace-probe: count this component's commits during a
+  // trace session. No-op when no session is active; cost = one boolean
+  // check per render.
+  useTraceStormProbe('PropertiesPanel');
   const sceneRef = useRef(scene);
   sceneRef.current = scene;
 
@@ -221,6 +231,19 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     // current vs discard) is filed as T2-77-followup.
     const revisionAtStart = captureSceneRevision(sceneRef.current);
 
+    // T1-17-followup-trace-probe: open a per-component commit-counter
+    // session for this trace. The summary lands in the console when
+    // endProbeSession() runs in the finally block. Disabled in prod
+    // unless the user opts in via window.__LF_TRACE_PROBE = true before
+    // clicking Trace.
+    const userOptedIn =
+      typeof globalThis !== 'undefined'
+      && (globalThis as { __LF_TRACE_PROBE?: boolean }).__LF_TRACE_PROBE === true;
+    if (userOptedIn) {
+      setTraceStormProbeEnabled(true);
+      startProbeSession(`trace-to-${targetMode}`);
+    }
+
     setIsTracing(true);
     await new Promise<void>(resolve => {
       requestAnimationFrame(() => resolve());
@@ -336,6 +359,10 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       );
     } finally {
       setIsTracing(false);
+      if (userOptedIn) {
+        endProbeSession();
+        setTraceStormProbeEnabled(false);
+      }
     }
   }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, deleteImageAfterTrace, onSceneCommit, onSelectionChange, showAlert]);
 
