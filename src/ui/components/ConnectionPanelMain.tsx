@@ -1245,8 +1245,50 @@ export function ConnectionPanelMain({
     return true;
   }, [framePhysicalBounds, bedWidth, bedHeight, showAlert, showConfirm]);
 
+  /**
+   * T1-41-followup: verify saved-origin G54 before frame motion. The
+   * inline check at job-start (~line 1086) covers Start; this helper
+   * applies the same logic to Frame Safe / Frame Dot. Without it, a
+   * console `G10` / `G92` between Set Origin and Frame let the head
+   * move with a drifted G54 — exactly the wall-crash a 2026-05-12
+   * Falcon hardware test surfaced.
+   *
+   * Returns `true` when the verification passes (or doesn't apply
+   * because `startMode !== 'savedOrigin'`); `false` when the check
+   * failed and an alert was already shown to the user.
+   */
+  const verifySavedOriginForFrame = useCallback(async (): Promise<boolean> => {
+    if (startMode !== 'savedOrigin') return true;
+    const expectedG54 = machineService.getSavedOriginG54Snapshot();
+    const currentG54 = await machineService.requestWorkOffsets();
+    const verified = verifySavedOriginG54(expectedG54, currentG54);
+    if (verified.ok) return true;
+    let title = 'Saved origin not verified';
+    let body: string;
+    if (verified.reason === 'no-snapshot') {
+      body = 'Saved origin has no recorded G54 snapshot — Set Origin again on the workpiece, or switch to absolute / from-laser-head mode.';
+    } else if (verified.reason === 'no-current-g54') {
+      body = 'The controller did not respond to the work-offset query in time. Verify the connection is healthy and try again, or switch to absolute / from-laser-head mode.';
+    } else if (verified.reason === 'drift' && verified.drift) {
+      title = 'Saved origin no longer valid';
+      body = describeSavedOriginDrift(verified.drift);
+    } else {
+      body = 'Saved origin could not be verified — switch start mode or re-set origin.';
+    }
+    setMessages(prev => [...prev, `⚠ ${title}: ${body}`]);
+    await showAlert(title, body);
+    return false;
+  }, [startMode, machineService, showAlert, setMessages]);
+
   const handleFrameSafe = useCallback(async () => {
     if (!canFrame) return;
+
+    // T1-41-followup: refuse Frame when saved-origin G54 has drifted
+    // since Set Origin (e.g. user typed G10 / G92 in the console).
+    // Same check as the Start handler; runs before bounds confirmation
+    // so a drifted G54 surfaces a clear "saved origin invalid" alert
+    // instead of an off-bed bounds alert.
+    if (!(await verifySavedOriginForFrame())) return;
 
     if (!(await confirmFrameBounds())) return;
 
@@ -1292,10 +1334,16 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
+
+    // T1-41-followup: same saved-origin G54 verification the Start
+    // handler runs. A drifted G54 must block Frame Dot identically —
+    // the laser-dot move is even more dangerous than the corner trace
+    // because it fires power at a single point.
+    if (!(await verifySavedOriginForFrame())) return;
 
     if (!(await confirmFrameBounds())) return;
 
@@ -1356,7 +1404,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages]);
+  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleHome = useCallback(async () => {
     if (!canHome) {

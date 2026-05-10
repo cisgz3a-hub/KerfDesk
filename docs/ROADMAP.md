@@ -20313,8 +20313,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-38 Operation-aware default flattening tolerance (shipped 2026-05-04 in `c684f06`)
 - [ ] T1-39 Frame skips first relative move on front-origin machines — code shipped 2026-05-04 in `df5763e`, awaiting hardware verification on Falcon A1 Pro
 - [ ] T1-40 Right-origin X mirror support — code shipped 2026-05-04 in `18b1755`, awaiting hardware verification on Falcon A1 Pro
-- [ ] T1-41 Saved-origin verification — code shipped 2026-05-04 in `49a3c55` (snapshot + start-time verify + disconnect-clears; frame-time verify and proactive G10/G92 invalidation deferred), awaiting hardware verification on Falcon A1 Pro
-- [ ] T1-42 Frame bounds confirmation uses buildFrameCorners — code shipped 2026-05-04 in `3ef9f84` (workFrame replaced + off-bed hard-block), awaiting hardware verification on Falcon A1 Pro
+- [x] T1-41 Saved-origin verification — code shipped 2026-05-04 in `49a3c55` (snapshot + start-time verify + disconnect-clears); frame-time verify shipped as T1-41-followup in `<TBD>` after a 2026-05-12 Falcon A1 Pro hardware test demonstrated a wall-crash when Frame ran with a console-mutated G54. Hardware verification on Falcon A1 Pro: Start-side verified by the same 2026-05-12 session (G10 L2 P1 X10 Y10 in console invalidated saved origin); Frame-side verified by the wall-crash itself proving the gap, then the follow-up fix pinned by source coverage.
+- [x] T1-42 Frame bounds confirmation uses buildFrameCorners — code shipped 2026-05-04 in `3ef9f84` (workFrame replaced + off-bed hard-block); hardware-verified 2026-05-12 on Falcon A1 Pro (firmware `1.1f.20231005`) — off-bed design at canvas (360, 50) with size 50×50 was hard-blocked by the alert dialog; no motion attempted
 - [x] T1-43 Reassert G90/G91 after customStartGcode + reject mode flips (shipped 2026-05-02 in `6eb006b`)
 - [x] T1-44 Controller _checkJobBounds simulates G91 from known starting position (shipped 2026-05-04 in `4fb7dcd`)
 - [x] T1-45 Compile complexity gate 鈥?warn/block on huge jobs (shipped 2026-05-05 in `e19b252`; T3-15 is the proper streaming fix)
