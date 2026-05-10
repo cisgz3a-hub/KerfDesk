@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 533 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 534 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -51,6 +51,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 |---|---:|---|
 | `tests/` | 466 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
+| `tests/end-to-end-workflows` | 1 | - |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
 | `tests/helpers` | 7 | - |
@@ -1029,6 +1030,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/e2e/snapshots/text-hershey-sans.gcode`
 - `tests/e2e/text-bundled-inter.test.ts`
 - `tests/e2e/text-hershey-sans.test.ts`
+
+### `tests/end-to-end-workflows`
+
+- `tests/end-to-end-workflows/end-to-end-workflows.test.ts`
 
 ### `tests/fixtures`
 
