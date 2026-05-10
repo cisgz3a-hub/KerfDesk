@@ -952,6 +952,58 @@ export class MachineService {
   }
 
   /**
+   * T3-90 (T1-25 follow-up): arm a one-shot listener that fires
+   * `M5 S0` after the connect-time safe-state handshake reports a
+   * clean idle/FS:0,0 verdict, when the active profile has
+   * `autoM5OnConnect: true`. The listener auto-unsubscribes on the
+   * first status report that records a verdict, regardless of
+   * whether M5 was sent.
+   *
+   * Pre-arm gates:
+   *   - Active profile must exist and have `autoM5OnConnect === true`.
+   *   - Controller must expose `getUnsafeAtConnect`. Without it (e.g.
+   *     a future non-GRBL controller), the listener is a no-op.
+   *
+   * Fire gates:
+   *   - Status must transition to `'idle'`.
+   *   - `getUnsafeAtConnect()` must return `null` (T1-25 verdict
+   *     is clean — no alarm / run / hold / unsafe-residual-spindle).
+   */
+  private _armAutoM5OnConnect(): void {
+    const profile = getActiveProfile();
+    if (profile?.autoM5OnConnect !== true) return;
+
+    const ctrl = this.controllerRef.current;
+    const getUnsafeAtConnect =
+      typeof (ctrl as { getUnsafeAtConnect?: () => unknown }).getUnsafeAtConnect === 'function'
+        ? (ctrl as { getUnsafeAtConnect: () => unknown }).getUnsafeAtConnect.bind(ctrl)
+        : null;
+    if (getUnsafeAtConnect == null) return;
+
+    let unsubscribed = false;
+    const unsubscribe = ctrl.onStateChange((state) => {
+      if (unsubscribed) return;
+      if (state.status !== 'idle') return;
+      // Fire-or-skip is one-shot: idle is the first reporter slot
+      // T1-25 uses to record a verdict. Past idle, the verdict is
+      // either null (safe) or set (unsafe). Either way, the auto-M5
+      // window has closed.
+      unsubscribed = true;
+      try {
+        const verdict = getUnsafeAtConnect();
+        if (verdict === null) {
+          ctrl.sendCommand('M5 S0', 'internal');
+        }
+      } catch {
+        /* ignore: auto-M5 is defense-in-depth; primary safety paths
+           (T1-22, T1-23, T1-26) cover run-time M-state. */
+      } finally {
+        unsubscribe();
+      }
+    });
+  }
+
+  /**
    * T2-12 part 1: canonical writer for {@link _laserOutputState}.
    * No-op writes (next === current) skip the notify so subscribers
    * only see real transitions.
@@ -1149,6 +1201,12 @@ export class MachineService {
       // T1-22: fresh connection clears any stale unknown laser-safety state
       // from a previous session.
       this._setLaserOutputState('off');
+      // T3-90 (T1-25 follow-up): if the active profile opts in, fire
+      // `M5 S0` once the controller's first idle status report records
+      // a clean T1-25 verdict. The listener auto-unsubscribes after
+      // firing or after status enters a non-clean state. Defense-in-
+      // depth: clears any modal M3/M4 state from a previous session.
+      this._armAutoM5OnConnect();
     } catch (err) {
       if (ws) {
         try {

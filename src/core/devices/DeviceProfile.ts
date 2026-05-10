@@ -156,6 +156,29 @@ export interface DeviceProfile {
   suppressWcsConsent?: boolean;
 
   /**
+   * T3-90 (T1-25 follow-up): when true, send `M5 S0` after the connect-time
+   * safe-state handshake (T1-25) reports a clean idle/FS:0,0 verdict.
+   * Defense-in-depth on top of T1-22 (`safetyOff()`), T1-23 (pause/resume
+   * M-state assertion), and T1-26 (footer M5) which already cover the
+   * run-time cases. The connect-time gap is small: a controller can be
+   * in M3/M4 modal mode with current S=0, T1-25 reports null verdict, and
+   * a subsequent G1 starts firing at the gcode's S value. Defaults to
+   * false so the contract does not surprise users who deliberately
+   * preserve modal state across reconnects; opt-in lets diode users pin
+   * connect-time behavior to "always start with laser off".
+   *
+   * Auto-M5 only fires when:
+   *   - the active profile has `autoM5OnConnect === true`, AND
+   *   - the controller's `getUnsafeAtConnect()` returns `null`
+   *     (T1-25 verdict is clean — idle + FS:0,0).
+   *
+   * If the controller is in alarm/run/hold/door state at connect, the
+   * verdict is non-null and auto-M5 does not fire (alarm requires
+   * explicit recovery via `$X`, T2-129 territory).
+   */
+  autoM5OnConnect?: boolean;
+
+  /**
    * When true, the machine workspace legitimately includes negative X/Y machine
    * or G-code coordinates (e.g. rear origin with G92/G10 offsets). When false
    * (default for new profiles and when omitted on load), negative output/travel
