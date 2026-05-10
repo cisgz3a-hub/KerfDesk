@@ -27,6 +27,10 @@ import { computeStreamingHealth } from './streamingHealth';
 import { buildGrblFrameGcode } from './GrblFrameGcode';
 import { parseGrblStatusReport } from './GrblStatusReportParser';
 import {
+  interpretGrblSettingValue,
+  parseGrblSettingLine,
+} from './GrblSettingsParser';
+import {
   type SafetyActionResult,
   makeEmergencyStopResult,
   makeNotConnectedResult,
@@ -44,7 +48,6 @@ const REALTIME_FEED_HOLD = 0x21; // '!'
 const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
 
-const GRBL_SETTING_LINE = /^\$(\d+)=(.+)$/;
 const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 
 interface PendingLine {
@@ -2494,64 +2497,42 @@ export class GrblController implements GrblControllerApi {
     this._writeSystemLine('$$');
   }
 
-  /** Returns true if `line` was a `$N=value` setting (stored in `_grblSettings`). */
+  /**
+   * Returns true if `line` was a `$N=value` setting (stored in
+   * `_grblSettings`).
+   *
+   * T1-126: pure parsing + interpretation now lives in
+   * `GrblSettingsParser.ts`. This method is the side-effect shell:
+   * it stores the raw value in the map and applies the per-setting
+   * interpretation by reading the typed view returned by
+   * `interpretGrblSettingValue`. Behavior is byte-identical to the
+   * pre-T1-126 inline implementation.
+   */
   private _parseDollarSetting(line: string): boolean {
-    const m = line.match(GRBL_SETTING_LINE);
-    if (!m) return false;
-    const num = parseInt(m[1], 10);
-    const rawVal = m[2].trim();
-    this._grblSettings.set(num, rawVal);
+    const parsed = parseGrblSettingLine(line);
+    if (parsed === null) return false;
+    this._grblSettings.set(parsed.number, parsed.rawValue);
 
-    switch (num) {
-      case 23:
-        this._homingDir = parseInt(rawVal, 10) || 0;
-        break;
-      case 30: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v) && v > 0) {
-          this._maxSpindle = v;
-          for (const cb of this._stateListeners) {
-            cb({ ...this._state });
-          }
-        }
-        break;
+    const interpreted = interpretGrblSettingValue(parsed.number, parsed.rawValue);
+    if (interpreted.homingDir !== undefined) this._homingDir = interpreted.homingDir;
+    if (interpreted.maxSpindle !== undefined) {
+      this._maxSpindle = interpreted.maxSpindle;
+      // $30 is the only interpreted field that fires a state-listener
+      // notification. Pre-T1-126 the listener fired exactly when the
+      // pre-fix gate (finite && > 0) accepted the value, which is the
+      // same condition the parser uses to set maxSpindle, so this
+      // preserves the firing pattern.
+      for (const cb of this._stateListeners) {
+        cb({ ...this._state });
       }
-      case 32:
-        this._laserMode = parseInt(rawVal, 10) !== 0;
-        break;
-      case 130: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v)) this._bedWidth = v;
-        break;
-      }
-      case 131: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v)) this._bedHeight = v;
-        break;
-      }
-      case 110: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v)) this._maxFeedX = v;
-        break;
-      }
-      case 111: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v)) this._maxFeedY = v;
-        break;
-      }
-      case 120: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v) && v > 0) this._maxAccelX = v;
-        break;
-      }
-      case 121: {
-        const v = parseFloat(rawVal);
-        if (Number.isFinite(v) && v > 0) this._maxAccelY = v;
-        break;
-      }
-      default:
-        break;
     }
+    if (interpreted.laserMode !== undefined) this._laserMode = interpreted.laserMode;
+    if (interpreted.bedWidth !== undefined) this._bedWidth = interpreted.bedWidth;
+    if (interpreted.bedHeight !== undefined) this._bedHeight = interpreted.bedHeight;
+    if (interpreted.maxFeedX !== undefined) this._maxFeedX = interpreted.maxFeedX;
+    if (interpreted.maxFeedY !== undefined) this._maxFeedY = interpreted.maxFeedY;
+    if (interpreted.maxAccelX !== undefined) this._maxAccelX = interpreted.maxAccelX;
+    if (interpreted.maxAccelY !== undefined) this._maxAccelY = interpreted.maxAccelY;
     return true;
   }
 
