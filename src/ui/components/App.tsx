@@ -44,6 +44,7 @@ import { useQuickActionHandlers } from '../hooks/useQuickActionHandlers';
 import { useFileHandlers } from '../hooks/useFileHandlers';
 import { useAppGeneratorWorkflows } from '../hooks/useAppGeneratorWorkflows';
 import { useAppDeviceProfiles } from '../hooks/useAppDeviceProfiles';
+import { useGrblDerivedMachineInfo } from '../hooks/useGrblDerivedMachineInfo';
 import { useAppMaterialWorkflows } from '../hooks/useAppMaterialWorkflows';
 import { useContextMenu } from '../hooks/useContextMenu';
 import { useDialogs } from '../hooks/useDialogs';
@@ -60,7 +61,6 @@ import { useViewportStore } from '../stores/viewportStore';
 import { useSceneOperations } from '../hooks/useSceneOperations';
 import { useControllerConnection } from '../hooks/useControllerConnection';
 import { useMachineService } from '../hooks/useMachineService';
-import { GrblController } from '../../controllers/grbl/GrblController';
 import { sendResetWcsCommand } from '../../app/sendResetWcsCommand';
 import { CanvasViewport, type ViewportActions } from './CanvasViewport';
 import { buildAppCanvasViewportProps } from './appCanvasViewportProps';
@@ -266,55 +266,22 @@ export function App(): React.ReactElement {
   });
   const wasJobRunningRef = useRef(false);
 
-  const machinePositionForStartWizard = useMemo(() => {
-    const s = grbl.machineState;
-    if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
-    return { x: s.position.x, y: s.position.y };
-  }, [grbl.machineState]);
-
-  const liveJobCanvasPosition = useMemo(() => {
-    if (!grbl.isJobRunning) return null;
-    const s = grbl.machineState;
-    if (!s || s.status === 'disconnected' || s.status === 'connecting') return null;
-    const wp = s.position;
-    if (activeJobTransform) {
-      const canvasX = wp.x - activeJobTransform.offsetX;
-      const canvasY = activeJobTransform.flipY
-        ? activeJobTransform.flipReferenceY - wp.y + activeJobTransform.offsetY
-        : wp.y - activeJobTransform.offsetY;
-      return { x: canvasX, y: canvasY };
-    }
-    return { x: wp.x, y: wp.y };
-  }, [grbl.isJobRunning, grbl.machineState, activeJobTransform]);
+  // T2-6 Phase 3t: GRBL machine-info derivations extracted into a single
+  // hook. Memoization keys mirror the originals exactly.
+  const {
+    machinePositionForStartWizard,
+    liveJobCanvasPosition,
+    machineBedFromGrbl,
+    machineAccelFromGrbl,
+    grblMachineInfo,
+  } = useGrblDerivedMachineInfo({
+    controller: grbl.controller,
+    machineState: grbl.machineState,
+    isJobRunning: grbl.isJobRunning,
+    activeJobTransform,
+  });
 
   const connectionSidebarOpen = dialogs.showConnection && grbl.controllerReady;
-
-  // Read bed scalars each render; memoize the {width,height} object by value only so
-  // GRBL status polls (new machineState references) do not churn object identity.
-  const _bedWidth =
-    grbl.controller instanceof GrblController ? grbl.controller.getMachineInfo().bedWidth : 0;
-  const _bedHeight =
-    grbl.controller instanceof GrblController ? grbl.controller.getMachineInfo().bedHeight : 0;
-  const machineBedFromGrbl = useMemo(() => {
-    if (_bedWidth > 0 && _bedHeight > 0) return { width: _bedWidth, height: _bedHeight };
-    return null;
-  }, [_bedWidth, _bedHeight]);
-
-  const machineAccelFromGrbl = useMemo(() => {
-    const c = grbl.controller;
-    if (!c || !(c instanceof GrblController)) return null;
-    const { maxAccelX, maxAccelY } = c.getMachineInfo();
-    if (maxAccelX > 0 && maxAccelY > 0) return Math.min(maxAccelX, maxAccelY);
-    if (maxAccelX > 0) return maxAccelX;
-    if (maxAccelY > 0) return maxAccelY;
-    return null;
-  }, [grbl.controller, grbl.machineState]);
-
-  const grblMachineInfo = useMemo(() => {
-    const c = grbl.controller;
-    if (!c || !(c instanceof GrblController)) return null;
-    return c.getMachineInfo();
-  }, [grbl.controller, grbl.machineState]);
   const settingsLiveCapabilities = useSettingsLiveCapabilities(grbl.controller, grbl.machineState);
 
   const handleSceneCommitRef = useRef<((newScene: Scene) => void) | null>(null);
