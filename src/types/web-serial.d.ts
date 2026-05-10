@@ -30,11 +30,20 @@ declare global {
     electronAPI?: ElectronAPI;
   }
 
+  interface SerialPortInfo {
+    readonly usbVendorId?: number;
+    readonly usbProductId?: number;
+  }
+
   interface SerialPort {
     readonly readable: ReadableStream<Uint8Array> | null;
     readonly writable: WritableStream<Uint8Array> | null;
     open(options: { baudRate: number }): Promise<void>;
     close(): Promise<void>;
+    /** Chrome 103+: revoke the persistent permission grant for this port. */
+    forget?(): Promise<void>;
+    /** Returns USB descriptor metadata when available. */
+    getInfo?(): SerialPortInfo;
   }
 
   interface SerialConnectionEvent extends Event {

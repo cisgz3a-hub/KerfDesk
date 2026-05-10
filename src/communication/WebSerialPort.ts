@@ -11,6 +11,30 @@ import {
 } from '../transports/Transport';
 import { type SerialPortLike } from './SerialPort';
 
+/**
+ * T3-48: USB descriptor fingerprint used to match a previously-
+ * authorized port without re-prompting the user. Captured from
+ * `SerialPort.getInfo()` after a successful connect; stored
+ * per-profile so reconnects to the same device skip the picker.
+ */
+export interface DeviceFingerprint {
+  readonly usbVendorId?: number;
+  readonly usbProductId?: number;
+}
+
+/** Result returned by {@link WebSerialPort.connectKnownPortOrPrompt}. */
+export interface KnownPortConnectResult {
+  /**
+   * `true` when a previously-authorized port was opened without a
+   * `requestPort()` prompt; `false` when the prompt fallback ran
+   * (no fingerprint match, ambiguous multi-port set, or browser
+   * does not support `getPorts`).
+   */
+  readonly usedKnownPort: boolean;
+  /** Captured device fingerprint after a successful open. */
+  readonly fingerprint?: DeviceFingerprint;
+}
+
 export class WebSerialPort implements SerialPortLike {
   readonly kind = 'web-serial';
   readonly capabilities = {
@@ -112,6 +136,174 @@ export class WebSerialPort implements SerialPortLike {
       const msg = e instanceof Error ? e.message : String(e);
       throw new Error(`Failed to open serial port: ${msg}`);
     }
+  }
+
+  /**
+   * T3-48: connect to a previously-authorized port without re-
+   * prompting the user. Walks `navigator.serial.getPorts()` looking
+   * for a match against `fingerprint`; when no fingerprint is given
+   * and exactly one port has been previously authorized, that single
+   * port is reused. In every other case the call falls back to the
+   * standard `requestAndOpen` prompt.
+   *
+   * Returns `{ usedKnownPort, fingerprint }`. The fingerprint reflects
+   * the actually-opened port's `getInfo()` so callers can persist it
+   * to the profile and match the same device on next reconnect.
+   *
+   * Failure modes are identical to {@link requestAndOpen} — this
+   * method delegates to the same try/catch unwind path. Browsers that
+   * do not implement `getPorts` (Chrome <89) silently fall through to
+   * the prompt path.
+   */
+  async connectKnownPortOrPrompt(
+    baudRate: number = 115200,
+    fingerprint?: DeviceFingerprint,
+    signal?: AbortSignal,
+  ): Promise<KnownPortConnectResult> {
+    signal?.throwIfAborted();
+    const known = await WebSerialPort.getKnownPorts();
+
+    let candidate: SerialPort | null = null;
+    if (fingerprint && known.length > 0) {
+      candidate = known.find((p) => matchesFingerprint(p, fingerprint)) ?? null;
+    }
+    if (!candidate && !fingerprint && known.length === 1) {
+      // Single previously-authorized port and no profile fingerprint
+      // to match against → safe to reuse. Multiple known ports without
+      // a fingerprint is ambiguous; fall through to the prompt.
+      candidate = known[0]!;
+    }
+
+    if (candidate) {
+      await this._openExistingPort(candidate, baudRate, signal);
+      return {
+        usedKnownPort: true,
+        fingerprint: extractFingerprint(candidate),
+      };
+    }
+
+    await this.requestAndOpen(baudRate, signal);
+    return {
+      usedKnownPort: false,
+      fingerprint: this._port ? extractFingerprint(this._port) : undefined,
+    };
+  }
+
+  /**
+   * Open a `SerialPort` we already hold a reference to (e.g. one
+   * returned by `navigator.serial.getPorts()`). Mirrors the unwind
+   * path from {@link requestAndOpen}.
+   */
+  private async _openExistingPort(
+    port: SerialPort,
+    baudRate: number,
+    signal?: AbortSignal,
+  ): Promise<void> {
+    let portOpened = false;
+    let writer: WritableStreamDefaultWriter | null = null;
+    let reader: ReadableStreamDefaultReader | null = null;
+
+    try {
+      signal?.throwIfAborted();
+      await port.open({ baudRate });
+      portOpened = true;
+      signal?.throwIfAborted();
+
+      writer = port.writable?.getWriter() ?? null;
+      if (!writer) throw new Error('Failed to acquire writer lock');
+      signal?.throwIfAborted();
+
+      reader = port.readable?.getReader() ?? null;
+      if (!reader) throw new Error('Failed to acquire reader lock');
+
+      this._port = port;
+      this._writer = writer;
+      this._reader = reader;
+      this._isOpen = true;
+      this._attachNavigatorDisconnectListener(port);
+      this._startReadLoop();
+    } catch (e) {
+      if (reader) {
+        try { await reader.cancel(); } catch { /* ignore */ }
+        try { reader.releaseLock(); } catch { /* ignore */ }
+      }
+      if (writer) {
+        try { writer.releaseLock(); } catch { /* ignore */ }
+      }
+      if (portOpened) {
+        try { await port.close(); } catch { /* ignore */ }
+      }
+      this._isOpen = false;
+      this._port = null;
+      this._reader = null;
+      this._writer = null;
+
+      if (signal?.aborted) {
+        throw new Error('Connection aborted by user');
+      }
+      const msg = e instanceof Error ? e.message : String(e);
+      throw new Error(`Failed to open serial port: ${msg}`);
+    }
+  }
+
+  /**
+   * T3-48: revoke the persistent permission grant for the currently-
+   * connected port. Closes the port first (since `forget()` on an
+   * open port is implementation-defined). Safe to call when no port
+   * is open (no-op).
+   */
+  async forgetActiveDevice(): Promise<void> {
+    const port = this._port;
+    if (this._isOpen) {
+      await this.close();
+    }
+    if (!port || typeof port.forget !== 'function') return;
+    try {
+      await port.forget();
+    } catch {
+      /* policy-granted permission may reject forget */
+    }
+  }
+
+  /**
+   * T3-48: list previously-authorized ports without prompting the
+   * user. Returns an empty array on browsers that do not support
+   * `getPorts` (Chrome <89) or when Web Serial is unavailable.
+   */
+  static async getKnownPorts(): Promise<readonly SerialPort[]> {
+    if (!WebSerialPort.isSupported()) return [];
+    const serial = (navigator as unknown as {
+      serial?: { getPorts?: () => Promise<readonly SerialPort[]> };
+    }).serial;
+    if (typeof serial?.getPorts !== 'function') return [];
+    try {
+      return await serial.getPorts();
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * T3-48: revoke persistent grants for known ports matching
+   * `fingerprint`. When `fingerprint` is omitted, every previously-
+   * authorized port has its grant revoked. Returns the number of
+   * grants actually revoked. Used by the "Forget device" UI button
+   * and per-profile cleanup paths.
+   */
+  static async forgetKnownPorts(fingerprint?: DeviceFingerprint): Promise<number> {
+    const known = await WebSerialPort.getKnownPorts();
+    let forgotten = 0;
+    for (const port of known) {
+      if (fingerprint && !matchesFingerprint(port, fingerprint)) continue;
+      if (typeof port.forget !== 'function') continue;
+      try {
+        await port.forget();
+        forgotten += 1;
+      } catch {
+        /* policy-granted permission may reject forget */
+      }
+    }
+    return forgotten;
   }
 
   write(data: string): void {
@@ -228,25 +420,21 @@ export class WebSerialPort implements SerialPortLike {
       this._writer = null;
     }
     if (port) {
-      // Chain: close the handle, THEN revoke the permission grant.
-      // forget() is best-effort — browsers may reject it if the
-      // permission was granted by administrator policy, which we
-      // ignore. Not all browsers support forget() (Chrome 103+),
-      // so feature-detect. Electron ships Chromium new enough to
-      // have it, but guard for safety.
+      // T3-48: stop calling `port.forget()` on every close. Pre-T3-48
+      // every disconnect cycle revoked the persistent permission grant,
+      // forcing the user to re-pick the device on every reconnect.
+      // The persistent grant is the entire point of `getPorts()` /
+      // `connectKnownPortOrPrompt` — keep it across normal close so
+      // reconnects can reuse the previously-authorized port. Users who
+      // explicitly want to revoke the grant call {@link forgetActiveDevice}
+      // (live port) or the static {@link forgetKnownPorts} helper.
       try {
         await port.close();
       } catch {
-        // close() failed — port likely already closed from the
-        // other side. Still try forget() to release the grant.
-      }
-      const portWithForget = port as unknown as { forget?: () => Promise<void> };
-      if (typeof portWithForget.forget === 'function') {
-        try {
-          await portWithForget.forget();
-        } catch {
-          /* forget failed — e.g. policy-granted permission */
-        }
+        // close() failed — port likely already closed from the other
+        // side. We deliberately do NOT call forget() here; revoking
+        // the grant on a transient close failure would silently degrade
+        // the user's "remember my device" UX.
       }
       this._port = null;
     }
@@ -352,4 +540,51 @@ export class WebSerialPort implements SerialPortLike {
       this._closeCallback?.();
     }
   }
+}
+
+/**
+ * Read USB descriptor metadata from a `SerialPort`. Browsers that do
+ * not implement `getInfo` return an empty fingerprint, which matches
+ * any caller-supplied fingerprint (vendor/product undefined → match).
+ */
+function extractFingerprint(port: SerialPort): DeviceFingerprint {
+  if (typeof port.getInfo !== 'function') return {};
+  try {
+    const info = port.getInfo();
+    return {
+      usbVendorId: info?.usbVendorId,
+      usbProductId: info?.usbProductId,
+    };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * `true` iff the port's USB descriptor matches every populated field
+ * of the fingerprint. An undefined fingerprint field is wildcard.
+ * Returns `false` when `getInfo` is not implemented and the
+ * fingerprint requires a specific vendor/product id (we cannot
+ * confirm a match without descriptors).
+ */
+function matchesFingerprint(port: SerialPort, fingerprint: DeviceFingerprint): boolean {
+  if (typeof port.getInfo !== 'function') {
+    // Browser cannot read descriptors. If the fingerprint is empty
+    // (no vendor/product specified) we accept; otherwise we cannot
+    // verify a match.
+    return fingerprint.usbVendorId === undefined && fingerprint.usbProductId === undefined;
+  }
+  let info: SerialPortInfo;
+  try {
+    info = port.getInfo();
+  } catch {
+    return false;
+  }
+  if (fingerprint.usbVendorId !== undefined && info.usbVendorId !== fingerprint.usbVendorId) {
+    return false;
+  }
+  if (fingerprint.usbProductId !== undefined && info.usbProductId !== fingerprint.usbProductId) {
+    return false;
+  }
+  return true;
 }
