@@ -20,6 +20,7 @@ import {
   type WcsConsentSnapshot,
   type ControllerJobTicket,
   type ControllerOutput,
+  type DeviceIdentity,
   type JobHandle,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
@@ -281,6 +282,16 @@ export class GrblController implements GrblControllerApi {
   private _homingDir = 0;
   private _laserMode = false;
   /**
+   * T3-50: device identity captured from the `$I` response. `firmwareVersion`
+   * is the payload of `[VER:...]` (e.g. `1.1h.20221128:` for stock GRBL,
+   * sometimes with a trailing build tag). `buildOptions` is the payload of
+   * `[OPT:...]` (e.g. `VL,15,128`). Both are null until `$I` arrives;
+   * cleared at connect-entry and on disconnect so a second connection
+   * reading these via `getDeviceIdentity()` does not see a stale snapshot.
+   */
+  private _firmwareVersion: string | null = null;
+  private _buildOptions: string | null = null;
+  /**
    * T1-23: last observed modal spindle/laser mode. Pause sends M5 as
    * defense-in-depth, and resume reasserts this mode with S0 before
    * cycle-start so motion continues with the gcode stream's expected mode.
@@ -410,6 +421,12 @@ export class GrblController implements GrblControllerApi {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._resetMachineSettingsCache();
+    // T3-50: clear captured device identity at connect entry. The probe
+    // sends `$I` and the welcome handler captures `[VER:...]` / `[OPT:...]`
+    // into these fields. Clearing here covers the case where a previous
+    // connect partially failed without going through disconnect.
+    this._firmwareVersion = null;
+    this._buildOptions = null;
     // T1-44: clear position-confirmed at connect; the welcome handshake's first
     // status report sets it back to true.
     this._positionConfirmed = false;
@@ -666,6 +683,10 @@ export class GrblController implements GrblControllerApi {
     this._awaitingWcsQueryOk = false;
     this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
+    // T3-50: clear identity snapshot so a future reconnect surfaces the
+    // newly-attached device's identity, not the previous session's.
+    this._firmwareVersion = null;
+    this._buildOptions = null;
     // T1-20: nothing to be uncertain about when not connected.
     this._placementUncertain = false;
     // T1-44: position is no longer trustworthy after disconnect; relative-mode
@@ -697,6 +718,9 @@ export class GrblController implements GrblControllerApi {
     this._awaitingWcsQueryOk = false;
     this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
+    // T3-50: clear identity snapshot on transport-error disconnect.
+    this._firmwareVersion = null;
+    this._buildOptions = null;
     this._placementUncertain = false;
     this._positionConfirmed = false;
     this._safeStateCheckArmed = false;
@@ -1598,9 +1622,34 @@ export class GrblController implements GrblControllerApi {
       this._handleAlarm(line);
     } else if (line.startsWith('Grbl')) {
       this._updateStatus('idle');
+    } else if (this._tryParseIdentityLine(line)) {
+      /* T3-50: identity line ([VER:...] / [OPT:...]) captured */
     } else if (this._parseDollarSetting(line)) {
       /* setting line outside active $$ dump — map already updated */
     }
+  }
+
+  /**
+   * T3-50: capture firmware identity from `$I` response lines. Stock GRBL
+   * emits `[VER:1.1h.20221128:]` and `[OPT:VL,15,128]`; some forks include
+   * a build-tag suffix after a second `:`. Returns true if the line matched
+   * a `[VER:...]` or `[OPT:...]` shape so the caller can avoid a second
+   * `_parseDollarSetting` attempt on the same line.
+   */
+  private _tryParseIdentityLine(line: string): boolean {
+    if (line.startsWith('[VER:') && line.endsWith(']')) {
+      // Strip the leading `[VER:` (5 chars) and trailing `]`.
+      const payload = line.slice(5, -1).trim();
+      // Stock GRBL ends `[VER:...:]` with a trailing colon — keep the version
+      // string but drop the empty trailing build-tag if it has no content.
+      this._firmwareVersion = payload.endsWith(':') ? payload.slice(0, -1) : payload;
+      return true;
+    }
+    if (line.startsWith('[OPT:') && line.endsWith(']')) {
+      this._buildOptions = line.slice(5, -1).trim();
+      return true;
+    }
+    return false;
   }
 
   private _handleOk(): void {
@@ -2363,5 +2412,28 @@ export class GrblController implements GrblControllerApi {
     const n = parseInt(v, 10);
     if (Number.isNaN(n)) return undefined;
     return n !== 0;
+  }
+
+  /**
+   * T3-50: snapshot the device identity captured during connect / settings
+   * query. `firmwareVersion` and `buildOptions` come from the `$I` response
+   * lines `[VER:...]` and `[OPT:...]`; the bed/spindle/laser/homing fields
+   * come from the `$$` dump and follow the cache-or-null convention used by
+   * `getFirmwareHomingCycleEnabled` / `getFirmwareLaserModeEnabled`. Used by
+   * preflight rules (T3-57) and by future ConnectionManager (T2-32) profile-
+   * binding checks. Returns a fresh object on every call so callers can
+   * snapshot at preflight-time without holding a live reference.
+   */
+  getDeviceIdentity(): DeviceIdentity {
+    return {
+      firmwareVersion: this._firmwareVersion,
+      buildOptions: this._buildOptions,
+      maxSpindle: this._maxSpindle,
+      bedWidthMm: this._bedWidth > 0 ? this._bedWidth : null,
+      bedHeightMm: this._bedHeight > 0 ? this._bedHeight : null,
+      homingDirection: this._grblSettings.has(23) ? this._homingDir : null,
+      homingEnabled: this.getFirmwareHomingCycleEnabled() ?? null,
+      laserMode: this.getFirmwareLaserModeEnabled() ?? null,
+    };
   }
 }

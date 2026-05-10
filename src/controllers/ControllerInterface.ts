@@ -156,6 +156,33 @@ export type FrameOperationResult =
   | { ok: true; message?: string }
   | { ok: false; reason: string; message?: string; blockedAtLine?: number };
 
+/**
+ * T3-50: snapshot of device identity captured during the connect handshake.
+ *
+ * `firmwareVersion` and `buildOptions` come from the GRBL `$I` response
+ * lines (`[VER:...]` / `[OPT:...]`); the bed/spindle/laser/homing fields
+ * come from the `$$` settings dump. Each field is `null` when the
+ * controller has not (yet) reported it — fingerprinting is best-effort,
+ * and a controller that drops `$I` packets still produces a partial
+ * identity rather than rejecting the connect.
+ *
+ * Used by:
+ *  - preflight rules (T3-57) to compare profile vs live identity
+ *  - ConnectionManager (T2-32, future) for profile-binding checks
+ *  - reconnect-same-machine verification (T3-51, future)
+ *  - T3-58 capability-confidence UI rendering
+ */
+export interface DeviceIdentity {
+  readonly firmwareVersion: string | null;
+  readonly buildOptions: string | null;
+  readonly maxSpindle: number | null;
+  readonly bedWidthMm: number | null;
+  readonly bedHeightMm: number | null;
+  readonly homingDirection: number | null;
+  readonly homingEnabled: boolean | null;
+  readonly laserMode: boolean | null;
+}
+
 export interface DisconnectOptions {
   reason?: string;
   skipStop?: boolean;
