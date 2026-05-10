@@ -19900,6 +19900,8 @@ Compression is opt-in via flag in the stored record, so old uncompressed logs co
 
 **Cross-check note (audit 5C):** Audit's Priority 12.
 
+**Status:** Shipped in `<TBD>` — pure-policy slice. New module `src/diagnostics/RetentionPolicy.ts` exports `RetentionPolicy` interface, `DEFAULT_RETENTION_POLICY` (matching audit 5C: 100 summaries, 10 detailed, 30-day failed-pin, 20 replays, 20 crash reports, last failed + last successful RX/TX trace), and four selection helpers — `selectKeptJobLogs(logs, policy, now, { withDetailed })`, `selectKeptReplays(replays, policy, now)`, `selectKeptCrashReports(reports, policy)`, `selectKeptRxTxTraces(traces, policy)` — plus the `sortByStartedAtDesc` primitive. Each selector is pure (no storage I/O, no mutation). `selectKeptJobLogs` and `selectKeptReplays` implement the failed-job pinning rule: `failed` and `failed_to_start` records younger than `policy.*.failedAgeMs` are retained even when they fall outside the count cap; older failed records are NOT pinned. Successful records are kept newest-first up to the count cap. `selectKeptRxTxTraces` keeps last failed + last successful regardless of intermediate count. Pinned by `tests/retention-policy.test.ts` (36 contracts: default-policy values, sort-without-mutation, summary/detailed cap behavior, 5-day failed pinned past tight summary cap, 60-day failed not pinned past horizon, `failed_to_start` counts as failed for pinning, no-duplicate when both recent and failed, replays count + pin, crash-reports count-only, RX/TX last-failed+last-successful selection, only-failed traces, empty input, source pin asserting the module imports neither storage nor JobLog). **Out of scope (future T3-87 follow-up slices):** wiring the selectors into `src/core/job/JobLog.ts` to replace `MAX_RETAINED_LOGS = 5`, into `src/core/job/JobReplay.ts` to replace `MAX_RETAINED_REPLAYS = 20`, and adding optional gzip compression to RX/TX trace persistence. Current production retention is unchanged. **Hardware verification not required** (pure policy + selection helpers; no storage I/O changed).
+
 ---
 
 ### T3-88 | IPC fuzz test suite 鈥?every handler tested with malformed and oversized inputs
@@ -20578,7 +20580,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
 - [ ] T3-85 Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
 - [x] T3-86 Native module packaging smoke test 鈥?packaged-app launches + serialport loads + storage works (Shipped — build-config smoke-test slice in `<TBD>`; `tests/packaged-app-smoke/packaged-app-build-config.test.ts` pins build pipeline contract; Playwright-based packaged-exe runner deferred until T2-98 CI runners land)
-- [ ] T3-87 Log retention policy 鈥?per-domain caps, failed-job pinning, compression (filed; pairs with T2-108/116)
+- [x] T3-87 Log retention policy 鈥?per-domain caps, failed-job pinning, compression (Shipped — pure-policy slice in `<TBD>`; `src/diagnostics/RetentionPolicy.ts` ships per-domain selectors + 30-day failed-job pin; live JobLog/JobReplay wiring deferred until follow-up slice)
 - [ ] T3-88 IPC fuzz test suite 鈥?every handler tested with malformed inputs (filed; recurring CI quality gate)
 - [ ] T3-89 Production security build CI checks (filed; extends T1-81)
 - [ ] T3-90 Profile opt-in: auto-send M5 S0 after T1-25 safe-state handshake passes (filed; T1-25 follow-up)
