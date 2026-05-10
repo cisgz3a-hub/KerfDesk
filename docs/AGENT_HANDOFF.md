@@ -9,17 +9,19 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `4d75922` (`test(connection): T3-54 connection-lifecycle coverage
+  `2f1174a` (`test(capability): T3-59 capability regression coverage
   manifest`). Always verify live HEAD with `git log --oneline -1`
   before editing.
-- Last shipped roadmap item: `T3-54` connection-lifecycle coverage
-  manifest. Recent slices: T3-51 identity comparator in `06a2941`,
-  T3-50 device identity capture in `7cd31e0`, T3-48 device-reuse flow
-  in `56d87ff`, T3-47 safety-routing audit in `01f0948`, T3-46 split-
-  profile schema in `72f30b5`, T3-44 generic progress model in
-  `aa08f44`, T3-43 controller-matrix in `5d19289`.
-- Next roadmap item: `T3-55` Falcon autofocus profile-heal must check
-  live firmware version before enabling autofocus.
+- Last shipped roadmap item: `T3-59` capability regression coverage
+  manifest. Recent slices: T3-57 capability-mismatch rules in
+  `5103ecb`, T3-55 Falcon autofocus firmware gate in `88d9e20`, T3-54
+  connection-lifecycle coverage manifest in `4d75922`, T3-51 identity
+  comparator in `06a2941`, T3-50 device identity capture in `7cd31e0`,
+  T3-48 device-reuse flow in `56d87ff`, T3-47 safety-routing audit in
+  `01f0948`, T3-46 split-profile schema in `72f30b5`, T3-44 generic
+  progress model in `aa08f44`, T3-43 controller-matrix in `5d19289`.
+- Next roadmap item: `T3-83` Tamper-resistance test suite (T3-60..T3-82
+  already shipped per master checklist).
 
 ## What To Read First
 
@@ -89,20 +91,20 @@ follow-up commit rather than re-opening the master-checklist line.
 
 ## Expected Next Step
 
-Continue strict roadmap order with **T3-55 — Falcon autofocus
-profile-heal must check live firmware version before enabling
-autofocus**. The headline issue is that `backfillFalconAutofocus` in
-`src/core/devices/DeviceProfile.ts` unconditionally enables autofocus
-for any Falcon A1 Pro brand/model match, but the `$HZ1` autofocus
-command requires firmware ≥1.0.38. With T3-50 having shipped (the
-captured `DeviceIdentity.firmwareVersion`), the heal can now consult
-the live firmware version before flipping `autoFocusSupported: true`.
+Continue strict roadmap order with **T3-83 — Tamper-resistance
+test suite**. The headline change is incremental: ship a test
+slice that pins the entitlement-tamper protections that are
+already in place (token signature verification, clock-tamper
+detection, monkey-patch resistance), and explicitly deferred for
+work that depends on Tier-2 entitlement tickets (T2-89 / T2-90 /
+T2-94) not yet shipped.
 
-T3-48 (`WebSerialPort` no-forget-on-close) still needs hardware
-verification on Falcon A1 Pro before release tagging: connect,
-disconnect, reconnect; confirm the second connect prompt is not
-shown.
-
-T3-50 also needs hardware verification — confirm `[VER:1.1h:]` is
-captured by the parser on the real Falcon, and inspect
-`getDeviceIdentity()` after a real connect.
+Hardware verification still owed before release tagging:
+- T3-48 device-reuse flow: connect, disconnect, reconnect on
+  Falcon A1 Pro; confirm second connect prompt is not shown.
+- T3-50 device identity capture: confirm `[VER:1.1h:]` parses on
+  the real Falcon and `getDeviceIdentity()` returns expected
+  fields after a real connect.
+- T3-55 Falcon autofocus firmware gate: once a profile-load
+  caller threads the live firmware version through, confirm
+  autofocus is correctly gated on a known-old firmware build.
