@@ -18098,6 +18098,8 @@ Many of these tests get written naturally inside the corresponding ticket. T3-59
 
 **Cross-check note (audit 3C):** Audit's Priority 12. The matrix is the test plan.
 
+**Status:** Shipped in `<TBD>` — coverage-manifest slice. Added `tests/capability-regression/capability-regression-coverage.test.ts`, a regression-roundup that maps every audit-3C-Priority-12 scenario (#1–#12) to its enabling-ticket's existing test file with required-content markers per row. 14 rows span enabling tickets T1-32 / T1-33 / T1-55 / T2-25 / T2-38 / T2-40 / T3-43 / T3-50 / T3-51 / T3-55 / T3-56 / T3-57 / T3-58 / T3-61. Each row asserts the test file exists and contains the expected ticket id plus scenario-specific symbols (`canExecuteOperation`, `getDeviceIdentity`, `compareIdentities`, `firmwareVersionAtLeast`, `MAXSPINDLE_UNKNOWN`, `Profile only`, etc.). Roundup-asserts that every Priority-12 scenario number 1..12 is represented (no audit row dropped) and that the manifest spans 11+ enabling tickets. Self-pin asserts the T3-59 marker plus the audit-3C-Priority-12 reference are preserved in the manifest file. 55/55 contracts. Same pattern as T3-54 connection-lifecycle coverage roundup. **Out of scope:** behavioral end-to-end roundup (would duplicate per-ticket tests). **Hardware verification not required** (test-coverage roundup; no production behavior changed).
+
 ---
 
 ### T3-60 | Disconnect-stops-job capability gating
@@ -20542,7 +20544,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-56 Conservative unknown-capability handling (Shipped in `ebd614c` - connected M4 output now blocks until `$32` laser mode is known)
 - [x] T3-57 Expand preflight mismatch rules ($22, $110/$111, $120/$121, model identity) (Shipped — pure-rule slice in `<TBD>`; `checkCapabilityMismatches` returns structured findings for $22 / $110 / $111 / $120 / $121 / bed-envelope mismatches; orchestrator wiring deferred until preflight context threads live identity)
 - [x] T3-58 UI verified / unknown / stale capability indicators (Shipped in `ec6b224` - Machine Settings shows verified/profile-only/unknown capability confidence)
-- [ ] T3-59 Capability regression test suite (filed; depends on T1-52 through T3-58)
+- [x] T3-59 Capability regression test suite (Shipped — coverage-manifest slice in `<TBD>`; `tests/capability-regression/capability-regression-coverage.test.ts` maps every audit-3C-Priority-12 scenario to its enabling-ticket test file with required-content markers)
 - [x] T3-60 Disconnect-stops-job capability gating (Shipped in `4324ece` - non-host-stream controllers must abort before disconnect)
 - [x] T3-61 Per-controller-family safety regression tests (Shipped in `288ae17` - unknown/non-GRBL controllers now refuse job start and risky safety operations without explicit capability)
 - [x] T3-62 Ruida controller safety stub 鈥?design before implementation (Shipped in `f24ef82` - design doc only; no production Ruida controller added)
