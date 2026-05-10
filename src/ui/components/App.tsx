@@ -188,6 +188,7 @@ export function App(): React.ReactElement {
       sceneRef,
       selectedIdsRef,
       hashScene: hashSceneForPersistence,
+      controllerRef: grbl.controllerRef,
     });
   }, []);
 
