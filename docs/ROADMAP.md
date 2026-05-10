@@ -19465,7 +19465,7 @@ These are integration tests 鈥?they spin up the App with a controlled environme
 
 T3-78 and T3-80 are unit-level tests for individual tickets. T3-81 is the cross-cutting workflow suite that protects against composition regressions.
 
-**Status:** Shipped in `<TBD>` — `tests/end-to-end-workflows/end-to-end-workflows.test.ts` adds a 40-assertion cross-cutting regression suite for the 12 audit workflows: SVG import/edit/save/reload/compile/start, undo-after-compile stale start blocking, undo-after-frame stale readiness, async trace stale-scene protection, autosave failure dirty-state preservation, project repair reports, disconnect and alarm recovery gates, stop-failure user surfacing, large-raster history budget eviction, profile snapshot drift, and material preset drift warnings. The suite uses controlled storage and mock controllers; no production machine behavior changed. **Hardware verification not required** (test coverage only).
+**Status:** Shipped in `a3275c6` — `tests/end-to-end-workflows/end-to-end-workflows.test.ts` adds a 40-assertion cross-cutting regression suite for the 12 audit workflows: SVG import/edit/save/reload/compile/start, undo-after-compile stale start blocking, undo-after-frame stale readiness, async trace stale-scene protection, autosave failure dirty-state preservation, project repair reports, disconnect and alarm recovery gates, stop-failure user surfacing, large-raster history budget eviction, profile snapshot drift, and material preset drift warnings. The suite uses controlled storage and mock controllers; no production machine behavior changed. **Hardware verification not required** (test coverage only).
 
 **Estimate:** ~3-4 sessions for the 12 scenarios + harness/mock setup.
 
@@ -20539,7 +20539,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-78 Save/load stress test suite (Shipped in `8ad1f6d` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
 - [x] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (Shipped in `15c9181` — explicit group/ungroup scene ops, parent graph validation/repair, and safe clone parent-id remapping)
 - [x] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (Shipped in `75582d3` — cross-cutting undo/redo harness covers dirty/stale invalidation, preview coalescing, async guards, selection restore, cache stripping, redo branching, and group history)
-- [x] T3-81 End-to-end workflow integration test suite (Shipped in `<TBD>` — 40-assertion cross-cutting suite for import/save/reload/start, stale gates, async trace guard, recovery, history memory, profile drift, and material drift workflows)
+- [x] T3-81 End-to-end workflow integration test suite (Shipped in `a3275c6` — 40-assertion cross-cutting suite for import/save/reload/start, stale gates, async trace guard, recovery, history memory, profile drift, and material drift workflows)
 - [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)
 - [ ] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
 - [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
