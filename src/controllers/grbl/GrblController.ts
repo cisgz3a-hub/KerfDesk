@@ -305,6 +305,16 @@ export class GrblController implements GrblControllerApi {
   private _maxAccelY = 0;
   /** Waiting for trailing `ok` after a `$$` settings dump. */
   private _awaitingSettingsOk = false;
+  /**
+   * T3-50: waiting for trailing `ok` after a `$I` identity query.
+   * Set just before `_writeSystemLine('$I')` in `_queryMachineSettings`
+   * and cleared by the first subsequent `ok`. While true, `[VER:...]`
+   * / `[OPT:...]` lines route to `_tryParseIdentityLine` in the
+   * identity-await branch of `_handleLine`; the trailing `ok` is
+   * consumed there before reaching the `_awaitingSettingsOk` branch
+   * for `$$`.
+   */
+  private _awaitingIdentityOk = false;
   /** Waiting for `ok` after a `$#` WCS / parameter report. */
   private _awaitingWcsQueryOk = false;
   /** Waiting for `ok` after a one-off `$#` work-offset request. */
@@ -680,6 +690,7 @@ export class GrblController implements GrblControllerApi {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
+    this._awaitingIdentityOk = false;
     this._awaitingWcsQueryOk = false;
     this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
@@ -715,6 +726,7 @@ export class GrblController implements GrblControllerApi {
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
+    this._awaitingIdentityOk = false;
     this._awaitingWcsQueryOk = false;
     this._finishWorkOffsetRequest(null);
     this._currentG54 = null;
@@ -1599,6 +1611,24 @@ export class GrblController implements GrblControllerApi {
       return;
     }
 
+    // T3-50: identity-await runs BEFORE settings-await so the `$I`
+    // ok is consumed here and never reaches the `$$` branch. `[VER:]`
+    // / `[OPT:]` lines also route through here so the parser captures
+    // them deterministically even while `_awaitingSettingsOk` is true
+    // (post-`$$`-write but pre-first-`$$`-response).
+    if (this._awaitingIdentityOk) {
+      if (line === 'ok') {
+        this._awaitingIdentityOk = false;
+        return;
+      }
+      if (line.startsWith('error:')) {
+        this._awaitingIdentityOk = false;
+        // Fall through to surface the error.
+      } else if (this._tryParseIdentityLine(line)) {
+        return;
+      }
+    }
+
     if (this._awaitingSettingsOk) {
       if (line === 'ok') {
         this._onSettingsDollarOk();
@@ -2249,6 +2279,18 @@ export class GrblController implements GrblControllerApi {
     this._resetMachineSettingsCache();
     this._maxSpindle = null;
     this._settingsQueried = false;
+    // T3-50: solicit `$I` before `$$` so `[VER:...]` / `[OPT:...]`
+    // are captured even when the Falcon's welcome banner arrives
+    // before the connect-time `$I` probe fires. Both awaits arm
+    // before either ok arrives; `_awaitingIdentityOk` runs first in
+    // `_handleLine` so the `$I` ok is consumed by the identity
+    // branch and never reaches the settings branch. `[VER:]` /
+    // `[OPT:]` lines are captured by `_tryParseIdentityLine` in the
+    // identity branch as well; once the `$I` ok clears the flag,
+    // the `$$` response stream is consumed by the settings branch
+    // unchanged.
+    this._awaitingIdentityOk = true;
+    this._writeSystemLine('$I');
     this._awaitingSettingsOk = true;
     this._writeSystemLine('$$');
   }
