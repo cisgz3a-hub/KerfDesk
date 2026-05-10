@@ -26,11 +26,15 @@ export interface TemplateFinding {
   message: string;
 }
 
+export type TemplateValidationDialect = 'grbl' | 'marlin' | 'smoothie' | 'ruida' | 'custom';
+
 export interface TemplateValidationInput {
   customStart?: string;
   customEnd?: string;
   headerTemplate?: string;
   footerTemplate?: string;
+  /** T3-42: choose GRBL-specific vs generic/Ruida validation rules. Defaults to GRBL. */
+  dialect?: TemplateValidationDialect | string;
   templateContext: GcodeTemplateContext;
   bedWidthMm: number;
   bedHeightMm: number;
@@ -73,6 +77,65 @@ export function buildPreflightTemplateContext(
 }
 
 export function validateGcodeTemplates(input: TemplateValidationInput): TemplateFinding[] {
+  return getTemplateValidatorForDialect(input.dialect)(input);
+}
+
+type TemplateValidator = (input: TemplateValidationInput) => TemplateFinding[];
+
+export function templateValidationDialectFromProfile(
+  profile: Pick<DeviceProfile, 'outputDialect' | 'outputFormat'> | null | undefined,
+): TemplateValidationDialect {
+  return normalizeTemplateDialect(profile?.outputDialect ?? profile?.outputFormat);
+}
+
+export function getTemplateValidatorForDialect(dialect: string | null | undefined): TemplateValidator {
+  const normalized = normalizeTemplateDialect(dialect);
+  switch (normalized) {
+    case 'ruida':
+      return validateRuidaTemplates;
+    case 'marlin':
+    case 'smoothie':
+    case 'custom':
+      return validateGenericGcodeTemplates;
+    case 'grbl':
+    default:
+      return validateGrblTemplates;
+  }
+}
+
+function normalizeTemplateDialect(dialect: string | null | undefined): TemplateValidationDialect {
+  const raw = (dialect ?? 'grbl').trim().toLowerCase();
+  if (raw.includes('ruida')) return 'ruida';
+  if (raw.includes('marlin')) return 'marlin';
+  if (raw.includes('smoothie')) return 'smoothie';
+  if (raw.includes('custom')) return 'custom';
+  return 'grbl';
+}
+
+function validateGrblTemplates(input: TemplateValidationInput): TemplateFinding[] {
+  return validateTemplatesWithResolvedText(input, validateGrblResolvedText, true);
+}
+
+function validateGenericGcodeTemplates(input: TemplateValidationInput): TemplateFinding[] {
+  return validateTemplatesWithResolvedText(input, validateGenericGcodeResolvedText, true);
+}
+
+function validateRuidaTemplates(_input: TemplateValidationInput): TemplateFinding[] {
+  // T3-42: Ruida output is binary/device-native; LaserForge does not expose
+  // user-editable G-code templates for that dialect, so GRBL rules like $X,
+  // $H, and M5 footer hygiene are meaningless here.
+  return [];
+}
+
+function validateTemplatesWithResolvedText(
+  input: TemplateValidationInput,
+  validateResolved: (
+    text: string,
+    source: TemplateSource,
+    input: TemplateValidationInput,
+  ) => TemplateFinding[],
+  checkFooterLaserOff: boolean,
+): TemplateFinding[] {
   const findings: TemplateFinding[] = [];
 
   const sources: Array<{ name: TemplateSource; text: string | undefined; isTemplate: boolean }> = [
@@ -97,10 +160,10 @@ export function validateGcodeTemplates(input: TemplateValidationInput): Template
       ? renderTemplate(src.text, input.templateContext)
       : src.text;
 
-    findings.push(...validateResolvedText(resolved, src.name, input));
+    findings.push(...validateResolved(resolved, src.name, input));
   }
 
-  if (shouldCheckFooterLaserOff(input)) {
+  if (checkFooterLaserOff && shouldCheckFooterLaserOff(input)) {
     const footerRendered = input.footerTemplate?.trim()
       ? renderTemplate(input.footerTemplate!, input.templateContext)
       : '';
@@ -139,10 +202,27 @@ function isSafeQueryDollar(line: string): boolean {
   );
 }
 
+function validateGrblResolvedText(
+  text: string,
+  source: TemplateSource,
+  input: TemplateValidationInput,
+): TemplateFinding[] {
+  return validateResolvedText(text, source, input, true);
+}
+
+function validateGenericGcodeResolvedText(
+  text: string,
+  source: TemplateSource,
+  input: TemplateValidationInput,
+): TemplateFinding[] {
+  return validateResolvedText(text, source, input, false);
+}
+
 function validateResolvedText(
   text: string,
   source: TemplateSource,
   input: TemplateValidationInput,
+  grblSpecific: boolean,
 ): TemplateFinding[] {
   const findings: TemplateFinding[] = [];
   const lines = text.split(/\r?\n/);
@@ -164,11 +244,11 @@ function validateResolvedText(
       });
     };
 
-    if (line === '$X') {
+    if (grblSpecific && line === '$X') {
       push('error', 'TEMPLATE_UNLOCK', '$X unlocks the alarm state and must not appear in templates or custom G-code.');
       continue;
     }
-    if (/^\$RST=[*#$]$/i.test(line)) {
+    if (grblSpecific && /^\$RST=[*#$]$/i.test(line)) {
       push(
         'error',
         'TEMPLATE_EEPROM_RESET',
@@ -176,11 +256,11 @@ function validateResolvedText(
       );
       continue;
     }
-    if (line === '$SLP') {
+    if (grblSpecific && line === '$SLP') {
       push('error', 'TEMPLATE_SLEEP', '$SLP puts the controller to sleep and must not appear in templates or custom G-code.');
       continue;
     }
-    if (/^\$\d+=/.test(line)) {
+    if (grblSpecific && /^\$\d+=/.test(line)) {
       const key = line.split('=')[0] ?? line;
       push(
         'error',
@@ -308,7 +388,7 @@ function validateResolvedText(
       );
     }
 
-    if (/^\$/.test(line) && !isSafeQueryDollar(line)) {
+    if (grblSpecific && /^\$/.test(line) && !isSafeQueryDollar(line)) {
       push(
         'warning',
         'TEMPLATE_UNKNOWN_DOLLAR',

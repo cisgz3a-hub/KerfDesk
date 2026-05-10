@@ -3,6 +3,7 @@ import { PREFLIGHT_CODES } from '../Preflight';
 import {
   buildPreflightTemplateContext,
   resolveFooterTemplateForValidation,
+  templateValidationDialectFromProfile,
   validateGcodeTemplates,
 } from '../GcodeTemplateValidator';
 
@@ -26,6 +27,7 @@ export function runGcodeTemplateSemanticValidation(
     customEnd: profile.endGcode,
     headerTemplate: profile.gcodeHeaderTemplate,
     footerTemplate: resolveFooterTemplateForValidation(profile),
+    dialect: templateValidationDialectFromProfile(profile),
     templateContext,
     bedWidthMm: ctx.preflightBedWidthMm,
     bedHeightMm: ctx.preflightBedHeightMm,
@@ -48,6 +50,7 @@ export function runGcodeTemplateSemanticValidation(
 }
 
 export function runTemplateChecks(ctx: PreflightContext, out: PreflightResult[]): void {
+  if (templateValidationDialectFromProfile(ctx.profile) !== 'grbl') return;
   if (!ctx.gcodeHeaderPreview) return;
   if (ctx.profile?.homingEnabled && !/\$H/.test(ctx.gcodeHeaderPreview)) {
     out.push({
