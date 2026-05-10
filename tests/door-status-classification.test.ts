@@ -190,14 +190,25 @@ async function run(): Promise<void> {
       resolve(here, '../src/controllers/grbl/GrblController.ts'),
       'utf-8',
     );
-    assert(/door:\s*'door'/.test(grblSrc),
-      'GrblController.ts statusMap includes door entry');
-    assert(/'door:0':\s*'door'/.test(grblSrc),
-      'GrblController.ts statusMap includes door:0 entry');
-    assert(/T1-followup-safety-door/.test(grblSrc),
-      'GrblController.ts carries T1-followup-safety-door marker');
-    assert(!/'door' GRBL status is intentionally not classified/.test(grblSrc),
-      "GrblController.ts no longer carries the 'intentionally not classified' carve-out comment");
+    // T1-124: the runtime statusMap moved from GrblController._handleStatusReport
+    // to GrblStatusReportParser.ts as part of the audit's Sprint 4
+    // "extract pure parsers first" sequence. Source-pin the parser
+    // module directly; GrblController is now just verified to delegate
+    // to the parser.
+    assert(/parseGrblStatusReport\(raw\)/.test(grblSrc),
+      'GrblController._handleStatusReport delegates to parseGrblStatusReport');
+    const parserSrc = readFileSync(
+      resolve(here, '../src/controllers/grbl/GrblStatusReportParser.ts'),
+      'utf-8',
+    );
+    assert(/door:\s*'door'/.test(parserSrc),
+      'GrblStatusReportParser.ts statusMap includes door entry');
+    assert(/'door:0':\s*'door'/.test(parserSrc),
+      'GrblStatusReportParser.ts statusMap includes door:0 entry');
+    assert(/T1-followup-safety-door|T1-115/.test(grblSrc + parserSrc),
+      'door support carries the T1-followup-safety-door / T1-115 marker somewhere in the GRBL parser stack');
+    assert(!/'door' GRBL status is intentionally not classified/.test(grblSrc + parserSrc),
+      "GRBL parser stack no longer carries the 'intentionally not classified' carve-out comment");
 
     const ifaceSrc = readFileSync(
       resolve(here, '../src/controllers/ControllerInterface.ts'),

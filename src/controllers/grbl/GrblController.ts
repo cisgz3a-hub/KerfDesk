@@ -7,7 +7,6 @@ import {
   type GrblControllerApi,
   type MachineState,
   type MachineStatus,
-  type MachinePosition,
   type JobProgress,
   type OperationResult,
   type FrameOperationResult,
@@ -26,6 +25,7 @@ import {
 import { type SerialPortLike } from '../../communication/SerialPort';
 import { computeStreamingHealth } from './streamingHealth';
 import { buildGrblFrameGcode } from './GrblFrameGcode';
+import { parseGrblStatusReport } from './GrblStatusReportParser';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -2049,27 +2049,17 @@ export class GrblController implements GrblControllerApi {
 
   private _handleStatusReport(raw: string): void {
     this._recordJobStatusHeartbeatResponse();
-    const content = raw.slice(1, -1);
-    const parts = content.split('|');
-    if (parts.length === 0) return;
+    // T1-124: pure parsing now lives in `parseGrblStatusReport`
+    // (src/controllers/grbl/GrblStatusReportParser.ts) — first slice
+    // of the audit's Sprint 4 "extract pure parsers first" sequence.
+    // The parser returns a structured record; this method applies
+    // side effects (state mutation, pause/resume bookkeeping,
+    // job-abort gates, safe-state-at-connect verdict). Behavior is
+    // byte-identical to the pre-T1-124 inline implementation.
+    const parsed = parseGrblStatusReport(raw);
+    if (parsed.stateWord === null) return;
 
-    const stateStr = parts[0].toLowerCase();
-    // T1-followup-safety-door: door is a first-class status. GRBL emits
-    // `Door`, `Door:0`, `Door:1`, and (rarely) `Door:2`/`Door:3` to
-    // signal subphases of the interlock cycle (parking, restoring,
-    // door-still-ajar). Treat all `door:*` variants as status `door`
-    // and let the safety preflight / OperationGate decide what to
-    // block. `door` matching takes precedence over the prefix `door`
-    // → `hold` mapping in machineStatusFromGrblReportToken so a live
-    // open-interlock event doesn't show up as a feed-hold.
-    const statusMap: Record<string, MachineStatus> = {
-      idle: 'idle', run: 'run', hold: 'hold',
-      'hold:0': 'hold', 'hold:1': 'hold',
-      alarm: 'alarm', home: 'homing', check: 'check',
-      door: 'door', 'door:0': 'door', 'door:1': 'door',
-      'door:2': 'door', 'door:3': 'door',
-    };
-    const newStatus = statusMap[stateStr];
+    const newStatus = parsed.machineStatus;
     if (newStatus && this._state.status !== 'disconnected' && this._state.status !== 'connecting') {
       if (this._pausePending) {
         if (newStatus === 'hold' || newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
@@ -2110,48 +2100,14 @@ export class GrblController implements GrblControllerApi {
       }
     }
 
-    let mPos: MachinePosition | null = null;
-    let wPos: MachinePosition | null = null;
+    if (parsed.feedRate != null) this._state.feedRate = parsed.feedRate;
+    if (parsed.spindleSpeed != null) this._state.spindleSpeed = parsed.spindleSpeed;
 
-    for (let i = 1; i < parts.length; i++) {
-      const colonIdx = parts[i].indexOf(':');
-      if (colonIdx < 0) continue;
-      const key = parts[i].slice(0, colonIdx);
-      const value = parts[i].slice(colonIdx + 1);
-
-      switch (key) {
-        case 'MPos': {
-          const coords = value.split(',').map(Number);
-          if (coords.length >= 2) {
-            mPos = { x: coords[0], y: coords[1], z: coords[2] || 0 };
-          }
-          break;
-        }
-        case 'WPos': {
-          const coords = value.split(',').map(Number);
-          if (coords.length >= 2) {
-            wPos = { x: coords[0], y: coords[1], z: coords[2] || 0 };
-          }
-          break;
-        }
-        case 'FS': {
-          const [feed, spindle] = value.split(',').map(Number);
-          this._state.feedRate = feed || 0;
-          this._state.spindleSpeed = spindle || 0;
-          break;
-        }
-        case 'F': {
-          this._state.feedRate = Number(value) || 0;
-          break;
-        }
-      }
-    }
-
-    if (wPos) {
-      this._state.position = wPos;
+    if (parsed.wPos) {
+      this._state.position = parsed.wPos;
       this._positionConfirmed = true; // T1-44
-    } else if (mPos) {
-      this._state.position = mPos;
+    } else if (parsed.mPos) {
+      this._state.position = parsed.mPos;
       this._positionConfirmed = true; // T1-44
     }
 
