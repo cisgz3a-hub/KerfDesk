@@ -361,8 +361,13 @@ app.on('before-quit', (e) => {
 
 // ─── NATIVE FILE DIALOGS ─────────────────────────────────────────
 
-ipcMain.handle('dialog:save', async (event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:save', async (event, defaultName: unknown, content: unknown) => {
   assertTrustedSender(event);
+  // T3-88: runtime type-guards. TS-typed parameters do not protect
+  // against ipcRenderer passing arbitrary values; defense-in-depth
+  // here keeps `fs.writeFileSync` from being handed `[object Object]`.
+  if (typeof defaultName !== 'string') throw new Error('Invalid default file name');
+  if (typeof content !== 'string') throw new Error('Invalid file content');
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
@@ -376,8 +381,11 @@ ipcMain.handle('dialog:save', async (event, defaultName: string, content: string
   return true;
 });
 
-ipcMain.handle('dialog:saveGcode', async (event, defaultName: string, content: string) => {
+ipcMain.handle('dialog:saveGcode', async (event, defaultName: unknown, content: unknown) => {
   assertTrustedSender(event);
+  // T3-88: runtime type-guards. Same rationale as `dialog:save`.
+  if (typeof defaultName !== 'string') throw new Error('Invalid default file name');
+  if (typeof content !== 'string') throw new Error('Invalid file content');
   if (!mainWindow) return false;
   const result = await dialog.showSaveDialog(mainWindow, {
     defaultPath: defaultName,
