@@ -5,6 +5,14 @@
 **Method:** Static probe of the working tree against every ticket in `docs/ROADMAP.md`. Each row backed by code identifier search, file existence, test file existence, or explicit T-marker comment in source. Where a ticket has multiple parts, each part assessed.
 **Companion file:** `docs/ROADMAP.md` (the master ticket list).
 
+> **Planning note, 2026-05-10:** The shipped rows in this file remain useful
+> audit evidence, but some headline and historical "Open" sections below were
+> produced during the 2026-04-30 audit and are no longer current planning
+> counts. For strict roadmap execution, use the master checklist at the bottom
+> of `docs/ROADMAP.md`. Direct checklist count on `master` before this note:
+> T0 open 0, T1 open 10, T2 open 3, T3 open 26, and T4 represented by one
+> broad backlog line (`T4-1 through T4-9`). Active open checklist lines: 40.
+
 ---
 
 ## How this file is maintained
@@ -31,6 +39,9 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 
 ## Headline numbers
 
+The original 2026-04-30 audit snapshot is preserved for evidence history. It
+must not be used as the current open-ticket count.
+
 | Tier | Total | Fully shipped | Partial | Open | Shipped + partial |
 |---|---|---|---|---|---|
 | 0 | 4 | **4** | 0 | 0 | **100%** |
@@ -40,10 +51,21 @@ This file is the **verified ledger** that pairs with `docs/ROADMAP.md`. It exist
 | 4 | 9 | **2** | 0 | **7** | ~22% |
 | **Total** | **323** | ~49 | 6 | ~210 confirmed-or-likely | 鈥?|
 
+Current checklist snapshot from `docs/ROADMAP.md` on 2026-05-10:
+
+| Tier | Shipped/closed | Open | Planning note |
+|---|---:|---:|---|
+| T0 | 4 | 0 | Fully closed. |
+| T1 | 85 | 10 | Remaining lines are mostly hardware-verification gates. |
+| T2 | 127 | 3 | Open: T2-6, T2-30, T2-95. |
+| T3 | 66 | 26 | Current strict-roadmap work starts at T3-43 after T3-42. |
+| T4 | 0 | 1 broad line | `T4-1 through T4-9`; this audit still lists 7 concrete later items. |
+| **Checklist total** | **282** | **40** | Counted from checked/unchecked master checklist lines. |
+
 **Gate status (per `docs/ROADMAP.md` 搂 Release Readiness):**
 
 - **Gate 1 鈥?Private Technical Alpha: cleared.** Every Gate 1 cluster ticket (dirty-state, commercial credibility, diagnostic recovery, installer correctness, easy security wins, architectural safety) is shipped.
-- **Gate 2 鈥?Public Beta: open.** Tier 2 architectural work is the path; ~115 tickets remaining of various sizes.
+- **Gate 2 鈥?Public Beta: open.** The current master checklist has only three Tier 2 lines still open; remaining beta readiness is now mostly the larger Tier 3 verification/release hardening backlog plus hardware checks.
 - **Gate 3 鈥?Paid Production Release: open.** Tier 2 commercial / release-engineering / supportability / security clusters all open.
 
 ---
@@ -241,7 +263,7 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 
 ---
 
-## Tier 2 - 18 fully shipped, 3 partial, 109 open
+## Tier 2 - historical audit section; current checklist has 127 shipped, 3 open
 
 ### Shipped (18)
 
@@ -408,7 +430,11 @@ T1-1 through T1-67 minus the items above (i.e., T1-2, T1-3, T1-4, T1-26 through 
 | T2-12 | Unified MachineSafetyState | Part 1: `laserOutputState` + subscriptions (6 markers). Part 2: `FAULTED_REQUIRES_INSPECTION` + Acknowledge button (15 markers, `tests/execution-coordinator-disconnect.test.ts` etc.) | Full canonical `MachineSafetyState` discriminated union (16 states: DISCONNECTED_UNKNOWN, RUNNING_TEMP_LASER, etc.) not done. Most consequential parts shipped; type-unification "bow on top" remains. |
 | T2-77 | Async revision guards | `capturedRevisionId` reserved in `SceneTransaction.ts:53` (scaffolding) | Mid-async cancellation logic not wired; needed for trace, image import |
 
-### 鉁?Open (115)
+### Historical Open List (stale; do not use for current planning)
+
+Most rows below were subsequently closed in `docs/ROADMAP.md`. Current open
+Tier 2 checklist lines are T2-6, T2-30, and T2-95. The historical grouping is
+kept only so old audit evidence is not destroyed.
 
 Grouped by cluster. **Bold = highest leverage / blocks other work.**
 

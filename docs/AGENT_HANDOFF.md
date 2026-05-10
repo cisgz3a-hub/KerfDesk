@@ -8,7 +8,11 @@ chat transcript.
 
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
-- Current HEAD: `3b049b2` (`docs(roadmap): fill T3-42 ship hash`).
+- Current HEAD when this handoff was first written: `3b049b2`
+  (`docs(roadmap): fill T3-42 ship hash`).
+- Latest docs-only continuation commit before this note was refreshed:
+  `3d60339` (`docs(handoff): add Claude continuation note`). Always verify
+  live HEAD with `git log --oneline -1` before editing.
 - Last shipped roadmap item: `T3-42` Dialect-specific preflight / template validators.
 - Next roadmap item: `T3-43` Controller simulator / test matrix.
 
@@ -20,13 +24,17 @@ chat transcript.
 4. `docs/ROADMAP-shipped-audit.md`
 5. `PROJECT_MAP.md`
 
-The roadmap and shipped-audit docs are current through T3-42. T3-43 is still
-open in both files.
+The roadmap is current through T3-42, and T3-43 is still open. Use the master
+checklist at the bottom of `docs/ROADMAP.md` for current open-ticket counts.
+Some historical "Open" sections in `docs/ROADMAP-shipped-audit.md` are audit
+evidence from 2026-04-30 and must not be treated as current planning counts.
 
 ## Continuation Notes
 
 - A paused T3-43 scratch test under `tests/controller-matrix/` was removed. No
-  partial T3-43 code or docs are intentionally left in the tree.
+  tracked partial T3-43 code or docs are intentionally left in the tree. If an
+  empty local `tests/controller-matrix/` folder exists, inspect it, then reuse
+  or remove it as needed.
 - Do not merge Dependabot PRs blindly. Most open Dependabot PRs had failing
   checks at this handoff.
 - Dependabot PR #3 was green on GitHub, but a local no-commit test merge was
