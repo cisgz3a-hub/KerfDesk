@@ -402,7 +402,22 @@ export class GrblController implements GrblControllerApi {
   private _ackTimestamps: number[] = [];
   /** Ring buffer of job-line send timestamps (ms) for expected ack rate. */
   private _sendTimestamps: number[] = [];
-  private readonly ACK_RATE_WINDOW_SIZE = 100;
+  /**
+   * T1-125: ring-buffer capacity. Pre-T1-125 this was 100 samples;
+   * the streaming-health computation in `streamingHealth.ts` assumed
+   * a fixed 5-second window, which over-truncated at high streaming
+   * rates (200+ Hz acks → 100 samples covered ~0.5 s, but the rate
+   * formula divided by 5 s and reported ~20 Hz). T1-125 switched the
+   * rate formula to endpoint-based (`(N-1) / (last - first)`) so the
+   * computation is robust regardless of buffer size; 1000 samples
+   * keeps trend-detection sensitive over the full 5-second window
+   * even at sustained 200 Hz rates. Memory cost: ~16 KB total
+   * (1000 × 8-byte numbers, two buffers, only while a job is active
+   * — both buffers reset on disconnect, transport-error, and
+   * job-start). Per-event push/shift is O(1) amortised; shift on a
+   * 1000-element array is fine in V8.
+   */
+  private readonly ACK_RATE_WINDOW_SIZE = 1000;
   private _stopOnError = true;
   /** Feed-hold sent; ignore stale Run in status reports until Hold is confirmed. */
   private _pausePending = false;
