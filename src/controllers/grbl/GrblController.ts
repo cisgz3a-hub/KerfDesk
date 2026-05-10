@@ -2434,6 +2434,15 @@ export class GrblController implements GrblControllerApi {
       homingDirection: this._grblSettings.has(23) ? this._homingDir : null,
       homingEnabled: this.getFirmwareHomingCycleEnabled() ?? null,
       laserMode: this.getFirmwareLaserModeEnabled() ?? null,
+      // T3-57: $110/$111/$120/$121 read from the latest $$ dump. The
+      // private `_maxFeedX/Y` / `_maxAccelX/Y` fields default to 0
+      // before the first $$ response; map zero to null so callers
+      // can distinguish "firmware never reported" from "firmware
+      // reported zero".
+      maxRateXMmPerMin: this._maxFeedX > 0 ? this._maxFeedX : null,
+      maxRateYMmPerMin: this._maxFeedY > 0 ? this._maxFeedY : null,
+      maxAccelXMmPerS2: this._maxAccelX > 0 ? this._maxAccelX : null,
+      maxAccelYMmPerS2: this._maxAccelY > 0 ? this._maxAccelY : null,
     };
   }
 }

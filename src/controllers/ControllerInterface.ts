@@ -181,6 +181,14 @@ export interface DeviceIdentity {
   readonly homingDirection: number | null;
   readonly homingEnabled: boolean | null;
   readonly laserMode: boolean | null;
+  /** T3-57: GRBL `$110` max X feed rate (mm/min). null until reported. */
+  readonly maxRateXMmPerMin?: number | null;
+  /** T3-57: GRBL `$111` max Y feed rate (mm/min). null until reported. */
+  readonly maxRateYMmPerMin?: number | null;
+  /** T3-57: GRBL `$120` max X acceleration (mm/s²). null until reported. */
+  readonly maxAccelXMmPerS2?: number | null;
+  /** T3-57: GRBL `$121` max Y acceleration (mm/s²). null until reported. */
+  readonly maxAccelYMmPerS2?: number | null;
 }
 
 export interface DisconnectOptions {
