@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 532 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 533 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -59,6 +59,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `tests/persistence-stress` | 1 | - |
 | `tests/safety-controller-matrix` | 1 | - |
 | `tests/simulators` | 4 | - |
+| `tests/undo-redo-correctness` | 1 | - |
 
 ## Source Files
 
@@ -1078,3 +1079,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/simulators/SimulatedControllerDevice.ts`
 - `tests/simulators/grbl-simulator.test.ts`
 - `tests/simulators/simulated-controller-device.test.ts`
+
+### `tests/undo-redo-correctness`
+
+- `tests/undo-redo-correctness/undo-redo-correctness.test.ts`
