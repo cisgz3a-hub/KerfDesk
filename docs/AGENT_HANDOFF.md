@@ -9,15 +9,20 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `01f0948` (`test(safety): T3-47 routing-audit pin for generic safety
-  operations`). Always verify live HEAD with `git log --oneline -1`
+  `56d87ff` (`feat(connection): T3-48 navigator.serial.getPorts device-
+  reuse flow`). Always verify live HEAD with `git log --oneline -1`
   before editing.
-- Last shipped roadmap item: `T3-47` Generic safety operations API —
-  routing-audit slice. Recent slices: T3-46 split-profile schema in
-  `72f30b5`, T3-44 generic progress model in `aa08f44`, T3-43
-  controller-matrix in `5d19289`.
-- Next roadmap item: `T3-48` `navigator.serial.getPorts()` device-reuse
-  flow.
+- Last shipped roadmap item: `T3-48` device-reuse flow — production
+  change to `WebSerialPort.close` (no longer revokes the persistent
+  permission grant) plus the `connectKnownPortOrPrompt` /
+  `forgetActiveDevice` / `forgetKnownPorts` API. Hardware verification
+  needed before release tagging. Recent slices: T3-47 safety-routing
+  audit in `01f0948`, T3-46 split-profile schema in `72f30b5`, T3-44
+  generic progress model in `aa08f44`, T3-43 controller-matrix in
+  `5d19289`.
+- Next roadmap item: `T3-50` Device identity verification on connect —
+  require `$I` firmware response (T3-49 navigator-disconnect already
+  shipped in `66c3e7c`).
 
 ## What To Read First
 
@@ -87,10 +92,17 @@ follow-up commit rather than re-opening the master-checklist line.
 
 ## Expected Next Step
 
-Continue strict roadmap order with **T3-48 —
-`navigator.serial.getPorts()` device-reuse flow**. Read the ticket text
-in `docs/ROADMAP.md` before starting; the headline change is making
-the connect path try previously-authorized ports via
-`navigator.serial.getPorts()` before prompting the user, so a
-power-cycle / page-reload flow can reconnect without re-prompting for
-device permission.
+Continue strict roadmap order with **T3-50 — Device identity
+verification on connect**. The headline change is requiring an `$I`
+firmware response within the connect handshake window so a non-GRBL
+USB-serial device cannot pass the welcome predicate via banner-only
+or `[VER:]`-only signals. T3-51 (reconnect-same-machine
+verification) builds on the same `$I` snapshot.
+
+T3-49 (navigator disconnect event handling) already shipped in
+`66c3e7c`; the master checklist line confirms.
+
+T3-48 ships a real production change in `WebSerialPort` —
+hardware verification on Falcon A1 Pro is **needed** before release
+tagging: connect, disconnect, reconnect; confirm the second connect
+prompt is not shown.
