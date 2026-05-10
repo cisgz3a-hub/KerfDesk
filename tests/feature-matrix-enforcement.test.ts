@@ -182,6 +182,49 @@ function existsOutsideEntitlements(needle: RegExp): { matched: boolean; samples:
   }
 }
 
+// 11. T1-121 design-rationale pin: the audit's "missing service-layer"
+//     concern for compile-time-config features (tabs, overcut, lead_in,
+//     cross_hatch, power_scale, cut_start_point) was investigated and
+//     closed as not-a-bug because these features have no callable
+//     service to gate — they're layer settings consumed only by
+//     JobCompiler.createEntitlementPolicy. The rationale is documented
+//     in FeatureMatrix.ts so a future audit can find it.
+{
+  const src = fileContent.get(path.join(srcRoot, 'entitlements/FeatureMatrix.ts')) ?? '';
+  assert(/T1-121/.test(src),
+    'T1-121 marker in FeatureMatrix.ts (rationale for ui+compiler vs ui+service)');
+  assert(/design rationale|design-intent/i.test(src),
+    'rationale block names the design choice');
+  // Each compile-time-config feature is named in the rationale block.
+  for (const id of ['tabs', 'overcut', 'lead_in', 'cross_hatch', 'power_scale', 'cut_start_point']) {
+    assert(src.includes(id),
+      `rationale names compile-time-config feature '${id}'`);
+  }
+  // And the callable-service category enumerates the right side of the design.
+  for (const id of ['nesting', 'boolean ops', 'text-to-path', 'material-test', 'kerf-wizard']) {
+    assert(src.includes(id),
+      `rationale names callable-service feature '${id}'`);
+  }
+}
+
+// 12. T1-121: the existing T2-91 enforcement (test #4 above) is
+//     load-bearing for compile-time-config features. Pin it explicitly
+//     here so a future refactor that drops the compiler-allow check
+//     also has to update this test (defense-in-depth against the
+//     audit's worry).
+{
+  const jobCompilerPath = path.join(repoRoot, 'src/core/job/JobCompiler.ts');
+  const jc = fs.readFileSync(jobCompilerPath, 'utf-8');
+  // Each compile-time-config feature MUST flow through createEntitlementPolicy.
+  for (const id of ['tabs', 'overcut', 'lead_in', 'cross_hatch', 'power_scale', 'cut_start_point']) {
+    const re = new RegExp(`canUseFeature\\(['"]${id}['"]\\)`);
+    assert(re.test(jc),
+      `JobCompiler.ts calls canUseFeature('${id}') (compile-time-config gate)`);
+  }
+  assert(/createEntitlementPolicy/.test(jc),
+    'JobCompiler.ts has createEntitlementPolicy()');
+}
+
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
 

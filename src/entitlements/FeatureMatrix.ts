@@ -36,6 +36,43 @@ import type { ProFeature } from './types';
  * - `export` — SVG / `.laserforge.json` export omits the feature's data
  *   (or watermarks the file). Belongs to features whose value is in
  *   the artifact a user shares.
+ *
+ * T1-121 design rationale — `'service'` vs `'compiler'` choice:
+ *
+ * `'service'` is right for features whose value is a *callable
+ * geometry/operation entrypoint*: nesting (Nester.run), boolean ops
+ * (BooleanOps.union/diff/intersect), text-to-path (TextOps.outline),
+ * material-test (MaterialTestPlanner.run), variable-text expansion,
+ * kerf-wizard. These are imperative API calls that produce or modify
+ * scene geometry; gating at the call site stops every caller (UI,
+ * plugin, devtools) from reaching the operation.
+ *
+ * `'compiler'` is right for features that are *layer / cut config
+ * carried on scene data* and only become G-code at compile time:
+ * tabs (layer.settings.tabs.{count,width}), overcut (cut.overcut
+ * mm extension), lead_in (cut.leadIn mm), cross_hatch (fill.mode),
+ * power_scale (per-segment stroke modulation), cut_start_point
+ * (closed-path start index). These features produce no callable
+ * service to gate — the user just edits a number on a layer panel.
+ * The natural enforcement point is `JobCompiler.createEntitlementPolicy()`
+ * (lines 95-109): if `canUseFeature('tabs')` is false, `allowTabs`
+ * is false, and the per-feature emission below clamps every dependent
+ * field (tabCount → 0, tabWidth → 0, fillMode → 'line', overcut → 0,
+ * leadIn → 0, cutStartIndex → 0, powerScale → 1.0). A hand-edited
+ * `.laserforge.json` with tabs.count = 4 is stripped at this layer.
+ * There is no service-layer to insert between the layer-settings
+ * scene data and the JobCompiler that reads it; PipelineService is
+ * a thin orchestration shell that just calls `compileJob(scene)`.
+ *
+ * Adding a `'service'` entry to a feature in this category would
+ * either be a no-op (no service to gate) or require synthesizing a
+ * service shim purely for gating, which adds indirection without
+ * closing a real bypass. The audit (Phase 4 #14, 2026-05-10) flagged
+ * the absence of `'service'` entries on these six features as a
+ * potential gap; the bypass-risk analysis in T1-121 confirmed there
+ * is no code path that reaches the compiler-emitted feature without
+ * going through JobCompiler.createEntitlementPolicy first. Closed
+ * as design-intent.
  */
 export type EnforcementLayer = 'ui' | 'service' | 'compiler' | 'export';
 
