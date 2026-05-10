@@ -30,6 +30,7 @@ import {
   interpretGrblSettingValue,
   parseGrblSettingLine,
 } from './GrblSettingsParser';
+import { parseGrblG54WcsLine } from './GrblWcsParser';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -48,7 +49,6 @@ const REALTIME_FEED_HOLD = 0x21; // '!'
 const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
 
-const GRBL_G54_WCS_LINE = /^\[G54:([^,]+),([^,]+),([^\]]+)\]$/;
 
 interface PendingLine {
   text: string;
@@ -1638,15 +1638,17 @@ export class GrblController implements GrblControllerApi {
     }
   }
 
+  /**
+   * T1-127: WCS-line parsing now lives in `GrblWcsParser.ts`. This
+   * method is the side-effect shell — it stores the parsed offset
+   * in `_currentG54`. Behavior is byte-identical: malformed lines
+   * (NaN coordinates) leave `_currentG54` unchanged exactly as
+   * pre-T1-127 (T1-117's fail-closed WCS path depends on this).
+   */
   private _tryParseG54WcsLine(line: string): void {
-    const m = line.match(GRBL_G54_WCS_LINE);
-    if (!m) return;
-    const x = parseFloat(m[1]);
-    const y = parseFloat(m[2]);
-    const z = parseFloat(m[3]);
-    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
-      this._currentG54 = { x, y, z };
-    }
+    const parsed = parseGrblG54WcsLine(line);
+    if (parsed === null) return;
+    this._currentG54 = { x: parsed.x, y: parsed.y, z: parsed.z };
   }
 
   /**
