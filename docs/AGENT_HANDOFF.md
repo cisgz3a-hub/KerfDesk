@@ -9,14 +9,14 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `aa08f44` (`feat(controller): T3-44 multi-domain JobProgress type
-  foundation`). Always verify live HEAD with `git log --oneline -1` before
-  editing.
-- Last shipped roadmap item: `T3-44` Generic progress model — additive
-  type-foundation slice. T3-43 first slice (controller-matrix) shipped in
-  `5d19289`.
-- Next roadmap item: `T3-46` Profile schema split — Device / Controller /
-  Transport / Output (T3-45 transport abstraction shipped in `6ac9cce`).
+  `72f30b5` (`feat(devices): T3-46 split-profile schema (Device/Controller/
+  Transport/Output)`). Always verify live HEAD with `git log --oneline -1`
+  before editing.
+- Last shipped roadmap item: `T3-46` Profile schema split — additive
+  type-foundation slice. Recent slices: T3-44 generic progress model in
+  `aa08f44`, T3-43 controller-matrix in `5d19289`.
+- Next roadmap item: `T3-47` Generic safety operations API — capability-
+  gated pause / stop / laserOff / testFire.
 
 ## What To Read First
 
@@ -86,18 +86,14 @@ follow-up commit rather than re-opening the master-checklist line.
 
 ## Expected Next Step
 
-Continue strict roadmap order. T3-45 (transport abstraction) already
-shipped in `6ac9cce` (foundation slice). The next open item is **T3-46 —
-Profile schema split** (Device / Controller / Transport / Output). Read the
-full ticket text in `docs/ROADMAP.md` before starting; the headline change
-is splitting the monolithic `DeviceProfile` into four orthogonal schemas
-so that "what hardware are you running" (Device), "what controller speaks
-to it" (Controller), "what transport carries the bytes" (Transport), and
-"what output format is emitted" (Output) become four independently
-typed records that compose into a runtime profile.
+Continue strict roadmap order with **T3-47 — Generic safety operations
+API**. Capability-gated `pause` / `stop` / `laserOff` / `testFire`
+operations on the controller surface, building on top of T2-42
+(`ControllerSafetyOps`), T2-43 (`ControllerSafetyCapabilities`), T2-40
+(operation gate), and T3-60 (disconnect-stops-job capability gating).
+Read the full ticket text in `docs/ROADMAP.md` before starting.
 
-Estimate ~2-3 sessions. Depends on T2-24, T3-45 (both partially / fully
-landed). The same additive-foundation pattern T3-43, T3-44, and T3-45 used
-should work here: ship the schema types and conversion adapters first, defer
-caller migration until a profile actually exposes the split (e.g., a Falcon
-WiFi profile that needs distinct Controller and Transport entries).
+The same additive-foundation pattern T3-43 / T3-44 / T3-45 / T3-46 used
+should work here: pin the safety-operation contract surface first, defer
+controller emission and UI wiring until a non-GRBL controller exercises
+the capability gate.
