@@ -38,6 +38,13 @@ import {
   type SafetyResultLike,
   type SafetyState,
 } from './SafetyStateMachine';
+import {
+  recoveryStateInitial,
+  recoveryAllowsStart,
+  triggerAlarm,
+  triggerEmergencyStop,
+  type RecoveryState,
+} from '../runtime/RecoveryState';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -74,6 +81,7 @@ export type BurnStateListener = (state: BurnState) => void;
 export type LaserOutputState = 'off' | 'on' | 'unknown';
 export type LaserOutputStateListener = (state: LaserOutputState) => void;
 export type SafetyStateListener = (state: SafetyState) => void;
+export type RecoveryStateListener = (state: RecoveryState) => void;
 
 /**
  * T2-11: kinds of temporary machine operations protected by the
@@ -246,6 +254,24 @@ export class MachineService {
    */
   private _laserOutputState: LaserOutputState = 'off';
   private _safetyState: SafetyState = safetyStateInitial;
+  /**
+   * T1-122: explicit `RecoveryState` machine. Pre-T1-122 the runtime
+   * type defined in `src/runtime/RecoveryState.ts` (T2-87) was
+   * type-only — no production owner held an instance, no triggers
+   * fired in production, and `recoveryAllowsStart()` was never
+   * consulted by the live start gate. The audit's Phase 2 #6 finding
+   * called this out as a "foundation exists but product does not use
+   * it" bug. T1-122 wires it: MachineService is the natural owner;
+   * `startValidatedJob` consults `recoveryAllowsStart`; `triggerAlarm`
+   * fires from the controller-state subscriber when alarm hits during
+   * an active job; `triggerEmergencyStop` fires from the safetyOff
+   * unknown-outcome path; `acknowledgeRecoveryComplete()` lets the UI
+   * clear recovery to 'none' once the user confirms inspection /
+   * rehome / reframe. Per-step ack functions (ackInspection /
+   * ackUnlock / ackRehome / ackReframe / ackReconnect / ackRecompile)
+   * are exposed via `setRecoveryState` for the recovery card UI.
+   */
+  private _recoveryState: RecoveryState = recoveryStateInitial;
   // T1-41: G54 work offset captured at the time the user clicked Set Origin.
   // The verify path (`verifySavedOrigin`) compares this to a freshly-queried
   // value at job start. `null` means Set Origin was never run this session
@@ -255,6 +281,7 @@ export class MachineService {
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
   private _safetyStateListeners: Set<SafetyStateListener> = new Set();
+  private _recoveryStateListeners: Set<RecoveryStateListener> = new Set();
 
   /**
    * T2-11: service-layer mutex for temporary-laser-on operations. Single
@@ -475,6 +502,29 @@ export class MachineService {
       console.info('[T2-56 auto-finalize]', msg);
     };
     const unsubState = ctrl.onStateChange((state) => {
+      // T1-122: when alarm fires during an active job, transition the
+      // RecoveryState machine. The controller's status alone clearing
+      // back to idle is no longer enough to start another job —
+      // `recoveryAllowsStart` also has to be true, which requires the
+      // user to acknowledge the inspection / unlock / rehome / reframe
+      // checklist via setRecoveryState (or acknowledgeRecoveryComplete
+      // for the bypass). Pre-T1-122 the production path treated post-
+      // alarm idle as fully recovered, leaving the user able to start
+      // a job after $X without inspecting the workpiece.
+      if (state.status === 'alarm' && this.activeTicket != null) {
+        this._setRecoveryState(
+          triggerAlarm({
+            current: this._recoveryState,
+            alarmCode: state.alarmCode ?? 0,
+            occurredAt: Date.now(),
+            // Per the audit, requiresRehome reflects whether the
+            // machine supports homing. Conservatively true for GRBL;
+            // the recovery card UI surfaces it as a checkbox the user
+            // can skip if their machine has no limit switches.
+            requiresRehome: true,
+          }),
+        );
+      }
       void this.tryFinalizeJobLog(state, lastProgress, ctrl.isJobRunning, sink);
     });
     const unsubProgress = ctrl.onProgress((progress) => {
@@ -646,6 +696,22 @@ export class MachineService {
       throw new Error(
         'Machine is in an unknown laser-safety state after a previous laser-off failure. '
         + 'Reconnect or clear the safety state before starting a job.',
+      );
+    }
+
+    // T1-122: refuse to start a job while RecoveryState is non-none.
+    // Pre-T1-122 this gate was missing from the production start path
+    // entirely (the runtime type + triggers in src/runtime/RecoveryState.ts
+    // were defined but no production code consumed them). After alarm /
+    // disconnect-during-job / emergency-stop / frame-fail / compile-fail
+    // the controller may be reachable and report idle, but the user has
+    // not acknowledged the recovery checklist (inspect machine / unlock /
+    // rehome / reframe / etc.). Recovery transitions back to 'none' only
+    // after every required step is done — see RecoveryState.checkRecoveryComplete.
+    if (!recoveryAllowsStart(this._recoveryState)) {
+      throw new Error(
+        `Machine recovery is incomplete (status: ${this._recoveryState.status}). `
+        + 'Acknowledge every required recovery step before starting a new job.',
       );
     }
 
@@ -952,6 +1018,59 @@ export class MachineService {
   }
 
   /**
+   * T1-122: read the current `RecoveryState`. Synchronous; UI consumers
+   * subscribe via {@link onRecoveryStateChange} for transition events.
+   */
+  getRecoveryState(): RecoveryState {
+    return this._recoveryState;
+  }
+
+  /**
+   * T1-122: subscribe to RecoveryState transitions. Fires when the
+   * service moves the state machine via {@link _setRecoveryState}
+   * (alarm trigger, emergency-stop trigger, ack methods,
+   * acknowledgeRecoveryComplete). Returns an unsubscribe function.
+   */
+  onRecoveryStateChange(cb: RecoveryStateListener): () => void {
+    this._recoveryStateListeners.add(cb);
+    return () => this._recoveryStateListeners.delete(cb);
+  }
+
+  /**
+   * T1-122: replace the recovery state. Used by UI surfaces (recovery
+   * card per-step ack buttons) that compute the next state via the
+   * pure helpers in `src/runtime/RecoveryState.ts` (`ackInspection`,
+   * `ackUnlock`, `ackRehome`, `ackReframe`, `ackReconnect`,
+   * `ackRecompile`) and pass the result back here. The pure helpers
+   * automatically transition to `'none'` when every required step for
+   * the active recovery is done; this method is a thin pass-through
+   * that fires the listener notification.
+   */
+  setRecoveryState(next: RecoveryState): void {
+    this._setRecoveryState(next);
+  }
+
+  /**
+   * T1-122: user-explicit "I have inspected and acknowledge it's safe"
+   * clear. Used by a future "Reset recovery" button that bypasses the
+   * per-step checklist when the user has done all the physical-world
+   * steps and just wants to clear the gate. Equivalent to calling
+   * `setRecoveryState({ status: 'none' })` directly; provided as a
+   * named method so call sites read clearly.
+   */
+  acknowledgeRecoveryComplete(): void {
+    this._setRecoveryState({ status: 'none' });
+  }
+
+  private _setRecoveryState(next: RecoveryState): void {
+    if (this._recoveryState === next) return;
+    this._recoveryState = next;
+    for (const cb of this._recoveryStateListeners) {
+      cb(next);
+    }
+  }
+
+  /**
    * T3-90 (T1-25 follow-up): arm a one-shot listener that fires
    * `M5 S0` after the connect-time safe-state handshake reports a
    * clean idle/FS:0,0 verdict, when the active profile has
@@ -1108,6 +1227,21 @@ export class MachineService {
       // the planner state is unknown and a fresh connection check is the
       // safest reset.
       this._setLaserOutputState('unknown');
+      // T1-122: a soft-reset / failed safetyOff outcome means the
+      // laser-off contract was indeterminate AND the controller was
+      // forced into a known-but-uncertain state. Treat that the same
+      // as an emergency-stop from the recovery-checklist perspective:
+      // the user should reconnect, rehome, and reframe before the
+      // next job. The 'unknown' laser-output state already throws on
+      // start (T1-22 above); this trigger means even after the user
+      // clears that flag via clearLaserUnknownState, recovery still
+      // gates the start until the checklist is acknowledged.
+      this._setRecoveryState(
+        triggerEmergencyStop({
+          current: this._recoveryState,
+          occurredAt: Date.now(),
+        }),
+      );
     }
   }
 

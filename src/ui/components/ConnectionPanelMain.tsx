@@ -21,6 +21,7 @@ import {
 } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
+import { recoveryAllowsStart } from '../../runtime/RecoveryState';
 import { type StructuredLogEvent, type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
 import { describeFrameFailure } from '../../app/FrameResultMessages';
@@ -1692,6 +1693,21 @@ export function ConnectionPanelMain({
   // controllers that don't implement it.
   const placementUncertain =
     controllerRef.current?.getPlacementUncertain?.() ?? false;
+  // T1-122: live RecoveryState. Pre-T1-122 the runtime RecoveryState
+  // type was defined but no production owner held an instance and no
+  // canonical canStartJob consulted `recoveryAllowsStart`. Now
+  // MachineService owns the state; this subscription is the UI half
+  // of the wiring so the start button refuses while recovery is
+  // incomplete (alarm pending acknowledgement, disconnect-during-job
+  // not yet rehomed, etc.) regardless of what the live controller
+  // status reports.
+  const [recoveryState, setRecoveryStateLocal] = useState(
+    () => machineService.getRecoveryState(),
+  );
+  useEffect(() => {
+    setRecoveryStateLocal(machineService.getRecoveryState());
+    return machineService.onRecoveryStateChange(setRecoveryStateLocal);
+  }, [machineService]);
   const currentModeFrameAnchorValid =
     !requireFrame ||
     currentModeFrameAnchorAllowsStart({
@@ -1720,6 +1736,14 @@ export function ConnectionPanelMain({
     currentModeFrameAnchorValid &&
     laserOutputState !== 'unknown' &&
     !placementUncertain &&
+    // T1-122: recovery checklist must be complete. recoveryAllowsStart
+    // returns true exactly when state.status === 'none' (every required
+    // step for the active recovery has been acknowledged). Audit Phase
+    // 2 #6: previously this conjunct was missing entirely, so the UI
+    // would re-enable Start as soon as the controller cleared back to
+    // idle even though the user hadn't acknowledged inspection /
+    // rehome / reframe.
+    recoveryAllowsStart(recoveryState) &&
     (gates?.baseSafe ?? false);
   /**
    * T1-96: structured Start-button readiness for the diagnostics panel.
