@@ -9,20 +9,17 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `56d87ff` (`feat(connection): T3-48 navigator.serial.getPorts device-
-  reuse flow`). Always verify live HEAD with `git log --oneline -1`
+  `4d75922` (`test(connection): T3-54 connection-lifecycle coverage
+  manifest`). Always verify live HEAD with `git log --oneline -1`
   before editing.
-- Last shipped roadmap item: `T3-48` device-reuse flow — production
-  change to `WebSerialPort.close` (no longer revokes the persistent
-  permission grant) plus the `connectKnownPortOrPrompt` /
-  `forgetActiveDevice` / `forgetKnownPorts` API. Hardware verification
-  needed before release tagging. Recent slices: T3-47 safety-routing
-  audit in `01f0948`, T3-46 split-profile schema in `72f30b5`, T3-44
-  generic progress model in `aa08f44`, T3-43 controller-matrix in
-  `5d19289`.
-- Next roadmap item: `T3-50` Device identity verification on connect —
-  require `$I` firmware response (T3-49 navigator-disconnect already
-  shipped in `66c3e7c`).
+- Last shipped roadmap item: `T3-54` connection-lifecycle coverage
+  manifest. Recent slices: T3-51 identity comparator in `06a2941`,
+  T3-50 device identity capture in `7cd31e0`, T3-48 device-reuse flow
+  in `56d87ff`, T3-47 safety-routing audit in `01f0948`, T3-46 split-
+  profile schema in `72f30b5`, T3-44 generic progress model in
+  `aa08f44`, T3-43 controller-matrix in `5d19289`.
+- Next roadmap item: `T3-55` Falcon autofocus profile-heal must check
+  live firmware version before enabling autofocus.
 
 ## What To Read First
 
@@ -92,17 +89,20 @@ follow-up commit rather than re-opening the master-checklist line.
 
 ## Expected Next Step
 
-Continue strict roadmap order with **T3-50 — Device identity
-verification on connect**. The headline change is requiring an `$I`
-firmware response within the connect handshake window so a non-GRBL
-USB-serial device cannot pass the welcome predicate via banner-only
-or `[VER:]`-only signals. T3-51 (reconnect-same-machine
-verification) builds on the same `$I` snapshot.
+Continue strict roadmap order with **T3-55 — Falcon autofocus
+profile-heal must check live firmware version before enabling
+autofocus**. The headline issue is that `backfillFalconAutofocus` in
+`src/core/devices/DeviceProfile.ts` unconditionally enables autofocus
+for any Falcon A1 Pro brand/model match, but the `$HZ1` autofocus
+command requires firmware ≥1.0.38. With T3-50 having shipped (the
+captured `DeviceIdentity.firmwareVersion`), the heal can now consult
+the live firmware version before flipping `autoFocusSupported: true`.
 
-T3-49 (navigator disconnect event handling) already shipped in
-`66c3e7c`; the master checklist line confirms.
+T3-48 (`WebSerialPort` no-forget-on-close) still needs hardware
+verification on Falcon A1 Pro before release tagging: connect,
+disconnect, reconnect; confirm the second connect prompt is not
+shown.
 
-T3-48 ships a real production change in `WebSerialPort` —
-hardware verification on Falcon A1 Pro is **needed** before release
-tagging: connect, disconnect, reconnect; confirm the second connect
-prompt is not shown.
+T3-50 also needs hardware verification — confirm `[VER:1.1h:]` is
+captured by the parser on the real Falcon, and inspect
+`getDeviceIdentity()` after a real connect.
