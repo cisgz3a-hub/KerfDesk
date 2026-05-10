@@ -19335,7 +19335,7 @@ Selection restore (via T2-79) covers:
 
 ### T3-80 | Test suite for undo / redo correctness 鈥?15+ scenarios from audit Priority 14
 
-**Status:** Shipped in `<TBD>`. Added `tests/undo-redo-correctness/undo-redo-correctness.test.ts`, a cross-cutting undo/redo regression suite around the real `HistoryManager` and scene transaction dispatcher. It covers dirty marking, named history entries, compile/frame/preflight invalidation, text font undo/redo, text/layer/image preview coalescing, async stale-scene discard, layer-delete undo/redo, selection restore, image-history cache stripping, redo truncation after branching, and group undo/redo selection. Hardware verification: not required (test coverage only).
+**Status:** Shipped in `75582d3`. Added `tests/undo-redo-correctness/undo-redo-correctness.test.ts`, a cross-cutting undo/redo regression suite around the real `HistoryManager` and scene transaction dispatcher. It covers dirty marking, named history entries, compile/frame/preflight invalidation, text font undo/redo, text/layer/image preview coalescing, async stale-scene discard, layer-delete undo/redo, selection restore, image-history cache stripping, redo truncation after branching, and group undo/redo selection. Hardware verification: not required (test coverage only).
 
 **Code reference:** Tests scattered across `tests/` 鈥?basic history mechanics covered (push/undo/redo/truncation), specific correctness scenarios from audit 4E Priority 14 not all covered.
 
@@ -20536,7 +20536,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-77 Project integrity checksum (Shipped in `3a92a63` — file format 1.2 checksum fields, canonical SHA-256 validation, mismatch prompt, and parser-worker integrity enforcement)
 - [x] T3-78 Save/load stress test suite (Shipped in `8ad1f6d` — `tests/persistence-stress/persistence-stress.test.ts` covers large object/raster roundtrips, repairs, missing images, snapshot drift, and autosave fallback)
 - [x] T3-79 Group/ungroup explicit command model with parent-graph integrity verification (Shipped in `15c9181` — explicit group/ungroup scene ops, parent graph validation/repair, and safe clone parent-id remapping)
-- [x] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (Shipped in `<TBD>` — cross-cutting undo/redo harness covers dirty/stale invalidation, preview coalescing, async guards, selection restore, cache stripping, redo branching, and group history)
+- [x] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (Shipped in `75582d3` — cross-cutting undo/redo harness covers dirty/stale invalidation, preview coalescing, async guards, selection restore, cache stripping, redo branching, and group history)
 - [ ] T3-81 End-to-end workflow integration test suite (filed; depends on most of T2 cluster, regression net for 4-series cleanup)
 - [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)
 - [ ] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
