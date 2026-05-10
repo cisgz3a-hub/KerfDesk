@@ -32,8 +32,22 @@ function sawActive(events: readonly (readonly string[])[], id: string): boolean 
 console.log('\n=== T3-11 burn progress ack timing ===\n');
 
 async function main(): Promise<void> {
+  // T1-117: $$ response must include $10= explicitly. Pre-T1-117 a
+  // missing $10 setting silently defaulted to mask=0 and combined with
+  // the verified-zero G54 to auto-applyWcsNormalization. Post-T1-117
+  // the same setup fails closed (placement-uncertain) — tests that
+  // need the auto-normalize path must publish $10 explicitly so the
+  // verified-zero classification fires.
+  // T1-118: $I response must include `ok`. T3-50 (commit 92df22a)
+  // started soliciting $I before $$ from _queryMachineSettings; this
+  // mock predates that change and was returning [] for $I, leaving the
+  // controller's _awaitingIdentityOk flag set. The test's later
+  // port.injectResponse('ok') was then consumed by the identity-await
+  // branch instead of the streamed-job-line ack, so lifecycle never
+  // advanced.
   const port = new MockSerialPort((line: string) => {
-    if (line === '$$') return ['$30=1000', 'ok'];
+    if (line === '$I') return ['[VER:1.1f.test]', '[OPT:VL]', 'ok'];
+    if (line === '$$') return ['$10=0', '$30=1000', 'ok'];
     if (line === '$#') return ['[G54:0.000,0.000,0.000]', 'ok'];
     return [];
   });

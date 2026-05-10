@@ -204,10 +204,26 @@ function selectFilesForLane(files, spec) {
  * `profile: getActiveProfile()` (or the test's own saved profile)
  * to `compileGcode`. Filed as T2-22-followup in the roadmap.
  */
-const KNOWN_FAILURES = new Map([
-  ['ui-start-job-uses-ticket.test.tsx',
-    'second scenario crashes on undefined ticket reference; multiple unrelated bugs beyond profile-hash, deferred to a focused investigation (T2-22-followup)'],
-]);
+/**
+ * T1-118: previously this map skipped `ui-start-job-uses-ticket.test.tsx`
+ * because the second scenario crashed on an undefined ticket reference.
+ * The skip was reviewed during the T1-114..T1-117 safety pass and the
+ * underlying issues were:
+ *   1. Mock controller missing `operations` (frame click crashed).
+ *   2. Mock head positioned at (0,0) so frame-bounds went off-bed in
+ *      front-left + 'current' mode.
+ *   3. Mock `maxSpindle: null` + missing `getFirmwareLaserModeEnabled`
+ *      raised MACHINE_MAXSPINDLE_UNKNOWN / MACHINE_LASER_MODE_UNKNOWN
+ *      preflight blockers.
+ *   4. compileGcode was called with profile=null so the ticket carried
+ *      a "no-profile" hash that didn't match the runtime profile, firing
+ *      a `[ticket] profile hash mismatch` warning.
+ * All four are fixed in T1-118; the test runs end-to-end with three
+ * scenarios (valid-start path, missing-ticket-blocks-start, stale-
+ * gcode-blocks-start). For a hardware-control app, no start-job
+ * validation test should be skipped.
+ */
+const KNOWN_FAILURES = new Map([]);
 
 /**
  * Recursive walk over `dir`, collecting paths relative to `testsDir` for

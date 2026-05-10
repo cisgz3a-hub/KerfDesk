@@ -90,9 +90,14 @@ function installMockLocalStorage(): void {
   } as Storage;
 }
 
+// T1-118: head positioned mid-bed so a 40x30 rect at canvas (20, 20)
+// frames within machine bounds in startMode='current' on front-left
+// origin. Y-flip + work-relative coordinates produce corners at
+// machine X∈[head.x, head.x+40], Y∈[head.y-30, head.y]; we need
+// head.y >= 30 and head.x+40 <= bedWidth and head.y <= bedHeight.
 const idle: MachineState = {
   status: 'idle',
-  position: { x: 0, y: 0, z: 0 },
+  position: { x: 100, y: 100, z: 0 },
   feedRate: 0,
   spindleSpeed: 0,
   alarmCode: null,
@@ -100,11 +105,39 @@ const idle: MachineState = {
 };
 
 function makeController(): LaserController {
+  // T1-118: mock must provide `operations` so ExecutionCoordinator's
+  // frameSafe / startValidatedJob path can run end-to-end. Pre-T1-118
+  // the test's mock omitted operations entirely; the Frame click then
+  // crashed inside `ctrl.operations.frame()` (TypeError reading
+  // 'frame'), `hasFramed` never flipped to true, the Start button
+  // stayed disabled, and every downstream assertion failed including
+  // a final crash on `arg0!.ticket.gcodeLines.length`. The test was
+  // skipped instead of fixed; this is the fix.
+  const successOp = async () => ({ ok: true as const });
+  const successFrame = async () => ({ ok: true as const });
+  const operations = {
+    jog: successOp,
+    home: successOp,
+    unlockAlarm: successOp,
+    setWorkOriginAtCurrentPosition: successOp,
+    resetWcsToMachineOrigin: successOp,
+    testFire: successOp,
+    frame: successFrame,
+    laserOff: successOp,
+    pauseJob: successOp,
+    resumeJob: successOp,
+    stopJob: successOp,
+    emergencyStop: successOp,
+  };
   return {
     protocolName: 'mock',
     state: idle,
     isJobRunning: false,
-    maxSpindle: null,
+    // T1-118: mock must report a positive maxSpindle so preflight's
+    // MACHINE_MAXSPINDLE_UNKNOWN rule passes. 1000 matches GRBL's
+    // default $30.
+    maxSpindle: 1000,
+    operations,
     connect: async () => {},
     disconnect: async () => {},
     sendJob: async () => {},
@@ -119,6 +152,14 @@ function makeController(): LaserController {
     onError: () => () => {},
     onRawLine: () => () => {},
     safetyOff: async () => ({ stage: 'm5' as const }),
+    // T1-118: mock must expose firmware-capability getters so
+    // preflight's MACHINE_LASER_MODE_UNKNOWN / MACHINE_HOMING_UNKNOWN
+    // rules don't block. true = laser mode enabled ($32=1); false =
+    // homing disabled (skips MACHINE_HOMING_REQUIRED).
+    getFirmwareLaserModeEnabled: () => true,
+    getFirmwareHomingCycleEnabled: () => false,
+    getPlacementUncertain: () => false,
+    getUnsafeAtConnect: () => null,
   } as unknown as LaserController;
 }
 
@@ -227,7 +268,13 @@ async function run(): Promise<void> {
 
   const s0 = createScene(400, 300, 'UiTicket');
   const scene = addObject(s0, createRect(s0.layers[0].id, 20, 20, 40, 30));
-  const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null);
+  // T1-118: pass the active profile so the ticket carries a profile
+  // hash that matches what the panel reads from getActiveProfile() at
+  // start-time. Pre-fix the call passed `null` for the profile arg →
+  // ticket.profileHash = hash('no-profile') → runtime mismatch warning
+  // "[ticket] profile hash mismatch" fired even though the test was
+  // running with a single profile end to end.
+  const compiled = await compileGcode(scene, 'current', null, null, 'grbl', null, null, getActiveProfile());
   if (!compiled) {
     console.error('compileGcode returned null');
     process.exit(1);
@@ -318,6 +365,154 @@ async function run(): Promise<void> {
     'gcode prop has an extra injected line vs ticket.gcodeLines',
   );
 
+  if (root) {
+    root.unmount();
+    root = null;
+  }
+
+  // ─── Scenario 2: missing ticket → start blocked ──────────────────
+  // T1-118: re-mount the panel with `compiledJobTicket: null` (and a
+  // matching `gcode: null` since the prop usually arrives together)
+  // and verify the Start button stays disabled. Pre-T1-118 the second
+  // scenario in this file asserted ticket-driven behavior but crashed
+  // earlier and was skipped wholesale; this is the closing contract:
+  // the UI can't start without a valid ticket.
+  const controller2 = makeController();
+  const controllerRef2 = { current: controller2 } as MutableRefObject<LaserController>;
+  const portRef2 = { current: null } as MutableRefObject<SerialPortLike | null>;
+  const machineService2 = new MachineService(controllerRef2, portRef2);
+  const startCalls2: StartArgs[] = [];
+  const realStart2 = machineService2.startValidatedJob.bind(machineService2);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (machineService2 as any).startValidatedJob = async (args: StartArgs) => {
+    startCalls2.push(args);
+    return realStart2(args);
+  };
+  root = createRoot(container);
+  await act(async () => {
+    root!.render(
+      React.createElement(PanelHarness, {
+        scene,
+        gcode: null,
+        compiledJobTicket: null,
+        lastGcodeCompileResult: null,
+        machinePlanBounds: null,
+        machineService: machineService2,
+        controller: controller2,
+        portRef: portRef2,
+        controllerRef: controllerRef2,
+      }),
+    );
+    await flush(50);
+  });
+  const btn2 = container.querySelector('[data-testid="connection-start-job"]') as HTMLButtonElement | null;
+  assert(btn2 != null, 'scenario 2: start button present');
+  assert(btn2?.disabled === true, 'scenario 2: start disabled when compiledJobTicket is null');
+  assert(startCalls2.length === 0, 'scenario 2: startValidatedJob never invoked without a ticket');
+  if (root) {
+    root.unmount();
+    root = null;
+  }
+
+  // ─── Scenario 3: stale gcode → start blocked ─────────────────────
+  // T1-118: with a live ticket but `gcodeStale: true`, the panel must
+  // refuse to start. PanelHarness pins `gcodeStale: false` so re-mount
+  // with a wrapper that flips it.
+  const controller3 = makeController();
+  const controllerRef3 = { current: controller3 } as MutableRefObject<LaserController>;
+  const portRef3 = { current: null } as MutableRefObject<SerialPortLike | null>;
+  const machineService3 = new MachineService(controllerRef3, portRef3);
+  const startCalls3: StartArgs[] = [];
+  const realStart3 = machineService3.startValidatedJob.bind(machineService3);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (machineService3 as any).startValidatedJob = async (args: StartArgs) => {
+    startCalls3.push(args);
+    return realStart3(args);
+  };
+
+  function StaleHarness(props: {
+    scene: Scene;
+    gcode: string | null;
+    compiledJobTicket: ValidatedJobTicket | null;
+    lastGcodeCompileResult: CompileGcodeResult | null;
+    machinePlanBounds: AABB | null;
+    machineService: MachineService;
+    controller: LaserController;
+    portRef: MutableRefObject<SerialPortLike | null>;
+    controllerRef: MutableRefObject<LaserController | null>;
+  }): React.ReactElement {
+    const [messages, setMessages] = useState<string[]>([]);
+    const activeProfile = getActiveProfile();
+    const coordinatorSimulatorNotifyRef = useRef<(line: string) => void>(() => {});
+    const executionCoordinator = useMemo(
+      () =>
+        new ExecutionCoordinator({
+          machineService: props.machineService,
+          controllerRef: props.controllerRef,
+          notifySimulatorRef: coordinatorSimulatorNotifyRef,
+        }),
+      [],
+    );
+    return React.createElement(ConnectionPanelMain, {
+      controller: props.controller,
+      portRef: props.portRef,
+      executionCoordinator,
+      coordinatorSimulatorNotifyRef,
+      machineState: idle,
+      jobProgress: null as JobProgress | null,
+      scene: props.scene,
+      gcode: props.gcode,
+      bedWidth: 400,
+      bedHeight: 300,
+      machinePlanBounds: props.machinePlanBounds,
+      compiledJobTicket: props.compiledJobTicket,
+      lastGcodeCompileResult: props.lastGcodeCompileResult,
+      onClose: () => {},
+      activeProfile,
+      productionMode: false,
+      showAlert: async () => {},
+      showConfirm: async () => true,
+      showPrompt: async () => null,
+      onSceneCommit: () => {},
+      startMode: 'current',
+      savedOrigin: null,
+      originCorner: activeProfile?.originCorner ?? 'front-left',
+      machinePosition: null,
+      onSelectMode: () => {},
+      onSaveOrigin: () => {},
+      gcodeStale: true,
+      machineService: props.machineService,
+      outcomeReplaySection: null,
+      messages,
+      appendMessage: (m: string) => setMessages((p) => [...p, m]),
+      replaceMessages: (n) => setMessages((p) => (typeof n === 'function' ? n(p) : n)),
+      clearMessages: () => setMessages([]),
+      isSimulator: true,
+      setSimulator: () => {},
+    });
+  }
+
+  root = createRoot(container);
+  await act(async () => {
+    root!.render(
+      React.createElement(StaleHarness, {
+        scene,
+        gcode: gcodeProp,
+        compiledJobTicket: ticket,
+        lastGcodeCompileResult: compiled,
+        machinePlanBounds: compiled.machinePlanBounds,
+        machineService: machineService3,
+        controller: controller3,
+        portRef: portRef3,
+        controllerRef: controllerRef3,
+      }),
+    );
+    await flush(50);
+  });
+  const btn3 = container.querySelector('[data-testid="connection-start-job"]') as HTMLButtonElement | null;
+  assert(btn3 != null, 'scenario 3: start button present');
+  assert(btn3?.disabled === true, 'scenario 3: start disabled when gcodeStale=true (even with valid ticket)');
+  assert(startCalls3.length === 0, 'scenario 3: startValidatedJob never invoked when gcode is stale');
   if (root) {
     root.unmount();
     root = null;
