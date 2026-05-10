@@ -19732,7 +19732,11 @@ A subset can be automated as smoke tests (T3-86 covers the launch-and-load path)
 
 ---
 
-### T3-86 | Native module packaging smoke test 鈥?packaged app launches + serialport loads + storage works
+### T3-86 | Native module packaging smoke test — packaged app launches + serialport loads + storage works
+
+**Status:** Shipped in `<TBD>` — build-config smoke-test slice. Added `tests/packaged-app-smoke/packaged-app-build-config.test.ts` (23 contracts) that runs inside the normal `npm test` pipeline and pins the static contract surface a packaged-app smoke test depends on: `package.json` exposes `electron:build` (Windows installer) and `electron:build:mac` (macOS dmg) scripts; the build chain resolves through `npm run build` (`vite build` for the renderer) → `npm run electron:compile` (`tsc` for the Electron main) → `electron-builder --win`; `scripts/verify-production-build.mjs` (T1-81) is invoked from the build pipeline; `serialport` and `@serialport/bindings-cpp` are NOT runtime dependencies (T2-35 native-path removal); the regression-protection tests `tests/native-deps-prebuild-check.test.ts` and `tests/no-electron-sendgcode-export.test.ts` are present; `tests/auto-update-infrastructure.test.ts` (T2-101) and `tests/update-notice-ui.test.tsx` (T3-5) are present; `electron/falcon-wifi/FalconWiFiService.ts` ships built-in; `electron/cspPolicy.ts` (T3-8) exists and is referenced from `electron/main.ts`; `license-check` script and allowlist are wired into the pipeline. **Out of scope (future T3-86 follow-up slice):** Playwright-based runner that launches the packaged exe end-to-end. Filed for after T2-98 (Win/macOS CI runners) lands; the audit's "serialport loads" criterion is now "Web Serial is available in the renderer" because of T2-35 — Web Serial is built into Electron's bundled Chromium and does not need a separate native prebuild. **Hardware verification not required** (build-config + test surface; no production behavior changed).
+
+
 
 **Code reference:** No packaged-app smoke tests exist.
 
@@ -20573,7 +20577,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (Shipped — first slice in `<TBD>`; pins T1-77 / T1-78 / T1-79 / T1-81 protections; signed-token / clock-rollback / monkey-patch scenarios deferred until T2-90 / T2-91 / T2-94 land)
 - [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
 - [ ] T3-85 Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
-- [ ] T3-86 Native module packaging smoke test 鈥?packaged-app launches + serialport loads + storage works (filed; pairs with T1-86 + T2-98)
+- [x] T3-86 Native module packaging smoke test 鈥?packaged-app launches + serialport loads + storage works (Shipped — build-config smoke-test slice in `<TBD>`; `tests/packaged-app-smoke/packaged-app-build-config.test.ts` pins build pipeline contract; Playwright-based packaged-exe runner deferred until T2-98 CI runners land)
 - [ ] T3-87 Log retention policy 鈥?per-domain caps, failed-job pinning, compression (filed; pairs with T2-108/116)
 - [ ] T3-88 IPC fuzz test suite 鈥?every handler tested with malformed inputs (filed; recurring CI quality gate)
 - [ ] T3-89 Production security build CI checks (filed; extends T1-81)
