@@ -27,6 +27,7 @@ import {
   buildSceneChecksum,
   validateSceneFileChecksum,
 } from './ProjectIntegrity';
+import { migrateSceneEnvelope } from './migrations/projectMigrations';
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
@@ -191,7 +192,19 @@ function parseSceneEnvelope(json: string): any {
     );
   }
 
-  return parsed;
+  // T1-119: route every parsed envelope through the formal migration
+  // pipeline. Pre-T1-119 the deserialize path skipped this entirely;
+  // ad-hoc legacy patches inside `migrateGeometry` (e.g. `_sourceText`
+  // → `sourceText`) were the only schema migration in production.
+  // The pipeline registry is empty today (T2-73 framework-only) so
+  // current-version files are passthroughs; the wiring matters because
+  // future schema bumps register a step in `projectMigrations.ts` and
+  // every load path automatically walks the chain.
+  const migration = migrateSceneEnvelope(parsed);
+  for (const warning of migration.warnings) {
+    console.warn(warning);
+  }
+  return migration.envelope;
 }
 
 /**
