@@ -21,6 +21,7 @@ import {
   invertImage,
 } from '../../core/image/ImageProcessing';
 import { warmProcessedImageCache } from '../hooks/useImageCacheWarmer';
+import { ditherInWorker } from '../../workers/imagePrepClient';
 import { captureSceneRevision, isSceneStale } from '../hooks/asyncSceneGuard';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
@@ -1339,20 +1340,44 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               const pre = buildPreprocessedForDitherPreview();
               if (!pre || !g.grayscaleWidth || !g.grayscaleHeight) return;
               const thr = sceneRef.current.layers.find(l => l.id === imgObj.layerId)?.settings.image.imageThreshold ?? 128;
-              const dithered = ditherImage(pre, g.grayscaleWidth, g.grayscaleHeight, mode, thr);
-              const s = sceneRef.current;
-              onSceneCommit({
-                ...s,
-                layers: s.layers.map(l =>
-                  l.id === imageLayer.id
-                    ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, dithering: mode, imageMode: 'dither' } } }
-                    : l,
-                ),
-                objects: s.objects.map(o =>
-                  o.id === imgObj.id
-                    ? { ...o, geometry: { ...o.geometry, adjustedData: dithered, ditherMode: mode } as ImageGeometry, _bounds: null, _worldTransform: null }
-                    : o,
-                ),
+              const targetWidth = g.grayscaleWidth;
+              const targetHeight = g.grayscaleHeight;
+              const targetObjId = imgObj.id;
+              const targetLayerId = imageLayer.id;
+              // T1-17-followup: dither off-thread. Pre-fix this call ran
+              // synchronously and froze the canvas for 5+ seconds on a
+              // 12 MP photo (surfaced by the 2026-05-12 Falcon hardware
+              // test). The async fire-and-forget pattern matches T1-17
+              // Pass 4c's worker-warmer for processedData. The same
+              // stale-fingerprint guard applies — re-check the live
+              // scene after the worker resolves so a fast user-drag
+              // before the worker finishes doesn't write a stale buffer.
+              void ditherInWorker(pre, targetWidth, targetHeight, mode, thr).then((dithered) => {
+                const s = sceneRef.current;
+                const liveObj = s.objects.find(o => o.id === targetObjId);
+                if (!liveObj || liveObj.geometry.type !== 'image') return;
+                const liveGeom = liveObj.geometry as ImageGeometry;
+                if (
+                  liveGeom.grayscaleWidth !== targetWidth
+                  || liveGeom.grayscaleHeight !== targetHeight
+                ) {
+                  return; // image was replaced; drop the stale dither.
+                }
+                onSceneCommit({
+                  ...s,
+                  layers: s.layers.map(l =>
+                    l.id === targetLayerId
+                      ? { ...l, settings: { ...l.settings, image: { ...l.settings.image, dithering: mode, imageMode: 'dither' } } }
+                      : l,
+                  ),
+                  objects: s.objects.map(o =>
+                    o.id === targetObjId
+                      ? { ...o, geometry: { ...o.geometry, adjustedData: dithered, ditherMode: mode } as ImageGeometry, _bounds: null, _worldTransform: null }
+                      : o,
+                  ),
+                });
+              }).catch((err) => {
+                console.warn('[PropertiesPanel] dither preview failed:', err);
               });
             },
           },

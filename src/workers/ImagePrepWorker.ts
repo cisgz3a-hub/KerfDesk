@@ -27,6 +27,8 @@
  * does it on a different thread.
  */
 
+import { ditherImage, type DitherMode } from '../import/Dithering';
+
 // ───────────────────────────────────────────────────────────
 // Pass 1 protocol: image grayscale preparation
 // ───────────────────────────────────────────────────────────
@@ -73,8 +75,36 @@ interface ImageProcessResponse {
   data: Uint8Array;
 }
 
-type AnyRequest = ImagePrepRequest | ImageProcessRequest;
-type AnyResponse = ImagePrepResponse | ImageProcessResponse;
+// ───────────────────────────────────────────────────────────
+// T1-17-followup protocol: dithering off the main thread.
+//
+// Pre-T1-17-followup, `PropertiesPanel.tsx`'s dither-mode onChange
+// called the synchronous `ditherImage` from `src/import/Dithering.ts`
+// directly on the main thread. For a 12 MP image (~12 M pixels)
+// every error-diffusion pass is hundreds of ms to seconds — the
+// reason a 2026-05-12 Falcon hardware test reported a 5+ second
+// canvas freeze when changing dither mode after photo import.
+// Off-loading mirrors the existing 'prep' / 'process' kinds.
+// ───────────────────────────────────────────────────────────
+
+interface ImageDitherRequest {
+  kind: 'dither';
+  id: number;
+  source: Uint8Array;     // grayscale bytes (length = width * height)
+  width: number;
+  height: number;
+  mode: DitherMode;
+  threshold: number;
+}
+
+interface ImageDitherResponse {
+  kind: 'dither';
+  id: number;
+  data: Uint8Array;
+}
+
+type AnyRequest = ImagePrepRequest | ImageProcessRequest | ImageDitherRequest;
+type AnyResponse = ImagePrepResponse | ImageProcessResponse | ImageDitherResponse;
 
 // Backward-compat: pass-1 client still posts a request with no `kind`
 // field. Treat any request without a `kind` as 'prep'.
@@ -141,6 +171,19 @@ self.onmessage = (ev: MessageEvent<AnyRequest>) => {
     return;
   }
 
+  if (req.kind === 'dither') {
+    // T1-17-followup: off-thread dithering. `ditherImage` from
+    // `src/import/Dithering.ts` is a pure function (no DOM / canvas
+    // dependencies) so it imports cleanly into the worker module
+    // graph via Vite's worker bundler. Output is byte-for-byte
+    // identical to the main-thread call site `ditherImage(...)` was
+    // doing before this off-load.
+    const data = ditherImage(req.source, req.width, req.height, req.mode, req.threshold);
+    const reply: ImageDitherResponse = { kind: 'dither', id: req.id, data };
+    (self as unknown as Worker).postMessage(reply, [data.buffer]);
+    return;
+  }
+
   // kind === 'prep'
   const { id, bitmap, gsWidth, gsHeight } = req;
   const canvas = new OffscreenCanvas(gsWidth, gsHeight);
@@ -176,6 +219,8 @@ export type {
   ImagePrepResponse,
   ImageProcessRequest,
   ImageProcessResponse,
+  ImageDitherRequest,
+  ImageDitherResponse,
   AnyRequest,
   AnyResponse,
 };

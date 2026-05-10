@@ -21,6 +21,8 @@
  * caller never sees the worker failure.
  */
 
+import { ditherImage, type DitherMode as DitherModeName } from '../import/Dithering';
+
 let imagePrepWorkerInstance: Worker | null = null;
 let imagePrepRequestId = 0;
 let workerKnownBroken = false;
@@ -264,6 +266,79 @@ export async function processImage(
   }
 
   return processImageMainThread(source, width, height, settings);
+}
+
+// ───────────────────────────────────────────────────────────
+// T1-17-followup: dither off the main thread
+// ───────────────────────────────────────────────────────────
+
+let imageDitherRequestId = 0;
+
+/**
+ * T1-17-followup: off-load `ditherImage` to the existing image-prep
+ * worker. Pre-T1-17-followup, `PropertiesPanel.tsx`'s dither-mode
+ * onChange called `ditherImage(...)` synchronously on the main
+ * thread; for a 12 MP image (~12 M pixels) every error-diffusion pass
+ * is hundreds of ms to seconds, freezing the canvas. A 2026-05-12
+ * Falcon hardware test surfaced this as a 5+ second canvas freeze
+ * when changing dither mode after photo import.
+ *
+ * Output is byte-for-byte identical to a synchronous `ditherImage`
+ * call (the worker imports the same pure function from
+ * `src/import/Dithering.ts`). The worker fall-back path runs the
+ * same function on the main thread when no worker is available
+ * (older Electron, jsdom, locked-down browsers).
+ */
+export async function ditherInWorker(
+  source: Uint8Array,
+  width: number,
+  height: number,
+  mode: DitherModeName,
+  threshold: number,
+): Promise<Uint8Array> {
+  const worker = getImagePrepWorker();
+
+  if (worker) {
+    try {
+      const id = ++imageDitherRequestId;
+      return await new Promise<Uint8Array>((resolve, reject) => {
+        const onMessage = (ev: MessageEvent<{ kind?: 'prep' | 'process' | 'dither'; id: number; data?: Uint8Array }>) => {
+          if (ev.data.id !== id) return;
+          if (ev.data.kind !== 'dither') return; // ignore other channels
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+          if (!ev.data.data) {
+            workerKnownBroken = true;
+            resolve(ditherImage(source, width, height, mode, threshold));
+            return;
+          }
+          resolve(ev.data.data);
+        };
+        const onError = (ev: ErrorEvent) => {
+          worker.removeEventListener('message', onMessage);
+          worker.removeEventListener('error', onError);
+          reject(new Error(`Image dither worker error: ${ev.message}`));
+        };
+        worker.addEventListener('message', onMessage);
+        worker.addEventListener('error', onError);
+        const sourceCopy = new Uint8Array(source);
+        worker.postMessage({
+          kind: 'dither',
+          id,
+          source: sourceCopy,
+          width,
+          height,
+          mode,
+          threshold,
+        }, [sourceCopy.buffer]);
+      });
+    } catch (err) {
+      console.warn('[ImagePrepWorker] dither dispatch failed, falling back to main thread:', err);
+      workerKnownBroken = true;
+    }
+  }
+
+  return ditherImage(source, width, height, mode, threshold);
 }
 
 /**
