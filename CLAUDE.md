@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **`.cursor/rules/laserforge.md` is the binding workflow contract** for this repo and applies to Claude Code as much as to Cursor. Read it before proposing any change. The non-negotiables it encodes:
 
+- **`docs/AGENT_HANDOFF.md`** captures the latest agent-to-agent continuation note. Read it after this file so you know the current clean HEAD, last shipped ticket, next ticket, and any local verification caveats.
 - **`docs/ROADMAP.md`** is the authoritative ticket list (323 tickets, Tier 0–4). **`docs/ROADMAP-shipped-audit.md`** is the verified ledger of what has shipped, with hashes. Both are source of truth — don't propose work that isn't on them without explicit approval.
 - **Strict tier order, lower number first.** No skipping. Partial tickets must be finished before adjacent ones are started.
 - **Every shipped fix is a coupled triple** in one commit: code change + test, `ROADMAP.md` ticket marked `**Status:** Shipped in <hash>`, and `ROADMAP-shipped-audit.md` row moved to Shipped. A patch missing any of the three is incomplete.
@@ -27,7 +28,7 @@ npm run electron:build:mac     # macOS dmg
 npm run license-check          # validate dependency licenses against scripts/license-allowlist.mjs
 ```
 
-The test runner deliberately spawns a **separate Node process per test file** to prevent leaked timers (e.g. GRBL status polling) from keeping `npm test` running. New test files must be appended to the `files` array in `scripts/run-tests.mjs` to be picked up by `npm test`. Tests use `tsx` directly — there is no vitest/jest. `LASERFORGE_DETERMINISTIC_IDS=1` is set for the suite.
+The test runner deliberately spawns a **separate Node process per test file** to prevent leaked timers (e.g. GRBL status polling) from keeping `npm test` running. Tests are auto-discovered under `tests/` by `scripts/run-tests.mjs`. Tests use `tsx` directly — there is no vitest/jest. `LASERFORGE_DETERMINISTIC_IDS=1` is set for the suite.
 
 ## Architecture
 
