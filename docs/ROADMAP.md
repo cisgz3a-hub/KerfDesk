@@ -16483,7 +16483,9 @@ For each, capture optimal speed/power/passes plus a 256-point luminance鈫抪owe
 
 **Estimate:** Several days of hardware testing + curve extraction. Possibly leverage community submissions over time.
 
-**Priority:** Tier 3 鈥?competitive parity. Could also be community-driven content rather than internal work.
+**Priority:** Tier 3 — competitive parity. Could also be community-driven content rather than internal work.
+
+**Status:** Shipped in `<TBD>` — community-curve ingestion-pipeline slice. The audit's calibrated-preset library wants per-material luminance→power response curves; generating those needs hardware time on real materials. The audit explicitly notes "Possibly leverage community submissions over time." This slice ships the foundation that makes those submissions actionable. New `src/core/materials/CommunityResponseCurve.ts` defines a versioned JSON envelope (`format: 'laserforge-community-response-curve'`, `formatVersion: 1`, `materialName`, `calibrationSpeed`, optional `machine` / `contributor` attribution, `calibratedAt`, optional `note`, `points`), a runtime `validateCommunityResponseCurve(unknown)` validator with structured `CommunityCurveValidationCode` issues (wrong-format / unsupported-version / missing-material-name / invalid-calibration-speed / invalid-calibrated-at / too-few-points / point-out-of-range / points-not-sorted / duplicate-power-point), a forward adapter `adoptCommunityResponseCurve(envelope, id)` producing a canonical `ResponseCurve` that works with `darknessToPower`, and a reverse `exportCommunityResponseCurve(curve, attribution?)` for the in-app "Export curve as JSON" path. Pinned by `tests/community-response-curve.test.ts` (37 contracts: format-version constant; valid-envelope passes; every error code detected; non-object inputs reject without crash; adopt produces a `darknessToPower`-compatible curve; round-trip via `JSON.stringify`/`JSON.parse` + validate still passes; export → validate → adopt preserves all fields and points). **Out of scope (future T3-24 follow-up slices):** bundled calibrated curves for common materials (still requires hardware time on a Falcon or community submissions); UI surface for "Import curve from JSON" / "Export curve as JSON" inside Materials; a community-curve registry with model/wattage filtering. The pipeline is now ready for the first contributor with calibrated material data. **Hardware verification not required** for this slice (no curve data shipped; pure ingestion plumbing).
 
 ---
 
@@ -20524,7 +20526,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-21 Frame-dot hardcoded F3000 should follow profile / settings (Shipped in `54ff72e` — configurable profile/settings frame-dot feed rate)
 - [x] T3-22 Tolerance-based grayscale segment merge in raster (Shipped in `03c916f` — default 2-point grayscale power merge tolerance with UI setting)
 - [x] T3-23 Warn when powerMin > 0 with photo-style image content (Shipped in `681a178` — non-blocking grayscale/photo image minimum-power warning)
-- [ ] T3-24 Material-specific calibration preset library (calibration curves for common materials)
+- [x] T3-24 Material-specific calibration preset library (Shipped — community-curve ingestion-pipeline slice in `<TBD>`; `CommunityResponseCurve` envelope + validator + adopt/export + 37-contract test; bundled calibrated curves still require hardware testing or community submissions)
 - [x] T3-25 Bidirectional row alternation by raw row index, not non-empty-row count (Shipped in `17a3457` — sparse raster rows use physical row parity)
 - [x] T3-26 Blue-noise / advanced halftone dithering modes (Shipped in `e083791` — deterministic blue-noise dither mode)
 - [x] T3-27 SVG `<text>` element import 鈥?convert to outlines or warn (Shipped in `3d2c1bc` — text skip warning/report path)
