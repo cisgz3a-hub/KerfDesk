@@ -145,13 +145,16 @@ async function run(): Promise<void> {
 
   // ── 6. Preflight blocks on machine status === 'door' ──
   {
-    const ctx: PreflightContext = {
+    const ctx = {
       scene: { objects: [], layers: [] } as never,
       profile: null,
-      machineStatus: 'door',
+      optimizeOrderEnabled: true,
+      preflightBedWidthMm: 300,
+      preflightBedHeightMm: 300,
+      machineStatus: 'door' as const,
       connectedToMachine: true,
       hasGcode: true,
-    } as PreflightContext;
+    } as unknown as PreflightContext;
     const findings = [] as ReturnType<typeof runMachineStateChecks> extends void ? Array<{ severity: string; code: string; message: string }> : never;
     const out: Array<{ severity: string; code: string; message: string }> = [];
     runMachineStateChecks(ctx, out as never);

@@ -183,7 +183,12 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     borderRadius: 4, color: '#e0e0ec', fontSize: 12, outline: 'none', width: '100%',
   };
   const hintStyle: React.CSSProperties = { fontSize: 10, color: '#666' };
-  const stopOnErrorChecked = activeProfile.stopOnError !== false;
+  // T1-116: stopOnErrorChecked was removed alongside the casual UI
+  // checkbox. The controller-side default is `true`, and overriding it
+  // requires an UnsafeStopOnErrorOverrideToken minted by
+  // createStopOnErrorOverrideToken(reason). No production caller mints
+  // a token; the override surface is reserved for tests / future
+  // expert-diagnostics mode.
   const capabilityRows = buildMachineSettingsCapabilityRows(activeProfile, liveCapabilities);
   const cornerOptions: Array<{ value: MachineOriginCorner; label: string }> = [
     { value: 'front-left', label: 'Front left' },
@@ -415,22 +420,16 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
         'Most diode lasers have the origin at a front corner and treat negative coords as limit hits. Enable only if your machine is configured for work offsets that produce negative coordinates.'),
     ),
 
-    React.createElement('div', { style: sectionStyle },
-      React.createElement('div', { style: sectionTitleStyle }, 'Advanced'),
-      React.createElement('div', { style: fieldRowStyle },
-        React.createElement('label', { style: labelStyle }, 'Stop job on GRBL errors'),
-        React.createElement('input', {
-          type: 'checkbox',
-          checked: stopOnErrorChecked,
-          onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
-            onUpdateProfile({ stopOnError: e.target.checked } as unknown as Partial<DeviceProfile>);
-          },
-          style: { justifySelf: 'start' },
-        }),
-        React.createElement('div', { style: hintStyle },
-          'When checked, any error:N response from the machine aborts the running job. Uncheck only if your firmware emits benign error codes that are safe to ignore. Uncheck at your own risk — real errors (bad G-code, limit hits) will also be ignored until you turn this back on.',
-        ),
-      ),
-    ),
+    // T1-116: the "Stop job on GRBL errors" checkbox was removed from
+    // production settings. Pre-fix this was a casual checkbox that
+    // disabled the safety abort on `error:N` responses (malformed
+    // G-code, invalid commands, unexpected controller state) — saved
+    // to the device profile and persisted across restarts. Continuing
+    // past `error:` is not a casual preference; a `setStopOnError(false)`
+    // call now requires an UnsafeStopOnErrorOverrideToken minted via
+    // createStopOnErrorOverrideToken(reason) at the controller layer.
+    // Production code paths no longer mint tokens. Diagnostics callers
+    // (tests, internal expert mode if added later) mint a token
+    // explicitly with a reason string that is logged on creation.
   );
 }

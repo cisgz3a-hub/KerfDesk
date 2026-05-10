@@ -1,8 +1,18 @@
 /**
  * GrblController.setStopOnError — when false, error:N does not abort the job stream.
+ *
+ * T1-116: pre-fix the controller accepted setStopOnError(false) from
+ * any caller. Post-fix it requires an UnsafeStopOnErrorOverrideToken
+ * minted by createStopOnErrorOverrideToken(reason). This test was
+ * updated to mint a token explicitly and to add a contract that
+ * setStopOnError(false) without a token throws.
+ *
  * Run: npx tsx tests/stop-on-error-override.test.ts
  */
-import { GrblController } from '../src/controllers/grbl/GrblController';
+import {
+  createStopOnErrorOverrideToken,
+  GrblController,
+} from '../src/controllers/grbl/GrblController';
 import { MockSerialPort } from '../src/communication/SerialPort';
 
 let passed = 0;
@@ -55,14 +65,15 @@ async function main(): Promise<void> {
     await ctrl.disconnect();
   }
 
-  console.log('\n=== setStopOnError(false) → error:20 does not abort; job can finish ===');
+  console.log('\n=== setStopOnError(false) with override token → error:20 does not abort; job can finish ===');
   {
     const port = makeError20Port();
     const ctrl = new GrblController();
     port.open();
     await ctrl.connect(port);
     await flush();
-    ctrl.setStopOnError(false);
+    const token = createStopOnErrorOverrideToken('test: continue past error:20 to verify behavior');
+    ctrl.setStopOnError(false, token);
     let errCount = 0;
     ctrl.onError((code) => { errCount++; if (code !== 20) console.error('expected 20, got', code); });
     const job = ['G21', 'G0 X0', 'G0 X1', 'G0 X2', 'M2'];
@@ -80,13 +91,63 @@ async function main(): Promise<void> {
     port.open();
     await ctrl.connect(port);
     await flush();
-    ctrl.setStopOnError(false);
+    const token = createStopOnErrorOverrideToken('test: temporarily disabled, then re-enabled');
+    ctrl.setStopOnError(false, token);
     ctrl.setStopOnError(true);
     const job = ['G21', 'G0 X0', 'G0 X1', 'G0 X2', 'M2'];
     await ctrl.sendJob(job);
     await waitUntil(() => !ctrl.isJobRunning, 3000);
     assert(!ctrl.isJobRunning, 're-enabled stopOnError aborts again');
     await ctrl.disconnect();
+  }
+
+  console.log('\n=== T1-116: setStopOnError(false) without a token throws ===');
+  {
+    const ctrl = new GrblController();
+    let threw = false;
+    let message = '';
+    try {
+      ctrl.setStopOnError(false);
+    } catch (err) {
+      threw = true;
+      message = err instanceof Error ? err.message : String(err);
+    }
+    assert(threw, 'setStopOnError(false) without a token throws');
+    assert(/UnsafeStopOnErrorOverrideToken/i.test(message),
+      'thrown error names UnsafeStopOnErrorOverrideToken');
+    assert(/createStopOnErrorOverrideToken/i.test(message),
+      'thrown error names the createStopOnErrorOverrideToken factory');
+  }
+
+  console.log('\n=== T1-116: createStopOnErrorOverrideToken requires a non-empty reason ===');
+  {
+    let threwOnEmpty = false;
+    try { createStopOnErrorOverrideToken(''); } catch { threwOnEmpty = true; }
+    assert(threwOnEmpty, 'empty reason → throws');
+
+    let threwOnWhitespace = false;
+    try { createStopOnErrorOverrideToken('   '); } catch { threwOnWhitespace = true; }
+    assert(threwOnWhitespace, 'whitespace-only reason → throws');
+
+    const token = createStopOnErrorOverrideToken('legitimate reason');
+    assert(token.kind === 'unsafe-stop-on-error-override-token',
+      'minted token has the expected kind');
+    assert(token.reason === 'legitimate reason',
+      'minted token records the caller-supplied reason');
+    assert(typeof token.mintedAt === 'number' && token.mintedAt > 0,
+      'minted token records mintedAt timestamp');
+  }
+
+  console.log('\n=== T1-116: a fake/forged token is rejected ===');
+  {
+    const ctrl = new GrblController();
+    const fake = {
+      kind: 'unsafe-stop-on-error-override-token',
+      // Missing reason — strips the audit trail.
+    } as unknown as Parameters<GrblController['setStopOnError']>[1];
+    let threw = false;
+    try { ctrl.setStopOnError(false, fake); } catch { threw = true; }
+    assert(threw, 'token missing reason field → throws');
   }
 
   console.log(`\nStop on error override: ${passed} passed, ${failed} failed`);

@@ -107,6 +107,57 @@ function machineStatusFromGrblReportToken(token: string): MachineStatus | null {
  * `<...>` status reaching the parser — typically a wedged firmware or a
  * non-responsive cable.
  */
+/**
+ * T1-116: opaque token authorizing a `setStopOnError(false)` call.
+ *
+ * Pre-T1-116 the controller accepted `setStopOnError(false)` from any
+ * caller — including a casual MachineSettingsTab checkbox — which let
+ * a user silently keep streaming after GRBL `error:` lines (malformed
+ * G-code, invalid commands, unexpected controller state). The override
+ * is now mintable only via {@link createStopOnErrorOverrideToken} or
+ * its test-only counterpart, both of which require the caller to name
+ * a reason. The token is stamped at mint time so a future ban-list /
+ * audit-log subsystem can attribute every override to a specific
+ * mint call.
+ */
+export interface UnsafeStopOnErrorOverrideToken {
+  readonly kind: 'unsafe-stop-on-error-override-token';
+  readonly reason: string;
+  readonly mintedAt: number;
+}
+
+const STOP_ON_ERROR_OVERRIDE_TOKEN_KIND = 'unsafe-stop-on-error-override-token' as const;
+
+export function createStopOnErrorOverrideToken(reason: string): UnsafeStopOnErrorOverrideToken {
+  if (typeof reason !== 'string' || reason.trim().length === 0) {
+    throw new Error('createStopOnErrorOverrideToken requires a non-empty reason string.');
+  }
+  // Always log so an override can never happen invisibly. Production
+  // paths never mint a token; only test harnesses or an explicit
+  // diagnostics-mode call site reach this code.
+  console.warn(
+    `[GrblController] T1-116 stop-on-error override minted: "${reason}". `
+    + 'Streaming may continue after GRBL error: lines until the override is cleared.',
+  );
+  return Object.freeze({
+    kind: STOP_ON_ERROR_OVERRIDE_TOKEN_KIND,
+    reason,
+    mintedAt: Date.now(),
+  });
+}
+
+function isUnsafeStopOnErrorOverrideToken(
+  value: unknown,
+): value is UnsafeStopOnErrorOverrideToken {
+  if (value == null || typeof value !== 'object') return false;
+  const v = value as { kind?: unknown; reason?: unknown };
+  return (
+    v.kind === STOP_ON_ERROR_OVERRIDE_TOKEN_KIND
+    && typeof v.reason === 'string'
+    && v.reason.length > 0
+  );
+}
+
 export type UnsafeAtConnectReason =
   | 'alarm'
   | 'run'
@@ -409,8 +460,31 @@ export class GrblController implements GrblControllerApi {
     return this._placementUncertain;
   }
 
-  /** When false, GRBL `error:` during a job is logged but streaming may continue. Default true. */
-  setStopOnError(value: boolean): void {
+  /**
+   * When false, GRBL `error:` during a job is logged but streaming may
+   * continue. Default true.
+   *
+   * T1-116: pre-fix this method accepted any boolean, and a casual
+   * checkbox in MachineSettingsTab let the user disable stop-on-error
+   * with no override / no acknowledgment / persisted across restarts.
+   * Continuing past `error:` lines after malformed G-code or unexpected
+   * controller state can produce wrong motion, skipped commands, or
+   * unsafe job execution. That is not a casual preference. The token
+   * gate forces every false-value caller to pass through
+   * `createStopOnErrorOverrideToken(reason)` (or the test-only variant)
+   * so the override is always paired with an explicit reason string +
+   * console warning the user / support / log review can see. Test
+   * harnesses pass a token explicitly; production code paths no longer
+   * disable stop-on-error.
+   */
+  setStopOnError(value: boolean, token?: UnsafeStopOnErrorOverrideToken): void {
+    if (value === false && !isUnsafeStopOnErrorOverrideToken(token)) {
+      throw new Error(
+        'GrblController.setStopOnError(false) requires an UnsafeStopOnErrorOverrideToken. '
+        + 'Continuing past GRBL error: lines after malformed G-code is unsafe; if you really '
+        + 'need this for diagnostics, mint a token via createStopOnErrorOverrideToken(reason).',
+      );
+    }
     this._stopOnError = value;
   }
 

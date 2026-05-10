@@ -182,9 +182,17 @@ export function useAppDeviceProfiles({
 
   useEffect(() => {
     if (!controller || typeof controller.setStopOnError !== 'function') return;
-    const profile = getActiveProfile();
-    const value = profile?.stopOnError !== false;
-    controller.setStopOnError(value);
+    // T1-116: production no longer pipes profile.stopOnError through
+    // to the controller. Pre-fix this read profile.stopOnError and
+    // called setStopOnError(false) when the user had unchecked a UI
+    // checkbox — silently disabling the abort-on-error safety. The
+    // checkbox is removed from the production UI and the controller
+    // now requires an UnsafeStopOnErrorOverrideToken to flip the
+    // value to false; only test harnesses / explicit diagnostics-mode
+    // call sites mint tokens. Each connect/profile-revision tick
+    // therefore reasserts the safe default (true) instead of trusting
+    // a persisted profile value.
+    controller.setStopOnError(true);
   }, [controller, profileRevision]);
 
   const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
@@ -205,7 +213,14 @@ export function useAppDeviceProfiles({
     target.maxAccelY = previous.maxAccelY;
     target.frameDotFeedRate = previous.frameDotFeedRate;
     if (previous.suppressWcsConsent) target.suppressWcsConsent = true;
-    if (previous.stopOnError === false) target.stopOnError = false;
+    // T1-116: the legacy `stopOnError === false` preservation path is
+    // gone. The controller now refuses to accept a false value without
+    // an UnsafeStopOnErrorOverrideToken, and no production caller
+    // mints one. Even if a legacy profile carried `stopOnError: false`
+    // from before T1-116, the production setStopOnError(true) call in
+    // the connect-time effect above pins the safe default; preserving
+    // the false value across profile copies would let it leak back in
+    // through some future code path.
   }, []);
 
   const setActiveProfileAndApply = useCallback((id: string | null) => {

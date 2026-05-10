@@ -1,5 +1,13 @@
 /**
- * Machine settings: Advanced "Stop job on GRBL errors" field renders correctly.
+ * T1-116: regression test for the removed "Stop job on GRBL errors"
+ * checkbox. Pre-T1-116 this file pinned the existence of an Advanced
+ * section checkbox that let users disable abort-on-error from a
+ * casual production UI. T1-116 removed the checkbox — disabling
+ * stop-on-error now requires an UnsafeStopOnErrorOverrideToken minted
+ * by createStopOnErrorOverrideToken(reason) at the controller layer,
+ * which no production code path reaches. This test now asserts the
+ * checkbox is GONE so a future refactor doesn't quietly bring it back.
+ *
  * Run: npx tsx tests/machine-settings-stop-on-error-toggle.test.ts
  */
 import React from 'react';
@@ -29,7 +37,9 @@ function baseProfile(over: Partial<DeviceProfile> = {}): DeviceProfile {
   };
 }
 
-console.log('\n=== MachineSettingsTab: Advanced stopOnError field ===');
+console.log('\n=== T1-116 MachineSettingsTab: stopOnError checkbox removed ===');
+
+// Default profile: no stop-on-error UI surface.
 {
   const html = renderToStaticMarkup(
     React.createElement(MachineSettingsTab, {
@@ -39,14 +49,14 @@ console.log('\n=== MachineSettingsTab: Advanced stopOnError field ===');
       onAutoDetect: () => {},
     }),
   );
-  assert(html.includes('Advanced'), 'renders Advanced section');
-  assert(html.includes('Stop job on GRBL errors'), 'renders label');
   assert(
-    /checked(=\"\")?/i.test(html) || /checked="checked"/i.test(html),
-    'default (undefined) shows checked in markup',
+    !html.includes('Stop job on GRBL errors'),
+    'default profile: "Stop job on GRBL errors" label is gone from the production UI',
   );
 }
 
+// Even a legacy profile carrying stopOnError=false must not surface a
+// re-enable / re-disable control.
 {
   const html = renderToStaticMarkup(
     React.createElement(MachineSettingsTab, {
@@ -56,17 +66,11 @@ console.log('\n=== MachineSettingsTab: Advanced stopOnError field ===');
       onAutoDetect: () => {},
     }),
   );
-  const inAdvanced = html.indexOf('Advanced') < html.indexOf('Stop job on GRBL');
-  assert(inAdvanced, 'Advanced title precedes label in DOM order');
-  const lastCheckboxBeforeHint = /Stop job on GRBL[\s\S]*?<input[^>]*>/.exec(html);
-  const advInp = lastCheckboxBeforeHint
-    ? lastCheckboxBeforeHint[0].match(/<input[^>]+>/)?.[0] ?? ''
-    : '';
   assert(
-    advInp !== '' && !/\bchecked=/.test(advInp),
-    'when stopOnError is false, checkbox input has no checked= attribute',
+    !html.includes('Stop job on GRBL errors'),
+    'legacy profile with stopOnError=false: still no UI control surfaced',
   );
 }
 
-console.log(`\nMachine settings stop-on-error toggle: ${passed} passed, ${failed} failed`);
+console.log(`\nT1-116 stopOnError checkbox removal: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
