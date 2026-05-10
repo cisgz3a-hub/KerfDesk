@@ -17109,7 +17109,7 @@ function getValidatorFor(family: ControllerFamily): TemplateValidator {
 
 **Cross-check note (audit 3A):** Verified existing validator is GRBL-shaped. Audit's Priority 8.
 
-**Status:** Shipped in `<TBD>` — `src/core/preflight/GcodeTemplateValidator.ts` now routes template semantic validation by dialect. GRBL keeps the existing `$X` / `$RST` / `$SLP` / `$N=` / unknown-dollar rules; Marlin, Smoothie, and Custom use the generic G-code validator so shared laser/motion safety still applies without interpreting `$X` as a GRBL alarm unlock; Ruida returns no template findings because LaserForge does not expose user-editable G-code templates for that binary/device-native path. `TemplatePreflight` derives the dialect from `DeviceProfile.outputDialect ?? outputFormat`, and GRBL-only `$H` header checks now skip non-GRBL profiles. Pinned by `tests/preflight-validator-dialect-routing.test.ts` plus existing template/preflight regressions. **Hardware verification not required** (preflight routing only; no emitted G-code or controller command semantics changed).
+**Status:** Shipped in `86e0cd0` — `src/core/preflight/GcodeTemplateValidator.ts` now routes template semantic validation by dialect. GRBL keeps the existing `$X` / `$RST` / `$SLP` / `$N=` / unknown-dollar rules; Marlin, Smoothie, and Custom use the generic G-code validator so shared laser/motion safety still applies without interpreting `$X` as a GRBL alarm unlock; Ruida returns no template findings because LaserForge does not expose user-editable G-code templates for that binary/device-native path. `TemplatePreflight` derives the dialect from `DeviceProfile.outputDialect ?? outputFormat`, and GRBL-only `$H` header checks now skip non-GRBL profiles. Pinned by `tests/preflight-validator-dialect-routing.test.ts` plus existing template/preflight regressions. **Hardware verification not required** (preflight routing only; no emitted G-code or controller command semantics changed).
 
 ---
 
@@ -20504,7 +20504,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-39 Malformed-input test suite (Shipped in `a28eec8` — malformed SVG/image/settings/template/extreme-coordinate suite)
 - [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `6dec8a8` — bounded perf suite with T3-15 streaming blockers documented)
 - [x] T3-41 Snapshot semantic-assertion pairing éˆ¥?every snapshot test gets parsed checks (Shipped in `3684f6b`; semantic parser/analyzer assertions now paired with every E2E snapshot)
-- [x] T3-42 Dialect-specific preflight / template validators (Shipped in `<TBD>` — template semantic validation now routes GRBL-specific, generic G-code, and Ruida no-template dialect paths)
+- [x] T3-42 Dialect-specific preflight / template validators (Shipped in `86e0cd0` — template semantic validation now routes GRBL-specific, generic G-code, and Ruida no-template dialect paths)
 - [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
 - [ ] T3-44 Generic progress model 鈥?line/byte/percent/device-reported (filed; depends on T2-24)
 - [x] T3-45 Transport abstraction layer 鈥?Line/Byte/HttpJob transports (Shipped — focused foundation in `6ac9cce`; real Falcon WiFi controller remains T2-30)
