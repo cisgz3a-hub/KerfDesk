@@ -1708,6 +1708,24 @@ export function ConnectionPanelMain({
     setRecoveryStateLocal(machineService.getRecoveryState());
     return machineService.onRecoveryStateChange(setRecoveryStateLocal);
   }, [machineService]);
+  // T1-123: live WiFi trust verdict + override snapshot. Pre-T1-123
+  // the panel never showed trust at all — the user couldn't tell a
+  // USB connection (trusted local control) from a Falcon WiFi
+  // connection (unauthenticated, attacker-spoofable per audit 5D
+  // Critical 10). The badge below renders the trust label;
+  // canStartJob conjuncts off the service's combined trust+override
+  // policy evaluation so the Start button refuses over WiFi until
+  // the user grants an explicit override.
+  const [wifiOverride, setWiFiOverrideLocal] = useState(
+    () => machineService.getWiFiOverride(),
+  );
+  useEffect(() => {
+    setWiFiOverrideLocal(machineService.getWiFiOverride());
+    return machineService.onWiFiOverrideChange(setWiFiOverrideLocal);
+  }, [machineService]);
+  void wifiOverride; // referenced via re-render trigger; the gate reads via service
+  const wifiTrust = machineService.getConnectionTrust();
+  const wifiStartAllowed = machineService.evaluateActionAllowed('start-job').allowed;
   const currentModeFrameAnchorValid =
     !requireFrame ||
     currentModeFrameAnchorAllowsStart({
@@ -1744,6 +1762,12 @@ export function ConnectionPanelMain({
     // idle even though the user hadn't acknowledged inspection /
     // rehome / reframe.
     recoveryAllowsStart(recoveryState) &&
+    // T1-123: connection-trust gate. Trusted (USB) connections pass
+    // automatically; Falcon WiFi connections need an explicit override
+    // grant. Audit Phase 2 #7: previously trust was never consulted
+    // by the start gate, so a job could go out over an unauthenticated
+    // WiFi connection without the user's awareness.
+    wifiStartAllowed &&
     (gates?.baseSafe ?? false);
   /**
    * T1-96: structured Start-button readiness for the diagnostics panel.
@@ -1866,6 +1890,22 @@ export function ConnectionPanelMain({
         status: placementUncertain ? 'fail' : 'ok',
         failHeadline: 'Work-coordinate state could not be confirmed',
         failAction: 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry',
+      },
+      // T1-123: connection-trust readiness gate. Surfaces the WiFi
+      // trust label so the user can see "WiFi (telemetry only)" vs
+      // "USB Serial" in the diagnostics dropdown. The actual policy
+      // gate is in `wifiStartAllowed`; this row is the operator-
+      // facing surface that explains WHY Start is blocked when the
+      // connection is untrusted. Trusted connections render this
+      // row as 'ok' regardless. Filed: a richer connection badge
+      // in the panel header is T1-123-followup.
+      {
+        id: 'connectionTrust',
+        label: `Connection trust (${wifiTrust.label})`,
+        status: wifiStartAllowed ? 'ok' : 'fail',
+        failHeadline: 'Connection is not authenticated for safety-critical actions',
+        failAction: wifiTrust.hint
+          ?? 'Connect via USB, or grant a WiFi override before retrying.',
       },
     ];
 

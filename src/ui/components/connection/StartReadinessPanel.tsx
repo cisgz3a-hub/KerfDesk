@@ -24,6 +24,7 @@ export interface StartReadinessGate {
     | 'currentModeAnchor'
     | 'laserState'
     | 'wcsState'
+    | 'connectionTrust'
     | 'controllerConnected';
   label: string;
   status: GateStatus;

@@ -45,6 +45,13 @@ import {
   triggerEmergencyStop,
   type RecoveryState,
 } from '../runtime/RecoveryState';
+import {
+  classifyConnectionTrust,
+  evaluateWiFiActionPolicy,
+  type ConnectionKind,
+  type FalconWiFiAction,
+  type TrustClassification,
+} from '../security/FalconWiFiTrust';
 import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -82,6 +89,20 @@ export type LaserOutputState = 'off' | 'on' | 'unknown';
 export type LaserOutputStateListener = (state: LaserOutputState) => void;
 export type SafetyStateListener = (state: SafetyState) => void;
 export type RecoveryStateListener = (state: RecoveryState) => void;
+/**
+ * T1-123: ephemeral override that lets safety-critical actions
+ * proceed over an untrusted (WiFi) connection. Records the reason
+ * the user supplied at override time + an expiry deadline; UI clears
+ * + reissues per use case (typical: 5 min). The override does NOT
+ * upgrade trust — `getConnectionTrust()` still reports 'untrusted';
+ * the override only affects policy evaluation.
+ */
+export interface WiFiOverride {
+  readonly reason: string;
+  readonly grantedAt: number;
+  readonly expiresAt: number;
+}
+export type WiFiOverrideListener = (override: WiFiOverride | null) => void;
 
 /**
  * T2-11: kinds of temporary machine operations protected by the
@@ -272,6 +293,23 @@ export class MachineService {
    * are exposed via `setRecoveryState` for the recovery card UI.
    */
   private _recoveryState: RecoveryState = recoveryStateInitial;
+  /**
+   * T1-123: WiFi override state. null when no override is active or
+   * when the trust verdict is 'trusted' (override is meaningless on a
+   * USB connection). Set by the UI's "Start over WiFi anyway" flow
+   * via {@link requestWiFiOverride}; cleared by
+   * {@link clearWiFiOverride}, by the expiry timer, or implicitly when
+   * trust changes from 'untrusted' back to 'trusted'.
+   */
+  private _wifiOverride: WiFiOverride | null = null;
+  /**
+   * T1-123: 5-minute default override window. Long enough to start
+   * a job; short enough that an unattended LaserForge instance with
+   * a WiFi connection can't be hijacked into a job hours later. The
+   * UI flow re-prompts on every safety-critical action that needs
+   * the override; each grant resets the expiry.
+   */
+  private static readonly _DEFAULT_WIFI_OVERRIDE_MS = 5 * 60 * 1000;
   // T1-41: G54 work offset captured at the time the user clicked Set Origin.
   // The verify path (`verifySavedOrigin`) compares this to a freshly-queried
   // value at job start. `null` means Set Origin was never run this session
@@ -282,6 +320,8 @@ export class MachineService {
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
   private _safetyStateListeners: Set<SafetyStateListener> = new Set();
   private _recoveryStateListeners: Set<RecoveryStateListener> = new Set();
+  private _wifiOverrideListeners: Set<WiFiOverrideListener> = new Set();
+  private _wifiOverrideTimer: ReturnType<typeof setTimeout> | null = null;
 
   /**
    * T2-11: service-layer mutex for temporary-laser-on operations. Single
@@ -699,6 +739,26 @@ export class MachineService {
       );
     }
 
+    // T1-123: refuse to start a job over an untrusted (Falcon WiFi)
+    // connection unless the user has explicitly granted a recent
+    // override. Pre-T1-123 the production code never consulted trust
+    // — start_job over WiFi went through silently, even though the
+    // Falcon protocol has no auth (electron/falcon-wifi/FalconHttpClient.ts
+    // line 11 documents "No auth of any kind"), so a local-network
+    // attacker / fake device / DNS-rebound HTTP responder could
+    // accept the job. Default policy is 'medium' (require override
+    // with a reason). The override is grantable for 5 min via
+    // requestWiFiOverride; trusted USB connections bypass this gate
+    // entirely (allowed=true on the trusted branch).
+    const wifiGate = this.evaluateActionAllowed('start-job');
+    if (!wifiGate.allowed) {
+      throw new Error(
+        `Job start blocked over an untrusted connection (${wifiGate.trust.label}). `
+        + `${wifiGate.userMessage} `
+        + 'Connect via USB, or grant a WiFi override before retrying.',
+      );
+    }
+
     // T1-122: refuse to start a job while RecoveryState is non-none.
     // Pre-T1-122 this gate was missing from the production start path
     // entirely (the runtime type + triggers in src/runtime/RecoveryState.ts
@@ -1066,6 +1126,166 @@ export class MachineService {
     if (this._recoveryState === next) return;
     this._recoveryState = next;
     for (const cb of this._recoveryStateListeners) {
+      cb(next);
+    }
+  }
+
+  /**
+   * T1-123: derive the connection trust verdict from the active
+   * device profile's connection kind. Pre-T1-123 the production code
+   * never consulted trust at all — every connection was treated
+   * equivalently, even Falcon WiFi which is unauthenticated by
+   * protocol design (see electron/falcon-wifi/FalconHttpClient.ts:11
+   * "No auth of any kind"). Now safety-critical actions are gated
+   * via {@link evaluateActionAllowed}; the UI surfaces the trust
+   * label so the user can tell which connection is which.
+   *
+   * Trusted: serial / USB; Untrusted: falcon-wifi; Partial:
+   * unknown (no profile, or unrecognized kind). Simulator detection
+   * is filed as T1-123-followup since it requires UI-side knowledge
+   * not currently routed through MachineService.
+   */
+  getConnectionTrust(): TrustClassification {
+    // Mirror `getProfileConnectionKind`'s convention from
+    // src/core/devices/DeviceProfile.ts: a profile with no explicit
+    // `connection.kind` field — and the no-profile case — both default
+    // to 'serial' (the historical default for legacy profiles that
+    // predate the `connection` type). 'unknown' is reserved for a
+    // future explicit-unknown signal. Only the explicit
+    // `'falcon-wifi'` profile kind triggers the untrusted branch.
+    const profile = getActiveProfile();
+    const kind = profile?.connection?.kind ?? 'serial';
+    if (kind === 'falcon-wifi') {
+      return classifyConnectionTrust('wifi');
+    }
+    return classifyConnectionTrust('usb-serial');
+  }
+
+  /**
+   * T1-123: read the current WiFi override (or null if none active).
+   * Override expiry is checked at read time so a stale override is
+   * never returned even if the timer hasn't fired yet (defense-in-
+   * depth against system-clock drift between grant and check).
+   */
+  getWiFiOverride(): WiFiOverride | null {
+    if (this._wifiOverride == null) return null;
+    if (Date.now() >= this._wifiOverride.expiresAt) {
+      this._setWiFiOverride(null);
+      return null;
+    }
+    return this._wifiOverride;
+  }
+
+  /**
+   * T1-123: subscribe to WiFi-override transitions. Fires when the
+   * override is granted, cleared, or expires.
+   */
+  onWiFiOverrideChange(cb: WiFiOverrideListener): () => void {
+    this._wifiOverrideListeners.add(cb);
+    return () => this._wifiOverrideListeners.delete(cb);
+  }
+
+  /**
+   * T1-123: grant a WiFi override. Caller (typically the UI's
+   * "Start over WiFi anyway" dialog) supplies a reason string that
+   * lands in the audit log. Default duration is 5 minutes; pass an
+   * explicit `durationMs` for a different window. Re-granting before
+   * expiry RESETS the timer (matches the UI flow where each
+   * safety-critical action re-prompts).
+   *
+   * Throws when reason is empty/whitespace — every override must be
+   * paired with a user-supplied justification.
+   */
+  requestWiFiOverride(reason: string, durationMs?: number): WiFiOverride {
+    if (typeof reason !== 'string' || reason.trim().length === 0) {
+      throw new Error('requestWiFiOverride requires a non-empty reason string.');
+    }
+    const now = Date.now();
+    const ms = durationMs == null
+      ? MachineService._DEFAULT_WIFI_OVERRIDE_MS
+      : Math.max(0, Math.floor(durationMs));
+    const next: WiFiOverride = {
+      reason,
+      grantedAt: now,
+      expiresAt: now + ms,
+    };
+    this._setWiFiOverride(next);
+    return next;
+  }
+
+  /**
+   * T1-123: clear the WiFi override (user pressed "Cancel" or the
+   * connection switched back to USB). Idempotent — no-op when no
+   * override is active.
+   */
+  clearWiFiOverride(): void {
+    this._setWiFiOverride(null);
+  }
+
+  /**
+   * T1-123: combined trust + override + policy evaluation for a
+   * safety-critical action. Returns the audit-derived
+   * {@link ActionPolicy} so callers (UI buttons, service-layer
+   * gates) can branch on `allowed` and surface `userMessage` to the
+   * operator. Default policy is 'medium' (requires explicit
+   * override) — the strictest practical default that doesn't break
+   * single-USB users, who get 'allow' on the trusted-connection
+   * branch.
+   *
+   * If a non-expired override is active, the override-active branch
+   * returns 'allow' for the action. The override is consulted
+   * separately from the trust verdict so trust isn't artificially
+   * "upgraded".
+   */
+  evaluateActionAllowed(action: FalconWiFiAction): {
+    readonly allowed: boolean;
+    readonly userMessage: string;
+    readonly trust: TrustClassification;
+    readonly overrideActive: boolean;
+  } {
+    const trust = this.getConnectionTrust();
+    const override = this.getWiFiOverride();
+    const overrideActive = override != null;
+    if (trust.tier === 'trusted') {
+      return { allowed: true, userMessage: '', trust, overrideActive };
+    }
+    if (overrideActive) {
+      return {
+        allowed: true,
+        userMessage: `WiFi override active (reason: ${override?.reason ?? ''}).`,
+        trust,
+        overrideActive,
+      };
+    }
+    const policy = evaluateWiFiActionPolicy({
+      action,
+      trust,
+      policyMode: 'medium',
+    });
+    return {
+      allowed: policy.allowed && policy.kind !== 'require-override',
+      userMessage: policy.userMessage,
+      trust,
+      overrideActive,
+    };
+  }
+
+  private _setWiFiOverride(next: WiFiOverride | null): void {
+    if (this._wifiOverride === next) return;
+    this._wifiOverride = next;
+    if (this._wifiOverrideTimer != null) {
+      clearTimeout(this._wifiOverrideTimer);
+      this._wifiOverrideTimer = null;
+    }
+    if (next != null) {
+      const remaining = Math.max(0, next.expiresAt - Date.now());
+      this._wifiOverrideTimer = setTimeout(() => {
+        // Re-read at fire time so a clearWiFiOverride that arrived
+        // first doesn't get clobbered.
+        if (this._wifiOverride === next) this._setWiFiOverride(null);
+      }, remaining);
+    }
+    for (const cb of this._wifiOverrideListeners) {
       cb(next);
     }
   }
