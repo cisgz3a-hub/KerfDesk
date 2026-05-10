@@ -31,6 +31,7 @@ import {
   parseGrblSettingLine,
 } from './GrblSettingsParser';
 import { parseGrblG54WcsLine } from './GrblWcsParser';
+import { classifyGrblSafeState } from './GrblSafeStateClassifier';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -2589,28 +2590,18 @@ export class GrblController implements GrblControllerApi {
    *   - unsafe-residual-spindle → idle but FS reports non-zero spindle,
    *     meaning the laser is still in modal M3/M4 from a prior operation.
    */
+  /**
+   * T1-128: classification logic moved to `classifyGrblSafeState` in
+   * `GrblSafeStateClassifier.ts`. This method is the controller-side
+   * shell that snapshots the relevant `_state` fields and delegates.
+   * Behavior is byte-identical to the pre-T1-128 inline implementation.
+   */
   private _classifySafeStateReason(): UnsafeAtConnectReason | null {
-    const status = this._state.status;
-    if (status === 'alarm') return 'alarm';
-    if (status === 'run') return 'run';
-    if (status === 'hold') return 'hold';
-    // T1-followup-safety-door: door support in `_handleStatusReport` is
-    // shipped, so a live `<Door|...>` first report after connect now
-    // produces a distinct unsafe-at-connect verdict. Recovery is
-    // user-action ("close the door / release the e-stop"), not host-
-    // initiated ($X unlock or M5).
-    if (status === 'door') return 'door';
-    if (status === 'check') return 'check';
-    if (status === 'idle') {
-      if (this._state.spindleSpeed !== 0 || this._state.feedRate !== 0) {
-        return 'unsafe-residual-spindle';
-      }
-      return null;
-    }
-    // homing / connecting / disconnected / faulted → no verdict
-    // (homing is a user-initiated startup cycle; faulted is T2-12
-    // territory and has its own gate).
-    return null;
+    return classifyGrblSafeState({
+      status: this._state.status,
+      spindleSpeed: this._state.spindleSpeed,
+      feedRate: this._state.feedRate,
+    });
   }
 
   /**
