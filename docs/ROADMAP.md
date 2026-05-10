@@ -17173,6 +17173,8 @@ Test categories:
 
 **Cross-check note (audit 3A):** Audit's Priority 9.
 
+**Status:** Shipped in `<TBD>` — `tests/controller-matrix/operation-routing-by-family.test.ts` adds a family-agnostic regression matrix on top of `canExecuteOperation` (T2-40) and `ControllerCapabilities` (T2-25). Five capability fixtures (GRBL, Marlin-shape line-stream, Ruida-shape native-binary, file-upload gcode, no-output) pin operation routing (T2-26 enforcement: GRBL exposes semantic `operations.{jog,home,unlockAlarm,frame,testFire,laserOff}` methods, source-pinned), capability gating (T2-25 enforcement: `canExecuteOperation` refuses with `capability-not-supported` per family), output-format gating (T2-29 enforcement: `job-start` refused when no executable output is advertised), profile-override propagation (`applyProfileOverrides({ homingEnabled: false })` collapses `home` to a refused decision without mutating the static capabilities), and a GRBL regression block pinning `grblCapabilities` still advertises gcode-text/line-stream/M3+M4/M5/ok-line and the full operator operations set. 75/75 contracts. **Out of scope (future T3-43 slices):** profile / controller-family transport mismatch (T2-30 Falcon WiFi as transport — still blocked on real WiFi controller plumbing) and live `FakeMarlinController` / `FakeBinaryController` production stubs (capability fixtures cover the same contract surface without duplicating controller plumbing). **Hardware verification not required** (test-only matrix; no emitted G-code, motion, controller, or safety gate behavior changed).
+
 ---
 
 ### T3-44 | Generic progress model 鈥?line / byte / percent / device-reported
@@ -20505,7 +20507,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-40 Performance / stress test suite with cancellation gates (Shipped in `6dec8a8` — bounded perf suite with T3-15 streaming blockers documented)
 - [x] T3-41 Snapshot semantic-assertion pairing éˆ¥?every snapshot test gets parsed checks (Shipped in `3684f6b`; semantic parser/analyzer assertions now paired with every E2E snapshot)
 - [x] T3-42 Dialect-specific preflight / template validators (Shipped in `86e0cd0` — template semantic validation now routes GRBL-specific, generic G-code, and Ruida no-template dialect paths)
-- [ ] T3-43 Controller simulator / test matrix (filed; regression guard for T2-24 through T2-30)
+- [x] T3-43 Controller simulator / test matrix (Shipped — first slice in `<TBD>`; family-agnostic capability/operation-gate matrix covers T2-25/T2-26/T2-29 enforcement plus GRBL regression; live FakeMarlin/FakeBinary stubs and T2-30 transport mismatch deferred to future slices)
 - [ ] T3-44 Generic progress model 鈥?line/byte/percent/device-reported (filed; depends on T2-24)
 - [x] T3-45 Transport abstraction layer 鈥?Line/Byte/HttpJob transports (Shipped — focused foundation in `6ac9cce`; real Falcon WiFi controller remains T2-30)
 - [ ] T3-46 Profile schema split 鈥?Device / Controller / Transport / Output (filed; quality-of-life for multi-controller)
