@@ -9,18 +9,16 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `30fb369` (`feat(ipc): T3-88 IPC fuzz coverage manifest + dialog
-  handler guards`). Always verify live HEAD with `git log --oneline -1`
+  `3541292` (`feat(output): T3-15 streaming G-code output type
+  foundation`). Always verify live HEAD with `git log --oneline -1`
   before editing.
-- Last shipped roadmap item: `T3-88` IPC fuzz coverage manifest. This
-  session shipped a 10-ticket run: T3-50 / T3-51 / T3-54 / T3-55 / T3-57
-  / T3-59 / T3-83 / T3-86 / T3-87 / T3-88, on top of an earlier 5-ticket
-  run (T3-43 / T3-44 / T3-46 / T3-47 / T3-48). Hashes are filled in
-  the master checklist + shipped audit.
-- Next roadmap item: `T3-89` Production security build CI checks
-  (extends T1-81); other open T3 items still gated on external work
-  (T3-84 business decision, T3-85 release-time QA, T3-90 / T3-91
-  T1-25 dependency).
+- Last shipped roadmap item: `T3-15` streaming G-code type foundation.
+  This run shipped 5 unblocked tickets: T3-89 / T3-90 / T3-91 / T3-24 /
+  T3-15. Combined with prior runs this session (T3-43..T3-48 then
+  T3-50..T3-88), 20 Tier-3 tickets advanced in this session arc.
+- Next roadmap item: there are no fully unblocked Tier-3 tickets left.
+  The remaining open lines hit external blockers (see "What's blocked
+  and why" below).
 
 ## What To Read First
 
@@ -88,17 +86,45 @@ follow-up commit rather than re-opening the master-checklist line.
 - On clean `master`, `npm ci` completed and
   `npx tsc --noEmit --pretty false` passed.
 
+## What's blocked and why
+
+After this session's run, the remaining open lines on the master
+checklist all hit a real blocker. A future session that wants to
+make further progress needs one of the following inputs:
+
+**Hardware verification (10 T1 tickets):** T1-17, T1-28, T1-31,
+T1-34, T1-36, T1-39, T1-40, T1-41, T1-42, T1-51. Each has code
+shipped and pinned by tests; the close-out gate is a Falcon A1 Pro
+burn / connect / frame test that a software-only agent cannot
+perform.
+
+**Hardware investigation required:** T2-30 Falcon WiFi as real
+controller, T3-17 Wi-Fi safety model, T3-12 hardware-in-the-loop
+test framework. These need someone to capture the real Falcon WiFi
+protocol (HTTP + WebSocket message shapes, file-upload semantics,
+progress callbacks) on real hardware before any production code
+can land safely.
+
+**External / business decisions:** T3-4 (code-signing certs from
+Apple / Microsoft), T3-84 (Linux packaging — explicit "defer until
+business decides"), T3-85 (release-time installer QA matrix),
+T2-95 (real trial model — gated on monetization decision).
+
+**Multi-week refactor:** T2-6 App.tsx file split (still 1987 lines
+after 19 phases). Each remaining phase is a discrete extraction
+that needs careful before/after verification — not safe to ship
+quickly. T3-34 (stripe-based raster) depends on the live emitter
+migration of T3-15 (multi-week itself).
+
 ## Expected Next Step
 
-Continue strict roadmap order with **T3-89 — Production security
-build CI checks (extends T1-81)**. The headline change is wiring
-mechanical CI gates that catch the kinds of regressions T1-81
-already detects in source (`__forceProUnlock`, source maps in
-production, dev-only IPC handlers in preload, relaxed CSP). T1-81
-already has the verifier; T3-89 extends to a CI-runnable set of
-checks plus a GitHub Actions workflow.
+Pick one of the blockers above with the right input, or take a
+T2/T3 follow-up not in the master checklist (e.g., wire the
+T3-91 banner into `ConnectionPanelMain`, or wire the T3-90
+Settings UI checkbox).
 
-Hardware verification still owed before release tagging:
+## Hardware verification still owed before release tagging
+
 - T3-48 device-reuse flow: connect, disconnect, reconnect on
   Falcon A1 Pro; confirm second connect prompt is not shown.
 - T3-50 device identity capture: confirm `[VER:1.1h:]` parses on
@@ -107,11 +133,14 @@ Hardware verification still owed before release tagging:
 - T3-55 Falcon autofocus firmware gate: once a profile-load
   caller threads the live firmware version through, confirm
   autofocus is correctly gated on a known-old firmware build.
+- T3-90 auto-M5: enable `autoM5OnConnect` in a profile, connect,
+  and confirm M5 lands shortly after the first idle status.
 
-This session's 10-ticket run was deliberate-foundation slices. Many
-landed only the contract surface (types + comparators + selectors)
-with explicit caller-migration follow-ups deferred. Watch for
-those in future sessions:
+## Foundation slices shipped without caller migration
+
+Many of this session's slices landed only the contract surface
+(types + comparators + selectors + helpers) with explicit caller-
+migration follow-ups deferred. Watch for those in future sessions:
 
   - T3-44 progress emission: `GrblController` emit + UI render.
   - T3-46 split-profile storage migration when a non-GRBL
@@ -127,3 +156,13 @@ those in future sessions:
   - T3-86 Playwright runner once T2-98 CI runners land.
   - T3-87 wire selectors into `JobLog.ts` / `JobReplay.ts`.
   - T3-88 behavioral end-to-end fuzz once T2-122 typed-IPC.
+  - T3-89 dedicated `.github/workflows/security-checks.yml` once
+    T2-99 / T2-100 release signing infrastructure ships.
+  - T3-90 Settings UI checkbox + explanatory text in the
+    device-profile editor.
+  - T3-91 wire `<UnsafeAtConnectBanner>` into `ConnectionPanelMain`
+    and the recovery-action handler dispatcher.
+  - T3-24 bundled calibrated curves once a contributor with
+    real material data submits via the now-shipped pipeline.
+  - T3-15 live emitter / ticket / controller / preview
+    migration to `AsyncIterable<GcodeChunk>` (multi-week each).
