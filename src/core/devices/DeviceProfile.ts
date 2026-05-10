@@ -443,19 +443,99 @@ function isMachineType(v: string): v is DeviceProfile['machineType'] {
  * Exported so the migration can be unit-tested without touching
  * localStorage.
  */
-export function backfillFalconAutofocus(profile: DeviceProfile): DeviceProfile {
+/**
+ * T3-55: Falcon autofocus minimum firmware version. The `$HZ1` command
+ * was added in 1.0.38; older firmware emits `error:20` on the line and
+ * the autofocus probe never moves. When we can read the firmware version
+ * via T3-50's `DeviceIdentity`, refuse to flip `autoFocusSupported: true`
+ * on a profile whose hardware reports an older version.
+ */
+export const FALCON_AUTOFOCUS_MIN_FIRMWARE = '1.0.38';
+
+/**
+ * T3-55: parse a GRBL-style firmware version string into a comparable
+ * triple. Handles `1.0.38`, `1.1h.20221128`, `1.0.38:Falcon`, and other
+ * forks; strips a trailing `:tag` suffix; treats a letter suffix on the
+ * patch component (`1.1h`) as the patch number with a fractional letter
+ * weight so `1.1h` > `1.1` and `1.1i` > `1.1h`. Returns `null` when the
+ * string cannot be parsed — caller treats `null` as "version unknown,
+ * fall through to optimistic heal so the existing UI gating
+ * (T1-55 / T3-56) still protects the user".
+ */
+export function parseFirmwareVersion(version: string): { major: number; minor: number; patch: number } | null {
+  if (typeof version !== 'string') return null;
+  // Strip trailing `:tag` build-name suffix and surrounding whitespace.
+  const trimmed = version.replace(/:.*$/, '').trim();
+  // Match `MAJOR.MINOR[.PATCH][LETTER]` plus optional `.YYYYMMDD` build date.
+  const match = trimmed.match(/^(\d+)\.(\d+)(?:\.(\d+))?([a-z])?(?:\.\d+)?$/i);
+  if (!match) return null;
+  const major = parseInt(match[1]!, 10);
+  const minor = parseInt(match[2]!, 10);
+  const patchNum = match[3] !== undefined ? parseInt(match[3], 10) : 0;
+  const letter = match[4]?.toLowerCase();
+  // Letter suffix on the patch component (`1.1h`) sorts after the
+  // letter-less patch (`1.1`) and before the next letter (`1.1i`). Use
+  // a fractional offset so 1.1h.20221128 < 1.1i.20221128 < 1.2.0.
+  const letterOffset = letter ? (letter.charCodeAt(0) - 'a'.charCodeAt(0) + 1) / 100 : 0;
+  return { major, minor, patch: patchNum + letterOffset };
+}
+
+/**
+ * T3-55: returns `true` iff `version >= minimum`. Returns `false` when
+ * `version` cannot be parsed — refusing on parse failure is the
+ * conservative choice. Public so preflight and tests can reuse it.
+ */
+export function firmwareVersionAtLeast(version: string, minimum: string): boolean {
+  const v = parseFirmwareVersion(version);
+  const m = parseFirmwareVersion(minimum);
+  if (v == null || m == null) return false;
+  if (v.major !== m.major) return v.major > m.major;
+  if (v.minor !== m.minor) return v.minor > m.minor;
+  return v.patch >= m.patch;
+}
+
+/**
+ * T3-55: heal Falcon A1 Pro autofocus fields, but consult live firmware
+ * version when available. The version comes from the T3-50
+ * `DeviceIdentity.firmwareVersion` snapshot. When the version is
+ * supplied AND parses AND is below the `$HZ1` minimum, mark autofocus
+ * unsupported so the Focus button stays hidden. When the version is
+ * supplied AND at or above the minimum, heal optimistically. When the
+ * version is missing or unparseable, the existing optimistic heal still
+ * runs — this preserves the pre-T3-55 behavior so a fresh profile load
+ * before connect doesn't lose autofocus support; the broader
+ * "capabilities unknown while connected" gate (T1-55 / T3-56) still
+ * blocks the actual `$HZ1` send when the controller hasn't reported
+ * its firmware yet.
+ */
+export function backfillFalconAutofocus(
+  profile: DeviceProfile,
+  controllerFirmwareVersion?: string | null,
+): DeviceProfile {
   const isFalconA1Pro =
     profile.brand === 'Creality' &&
     typeof profile.model === 'string' &&
     profile.model.includes('Falcon A1 Pro');
   if (!isFalconA1Pro) return profile;
 
-  // Heal autofocus fields unconditionally for Falcon A1 Pro.
-  // These values are firmware-dictated, not user preferences:
-  //   - autoFocusSupported: true (Falcon A1 Pro always supports $HZ1 since fw 1.0.38)
+  // Heal autofocus fields for Falcon A1 Pro. These values are
+  // firmware-dictated, not user preferences:
+  //   - autoFocusSupported: true (Falcon A1 Pro supports $HZ1 since fw 1.0.38)
   //   - autoFocusCommand:   '$HZ1' (the correct GRBL-LPC command for this hardware)
   //   - autoFocusTimeoutMs: 15_000 (empirically validated timeout)
   // Older builds may have written stale values; we overwrite them on every load.
+  if (typeof controllerFirmwareVersion === 'string' && controllerFirmwareVersion.length > 0) {
+    const ok = firmwareVersionAtLeast(controllerFirmwareVersion, FALCON_AUTOFOCUS_MIN_FIRMWARE);
+    if (!ok) {
+      return {
+        ...profile,
+        autoFocusSupported: false,
+        autoFocusCommand: '',
+        autoFocusTimeoutMs: 0,
+      };
+    }
+  }
+
   return {
     ...profile,
     autoFocusSupported: true,
