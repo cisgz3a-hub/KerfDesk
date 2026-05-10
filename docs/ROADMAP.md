@@ -19641,6 +19641,8 @@ The "what's not protected" section is important: it helps future engineers under
 
 **Cross-check note (audit 5A):** Audit's Required tests + Tamper resistance.
 
+**Status:** Shipped in `<TBD>` — first-slice tamper-resistance suite pinning the protections that already shipped (T1-77 / T1-78 / T1-79 / T1-81). Added `tests/entitlement-tamper-resistance/tamper-resistance.test.ts` (29 contracts): T1-77 tester-key behavioral tests (no-secret rejection, malformed input rejection, secret-A-key-vs-secret-B rejection via the `__setTesterHmacSecretForTest` injection point and a real HMAC round-trip) plus source pins (no `?? 'literal'` fallback after `VITE_TESTER_HMAC_SECRET` read, no exported `DEFAULT_TESTER_HMAC_SECRET`); T1-78 entitlement-API split source pins (`canUseFeature`, `assertFeature`, `EntitlementError` exported; deprecated `requireFeature` alias absent); T1-79 service-layer gate coverage roundup pin (Nester, BooleanOps, JobCompiler entries); T1-81 production-build verifier pins (`__forceProUnlock` / `__entitlementService` markers blocked); behavioral `assertFeature('boolean_ops')` throws `EntitlementError` when free-tier; `booleanOperation` source-pinned to call `assertFeature`; documented client-side-enforcement-limit acknowledgment in the audit doc. **Out of scope (future T3-83 slices):** signed-token cache-forgery rejection (depends on T2-90), clock-rollback rejection (depends on T2-94), runtime-state monkey-patch defenses (depends on T2-91 enforcement registry). The first slice covers what's testable today; the deferred scenarios will be added when their upstream tickets land. **Hardware verification not required** (test-only suite + source pins; no production behavior changed).
+
 ---
 
 ### T3-84 | Linux packaging 鈥?AppImage / .deb / .rpm (if business decides to support Linux)
@@ -20568,7 +20570,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-80 Test suite for undo/redo correctness 鈥?15+ scenarios from audit Priority 14 (Shipped in `75582d3` — cross-cutting undo/redo harness covers dirty/stale invalidation, preview coalescing, async guards, selection restore, cache stripping, redo branching, and group history)
 - [x] T3-81 End-to-end workflow integration test suite (Shipped in `a3275c6` — 40-assertion cross-cutting suite for import/save/reload/start, stale gates, async trace guard, recovery, history memory, profile drift, and material drift workflows)
 - [x] T3-82 Production bundle smoke tests — no tester secret, no dev unlock, no mock entitlements (shipped 2026-04-25 in `de3fbc7`)
-- [ ] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (filed; ships incrementally as 5A protections land)
+- [x] T3-83 Tamper-resistance test suite 鈥?cache edit / monkey-patch / clock rollback (Shipped — first slice in `<TBD>`; pins T1-77 / T1-78 / T1-79 / T1-81 protections; signed-token / clock-rollback / monkey-patch scenarios deferred until T2-90 / T2-91 / T2-94 land)
 - [ ] T3-84 Linux packaging 鈥?AppImage / .deb / .rpm (filed; defer until business decides)
 - [ ] T3-85 Installer QA matrix 鈥?Win 10/11, macOS Intel/Apple Silicon, Gatekeeper, offline, restricted user, unicode paths (filed; release-time QA)
 - [ ] T3-86 Native module packaging smoke test 鈥?packaged-app launches + serialport loads + storage works (filed; pairs with T1-86 + T2-98)
