@@ -6,7 +6,7 @@ import { createSerialPort } from '../../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../../controllers/ControllerInterface';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
 import { type Scene } from '../../core/scene/Scene';
-import { sortLayersByProcessingOrder, type LayerMode } from '../../core/scene/Layer';
+import { type LayerMode } from '../../core/scene/Layer';
 import { DeviceProfileSelector } from './DeviceProfileSelector';
 import { JobLogViewer } from './JobLogViewer';
 import { runPreflightSummary, type PreflightSummary } from '../../core/preflight/Preflight';
@@ -24,7 +24,7 @@ import { type MachineService, type LaserOutputState } from '../../app/MachineSer
 import { recoveryAllowsStart } from '../../runtime/RecoveryState';
 import { type StructuredLogEvent, type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
-import { describeFrameFailure } from '../../app/FrameResultMessages';
+// T1-143: describeFrameFailure usage moved into connectionPanelLabels.
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
@@ -65,6 +65,16 @@ import { ConnectWizard } from './connection/ConnectWizard';
 import { Controls } from './connection/Controls';
 import type { StartReadiness } from './connection/StartReadinessPanel';
 import { buildStartReadiness } from './connection/buildStartReadiness';
+// T1-143: pure label/format/scene-summary helpers moved out so they
+// can be tested without mounting the panel.
+import {
+  buildReadyOperationRows,
+  formatJobTime,
+  frameFailureLogLine,
+  jobModeLabel,
+  layerModeToOperationKind,
+  readyStartModeLabel,
+} from './connection/connectionPanelLabels';
 import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
 import { JobPosition, WorkflowSteps } from './connection/Workflow';
 import {
@@ -75,33 +85,12 @@ import {
 import { MachineControls } from './connection/MachineControls';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
-import { analyzeOperationOrder, type OperationKind, type OperationRow } from '../../app/OperationOrder';
+import { analyzeOperationOrder } from '../../app/OperationOrder';
 import { computeUserModeGatePolicy, type UserMode } from '../../app/UserModeGates';
 import { RecoveryCard } from '../recovery/RecoveryCard';
 import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
-function jobModeLabel(scene: Scene): string {
-  const outputLayers = scene.layers.filter(l => l.visible && l.output !== false);
-  const hasObjectsByLayer = new Set(
-    scene.objects.filter(o => o.visible).map(o => o.layerId),
-  );
-  const contributing = outputLayers.filter(l => hasObjectsByLayer.has(l.id));
-
-  if (contributing.length === 0) return 'Running';
-
-  const modes = new Set(contributing.map(l => l.settings.mode));
-  if (modes.size > 1) return 'Running';
-
-  const onlyMode = modes.values().next().value as LayerMode;
-  switch (onlyMode) {
-    case 'cut': return 'Cutting';
-    case 'engrave': return 'Engraving';
-    case 'score': return 'Scoring';
-    case 'image': return 'Engraving';
-    default: return 'Running';
-  }
-}
-
+// T1-143: jobModeLabel moved to ./connection/connectionPanelLabels.
 
 type StartMode = GcodeStartMode;
 
@@ -109,59 +98,9 @@ type StartMode = GcodeStartMode;
 const STREAMING_WARNING_HOLD_MS = 3000;
 const CURRENT_MODE_LONG_JOB_TIP_KEY = 'laserforge_current_mode_long_job_tip_acknowledged';
 
-function formatJobTime(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${r.toString().padStart(2, '0')}`;
-}
-
-function readyStartModeLabel(mode: GcodeStartMode): string {
-  switch (mode) {
-    case 'absolute': return 'Use canvas position';
-    case 'current': return 'Start from laser head';
-    case 'savedOrigin': return 'Use saved zero point';
-  }
-}
-
-function layerModeToOperationKind(mode: LayerMode): OperationKind {
-  return mode === 'image' ? 'image' : mode;
-}
-
-function buildReadyOperationRows(scene: Scene): OperationRow[] {
-  const visibleObjectCounts = new Map<string, number>();
-  for (const object of scene.objects) {
-    if (!object.visible) continue;
-    visibleObjectCounts.set(object.layerId, (visibleObjectCounts.get(object.layerId) ?? 0) + 1);
-  }
-
-  const layers = sortLayersByProcessingOrder(
-    scene.layers.filter(layer => layer.visible && layer.output !== false),
-  );
-  const rows: OperationRow[] = [];
-  for (const layer of layers) {
-    if ((visibleObjectCounts.get(layer.id) ?? 0) === 0) continue;
-    rows.push({
-      index: rows.length + 1,
-      layerName: layer.name || `Layer ${layer.id.slice(0, 4)}`,
-      kind: layerModeToOperationKind(layer.settings.mode),
-      powerPercent: Math.round(layer.settings.power.max),
-      feedRateMmPerMin: Math.round(layer.settings.speed),
-      passes: Math.max(1, Math.round(layer.settings.passes)),
-    });
-  }
-  return rows;
-}
-
-function frameFailureLogLine(
-  result: FrameResult,
-  frameLabel: string,
-  idleTimeoutSeconds?: number,
-): string {
-  const description = describeFrameFailure(result, frameLabel, idleTimeoutSeconds);
-  const details = description.details ? ` Details: ${description.details}` : '';
-  return `⚠ ${description.title}: ${description.message} ${description.recovery}${details}`;
-}
+// T1-143: formatJobTime / readyStartModeLabel / layerModeToOperationKind
+// / buildReadyOperationRows / frameFailureLogLine all moved to
+// ./connection/connectionPanelLabels.
 
 function playCompletionBeep(): void {
   try {
