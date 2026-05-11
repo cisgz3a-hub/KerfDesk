@@ -9,16 +9,38 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `3541292` (`feat(output): T3-15 streaming G-code output type
-  foundation`). Always verify live HEAD with `git log --oneline -1`
-  before editing.
-- Last shipped roadmap item: `T3-15` streaming G-code type foundation.
-  This run shipped 5 unblocked tickets: T3-89 / T3-90 / T3-91 / T3-24 /
-  T3-15. Combined with prior runs this session (T3-43..T3-48 then
-  T3-50..T3-88), 20 Tier-3 tickets advanced in this session arc.
-- Next roadmap item: there are no fully unblocked Tier-3 tickets left.
-  The remaining open lines hit external blockers (see "What's blocked
-  and why" below).
+  `219feb85` (`fix(machine-service): T1-171 — clear auto-M5-on-connect
+  listener on disconnect / emergencyStop`). Always verify live HEAD
+  with `git log --oneline -1` before editing.
+- Last shipped roadmap item: **T1-171** (audit F-014 fix — auto-M5
+  listener cleanup). This session shipped **11 consecutive audit-
+  driven tickets** off `docs/AUDIT-2026-05-11.md`: **T1-161** (F-010
+  + F-052 auto-M5 gateway routing), **T1-162** (F-012 + F-061 stale
+  doc strings), **T1-163** (F-001 UnsafeStopOnErrorOverrideToken in
+  interface), **T1-164** (F-011 disconnect laserOff routes through
+  notify), **T1-165** (F-029 PlanOptimizer mid-op cancel), **T1-166**
+  (F-030 named time-estimation defaults), **T1-167** (F-024 strip
+  comments before defense-in-depth M5 check), **T1-168** (F-025
+  aggregate template-validation errors + surface warnings), **T1-169**
+  (F-013 portRef compare-and-swap in disconnect / emergencyStop),
+  **T1-170** (F-016 rate-limited warn for broken simulator listener),
+  **T1-171** (F-014 clear auto-M5 listener on disconnect /
+  emergencyStop). Each ticket landed as a coupled triple: code change
+  + regression test + ROADMAP.md entry with verification, followed by
+  the hash-fill commit. TS baseline 0 errors maintained across every
+  commit.
+- Next roadmap item: continue with the remaining audit findings.
+  Still open (medium / low severity, well-scoped): F-017 (50ms hard-
+  coded line-delay in `ExecutionCoordinator.frameSafe` / `frameDot`),
+  F-022 (`confirmPreflightForJobStart` doesn't surface info-severity
+  findings), F-026 (`applyMachineTransform` iterates plan moves THREE
+  times — perf opportunity), F-034 / F-036 / F-048 (small `any`-cast
+  cleanups in `hit-test.ts` / `SceneSerializer.ts` / `SvgParser.ts`).
+  Medium / High blocked by integration work: F-002 (Connection-
+  GenerationGuard primitive shipped but never wired), F-004 (T1-22
+  ForceSafeState orchestration — needs hardware), F-018 (T3-57
+  CapabilityMismatchRules unwired), F-050 (diagnostics cluster
+  wiring).
 
 ## What To Read First
 
