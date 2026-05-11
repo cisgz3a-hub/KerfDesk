@@ -121,56 +121,20 @@ function machineStatusFromGrblReportToken(token: string): MachineStatus | null {
  * `<...>` status reaching the parser — typically a wedged firmware or a
  * non-responsive cable.
  */
-/**
- * T1-116: opaque token authorizing a `setStopOnError(false)` call.
- *
- * Pre-T1-116 the controller accepted `setStopOnError(false)` from any
- * caller — including a casual MachineSettingsTab checkbox — which let
- * a user silently keep streaming after GRBL `error:` lines (malformed
- * G-code, invalid commands, unexpected controller state). The override
- * is now mintable only via {@link createStopOnErrorOverrideToken} or
- * its test-only counterpart, both of which require the caller to name
- * a reason. The token is stamped at mint time so a future ban-list /
- * audit-log subsystem can attribute every override to a specific
- * mint call.
- */
-export interface UnsafeStopOnErrorOverrideToken {
-  readonly kind: 'unsafe-stop-on-error-override-token';
-  readonly reason: string;
-  readonly mintedAt: number;
-}
-
-const STOP_ON_ERROR_OVERRIDE_TOKEN_KIND = 'unsafe-stop-on-error-override-token' as const;
-
-export function createStopOnErrorOverrideToken(reason: string): UnsafeStopOnErrorOverrideToken {
-  if (typeof reason !== 'string' || reason.trim().length === 0) {
-    throw new Error('createStopOnErrorOverrideToken requires a non-empty reason string.');
-  }
-  // Always log so an override can never happen invisibly. Production
-  // paths never mint a token; only test harnesses or an explicit
-  // diagnostics-mode call site reach this code.
-  console.warn(
-    `[GrblController] T1-116 stop-on-error override minted: "${reason}". `
-    + 'Streaming may continue after GRBL error: lines until the override is cleared.',
-  );
-  return Object.freeze({
-    kind: STOP_ON_ERROR_OVERRIDE_TOKEN_KIND,
-    reason,
-    mintedAt: Date.now(),
-  });
-}
-
-function isUnsafeStopOnErrorOverrideToken(
-  value: unknown,
-): value is UnsafeStopOnErrorOverrideToken {
-  if (value == null || typeof value !== 'object') return false;
-  const v = value as { kind?: unknown; reason?: unknown };
-  return (
-    v.kind === STOP_ON_ERROR_OVERRIDE_TOKEN_KIND
-    && typeof v.reason === 'string'
-    && v.reason.length > 0
-  );
-}
+// T1-163 (audit F-001): UnsafeStopOnErrorOverrideToken + factory +
+// type-guard moved to ./StopOnErrorOverrideToken so ControllerInterface
+// can import the type and surface the token slot in the
+// `setStopOnError` signature. GrblController re-exports the public
+// surface (UnsafeStopOnErrorOverrideToken type + createStopOnErrorOverrideToken
+// factory) so existing tests under `tests/stop-on-error-*` keep working
+// unchanged.
+import {
+  type UnsafeStopOnErrorOverrideToken,
+  createStopOnErrorOverrideToken,
+  isUnsafeStopOnErrorOverrideToken,
+} from './StopOnErrorOverrideToken';
+export type { UnsafeStopOnErrorOverrideToken };
+export { createStopOnErrorOverrideToken };
 
 // T1-152: WcsUncertainReason / WcsConsentVerdict /
 // classifyWcsConsentInputs moved to ./GrblWcsConsentClassifier.

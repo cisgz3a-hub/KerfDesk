@@ -63,6 +63,13 @@ const violations: Array<{ file: string; line: number; text: string }> = [];
 const allowedFiles = new Set<string>([
   // The controller's own definition of setStopOnError.
   resolve(srcRoot, 'controllers', 'grbl', 'GrblController.ts'),
+  // T1-163 (audit F-001): the token's definition module. Its JSDoc
+  // mentions `setStopOnError(false)` literally when describing the
+  // gate the token authorizes; those references are documentation,
+  // not call sites. The scanner only strips `//` line comments, not
+  // `/* ... */` block comments, so this sibling of GrblController.ts
+  // is allowlisted alongside it.
+  resolve(srcRoot, 'controllers', 'grbl', 'StopOnErrorOverrideToken.ts'),
 ]);
 
 for (const file of walkTs(srcRoot)) {

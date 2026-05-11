@@ -10,6 +10,9 @@
 import { type SerialPortLike } from '../communication/SerialPort';
 import type { SafetyActionResult } from '../app/SafetyActionResult';
 import type { GcodeStartMode } from '../core/output/GcodeOrigin';
+// T1-163 (audit F-001): surface the T1-116 token type so the
+// setStopOnError signature declares its safety contract.
+import type { UnsafeStopOnErrorOverrideToken } from './grbl/StopOnErrorOverrideToken';
 
 export type MachineStatus =
   | 'disconnected'
@@ -395,8 +398,17 @@ export interface GrblControllerApi extends GcodeLineController {
   /**
    * Configure whether a running job is aborted on GRBL `error:` responses.
    * Optional; defaults to true when not implemented.
+   *
+   * T1-163 (audit F-001): the runtime gate in `GrblController.setStopOnError`
+   * requires an {@link UnsafeStopOnErrorOverrideToken} when `value === false`.
+   * Pre-T1-163 the interface signature didn't declare the token slot, so
+   * a caller wired against the interface alone had no compile-time signal
+   * that the override was gated. Post-T1-163 the token slot is part of
+   * the contract; callers see at compile time that disabling
+   * stop-on-error requires a token. The runtime gate remains the
+   * load-bearing defense.
    */
-  setStopOnError?(value: boolean): void;
+  setStopOnError?(value: boolean, token?: UnsafeStopOnErrorOverrideToken): void;
   requestStatusReport(): void;
 
   onStateChange(callback: StateChangeCallback): Unsubscribe;
