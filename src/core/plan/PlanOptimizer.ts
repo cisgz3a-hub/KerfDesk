@@ -35,6 +35,11 @@ import { type CompoundPath } from '../geometry/CompoundPath';
 import {
   type Plan, type PlannedOperation, type Move,
   createEmptyPlan, calculatePlanStats,
+  // T1-166 (audit F-030): named-constant fallbacks for the
+  // calculatePlanStats time-estimation parameters. Pre-T1-166 these
+  // were inline `?? 500` / `?? 6000` magic numbers.
+  DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2,
+  DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN,
 } from './Plan';
 import {
   applyInsideFirstOrder,
@@ -79,9 +84,17 @@ import {
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
 export interface OptimizePlanConfig {
-  /** Max rapid travel speed in mm/min (default 6000). */
+  /**
+   * Max rapid travel speed in mm/min (default
+   * {@link DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN}). T1-166 (audit
+   * F-030): named constant — see Plan.ts for the rationale.
+   */
   maxRapidSpeed?: number;
-  /** Max acceleration in mm/s² (default 500). */
+  /**
+   * Max acceleration in mm/s² (default
+   * {@link DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2}). T1-166 (audit
+   * F-030): named constant — see Plan.ts for the rationale.
+   */
   maxAcceleration?: number;
   /** T2-17-followup: cooperative cancellation for long operation-planning loops. */
   signal?: AbortSignal;
@@ -138,8 +151,8 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
 
   plan.stats = calculatePlanStats(
     plan,
-    config?.maxAcceleration ?? 500,
-    config?.maxRapidSpeed ?? 6000,
+    config?.maxAcceleration ?? DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2,
+    config?.maxRapidSpeed ?? DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN,
   );
 
   return plan;

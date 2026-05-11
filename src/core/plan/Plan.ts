@@ -167,13 +167,31 @@ export function emptyStats(): PlanStats {
 // ─── PLAN ANALYSIS ───────────────────────────────────────────────
 
 /**
+ * T1-166 (audit F-030): time-estimation defaults for
+ * {@link calculatePlanStats} when the caller doesn't override.
+ *
+ * Why 500 mm/s² (not 1000)? `DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2 = 1000`
+ * (in `jobCompilerHelpers.ts`) is the planner's typical-small-laser
+ * default for the raster-power velocity-curve math — it has to match
+ * what the firmware will actually do on a representative diode laser.
+ * Here the value is used only for trapezoidal time estimation; a
+ * lower value overestimates time slightly (the machine, if more
+ * capable, finishes earlier than predicted) which is the correct
+ * direction for a "this is how long the burn will take" estimate.
+ * Pre-T1-166 these were inline magic numbers at three call sites,
+ * making the rationale invisible and risking accidental drift.
+ */
+export const DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2 = 500;
+export const DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN = 6000;
+
+/**
  * Calculates plan statistics by iterating all moves.
  * Uses trapezoidal velocity model for accurate time estimation.
  */
 export function calculatePlanStats(
   plan: Plan,
-  maxAcceleration: number = 500,  // mm/s² (default for diode lasers)
-  maxRapidSpeed: number = 6000,   // mm/min
+  maxAcceleration: number = DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2,  // mm/s² (default for diode lasers)
+  maxRapidSpeed: number = DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN,   // mm/min
 ): PlanStats {
   let totalDist = 0;
   let rapidDist = 0;
