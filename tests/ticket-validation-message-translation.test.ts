@@ -21,7 +21,14 @@ function assertContract(condition: boolean, message: string): void {
 }
 
 const ROOT = process.cwd();
+// T1-135: the inline validation body moved to src/app/validateJobTicket.ts.
+// MachineService.validateTicket now delegates to validateJobTicket; the
+// reason strings + console.warn diagnostics live in the helper module,
+// so the T1-67 user-facing-message pins scan the helper instead of the
+// service. The service still owns the (private) wrapper method, so the
+// "function exists" / "boundary located" pins remain.
 const SOURCE = readFileSync(resolve(ROOT, 'src/app/MachineService.ts'), 'utf-8');
+const HELPER_SOURCE = readFileSync(resolve(ROOT, 'src/app/validateJobTicket.ts'), 'utf-8');
 
 console.log('\n=== T1-67 ticket validation messages ===\n');
 
@@ -29,7 +36,10 @@ const fnStart = SOURCE.indexOf('private validateTicket(');
 const fnEnd = SOURCE.indexOf('async startValidatedJob(', fnStart);
 assertContract(fnStart > -1, 'validateTicket function exists');
 assertContract(fnEnd > fnStart, 'validateTicket function boundary located');
-const fnBody = SOURCE.slice(fnStart, fnEnd);
+// Scan the helper for the reason strings + diagnostics, the service
+// wrapper only stitches the inputs together (and is intentionally
+// reason-free).
+const fnBody = HELPER_SOURCE;
 
 const reasonAssignments = [...fnBody.matchAll(/reason:\s*([\s\S]*?)(?=\n\s*};)/g)].map(match => match[1]);
 assertContract(reasonAssignments.length >= 4, `validation reason assignments found (got ${reasonAssignments.length})`);

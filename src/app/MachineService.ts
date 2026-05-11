@@ -56,8 +56,10 @@ import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
-import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
-import { type ControllerId } from '../controllers/ControllerRegistry';
+// T1-135: ticket validation extracted to a pure helper so each gate
+// (scene/profile/controller/gcode hash) can be tested in isolation.
+// Hashing imports + the ControllerId type moved with the logic.
+import { validateJobTicket } from './validateJobTicket';
 import {
   classifyUserCommand,
   MachineCommandGateway,
@@ -648,66 +650,19 @@ export class MachineService {
   /** Start a job from a validated ticket. The ticket carries the
    *  gcode lines and metadata; we stash it for later phases that
    *  will verify scene/profile hashes before streaming. */
+  // T1-135: delegates to pure validateJobTicket. The wrapper resolves
+  // the runtime context (active profile + the GRBL controller-id
+  // constant) so the helper can stay free of singleton access.
   private validateTicket(
     ticket: ValidatedJobTicket,
     scene: Scene,
   ): { ok: true } | { ok: false; reason: string } {
-    const currentSceneHash = hashSceneForTicket(scene);
-    if (currentSceneHash !== ticket.sceneHash) {
-      // T1-67: hashes stay in diagnostics, not in user-facing modal text.
-      console.warn('[ticket] scene hash mismatch', {
-        ticketHash: ticket.sceneHash,
-        currentHash: currentSceneHash,
-        ticketScenePreview: JSON.stringify(ticket).slice(0, 500),
-      });
-      return {
-        ok: false,
-        reason:
-          'The design changed after this G-code was created. '
-          + 'Update G-code, then frame again before starting.',
-      };
-    }
-
-    const currentProfile = getActiveProfile();
-    const currentProfileHash = currentProfile
-      ? hashObject(currentProfile)
-      : hashString('no-profile');
-    if (currentProfileHash !== ticket.profileHash) {
-      console.warn('[ticket] profile hash mismatch', {
-        ticketHash: ticket.profileHash,
-        currentHash: currentProfileHash,
-      });
-      return {
-        ok: false,
-        reason:
-          'The device profile changed after this G-code was created. '
-          + 'Update G-code before starting.',
-      };
-    }
-
-    const currentControllerType: ControllerId = 'grbl';
-    if (currentControllerType !== ticket.controllerType) {
-      console.warn('[ticket] controller type mismatch', {
-        ticketControllerType: ticket.controllerType,
-        currentControllerType,
-      });
-      return {
-        ok: false,
-        reason:
-          'The controller type changed after this G-code was created. '
-          + 'Update G-code before starting.',
-      };
-    }
-
-    const recomputedGcodeHash = hashString(ticket.gcodeText);
-    if (recomputedGcodeHash !== ticket.gcodeHash) {
-      return {
-        ok: false,
-        reason: 'Ticket is corrupted (gcode hash mismatch). Recompile to continue.',
-      };
-    }
-
-    return { ok: true };
+    return validateJobTicket({
+      ticket,
+      scene,
+      currentProfile: getActiveProfile(),
+      currentControllerType: 'grbl',
+    });
   }
 
   async startValidatedJob(args: {
