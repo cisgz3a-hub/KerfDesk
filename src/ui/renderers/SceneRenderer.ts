@@ -35,6 +35,9 @@ import {
   type SceneBounds,
   type SceneMachineOverlayOptions,
 } from './sceneOverlayHelpers';
+// T1-138: local-space corner helper for fill-preview AABB extracted
+// so the geometry-type switch can be tested without canvas dependencies.
+import { getSceneObjectLocalCorners } from './sceneCornerHelpers';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
 const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
@@ -835,7 +838,7 @@ function drawFillPreview(
   // Compute local-space bounding box
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-  const corners = getLocalCorners(geom);
+  const corners = getSceneObjectLocalCorners(geom);
   if (corners.length === 0) return;
   for (const p of corners) {
     minX = Math.min(minX, p.x);
@@ -937,34 +940,9 @@ function drawFillPreview(
   ctx.restore();
 }
 
-/** Get local-space corner points for scanline bounding box computation. */
-function getLocalCorners(geom: Geometry): Array<{ x: number; y: number }> {
-  switch (geom.type) {
-    case 'rect':
-      return [
-        { x: geom.x, y: geom.y },
-        { x: geom.x + geom.width, y: geom.y + geom.height },
-      ];
-    case 'ellipse':
-      return [
-        { x: geom.cx - geom.rx, y: geom.cy - geom.ry },
-        { x: geom.cx + geom.rx, y: geom.cy + geom.ry },
-      ];
-    case 'polygon': return geom.points;
-    case 'path': {
-      const pts: Array<{ x: number; y: number }> = [];
-      for (const sub of geom.subPaths) {
-        for (const seg of sub.segments) {
-          if (seg.type === 'move' || seg.type === 'line') pts.push(seg.to);
-          else if (seg.type === 'cubic') { pts.push(seg.cp1); pts.push(seg.cp2); pts.push(seg.to); }
-          else if (seg.type === 'quadratic') { pts.push(seg.cp); pts.push(seg.to); }
-        }
-      }
-      return pts;
-    }
-    default: return [];
-  }
-}
+// T1-138: getLocalCorners moved to ./sceneCornerHelpers as
+// getSceneObjectLocalCorners so the geometry-type switch can be
+// tested without loading the renderer module.
 
 function drawObjectPath(ctx: CanvasRenderingContext2D, obj: SceneObject): void {
   const geom = obj.geometry as any;
