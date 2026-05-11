@@ -19,6 +19,19 @@ import { markSettingsManualUnverified } from '../../core/materials/MaterialSetti
 // T1-133: material-preset grouping moved to a pure sibling helper so
 // the sort order can be tested without mounting the whole panel.
 import { groupMaterialPresetsByMaterial } from './layers/groupMaterialPresets';
+// T1-141: style constants hoisted to module scope (same pattern as
+// T1-131 / PropertiesPanel) so they aren't recreated per render.
+import {
+  fieldStyle,
+  iconToggleStyle,
+  listStyle,
+  numberInputStyle,
+  outerColumnStyle,
+  scrollTabContentStyle,
+  selectStyle,
+  settingsLabelStyle,
+  settingsStyle,
+} from './layers/layerPanelStyles';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -231,84 +244,8 @@ export function LayerPanel({
     onSceneCommit(newScene);
   }, [scene, onSceneCommit]);
 
-  const outerColumnStyle = {
-    flex: 1,
-    minHeight: 0,
-    display: 'flex',
-    flexDirection: 'column' as const,
-    fontFamily: theme.font.ui,
-    borderBottom: `1px solid ${theme.border.subtle}`,
-    overflow: 'hidden' as const,
-    background: '#0c0c18',
-  };
-
-  const scrollTabContentStyle = {
-    flex: 1,
-    minHeight: 0,
-    overflowY: 'auto' as const,
-  };
-
-  const listStyle = {
-    padding: '4px 0',
-    borderBottom: `1px solid ${theme.border.subtle}`,
-    flexShrink: 0,
-  };
-
-  const settingsStyle = {
-    padding: '10px 12px',
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 10,
-  };
-
-  const fieldStyle = {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    gap: 4,
-  };
-
-  const settingsLabelStyle = {
-    fontSize: theme.font.size.xs,
-    color: theme.text.secondary,
-    fontFamily: theme.font.ui,
-    marginBottom: 2,
-  };
-
-  const numberInputStyle = {
-    width: '100%',
-    padding: '4px 8px',
-    background: theme.bg.base,
-    border: `1px solid ${theme.border.default}`,
-    borderRadius: theme.radius.sm,
-    color: theme.text.primary,
-    fontSize: theme.font.size.sm,
-    fontFamily: theme.font.mono,
-    outline: 'none',
-  };
-
-  const selectStyle = {
-    width: '100%',
-    padding: '4px 8px',
-    background: theme.bg.base,
-    border: `1px solid ${theme.border.default}`,
-    borderRadius: theme.radius.sm,
-    color: theme.text.primary,
-    fontSize: theme.font.size.sm,
-    fontFamily: theme.font.ui,
-    outline: 'none',
-    cursor: 'pointer',
-  };
-
-  const iconToggleStyle = (layer: Layer) => ({
-    background: 'none',
-    border: 'none',
-    color: layer.visible ? theme.text.secondary : theme.text.tertiary,
-    cursor: 'pointer',
-    fontSize: 12,
-    padding: 2,
-    opacity: layer.visible ? 1 : 0.4,
-  });
-
+  // T1-141: 8 style constants + iconToggleStyle moved to module
+  // scope (./layers/layerPanelStyles).
   const accentTabBorder = theme.accent.cyan;
 
   return React.createElement('div', { style: outerColumnStyle },
