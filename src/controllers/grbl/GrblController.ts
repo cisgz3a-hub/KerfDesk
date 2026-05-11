@@ -184,37 +184,14 @@ import {
 export type { WcsConsentVerdict, WcsUncertainReason };
 export { classifyWcsConsentInputs };
 
-export type UnsafeAtConnectReason =
-  | 'alarm'
-  | 'run'
-  | 'hold'
-  // T1-followup-safety-door: connect verdict for a controller whose
-  // first status report is `<Door|...>`. Treated like alarm/hold from
-  // the start-gate's perspective — the door must close and the
-  // controller must return to idle before any motion or laser command
-  // is allowed. Distinct from `hold` because the recovery action is
-  // "close door / release e-stop", not "$X unlock".
-  | 'door'
-  | 'check'
-  | 'no-status-response'
-  | 'unsafe-residual-spindle';
-
-/**
- * T1-25: snapshot of the controller's state captured at the first status
- * report after connect (or at watchdog timeout). A null value from
- * `getUnsafeAtConnect()` means the safe-state handshake passed (idle + FS
- * 0,0). A non-null value means job start, frame, jog, and test-fire must
- * be refused by the UI / preflight layer until the user acknowledges and
- * reconnects (the spec's "machineControlAllowed: false" semantic).
- */
-export interface UnsafeAtConnectState {
-  reason: UnsafeAtConnectReason;
-  capturedAt: number;
-  status: MachineStatus;
-  alarmCode: number | null;
-  feedRate: number;
-  spindleSpeed: number;
-}
+// T1-153: UnsafeAtConnectReason + UnsafeAtConnectState moved to
+// ./GrblUnsafeAtConnect. Internal callers import locally; the
+// public surface is preserved via re-exports.
+import type {
+  UnsafeAtConnectReason,
+  UnsafeAtConnectState,
+} from './GrblUnsafeAtConnect';
+export type { UnsafeAtConnectReason, UnsafeAtConnectState };
 
 /** Parsed machine limits from GRBL $$ (defaults until first successful dump). */
 export interface GrblMachineInfo {

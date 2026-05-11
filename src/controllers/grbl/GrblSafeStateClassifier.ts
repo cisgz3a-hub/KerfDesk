@@ -28,7 +28,9 @@
  * `$X` unlock or M5.
  */
 import type { MachineState } from '../ControllerInterface';
-import type { UnsafeAtConnectReason } from './GrblController';
+// T1-153: import directly from the type module instead of the
+// 2400-line controller (was './GrblController').
+import type { UnsafeAtConnectReason } from './GrblUnsafeAtConnect';
 
 /**
  * Subset of MachineState the classifier reads. Carved out so the
