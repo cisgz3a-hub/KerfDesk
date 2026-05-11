@@ -38,6 +38,14 @@ import {
 // T1-138: local-space corner helper for fill-preview AABB extracted
 // so the geometry-type switch can be tested without canvas dependencies.
 import { getSceneObjectLocalCorners } from './sceneCornerHelpers';
+// T1-146: pure predicates + the preview-stroke color mapping extracted
+// so the predicates / colors can be tested without canvas mocks.
+import {
+  isCurrentTransformFinite,
+  isRenderableAabb,
+  isSafeObjectMatrix,
+  previewStrokeForMode,
+} from './sceneRendererPredicates';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
 const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
@@ -46,26 +54,8 @@ function dispatchCanvasRepaint(): void {
   window.dispatchEvent(new Event(CANVAS_REPAINT_EVENT));
 }
 
-function isCurrentTransformFinite(ctx: CanvasRenderingContext2D): boolean {
-  const m = ctx.getTransform();
-  return (
-    Number.isFinite(m.a) && Number.isFinite(m.b) &&
-    Number.isFinite(m.c) && Number.isFinite(m.d) &&
-    Number.isFinite(m.e) && Number.isFinite(m.f)
-  );
-}
-
-function isRenderableAabb(b: AABB): boolean {
-  return (
-    Number.isFinite(b.minX) && Number.isFinite(b.maxX) &&
-    Number.isFinite(b.minY) && Number.isFinite(b.maxY) &&
-    b.maxX > b.minX && b.maxY > b.minY
-  );
-}
-
-function isSafeObjectMatrix(t: Matrix3x2): boolean {
-  return [t.a, t.b, t.c, t.d, t.tx, t.ty].every(Number.isFinite);
-}
+// T1-146: isCurrentTransformFinite / isRenderableAabb / isSafeObjectMatrix
+// moved to ./sceneRendererPredicates.
 
 // Global content-keyed caches (LRU) — moving/transforming an object does not evict entries.
 const RENDER_CACHE_CAP = 100;
@@ -731,13 +721,7 @@ function renderOrigin(ctx: CanvasRenderingContext2D, transform: Transform): void
 
 // ─── SCENE OBJECT ────────────────────────────────────────────────
 
-function previewStrokeForMode(mode: LayerMode): string {
-  if (mode === 'cut') return '#ff4466';
-  if (mode === 'engrave') return '#00d4ff';
-  if (mode === 'score') return '#2dd4a0';
-  if (mode === 'image') return '#8888aa';
-  return '#8888aa';
-}
+// T1-146: previewStrokeForMode moved to ./sceneRendererPredicates.
 
 function renderObject(
   ctx: CanvasRenderingContext2D,

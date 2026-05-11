@@ -71,7 +71,7 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
 
 // -------- safetyResultForStateMachine --------
 {
-  const base: SafetyActionResult = {
+  const base = {
     action: 'stop',
     accepted: true,
     motionState: 'idle',
@@ -81,7 +81,8 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
     requiresReconnect: false,
     requiresInspection: false,
     message: 'test',
-  } as SafetyActionResult;
+    timestamp: 0,
+  } as unknown as SafetyActionResult;
 
   const r = safetyResultForStateMachine(base);
   assert(r.action === 'stop',
