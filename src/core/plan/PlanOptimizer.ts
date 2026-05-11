@@ -764,11 +764,30 @@ function planRasterOperation(
       adjusted.push({ startX: s, endX: e, power: seg.power, y: seg.y });
     }
 
-    // Rapid to the first segment's burn-start. In M4 mode G0 leaves
-    // the laser off, so this transition between scanlines is safe.
-    moves.push({ type: 'rapid', to: { x: adjusted[0].startX, y: adjusted[0].y } });
+    // T1-173 (audit Critical #1): rapid to the row's overscan-from,
+    // NOT the first segment's burn-start. The overscan-from is the
+    // entry point for the row's travel envelope; the laser is off
+    // here. Pre-T1-173 the rapid landed at `firstSeg.startX` which
+    // had `-overscan` baked in, but `appendRasterBurnMoves` then
+    // burned from that point at full power — engraving outside the
+    // artwork.
+    moves.push({ type: 'rapid', to: { x: scanline.overscanFromX, y: adjusted[0].y } });
 
-    let prevEndX = adjusted[0].startX;
+    // T1-173: G1 S0 approach from overscan-from to the first burn
+    // pixel. The machine accelerates to scan speed during this
+    // distance with the laser off, so the first burn pixel is hit
+    // at the correct velocity. Skip if overscan === 0 (no headroom).
+    const firstBurnStart = adjusted[0].startX;
+    if (Math.abs(firstBurnStart - scanline.overscanFromX) > 1e-4) {
+      moves.push({
+        type: 'linear',
+        to: { x: firstBurnStart, y: adjusted[0].y },
+        power: 0,
+        speed,
+      });
+    }
+
+    let prevEndX = firstBurnStart;
     for (let i = 0; i < adjusted.length; i++) {
       const seg = adjusted[i];
       // Bridge the gap from the previous segment's end to this
@@ -797,6 +816,19 @@ function planRasterOperation(
         minRatio,
       );
       prevEndX = seg.endX;
+    }
+
+    // T1-173: G1 S0 exit from the last burn-end to overscan-to.
+    // The machine decelerates with the laser off so deceleration
+    // doesn't degrade the trailing burn pixels. Skip when overscan
+    // === 0.
+    if (Math.abs(scanline.overscanToX - prevEndX) > 1e-4) {
+      moves.push({
+        type: 'linear',
+        to: { x: scanline.overscanToX, y: adjusted[adjusted.length - 1].y },
+        power: 0,
+        speed,
+      });
     }
   }
 

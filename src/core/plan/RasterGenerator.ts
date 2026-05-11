@@ -31,21 +31,60 @@ export const DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE = 2;
 /**
  * A single burn segment within one scanline row.
  * Coordinates are in world space (mm).
+ *
+ * T1-173 (audit Critical #1): `startX` and `endX` are now the pure
+ * ARTWORK pixel bounds — the range where the laser fires at `power`.
+ * Pre-T1-173 these fields silently included `±overscanning`, which
+ * caused `planRasterOperation` to burn the overscan region at full
+ * power and engrave outside the intended image. The overscan-travel
+ * envelope now lives at the scanline level (see `RasterScanline`)
+ * and is emitted as G1 S0 motion by the planner, mirroring the
+ * existing-and-correct fill pattern.
+ *
+ * For LTR rows: `startX < endX` (left edge of first burn pixel to
+ * right edge of last burn pixel in this segment).
+ *
+ * For RTL rows: `startX > endX` (the segment is reversed AFTER
+ * generation so the burn-on point is `startX` and burn-off is `endX`,
+ * matching machine motion direction).
  */
 export interface RasterSegment {
-  startX: number;   // mm, world coordinate
-  endX: number;     // mm, world coordinate
+  startX: number;   // mm, world coordinate, burn START (laser on point)
+  endX: number;     // mm, world coordinate, burn END (laser off point)
   y: number;        // mm, world coordinate
   power: number;    // 0–100%
 }
 
 /**
  * One complete scanline row, containing zero or more burn segments.
+ *
+ * T1-173 (audit Critical #1): added `overscanFromX` / `overscanToX`
+ * — the row's travel envelope for acceleration/deceleration. The
+ * machine ENTERS the scanline at `overscanFromX` (G0 rapid), travels
+ * to the first segment's `startX` with G1 S0 (laser off, machine
+ * accelerates to scan speed), burns the segments, then travels from
+ * the last segment's `endX` to `overscanToX` with G1 S0 (laser off,
+ * machine decelerates). This mirrors the existing-and-correct
+ * `FillScanlineRow.overscanFrom` / `overscanTo` pattern.
  */
 export interface RasterScanline {
   y: number;                    // mm, world coordinate
   segments: RasterSegment[];
   direction: 'ltr' | 'rtl';    // left-to-right or right-to-left
+  /**
+   * T1-173: row's overscan-from X. For LTR: leftmost burn-start
+   * minus `overscanning`. For RTL: rightmost burn-start plus
+   * `overscanning`. (For RTL the segments are reversed so the
+   * "first" segment's `startX` is the rightmost burn-start.)
+   * Equal to `firstSegment.startX` when `overscanning === 0`.
+   */
+  overscanFromX: number;
+  /**
+   * T1-173: row's overscan-to X. For LTR: rightmost burn-end plus
+   * `overscanning`. For RTL: leftmost burn-end minus `overscanning`.
+   * Equal to `lastSegment.endX` when `overscanning === 0`.
+   */
+  overscanToX: number;
 }
 
 export interface RasterSettings {
@@ -112,7 +151,26 @@ export function generateRasterScanlines(
       }
     }
 
-    scanlines.push({ y, segments, direction });
+    // T1-173 (audit Critical #1): compute the row's overscan-travel
+    // envelope. The machine enters at `overscanFromX` (G0 rapid),
+    // approaches the first burn pixel with G1 S0, burns the segments,
+    // then decelerates from the last burn pixel to `overscanToX` with
+    // G1 S0. Pre-T1-173 this envelope was baked into per-segment
+    // `startX`/`endX` and engraved at full power. For LTR the envelope
+    // extends leftward at the start and rightward at the end; for RTL
+    // the directions are mirrored because the first/last segments'
+    // startX/endX have been swapped above.
+    const overscan = settings.overscanning;
+    const firstSeg = segments[0];
+    const lastSeg = segments[segments.length - 1];
+    const overscanFromX = direction === 'ltr'
+      ? firstSeg.startX - overscan
+      : firstSeg.startX + overscan;
+    const overscanToX = direction === 'ltr'
+      ? lastSeg.endX + overscan
+      : lastSeg.endX - overscan;
+
+    scanlines.push({ y, segments, direction, overscanFromX, overscanToX });
   }
 
   return scanlines;
@@ -147,7 +205,7 @@ function extractSegments1Bit(
       // End of current segment
       segments.push(createSegment(
         segStart, col, y, originX, pixelSizeMm,
-        settings.powerMax, settings.overscanning
+        settings.powerMax,
       ));
       segStart = null;
     }
@@ -200,7 +258,7 @@ function extractSegmentsGrayscale(
     }
     segments.push(createSegment(
       segStart, endCol, y, originX, pixelSizeMm,
-      currentPower, settings.overscanning,
+      currentPower,
     ));
     segStart = null;
     currentPower = -1;
@@ -252,10 +310,16 @@ function createSegment(
   originX: number,
   pixelSizeMm: number,
   power: number,
-  overscanning: number
 ): RasterSegment {
-  const startX = originX + colStart * pixelSizeMm - overscanning;
-  const endX = originX + colEnd * pixelSizeMm + overscanning;
+  // T1-173 (audit Critical #1): segments now contain PURE artwork
+  // pixel bounds. Pre-T1-173 the function added `-overscanning` /
+  // `+overscanning` here, which propagated into `appendRasterBurnMoves`
+  // in `planRasterOperation` and engraved the overscan region at full
+  // power. The overscan envelope is now computed per-scanline (see
+  // `generateRasterScanlines` → `overscanFromX` / `overscanToX`) and
+  // emitted as G1 S0 travel.
+  const startX = originX + colStart * pixelSizeMm;
+  const endX = originX + colEnd * pixelSizeMm;
   return { startX, endX, y, power };
 }
 
