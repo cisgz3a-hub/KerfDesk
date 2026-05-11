@@ -63,6 +63,21 @@ export function getProfileConnectionKind(p: DeviceProfile | null | undefined): D
 
 export const DEFAULT_FRAME_DOT_FEED_RATE = 3000;
 
+/**
+ * T1-172 (audit F-017): per-line delay (ms) inserted between G-code
+ * lines during the frame routine. 50 ms × 8 lines = 400 ms of inserted
+ * delay regardless of feedrate. Pre-T1-172 this was hardcoded in
+ * `ExecutionCoordinator.runFrame`. The audit
+ * (docs/AUDIT-2026-05-11.md F-017) flagged it as Low-severity
+ * Performance/Robustness: not safety-critical but adds noticeable
+ * lag for short frames AND may not be enough for slow firmware.
+ * Making it profile-driven lets fast firmware (Falcon A1 Pro at high
+ * baud) drop toward 0 ms while leaving slow / shared-buffer firmware
+ * room to raise it. The 50 ms default preserves shipped behavior for
+ * profiles that do not set the field.
+ */
+export const DEFAULT_FRAME_LINE_DELAY_MS = 50;
+
 export interface DeviceProfile {
   id: string;
   name: string;
@@ -92,6 +107,13 @@ export interface DeviceProfile {
   maxSpindle: number;      // S-value (usually 255 or 1000)
   /** Low-power frame-dot / mark-center move feed rate. Defaults to 3000 mm/min. */
   frameDotFeedRate?: number;
+  /**
+   * T1-172 (audit F-017): per-line delay (ms) for the frame routine.
+   * Defaults to {@link DEFAULT_FRAME_LINE_DELAY_MS} (50). Lower values
+   * (e.g. 10) suit fast firmware; higher values (e.g. 100) suit slow
+   * or shared-buffer firmware. Setting to 0 disables the delay.
+   */
+  frameLineDelayMs?: number;
   /** Optional per-axis max rate from GRBL ($110/$111). */
   maxRateX?: number;
   maxRateY?: number;
@@ -243,6 +265,22 @@ export function resolveFrameDotFeedRate(
   const value = profile?.frameDotFeedRate;
   if (typeof value === 'number' && Number.isFinite(value) && value > 0) return value;
   return DEFAULT_FRAME_DOT_FEED_RATE;
+}
+
+/**
+ * T1-172 (audit F-017): resolves the per-line delay (ms) for the
+ * frame routine. Accepts 0 (disable delay) explicitly; falls back to
+ * {@link DEFAULT_FRAME_LINE_DELAY_MS} when the profile value is
+ * missing, non-finite, or negative.
+ */
+export function resolveFrameLineDelayMs(
+  profile: Pick<DeviceProfile, 'frameLineDelayMs'> | null | undefined,
+): number {
+  const value = profile?.frameLineDelayMs;
+  // 0 is a valid disable value, so accept it explicitly (the
+  // `value > 0` check used for frameDotFeedRate would reject 0).
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0) return value;
+  return DEFAULT_FRAME_LINE_DELAY_MS;
 }
 
 async function migrateDeviceProfilesFromLocalStorage(): Promise<void> {

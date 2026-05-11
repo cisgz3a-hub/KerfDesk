@@ -16,6 +16,7 @@ import {
 import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import {
   resolveFrameDotFeedRate,
+  resolveFrameLineDelayMs,
   type DeviceProfile,
   type MachineOriginCorner,
 } from '../../core/devices/DeviceProfile';
@@ -1212,7 +1213,12 @@ export function ConnectionPanelMain({
       `Framing (safe): machine X${corners[0]!.x.toFixed(0)}-${corners[1]!.x.toFixed(0)} Y${yLo.toFixed(0)}-${yHi.toFixed(0)}`,
     ]);
 
-    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs });
+    // T1-172 (audit F-017): pass the profile's frame-line delay so
+    // fast firmware can drop toward 0 ms while slow firmware can
+    // raise it. Pre-T1-172 this was hardcoded 50 ms inside the
+    // coordinator with no profile override.
+    const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
+    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs, frameLineDelayMs });
 
     if (!result.ok) {
       const timeoutSec = Math.round(idleTimeoutMs / 1000);
@@ -1277,12 +1283,15 @@ export function ConnectionPanelMain({
 
     const maxSpindle = activeProfile?.maxSpindle ?? 1000;
     const frameDotFeedRateMmPerMin = resolveFrameDotFeedRate(activeProfile);
+    // T1-172 (audit F-017): same profile-driven line-delay as frameSafe.
+    const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
 
     const result = await executionCoordinator.frameDot({
       sceneBounds,
       transformOpts,
       maxSpindle,
       frameDotFeedRateMmPerMin,
+      frameLineDelayMs,
     });
 
     if (!result.ok) {

@@ -211,6 +211,13 @@ export class ExecutionCoordinator {
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
     signal?: AbortSignal;
+    /**
+     * T1-172 (audit F-017): per-line delay (ms) inserted between
+     * G-code lines in the frame routine. Pass the value resolved from
+     * the active profile via `resolveFrameLineDelayMs`. When omitted,
+     * `runFrame` falls back to `DEFAULT_FRAME_LINE_DELAY_MS` (50).
+     */
+    frameLineDelayMs?: number;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
@@ -219,6 +226,7 @@ export class ExecutionCoordinator {
       idleTimeoutMs: args.idleTimeoutMs,
       withCrosshair: args.withCrosshair ?? true,
       signal: args.signal,
+      frameLineDelayMs: args.frameLineDelayMs,
     });
   }
 
@@ -234,6 +242,8 @@ export class ExecutionCoordinator {
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
     signal?: AbortSignal;
+    /** T1-172 (audit F-017): see frameSafe. */
+    frameLineDelayMs?: number;
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
@@ -244,6 +254,7 @@ export class ExecutionCoordinator {
       idleTimeoutMs: args.idleTimeoutMs,
       withCrosshair: args.withCrosshair ?? true,
       signal: args.signal,
+      frameLineDelayMs: args.frameLineDelayMs,
     });
   }
 
@@ -256,6 +267,12 @@ export class ExecutionCoordinator {
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
     signal?: AbortSignal;
+    /**
+     * T1-172 (audit F-017): per-line delay (ms). Undefined →
+     * `DEFAULT_FRAME_LINE_DELAY_MS` (50). 0 disables the delay
+     * (matches the resolver semantics for fast firmware).
+     */
+    frameLineDelayMs?: number;
   }): Promise<FrameResult> {
     if (args.signal?.aborted) return { ok: false, reason: 'cancelled' };
     const ctrl = this.deps.controllerRef.current;
@@ -294,7 +311,11 @@ export class ExecutionCoordinator {
         frameDotFeedRateMmPerMin,
         crosshairAfterFrame: withCrosshair,
         onCommand: line => this.notifySimulator(line),
-        lineDelayMs: 50,
+        // T1-172 (audit F-017): pre-T1-172 this was hardcoded 50.
+        // The caller now passes a profile-resolved value (via
+        // `resolveFrameLineDelayMs`); fall back to 50 when omitted
+        // so existing call sites stay byte-identical.
+        lineDelayMs: args.frameLineDelayMs ?? 50,
       });
       if (args.signal?.aborted) return { ok: false, reason: 'cancelled' };
       if (!frameResult.ok) {

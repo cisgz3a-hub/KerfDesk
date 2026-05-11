@@ -184,6 +184,20 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
       message: `frameDotFeedRate must be a positive finite number when set (got ${String(profile.frameDotFeedRate)}).`,
     });
   }
+  // T1-172 (audit F-017): allow 0 (disable delay) but reject negative
+  // and non-finite values. Match the resolver semantics: 0 is a valid
+  // explicit choice.
+  if (
+    profile.frameLineDelayMs != null
+    && (!Number.isFinite(profile.frameLineDelayMs) || profile.frameLineDelayMs < 0)
+  ) {
+    issues.push({
+      field: 'frameLineDelayMs',
+      severity: 'error',
+      code: 'PROFILE_FRAME_LINE_DELAY_MS_INVALID',
+      message: `frameLineDelayMs must be a non-negative finite number when set (got ${String(profile.frameLineDelayMs)}).`,
+    });
+  }
   if (profile.maxRateX != null && !isPositiveFinite(profile.maxRateX)) {
     issues.push({
       field: 'maxRateX',
