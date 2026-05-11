@@ -35,6 +35,9 @@ import { classifyGrblSafeState } from './GrblSafeStateClassifier';
 // T1-134: pure job-line + OBJ-id marker parser extracted so the
 // gcode-line → object-id mapping contract is unit-testable in isolation.
 import { parseGrblJobLines } from './GrblJobLineParser';
+// T1-137: pure $I identity-line parser extracted so the
+// [VER:...] / [OPT:...] grammar is testable without mounting the controller.
+import { parseGrblIdentityLine } from './GrblIdentityParser';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -1895,20 +1898,18 @@ export class GrblController implements GrblControllerApi {
    * a `[VER:...]` or `[OPT:...]` shape so the caller can avoid a second
    * `_parseDollarSetting` attempt on the same line.
    */
+  // T1-137: delegates parsing to parseGrblIdentityLine; this method
+  // applies the parsed fields to controller state and returns whether
+  // the line matched so the dispatcher can avoid a second parse pass.
   private _tryParseIdentityLine(line: string): boolean {
-    if (line.startsWith('[VER:') && line.endsWith(']')) {
-      // Strip the leading `[VER:` (5 chars) and trailing `]`.
-      const payload = line.slice(5, -1).trim();
-      // Stock GRBL ends `[VER:...:]` with a trailing colon — keep the version
-      // string but drop the empty trailing build-tag if it has no content.
-      this._firmwareVersion = payload.endsWith(':') ? payload.slice(0, -1) : payload;
-      return true;
+    const parsed = parseGrblIdentityLine(line);
+    if (parsed === null) return false;
+    if ('firmwareVersion' in parsed) {
+      this._firmwareVersion = parsed.firmwareVersion;
+    } else {
+      this._buildOptions = parsed.buildOptions;
     }
-    if (line.startsWith('[OPT:') && line.endsWith(']')) {
-      this._buildOptions = line.slice(5, -1).trim();
-      return true;
-    }
-    return false;
+    return true;
   }
 
   private _handleOk(): void {
