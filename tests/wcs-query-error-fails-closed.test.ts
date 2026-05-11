@@ -94,14 +94,19 @@ console.log('\n=== T1-174 WCS query error fails closed (audit Critical #5) ===\n
     console.warn = origWarn;
   }
 
-  assert(priv._awaitingWcsQueryOk === false, 'error: clears the _awaitingWcsQueryOk flag');
+  // TS narrows `priv._awaitingWcsQueryOk` etc. to the literal `true`
+  // after the assignments above, so direct `=== false` comparisons
+  // trip the "unintentional" check. `_handleLine` mutates the fields;
+  // re-widen the reads via `Boolean(...)` so the assertions compile
+  // AND run against the post-mutation values.
+  assert(Boolean(priv._awaitingWcsQueryOk) === false, 'error: clears the _awaitingWcsQueryOk flag');
   assert(priv._currentG54 === null, 'error: clears the _currentG54 snapshot');
   assert(
-    priv._settingsQueried === true,
+    Boolean(priv._settingsQueried) === true,
     'error: marks _settingsQueried = true (no re-query loop)',
   );
   assert(
-    priv._placementUncertain === true,
+    Boolean(priv._placementUncertain) === true,
     'CRITICAL #5 invariant: error path marks _placementUncertain = true (NOT false)',
   );
   assert(

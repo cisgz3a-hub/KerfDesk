@@ -1622,6 +1622,19 @@ export class MachineService {
     // compare-and-swap pattern (`if (this.portRef.current === ws)`);
     // disconnect / emergencyStop now follow suit.
     const port = this.portRef.current;
+    // T1-175 (external audit Critical #3): capture whether a job was
+    // running BEFORE we mutate anything. Pre-T1-175 the finally clause
+    // unconditionally called `clearUnsafePriorState()` based on the
+    // T1-29 reasoning "user-initiated disconnect is a clean shutdown
+    // path." The audit pushed back: a user-initiated disconnect while
+    // a job is streaming IS qualitatively different from a renderer
+    // crash, BUT clicking disconnect doesn't make the physical state
+    // safe — the workpiece is partly burnt, the head is at an
+    // intermediate position, the material may need inspection. The
+    // safer contract: if a job was running at disconnect time, the
+    // recovery flag survives to the next launch so the user is
+    // prompted to inspect before reusing the setup.
+    const wasJobRunning = ctrl?.isJobRunning === true;
     const gatedResult = ctrl ? await this._guardDisconnectStopsJob(ctrl) : null;
     if (gatedResult) return gatedResult;
 
@@ -1703,13 +1716,30 @@ export class MachineService {
       // the previous session is no longer trustworthy — force a fresh
       // Set Origin before any saved-origin job.
       this._savedOriginG54Snapshot = null;
-      // T1-29: user-initiated disconnect is a clean shutdown path.
-      // Service ran controller laser-off + controller disconnect above; the job, if
-      // any was active, is being intentionally stopped. Clear the
-      // flag so the next launch doesn't surface the recovery dialog.
-      // Disconnect-while-job-runs IS the user explicitly halting the
-      // burn; that's qualitatively different from a renderer crash.
-      clearUnsafePriorState();
+      // T1-29 + T1-175 (external audit Critical #3): clear the
+      // recovery flag only when no job was streaming at disconnect
+      // time. Pre-T1-175 the call was unconditional; the audit
+      // flagged this as Critical because a user-initiated disconnect
+      // during a burn leaves the workpiece partly burnt and the head
+      // at an intermediate position — the physical state may need
+      // inspection even though the click was intentional. The T1-29
+      // "clean shutdown" semantics still apply to the common case
+      // (user disconnects from idle / finished machine): if no job
+      // was running, there's no recovery dialog to suppress, so the
+      // clear preserves the pre-T1-175 behavior for that path.
+      if (!wasJobRunning) {
+        clearUnsafePriorState();
+      } else {
+        // Audit-grade signal: a job was streaming when the user
+        // clicked disconnect. The unsafe-prior-state flag survives
+        // so the next launch surfaces a recovery dialog before
+        // allowing further machine commands.
+        console.warn(
+          '[MachineService] T1-175: disconnect while job was running. '
+          + 'Preserving unsafe-prior-state flag so the next launch '
+          + 'surfaces a recovery dialog before further machine commands.',
+        );
+      }
     }
     return this._recordSafetyResult(result);
   }
@@ -1781,7 +1811,23 @@ export class MachineService {
       this._clearAutoM5Listener();
       this.clearJobSession();
       this._savedOriginG54Snapshot = null;
-      clearUnsafePriorState();
+      // T1-175 (external audit Critical #2): emergencyStop must NOT
+      // clear the unsafe-prior-state flag. Pre-T1-175 the call was
+      // unconditional; the audit flagged this as Critical because
+      // emergency stop is by definition an unsafe physical
+      // interruption: the user pressed E-stop during a burn (or some
+      // automated path triggered it for a safety reason), the laser
+      // was forced off, the head may be at an intermediate position,
+      // the workpiece may be partially burnt. Clearing the recovery
+      // flag here means the next launch wouldn't surface a recovery
+      // dialog — exactly the case the flag exists for. The flag
+      // survives until the user explicitly acknowledges recovery
+      // via the App.tsx startup dialog (T1-29 path 3).
+      console.warn(
+        '[MachineService] T1-175: emergencyStop preserves unsafe-'
+        + 'prior-state flag. Next launch will surface a recovery '
+        + 'dialog before further machine commands.',
+      );
     }
     return this._recordSafetyResult(result);
   }
