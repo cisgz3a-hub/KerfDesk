@@ -26,7 +26,7 @@
  * Last updated: Phase 5, Step 18c — Fill scanline generation
  */
 
-import { type Point, type AABB, emptyAABB, mergeAABB } from '../types';
+import { type Point } from '../types';
 import {
   type Job, type Operation, type FlatPath,
   type ResolvedLaserSettings,
@@ -60,6 +60,21 @@ import {
   type MoveKinematics,
 } from './VelocityProfile';
 import { interpolateOffset, applyScanOffset } from './ScanningOffset';
+// T1-149: pure coordinate / direction-choice / position-tracking /
+// plan-bounds / distance helpers extracted so each can be tested
+// without loading the full PlanOptimizer import surface.
+import {
+  computePlanBounds,
+  distanceSq,
+  getFinalPosition,
+  getFinalPositionFromMoves,
+  getLastOrderedPathEndpoint,
+  getPathEnd,
+  getPathEndpoint,
+  getPathStart,
+  orderWithBestDirection,
+  type OrderedPath,
+} from './planOptimizerHelpers';
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
@@ -936,11 +951,7 @@ function orderPathsForCutting(
   return result;
 }
 
-function getLastOrderedPathEndpoint(ordered: OrderedPath[], fallback: Point): Point {
-  if (ordered.length === 0) return fallback;
-  const last = ordered[ordered.length - 1];
-  return getPathEndpoint(last.path, last.reversed);
-}
+// T1-149: getLastOrderedPathEndpoint moved to ./planOptimizerHelpers.
 
 /**
  * Build containment tree and return paths grouped by depth.
@@ -963,94 +974,6 @@ function getDepthGroups(closedPaths: FlatPath[]): Map<number, FlatPath[]> {
   return groups;
 }
 
-// ─── NEAREST-NEIGHBOR PATH ORDERING ──────────────────────────────
-
-interface OrderedPath {
-  path: FlatPath;
-  reversed: boolean;
-}
-
-/**
- * Fixed path order: choose start vs end traversal to minimize travel from current position.
- */
-function orderWithBestDirection(paths: FlatPath[], startPos: Point): OrderedPath[] {
-  if (paths.length === 0) return [];
-  const result: OrderedPath[] = [];
-  let pos = startPos;
-  for (const path of paths) {
-    const start = getPathStart(path);
-    const end = getPathEnd(path);
-    const dStart = distanceSq(pos, start);
-    const dEnd = distanceSq(pos, end);
-    const reversed = dEnd < dStart;
-    result.push({ path, reversed });
-    pos = getPathEndpoint(path, reversed);
-  }
-  return result;
-}
-
-// ─── FLATPATH COORDINATE HELPERS ─────────────────────────────────
-
-function getPathStart(path: FlatPath): Point {
-  return { x: path.coords[0], y: path.coords[1] };
-}
-
-function getPathEnd(path: FlatPath): Point {
-  const n = path.coords.length;
-  return { x: path.coords[n - 2], y: path.coords[n - 1] };
-}
-
-/**
- * Get the point where the laser head ends up after traversing
- * a path (accounting for direction and closed-path return).
- */
-function getPathEndpoint(path: FlatPath, reversed: boolean): Point {
-  if (path.closed) {
-    // Closed paths return to start, regardless of direction
-    return reversed ? getPathEnd(path) : getPathStart(path);
-  }
-  return reversed ? getPathStart(path) : getPathEnd(path);
-}
-
-// ─── POSITION TRACKING ──────────────────────────────────────────
-
-function getFinalPosition(ops: PlannedOperation[]): Point {
-  if (ops.length === 0) return { x: 0, y: 0 };
-  const lastOp = ops[ops.length - 1];
-  return getFinalPositionFromMoves(lastOp.moves) || { x: 0, y: 0 };
-}
-
-function getFinalPositionFromMoves(moves: Move[]): Point | null {
-  for (let i = moves.length - 1; i >= 0; i--) {
-    const move = moves[i];
-    if (move.type === 'rapid' || move.type === 'linear') {
-      return { ...move.to };
-    }
-  }
-  return null;
-}
-
-// ─── PLAN BOUNDS ─────────────────────────────────────────────────
-
-function computePlanBounds(plan: Plan): AABB {
-  let bounds = emptyAABB();
-
-  for (const op of plan.operations) {
-    for (const move of op.moves) {
-      if (move.type === 'rapid' || move.type === 'linear') {
-        bounds = mergeAABB(bounds, {
-          minX: move.to.x, minY: move.to.y,
-          maxX: move.to.x, maxY: move.to.y,
-        });
-      }
-    }
-  }
-
-  return bounds;
-}
-
-// ─── MATH ────────────────────────────────────────────────────────
-
-function distanceSq(a: Point, b: Point): number {
-  return (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
-}
+// T1-149: orderWithBestDirection / getPathStart / getPathEnd /
+// getPathEndpoint / getFinalPosition / getFinalPositionFromMoves /
+// computePlanBounds / distanceSq moved to ./planOptimizerHelpers.
