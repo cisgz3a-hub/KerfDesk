@@ -1649,9 +1649,32 @@ export class GrblController implements GrblControllerApi {
         return;
       }
       if (line.startsWith('error:')) {
+        // T1-174 (audit Critical #5): WCS query error must FAIL CLOSED,
+        // not fail open. Pre-T1-174 this branch called
+        // `skipWcsNormalization()` which set `_placementUncertain =
+        // false` — treating a controller-reported failure to read the
+        // WCS state as if the user had explicitly decided to skip
+        // normalization. The audit flagged this as Critical: a
+        // saved-origin job could then start from an unknown WCS
+        // offset, engraving in the wrong physical location.
+        //
+        // Post-T1-174: mark the settings handshake done (so we don't
+        // loop trying to re-query) AND mark placement uncertain with
+        // a dedicated reason so the start-job gate refuses until the
+        // user disconnects + reconnects from a known-safe state.
+        console.warn(
+          `[GrblController] T1-174: WCS query \`$#\` returned error response (${line}). `
+          + 'Refusing to mark placement safe. Job start blocked until the user '
+          + 'disconnects, addresses the underlying state, and reconnects.',
+        );
         this._awaitingWcsQueryOk = false;
         this._currentG54 = null;
-        this.skipWcsNormalization();
+        this._settingsQueried = true;
+        this._placementUncertain = true;
+        this._lastPlacementUncertainReason = 'wcs_query_error';
+        for (const cb of this._stateListeners) {
+          cb({ ...this._state });
+        }
         return;
       }
       this._tryParseG54WcsLine(line);

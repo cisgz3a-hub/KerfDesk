@@ -34,7 +34,17 @@ export type WcsUncertainReason =
   | 'missing_g54'         // [G54:...] line never arrived in response to $#.
   | 'malformed_g54'       // [G54:...] line had unparseable coordinates (NaN).
   | 'missing_status_mask' // $10 was not in the cached settings dump.
-  | 'malformed_status_mask'; // $10 was present but parseInt yielded NaN.
+  | 'malformed_status_mask' // $10 was present but parseInt yielded NaN.
+  /**
+   * T1-174 (audit Critical #5): `$#` returned an `error:` response.
+   * Pre-T1-174 this case called `skipWcsNormalization()` which marked
+   * placement as TRUSTED — a fail-OPEN bug that authorized saved-
+   * origin jobs to start from an unknown WCS offset. Post-T1-174 the
+   * controller marks placement uncertain with this reason and blocks
+   * start until the user disconnects + reconnects from a known-safe
+   * state.
+   */
+  | 'wcs_query_error';
 
 /**
  * T1-117: discriminated union for the WCS-verification verdict. The
