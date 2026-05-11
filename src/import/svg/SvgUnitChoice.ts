@@ -107,12 +107,17 @@ export function setStoredSvgUnitMode(mode: SvgUnitMode, storage: SvgUnitModeStor
 export function detectViewBoxOnlySvgUnitAmbiguity(svgString: string): SvgViewBoxOnlyUnitAmbiguity | null {
   if (!svgString.trim()) return null;
 
-  let doc: any;
-  try {
-    doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
-  } catch {
-    return null;
-  }
+  // T1-185 (internal audit F-048): drop the `any` cast. Pre-T1-185
+  // this was `let doc: any;` and a try/catch reassignment. The
+  // try-return pattern lets `parseFromString`'s return type narrow
+  // `doc` to its inferred shape (Document) for the success path,
+  // and returns null on failure — no explicit annotation needed,
+  // no `any` escape hatch.
+  const doc = (() => {
+    try { return new DOMParser().parseFromString(svgString, 'image/svg+xml'); }
+    catch { return null; }
+  })();
+  if (!doc) return null;
 
   const svgRoot = doc.getElementsByTagName('svg')[0];
   if (!svgRoot) return null;

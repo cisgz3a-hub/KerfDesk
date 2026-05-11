@@ -23,7 +23,7 @@
 
 import { type Point, type Matrix3x2 } from '../core/types';
 import { type Scene } from '../core/scene/Scene';
-import { type SceneObject, type Geometry, type TextGeometry } from '../core/scene/SceneObject';
+import { type SceneObject, type Geometry, type TextGeometry, type PathSegment } from '../core/scene/SceneObject';
 import { type Layer } from '../core/scene/Layer';
 import { computeObjectBounds } from './bounds';
 import { measureTextGeometrySize } from './textCanvasDraw';
@@ -224,7 +224,11 @@ function hitTestPath(
   return false;
 }
 
-function pathSegmentsToPoints(segments: any[]): Point[] {
+// T1-185 (internal audit F-034): typed segments. Pre-T1-185 this
+// was `segments: any[]` which silently accepted any shape. The
+// discriminated-union typing pins each `seg.type` branch — the
+// switch becomes exhaustive and TS catches missing cases.
+function pathSegmentsToPoints(segments: readonly PathSegment[]): Point[] {
   const points: Point[] = [];
   for (const seg of segments) {
     switch (seg.type) {

@@ -93,10 +93,21 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
 
   const unitMode: SvgUnitMode = options?.unitMode ?? 'laser';
 
+  // T1-185 (internal audit F-048): the `any` here documents a real
+  // type-system limitation, not a sloppy cast. `DOMParser` is
+  // available in both browser (lib.dom) and Node test environments
+  // (via `@xmldom/xmldom`). Their Document / Element types share
+  // a duck-typed subset (getElementsByTagName, getAttribute,
+  // childNodes) used by the SVG walkers below, but the two type
+  // libraries declare structurally-incompatible shapes (lib.dom
+  // Element has classList/clientHeight/etc. that xmldom does not).
+  // Casting through `any` lets the runtime-compatible subset flow
+  // through both code paths. Pre-T1-185 this had no comment; the
+  // audit asked for cleanup but the constraint is structural.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let doc: any;
   try {
-    const parser = new DOMParser();
-    doc = parser.parseFromString(svgString, 'image/svg+xml');
+    doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
   } catch {
     return EMPTY_RESULT;
   }
