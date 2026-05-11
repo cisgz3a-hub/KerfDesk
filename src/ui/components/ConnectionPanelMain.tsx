@@ -75,6 +75,12 @@ import {
   layerModeToOperationKind,
   readyStartModeLabel,
 } from './connection/connectionPanelLabels';
+// T1-144: structural-equality comparators used by setMessages /
+// setPreflight effects to skip redundant state updates.
+import {
+  samePreflightSummary,
+  sameMessages,
+} from './connection/connectionPanelEquality';
 import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
 import { JobPosition, WorkflowSteps } from './connection/Workflow';
 import {
@@ -126,44 +132,8 @@ function playCompletionBeep(): void {
   }
 }
 
-function samePreflightSummary(a: PreflightSummary, b: PreflightSummary): boolean {
-  if (
-    a.score !== b.score ||
-    a.canStart !== b.canStart ||
-    a.blockers !== b.blockers ||
-    a.warnings !== b.warnings
-  ) {
-    return false;
-  }
-  if (a.validatedTicket?.ticketId !== b.validatedTicket?.ticketId) return false;
-  const ia = a.issues;
-  const ib = b.issues;
-  if (ia.length !== ib.length) return false;
-  for (let i = 0; i < ia.length; i++) {
-    const x = ia[i];
-    const y = ib[i];
-    if (
-      x.id !== y.id ||
-      x.severity !== y.severity ||
-      x.category !== y.category ||
-      x.title !== y.title ||
-      x.detail !== y.detail ||
-      x.fix !== y.fix
-    ) {
-      return false;
-    }
-  }
-  return true;
-}
-
-function sameMessages(a: readonly string[], b: readonly string[]): boolean {
-  if (a === b) return true;
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) {
-    if (a[i] !== b[i]) return false;
-  }
-  return true;
-}
+// T1-144: samePreflightSummary + sameMessages moved to
+// ./connection/connectionPanelEquality.
 
 export interface ConnectionPanelMainProps {
   controller: LaserController;
