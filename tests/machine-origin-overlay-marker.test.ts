@@ -114,9 +114,16 @@ assert.ok(backgroundStart > overlayStart, 'renderSceneBackground follows renderM
 const overlayBody = source.slice(overlayStart, backgroundStart);
 
 assert.ok(overlayBody.includes('resolveMachineOriginMarker'), 'overlay rendering uses the marker resolver');
+// T1-132: the marker-resolution geometry helpers (computeSceneBounds /
+// resolveMachineOriginMarker / etc.) moved to ./sceneOverlayHelpers,
+// so the `transformPointToMachine` import moved with them. The pin
+// now scans the helper module — the property we want preserved is
+// "the same transform helper used for frame and G-code math drives
+// the overlay marker placement", which holds via the helper module.
+const helperSource = readFileSync('src/ui/renderers/sceneOverlayHelpers.ts', 'utf8');
 assert.ok(
-  source.includes('transformPointToMachine'),
-  'SceneRenderer imports the same transformPointToMachine helper used for frame and G-code math',
+  helperSource.includes('transformPointToMachine'),
+  'sceneOverlayHelpers imports the same transformPointToMachine helper used for frame and G-code math',
 );
 assert.ok(
   !/strokeRect\s*\(/.test(overlayBody),

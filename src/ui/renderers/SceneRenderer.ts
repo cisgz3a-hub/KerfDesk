@@ -25,9 +25,16 @@ import { type AABB, type Matrix3x2, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
 import { getImage } from '../../io/ImageStore';
-import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
-import { transformPointToMachine } from '../../core/plan/MachineTransform';
 import { type BurnState } from '../../app/MachineService';
+// T1-132: overlay-bounds helpers + types extracted to sibling module so
+// they can be unit-tested without loading the renderer surface.
+import {
+  computeSceneBounds,
+  resolveMachineOriginMarker,
+  type MachineOriginMarker,
+  type SceneBounds,
+  type SceneMachineOverlayOptions,
+} from './sceneOverlayHelpers';
 
 /** CanvasRenderer listens for this so async image decode triggers a repaint (resize alone does not). */
 const CANVAS_REPAINT_EVENT = 'laserforge-canvas-repaint';
@@ -160,27 +167,13 @@ function ditherCacheSet(key: string, canvas: HTMLCanvasElement): void {
   shrinkMap(ditherCanvasByKey);
 }
 
-export interface SceneMachineOverlayOptions {
-  /** Current G-code start mode -- controls which anchor marker is drawn. */
-  startMode?: 'absolute' | 'current' | 'savedOrigin';
-  /** Saved origin in canvas coordinates for saved-origin mode. */
-  savedOrigin?: { x: number; y: number } | null;
-  /** Physical bed size in mm, retained for callers that share machine overlay options. */
-  bedWidthMm?: number;
-  bedHeightMm?: number;
-  /** Machine origin corner, retained for callers that share machine overlay options. */
-  originCorner?: MachineOriginCorner;
-}
-
-type SceneBounds = { minX: number; minY: number; maxX: number; maxY: number };
-
-const DEFAULT_MACHINE_OVERLAY_BED_HEIGHT_MM = 300;
-
-export interface MachineOriginMarker {
-  x: number;
-  y: number;
-  label: 'Bed origin' | 'Head start' | 'Saved zero';
-}
+// T1-132: SceneMachineOverlayOptions, MachineOriginMarker,
+// computeSceneBounds, hasSceneBounds, positiveFinite,
+// resolveBedOriginMarker, and resolveMachineOriginMarker have moved to
+// ./sceneOverlayHelpers (re-imported above). The types are re-exported
+// here to preserve the public surface.
+export type { SceneMachineOverlayOptions, MachineOriginMarker } from './sceneOverlayHelpers';
+export { resolveMachineOriginMarker } from './sceneOverlayHelpers';
 
 // ─── MAIN RENDER ─────────────────────────────────────────────────
 
@@ -200,105 +193,6 @@ function renderMachineWorkAreaOverlay(
   ctx.textBaseline = 'top';
   ctx.fillText(`${machine.width}×${machine.height} mm (machine)`, 3, 3);
   ctx.restore();
-}
-
-function computeSceneBounds(scene: Scene): SceneBounds {
-  let minX = Infinity;
-  let minY = Infinity;
-  let maxX = -Infinity;
-  let maxY = -Infinity;
-  for (const obj of scene.objects) {
-    if (!obj.visible) continue;
-    const b = computeObjectBounds(obj);
-    if (!b || !Number.isFinite(b.minX) || !Number.isFinite(b.minY) || !Number.isFinite(b.maxX) || !Number.isFinite(b.maxY)) continue;
-    minX = Math.min(minX, b.minX);
-    minY = Math.min(minY, b.minY);
-    maxX = Math.max(maxX, b.maxX);
-    maxY = Math.max(maxY, b.maxY);
-  }
-  if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
-    return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
-  }
-  return { minX, minY, maxX, maxY };
-}
-
-function hasSceneBounds(sceneBounds: SceneBounds): boolean {
-  return (
-    Number.isFinite(sceneBounds.minX) &&
-    Number.isFinite(sceneBounds.minY) &&
-    Number.isFinite(sceneBounds.maxX) &&
-    Number.isFinite(sceneBounds.maxY) &&
-    (sceneBounds.maxX !== sceneBounds.minX || sceneBounds.maxY !== sceneBounds.minY)
-  );
-}
-
-function positiveFinite(value: number | undefined): number | null {
-  return Number.isFinite(value) && (value as number) > 0 ? (value as number) : null;
-}
-
-function resolveBedOriginMarker(options: SceneMachineOverlayOptions): MachineOriginMarker | null {
-  const originCorner = options.originCorner ?? 'front-left';
-  const bedHeightMm = positiveFinite(options.bedHeightMm) ?? DEFAULT_MACHINE_OVERLAY_BED_HEIGHT_MM;
-  const bedWidthMm = positiveFinite(options.bedWidthMm);
-
-  if ((originCorner === 'front-right' || originCorner === 'rear-right') && bedWidthMm == null) {
-    return null;
-  }
-
-  const transformOptions = {
-    startMode: 'absolute' as const,
-    savedOrigin: null,
-    originCorner,
-    bedHeightMm,
-    ...(bedWidthMm != null ? { bedWidthMm } : {}),
-  };
-  const transformBounds = {
-    minX: 0,
-    minY: 0,
-    maxX: bedWidthMm ?? 0,
-    maxY: bedHeightMm,
-  };
-  const candidates = [
-    { x: 0, y: 0 },
-    { x: 0, y: bedHeightMm },
-    ...(bedWidthMm != null
-      ? [
-          { x: bedWidthMm, y: 0 },
-          { x: bedWidthMm, y: bedHeightMm },
-        ]
-      : []),
-  ];
-
-  let best = candidates[0];
-  let bestScore = Infinity;
-  for (const candidate of candidates) {
-    const machine = transformPointToMachine(candidate, transformBounds, transformOptions);
-    const score = Math.abs(machine.x) + Math.abs(machine.y);
-    if (score < bestScore) {
-      best = candidate;
-      bestScore = score;
-    }
-  }
-
-  return { x: best.x, y: best.y, label: 'Bed origin' };
-}
-
-export function resolveMachineOriginMarker(
-  sceneBounds: SceneBounds,
-  options: SceneMachineOverlayOptions,
-): MachineOriginMarker | null {
-  switch (options.startMode) {
-    case 'absolute':
-      return resolveBedOriginMarker(options);
-    case 'current':
-      if (!hasSceneBounds(sceneBounds)) return null;
-      return { x: sceneBounds.minX, y: sceneBounds.minY, label: 'Head start' };
-    case 'savedOrigin':
-      if (!options.savedOrigin) return null;
-      return { x: options.savedOrigin.x, y: options.savedOrigin.y, label: 'Saved zero' };
-    default:
-      return null;
-  }
 }
 
 function renderMachineOriginOverlay(
