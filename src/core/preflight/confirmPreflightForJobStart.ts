@@ -40,18 +40,36 @@ export async function confirmPreflightForJobStart(
     // no value, no consequence, and no remediation \u2014 pressed Start because the
     // title didn't sound serious. Showing detail and fix lets the user make an
     // informed acknowledge-and-continue decision.
-    const proceed = await showConfirm(
-      'Start job?',
-      `${preflight.warnings} warning(s):\n\n` +
-        preflight.issues
-          .filter(i => i.severity === 'warning')
+    //
+    // T1-183 (external audit F-022): include info-severity findings
+    // (e.g. LAYER_OUTPUT_SUMMARIES "1 layer cuts at 2000 mm/min \u00D7 75%
+    // power, 3 passes") in the confirm dialog above the warnings.
+    // Pre-T1-183 the user only saw warnings here \u2014 info was confined
+    // to the side panel, easy to miss. Showing info first gives the
+    // user the "what will run" context BEFORE the warnings list.
+    const warningsText = preflight.issues
+      .filter(i => i.severity === 'warning')
+      .map(i => {
+        let line = `\u25B2 ${i.title}`;
+        if (i.detail && i.detail !== i.title) line += `\n  ${i.detail}`;
+        if (i.fix) line += `\n  \u2192 ${i.fix}`;
+        return line;
+      })
+      .join('\n\n');
+    const infoIssues = preflight.issues.filter(i => i.severity === 'info');
+    const infoText = infoIssues.length > 0
+      ? infoIssues
           .map(i => {
-            let line = `\u25B2 ${i.title}`;
+            let line = `\u2139 ${i.title}`;
             if (i.detail && i.detail !== i.title) line += `\n  ${i.detail}`;
-            if (i.fix) line += `\n  \u2192 ${i.fix}`;
             return line;
           })
-          .join('\n\n') +
+          .join('\n\n') + '\n\n'
+      : '';
+    const proceed = await showConfirm(
+      'Start job?',
+      `${infoText}${preflight.warnings} warning(s):\n\n` +
+        warningsText +
         '\n\nStart job anyway?',
     );
     if (!proceed) {
