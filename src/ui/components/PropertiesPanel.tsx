@@ -25,6 +25,9 @@ import {
   applyImageSettingsCommit,
   applyImageSettingsPreview,
 } from './properties/imageSettingsTransforms';
+// T1-140: pure trace-scene transforms (subpath scaling + post-trace
+// scene composition) moved to a sibling helper for unit-testability.
+import { buildSceneAfterTrace } from './properties/traceSceneTransforms';
 import {
   containerStyle,
   dividerStyle,
@@ -258,50 +261,20 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         return;
       }
 
-      const pathGeom = traced.geometry as PathGeometry;
-      const scaledSubPaths = pathGeom.subPaths.map(sp => ({
-        ...sp,
-        segments: sp.segments.map(seg => {
-          if (seg.type === 'close') return seg;
-          if (seg.type === 'move' || seg.type === 'line') {
-            return { ...seg, to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY } };
-          }
-          if (seg.type === 'quadratic') {
-            return {
-              ...seg,
-              cp: { x: seg.cp.x * scaleX, y: seg.cp.y * scaleY },
-              to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
-            };
-          }
-          if (seg.type === 'cubic') {
-            return {
-              ...seg,
-              cp1: { x: seg.cp1.x * scaleX, y: seg.cp1.y * scaleY },
-              cp2: { x: seg.cp2.x * scaleX, y: seg.cp2.y * scaleY },
-              to: { x: seg.to.x * scaleX, y: seg.to.y * scaleY },
-            };
-          }
-          return seg;
-        }),
-      }));
-
-      const finalObj = {
-        ...traced,
-        transform: { ...obj.transform },
-        geometry: { ...pathGeom, subPaths: scaledSubPaths },
-      };
-
-      const newScene = {
-        ...scene,
-        layers: layersForCommit,
-        activeLayerId: targetLayerId,
-        objects: deleteImageAfterTrace
-          ? [...scene.objects.filter(o => o.id !== obj.id), finalObj]
-          : [...scene.objects, finalObj],
-      };
+      // T1-140: pure scene composition delegated to traceSceneTransforms.
+      const { scene: newScene, addedObjectId } = buildSceneAfterTrace({
+        scene,
+        sourceImage: obj,
+        traced,
+        scaleX,
+        scaleY,
+        targetLayerId,
+        layersForCommit,
+        deleteImageAfterTrace,
+      });
       try {
         onSceneCommit(newScene);
-        onSelectionChange?.(new Set([finalObj.id]));
+        onSelectionChange?.(new Set([addedObjectId]));
       } catch (err) {
         console.error('[Trace] scene commit failed:', err);
         await showAlert(
