@@ -101,6 +101,48 @@ export interface CompileJobProgress {
 // T1-154: acceleration bounds moved to ./jobCompilerHelpers
 // (MIN/MAX_PLAUSIBLE_ACCEL_MM_PER_S2 + DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2).
 
+/**
+ * T1-187 (external audit High #6): thrown when a raster operation
+ * references a SceneObject whose transform contains non-zero skew
+ * (b) or rotation off-diagonal (c) components. The image CAM path
+ * uses only `transform.a` (scale X) and `transform.d` (scale Y);
+ * rotated / sheared geometry would compile as axis-aligned (or
+ * inconsistently — preflight gates have evolved over time),
+ * silently diverging from the preview that DID show the rotation.
+ *
+ * Fail-closed is the audit-recommended alternative to "implement
+ * affine raster sampling," which is a multi-week effort. The user
+ * remediation is: rotate / flatten the image in their image editor
+ * BEFORE import, then re-import. This preserves manufacturing
+ * intent (the rotation IS a real geometric request).
+ *
+ * The `diagnostics.objectId` lets the UI surface the offending
+ * SceneObject; the full transform is included so support bundles
+ * can verify the skew components.
+ */
+export interface RotatedRasterDiagnostics {
+  readonly objectId: string;
+  readonly transform: Readonly<{
+    a: number; b: number; c: number; d: number; tx: number; ty: number;
+  }>;
+}
+
+export class RotatedRasterUnsupportedError extends Error {
+  readonly diagnostics: RotatedRasterDiagnostics;
+  constructor(diagnostics: RotatedRasterDiagnostics) {
+    const { a, b, c, d } = diagnostics.transform;
+    super(
+      `Rotated / skewed raster image is not supported (objectId=${diagnostics.objectId}, `
+      + `transform a=${a}, b=${b}, c=${c}, d=${d}). The image CAM path emits `
+      + 'axis-aligned scanlines and does not implement affine raster sampling. '
+      + 'Remediation: rotate or flatten the image in your image editor before import, '
+      + 'then re-import. This preserves the geometric intent visible in the preview.',
+    );
+    this.name = 'RotatedRasterUnsupportedError';
+    this.diagnostics = diagnostics;
+  }
+}
+
 interface EntitlementPolicy {
   allowTabs: boolean;
   allowOvercut: boolean;
@@ -659,6 +701,29 @@ function compileGeometry(
       if (obj.geometry.type !== 'image') continue;
 
       const geom = obj.geometry;
+      // T1-187 (external audit High #6): fail closed for rotated /
+      // skewed raster geometry. The image CAM path below uses only
+      // the scale components (transform.a / .d) and the translation
+      // (tx / ty); it ignores the skew/rotation components (b / c).
+      // Pre-T1-187 a rotated image previewed rotated but compiled as
+      // axis-aligned (or, depending on preflight, was blocked
+      // inconsistently). Either path is a preview ↔ output divergence.
+      // The audit's recommendation: "either fail closed for non-axis-
+      // aligned rasters or implement affine raster sampling." We take
+      // the fail-closed path — it preserves manufacturing intent
+      // (the user's rotation is a real geometric request) without the
+      // multi-week effort of affine scanline emission.
+      const SKEW_EPSILON = 1e-9;
+      if (Math.abs(obj.transform.b) > SKEW_EPSILON || Math.abs(obj.transform.c) > SKEW_EPSILON) {
+        throw new RotatedRasterUnsupportedError({
+          objectId: obj.id,
+          transform: {
+            a: obj.transform.a, b: obj.transform.b,
+            c: obj.transform.c, d: obj.transform.d,
+            tx: obj.transform.tx, ty: obj.transform.ty,
+          },
+        });
+      }
       const sx = obj.transform.a;
       const sy = obj.transform.d;
       const scaleAbsX = Math.abs(sx) || 1;
