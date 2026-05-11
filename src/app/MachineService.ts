@@ -60,6 +60,12 @@ import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
 // (scene/profile/controller/gcode hash) can be tested in isolation.
 // Hashing imports + the ControllerId type moved with the logic.
 import { validateJobTicket } from './validateJobTicket';
+// T1-136: approval-nonce eviction extracted so the TTL + FIFO rules
+// can be unit-tested without mounting the service.
+import {
+  DEFAULT_MAX_CONSUMED_APPROVAL_NONCES,
+  pruneApprovalNonceStore,
+} from './approvalNonceStore';
 import {
   classifyUserCommand,
   MachineCommandGateway,
@@ -174,7 +180,10 @@ export interface JobRecordingSink {
 }
 
 const APPROVAL_TOKEN_TTL_MS = 30_000;
-const MAX_CONSUMED_APPROVAL_NONCES = 512;
+// T1-136: re-export from the helper module so a single source of
+// truth pins the cap. Local alias kept for readability at the call
+// site that initializes the Map's expected hard-cap.
+const MAX_CONSUMED_APPROVAL_NONCES = DEFAULT_MAX_CONSUMED_APPROVAL_NONCES;
 
 function mutatesWorkCoordinateSystem(command: string): boolean {
   return /^G10(?![0-9])/i.test(command) || /^G92(?![0-9])/i.test(command);
@@ -1706,18 +1715,12 @@ export class MachineService {
     };
   }
 
+  // T1-136: delegates to pure pruneApprovalNonceStore. The helper
+  // owns the TTL + FIFO-cap rules; this method now exists only so
+  // existing callers (MachineCommandGateway passes a callback to it)
+  // keep working unchanged.
   private pruneConsumedApprovalNonces(now = Date.now()): void {
-    for (const [nonce, expiresAt] of this.consumedApprovalNonces) {
-      if (expiresAt <= now) {
-        this.consumedApprovalNonces.delete(nonce);
-      }
-    }
-
-    while (this.consumedApprovalNonces.size > MAX_CONSUMED_APPROVAL_NONCES) {
-      const oldest = this.consumedApprovalNonces.keys().next().value;
-      if (typeof oldest !== 'string') break;
-      this.consumedApprovalNonces.delete(oldest);
-    }
+    pruneApprovalNonceStore(this.consumedApprovalNonces, now, MAX_CONSUMED_APPROVAL_NONCES);
   }
 
   /**
