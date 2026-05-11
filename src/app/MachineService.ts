@@ -1544,6 +1544,13 @@ export class MachineService {
 
   async disconnect(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
+    // T1-169 (audit F-013): capture the port at entry so the finally
+    // clause only nulls it if it's still the same reference. Pre-T1-169
+    // a rapid disconnect → connect race could leave the finally
+    // nulling the new port. `connectRealLaser` already used this
+    // compare-and-swap pattern (`if (this.portRef.current === ws)`);
+    // disconnect / emergencyStop now follow suit.
+    const port = this.portRef.current;
     const gatedResult = ctrl ? await this._guardDisconnectStopsJob(ctrl) : null;
     if (gatedResult) return gatedResult;
 
@@ -1608,7 +1615,11 @@ export class MachineService {
         result = makeNotConnectedResult('disconnectSafe');
       }
     } finally {
-      this.portRef.current = null;
+      // T1-169 (audit F-013): compare-and-swap to avoid nulling a
+      // port reference that a racing fresh connect just installed.
+      if (this.portRef.current === port) {
+        this.portRef.current = null;
+      }
       this.clearJobSession();
       // T1-41: invalidate saved-origin G54 snapshot on disconnect.
       // Firmware can lose G54 across power cycles, and a reconnect may
@@ -1662,6 +1673,9 @@ export class MachineService {
 
   async emergencyStop(): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
+    // T1-169 (audit F-013): compare-and-swap pattern — capture the
+    // port at entry and only null it if still the same reference.
+    const port = this.portRef.current;
     let result = makeEmergencyStopResult();
     try {
       if (ctrl) {
@@ -1676,7 +1690,13 @@ export class MachineService {
         message: err instanceof Error ? err.message : String(err),
       });
     } finally {
-      this.portRef.current = null;
+      // T1-169 (audit F-013): only null if the port reference still
+      // matches what we captured at entry. Defends against a racing
+      // fresh connect that landed between operations.emergencyStop()
+      // and the finally clause.
+      if (this.portRef.current === port) {
+        this.portRef.current = null;
+      }
       this.clearJobSession();
       this._savedOriginG54Snapshot = null;
       clearUnsafePriorState();
