@@ -61,6 +61,16 @@ import {
   subdivideCubic,
   subdivideQuadratic,
 } from './bezierFlatten';
+// T1-154: acceleration bounds + plausibility check + clamp helper +
+// mode→type mapping moved to a sibling helper module.
+import {
+  DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2,
+  MAX_PLAUSIBLE_ACCEL_MM_PER_S2,
+  MIN_PLAUSIBLE_ACCEL_MM_PER_S2,
+  clampFiniteNumber,
+  isPlausibleMachineAccel,
+  mapModeToType,
+} from './jobCompilerHelpers';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -88,10 +98,8 @@ export interface CompileJobProgress {
   detail?: string;
 }
 
-/** Min/max plausible acceleration (mm/s²) for controller-reported and profile-sourced values. */
-const MIN_PLAUSIBLE_ACCEL_MM_PER_S2 = 100;
-const MAX_PLAUSIBLE_ACCEL_MM_PER_S2 = 20000;
-const DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2 = 1000;
+// T1-154: acceleration bounds moved to ./jobCompilerHelpers
+// (MIN/MAX_PLAUSIBLE_ACCEL_MM_PER_S2 + DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2).
 
 interface EntitlementPolicy {
   allowTabs: boolean;
@@ -123,20 +131,8 @@ function recordDropped(policy: EntitlementPolicy, feature: string, active: boole
   if (active) policy.droppedFeatures.add(feature);
 }
 
-function isPlausibleMachineAccel(value: number | null | undefined): boolean {
-  return (
-    value != null
-    && Number.isFinite(value)
-    && value >= MIN_PLAUSIBLE_ACCEL_MM_PER_S2
-    && value <= MAX_PLAUSIBLE_ACCEL_MM_PER_S2
-  );
-}
-
-function clampFiniteNumber(value: unknown, min: number, max: number, fallback: number): number {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.max(min, Math.min(max, n));
-}
+// T1-154: isPlausibleMachineAccel + clampFiniteNumber moved to
+// ./jobCompilerHelpers.
 
 /**
  * Picks an acceleration (mm/s²) for acceleration-aware raster power. Controller value wins if
@@ -432,16 +428,7 @@ function compileOperation(
   };
 }
 
-// ─── MODE MAPPING ────────────────────────────────────────────────
-
-function mapModeToType(mode: import('../scene/Layer').LayerMode): OperationType {
-  switch (mode) {
-    case 'cut':     return 'cut';
-    case 'engrave': return 'engrave';
-    case 'score':   return 'score';
-    case 'image':   return 'raster';
-  }
-}
+// T1-154: mapModeToType moved to ./jobCompilerHelpers.
 
 // ─── RESOLVE SETTINGS ────────────────────────────────────────────
 /**
