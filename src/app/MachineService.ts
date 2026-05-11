@@ -870,6 +870,14 @@ export class MachineService {
           saveReplay(replay);
         }
 
+        // T1-176 (external audit Critical #4): capture whether the
+        // host observed the controller actually entering 'run' state
+        // BEFORE we clear `jobObservedRunning` for cleanup. If the
+        // host saw 'run', physical streaming was happening; the
+        // unsafe-prior-state flag MUST survive.
+        const sawRun = this.jobObservedRunning;
+        const controllerThinksRunning = this.controllerRef.current?.isJobRunning === true;
+
         this.activeReplay = null;
         this.currentJobLog = null;
         this.activeTicket = null;
@@ -877,14 +885,30 @@ export class MachineService {
         this.jobObservedRunning = false;
         this.activeJobSessionId = null;
         void this.releaseWakeLock();
-        // T1-29: a failed-start counts as a clean shutdown for the
-        // unsafe-prior-state flag — the job never reached "running" so
-        // there's no in-flight burn to recover from. The error already
-        // surfaced to the caller; the recovery dialog on next launch
-        // would be a confusing duplicate. T2-67's job log/replay
-        // capture + 'failed_to_start' status carries the diagnostic
-        // record forward.
-        clearUnsafePriorState();
+        // T1-29 + T1-176 (external audit Critical #4): pre-T1-176
+        // this branch unconditionally called `clearUnsafePriorState()`
+        // on the assumption that "a failed-start counts as a clean
+        // shutdown because the job never reached running." The audit
+        // pushed back: "failed to start" is inferred from an exception,
+        // not from physical streaming evidence. `executeJob` can set
+        // `_isJobRunning = true` and write the first header lines to
+        // the wire BEFORE throwing on a downstream bounds / status /
+        // transport error. If any byte hit the wire, the recovery
+        // flag must survive to the next launch.
+        //
+        // Strongest positive evidence that NOTHING streamed: the host
+        // never observed 'run' state AND the controller's own
+        // `isJobRunning` flag is false. If either was true, preserve
+        // the flag and warn so support bundles capture the event.
+        if (!sawRun && !controllerThinksRunning) {
+          clearUnsafePriorState();
+        } else {
+          console.warn(
+            `[MachineService] T1-176: failed-start preserves unsafe-prior-state flag `
+            + `(sawRun=${sawRun}, controllerThinksRunning=${controllerThinksRunning}). `
+            + 'Next launch will surface a recovery dialog before further machine commands.',
+          );
+        }
       }
       throw err;
     }
