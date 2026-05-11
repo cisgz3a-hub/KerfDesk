@@ -25,6 +25,14 @@ import type { Scene } from '../core/scene/Scene';
 import type { DeviceProfile } from '../core/devices/DeviceProfile';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
+// T1-181 (external audit High #1 + #3): live-state hashes for the
+// determinism gate. The validator recomputes these at start time and
+// refuses if they diverge from the ticket's compile-time hashes.
+import {
+  captureEntitlementPolicySnapshot,
+  hashEntitlementPolicy,
+  hashReferencedMaterialPresets,
+} from '../core/job/compileInputHashes';
 import type { ControllerId } from '../controllers/ControllerRegistry';
 
 /** Result of validating a `ValidatedJobTicket` against current state. */
@@ -104,6 +112,45 @@ export function validateJobTicket(input: ValidateJobTicketInput): TicketValidati
       reason:
         'The controller type changed after this G-code was created. '
         + 'Update G-code before starting.',
+    };
+  }
+
+  // T1-181 (external audit High #1 + #3): determinism gates.
+  //
+  // Gate 5 (entitlement policy): the 6 feature flags read by
+  // `JobCompiler.createEntitlementPolicy()` at compile time. A
+  // license-state flip between compile and start could mean tabs /
+  // overcut / lead-in / cross-hatch / power-scale / cut-start-point
+  // were dropped during compile but are now active (or vice versa).
+  const currentEntitlementHash = hashEntitlementPolicy(captureEntitlementPolicySnapshot());
+  if (currentEntitlementHash !== ticket.entitlementPolicyHash) {
+    console.warn('[ticket] entitlement policy hash mismatch', {
+      ticketHash: ticket.entitlementPolicyHash,
+      currentHash: currentEntitlementHash,
+    });
+    return {
+      ok: false,
+      reason:
+        'License / feature entitlements changed after this G-code was created. '
+        + 'Recompile so the toolpath reflects the current feature set, then start.',
+    };
+  }
+
+  // Gate 6 (material presets): hash of every preset referenced by
+  // a scene layer at compile time. A preset MUTATION (power curve
+  // edit, speed change, response-curve adjustment) between compile
+  // and start would silently change burn characteristics.
+  const currentMaterialPresetsHash = hashReferencedMaterialPresets(scene);
+  if (currentMaterialPresetsHash !== ticket.materialPresetsHash) {
+    console.warn('[ticket] material presets hash mismatch', {
+      ticketHash: ticket.materialPresetsHash,
+      currentHash: currentMaterialPresetsHash,
+    });
+    return {
+      ok: false,
+      reason:
+        'A material preset used by this design changed after the G-code was created. '
+        + 'Recompile so the toolpath reflects the current preset settings, then start.',
     };
   }
 

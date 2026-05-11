@@ -29,6 +29,11 @@ import {
   hashSceneForTicket,
   hashString,
 } from '../src/core/job/ticketHashing';
+import {
+  captureEntitlementPolicySnapshot,
+  hashEntitlementPolicy,
+  hashReferencedMaterialPresets,
+} from '../src/core/job/compileInputHashes';
 import { validateJobTicket } from '../src/app/validateJobTicket';
 
 let passed = 0;
@@ -84,6 +89,11 @@ function makeTicket(args: {
     sceneHash: hashSceneForTicket(args.scene),
     profileHash: args.profile ? hashObject(args.profile) : hashString('no-profile'),
     gcodeHash: hashString(args.gcodeText),
+    // T1-181 (audit High #1 + #3): live-state hashes pinned to the
+    // scene/entitlement state at ticket-construction time so the
+    // validator's hash-comparison gates pass for ticket-shape tests.
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(args.scene),
     gcodeLines: args.gcodeText.split('\n'),
     gcodeText: args.gcodeText,
     machinePlanBounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },

@@ -15,6 +15,7 @@ import {
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
+import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { createScene } from '../src/core/scene/Scene';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 
@@ -83,6 +84,8 @@ function makeTicket(
   const ticket: ValidatedJobTicket = {
     ticketId: 'tkt_lifecycle',
     sceneHash: hashSceneForTicket(scene),
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
     gcodeLines: [...gcodeLines],

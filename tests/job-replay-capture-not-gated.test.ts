@@ -40,6 +40,7 @@ import {
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
+import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { createScene } from '../src/core/scene/Scene';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { resetJobLogsForTest } from '../src/core/job/JobLog';
@@ -91,6 +92,8 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
   return {
     ticketId: 'tkt_replay_capture',
     sceneHash: hashSceneForTicket(scene),
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString('G0 X1\nM5'),
     gcodeLines: ['G0 X1', 'M5'],

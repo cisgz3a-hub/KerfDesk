@@ -18,6 +18,27 @@ export interface ValidatedJobTicket {
   readonly sceneHash: string;
   readonly profileHash: string;
   readonly gcodeHash: string;
+  /**
+   * T1-181 (external audit High #1 + #3): determinism gate.
+   * Hash of the entitlement-policy snapshot read at compile time
+   * (the 6 boolean feature flags from `canUseFeature`). The
+   * validator recomputes the live hash at start time and refuses
+   * if the entitlement state changed since compile — without this
+   * hash, a license-state flip between compile and start could
+   * silently change the running G-code's feature semantics
+   * (e.g. tabs dropped at compile when the license expired,
+   * license restored before start, user thinks tabs are active).
+   */
+  readonly entitlementPolicyHash: string;
+  /**
+   * T1-181: hash of every material preset referenced by any scene
+   * layer at compile time. Covers the preset's full definition (not
+   * just ID) so a preset MUTATION between compile and start is
+   * detected. Without this hash, editing a material preset's power
+   * curve between compile and start would silently change the
+   * running G-code's burn characteristics.
+   */
+  readonly materialPresetsHash: string;
   readonly gcodeLines: readonly string[];
   readonly gcodeText: string;
   readonly machinePlanBounds: AABB;

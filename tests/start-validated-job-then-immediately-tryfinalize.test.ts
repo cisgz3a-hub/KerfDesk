@@ -17,6 +17,7 @@ import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
+import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 
 let passed = 0;
@@ -57,6 +58,8 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
   return {
     ticketId: 'tkt_tryfin_race',
     sceneHash: hashSceneForTicket(scene),
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
     gcodeLines: [...gcodeLines],

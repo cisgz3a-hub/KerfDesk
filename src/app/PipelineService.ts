@@ -26,6 +26,14 @@ import {
 } from '../controllers/ControllerCapabilities';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
 import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
+// T1-181 (external audit High #1 + #3): determinism gate — hash
+// entitlement-policy + referenced material presets at compile time
+// so the start-time validator can detect input divergence.
+import {
+  captureEntitlementPolicySnapshot,
+  hashEntitlementPolicy,
+  hashReferencedMaterialPresets,
+} from '../core/job/compileInputHashes';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -381,6 +389,12 @@ export async function compileGcode(
     sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcode),
+    // T1-181 (audit High #1 + #3): capture compile-time entitlement
+    // policy AND referenced-material-presets so the start-time
+    // validator can detect divergence. See compileInputHashes.ts for
+    // rationale.
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
     gcodeLines,
     gcodeText: gcode,
     machinePlanBounds: { ...machineTransform.plan.bounds },
