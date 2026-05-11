@@ -519,7 +519,19 @@ function planPath(
             moves.push({ type: 'laserOff' });
             laserIsOn = false;
           }
-          moves.push({ type: 'rapid', to: { x: px, y: py } });
+          // T1-179 (external audit High #7): tab traversal uses G1
+          // (linear feed) with the laser off, NOT G0 (rapid). Pre-
+          // T1-179 this emitted a `rapid` move type, which encodes
+          // as `G0 X.. Y..`. The audit flagged this as High severity:
+          // rapid motion across a tab gap while the head is
+          // mechanically engaged at cutting height can jerk, lose
+          // steps, or produce inaccurate restart points (the planner
+          // assumes the next burn point exists at the post-tab
+          // location, but a step-loss event shifts that location).
+          // Using G1 at the cut feed rate keeps motion kinematically
+          // consistent with the surrounding burn — same acceleration
+          // envelope, same feed budget, no rapid-vs-cut jerk.
+          moves.push({ type: 'linear', to: { x: px, y: py }, power: 0, speed });
         } else {
           if (!laserIsOn) {
             moves.push({ type: 'laserOn', power });
