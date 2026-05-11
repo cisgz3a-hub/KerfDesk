@@ -32,6 +32,9 @@ import {
   settingsLabelStyle,
   settingsStyle,
 } from './layers/layerPanelStyles';
+// T1-142: pure layer add/remove transforms extracted so the naming
+// cycle + last-layer protection + orphan-object cleanup are testable.
+import { addSceneLayer, removeActiveSceneLayer } from './layers/layerTransforms';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -215,33 +218,15 @@ export function LayerPanel({
     }));
   };
 
+  // T1-142: scene mutations delegated to pure helpers.
   const handleAddLayer = useCallback(() => {
-    const nextIndex = scene.layers.length;
-    const modes: LayerMode[] = ['cut', 'engrave', 'score', 'image'];
-    const mode = modes[nextIndex % modes.length];
-    const names = ['Cut', 'Engrave', 'Score', 'Image'];
-    const name = names[nextIndex % names.length] + (nextIndex >= 4 ? ' ' + Math.floor(nextIndex / 4 + 1) : '');
-    const newLayer = createLayer(nextIndex, mode, name);
-    const newScene = {
-      ...scene,
-      layers: [...scene.layers, newLayer],
-      activeLayerId: newLayer.id,
-    };
-    onSceneCommit(newScene);
+    onSceneCommit(addSceneLayer(scene));
   }, [scene, onSceneCommit]);
 
   const handleRemoveLayer = useCallback(() => {
-    if (scene.layers.length <= 1) return;
-    const activeId = scene.activeLayerId;
-    const newLayers = scene.layers.filter(l => l.id !== activeId);
-    const newObjects = scene.objects.filter(o => o.layerId !== activeId);
-    const newScene = {
-      ...scene,
-      layers: newLayers,
-      objects: newObjects,
-      activeLayerId: newLayers[0].id,
-    };
-    onSceneCommit(newScene);
+    const next = removeActiveSceneLayer(scene);
+    if (next === scene) return; // last-layer protection — nothing changed
+    onSceneCommit(next);
   }, [scene, onSceneCommit]);
 
   // T1-141: 8 style constants + iconToggleStyle moved to module
