@@ -297,6 +297,17 @@ export class MachineService {
   // (or the snapshot was invalidated, e.g. by disconnect).
   private _savedOriginG54Snapshot: { x: number; y: number; z: number } | null = null;
 
+  /**
+   * T1-171 (audit F-014): unsubscribe handle for the auto-M5-on-
+   * connect onStateChange listener. The listener auto-unsubscribes
+   * once status reaches 'idle' (the T3-90 fire-or-skip gate). If the
+   * controller is force-disconnected BEFORE reaching idle, the
+   * listener leaks — accumulating one closure per failed connect
+   * cycle. T1-171 holds the unsubscribe here so `disconnect()` and
+   * `emergencyStop()` can clear it on every disconnect path.
+   */
+  private _autoM5Unsubscribe: (() => void) | null = null;
+
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
   private _safetyStateListeners: Set<SafetyStateListener> = new Set();
@@ -1253,6 +1264,16 @@ export class MachineService {
         : null;
     if (getUnsafeAtConnect == null) return;
 
+    // T1-171 (audit F-014): defensively tear down a prior arm before
+    // attaching a fresh listener — connect → connect without an
+    // intervening disconnect cleanup is not a supported flow in
+    // production, but the audit calls out that a force-disconnected
+    // controller can leak its onStateChange closure if the listener
+    // never sees 'idle'. Calling _clearAutoM5Listener here closes
+    // that window. The bulk of the cleanup is in disconnect() /
+    // emergencyStop() which also call this method.
+    this._clearAutoM5Listener();
+
     let unsubscribed = false;
     const unsubscribe = ctrl.onStateChange((state) => {
       if (unsubscribed) return;
@@ -1278,9 +1299,31 @@ export class MachineService {
         /* ignore: auto-M5 is defense-in-depth; primary safety paths
            (T1-22, T1-23, T1-26) cover run-time M-state. */
       } finally {
+        // T1-171: clear the stashed handle once the listener has
+        // fired its one-shot. A double-fire is impossible (the
+        // `unsubscribed` flag above gates it); clearing the handle
+        // here is for accounting — `_clearAutoM5Listener` should be
+        // a no-op after this point.
         unsubscribe();
+        if (this._autoM5Unsubscribe === unsubscribe) {
+          this._autoM5Unsubscribe = null;
+        }
       }
     });
+    this._autoM5Unsubscribe = unsubscribe;
+  }
+
+  /**
+   * T1-171 (audit F-014): tear down the auto-M5-on-connect listener
+   * unconditionally. Called from `disconnect()` and `emergencyStop()`
+   * so a controller that was force-disconnected before reaching idle
+   * doesn't leave its onStateChange closure attached.
+   */
+  private _clearAutoM5Listener(): void {
+    if (this._autoM5Unsubscribe === null) return;
+    const fn = this._autoM5Unsubscribe;
+    this._autoM5Unsubscribe = null;
+    try { fn(); } catch { /* listener may have already detached */ }
   }
 
   /**
@@ -1648,6 +1691,11 @@ export class MachineService {
       if (this.portRef.current === port) {
         this.portRef.current = null;
       }
+      // T1-171 (audit F-014): tear down the auto-M5-on-connect
+      // listener if it's still armed. Without this, a force-
+      // disconnect before the controller reaches 'idle' leaks one
+      // onStateChange closure per cycle.
+      this._clearAutoM5Listener();
       this.clearJobSession();
       // T1-41: invalidate saved-origin G54 snapshot on disconnect.
       // Firmware can lose G54 across power cycles, and a reconnect may
@@ -1725,6 +1773,12 @@ export class MachineService {
       if (this.portRef.current === port) {
         this.portRef.current = null;
       }
+      // T1-171 (audit F-014): tear down the auto-M5-on-connect
+      // listener if it's still armed. Same rationale as in disconnect()
+      // — emergencyStop is one of the paths that can force a
+      // controller into a non-idle terminal state without ever
+      // reporting 'idle'.
+      this._clearAutoM5Listener();
       this.clearJobSession();
       this._savedOriginG54Snapshot = null;
       clearUnsafePriorState();
