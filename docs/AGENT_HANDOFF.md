@@ -9,33 +9,47 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `27ca57bf` (`feat(profile): T1-172 — frame line-delay is profile-
-  driven`). Always verify live HEAD with `git log --oneline -1` before
-  editing.
-- Last shipped roadmap item: **T1-172** (audit F-017 fix — frame
-  line-delay is profile-driven). This session shipped **12
-  consecutive audit-driven tickets** off `docs/AUDIT-2026-05-11.md`:
-  **T1-161** (F-010 + F-052 auto-M5 gateway routing), **T1-162**
-  (F-012 + F-061 stale doc strings), **T1-163** (F-001
-  UnsafeStopOnErrorOverrideToken in interface), **T1-164** (F-011
-  disconnect laserOff routes through notify), **T1-165** (F-029
-  PlanOptimizer mid-op cancel), **T1-166** (F-030 named time-
-  estimation defaults), **T1-167** (F-024 strip comments before
-  defense-in-depth M5 check), **T1-168** (F-025 aggregate template-
-  validation errors + surface warnings), **T1-169** (F-013 portRef
-  compare-and-swap in disconnect / emergencyStop), **T1-170** (F-016
-  rate-limited warn for broken simulator listener), **T1-171** (F-014
-  clear auto-M5 listener on disconnect / emergencyStop), **T1-172**
-  (F-017 frame line-delay is profile-driven). Each ticket landed as
-  a coupled triple: code change + regression test + ROADMAP.md entry
-  with verification, followed by the hash-fill commit. TS baseline 0
-  errors maintained across every commit.
-- Next roadmap item: continue with the remaining audit findings.
-  Still open (medium / low severity, well-scoped): F-022
-  (`confirmPreflightForJobStart` doesn't surface info-severity
-  findings), F-026 (`applyMachineTransform` iterates plan moves THREE
-  times — perf opportunity), F-034 / F-036 / F-048 (small `any`-cast
-  cleanups in `hit-test.ts` / `SceneSerializer.ts` / `SvgParser.ts`).
+  `a66ca17c` (`fix(safety): T1-176 — CRITICAL failed-start preserves
+  unsafe-state when streamed`). Always verify live HEAD with `git log
+  --oneline -1` before editing.
+- Last shipped roadmap item: **T1-176** (external-audit Critical #4
+  fix — failed-start preserves unsafe-prior-state when streaming
+  evidence exists). This session shipped **17 consecutive audit-
+  driven tickets**. The first 12 (T1-161 → T1-172) addressed findings
+  from the internal audit (`docs/AUDIT-2026-05-11.md`); the next 5
+  (T1-173 → T1-176) addressed the **five Critical findings from a
+  separate external audit** (response received 2026-05-11) — every
+  Critical safety defect that audit identified now has a structural
+  fix + regression test:
+  - **T1-173** (external Critical #1): raster overscan as S0 travel.
+    Pre-T1-173 a 3mm overscan engraved 3mm beyond the artwork on every
+    segment edge — the laser fired outside the intended image.
+  - **T1-174** (external Critical #5): WCS query error fails closed.
+    Pre-T1-174 a `$#` error response called `skipWcsNormalization()`
+    which marked placement TRUSTED — saved-origin jobs could start
+    from an unknown WCS offset.
+  - **T1-175** (external Critical #2 + #3): emergencyStop + disconnect-
+    during-job preserve the unsafe-prior-state flag. Pre-T1-175 both
+    paths unconditionally cleared the flag → next launch wouldn't
+    surface a recovery dialog even after E-stop mid-burn.
+  - **T1-176** (external Critical #4): failed-start preserves unsafe-
+    state when ANY streaming evidence exists. Pre-T1-176 the catch
+    cleared the flag based on "exception = job never started" — but
+    if `executeJob` set `_isJobRunning=true` and wrote header lines
+    BEFORE throwing, the recovery flag was lost.
+  Each ticket landed as a coupled triple: code change + regression
+  test + ROADMAP.md entry with verification, followed by the hash-
+  fill commit. TS baseline 0 errors maintained across every commit.
+- Next roadmap item: address the remaining HIGH-severity findings
+  from the external audit (architecture / determinism / scalability
+  items that are NOT immediate physical safety defects but block
+  commercial release). Examples flagged: compile determinism (entitlement
+  + global profile state in `JobCompiler`), fill silent fallback to
+  outline tracing, controller numeric validation at the boundary,
+  G-code emitter state mutation, raster image rotation/skew, vector
+  tab feed semantics. Also still open from the internal audit
+  (medium / low severity, well-scoped): F-022, F-026, F-034 / F-036 /
+  F-048.
   Medium / High blocked by integration work: F-002 (Connection-
   GenerationGuard primitive shipped but never wired), F-004 (T1-22
   ForceSafeState orchestration — needs hardware), F-018 (T3-57
