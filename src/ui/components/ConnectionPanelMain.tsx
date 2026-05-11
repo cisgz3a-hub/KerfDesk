@@ -81,6 +81,9 @@ import {
   samePreflightSummary,
   sameMessages,
 } from './connection/connectionPanelEquality';
+// T1-157: completion beep (WebAudio side-effect) moved to its own
+// module so the panel's render body skips the audio detail.
+import { playCompletionBeep } from './connection/playCompletionBeep';
 import { ReadyToRunPanel, type ReadyToRunPanelData, type ReadyToRunWarning } from './connection/ReadyToRunPanel';
 import { JobPosition, WorkflowSteps } from './connection/Workflow';
 import {
@@ -108,29 +111,7 @@ const CURRENT_MODE_LONG_JOB_TIP_KEY = 'laserforge_current_mode_long_job_tip_ackn
 // / buildReadyOperationRows / frameFailureLogLine all moved to
 // ./connection/connectionPanelLabels.
 
-function playCompletionBeep(): void {
-  try {
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    const audioCtx = new AC();
-    const oscillator = audioCtx.createOscillator();
-    const gain = audioCtx.createGain();
-    oscillator.connect(gain);
-    gain.connect(audioCtx.destination);
-
-    oscillator.frequency.value = 880;
-    oscillator.type = 'sine';
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
-    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.12);
-    gain.gain.setValueAtTime(0.15, audioCtx.currentTime + 0.2);
-    gain.gain.setValueAtTime(0, audioCtx.currentTime + 0.32);
-
-    oscillator.start(audioCtx.currentTime);
-    oscillator.stop(audioCtx.currentTime + 0.4);
-  } catch {
-    /* Audio not available */
-  }
-}
+// T1-157: playCompletionBeep moved to ./connection/playCompletionBeep.
 
 // T1-144: samePreflightSummary + sameMessages moved to
 // ./connection/connectionPanelEquality.
