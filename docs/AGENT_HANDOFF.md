@@ -9,18 +9,29 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `a66ca17c` (`fix(safety): T1-176 — CRITICAL failed-start preserves
-  unsafe-state when streamed`). Always verify live HEAD with `git log
+  `548bc5a5` (`feat(output): T1-182 — HIGH canonical burn-envelope
+  parser for EMITTED gcode`). Always verify live HEAD with `git log
   --oneline -1` before editing.
-- Last shipped roadmap item: **T1-176** (external-audit Critical #4
-  fix — failed-start preserves unsafe-prior-state when streaming
-  evidence exists). This session shipped **17 consecutive audit-
-  driven tickets**. The first 12 (T1-161 → T1-172) addressed findings
-  from the internal audit (`docs/AUDIT-2026-05-11.md`); the next 5
-  (T1-173 → T1-176) addressed the **five Critical findings from a
-  separate external audit** (response received 2026-05-11) — every
-  Critical safety defect that audit identified now has a structural
-  fix + regression test:
+- Last shipped roadmap item: **T1-182** (external-audit High #2 + #8
+  fix — canonical burn-envelope parser for EMITTED gcode). This
+  session shipped **23 consecutive audit-driven tickets**. The first
+  12 (T1-161 → T1-172) addressed findings from the internal audit
+  (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
+  addressed the external audit (response received 2026-05-11) — both
+  its 5 Critical findings AND its 6 High-severity architectural items:
+  - **Critical** (T1-173 → T1-176): raster overscan as S0 travel,
+    WCS query error fails closed, emergencyStop + disconnect preserve
+    unsafe state, failed-start preserves unsafe state when streamed.
+  - **High** (T1-177 → T1-182): fill silent fallback to outline
+    tracing → thrown error (T1-177); controller numeric validation
+    at the boundary (T1-178); tab gaps use G1 feed not G0 rapid
+    (T1-179); G-code emitter purity (zero-distance suppression +
+    footer-preview state snapshot) (T1-180); compile determinism
+    via entitlement + material-preset hashes attached to the ticket
+    (T1-181); canonical burn-envelope parser for the EMITTED gcode
+    (T1-182).
+  Each ticket landed as a coupled triple. TS baseline 0 errors
+  maintained across every commit. Full Critical / High coverage list:
   - **T1-173** (external Critical #1): raster overscan as S0 travel.
     Pre-T1-173 a 3mm overscan engraved 3mm beyond the artwork on every
     segment edge — the laser fired outside the intended image.
@@ -40,16 +51,27 @@ chat transcript.
   Each ticket landed as a coupled triple: code change + regression
   test + ROADMAP.md entry with verification, followed by the hash-
   fill commit. TS baseline 0 errors maintained across every commit.
-- Next roadmap item: address the remaining HIGH-severity findings
-  from the external audit (architecture / determinism / scalability
-  items that are NOT immediate physical safety defects but block
-  commercial release). Examples flagged: compile determinism (entitlement
-  + global profile state in `JobCompiler`), fill silent fallback to
-  outline tracing, controller numeric validation at the boundary,
-  G-code emitter state mutation, raster image rotation/skew, vector
-  tab feed semantics. Also still open from the internal audit
-  (medium / low severity, well-scoped): F-022, F-026, F-034 / F-036 /
-  F-048.
+- Next roadmap item: the external audit's Medium / Low items remain
+  open. Notable remaining structural work explicitly NOT shipped in
+  this arc (deferred to future tickets):
+  - **Preview UI rebuild** to consume `ValidatedJobTicket.
+    emittedBurnBounds` from T1-182. The parser foundation is in
+    place; the simulation overlay still reads from `Plan`.
+  - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
+    remove all global reads (T1-181 ships the detection gate but
+    the compiler still calls `canUseFeature()` / `getActiveProfile()`
+    / `getPresetById()` directly).
+  - **Affine raster sampling** for rotated / skewed images (audit
+    High #6).
+  - **Arc support** in the emitted-gcode parser (T1-182 explicitly
+    excludes G2/G3).
+  - **Per-firmware adapter contract** (`FirmwareAdapter`) for real
+    Marlin / Ruida support (audit High #15).
+  - **Persistent event ledger** + recovery state machine (audit
+    Critical #14 — partial work shipped in T1-175/T1-176; full
+    centralization is a multi-week SafetySupervisor refactor).
+  Also still open from the internal audit (medium / low severity):
+  F-022, F-026, F-034 / F-036 / F-048.
   Medium / High blocked by integration work: F-002 (Connection-
   GenerationGuard primitive shipped but never wired), F-004 (T1-22
   ForceSafeState orchestration — needs hardware), F-018 (T3-57
