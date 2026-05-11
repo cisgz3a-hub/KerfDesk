@@ -28,6 +28,11 @@ import {
   filterValidIds,
   selectAllSelectableIds,
 } from './app/appSelectionHelpers';
+// T2-6 Phase 3v: active-layer-mode derivations extracted.
+import {
+  activeLayerMode as deriveActiveLayerMode,
+  interactableLayerIds as deriveInteractableLayerIds,
+} from './app/appLayerModeHelpers';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { installAppDebugStateGraph } from '../../debug/AppDebugState';
@@ -856,19 +861,16 @@ export function App(): React.ReactElement {
     grbl,
   });
 
-  const activeLayerMode = useMemo(() => {
-    const layer = scene.layers.find(l => l.id === scene.activeLayerId);
-    return layer?.settings.mode ?? scene.layers[0]?.settings.mode ?? 'cut';
-  }, [scene.layers, scene.activeLayerId]);
+  // T2-6 Phase 3v: derivations delegated to pure helpers.
+  const activeLayerMode = useMemo(
+    () => deriveActiveLayerMode(scene),
+    [scene.layers, scene.activeLayerId],
+  );
 
-  const interactableLayerIds = useMemo(() => {
-    const activeLayer = scene.layers.find(l => l.id === scene.activeLayerId);
-    const mode =
-      activeLayer?.settings.mode ?? scene.layers[0]?.settings.mode ?? 'cut';
-    return new Set(
-      scene.layers.filter(l => l.settings.mode === mode).map(l => l.id),
-    );
-  }, [scene.layers, scene.activeLayerId]);
+  const interactableLayerIds = useMemo(
+    () => deriveInteractableLayerIds(scene),
+    [scene.layers, scene.activeLayerId],
+  );
 
   const handleModeTabSelect = useCallback(
     (mode: string) => {
