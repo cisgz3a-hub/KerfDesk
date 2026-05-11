@@ -28,6 +28,18 @@ import {
   validateSceneFileChecksum,
 } from './ProjectIntegrity';
 import { migrateSceneEnvelope } from './migrations/projectMigrations';
+// T1-159: validation + version + base64 helpers extracted so each
+// can be tested without loading the serializer's full import surface
+// (ProjectIntegrity, migrations registry, etc.).
+import {
+  base64ToUint8,
+  fileFormatMajor,
+  fileFormatMinor,
+  uint8ToBase64,
+  validateArray,
+  validateRequired,
+  validateTransform,
+} from './sceneSerializerHelpers';
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
@@ -277,53 +289,12 @@ export function deserializeSceneWithReport(json: string): ProjectLoadReport {
 
 // ─── VALIDATION HELPERS ──────────────────────────────────────────
 
-function validateRequired(obj: any, field: string, expectedType: string): void {
-  if (obj[field] === undefined || obj[field] === null) {
-    throw new Error(`Invalid file: missing required field '${field}'`);
-  }
-  if (typeof obj[field] !== expectedType) {
-    throw new Error(`Invalid file: '${field}' must be ${expectedType}, got ${typeof obj[field]}`);
-  }
-}
-
-function validateArray(obj: any, field: string): void {
-  if (!Array.isArray(obj[field])) {
-    throw new Error(`Invalid file: '${field}' must be an array`);
-  }
-}
-
-/**
- * Validate all 6 transform components are finite numbers.
- * Catches NaN/Infinity from corrupted files before they silently
- * propagate through rendering and toolpath generation.
- */
-function validateTransform(t: any, context: string): void {
-  const fields = ['a', 'b', 'c', 'd', 'tx', 'ty'];
-  for (const f of fields) {
-    if (typeof t[f] !== 'number' || !Number.isFinite(t[f])) {
-      throw new Error(`Invalid file: transform.${f} in ${context} is not a finite number (got ${t[f]})`);
-    }
-  }
-}
+// T1-159: validateRequired / validateArray / validateTransform moved
+// to ./sceneSerializerHelpers.
 
 // ─── MIGRATION / ENVELOPE PARSE ──────────────────────────────────
 
-/** Major version number from envelope `version` (e.g. "1.2" → 1). Missing/empty → 1. */
-function fileFormatMajor(version: unknown): number {
-  if (version == null || version === '') return 1;
-  const s = String(version).trim();
-  const m = /^(\d+)/.exec(s);
-  if (!m) return NaN;
-  return parseInt(m[1], 10);
-}
-
-function fileFormatMinor(version: unknown): number {
-  if (version == null || version === '') return 0;
-  const s = String(version).trim();
-  const m = /^\d+\.(\d+)/.exec(s);
-  if (!m) return 0;
-  return parseInt(m[1], 10);
-}
+// T1-159: fileFormatMajor / fileFormatMinor moved to ./sceneSerializerHelpers.
 
 /** Shared load path after envelope checks (format laserforge, major version 1). */
 function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): Scene {
@@ -581,24 +552,7 @@ function stripObjectCache(obj: SceneObject): any {
 
 // ─── BASE64 HELPERS FOR TYPED ARRAYS ────────────────────────────
 
-function uint8ToBase64(arr: Uint8Array): string {
-  let binary = '';
-  const len = arr.length;
-  for (let i = 0; i < len; i++) {
-    binary += String.fromCharCode(arr[i]);
-  }
-  return btoa(binary);
-}
-
-function base64ToUint8(b64: string): Uint8Array {
-  const binary = atob(b64);
-  const len = binary.length;
-  const arr = new Uint8Array(len);
-  for (let i = 0; i < len; i++) {
-    arr[i] = binary.charCodeAt(i);
-  }
-  return arr;
-}
+// T1-159: uint8ToBase64 / base64ToUint8 moved to ./sceneSerializerHelpers.
 
 /**
  * Encode Uint8Array image buffers as base64 strings for JSON safety.
