@@ -21,6 +21,10 @@ import {
   invertImage,
 } from '../../core/image/ImageProcessing';
 import { warmProcessedImageCache } from '../hooks/useImageCacheWarmer';
+import {
+  applyImageSettingsCommit,
+  applyImageSettingsPreview,
+} from './properties/imageSettingsTransforms';
 import { ditherInWorker } from '../../workers/imagePrepClient';
 import { captureSceneRevision, isSceneStale } from '../hooks/asyncSceneGuard';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
@@ -86,36 +90,19 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   }, [scene, onSceneCommit]);
 
   /** Live preview only: updates brightness/contrast/invert on geometry. Canvas uses ctx.filter; no buffer work, no history. */
+  /**
+   * T1-130: image-settings preview + commit transforms moved to
+   * `properties/imageSettingsTransforms.ts`. The useCallback wrappers
+   * are now thin pass-throughs; the scene-transform logic is
+   * unit-testable in isolation. Behavior is byte-identical to the
+   * pre-T1-130 inline implementation.
+   */
   const previewImageSettings = useCallback(
     (objId: string, field: 'brightness' | 'contrast' | 'gamma' | 'invert', value: number | boolean) => {
       if (!onSceneChange) return;
-      const s = sceneRef.current;
-      const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
-      if (!target) return;
-      const newScene = {
-        ...s,
-        layers: s.layers.map(l => {
-          if (l.id !== target.layerId) return l;
-          return {
-            ...l,
-            settings: {
-              ...l.settings,
-              image: { ...l.settings.image, [field]: value },
-            },
-          };
-        }),
-        objects: s.objects.map(o => {
-          if (o.id !== objId || o.geometry.type !== 'image') return o;
-          const geom = o.geometry as ImageGeometry;
-          return {
-            ...o,
-            geometry: { ...geom, [field]: value } as ImageGeometry,
-            _bounds: null,
-            _worldTransform: null,
-          };
-        }),
-      };
-      onSceneChange(newScene);
+      const next = applyImageSettingsPreview(sceneRef.current, objId, field, value);
+      if (next === sceneRef.current) return; // no-op when target missing
+      onSceneChange(next);
     },
     [onSceneChange],
   );
@@ -123,54 +110,9 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   /** Persist image adjustments on the image layer (compile uses layer + original `grayscaleData` only). */
   const commitImageSettings = useCallback(
     (objId: string, overrides?: Partial<Pick<ImageGeometry, 'brightness' | 'contrast' | 'gamma' | 'invert'>>) => {
-      const s = sceneRef.current;
-      const target = s.objects.find(o => o.id === objId && o.geometry.type === 'image');
-      if (!target || target.geometry.type !== 'image') return;
-      const geom = target.geometry as ImageGeometry;
-      if (!geom.grayscaleData) return;
-
-      const brightness = overrides?.brightness ?? geom.brightness ?? 0;
-      const contrast = overrides?.contrast ?? geom.contrast ?? 0;
-      const gamma = overrides?.gamma ?? geom.gamma ?? 1;
-      const invert = overrides?.invert ?? geom.invert ?? false;
-
-      const newScene = {
-        ...s,
-        layers: s.layers.map(l => {
-          if (l.id !== target.layerId) return l;
-          return {
-            ...l,
-            settings: {
-              ...l.settings,
-              image: {
-                ...l.settings.image,
-                brightness,
-                contrast,
-                gamma,
-                invert,
-              },
-            },
-          };
-        }),
-        objects: s.objects.map(o => {
-          if (o.id !== objId || o.geometry.type !== 'image') return o;
-          return {
-            ...o,
-            geometry: {
-              ...(o.geometry as ImageGeometry),
-              brightness,
-              contrast,
-              gamma,
-              invert,
-              adjustedData: undefined,
-              ditherMode: undefined,
-            } as ImageGeometry,
-            _bounds: null,
-            _worldTransform: null,
-          };
-        }),
-      };
-      onSceneCommit(newScene);
+      const result = applyImageSettingsCommit(sceneRef.current, objId, overrides);
+      if (result === null) return;
+      onSceneCommit(result.scene);
 
       // T1-17 Pass 4c: warm the JobCompiler image-pipeline cache off-thread.
       // Fire-and-forget; the helper re-checks the fingerprint at write time
@@ -179,7 +121,12 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       if (onSceneChange) {
         void warmProcessedImageCache(
           objId,
-          { brightness, contrast, gamma, invert },
+          {
+            brightness: result.brightness,
+            contrast: result.contrast,
+            gamma: result.gamma,
+            invert: result.invert,
+          },
           () => sceneRef.current,
           onSceneChange,
         );
