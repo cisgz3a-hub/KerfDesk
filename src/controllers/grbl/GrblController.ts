@@ -32,6 +32,9 @@ import {
 } from './GrblSettingsParser';
 import { parseGrblG54WcsLine } from './GrblWcsParser';
 import { classifyGrblSafeState } from './GrblSafeStateClassifier';
+// T1-134: pure job-line + OBJ-id marker parser extracted so the
+// gcode-line → object-id mapping contract is unit-testable in isolation.
+import { parseGrblJobLines } from './GrblJobLineParser';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -1013,28 +1016,15 @@ export class GrblController implements GrblControllerApi {
     this._drainQueue();
   }
 
+  // T1-134: delegates to the pure parseGrblJobLines helper. The parser
+  // module owns the grammar (`; OBJ ids=...` comment markers); this
+  // method exists only to satisfy callers that previously held the
+  // private-method reference.
   private _parseJobLines(lines: string[]): {
     jobLines: string[];
     lineMarkers: (readonly string[] | null)[];
   } {
-    const jobLines: string[] = [];
-    const lineMarkers: (readonly string[] | null)[] = [];
-    let pending: readonly string[] | null = null;
-    for (const raw of lines) {
-      const line = raw.trim();
-      if (line.length === 0) continue;
-      if (line.startsWith(';')) {
-        const m = line.match(/^;\s*OBJ\s+ids=(.+)$/i);
-        if (m) {
-          pending = m[1].split(',').map(s => s.trim()).filter(s => s.length > 0);
-        }
-        continue;
-      }
-      jobLines.push(line);
-      lineMarkers.push(pending);
-      pending = null;
-    }
-    return { jobLines, lineMarkers };
+    return parseGrblJobLines(lines);
   }
 
   /**
