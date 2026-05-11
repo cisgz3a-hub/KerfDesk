@@ -36,6 +36,43 @@ import type {
   SafetyState,
 } from './SafetyStateMachine';
 import type { BurnState } from './MachineService';
+import type { LaserController } from '../controllers/ControllerInterface';
+
+/**
+ * Tri-state ("yes/no/unknown") for whether the controller is known
+ * to halt its active job on USB disconnect. Used by MachineService's
+ * disconnect-during-job guard.
+ */
+export type DisconnectStopsJobValue = boolean | 'unknown';
+
+/**
+ * Controller capability advert shape used by T1-155's resolver.
+ * Casts are used because the production `LaserController` interface
+ * doesn't carry this shape — adapters declare it on a per-family
+ * basis.
+ */
+type DisconnectSafetyAwareController = LaserController & {
+  capabilities?: {
+    safety?: {
+      disconnectStopsJob?: DisconnectStopsJobValue;
+    };
+  };
+};
+
+/**
+ * Resolve whether a controller halts its active job on USB
+ * disconnect. Honors a declared `capabilities.safety.disconnectStopsJob`
+ * field; otherwise falls back to a per-family default — GRBL and
+ * gcode-line-stream controllers default to `true` (the firmware
+ * stops streaming and motion when the port closes), other families
+ * fall back to `'unknown'` so the service can route through a
+ * `disconnectDuringJob` recovery state.
+ */
+export function controllerDisconnectStopsJob(ctrl: LaserController): DisconnectStopsJobValue {
+  const declared = (ctrl as DisconnectSafetyAwareController).capabilities?.safety?.disconnectStopsJob;
+  if (declared === true || declared === false || declared === 'unknown') return declared;
+  return ctrl.family === 'grbl' || ctrl.family === 'gcode-line-stream' ? true : 'unknown';
+}
 
 /**
  * Returns true if `command` is a G-code that mutates the work

@@ -16,12 +16,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { SafetyActionResult } from '../src/app/SafetyActionResult';
 import {
+  controllerDisconnectStopsJob,
   createApprovalNonce,
   emptyBurnState,
   mutatesWorkCoordinateSystem,
   safetyResultForStateMachine,
   safetyStatesEqual,
 } from '../src/app/machineServiceHelpers';
+import type { LaserController } from '../src/controllers/ControllerInterface';
 
 let passed = 0;
 let failed = 0;
@@ -142,6 +144,39 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
   assert(s.activeIds !== s2.activeIds, 'each call returns a fresh Set instance');
 }
 
+// -------- T1-155: controllerDisconnectStopsJob --------
+{
+  // Declared = true → returns true
+  const grbl = { family: 'grbl', capabilities: { safety: { disconnectStopsJob: true } } } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(grbl) === true,
+    'declared true → true');
+
+  // Declared = false → returns false (even for grbl family)
+  const grblFalse = { family: 'grbl', capabilities: { safety: { disconnectStopsJob: false } } } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(grblFalse) === false,
+    'declared false → false (overrides family default)');
+
+  // Declared = 'unknown' → returns 'unknown'
+  const grblUnknown = { family: 'grbl', capabilities: { safety: { disconnectStopsJob: 'unknown' } } } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(grblUnknown) === 'unknown',
+    'declared unknown → unknown');
+
+  // No declaration + grbl family → true (default)
+  const grblBare = { family: 'grbl' } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(grblBare) === true,
+    'grbl family + no declaration → true (family default)');
+
+  // No declaration + gcode-line-stream family → true
+  const gls = { family: 'gcode-line-stream' } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(gls) === true,
+    'gcode-line-stream family + no declaration → true');
+
+  // No declaration + unknown family → 'unknown'
+  const marlin = { family: 'marlin' } as unknown as LaserController;
+  assert(controllerDisconnectStopsJob(marlin) === 'unknown',
+    'marlin family + no declaration → unknown');
+}
+
 // -------- Source-level pin: MachineService delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -164,6 +199,9 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
     'inline createApprovalNonce is gone');
   assert(!/^function emptyBurnState/m.test(svcSrc),
     'inline emptyBurnState is gone');
+  // T1-155
+  assert(!/^function controllerDisconnectStopsJob/m.test(svcSrc),
+    'inline controllerDisconnectStopsJob is gone (T1-155)');
 
   const helperSrc = readFileSync(
     resolve(here, '../src/app/machineServiceHelpers.ts'),
@@ -177,6 +215,7 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
     'safetyStatesEqual',
     'createApprovalNonce',
     'emptyBurnState',
+    'controllerDisconnectStopsJob',
   ]) {
     const re = new RegExp(`export function ${name}`);
     assert(re.test(helperSrc),

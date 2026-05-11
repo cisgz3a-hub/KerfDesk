@@ -69,12 +69,15 @@ import {
 // T1-145: misc pure helpers (G10/G92 detection, safety-result
 // translation, structural state equality, nonce factory, burn-state
 // factory) moved to a sibling module for independent testability.
+// T1-155: controllerDisconnectStopsJob also moved there.
 import {
+  controllerDisconnectStopsJob,
   createApprovalNonce,
   emptyBurnState,
   mutatesWorkCoordinateSystem,
   safetyResultForStateMachine,
   safetyStatesEqual,
+  type DisconnectStopsJobValue,
 } from './machineServiceHelpers';
 import {
   classifyUserCommand,
@@ -139,8 +142,12 @@ export type ActiveOperationKind =
   | 'autoFocus'
   | 'setOrigin';
 
-type DisconnectStopsJobValue = boolean | 'unknown';
-
+// T1-155: DisconnectStopsJobValue + controllerDisconnectStopsJob
+// moved to ./machineServiceHelpers. The local
+// DisconnectSafetyAwareController interface stays because
+// _guardDisconnectStopsJob uses its `safetyOps.abortJob` field
+// directly — adding it to the helper's interface would couple the
+// helper module to non-resolver concerns.
 type DisconnectSafetyAwareController = LaserController & {
   capabilities?: {
     safety?: {
@@ -151,12 +158,6 @@ type DisconnectSafetyAwareController = LaserController & {
     abortJob?: (urgency: 'urgent') => Promise<SafetyActionResult>;
   };
 };
-
-function controllerDisconnectStopsJob(ctrl: LaserController): DisconnectStopsJobValue {
-  const declared = (ctrl as DisconnectSafetyAwareController).capabilities?.safety?.disconnectStopsJob;
-  if (declared === true || declared === false || declared === 'unknown') return declared;
-  return ctrl.family === 'grbl' || ctrl.family === 'gcode-line-stream' ? true : 'unknown';
-}
 
 /**
  * T2-11: snapshot of the active operation. `null` means no operation is
