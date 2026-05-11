@@ -236,10 +236,22 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       // The strict FOOTER_MISSING_M5 validator blocks malformed custom
       // footers before job start, but this keeps every encoded artifact
       // safe even if a future path bypasses that validator.
+      //
+      // T1-167 (audit F-024): strip GRBL comments before the regex.
+      // Pre-T1-167 the scan ran against the raw tail, so a user
+      // template ending `; remember to send M5` (or `(M5 reminder)`)
+      // would falsely match `\bM5\b` and skip the defense-in-depth
+      // append — leaving the laser ON at job end if T2-14's footer
+      // was also bypassed. Strip line-comments (`;` to EOL) AND
+      // parenthesized comments (`(...)`) so only executable g-code
+      // tokens reach the regex.
       const tailNonEmpty = lines
         .filter(l => l.trim().length > 0)
         .slice(-5);
-      if (!/\bM5\b/i.test(tailNonEmpty.join('\n'))) {
+      const tailCodeOnly = tailNonEmpty
+        .map(l => l.replace(/\([^)]*\)/g, '').replace(/;.*$/, ''))
+        .join('\n');
+      if (!/\bM5\b/i.test(tailCodeOnly)) {
         throwIfOutputAborted(options?.signal);
         lines.push('M5 S0 ; T1-26 defense-in-depth laser-off');
       }

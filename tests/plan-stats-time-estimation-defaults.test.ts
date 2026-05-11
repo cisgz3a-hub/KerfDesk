@@ -75,12 +75,20 @@ console.log('\n=== T1-166 PlanOptimizer time-estimation named-constant defaults 
   // This is the cross-file regression bait. If a future edit ever
   // makes them equal, the rationale (different purpose) needs to be
   // re-evaluated rather than silently following along.
+  //
+  // Both constants are typed as literal values (`as 500` / `as 1000`),
+  // so a direct `!==` is statically true-narrowed and TS warns about
+  // a "useless comparison". Widen to `number` at the read site so the
+  // assertion remains a real runtime check (a future change of either
+  // literal value would surface here).
+  const planAccel: number = DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2;
+  const rasterAccel: number = DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2;
   assert(
-    DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2 !== DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2,
-    `time-estimation default (${DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2}) is intentionally distinct from raster velocity-curve default (${DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2})`,
+    planAccel !== rasterAccel,
+    `time-estimation default (${planAccel}) is intentionally distinct from raster velocity-curve default (${rasterAccel})`,
   );
   assert(
-    DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2 < DEFAULT_RASTER_MAX_ACCEL_MM_PER_S2,
+    planAccel < rasterAccel,
     `time-estimation default is conservatively LOWER than raster velocity-curve default (overestimates burn time, the user-friendly direction)`,
   );
 }

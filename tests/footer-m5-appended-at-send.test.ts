@@ -23,7 +23,15 @@ function appendM5IfMissing(linesIn: string[]): string[] {
     .filter(line => line.trim().length > 0)
     .slice(-5);
 
-  if (!/\bM5\b/i.test(tailNonEmpty.join('\n'))) {
+  // T1-167 (audit F-024): mirror production by stripping `;` line-
+  // comments AND `(...)` parenthesized comments before the regex.
+  // Pre-T1-167 a user template ending `; remember to send M5` would
+  // falsely match and skip the append.
+  const tailCodeOnly = tailNonEmpty
+    .map(line => line.replace(/\([^)]*\)/g, '').replace(/;.*$/, ''))
+    .join('\n');
+
+  if (!/\bM5\b/i.test(tailCodeOnly)) {
     lines.push('M5 S0 ; T1-26 defense-in-depth laser-off');
   }
 
@@ -106,13 +114,36 @@ console.log('\n=== T1-26 footer M5 append at send ===\n');
 }
 
 {
+  // T1-167 (audit F-024): post-fix behavior. M5 mentioned only inside
+  // a `;` line-comment is documentation, not a real laser-off command.
+  // The defense-in-depth scan strips comments first and DOES append a
+  // real M5 in this case. Pre-T1-167 this test asserted the opposite
+  // (and was codifying the bug — the laser would have stayed ON if
+  // T2-14's safety footer was also bypassed).
   const result = appendM5IfMissing([
     'G1 X10 Y10',
     'M2 ; M5 was here',
   ]);
   assertContract(
-    result.filter(line => /\bM5\b/i.test(line)).length === 1,
-    'M5 in comment text: lenient scan does not double-append',
+    result.filter(line => /\bM5\b/i.test(line)).length === 2
+      && /M5 S0/.test(result[result.length - 1] ?? '')
+      && /T1-26/.test(result[result.length - 1] ?? ''),
+    'M5 only in a `;` comment: T1-167 strips comments → defense-in-depth append fires',
+  );
+}
+
+{
+  // T1-167 (audit F-024): same coverage for parenthesized comments,
+  // GRBL's other comment syntax. `(M5)` is documentation, not code.
+  const result = appendM5IfMissing([
+    'G1 X10 Y10',
+    'M2 (M5 reminder)',
+  ]);
+  assertContract(
+    result.filter(line => /\bM5\b/i.test(line)).length === 2
+      && /M5 S0/.test(result[result.length - 1] ?? '')
+      && /T1-26/.test(result[result.length - 1] ?? ''),
+    'M5 only in a `(...)` comment: T1-167 strips comments → defense-in-depth append fires',
   );
 }
 
