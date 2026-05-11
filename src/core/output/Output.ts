@@ -261,9 +261,34 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
       lines.push('');
       throwIfOutputAborted(options?.signal);
+      // T1-180 (external audit High #5): snapshot the encoder's
+      // mutable modal state BEFORE the preview-pass encodeFooter
+      // call. Pre-T1-180 encodeFooter was invoked twice — once to
+      // count footer lines (so the second call could pass the real
+      // `totalLines` to the footer template), then once to emit the
+      // final footer. Both calls go through `encodeRapid` for the
+      // return-to-origin move, which mutates `_prevPos` /
+      // `currentSpeed`. The preview-pass mutation leaked into the
+      // final-pass emission: if the footer template produced
+      // different content based on `totalLines` (e.g. relative-mode
+      // return distances), the final pass started from a state
+      // already-mutated by the preview pass and could emit
+      // inconsistent geometry. The audit flagged this as High
+      // severity (output determinism).
+      const stateSnapshot = {
+        prevPos: { x: this._prevPos.x, y: this._prevPos.y },
+        prevZ: this._prevZ,
+        currentSpeed: this.currentSpeed,
+      };
       const previewFooter = this.encodeFooter(job, options, lines.length + 1);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
       const totalLines = lines.length + footerLineCount;
+      // Restore the snapshot so the final encodeFooter sees the same
+      // state the operations loop left behind, not the preview-pass
+      // residue. Output stays deterministic.
+      this._prevPos = { x: stateSnapshot.prevPos.x, y: stateSnapshot.prevPos.y };
+      this._prevZ = stateSnapshot.prevZ;
+      this.currentSpeed = stateSnapshot.currentSpeed;
       const footer = this.encodeFooter(job, options, totalLines);
       const footerLines = footer.split(/\r?\n/);
       for (let i = 0; i < footerLines.length; i++) {
@@ -402,6 +427,25 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   encodeLinear(to: { x: number; y: number }, power: number, speed: number): string {
     const eps = BaseGCodeStrategy._posEps;
+    // T1-180 (external audit High #5): suppress zero-distance G1
+    // moves regardless of mode. Pre-T1-180 the absolute-mode branch
+    // emitted `G1 X.. Y.. S<power>` even when (to.x, to.y) ===
+    // _prevPos; the relative-mode branch built up an emission like
+    // `G1 F<speed> S<power>` (no X/Y components). Both produce
+    // **stationary** nonzero-power motion — the planner sits at one
+    // point with the laser on at full power, which is a dwell-burn
+    // and can scorch / through-cut material. The audit flagged this
+    // as High severity. Post-T1-180 we return a documenting comment
+    // so the line accounting (line count, byte count) still works
+    // but no motion / power command reaches the firmware.
+    const dx = to.x - this._prevPos.x;
+    const dy = to.y - this._prevPos.y;
+    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
+      return `; G1 skipped (zero distance — would dwell-burn at S${
+        Math.max(0, Math.round((power / 100) * this._maxSpindle))
+      } if emitted)`;
+    }
+
     if (!this._relative) {
       this._prevPos = { x: to.x, y: to.y };
       const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
@@ -413,22 +457,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       return parts.join(' ');
     }
 
-    const dx = to.x - this._prevPos.x;
-    const dy = to.y - this._prevPos.y;
     this._prevPos = { x: to.x, y: to.y };
 
     const parts: string[] = ['G1'];
     if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
     if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
-
-    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
-      if (speed !== this.currentSpeed) {
-        parts.push(`F${speed.toFixed(0)}`);
-        this.currentSpeed = speed;
-      }
-      parts.push(this.encodePowerValue(power));
-      return parts.length > 1 ? parts.join(' ') : '; G1 skipped (no motion)';
-    }
 
     if (speed !== this.currentSpeed) {
       parts.push(`F${speed.toFixed(0)}`);
