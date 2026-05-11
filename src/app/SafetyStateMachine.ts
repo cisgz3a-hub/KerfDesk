@@ -14,9 +14,15 @@
  * adds that distinction explicitly.
  *
  * T2-44 ships the 10-kind union + the transition function consuming
- * `SafetyActionResult` (T2-41). Wiring the machine into MachineService
- * is filed as T2-44-followup since it touches every safety method
- * caller.
+ * `SafetyActionResult` (T2-41). T2-44 status (T1-162 update): the
+ * wiring is complete. `MachineService._recordSafetyResult` calls
+ * `transitionFromSafetyResult` for every pause / resume / stop /
+ * emergencyStop / disconnect outcome and updates `_safetyState` so
+ * the UI can subscribe via `onSafetyStateChange`. The original
+ * "Wiring the machine into MachineService is filed as
+ * T2-44-followup" sentence was true at T2-44-shipped time but is
+ * stale; the audit (docs/AUDIT-2026-05-11.md F-012) flagged the
+ * drift.
  *
  * Pairs with T2-12 (canonical machine state — connect/idle/run);
  * T2-44 zooms in on the SAFETY-OPERATION transitions that wrap each

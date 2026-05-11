@@ -12,13 +12,16 @@
  * post-mortem analysis, the void return loses information the
  * caller could meaningfully use."
  *
- * This commit ships the **type + a focused MVP migration** for
- * `MachineService.stopAndEnsureLaserOff`. The other safety methods
- * (pause / resume / disconnect / emergencyStop) stay void for now;
- * each migration is an interface change that touches every caller,
- * and the audit's blast radius is too large for a single commit.
- * T2-41-followup migrates the remaining methods one-by-one with
- * paired tests.
+ * T2-41 status (T1-162 update): the migration is complete.
+ * `GrblController.pause / resume / stop / emergencyStop / safetyOff /
+ * acknowledgeFault` all return `SafetyActionResult` (or the
+ * structured `{stage, error}` shape for safetyOff) today.
+ * `MachineService.disconnect / emergencyStop` capture the result and
+ * route through `_recordSafetyResult` into the T2-44 state machine.
+ * The original "T2-41-followup migrates the remaining methods one-
+ * by-one" sentence was true at T2-41-shipped time but is stale post
+ * T2-12 + T2-44 wave; the audit (docs/AUDIT-2026-05-11.md F-012)
+ * flagged the drift.
  */
 
 export type SafetyAction =
