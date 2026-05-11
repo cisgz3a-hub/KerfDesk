@@ -50,6 +50,9 @@ import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOf
 import { computeSmartOverscan } from '../plan/SmartOverscan';
 import { getPresetById } from '../materials/MaterialLibrary';
 import { canUseFeature } from '../../entitlements';
+// T1-147: pure compound-role inference + point-in-polygon test
+// extracted so the topology classification can be tested in isolation.
+import { inferCompoundRoles } from './compoundRoles';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -859,37 +862,7 @@ function flattenObjectAsCompound(
   });
 }
 
-function inferCompoundRoles(groups: readonly PointGroup[]): ContourRole[] {
-  return groups.map((group, index) => {
-    if (!group.closed) return 'open';
-
-    const sample = group.points[0];
-    let depth = 0;
-    for (let i = 0; i < groups.length; i++) {
-      if (i === index) continue;
-      const candidate = groups[i];
-      if (!candidate.closed || candidate.points.length < 3) continue;
-      if (pointInPointGroup(sample, candidate.points)) depth++;
-    }
-
-    if (depth % 2 === 1) return 'hole';
-    return depth === 0 ? 'outer' : 'island';
-  });
-}
-
-function pointInPointGroup(point: Point, polygon: readonly Point[]): boolean {
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x;
-    const yi = polygon[i].y;
-    const xj = polygon[j].x;
-    const yj = polygon[j].y;
-    const intersects = (yi > point.y) !== (yj > point.y) &&
-      point.x < ((xj - xi) * (point.y - yi)) / (yj - yi || 1e-12) + xi;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
+// T1-147: inferCompoundRoles + pointInPointGroup moved to ./compoundRoles.
 
 // ─── GEOMETRY TO POINTS ──────────────────────────────────────────
 
