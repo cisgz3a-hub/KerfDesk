@@ -95,30 +95,16 @@ export function resetMaterialPresetsForTest(): void {
   _userMaterialsInitPromise = null;
 }
 
-interface LaserOp {
-  power: number;
-  speed: number;
-  passes: number;
-}
-
-/** Per-machine preset row: cut + engrave always; score derived from cut if omitted. */
-export type MaterialPresetOps = { cut: LaserOp; engrave: LaserOp; score?: LaserOp };
-
-function deriveScoreFromCut(cut: LaserOp): LaserOp {
-  return {
-    power: Math.max(1, Math.min(100, Math.round(cut.power * 0.2))),
-    speed: Math.min(6000, Math.max(2000, Math.round(cut.speed * 4))),
-    passes: 1,
-  };
-}
-
-function normalizePresetOps(ops: { cut: LaserOp; engrave: LaserOp; score?: LaserOp }): MaterialPresetOps {
-  return {
-    cut: ops.cut,
-    engrave: ops.engrave,
-    score: ops.score ?? deriveScoreFromCut(ops.cut),
-  };
-}
+// T1-160: LaserOp / MaterialPresetOps / deriveScoreFromCut /
+// normalizePresetOps moved to ./presetOpsHelpers. Internal callers
+// use the imported names; public surface preserved via re-export.
+import {
+  type LaserOp,
+  type MaterialPresetOps,
+  deriveScoreFromCut,
+  normalizePresetOps,
+} from './presetOpsHelpers';
+export type { MaterialPresetOps };
 
 export const MATERIAL_CATEGORIES = [
   'Wood', 'Plywood', 'MDF', 'Acrylic', 'Leather',
