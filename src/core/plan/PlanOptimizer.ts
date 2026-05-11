@@ -114,7 +114,13 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
 
   for (let operationIndex = 0; operationIndex < operationCount; operationIndex++) {
     const operation = job.operations[operationIndex];
-    const planned = planOperation(operation, currentPos);
+    // T1-165 (audit F-029): thread the signal into planOperation so
+    // inner scanline / fill / path loops can check cooperatively.
+    // Pre-T1-165 throwIfOptimizeAborted ran only between operations,
+    // so a 12MP raster (millions of moves in one operation) had to
+    // finish before cancel could land — 5–30 s of unresponsive UI
+    // after the cancel click.
+    const planned = planOperation(operation, currentPos, config?.signal);
     if (planned.length === 0) continue;
 
     for (let i = 0; i < planned.length; i++) {
@@ -170,7 +176,8 @@ function reportOptimizeProgress(
  */
 function planOperation(
   operation: Operation,
-  startPos: Point
+  startPos: Point,
+  signal?: AbortSignal,
 ): PlannedOperation[] {
   const results: PlannedOperation[] = [];
   const settings = operation.settings;
@@ -200,7 +207,8 @@ function planOperation(
       const rasterMoves = planRasterOperation(
         operation.geometry.bitmap,
         settings,
-        pos
+        pos,
+        signal,
       );
       for (let i = 0; i < rasterMoves.length; i++) {
         moves.push(rasterMoves[i]);
@@ -216,6 +224,7 @@ function planOperation(
         settings,
         pos,
         operation.geometry.compoundPaths,
+        signal,
       );
       for (let i = 0; i < fillMoves.length; i++) {
         moves.push(fillMoves[i]);
@@ -231,8 +240,11 @@ function planOperation(
           operation.type === 'cut',
         );
         for (const { path, reversed } of ordered) {
+          // T1-165: check between paths so cancel lands within ~1 path
+          // of click even when the operation contains thousands of paths.
+          throwIfOptimizeAborted(signal);
           moves.push({ type: 'marker', sourceObjectIds: [path.id] });
-          const pathMoves = planPath(path, reversed, settings);
+          const pathMoves = planPath(path, reversed, settings, signal);
           for (let i = 0; i < pathMoves.length; i++) {
             moves.push(pathMoves[i]);
           }
@@ -273,8 +285,14 @@ function planOperation(
 function planPath(
   path: FlatPath,
   reversed: boolean,
-  settings: ResolvedLaserSettings
+  settings: ResolvedLaserSettings,
+  signal?: AbortSignal,
 ): Move[] {
+  // T1-165: a single path is usually small (10–10k points) but bezier-
+  // tessellated curves can hit 100k+. Check at entry so a cancel before
+  // we begin still aborts; the inner segment loop is tight enough that
+  // a single per-path check is the right granularity.
+  throwIfOptimizeAborted(signal);
   const coords = path.coords;
   const n = coords.length / 2;
   if (n < 2) return [];
@@ -518,6 +536,7 @@ function planFillOperation(
   settings: ResolvedLaserSettings,
   startPos: Point,
   compoundPaths?: readonly CompoundPath[],
+  signal?: AbortSignal,
 ): Move[] {
   const fillMode = settings.fillMode ?? 'line';
   const baseAngle = settings.fillAngle;
@@ -577,6 +596,11 @@ function planFillOperation(
   moves.push({ type: 'laserOn', power: 0 });
 
   for (const row of allRows) {
+    // T1-165 (audit F-029): cancel-aware per-row check. Large fills
+    // can produce 10k+ rows × 100s of segments — checking once per
+    // row bounds cancel latency at one row of planning work (~ms),
+    // not the whole operation.
+    throwIfOptimizeAborted(signal);
     // 1. Rapid to the overscan start position (G0 — laser auto-off in M4 mode)
     moves.push({
       type: 'rapid',
@@ -673,7 +697,8 @@ function planFillOperation(
 function planRasterOperation(
   bitmap: import('../job/Job').ProcessedBitmap,
   settings: ResolvedLaserSettings,
-  startPos: Point
+  startPos: Point,
+  signal?: AbortSignal,
 ): Move[] {
   const rasterSettings: RasterSettings = {
     powerMin: settings.powerMin,
@@ -703,6 +728,12 @@ function planRasterOperation(
 
   for (const scanline of scanlines) {
     if (scanline.segments.length === 0) continue;
+    // T1-165 (audit F-029): cancel-aware per-scanline check. A 12MP
+    // photo produces ~4000 scanlines × 100–1000 segments — the inner
+    // segment loop here is ~0.1–1ms per scanline, so checking once
+    // per scanline lands a cancel within ~ms instead of waiting
+    // 5–30s for the whole raster operation to finish.
+    throwIfOptimizeAborted(signal);
 
     // Apply per-speed scanning offset to every segment in this row up
     // front so the gap-bridge logic below uses the adjusted endpoints
