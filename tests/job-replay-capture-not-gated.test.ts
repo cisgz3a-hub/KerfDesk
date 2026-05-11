@@ -95,6 +95,7 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(scene),
     emittedBurnBounds: null,
+    burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString('G0 X1\nM5'),
     gcodeLines: ['G0 X1', 'M5'],

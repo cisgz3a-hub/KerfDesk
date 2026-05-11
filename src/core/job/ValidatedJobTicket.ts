@@ -7,6 +7,7 @@ import type { MachineTransformResult } from '../plan/MachineTransform';
 import type { AABB } from '../types';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { ControllerId } from '../../controllers/ControllerRegistry';
+import type { BurnEnvelopeDivergenceReport } from '../output/burnEnvelopeDivergence';
 
 /**
  * Collision-resistant fingerprint of inputs that produced a compiled G-code
@@ -54,6 +55,15 @@ export interface ValidatedJobTicket {
    * support diagnostics, preview rebuild).
    */
   readonly emittedBurnBounds: AABB | null;
+  /**
+   * T1-188 (external audit High #2 + #8 wiring): compile-time
+   * consistency report between the plan-derived burn envelope and
+   * the emitted-gcode burn envelope. `null` when they agree within
+   * tolerance (0.5 mm per AABB edge); otherwise a structured report
+   * carrying the mismatch kind + deltas + move counts so support
+   * tooling can diagnose encoder regressions.
+   */
+  readonly burnEnvelopeDivergence: BurnEnvelopeDivergenceReport | null;
   readonly gcodeLines: readonly string[];
   readonly gcodeText: string;
   readonly machinePlanBounds: AABB;

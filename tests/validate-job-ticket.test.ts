@@ -95,6 +95,7 @@ function makeTicket(args: {
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(args.scene),
     emittedBurnBounds: null,
+    burnEnvelopeDivergence: null,
     gcodeLines: args.gcodeText.split('\n'),
     gcodeText: args.gcodeText,
     machinePlanBounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },

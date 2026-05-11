@@ -40,6 +40,12 @@ import {
 // real post-emission geometry, addressing the audit's "preview may
 // not match the actual program" framing.
 import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
+// T1-188 (external audit High #2 + #8 wiring): consistency gate
+// between plan-derived burn envelope and emitted-gcode burn envelope.
+// Catches encoder bugs (pre-T1-173 raster overscan, pre-T1-180
+// zero-distance dwell-burn) at compile time, before the ticket is
+// presented for approval.
+import { checkBurnEnvelopeDivergence } from '../core/output/burnEnvelopeDivergence';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -407,6 +413,26 @@ export async function compileGcode(
     // output cannot diverge silently. See emittedBurnEnvelope.ts
     // for the parser.
     emittedBurnBounds: analyzeEmittedBurnEnvelope(gcode).burnBounds,
+    // T1-188 (audit High #2 + #8 wiring): compile-time consistency
+    // check between the plan's burn envelope and the emitted gcode's
+    // burn envelope. Null when they agree within tolerance (0.5 mm
+    // per AABB edge); otherwise a structured report carrying the
+    // mismatch kind + deltas for support-bundle diagnosis. Logged
+    // via console.warn so support tooling captures the divergence
+    // event even when no listener consumes the ticket field.
+    burnEnvelopeDivergence: (() => {
+      const report = checkBurnEnvelopeDivergence(machineTransform.plan, gcode);
+      if (report !== null) {
+        console.warn(
+          `[T1-188] Burn-envelope divergence detected (kind=${report.kind}, `
+          + `maxEdgeDeltaMm=${report.maxEdgeDeltaMm.toFixed(3)}, `
+          + `planMoves=${report.planBurnMoveCount}, emittedMoves=${report.emittedBurnMoveCount}). `
+          + 'The emitted gcode produces a different burn region than the planned preview. '
+          + 'Check the encoder for new bugs introduced by recent edits.',
+        );
+      }
+      return report;
+    })(),
     gcodeLines,
     gcodeText: gcode,
     machinePlanBounds: { ...machineTransform.plan.bounds },

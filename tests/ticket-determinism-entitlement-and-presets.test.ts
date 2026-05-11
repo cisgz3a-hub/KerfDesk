@@ -109,6 +109,7 @@ console.log('\n=== T1-181 compile determinism: entitlement + material-preset has
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(scene),
     emittedBurnBounds: null,
+    burnEnvelopeDivergence: null,
     gcodeLines: ['G0 X1'],
     gcodeText: 'G0 X1',
     machinePlanBounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },
