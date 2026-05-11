@@ -25,6 +25,17 @@ import {
   applyImageSettingsCommit,
   applyImageSettingsPreview,
 } from './properties/imageSettingsTransforms';
+import {
+  containerStyle,
+  dividerStyle,
+  emptyStateStyle,
+  inputStyle,
+  labelStyle,
+  rowStyle,
+  sectionHeaderStyle,
+  selectStyle,
+  traceButtonStyle,
+} from './properties/propertiesPanelStyles';
 import { ditherInWorker } from '../../workers/imagePrepClient';
 import { captureSceneRevision, isSceneStale } from '../hooks/asyncSceneGuard';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
@@ -313,79 +324,11 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     }
   }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, deleteImageAfterTrace, onSceneCommit, onSelectionChange, showAlert]);
 
-  const containerStyle: React.CSSProperties = {
-    padding: '10px 12px',
-    fontFamily: theme.font.ui,
-    color: theme.text.secondary,
-  };
-
-  const labelStyle: React.CSSProperties = {
-    fontSize: theme.font.size.xs,
-    color: theme.text.secondary,
-    fontFamily: theme.font.ui,
-    marginBottom: 2,
-  };
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '4px 8px',
-    background: theme.bg.base,
-    border: `1px solid ${theme.border.default}`,
-    borderRadius: theme.radius.sm,
-    color: theme.text.primary,
-    fontSize: theme.font.size.sm,
-    fontFamily: theme.font.mono,
-    outline: 'none',
-    marginBottom: 6,
-  };
-
-  const selectStyle: React.CSSProperties = {
-    ...inputStyle,
-    fontFamily: theme.font.ui,
-    cursor: 'pointer',
-  };
-
-  const sectionHeaderStyle: React.CSSProperties = {
-    fontSize: theme.font.size.sm,
-    fontWeight: 600,
-    color: theme.text.secondary,
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.05em',
-    marginBottom: 6,
-  };
-
-  const emptyStateStyle: React.CSSProperties = {
-    padding: 12,
-    color: theme.text.tertiary,
-    fontSize: theme.font.size.sm,
-    fontFamily: theme.font.ui,
-    fontStyle: 'italic' as const,
-  };
-
-  const dividerStyle: React.CSSProperties = {
-    marginTop: 8,
-    borderTop: `1px solid ${theme.border.subtle}`,
-    paddingTop: 8,
-  };
-
-  const traceButtonStyle: React.CSSProperties = {
-    width: '100%',
-    padding: '7px 12px',
-    background: 'rgba(45, 212, 160, 0.1)',
-    border: `1px solid ${theme.accent.green}`,
-    borderRadius: theme.radius.md,
-    color: theme.accent.green,
-    cursor: 'pointer',
-    fontFamily: theme.font.ui,
-    fontSize: theme.font.size.sm,
-    fontWeight: 500,
-    transition: `all ${theme.transition.fast}`,
-  };
-
-  const rowStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: 6,
-  };
+  // T1-131: 9 style constants moved to module scope in
+  // `properties/propertiesPanelStyles.ts`. The values reference only
+  // the static `theme` module — there was no per-render dependency.
+  // Hoisting skips the per-render object allocation and clears ~70
+  // lines out of the render body.
 
   if (selectedObjects.length === 0) {
     return React.createElement('div', {
