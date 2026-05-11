@@ -53,6 +53,14 @@ import { canUseFeature } from '../../entitlements';
 // T1-147: pure compound-role inference + point-in-polygon test
 // extracted so the topology classification can be tested in isolation.
 import { inferCompoundRoles } from './compoundRoles';
+// T1-148: bezier subdivision + 2D affine transform primitives
+// extracted so the math is testable without JobCompiler's import surface.
+import {
+  applyTransform,
+  midpoint,
+  subdivideCubic,
+  subdivideQuadratic,
+} from './bezierFlatten';
 
 export interface CompileJobOptions {
   optimizeOrder?: boolean;
@@ -1055,75 +1063,5 @@ export function subPathToPoints(
   return points;
 }
 
-// ─── BEZIER SUBDIVISION ──────────────────────────────────────────
-
-function subdivideCubic(
-  p0: Point, p1: Point, p2: Point, p3: Point,
-  output: Point[], tolerance: number, depth: number = 0
-): void {
-  if (depth > 10) {
-    output.push({ ...p3 });
-    return;
-  }
-
-  // Flatness test: are control points close to the line p0→p3?
-  const dx = p3.x - p0.x, dy = p3.y - p0.y;
-  const d1 = Math.abs((p1.x - p3.x) * dy - (p1.y - p3.y) * dx);
-  const d2 = Math.abs((p2.x - p3.x) * dy - (p2.y - p3.y) * dx);
-  const len = Math.sqrt(dx * dx + dy * dy);
-
-  if ((d1 + d2) / (len || 1) < tolerance) {
-    output.push({ ...p3 });
-    return;
-  }
-
-  // De Casteljau subdivision at t=0.5
-  const m01 = midpoint(p0, p1);
-  const m12 = midpoint(p1, p2);
-  const m23 = midpoint(p2, p3);
-  const m012 = midpoint(m01, m12);
-  const m123 = midpoint(m12, m23);
-  const mid = midpoint(m012, m123);
-
-  subdivideCubic(p0, m01, m012, mid, output, tolerance, depth + 1);
-  subdivideCubic(mid, m123, m23, p3, output, tolerance, depth + 1);
-}
-
-function subdivideQuadratic(
-  p0: Point, p1: Point, p2: Point,
-  output: Point[], tolerance: number, depth: number = 0
-): void {
-  if (depth > 10) {
-    output.push({ ...p2 });
-    return;
-  }
-
-  const dx = p2.x - p0.x, dy = p2.y - p0.y;
-  const d = Math.abs((p1.x - p2.x) * dy - (p1.y - p2.y) * dx);
-  const len = Math.sqrt(dx * dx + dy * dy);
-
-  if (d / (len || 1) < tolerance) {
-    output.push({ ...p2 });
-    return;
-  }
-
-  const m01 = midpoint(p0, p1);
-  const m12 = midpoint(p1, p2);
-  const mid = midpoint(m01, m12);
-
-  subdivideQuadratic(p0, m01, mid, output, tolerance, depth + 1);
-  subdivideQuadratic(mid, m12, p2, output, tolerance, depth + 1);
-}
-
-// ─── TRANSFORM HELPERS ───────────────────────────────────────────
-
-function applyTransform(p: Point, m: import('../types').Matrix3x2): Point {
-  return {
-    x: m.a * p.x + m.c * p.y + m.tx,
-    y: m.b * p.x + m.d * p.y + m.ty,
-  };
-}
-
-function midpoint(a: Point, b: Point): Point {
-  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-}
+// T1-148: subdivideCubic / subdivideQuadratic / applyTransform /
+// midpoint moved to ./bezierFlatten.
