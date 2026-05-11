@@ -22,6 +22,12 @@
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene } from '../../core/scene/Scene';
 import { deleteObjects } from '../../core/scene/SceneOps';
+// T2-6 Phase 3u: selection helpers extracted so the filter +
+// select-all rules can be tested without mounting App.
+import {
+  filterValidIds,
+  selectAllSelectableIds,
+} from './app/appSelectionHelpers';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { installAppDebugStateGraph } from '../../debug/AppDebugState';
@@ -119,15 +125,7 @@ import { gatedFeature, isProUnlocked } from '../utils/proGate';
 
 // ─── COMPONENT ───────────────────────────────────────────────────
 
-function filterValidIds(ids: ReadonlySet<string>, scene: Scene): Set<string> {
-  if (ids.size === 0) return new Set();
-  const sceneIds = new Set(scene.objects.map(o => o.id));
-  const valid = new Set<string>();
-  for (const id of ids) {
-    if (sceneIds.has(id)) valid.add(id);
-  }
-  return valid;
-}
+// T2-6 Phase 3u: filterValidIds moved to ./app/appSelectionHelpers.
 
 export function App(): React.ReactElement {
   // T1-17-followup-trace-probe: counts App-level commits during a trace
@@ -1245,8 +1243,7 @@ export function App(): React.ReactElement {
   }, [applyHistoryScene, grbl.isJobRunning, showAlert, redoHistoryEntry]);
 
   const handleSelectAll = useCallback(() => {
-    const allIds = new Set(scene.objects.filter(o => o.visible && !o.locked).map(o => o.id));
-    setSelectedIds(allIds);
+    setSelectedIds(selectAllSelectableIds(scene));
   }, [scene]);
 
   const handleDelete = useCallback(() => {
