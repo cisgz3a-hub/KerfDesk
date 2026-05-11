@@ -77,13 +77,52 @@ export interface OutputStrategy {
   encodeFooter(job: Job, options?: GcodeGenerateOptions): string;
 }
 
+/**
+ * Thrown when one or more user g-code template findings have
+ * severity 'error'. Pre-T1-168 this carried a single `finding` —
+ * `validateTemplatesBeforeEmission` threw on the first error and
+ * discarded any remaining error-severity findings AND every warning-
+ * severity finding entirely. A user template with 3 errors had to
+ * be fixed one-at-a-time across 3 compile roundtrips. The full-code
+ * audit (docs/AUDIT-2026-05-11.md F-025) flagged this as a UX gap.
+ *
+ * T1-168 (audit F-025): the error now aggregates every error-severity
+ * finding into `errors` so the UI can render the full list in one
+ * roundtrip, and exposes the warning-severity findings via `warnings`
+ * so they're not silently dropped. `finding` is kept as a backwards-
+ * compat alias for `errors[0]` so existing callsites (`error.finding`
+ * reads) continue to work — the only callsite today is the constructor
+ * itself, but the field is a documented part of the public surface.
+ *
+ * The message is built from every error-severity finding so the
+ * default `error.message` string remains useful in logs without a
+ * caller having to walk `errors[]`. Format: first error verbatim,
+ * then "(+N more errors)" if `errors.length > 1`.
+ */
 export class TemplateValidationError extends Error {
+  /** First error-severity finding (backwards-compat alias for `errors[0]`). */
   readonly finding: TemplateFinding;
+  /** All error-severity findings, in source order. Always at least one. */
+  readonly errors: readonly TemplateFinding[];
+  /** Warning-severity findings collected during the same validation pass. */
+  readonly warnings: readonly TemplateFinding[];
 
-  constructor(finding: TemplateFinding) {
-    super(`Template validation failed (${finding.code}): ${finding.message}`);
+  constructor(errors: readonly TemplateFinding[], warnings: readonly TemplateFinding[] = []) {
+    if (errors.length === 0) {
+      // Defensive — callers should only build this when there is at
+      // least one error finding. Throwing the wrong type here would
+      // mask a real bug at the construction site.
+      throw new Error('TemplateValidationError requires at least one error-severity finding.');
+    }
+    const head = errors[0];
+    const summary = errors.length === 1
+      ? `Template validation failed (${head.code}): ${head.message}`
+      : `Template validation failed (${head.code}): ${head.message} (+${errors.length - 1} more error${errors.length - 1 === 1 ? '' : 's'})`;
+    super(summary);
     this.name = 'TemplateValidationError';
-    this.finding = finding;
+    this.finding = head;
+    this.errors = errors;
+    this.warnings = warnings;
   }
 }
 
@@ -520,8 +559,14 @@ function validateTemplatesBeforeEmission(
     bedHeightMm: templateContext.bedHeightMm,
     maxSpindle,
   });
-  const firstError = findings.find(finding => finding.severity === 'error');
-  if (firstError) {
-    throw new TemplateValidationError(firstError);
+  // T1-168 (audit F-025): aggregate every error finding into one
+  // throw, and attach the warning findings. Pre-T1-168 we threw on
+  // the first error and discarded the remaining error + warning
+  // findings entirely; a 3-error template required 3 compile
+  // roundtrips to surface.
+  const errors = findings.filter(f => f.severity === 'error');
+  const warnings = findings.filter(f => f.severity === 'warning');
+  if (errors.length > 0) {
+    throw new TemplateValidationError(errors, warnings);
   }
 }
