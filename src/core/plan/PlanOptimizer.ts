@@ -83,6 +83,58 @@ import {
 
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
+/**
+ * T1-177 (external audit High #7): thrown when an engrave-fill
+ * operation produces zero scanline rows but the boundary paths are
+ * non-empty. Pre-T1-177 this case silently fell back to outline
+ * tracing, mutating the manufacturing intent (engrave → cut). The
+ * audit flagged this as a High-severity safety / UX defect: the user
+ * receives no feedback before the material is committed.
+ *
+ * `diagnostics` carries everything the UI / support log needs to
+ * explain the failure without re-running the planner:
+ *   - `interval`: the resolved fill spacing (mm) — usually too large
+ *     relative to the shape.
+ *   - `fillMode`: `'line'` or `'cross-hatch'`.
+ *   - `fillAngles`: the angles the planner tried (one for line, two
+ *     for cross-hatch).
+ *   - `boundaryPathCount`: how many boundary paths were skipped.
+ *
+ * Remediation: reduce `fillInterval` (e.g. 0.5mm → 0.1mm) or
+ * increase the shape size so a scanline of the requested angle
+ * actually crosses the geometry.
+ */
+export interface FillProducedNoRowsDiagnostics {
+  /**
+   * Same string union as `Layer.FillMode`. Re-declared inline to keep
+   * the error class importable without pulling the scene-layer type
+   * graph — `Plan.ts` is the boundary between job/plan and scene.
+   */
+  readonly fillMode: 'line' | 'offset' | 'cross-hatch';
+  readonly interval: number;
+  readonly fillAngles: readonly number[];
+  readonly boundaryPathCount: number;
+}
+
+export class FillProducedNoRowsError extends Error {
+  readonly diagnostics: FillProducedNoRowsDiagnostics;
+  constructor(diagnostics: FillProducedNoRowsDiagnostics) {
+    const angleSummary = diagnostics.fillAngles
+      .map(a => `${a.toFixed(1)}°`)
+      .join(', ');
+    super(
+      `Engrave fill produced no scanlines (mode=${diagnostics.fillMode}, `
+      + `interval=${diagnostics.interval.toFixed(3)}mm, angles=[${angleSummary}], `
+      + `${diagnostics.boundaryPathCount} boundary path(s)). `
+      + 'Reduce the fill interval or increase the shape size so a scanline crosses '
+      + 'the geometry. Outline-trace fallback was removed in T1-177 because it '
+      + 'silently mutated engrave-fill intent into a cut operation.',
+    );
+    this.name = 'FillProducedNoRowsError';
+    this.diagnostics = diagnostics;
+  }
+}
+
 export interface OptimizePlanConfig {
   /**
    * Max rapid travel speed in mm/min (default
@@ -576,23 +628,30 @@ function planFillOperation(
     }
   }
 
-  // Fallback: if no scanline rows but paths exist, trace outlines instead
+  // T1-177 (external audit High #7): refuse to silently fall back
+  // to outline tracing when a fill produces zero scanlines.
+  //
+  // Pre-T1-177 this branch traced the boundary paths as a CUT
+  // operation when the fill interval / geometry combination produced
+  // no rows. A user who chose "engrave fill" got an outline cut
+  // instead — a different manufacturing operation with different
+  // material outcome (the laser cuts THROUGH the boundary on a
+  // shape that was meant to receive surface engraving). The audit
+  // flagged this as High severity: manufacturing intent is silently
+  // mutated, the user receives no feedback before commit, and the
+  // material may be ruined.
+  //
+  // Post-T1-177: throw `FillProducedNoRowsError` carrying enough
+  // diagnostic info for the UI / support log to explain the failure.
+  // The user must adjust the fill interval (typically reduce it) or
+  // resize the shape to fit the interval before the job can compile.
   if (allRows.length === 0 && boundaryPaths.length > 0) {
-    console.warn(
-      `[LaserForge] Engrave fill produced no scanlines (interval ${interval.toFixed(3)}mm); ` +
-        `falling back to outline trace (${boundaryPaths.length} path(s)). Check shape size vs line spacing.`,
-    );
-    let pos = startPos;
-    const movesOut: Move[] = [];
-    const ordered = orderPathsForCutting(boundaryPaths, pos, false, false);
-    for (const { path, reversed } of ordered) {
-      const pathMoves = planPath(path, reversed, settings);
-      for (let i = 0; i < pathMoves.length; i++) {
-        movesOut.push(pathMoves[i]);
-      }
-      pos = getPathEndpoint(path, reversed);
-    }
-    return movesOut;
+    throw new FillProducedNoRowsError({
+      fillMode,
+      interval,
+      fillAngles,
+      boundaryPathCount: boundaryPaths.length,
+    });
   }
 
   if (allRows.length === 0) return [];
