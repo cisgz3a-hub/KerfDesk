@@ -49,6 +49,14 @@ import { type MachineOriginCorner } from '../../core/devices/DeviceProfile';
 import { type BurnState } from '../../app/MachineService';
 import { useTraceStormProbe } from '../../debug/traceStormProbe';
 import { QuickActions } from './QuickActions';
+// T1-150: snap helpers (grid snap, per-geometry snap points, nearest-snap
+// search) extracted so the snap rules can be unit-tested without
+// loading the viewport's heavy import surface.
+import {
+  findSnapPoint,
+  getObjectSnapPoints,
+  snapToGrid,
+} from './canvas/canvasSnapHelpers';
 
 function defaultCursorForTool(activeTool: ToolType): string {
   const cursors: Record<string, string> = {
@@ -164,81 +172,8 @@ function drawPlannedToolpathPreview(
   ctx.setLineDash([]);
 }
 
-function snapToGrid(value: number, gridSize: number): number {
-  if (gridSize <= 0) return value;
-  return Math.round(value / gridSize) * gridSize;
-}
-
-/** Get snap points from a single object */
-function getObjectSnapPoints(obj: SceneObject): Array<{ x: number; y: number }> {
-  const t = obj.transform;
-  const g = obj.geometry;
-  const pts: Array<{ x: number; y: number }> = [];
-
-  if (g.type === 'rect') {
-    const x1 = t.a * g.x + t.tx;
-    const y1 = t.d * g.y + t.ty;
-    const x2 = t.a * (g.x + g.width) + t.tx;
-    const y2 = t.d * (g.y + g.height) + t.ty;
-    const cx = (x1 + x2) / 2;
-    const cy = (y1 + y2) / 2;
-    pts.push({ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 });
-    pts.push({ x: cx, y: cy });
-    pts.push({ x: cx, y: y1 }, { x: x2, y: cy }, { x: cx, y: y2 }, { x: x1, y: cy });
-  } else if (g.type === 'ellipse') {
-    const cx = t.a * g.cx + t.tx;
-    const cy = t.d * g.cy + t.ty;
-    pts.push({ x: cx, y: cy });
-    pts.push({ x: cx - t.a * g.rx, y: cy });
-    pts.push({ x: cx + t.a * g.rx, y: cy });
-    pts.push({ x: cx, y: cy - t.d * g.ry });
-    pts.push({ x: cx, y: cy + t.d * g.ry });
-  } else if (g.type === 'line') {
-    pts.push({ x: t.a * g.x1 + t.tx, y: t.d * g.y1 + t.ty });
-    pts.push({ x: t.a * g.x2 + t.tx, y: t.d * g.y2 + t.ty });
-    pts.push({
-      x: t.a * ((g.x1 + g.x2) / 2) + t.tx,
-      y: t.d * ((g.y1 + g.y2) / 2) + t.ty,
-    });
-  } else if (g.type === 'polygon') {
-    for (const pt of g.points) {
-      pts.push({ x: t.a * pt.x + t.tx, y: t.d * pt.y + t.ty });
-    }
-  } else {
-    pts.push({ x: t.tx, y: t.ty });
-  }
-
-  return pts;
-}
-
-/** Find nearest snap point from non-selected objects */
-function findSnapPoint(
-  x: number,
-  y: number,
-  excludeIds: Set<string>,
-  objects: SceneObject[],
-  snapDist: number,
-): { x: number; y: number; snapped: boolean } {
-  let bestDist = snapDist;
-  let sx = x;
-  let sy = y;
-  let snapped = false;
-
-  for (const obj of objects) {
-    if (excludeIds.has(obj.id) || !obj.visible) continue;
-    for (const p of getObjectSnapPoints(obj)) {
-      const d = Math.hypot(p.x - x, p.y - y);
-      if (d < bestDist) {
-        bestDist = d;
-        sx = p.x;
-        sy = p.y;
-        snapped = true;
-      }
-    }
-  }
-
-  return { x: sx, y: sy, snapped };
-}
+// T1-150: snapToGrid / getObjectSnapPoints / findSnapPoint moved to
+// ./canvas/canvasSnapHelpers.
 
 function drawRulers(
   ctx: CanvasRenderingContext2D,

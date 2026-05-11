@@ -38,7 +38,7 @@ function assert(condition: unknown, message: string): void {
 }
 
 function flatPath(coords: number[], closed: boolean): FlatPath {
-  return { coords, closed } as FlatPath;
+  return { coords, closed } as unknown as FlatPath;
 }
 
 console.log('\n=== T1-149 PlanOptimizer helpers ===\n');
@@ -178,7 +178,7 @@ console.log('\n=== T1-149 PlanOptimizer helpers ===\n');
         ],
       },
     ],
-  } as Plan;
+  } as unknown as Plan;
   const b = computePlanBounds(plan);
   assert(b.minX === -10 && b.maxX === 100,
     'plan bounds X = [-10, 100]');
@@ -188,7 +188,7 @@ console.log('\n=== T1-149 PlanOptimizer helpers ===\n');
 
 // -------- computePlanBounds: empty plan → emptyAABB sentinel --------
 {
-  const plan: Plan = { operations: [] } as Plan;
+  const plan: Plan = { operations: [] } as unknown as Plan;
   const b = computePlanBounds(plan);
   // emptyAABB returns Infinity-bounded — not finite
   assert(!Number.isFinite(b.minX) || b.minX === Infinity,
