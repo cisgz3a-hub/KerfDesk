@@ -1265,7 +1265,14 @@ export class MachineService {
       try {
         const verdict = getUnsafeAtConnect();
         if (verdict === null) {
-          ctrl.sendCommand('M5 S0', 'internal');
+          // T1-161 (audit F-010): route through MachineCommandGateway
+          // instead of calling ctrl.sendCommand directly. The gateway
+          // short-circuits source='internal' to a passthrough so behavior
+          // is byte-identical, but the choke-point invariant is
+          // preserved — `tests/no-direct-sendcommand-outside-gateway.test.ts`
+          // (a source-scan source-pin) now passes and stays the canonical
+          // enforcement for future audit logging / rate limiting.
+          new MachineCommandGateway(ctrl).sendCommand('M5 S0', 'internal');
         }
       } catch {
         /* ignore: auto-M5 is defense-in-depth; primary safety paths
