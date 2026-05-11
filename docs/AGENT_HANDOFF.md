@@ -9,12 +9,18 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `548bc5a5` (`feat(output): T1-182 — HIGH canonical burn-envelope
-  parser for EMITTED gcode`). Always verify live HEAD with `git log
-  --oneline -1` before editing.
-- Last shipped roadmap item: **T1-182** (external-audit High #2 + #8
-  fix — canonical burn-envelope parser for EMITTED gcode). This
-  session shipped **23 consecutive audit-driven tickets**. The first
+  `1ef93514` (`feat(output): T1-188 — HIGH compile-time burn-envelope
+  divergence check`). Always verify live HEAD with `git log --oneline
+  -1` before editing.
+- Last shipped roadmap item: **T1-188** (external-audit High #2 + #8
+  wiring — compile-time burn-envelope divergence check). This
+  session-arc shipped **29 consecutive audit-driven tickets**
+  (T1-161 → T1-188): 12 internal + 5 external-Critical + 6 external-
+  High + 6 deferred follow-ups (T1-183 F-022 info findings, T1-184
+  F-026 fused MachineTransform iterations, T1-185 F-034+F-048 any-
+  cast cleanup, T1-186 arc support in emittedBurnEnvelope, T1-187
+  rotated-raster fail-closed, T1-188 plan-vs-emitted burn divergence
+  check). The first
   12 (T1-161 → T1-172) addressed findings from the internal audit
   (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
   addressed the external audit (response received 2026-05-11) — both
@@ -51,27 +57,29 @@ chat transcript.
   Each ticket landed as a coupled triple: code change + regression
   test + ROADMAP.md entry with verification, followed by the hash-
   fill commit. TS baseline 0 errors maintained across every commit.
-- Next roadmap item: the external audit's Medium / Low items remain
-  open. Notable remaining structural work explicitly NOT shipped in
-  this arc (deferred to future tickets):
+- Next roadmap item: remaining structural work explicitly NOT shipped
+  in this arc (each is multi-week and deferred to a focused future
+  arc):
   - **Preview UI rebuild** to consume `ValidatedJobTicket.
-    emittedBurnBounds` from T1-182. The parser foundation is in
-    place; the simulation overlay still reads from `Plan`.
+    emittedBurnBounds` from T1-182 (the parser + divergence check
+    are in place; the SimulationRenderer still reads from `Plan`).
   - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
     remove all global reads (T1-181 ships the detection gate but
     the compiler still calls `canUseFeature()` / `getActiveProfile()`
     / `getPresetById()` directly).
-  - **Affine raster sampling** for rotated / skewed images (audit
-    High #6).
-  - **Arc support** in the emitted-gcode parser (T1-182 explicitly
-    excludes G2/G3).
+  - **Affine raster sampling** for rotated / skewed images. T1-187
+    closes the safety gap with a fail-closed throw; emitting actual
+    rotated scanlines is the deferred follow-up.
   - **Per-firmware adapter contract** (`FirmwareAdapter`) for real
     Marlin / Ruida support (audit High #15).
   - **Persistent event ledger** + recovery state machine (audit
     Critical #14 — partial work shipped in T1-175/T1-176; full
     centralization is a multi-week SafetySupervisor refactor).
-  Also still open from the internal audit (medium / low severity):
-  F-022, F-026, F-034 / F-036 / F-048.
+  - **R-mode arc parsing** in `analyzeEmittedBurnEnvelope` (T1-186
+    supports I/J only; GRBL `G2 X.. Y.. R..` is a future extension).
+  Internal audit Medium/Low items still open: F-036 (10 any-casts
+  in SceneSerializer — kept as the largest remaining cluster; would
+  benefit from a focused refactor pass).
   Medium / High blocked by integration work: F-002 (Connection-
   GenerationGuard primitive shipped but never wired), F-004 (T1-22
   ForceSafeState orchestration — needs hardware), F-018 (T3-57
