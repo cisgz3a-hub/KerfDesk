@@ -41,7 +41,7 @@ function layer(id: string, mode: LayerMode): Layer {
     locked: false,
     output: true,
     settings: { mode } as never,
-  } as Layer;
+  } as unknown as Layer;
 }
 
 function scene(layers: Layer[], activeLayerId: string): Scene {

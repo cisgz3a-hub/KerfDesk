@@ -33,6 +33,11 @@ import {
   activeLayerMode as deriveActiveLayerMode,
   interactableLayerIds as deriveInteractableLayerIds,
 } from './app/appLayerModeHelpers';
+// T2-6 Phase 3w: layout-width math + connection-status predicate.
+import {
+  computeLayoutWidths,
+  isLaserConnected,
+} from './app/appLayoutHelpers';
 import { makeCommitSceneTransaction, type CommitSceneTransaction } from '../scene/SceneTransaction';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { installAppDebugStateGraph } from '../../debug/AppDebugState';
@@ -371,18 +376,15 @@ export function App(): React.ReactElement {
     wasJobRunningRef.current = grbl.isJobRunning;
   }, [grbl.isJobRunning, machineUi.service, setActiveJobCanvasContext, clearActiveJobCanvasContext]);
 
-  const connectionSidebarWidth = connectionSidebarOpen
-    ? Math.min(500, Math.floor(canvasSize.width * 0.45))
-    : 0;
-  const layersPanelWidth = connectionSidebarOpen ? 0 : 240;
-  const toolbarWidth = 36;
-  const canvasViewportWidth =
-    canvasSize.width - toolbarWidth - connectionSidebarWidth - layersPanelWidth;
+  // T2-6 Phase 3w: layout-width math + connection-status delegated
+  // to pure helpers.
+  const { connectionSidebarWidth, layersPanelWidth, toolbarWidth, canvasViewportWidth } =
+    computeLayoutWidths(canvasSize.width, connectionSidebarOpen);
 
-  const toolbarLaserConnected = useMemo(() => {
-    const s = grbl.machineState;
-    return !!s && s.status !== 'disconnected' && s.status !== 'connecting';
-  }, [grbl.machineState]);
+  const toolbarLaserConnected = useMemo(
+    () => isLaserConnected(grbl.machineState),
+    [grbl.machineState],
+  );
 
   useEffect(() => {
     if (
