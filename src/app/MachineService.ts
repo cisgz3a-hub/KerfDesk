@@ -1337,17 +1337,45 @@ export class MachineService {
   ): void {
     const NOTIFY_CHUNK = 1000;
     let idx = 0;
+    // T1-170 (audit F-016): rate-limited observability for broken
+    // listeners. Pre-T1-170 the catch silently swallowed every error,
+    // so a broken simulator listener could fail every line of a
+    // million-line job without operator-visible signal. The audit
+    // recommended "first failure + final count" — first failure
+    // surfaces the error TYPE so a support bundle can identify it,
+    // and the final count signals how widespread the failure was.
+    let failureCount = 0;
+    let firstError: unknown;
     const tick = (): void => {
       const end = Math.min(idx + NOTIFY_CHUNK, lines.length);
       for (; idx < end; idx++) {
         try {
           notify(lines[idx]);
-        } catch {
-          /* ignore — broken listener must not break the chunked loop */
+        } catch (err: unknown) {
+          // broken listener must not break the chunked loop (kept the
+          // hard contract); only the observability changes
+          if (failureCount === 0) {
+            firstError = err;
+            console.warn(
+              '[MachineService] _notifySimulatorChunked: simulator listener threw on line %d. Suppressing further per-line warnings; a summary will be logged when the chunked notification completes.',
+              idx,
+              err,
+            );
+          }
+          failureCount++;
         }
       }
       if (idx < lines.length) {
         setTimeout(tick, 0);
+      } else if (failureCount > 1) {
+        // Final summary: include the first-seen error so support bundles
+        // can correlate the count with the cause.
+        console.warn(
+          '[MachineService] _notifySimulatorChunked: simulator listener failed on %d of %d lines (first error attached).',
+          failureCount,
+          lines.length,
+          firstError,
+        );
       }
     };
     setTimeout(tick, 0);
