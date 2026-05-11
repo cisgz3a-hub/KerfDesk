@@ -134,19 +134,30 @@ export function applyMachineTransform(
     options.savedOrigin,
   );
 
-  const transformedOps: PlannedOperation[] = plan.operations.map(op => ({
-    ...op,
-    moves: op.moves.map(move => transformMove(move, offset.x, offset.y, flipReferenceX, flipReferenceY, flipX, flipY)),
-  }));
-
+  // T1-184 (internal audit F-026): fuse the transform pass with the
+  // post-bounds accumulation. Pre-T1-184 this was three traversals:
+  //   1. compute pre-transform bounds (needed BEFORE transform for
+  //      flipReferenceY/X)
+  //   2. .map()/.map() builds transformedOps
+  //   3. another nested for-loop accumulates newBounds from
+  //      transformedOps
+  // On a million-move plan that's 3 M iterations of plan traversal.
+  // Passes 2 and 3 can be fused: while we build the transformed
+  // move, we also expand the post-bounds AABB with its endpoint.
+  // Pass 1 stays separate because the transform parameters depend
+  // on the pre-bounds; that's the structural minimum.
   let newBounds = emptyAABB();
-  for (const op of transformedOps) {
-    for (const move of op.moves) {
-      if (move.type === 'rapid' || move.type === 'linear') {
-        newBounds = expandAABB(newBounds, move.to.x, move.to.y);
+  const transformedOps: PlannedOperation[] = plan.operations.map(op => {
+    const transformedMoves: Move[] = new Array(op.moves.length);
+    for (let i = 0; i < op.moves.length; i++) {
+      const tm = transformMove(op.moves[i], offset.x, offset.y, flipReferenceX, flipReferenceY, flipX, flipY);
+      transformedMoves[i] = tm;
+      if (tm.type === 'rapid' || tm.type === 'linear') {
+        newBounds = expandAABB(newBounds, tm.to.x, tm.to.y);
       }
     }
-  }
+    return { ...op, moves: transformedMoves };
+  });
 
   const transformedPlan: Plan = {
     ...plan,
