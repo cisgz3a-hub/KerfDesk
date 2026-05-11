@@ -136,6 +136,22 @@ import {
 export type { UnsafeStopOnErrorOverrideToken };
 export { createStopOnErrorOverrideToken };
 
+// T1-178 (external audit High #4): boundary validators for jog /
+// testFire / frame args. The controller refuses to compose a G-code
+// line from invalid numbers — defense-in-depth against any UI bypass
+// that would otherwise send dangerous motion.
+import {
+  validateJogArgs,
+  validateTestFireArgs,
+  validateFrameArgs,
+} from './grblOperationValidators';
+export {
+  InvalidOperationArgumentError,
+  validateJogArgs,
+  validateTestFireArgs,
+  validateFrameArgs,
+} from './grblOperationValidators';
+
 // T1-152: WcsUncertainReason / WcsConsentVerdict /
 // classifyWcsConsentInputs moved to ./GrblWcsConsentClassifier.
 // Internal callers import locally; the public surface is preserved
@@ -176,8 +192,16 @@ export class GrblController implements GrblControllerApi {
   readonly family = 'grbl' as const;
   readonly protocolName = 'GRBL 1.1';
   readonly operations = {
-    jog: async (args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number; onCommand?: (line: string) => void }): Promise<OperationResult> =>
-      this._trySendInternalOperationCommand(`$J=G91 G21 ${args.axis}${args.distanceMm} F${args.feedMmPerMin}`, args.onCommand),
+    jog: async (args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number; onCommand?: (line: string) => void }): Promise<OperationResult> => {
+      // T1-178 (audit High #4): validate at the boundary before
+      // composing the G-code line. Throws InvalidOperationArgumentError
+      // on bad numeric input — the operation API surface is async, so
+      // the throw rejects the returned promise, never reaches the wire.
+      validateJogArgs(args);
+      return this._trySendInternalOperationCommand(
+        `$J=G91 G21 ${args.axis}${args.distanceMm} F${args.feedMmPerMin}`, args.onCommand,
+      );
+    },
     home: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
       this._trySendInternalOperationCommand('$H', args?.onCommand),
     unlockAlarm: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
@@ -187,6 +211,12 @@ export class GrblController implements GrblControllerApi {
     resetWcsToMachineOrigin: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
       this._trySendInternalOperationCommand('G10 L2 P1 X0 Y0 Z0', args?.onCommand),
     testFire: async (args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }): Promise<OperationResult> => {
+      // T1-178 (audit High #4): validate at the boundary. Pre-T1-178
+      // the computation clamped only the lower bound — a powerPercent
+      // of 500 with maxSpindle=1000 would emit `M3 S5000` (5× the
+      // PWM ceiling). Post-T1-178 the validator rejects out-of-range
+      // powerPercent / maxSpindle before any G-code is composed.
+      validateTestFireArgs(args);
       const sVal = Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle));
       return this._trySendInternalOperationCommand(`M3 S${sVal}`, args.onCommand);
     },
@@ -200,6 +230,14 @@ export class GrblController implements GrblControllerApi {
       onCommand?: (line: string) => void;
       lineDelayMs?: number;
     }): Promise<FrameOperationResult> => {
+      // T1-178 (audit High #4): validate corners, maxSpindle, feed at
+      // the boundary. Each corner must have finite XY; maxSpindle and
+      // (optional) frameDotFeedRate must be finite + positive.
+      validateFrameArgs({
+        corners: args.corners,
+        maxSpindle: args.maxSpindle,
+        frameDotFeedRateMmPerMin: args.frameDotFeedRateMmPerMin,
+      });
       const lines = buildGrblFrameGcode(args.corners, {
         startMode: args.startMode,
         laserMode: args.laserMode,
