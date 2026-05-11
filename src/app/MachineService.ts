@@ -1550,10 +1550,51 @@ export class MachineService {
     let result = makeDisconnectResult();
     try {
       if (ctrl) {
+        // T1-164 (audit F-011): route the disconnect-time laserOff
+        // outcome through notifyLaserSafetyOutcome so the safety-state
+        // machine sees the attempt. Pre-T1-164 the try/catch swallowed
+        // both success and failure — a transport-failure laserOff
+        // during disconnect couldn't escalate _laserOutputState to
+        // 'unknown', and a successful M5 couldn't downgrade it to
+        // 'off'. The audit notes the comment ("not connected, buffer
+        // full, or port already gone") was misleading: only the first
+        // is safe to swallow; the others are real safety events that
+        // must reach notifyLaserSafetyOutcome('failed') so the next
+        // job-start is gated until the user re-resolves the safe state.
+        let stage: 'm5' | 'soft-reset' | 'failed' = 'failed';
+        let safeToSwallow = false;
         try {
-          await ctrl.operations.laserOff();
-        } catch {
-          /* not connected, buffer full, or port already gone */
+          const laserResult = await ctrl.operations.laserOff();
+          if (laserResult.ok) {
+            stage = 'm5';
+          } else {
+            // operations.laserOff() converts safetyOff().stage into
+            // OperationResult.reason. The kind passes through verbatim,
+            // so 'soft-reset' / 'failed' map straight back.
+            stage = laserResult.reason === 'soft-reset' ? 'soft-reset' : 'failed';
+            // "Not connected" is the one swallowable case the audit
+            // calls out: the controller never had a live port we could
+            // have left in a laser-on state. Anything else (buffer
+            // full, port closed mid-flight, soft-reset fallback) is a
+            // real safety event.
+            const msg = laserResult.message ?? '';
+            if (stage === 'failed' && /Not connected/i.test(msg)) {
+              safeToSwallow = true;
+            }
+          }
+        } catch (err: unknown) {
+          // operations.laserOff() shouldn't throw under normal flow
+          // (it returns OperationResult), but if the underlying safetyOff
+          // throws synchronously we still want a 'failed' notify unless
+          // it's the "Not connected" case.
+          const msg = err instanceof Error ? err.message : String(err);
+          if (/Not connected/i.test(msg)) {
+            safeToSwallow = true;
+          }
+          stage = 'failed';
+        }
+        if (!safeToSwallow) {
+          this.notifyLaserSafetyOutcome(stage);
         }
         try {
           await ctrl.disconnect();
