@@ -16,6 +16,9 @@ import {
 } from '../../core/materials/MaterialLibrary';
 import type { MaterialPreset } from '../../core/materials/MaterialPreset';
 import { markSettingsManualUnverified } from '../../core/materials/MaterialSettingConfidence';
+// T1-133: material-preset grouping moved to a pure sibling helper so
+// the sort order can be tested without mounting the whole panel.
+import { groupMaterialPresetsByMaterial } from './layers/groupMaterialPresets';
 
 interface LayerPanelProps {
   scene: Scene;
@@ -103,19 +106,11 @@ export function LayerPanel({
     return getPresets();
   }, [materialPresetRevision]);
 
-  const materialPresetsByMaterial = useMemo(() => {
-    const map = new Map<string, MaterialPreset[]>();
-    for (const p of materialPresets) {
-      const key = p.material || 'Other';
-      const list = map.get(key) ?? [];
-      list.push(p);
-      map.set(key, list);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => a.name.localeCompare(b.name));
-    }
-    return [...map.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [materialPresets]);
+  // T1-133: grouping delegated to pure helper for testability.
+  const materialPresetsByMaterial = useMemo(
+    () => groupMaterialPresetsByMaterial(materialPresets),
+    [materialPresets],
+  );
 
   useEffect(() => {
     setShowTabsCustomize(false);
