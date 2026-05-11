@@ -57,37 +57,17 @@ import {
   getObjectSnapPoints,
   snapToGrid,
 } from './canvas/canvasSnapHelpers';
+// T1-151: cursor / pen-position / time-format helpers hoisted out.
+import {
+  defaultCursorForTool,
+  formatTime,
+  penAfterMoveIndex,
+} from './canvas/canvasViewportHelpers';
 
-function defaultCursorForTool(activeTool: ToolType): string {
-  const cursors: Record<string, string> = {
-    select: 'default',
-    node: 'crosshair',
-    rect: 'crosshair',
-    ellipse: 'crosshair',
-    line: 'crosshair',
-    text: 'text',
-  };
-  return cursors[activeTool] || 'default';
-}
+// T1-151: defaultCursorForTool + penAfterMoveIndex moved to
+// ./canvas/canvasViewportHelpers.
 
 const GRID_SNAP = 1; // mm — snap to 1mm grid. Set to 0 to disable.
-
-/** Pen position after applying moves[0..lastMoveIndex] (rapid/linear update X/Y). */
-function penAfterMoveIndex(moves: readonly Move[], lastMoveIndex: number): { x: number; y: number } {
-  let x = 0;
-  let y = 0;
-  if (lastMoveIndex < 0) return { x: 0, y: 0 };
-  const lim = Math.min(lastMoveIndex, moves.length - 1);
-  for (let i = 0; i <= lim; i++) {
-    const m = moves[i];
-    if (m.type === 'marker') continue;
-    if (m.type === 'rapid' || m.type === 'linear') {
-      x = m.to.x;
-      y = m.to.y;
-    }
-  }
-  return { x, y };
-}
 
 function drawJobToolpathRange(
   ctx: CanvasRenderingContext2D,
@@ -1878,9 +1858,4 @@ function PlaybackControls({
 
 // ─── HELPERS ─────────────────────────────────────────────────────
 
-function formatTime(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  const ms = Math.floor((seconds * 10) % 10);
-  return `${m}:${s.toString().padStart(2, '0')}.${ms}`;
-}
+// T1-151: formatTime moved to ./canvas/canvasViewportHelpers.
