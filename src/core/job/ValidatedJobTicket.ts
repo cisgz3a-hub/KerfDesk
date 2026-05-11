@@ -39,6 +39,21 @@ export interface ValidatedJobTicket {
    * running G-code's burn characteristics.
    */
   readonly materialPresetsHash: string;
+  /**
+   * T1-182 (external audit High #2 + #8): burn envelope derived
+   * from the EMITTED gcode (not from the upstream `Plan`). The
+   * audit's framing was "the user may approve a preview that is
+   * not the actual program" — the preview consumes `Plan`, but
+   * footer return motion / template g-code / modal quirks could
+   * make the emitted bytes' burn region differ from the plan's.
+   * This field is the canonical post-emission burn AABB, derived
+   * by `analyzeEmittedBurnEnvelope(gcodeText)`. `null` when the
+   * emission contained no burn moves (a degenerate / empty job).
+   * Wiring the preview UI to consume this is deferred — this field
+   * makes the data available for future consumers (validators,
+   * support diagnostics, preview rebuild).
+   */
+  readonly emittedBurnBounds: AABB | null;
   readonly gcodeLines: readonly string[];
   readonly gcodeText: string;
   readonly machinePlanBounds: AABB;

@@ -34,6 +34,12 @@ import {
   hashEntitlementPolicy,
   hashReferencedMaterialPresets,
 } from '../core/job/compileInputHashes';
+// T1-182 (external audit High #2 + #8): canonical burn envelope
+// derived from the EMITTED gcode (not the upstream `Plan`). Attaches
+// to the ticket so future preview / validation code can consume the
+// real post-emission geometry, addressing the audit's "preview may
+// not match the actual program" framing.
+import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -395,6 +401,12 @@ export async function compileGcode(
     // rationale.
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(scene),
+    // T1-182 (audit High #2 + #8): canonical burn envelope derived
+    // from the EMITTED gcode bytes (not the upstream Plan). Future
+    // preview / validator code consumes this to ensure preview ↔
+    // output cannot diverge silently. See emittedBurnEnvelope.ts
+    // for the parser.
+    emittedBurnBounds: analyzeEmittedBurnEnvelope(gcode).burnBounds,
     gcodeLines,
     gcodeText: gcode,
     machinePlanBounds: { ...machineTransform.plan.bounds },

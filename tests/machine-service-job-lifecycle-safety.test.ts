@@ -86,6 +86,7 @@ function makeTicket(
     sceneHash: hashSceneForTicket(scene),
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(scene),
+    emittedBurnBounds: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
     gcodeLines: [...gcodeLines],
