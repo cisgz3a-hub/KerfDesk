@@ -38,6 +38,10 @@ import { parseGrblJobLines } from './GrblJobLineParser';
 // T1-137: pure $I identity-line parser extracted so the
 // [VER:...] / [OPT:...] grammar is testable without mounting the controller.
 import { parseGrblIdentityLine } from './GrblIdentityParser';
+// T1-139: pure job-bounds checker (the controller-layer
+// defense-in-depth that scans G0/G1 X/Y moves against bed extents,
+// including the T1-44 relative-mode simulated-cursor path).
+import { checkGrblJobBounds } from './GrblJobBoundsChecker';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -1050,67 +1054,18 @@ export class GrblController implements GrblControllerApi {
    * origin," and a wrong assumption can place the head off-bed. The user is
    * told to reconnect.
    */
+  // T1-139: delegates to the pure checkGrblJobBounds helper. The
+  // checker owns the EPS tolerance, the G90/G91 mode tracking, and
+  // the position-confirmed gate for relative-mode jobs; this method
+  // wires the controller's runtime state (bed extents, head position,
+  // confirmation flag) into the helper's input shape.
   private _checkJobBounds(lines: string[]): string | null {
-    const bedW = this._bedWidth;
-    const bedH = this._bedHeight;
-    if (!(bedW > 0) || !(bedH > 0)) {
-      return null;
-    }
-
-    const EPS = 0.01;
-    let relative = false;
-
-    // T1-44: simulated cursor for relative-mode tracking. Seeded from the last
-    // confirmed status report; only consulted when a relative move is reached.
-    let curX = this._state.position.x;
-    let curY = this._state.position.y;
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      if (/^G91\b/i.test(line)) {
-        relative = true;
-        continue;
-      }
-      if (/^G90\b/i.test(line)) {
-        relative = false;
-        continue;
-      }
-
-      if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
-
-      const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
-      const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
-      if (!xMatch && !yMatch) continue;
-
-      if (relative) {
-        // T1-44: refuse the job if we don't actually know where the head is.
-        if (!this._positionConfirmed) {
-          return (
-            'Cannot accept relative-mode job: current head position is unknown. ' +
-            'Reconnect to refresh status, then try again.'
-          );
-        }
-        if (xMatch) curX += parseFloat(xMatch[1]);
-        if (yMatch) curY += parseFloat(yMatch[1]);
-      } else {
-        if (xMatch) curX = parseFloat(xMatch[1]);
-        if (yMatch) curY = parseFloat(yMatch[1]);
-      }
-
-      if (Number.isFinite(curX) && (curX < -EPS || curX > bedW + EPS)) {
-        return (
-          `Job out of bounds: position would reach X=${curX.toFixed(3)} but machine bed is ` +
-          `${bedW.toFixed(0)}mm wide. Recompile against the current profile or move the head.`
-        );
-      }
-      if (Number.isFinite(curY) && (curY < -EPS || curY > bedH + EPS)) {
-        return (
-          `Job out of bounds: position would reach Y=${curY.toFixed(3)} but machine bed is ` +
-          `${bedH.toFixed(0)}mm tall. Recompile against the current profile or move the head.`
-        );
-      }
-    }
-    return null;
+    return checkGrblJobBounds(lines, {
+      bedWidthMm: this._bedWidth,
+      bedHeightMm: this._bedHeight,
+      headPosition: { x: this._state.position.x, y: this._state.position.y },
+      positionConfirmed: this._positionConfirmed,
+    });
   }
 
   /**
