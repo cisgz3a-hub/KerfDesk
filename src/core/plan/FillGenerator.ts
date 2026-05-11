@@ -26,6 +26,17 @@ import { type Point } from '../types';
 import { type FlatPath } from '../job/Job';
 import { flatPathsFromCompoundPath } from '../job/CompoundPathOutput';
 import { type CompoundPath } from '../geometry/CompoundPath';
+// T1-156: scanline-rasterizer geometry primitives extracted so they
+// can be tested independently of FillGenerator's cache/orchestration.
+import {
+  buildScanlineEdgeBuckets,
+  extractEdges,
+  findActiveIntersections,
+  findIntersections,
+  rotatePoint,
+  type Edge,
+  type ScanlineEdge,
+} from './fillGeometryHelpers';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
@@ -460,43 +471,14 @@ export function estimateScanlineCount(
   return Math.max(0, Math.floor(spanY / safeInterval));
 }
 
-// ─── EDGE EXTRACTION ─────────────────────────────────────────────
-
-interface Edge {
-  x1: number; y1: number;
-  x2: number; y2: number;
-}
-
-interface ScanlineEdge extends Edge {
-  enterRow: number;
-  leaveRow: number;
-}
+// T1-156: Edge + ScanlineEdge moved to ./fillGeometryHelpers.
 
 /**
  * Extract all edges from closed FlatPaths.
  * Each consecutive pair of coordinates forms an edge.
  * The last point connects back to the first (closing edge).
  */
-function extractEdges(paths: FlatPath[]): Edge[] {
-  const edges: Edge[] = [];
-
-  for (const path of paths) {
-    const n = path.coords.length / 2;
-    if (n < 2) continue;
-
-    for (let i = 0; i < n; i++) {
-      const j = (i + 1) % n;  // Wraps to first point for closing edge
-      edges.push({
-        x1: path.coords[i * 2],
-        y1: path.coords[i * 2 + 1],
-        x2: path.coords[j * 2],
-        y2: path.coords[j * 2 + 1],
-      });
-    }
-  }
-
-  return edges;
-}
+// T1-156: extractEdges moved to ./fillGeometryHelpers.
 
 // ─── RAY-EDGE INTERSECTION ───────────────────────────────────────
 
@@ -509,85 +491,9 @@ function extractEdges(paths: FlatPath[]): Edge[] {
  * - Horizontal edges are skipped (they don't produce crossings)
  * - Vertices are counted once (not double-counted at edge joints)
  */
-function findIntersections(edges: Edge[], y: number): number[] {
-  const intersections: number[] = [];
-
-  for (const edge of edges) {
-    const { y1, y2 } = edge;
-
-    // Skip horizontal edges — they don't contribute crossings
-    if (y1 === y2) continue;
-
-    // Check if Y is within the edge's Y range
-    // Use strict inequality on one end to avoid double-counting vertices
-    const yMin = Math.min(y1, y2);
-    const yMax = Math.max(y1, y2);
-
-    if (y < yMin || y >= yMax) continue;
-
-    // Compute X at intersection via linear interpolation
-    const t = (y - y1) / (y2 - y1);
-    const x = edge.x1 + t * (edge.x2 - edge.x1);
-    intersections.push(x);
-  }
-
-  return intersections;
-}
+// T1-156: findIntersections moved to ./fillGeometryHelpers.
 
 // ─── ACTIVE EDGE TABLE ────────────────────────────────────────────
 
-function buildScanlineEdgeBuckets(
-  edges: Edge[],
-  startY: number,
-  interval: number,
-  rowCount: number,
-): { addAt: ScanlineEdge[][]; removeAt: ScanlineEdge[][] } {
-  const addAt = Array.from({ length: rowCount }, () => [] as ScanlineEdge[]);
-  const removeAt = Array.from({ length: rowCount }, () => [] as ScanlineEdge[]);
-  if (rowCount <= 0 || interval <= 0) {
-    return { addAt, removeAt };
-  }
-
-  for (const edge of edges) {
-    if (edge.y1 === edge.y2) continue;
-
-    const yMin = Math.min(edge.y1, edge.y2);
-    const yMax = Math.max(edge.y1, edge.y2);
-    const enterRow = Math.max(0, Math.ceil((yMin - startY) / interval));
-    const leaveRow = Math.min(rowCount, Math.ceil((yMax - startY) / interval));
-
-    if (enterRow >= leaveRow || leaveRow <= 0 || enterRow >= rowCount) continue;
-
-    const scanlineEdge: ScanlineEdge = { ...edge, enterRow, leaveRow };
-    addAt[enterRow].push(scanlineEdge);
-    if (leaveRow < rowCount) {
-      removeAt[leaveRow].push(scanlineEdge);
-    }
-  }
-
-  return { addAt, removeAt };
-}
-
-function findActiveIntersections(activeEdges: readonly ScanlineEdge[], y: number): number[] {
-  const intersections: number[] = [];
-
-  for (const edge of activeEdges) {
-    if (y < Math.min(edge.y1, edge.y2) || y >= Math.max(edge.y1, edge.y2)) continue;
-    const t = (y - edge.y1) / (edge.y2 - edge.y1);
-    intersections.push(edge.x1 + t * (edge.x2 - edge.x1));
-  }
-
-  return intersections;
-}
-
-// ─── ROTATION ────────────────────────────────────────────────────
-
-/**
- * Rotate a point by angle (radians) around the origin.
- */
-function rotatePoint(x: number, y: number, angleRad: number): Point {
-  return {
-    x: x * Math.cos(angleRad) - y * Math.sin(angleRad),
-    y: x * Math.sin(angleRad) + y * Math.cos(angleRad),
-  };
-}
+// T1-156: buildScanlineEdgeBuckets + findActiveIntersections +
+// rotatePoint moved to ./fillGeometryHelpers.
