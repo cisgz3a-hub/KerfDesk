@@ -34,7 +34,6 @@ function summary(overrides: Partial<PreflightSummary> = {}): PreflightSummary {
     blockers: 0,
     warnings: 1,
     issues: [],
-    validatedTicket: null,
     ...overrides,
   } as PreflightSummary;
 }
@@ -68,11 +67,11 @@ console.log('\n=== T1-144 connection-panel equality ===\n');
     summary({ validatedTicket: { ticketId: 'x' } as never }),
     summary({ validatedTicket: { ticketId: 'x' } as never }),
   ), 'same ticketId → true');
-  // Null vs ticket
+  // Undefined vs ticket
   assert(!samePreflightSummary(
-    summary({ validatedTicket: null }),
+    summary({ validatedTicket: undefined }),
     summary({ validatedTicket: { ticketId: 'x' } as never }),
-  ), 'null ticket vs present ticket → false');
+  ), 'undefined ticket vs present ticket → false');
 
   // Different issue count
   const a1 = summary({ issues: [{ id: 'x' } as never] });

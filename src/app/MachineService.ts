@@ -66,6 +66,16 @@ import {
   DEFAULT_MAX_CONSUMED_APPROVAL_NONCES,
   pruneApprovalNonceStore,
 } from './approvalNonceStore';
+// T1-145: misc pure helpers (G10/G92 detection, safety-result
+// translation, structural state equality, nonce factory, burn-state
+// factory) moved to a sibling module for independent testability.
+import {
+  createApprovalNonce,
+  emptyBurnState,
+  mutatesWorkCoordinateSystem,
+  safetyResultForStateMachine,
+  safetyStatesEqual,
+} from './machineServiceHelpers';
 import {
   classifyUserCommand,
   MachineCommandGateway,
@@ -161,12 +171,7 @@ export interface ActiveOperationState {
   sessionId: number;
 }
 
-function emptyBurnState(): BurnState {
-  return {
-    activeIds: new Set<string>(),
-    burnedIds: new Set<string>(),
-  };
-}
+// T1-145: emptyBurnState moved to ./machineServiceHelpers.
 
 export interface MachineServiceState {
   isSimulator: boolean;
@@ -185,44 +190,8 @@ const APPROVAL_TOKEN_TTL_MS = 30_000;
 // site that initializes the Map's expected hard-cap.
 const MAX_CONSUMED_APPROVAL_NONCES = DEFAULT_MAX_CONSUMED_APPROVAL_NONCES;
 
-function mutatesWorkCoordinateSystem(command: string): boolean {
-  return /^G10(?![0-9])/i.test(command) || /^G92(?![0-9])/i.test(command);
-}
-
-function safetyResultForStateMachine(result: SafetyActionResult): SafetyResultLike {
-  const action: SafetyResultLike['action'] =
-    result.action === 'abortJob' ? 'stop' : result.action;
-  const motionState: SafetyResultLike['motionState'] =
-    result.motionState === 'running' ? 'moving' : result.motionState;
-  const laserState: SafetyResultLike['laserState'] =
-    result.laserState === 'off'
-      ? 'confirmed'
-      : result.laserState === 'commandedOff' ? 'commanded' : 'unknown';
-
-  return {
-    action,
-    accepted: result.accepted,
-    motionState,
-    laserState,
-    positionTrusted: result.positionTrusted,
-    requiresRehome: result.requiresRehome,
-    requiresReconnect: result.requiresReconnect,
-    requiresInspection: result.requiresInspection,
-    message: result.message,
-  };
-}
-
-function safetyStatesEqual(a: SafetyState, b: SafetyState): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function createApprovalNonce(): string {
-  const cryptoLike = globalThis.crypto as Crypto | undefined;
-  if (typeof cryptoLike?.randomUUID === 'function') {
-    return cryptoLike.randomUUID();
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-}
+// T1-145: mutatesWorkCoordinateSystem / safetyResultForStateMachine /
+// safetyStatesEqual / createApprovalNonce moved to ./machineServiceHelpers.
 
 export class MachineService {
   private state: MachineServiceState = {
