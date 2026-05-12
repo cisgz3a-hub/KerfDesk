@@ -1152,6 +1152,26 @@ export class MachineService {
    * named method so call sites read clearly.
    */
   acknowledgeRecoveryComplete(): void {
+    // T1-201: record the user-explicit clear in the persistent ledger.
+    // Pre-T1-201 the `recovery-cleared` MachineEvent kind was declared
+    // by T1-193 but had no writer. The auto-clear path (per-step
+    // checklist completion → state machine transitions to 'none' via
+    // checkRecoveryComplete) is intentionally NOT wired in T1-201
+    // because it lives deeper in the runtime state machine; that
+    // wiring is deferred until the step-ack call sites land. The
+    // `acknowledgedBy: 'user'` discriminant carries the source so
+    // support bundles can distinguish "user clicked Acknowledge"
+    // from a future "all steps got auto-checked off".
+    //
+    // Append BEFORE the state transition so the ledger entry exists
+    // even if _setRecoveryState throws via a listener callback.
+    if (this._recoveryState.status !== 'none') {
+      getMachineEventLedger().append({
+        kind: 'recovery-cleared',
+        t: Date.now(),
+        acknowledgedBy: 'user',
+      });
+    }
     this._setRecoveryState({ status: 'none' });
   }
 

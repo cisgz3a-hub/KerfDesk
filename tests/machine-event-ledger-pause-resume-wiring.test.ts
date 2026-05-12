@@ -103,7 +103,11 @@ function makeController(opts: { pauseOk: boolean; resumeOk: boolean }): LaserCon
 
 function buildService(ctrl: LaserController | null): MachineService {
   const portRef: { current: SerialPortLike | null } = { current: {} as SerialPortLike };
-  return new MachineService({ current: ctrl }, portRef);
+  // The controllerRef type expects `current: LaserController` but the
+  // production code reads `this.controllerRef.current` and checks for
+  // null inline, so the runtime correctly handles a null current. The
+  // cast keeps the type system in sync with that intent.
+  return new MachineService({ current: ctrl } as { current: LaserController }, portRef);
 }
 
 console.log('\n=== T1-200 MachineEventLedger pause/resume wiring ===\n');
