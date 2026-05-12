@@ -61,6 +61,17 @@ export interface BuildStartReadinessInput {
    * only case the original message describes correctly).
    */
   readonly placementUncertainReason: WcsUncertainReason | null;
+  /**
+   * T1-205: callback for the "Reset WCS to baseline" recovery
+   * button. When set AND the WCS gate is failing with a
+   * data-failure reason (missing/malformed G54 or $10), the gate
+   * surfaces an inline button that invokes this callback. Calling
+   * `GrblController.applyWcsNormalization()` is the natural
+   * implementation — it sends `G10 L2 P1 X0 Y0 Z0` + `$10=0` and
+   * clears the placement-uncertain flag locally. `null` (no
+   * callback) leaves the gate text-only as before T1-205.
+   */
+  readonly onResetWcsToBaseline: (() => void) | null;
   readonly wifiTrust: TrustClassification;
   readonly wifiStartAllowed: boolean;
   readonly isRunning: boolean;
@@ -90,6 +101,17 @@ function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
   }
   let failHeadline: string;
   let failAction: string;
+  // T1-205: data-failure reasons (missing/malformed G54 or $10) get
+  // a "Reset WCS to baseline" recovery button alongside the
+  // descriptive text. The button calls `applyWcsNormalization()` on
+  // the controller, which sends `G10 L2 P1 X0 Y0 Z0` (sets G54 to
+  // baseline, persistent in EEPROM) + `$10=0` and clears the
+  // placement-uncertain flag locally — no reconnect cycle needed.
+  // wcs_query_error and the null (T1-20 listener race) cases don't
+  // get a button: the former needs the user to clear an alarm at
+  // the controller level (soft-reset / M999) and the latter is a
+  // reconnect race.
+  let offerResetButton = false;
   switch (input.placementUncertainReason) {
     case 'wcs_query_error':
       failHeadline = 'Controller refused the WCS query ($#)';
@@ -97,19 +119,23 @@ function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
       break;
     case 'missing_g54':
       failHeadline = 'Controller did not report a G54 offset';
-      failAction = 'The $# response contained no [G54:...] line. Check firmware version and cable; reconnect to retry.';
+      failAction = 'The $# response contained no [G54:...] line. Use the button below to initialize G54 = (0,0,0) on the controller (persists in EEPROM).';
+      offerResetButton = true;
       break;
     case 'malformed_g54':
       failHeadline = 'Controller reported a malformed G54 offset';
-      failAction = 'The [G54:...] response had unparseable coordinates. Check for cable noise; reconnect to retry.';
+      failAction = 'The [G54:...] response had unparseable coordinates. Use the button below to reset G54 to baseline, or check the USB cable for noise.';
+      offerResetButton = true;
       break;
     case 'missing_status_mask':
       failHeadline = 'Controller did not report a $10 status mask';
-      failAction = 'The $$ settings dump did not include $10. Check firmware version; reconnect to retry.';
+      failAction = 'The $$ settings dump did not include $10. Use the button below to set $10=0 on the controller.';
+      offerResetButton = true;
       break;
     case 'malformed_status_mask':
       failHeadline = 'Controller reported a malformed $10 value';
-      failAction = 'The $10= value was unparseable. Check for cable noise; reconnect to retry.';
+      failAction = 'The $10= value was unparseable. Use the button below to reset $10=0, or check the USB cable for noise.';
+      offerResetButton = true;
       break;
     case null:
       // T1-20 no-listener fallback: no reason stored. The original
@@ -124,6 +150,12 @@ function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
     status: 'fail',
     failHeadline,
     failAction,
+    failActionButton: offerResetButton && input.onResetWcsToBaseline
+      ? {
+          label: 'Reset WCS to baseline (G10 L2 P1 X0 Y0 Z0)',
+          onClick: input.onResetWcsToBaseline,
+        }
+      : undefined,
   };
 }
 

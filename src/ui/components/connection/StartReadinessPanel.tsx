@@ -32,6 +32,18 @@ export interface StartReadinessGate {
   failHeadline?: string;
   /** Human-actionable next step — shown when a gate is failing. */
   failAction?: string;
+  /**
+   * T1-205: optional clickable recovery action. When present, the
+   * panel renders an inline button below the failAction text. The
+   * existing failAction string is still shown as a description so
+   * the user knows what the button does. Used by the WCS-state
+   * gate (and any future gate) when there's a specific recovery
+   * command the user can fire from the UI.
+   */
+  failActionButton?: {
+    readonly label: string;
+    readonly onClick: () => void;
+  };
   /** Optional indented details, currently used by the preflight gate. */
   failDetails?: ReadonlyArray<{ severity: 'blocker' | 'warning'; text: string }>;
 }
@@ -218,6 +230,24 @@ export function StartReadinessPanel({ readiness }: Props): React.ReactElement | 
             lineHeight: 1.4,
           },
         }, `→ ${gate.failAction}`),
+        // T1-205: optional clickable recovery action.
+        gate.status === 'fail' && gate.failActionButton && React.createElement('button', {
+          type: 'button',
+          onClick: gate.failActionButton.onClick,
+          style: {
+            marginTop: 4,
+            marginLeft: 16,
+            padding: '4px 10px',
+            background: '#1a3a5a',
+            color: '#90c8ff',
+            border: '1px solid #2a5a8a',
+            borderRadius: 3,
+            fontSize: 11,
+            fontWeight: 500,
+            cursor: 'pointer',
+            alignSelf: 'flex-start' as const,
+          },
+        }, gate.failActionButton.label),
       )),
     ),
   );

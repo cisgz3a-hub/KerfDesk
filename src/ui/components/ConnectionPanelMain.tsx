@@ -1712,6 +1712,13 @@ export function ConnectionPanelMain({
     currentModeFrameAnchorValid,
     placementUncertain,
     placementUncertainReason,
+    // T1-205: wire the "Reset WCS to baseline" recovery button.
+    // applyWcsNormalization sends `G10 L2 P1 X0 Y0 Z0` + `$10=0`
+    // and clears _placementUncertain locally — the gate flips to
+    // ok without a reconnect cycle.
+    onResetWcsToBaseline: () => {
+      controllerRef.current?.applyWcsNormalization?.();
+    },
     wifiTrust,
     wifiStartAllowed,
     isRunning,

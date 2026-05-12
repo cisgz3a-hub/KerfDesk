@@ -87,6 +87,7 @@ function happy(): BuildStartReadinessInput {
     currentModeFrameAnchorValid: true,
     placementUncertain: false,
     placementUncertainReason: null,
+    onResetWcsToBaseline: null,
     wifiTrust: trustedTrust,
     wifiStartAllowed: true,
     isRunning: false,
@@ -459,9 +460,14 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       /did not report a G54 offset/i.test(g?.failHeadline ?? ''),
       'missing_g54 → headline names the missing G54',
     );
+    // T1-205: assert the failAction now points at the recovery button
+    // (the "Use the button below" phrasing). Cable/firmware hints
+    // remain implicit in the malformed-* variants where they're still
+    // a possible cause, but the data-failure recoveries route through
+    // the button as the primary path.
     assert(
-      /firmware|cable/i.test(g?.failAction ?? ''),
-      'missing_g54 → recovery hint mentions firmware/cable',
+      /button below|initialize G54/i.test(g?.failAction ?? ''),
+      'missing_g54 → recovery hint points at the reset button',
     );
   }
 
@@ -479,8 +485,8 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       'malformed_g54 → headline names the malformed G54',
     );
     assert(
-      /cable noise/i.test(g?.failAction ?? ''),
-      'malformed_g54 → recovery hint mentions cable noise',
+      /button below|cable/i.test(g?.failAction ?? ''),
+      'malformed_g54 → recovery hint mentions the button or the cable',
     );
   }
 
@@ -498,8 +504,8 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       'missing_status_mask → headline names $10',
     );
     assert(
-      /firmware/i.test(g?.failAction ?? ''),
-      'missing_status_mask → recovery hint mentions firmware',
+      /button below|\$10=0/i.test(g?.failAction ?? ''),
+      'missing_status_mask → recovery hint points at the reset button',
     );
   }
 
@@ -517,8 +523,8 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       'malformed_status_mask → headline names the malformed $10',
     );
     assert(
-      /cable noise/i.test(g?.failAction ?? ''),
-      'malformed_status_mask → recovery hint mentions cable noise',
+      /button below|cable/i.test(g?.failAction ?? ''),
+      'malformed_status_mask → recovery hint mentions the button or the cable',
     );
   }
 
@@ -548,6 +554,115 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     assert(
       seen.size === reasons.length,
       `each of the ${reasons.length} reasons produces a distinct message pair (got ${seen.size})`,
+    );
+  }
+}
+
+// -------- 16. T1-205: data-failure reasons get a recovery button --------
+//
+// User-reported bug: hitting `missing_g54` had no recovery action
+// — disconnect+reconnect didn't help because GRBL still didn't
+// respond to $# with G54. The fix exposes a button that fires
+// `applyWcsNormalization()` (G10 L2 P1 X0 Y0 Z0 + $10=0) so the
+// user can recover from the UI without typing console commands.
+//
+// The button SHOULD appear for the four "data" reasons
+// (missing/malformed × G54/$10) but NOT for `wcs_query_error`
+// (needs alarm clear at the controller) or `null` (T1-20 listener
+// race — needs reconnect cycle).
+{
+  const noop = () => {};
+  const dataReasons = [
+    'missing_g54',
+    'malformed_g54',
+    'missing_status_mask',
+    'malformed_status_mask',
+  ] as const;
+  for (const reason of dataReasons) {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: reason,
+      onResetWcsToBaseline: noop,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      g?.failActionButton !== undefined,
+      `${reason}: failActionButton present`,
+    );
+    assert(
+      g?.failActionButton?.label === 'Reset WCS to baseline (G10 L2 P1 X0 Y0 Z0)',
+      `${reason}: button label names the actual G10 command`,
+    );
+    assert(
+      g?.failActionButton?.onClick === noop,
+      `${reason}: button onClick is the wired callback`,
+    );
+  }
+
+  // wcs_query_error gets NO button (alarm-level recovery needed).
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'wcs_query_error',
+      onResetWcsToBaseline: noop,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      g?.failActionButton === undefined,
+      "wcs_query_error: no button (alarm-clear is controller-level)",
+    );
+  }
+
+  // null reason gets NO button (T1-20 listener race — reconnect).
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: null,
+      onResetWcsToBaseline: noop,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      g?.failActionButton === undefined,
+      'null reason: no button (reconnect fixes the listener race)',
+    );
+  }
+
+  // No callback wired → no button even when reason qualifies.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'missing_g54',
+      onResetWcsToBaseline: null,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      g?.failActionButton === undefined,
+      'missing_g54 + no callback → no button (graceful degrade)',
+    );
+  }
+
+  // Source pin: ConnectionPanelMain wires applyWcsNormalization.
+  {
+    const here = dirname(fileURLToPath(import.meta.url));
+    const panelSrc = readFileSync(
+      resolve(here, '../src/ui/components/ConnectionPanelMain.tsx'),
+      'utf-8',
+    );
+    assert(
+      /T1-205/.test(panelSrc),
+      'ConnectionPanelMain carries T1-205 marker',
+    );
+    assert(
+      /onResetWcsToBaseline:[\s\S]{0,200}applyWcsNormalization/.test(panelSrc),
+      'ConnectionPanelMain wires onResetWcsToBaseline to applyWcsNormalization',
     );
   }
 }
