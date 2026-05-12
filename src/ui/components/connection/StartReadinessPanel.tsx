@@ -23,6 +23,9 @@ export interface StartReadinessGate {
     | 'framing'
     | 'currentModeAnchor'
     | 'laserState'
+    | 'noActiveOperation'
+    | 'noControllerError'
+    | 'recoveryComplete'
     | 'wcsState'
     | 'connectionTrust'
     | 'controllerConnected';

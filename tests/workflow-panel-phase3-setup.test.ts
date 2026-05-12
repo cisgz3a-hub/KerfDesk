@@ -283,8 +283,8 @@ console.log('\n=== T1-207 WorkflowPanel Phase 3 setup mode ===\n');
   );
   // canFrame requires compiled bounds.
   assert(
-    /sceneBounds[\s\S]{0,200}canvasPlanBounds/.test(adapterSrc),
-    'adapter resolves sceneBounds from compileResult.canvasPlanBounds',
+    /sceneBounds[\s\S]{0,120}canvasBurnBounds[\s\S]{0,80}canvasPlanBounds/.test(adapterSrc),
+    'adapter resolves frame trace bounds from burn bounds with plan fallback',
   );
 }
 

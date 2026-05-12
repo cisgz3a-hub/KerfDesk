@@ -343,15 +343,26 @@ export function App(): React.ReactElement {
     isJobRunning: grbl.isJobRunning,
   });
 
-  // T3-36: framing prefers fresh compiled canvas-plan bounds when they
-  // exist. Raw object output bounds remain the fallback for no/stale G-code.
+  // T3-36 follow-up: framing prefers fresh compiled canvas burn bounds when
+  // they exist. Raw object output bounds remain the fallback for no/stale G-code.
   const sceneBounds = useMemo(
     () => resolveFrameSceneBounds({
       outputBounds: outputSceneBounds,
+      compiledCanvasBurnBounds:
+        !gcodeStale && currentGcode && lastResult ? lastResult.canvasBurnBounds ?? null : null,
       compiledCanvasPlanBounds:
         !gcodeStale && currentGcode && lastResult ? lastResult.canvasPlanBounds : null,
       hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
     }),
+    [outputSceneBounds, gcodeStale, currentGcode, lastResult],
+  );
+
+  const frameTransformBounds = useMemo(
+    () => (
+      !gcodeStale && currentGcode && lastResult?.canvasPlanBounds
+        ? lastResult.canvasPlanBounds
+        : outputSceneBounds
+    ),
     [outputSceneBounds, gcodeStale, currentGcode, lastResult],
   );
 
@@ -1693,6 +1704,10 @@ export function App(): React.ReactElement {
         boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
         boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
         boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
+        frameTransformBoundsMinX: Number.isFinite(frameTransformBounds.minX) ? frameTransformBounds.minX : 0,
+        frameTransformBoundsMinY: Number.isFinite(frameTransformBounds.minY) ? frameTransformBounds.minY : 0,
+        frameTransformBoundsMaxX: Number.isFinite(frameTransformBounds.maxX) ? frameTransformBounds.maxX : 100,
+        frameTransformBoundsMaxY: Number.isFinite(frameTransformBounds.maxY) ? frameTransformBounds.maxY : 100,
         showAlert,
         showConfirm,
         showPrompt,

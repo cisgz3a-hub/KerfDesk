@@ -184,17 +184,18 @@ void (async () => {
       'MachineService: laserOff routed through ctrl.operations.laserOff',
     );
 
-    // Negative pin: no app-level caller should be constructing GRBL
-    // realtime bytes or M5 strings inline. Realtime byte literals
-    // 0x18 / 0x21 / 0x7e are GRBL-specific and belong in the
-    // controller, not the service / coordinator.
+    // Negative pin: no app-level caller should bypass controller
+    // operations or the MachineCommandGateway choke point with direct
+    // controller sends. T3-90's connect-time auto-M5 is intentionally
+    // routed through MachineCommandGateway and pinned by
+    // auto-m5-routes-through-gateway.test.ts.
     assert(
-      !/sendCommand\(['"]M5\s+S0['"]/.test(svc),
-      'MachineService: no inline sendCommand("M5 S0") (must go through operations.laserOff)',
+      !/\bctrl\.sendCommand\(['"]M5\s+S0['"]/.test(svc),
+      'MachineService: no direct ctrl.sendCommand("M5 S0") bypass',
     );
     assert(
-      !/sendCommand\(['"]M5\s+S0['"]/.test(coord),
-      'ExecutionCoordinator: no inline sendCommand("M5 S0") (must go through operations.laserOff)',
+      !/\bctrl\.sendCommand\(['"]M5\s+S0['"]/.test(coord),
+      'ExecutionCoordinator: no direct ctrl.sendCommand("M5 S0") bypass',
     );
     assert(
       !/_sendRealtime\(/.test(svc),

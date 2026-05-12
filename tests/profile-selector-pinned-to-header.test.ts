@@ -66,7 +66,7 @@ assert(
 // 3. profileSection is rendered in the main panel body, BEFORE the
 //    MoveControls component (so the user sees it without scrolling).
 {
-  const profileIdx = src.indexOf('detailsPanel == null && profileSection');
+  const profileIdx = src.indexOf('profileSection,');
   const moveControlsIdx = src.indexOf('React.createElement(MoveControls,', profileIdx);
   assert(profileIdx > 0, 'profileSection is referenced in the JSX tree');
   assert(
@@ -97,18 +97,21 @@ assert(
   );
 }
 
-// 6. profileSection is in the fixed Machine zone above the scroll body,
-//    so users can confirm the profile without scrolling through job details.
+// 6. profileSection is the first normal entry in the scrollable machine
+//    body (T1-214 moved prep content into one scroll area to keep E-Stop
+//    visible), so users see the profile before job details or move controls.
 {
   const renderStart = src.indexOf('React.createElement(ConnectionControls');
   const scrollBodyIdx = src.indexOf("overflowY: 'auto' as const", renderStart);
-  const profileRenderIdx = src.indexOf('isConnected && detailsPanel == null && profileSection', renderStart);
+  const profileRenderIdx = src.indexOf('profileSection,', renderStart);
+  const controlsRenderIdx = src.indexOf('controlsSection', profileRenderIdx);
   assert(renderStart > 0, 'main render tree found');
   assert(scrollBodyIdx > 0, 'scrollable panel body found');
   assert(profileRenderIdx > 0, 'profileSection is referenced in the main machine JSX tree');
+  assert(controlsRenderIdx > 0, 'controlsSection follows profileSection in the machine JSX tree');
   assert(
-    profileRenderIdx < scrollBodyIdx,
-    'profileSection renders in the fixed Machine zone before the scrollable body',
+    scrollBodyIdx < profileRenderIdx && profileRenderIdx < controlsRenderIdx,
+    'profileSection renders first inside the scrollable machine body before controls/job details',
   );
 }
 

@@ -37,14 +37,19 @@ function copyBounds(bounds: AABB): AABB {
  *
  * Raw output-object bounds are the right fallback when no fresh compile exists,
  * but raster jobs and generated toolpaths can burn a tighter/different envelope
- * than the object rectangle. A fresh compile's canvasPlanBounds is the closest
- * source to the actual emitted burn path, so framing should prefer it.
+ * than the object rectangle. A fresh compile's canvasBurnBounds is the closest
+ * source to the actual emitted burn path, so framing should prefer it. Older
+ * compile results may only carry canvasPlanBounds; keep that as a fallback.
  */
 export function resolveFrameSceneBounds(args: {
   outputBounds: AABB;
+  compiledCanvasBurnBounds?: AABB | null | undefined;
   compiledCanvasPlanBounds: AABB | null | undefined;
   hasFreshCompile: boolean;
 }): AABB {
+  if (args.hasFreshCompile && isUsableFrameBounds(args.compiledCanvasBurnBounds)) {
+    return copyBounds(args.compiledCanvasBurnBounds);
+  }
   if (args.hasFreshCompile && isUsableFrameBounds(args.compiledCanvasPlanBounds)) {
     return copyBounds(args.compiledCanvasPlanBounds);
   }
@@ -54,6 +59,7 @@ export function resolveFrameSceneBounds(args: {
 export function buildFrameCorners(
   sceneBounds: AABB,
   transformOpts: MachineTransformOptions,
+  transformReferenceBounds: AABB = sceneBounds,
 ): { x: number; y: number }[] {
   const corners = [
     { x: sceneBounds.minX, y: sceneBounds.minY },
@@ -62,5 +68,5 @@ export function buildFrameCorners(
     { x: sceneBounds.minX, y: sceneBounds.maxY },
     { x: sceneBounds.minX, y: sceneBounds.minY },
   ];
-  return corners.map(p => transformPointToMachine(p, sceneBounds, transformOpts));
+  return corners.map(p => transformPointToMachine(p, transformReferenceBounds, transformOpts));
 }

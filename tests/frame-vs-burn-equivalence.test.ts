@@ -216,16 +216,21 @@ async function runMatrixCase(
   const outputBounds = computeOutputBounds(scene);
   const frameSourceBounds = resolveFrameSceneBounds({
     outputBounds,
+    compiledCanvasBurnBounds: compiled.canvasBurnBounds ?? null,
     compiledCanvasPlanBounds: compiled.canvasPlanBounds,
     hasFreshCompile: true,
   });
-  const frameCorners = buildFrameCorners(frameSourceBounds, {
-    startMode,
-    savedOrigin,
-    originCorner,
-    bedHeightMm: profile.bedHeight,
-    bedWidthMm: profile.bedWidth,
-  });
+  const frameCorners = buildFrameCorners(
+    frameSourceBounds,
+    {
+      startMode,
+      savedOrigin,
+      originCorner,
+      bedHeightMm: profile.bedHeight,
+      bedWidthMm: profile.bedWidth,
+    },
+    compiled.canvasPlanBounds,
+  );
   const frameGcode = buildFrameGcode(frameCorners, {
     startMode,
     laserMode: 'dot',
@@ -256,13 +261,20 @@ async function main(): Promise<void> {
     const outputBounds = { minX: 10, minY: 20, maxX: 30, maxY: 40 };
     const compiledCanvasPlanBounds = { minX: 11, minY: 21, maxX: 29, maxY: 39 };
     assertBoundsClose(
-      resolveFrameSceneBounds({ outputBounds, compiledCanvasPlanBounds, hasFreshCompile: true }),
+      resolveFrameSceneBounds({ outputBounds, compiledCanvasBurnBounds: null, compiledCanvasPlanBounds, hasFreshCompile: true }),
       compiledCanvasPlanBounds,
       'fresh compile bounds win over raw output bounds',
       0.001,
     );
+    const compiledCanvasBurnBounds = { minX: 12, minY: 22, maxX: 28, maxY: 38 };
     assertBoundsClose(
-      resolveFrameSceneBounds({ outputBounds, compiledCanvasPlanBounds, hasFreshCompile: false }),
+      resolveFrameSceneBounds({ outputBounds, compiledCanvasBurnBounds, compiledCanvasPlanBounds, hasFreshCompile: true }),
+      compiledCanvasBurnBounds,
+      'fresh burn bounds win over fresh plan bounds',
+      0.001,
+    );
+    assertBoundsClose(
+      resolveFrameSceneBounds({ outputBounds, compiledCanvasBurnBounds, compiledCanvasPlanBounds, hasFreshCompile: false }),
       outputBounds,
       'stale compile falls back to raw output bounds',
       0.001,
@@ -280,8 +292,8 @@ async function main(): Promise<void> {
   {
     const appSource = readFileSync('src/ui/components/App.tsx', 'utf8');
     assert(
-      appSource.includes('resolveFrameSceneBounds') && appSource.includes('lastResult.canvasPlanBounds'),
-      'App frames from fresh compiled canvas bounds when available',
+      appSource.includes('resolveFrameSceneBounds') && appSource.includes('lastResult.canvasBurnBounds'),
+      'App frames from fresh compiled canvas burn bounds when available',
     );
   }
 

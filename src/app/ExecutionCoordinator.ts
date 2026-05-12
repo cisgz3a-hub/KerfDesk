@@ -207,6 +207,7 @@ export class ExecutionCoordinator {
   /** Frame without firing the laser (rapid moves only). */
   async frameSafe(args: {
     sceneBounds: AABB;
+    transformReferenceBounds?: AABB;
     transformOpts: MachineTransformOptions;
     idleTimeoutMs?: number;
     withCrosshair?: boolean;
@@ -221,6 +222,7 @@ export class ExecutionCoordinator {
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
+      transformReferenceBounds: args.transformReferenceBounds,
       transformOpts: args.transformOpts,
       laserMode: 'off',
       idleTimeoutMs: args.idleTimeoutMs,
@@ -236,6 +238,7 @@ export class ExecutionCoordinator {
    */
   async frameDot(args: {
     sceneBounds: AABB;
+    transformReferenceBounds?: AABB;
     transformOpts: MachineTransformOptions;
     maxSpindle: number;
     frameDotFeedRateMmPerMin?: number;
@@ -247,6 +250,7 @@ export class ExecutionCoordinator {
   }): Promise<FrameResult> {
     return this.runFrame({
       sceneBounds: args.sceneBounds,
+      transformReferenceBounds: args.transformReferenceBounds,
       transformOpts: args.transformOpts,
       laserMode: 'dot',
       maxSpindle: args.maxSpindle,
@@ -260,6 +264,7 @@ export class ExecutionCoordinator {
 
   private async runFrame(args: {
     sceneBounds: AABB;
+    transformReferenceBounds?: AABB;
     transformOpts: MachineTransformOptions;
     laserMode: 'off' | 'dot';
     maxSpindle?: number;
@@ -296,7 +301,11 @@ export class ExecutionCoordinator {
       frameDotFeedRateMmPerMin,
       withCrosshair = false,
     } = args;
-    const corners = buildFrameCorners(sceneBounds, transformOpts);
+    const corners = buildFrameCorners(
+      sceneBounds,
+      transformOpts,
+      args.transformReferenceBounds ?? sceneBounds,
+    );
 
     // T1-21: frame-dot emits M4 before the final M5. If the streaming
     // sequence returns early (T1-103 command-blocked) or throws before

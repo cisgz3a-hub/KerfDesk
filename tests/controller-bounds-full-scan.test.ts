@@ -111,15 +111,17 @@ async function main(): Promise<void> {
 
   {
     const here = dirname(fileURLToPath(import.meta.url));
-    const src = readFileSync(resolve(here, '../src/controllers/grbl/GrblController.ts'), 'utf8');
-    const start = src.indexOf('private _checkJobBounds(');
-    const end = src.indexOf('private _queryFreshStatus', start);
-    const body = src.slice(start, end);
-    assert(src.includes('T1-108: all lines are inspected'),
+    const controllerSrc = readFileSync(resolve(here, '../src/controllers/grbl/GrblController.ts'), 'utf8');
+    const helperSrc = readFileSync(resolve(here, '../src/controllers/grbl/GrblJobBoundsChecker.ts'), 'utf8');
+    const start = controllerSrc.indexOf('private _checkJobBounds(');
+    const end = controllerSrc.indexOf('private _queryFreshStatus', start);
+    const body = controllerSrc.slice(start, end);
+    assert(controllerSrc.includes('T1-108: all lines are inspected') || helperSrc.includes('T1-108: deliberately O(n)'),
       'source documents the full-scan safety rationale');
-    assert(!/MAX_LINES/.test(body), 'old MAX_LINES cap is absent from _checkJobBounds');
-    assert(/for \(let i = 0; i < lines\.length; i\+\+\)/.test(body),
-      '_checkJobBounds loops across all lines');
+    assert(!/MAX_LINES/.test(body) && !/MAX_LINES/.test(helperSrc),
+      'old MAX_LINES cap is absent from _checkJobBounds');
+    assert(/for \(let i = 0; i < lines\.length; i\+\+\)/.test(helperSrc),
+      'job-bounds helper loops across all lines');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

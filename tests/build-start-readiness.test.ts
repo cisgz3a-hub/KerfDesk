@@ -9,7 +9,7 @@
  * without mounting ConnectionPanelMain with ~50 fixture props.
  *
  * This test pins:
- *   - All 11 readiness gates render in canonical order with correct
+ *   - All 14 readiness gates render in canonical order with correct
  *     status / headline / action text.
  *   - Per-gate fail headlines reflect the relevant input slice.
  *   - The frame-control failHeadline switches based on the failure
@@ -88,6 +88,7 @@ function happy(): BuildStartReadinessInput {
     placementUncertain: false,
     placementUncertainReason: null,
     onResetWcsToBaseline: null,
+    recoveryAllowsStart: true,
     wifiTrust: trustedTrust,
     wifiStartAllowed: true,
     isRunning: false,
@@ -102,7 +103,7 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   const r = buildStartReadiness(happy());
   assert(r.ready === true, 'happy path: ready=true');
   assert(r.blockingGate === null, 'happy path: no blocking gate');
-  assert(r.gates.length === 11, `11 gates rendered (got ${r.gates.length})`);
+  assert(r.gates.length === 14, `14 gates rendered (got ${r.gates.length})`);
   assert(r.gates.every((g) => g.status === 'ok'),
     'happy path: every gate status ok');
 }
@@ -119,6 +120,9 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     'framing',
     'currentModeAnchor',
     'laserState',
+    'noActiveOperation',
+    'noControllerError',
+    'recoveryComplete',
     'wcsState',
     'connectionTrust',
   ];
@@ -664,6 +668,79 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       /onResetWcsToBaseline:[\s\S]{0,200}applyWcsNormalization/.test(panelSrc),
       'ConnectionPanelMain wires onResetWcsToBaseline to applyWcsNormalization',
     );
+  }
+}
+
+// -------- 17. Hidden canStartJob conjuncts are visible --------
+//
+// Regression: Start could be disabled while every readiness row
+// looked green because canStartJob also depended on baseSafe and
+// recoveryAllowsStart. These rows keep the explanation aligned with
+// the real Start button predicate.
+{
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      activeOperation: { kind: 'jog', startedAt: 0, sessionId: 1 },
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'noActiveOperation');
+    assert(g?.status === 'fail', 'activeOperation set: noActiveOperation fails');
+    assert(/jog/i.test(g?.failHeadline ?? ''), 'activeOperation: failHeadline names operation kind');
+  }
+
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      machineState: { ...happy().machineState!, errorCode: 7 },
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'noControllerError');
+    assert(g?.status === 'fail', 'machineState.errorCode set: noControllerError fails');
+    assert(/7/.test(g?.failHeadline ?? ''), 'controller error: failHeadline names error code');
+  }
+
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      recoveryAllowsStart: false,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'recoveryComplete');
+    assert(g?.status === 'fail', 'recoveryAllowsStart=false: recoveryComplete fails');
+  }
+
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      recoveryPending: true,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'recoveryComplete');
+    assert(g?.status === 'fail', 'recoveryPending=true: recoveryComplete fails');
+    assert(/unsafe state pending/i.test(g?.failHeadline ?? ''),
+      'recoveryPending: failHeadline names unsafe prior state');
+  }
+
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      laserOutputState: 'on',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'laserState');
+    assert(g?.status === 'fail', "laserOutputState 'on': laserState fails");
+    assert(/still on/i.test(g?.failHeadline ?? ''), "laserOutputState 'on': headline names laser still on");
+  }
+
+  {
+    const r = buildStartReadiness(happy());
+    assert(r.gates.find((g) => g.id === 'noActiveOperation')?.status === 'ok',
+      'happy: noActiveOperation ok');
+    assert(r.gates.find((g) => g.id === 'noControllerError')?.status === 'ok',
+      'happy: noControllerError ok');
+    assert(r.gates.find((g) => g.id === 'recoveryComplete')?.status === 'ok',
+      'happy: recoveryComplete ok');
   }
 }
 

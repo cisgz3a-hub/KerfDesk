@@ -25,6 +25,11 @@ import { createScene } from '../src/core/scene/Scene';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
+import {
+  captureEntitlementPolicySnapshot,
+  hashEntitlementPolicy,
+  hashReferencedMaterialPresets,
+} from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 
 let passed = 0;
@@ -106,6 +111,8 @@ function makeBigTicket(lineCount: number): ValidatedJobTicket {
     ticketId: 'fanout-' + lineCount,
     sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
     gcodeHash: hashString(gcodeText),
     gcodeLines: lines,
     gcodeText,

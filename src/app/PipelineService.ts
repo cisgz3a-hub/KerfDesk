@@ -45,7 +45,7 @@ import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
 // Catches encoder bugs (pre-T1-173 raster overscan, pre-T1-180
 // zero-distance dwell-burn) at compile time, before the ticket is
 // presented for approval.
-import { checkBurnEnvelopeDivergence } from '../core/output/burnEnvelopeDivergence';
+import { checkBurnEnvelopeDivergence, computePlanBurnEnvelope } from '../core/output/burnEnvelopeDivergence';
 // T1-195 (extends T1-193): persist burn-envelope divergence events
 // to the shared ledger so support bundles can correlate compile-time
 // encoder regressions with the runtime stream they affected.
@@ -161,6 +161,8 @@ export interface CompileGcodeResult {
   machinePlanBounds: AABB;
   /** Canvas-space moves for toolpath preview overlay. */
   canvasMoves: Move[];
+  /** Canvas-space laser-on envelope for framing. Excludes laser-off raster overscan. */
+  canvasBurnBounds?: AABB | null;
   canvasPlanBounds: AABB;
   failedTextObjects: string[];
   /** Execution-contract ticket (phase 1: built here; consumed by later phases). */
@@ -324,6 +326,7 @@ export async function compileGcode(
   // Canvas-space data for preview
   const canvasMoves = plan.operations.flatMap(op => op.moves);
   const canvasPlanBounds = { ...plan.bounds };
+  const canvasBurnBounds = computePlanBurnEnvelope(plan).burnBounds;
 
   const originCorner = resolveOriginCorner(profile);
   const bedWidthMm = resolveBedWidthMm(profile, machineBedFromController);
@@ -464,6 +467,7 @@ export async function compileGcode(
     machineTransform,
     machinePlanBounds: { ...machineTransform.plan.bounds },
     canvasMoves,
+    canvasBurnBounds: canvasBurnBounds ? { ...canvasBurnBounds } : null,
     canvasPlanBounds,
     failedTextObjects,
     ticket,

@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 387 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 536 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 466 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 655 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,18 +23,18 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 42 | - |
+| `src/app` | 47 | - |
 | `src/communication` | 5 | - |
-| `src/controllers` | 11 | grbl |
-| `src/core` | 96 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
-| `src/debug` | 3 | - |
-| `src/diagnostics` | 11 | - |
+| `src/controllers` | 27 | grbl |
+| `src/core` | 109 | box, devices, geometry, grbl, image, job, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/debug` | 4 | - |
+| `src/diagnostics` | 12 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
-| `src/import` | 16 | dxf, image, svg, trace |
+| `src/import` | 17 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
-| `src/io` | 12 | migrations, validation |
+| `src/io` | 14 | migrations, validation |
 | `src/onboarding` | 1 | - |
 | `src/runtime` | 2 | - |
 | `src/security` | 3 | - |
@@ -42,20 +42,26 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 148 | browser, components, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 188 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 468 | - |
+| `tests/` | 581 | - |
+| `tests/capability-regression` | 1 | - |
+| `tests/connection-lifecycle` | 1 | - |
+| `tests/controller-matrix` | 1 | - |
 | `tests/e2e` | 40 | fixtures, helpers, snapshots |
 | `tests/end-to-end-workflows` | 1 | - |
+| `tests/entitlement-tamper-resistance` | 1 | - |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
 | `tests/helpers` | 7 | - |
+| `tests/ipc-fuzz` | 1 | - |
 | `tests/malformed` | 5 | - |
+| `tests/packaged-app-smoke` | 1 | - |
 | `tests/perf` | 3 | - |
 | `tests/persistence-stress` | 1 | - |
 | `tests/safety-controller-matrix` | 1 | - |
@@ -90,6 +96,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/JobSession.ts`
 - `src/app/LastMachinePosition.ts`
 - `src/app/MachineCommandGateway.ts`
+- `src/app/MachineEventLedger.ts`
 - `src/app/MachineSafetyState.ts`
 - `src/app/MachineService.ts`
 - `src/app/OperationGate.ts`
@@ -102,17 +109,21 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/app/StructuredMessageLog.ts`
 - `src/app/StructuredRxTxEntry.ts`
 - `src/app/UserModeGates.ts`
+- `src/app/approvalNonceStore.ts`
 - `src/app/autosavePersistence.ts`
 - `src/app/computeCommandGates.ts`
 - `src/app/computeFrameFreshnessKey.ts`
 - `src/app/frameGcode.ts`
 - `src/app/grblIdlePoll.ts`
+- `src/app/machineServiceHelpers.ts`
 - `src/app/recoveryEligibility.ts`
 - `src/app/savedOriginVerify.ts`
 - `src/app/sceneDirtyHash.ts`
 - `src/app/sendResetWcsCommand.ts`
 - `src/app/sendSetOriginWcsCommand.ts`
+- `src/app/unsafeAtConnectMessages.ts`
 - `src/app/unsafePriorState.ts`
+- `src/app/validateJobTicket.ts`
 
 ### `src/communication`
 
@@ -130,10 +141,26 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/controllers/ControllerRegistry.ts`
 - `src/controllers/ControllerSafetyCapabilities.ts`
 - `src/controllers/ControllerSafetyOps.ts`
+- `src/controllers/FirmwareAdapter.ts`
+- `src/controllers/GrblFirmwareAdapter.ts`
+- `src/controllers/IdentityComparison.ts`
+- `src/controllers/JobProgressMultiDomain.ts`
+- `src/controllers/MarlinFirmwareAdapter.ts`
 - `src/controllers/grbl/CommandClassifier.ts`
 - `src/controllers/grbl/ForceSafeState.ts`
 - `src/controllers/grbl/GrblController.ts`
 - `src/controllers/grbl/GrblFrameGcode.ts`
+- `src/controllers/grbl/GrblIdentityParser.ts`
+- `src/controllers/grbl/GrblJobBoundsChecker.ts`
+- `src/controllers/grbl/GrblJobLineParser.ts`
+- `src/controllers/grbl/GrblSafeStateClassifier.ts`
+- `src/controllers/grbl/GrblSettingsParser.ts`
+- `src/controllers/grbl/GrblStatusReportParser.ts`
+- `src/controllers/grbl/GrblUnsafeAtConnect.ts`
+- `src/controllers/grbl/GrblWcsConsentClassifier.ts`
+- `src/controllers/grbl/GrblWcsParser.ts`
+- `src/controllers/grbl/StopOnErrorOverrideToken.ts`
+- `src/controllers/grbl/grblOperationValidators.ts`
 - `src/controllers/grbl/streamingHealth.ts`
 
 ### `src/core`
@@ -150,6 +177,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/box/panelModel.ts`
 - `src/core/devices/ActiveProfileStore.ts`
 - `src/core/devices/DeviceProfile.ts`
+- `src/core/devices/SplitDeviceProfile.ts`
 - `src/core/devices/homeCorner.ts`
 - `src/core/devices/profileSnapshot.ts`
 - `src/core/devices/validateProfile.ts`
@@ -165,10 +193,15 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/job/ReconstructionGradeJobLog.ts`
 - `src/core/job/TicketCapabilitySnapshot.ts`
 - `src/core/job/ValidatedJobTicket.ts`
+- `src/core/job/bezierFlatten.ts`
+- `src/core/job/compileInputHashes.ts`
+- `src/core/job/compoundRoles.ts`
 - `src/core/job/index.ts`
+- `src/core/job/jobCompilerHelpers.ts`
 - `src/core/job/ticketHashing.ts`
 - `src/core/materials/CalibrationAnalyzer.ts`
 - `src/core/materials/CalibrationGrid.ts`
+- `src/core/materials/CommunityResponseCurve.ts`
 - `src/core/materials/MaterialFeedback.ts`
 - `src/core/materials/MaterialLibrary.ts`
 - `src/core/materials/MaterialPreset.ts`
@@ -177,11 +210,15 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/materials/MaterialSettingConfidence.ts`
 - `src/core/materials/ResponseCurve.ts`
 - `src/core/materials/defaultPresets.ts`
+- `src/core/materials/presetOpsHelpers.ts`
 - `src/core/nesting/Nester.ts`
 - `src/core/output/GcodeOrigin.ts`
+- `src/core/output/GcodeStreaming.ts`
 - `src/core/output/GrblStrategy.ts`
 - `src/core/output/Output.ts`
 - `src/core/output/TimeEstimator.ts`
+- `src/core/output/burnEnvelopeDivergence.ts`
+- `src/core/output/emittedBurnEnvelope.ts`
 - `src/core/output/index.ts`
 - `src/core/plan/ContainmentOrder.ts`
 - `src/core/plan/FillGenerator.ts`
@@ -198,10 +235,13 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/plan/Simulation.ts`
 - `src/core/plan/SmartOverscan.ts`
 - `src/core/plan/VelocityProfile.ts`
+- `src/core/plan/fillGeometryHelpers.ts`
 - `src/core/plan/index.ts`
+- `src/core/plan/planOptimizerHelpers.ts`
 - `src/core/preflight/GcodeTemplateValidator.ts`
 - `src/core/preflight/Preflight.ts`
 - `src/core/preflight/confirmPreflightForJobStart.ts`
+- `src/core/preflight/rules/CapabilityMismatchRules.ts`
 - `src/core/preflight/rules/CompileComplexityPreflight.ts`
 - `src/core/preflight/rules/DuplicateGeometryPreflight.ts`
 - `src/core/preflight/rules/GeometryValidityPreflight.ts`
@@ -240,6 +280,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/debug/AppDebugState.ts`
 - `src/debug/StateGraph.ts`
 - `src/debug/TransitionLog.ts`
+- `src/debug/traceStormProbe.ts`
 
 ### `src/diagnostics`
 
@@ -250,6 +291,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/diagnostics/CrashReporter.ts`
 - `src/diagnostics/GrblDiagnostics.ts`
 - `src/diagnostics/Redaction.ts`
+- `src/diagnostics/RetentionPolicy.ts`
 - `src/diagnostics/StorageHealth.ts`
 - `src/diagnostics/SupportBundle.ts`
 - `src/diagnostics/TroubleshootingPanelContent.ts`
@@ -303,6 +345,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/import/svg/SvgUnitChoice.ts`
 - `src/import/svg/TransformParser.ts`
 - `src/import/svg/index.ts`
+- `src/import/svg/svgParserHelpers.ts`
 - `src/import/trace/ImageTracerAdapter.ts`
 - `src/import/trace/PotraceTracer.ts`
 - `src/import/trace/index.ts`
@@ -325,6 +368,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/io/SvgImportPlacement.ts`
 - `src/io/index.ts`
 - `src/io/migrations/MigrationPipeline.ts`
+- `src/io/migrations/projectMigrations.ts`
+- `src/io/sceneSerializerHelpers.ts`
 - `src/io/validation/geometryValidation.ts`
 
 ### `src/onboarding`
@@ -417,6 +462,9 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/UpdateNotice.tsx`
 - `src/ui/components/VariableTextDialog.tsx`
 - `src/ui/components/WelcomeWizard.tsx`
+- `src/ui/components/app/appLayerModeHelpers.ts`
+- `src/ui/components/app/appLayoutHelpers.ts`
+- `src/ui/components/app/appSelectionHelpers.ts`
 - `src/ui/components/appCanvasViewportProps.ts`
 - `src/ui/components/appConnectionPanelProps.ts`
 - `src/ui/components/appFileToolbarProps.ts`
@@ -431,6 +479,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/box-library/BoxStudioWorkspace.tsx`
 - `src/ui/components/canvas/CanvasRenderer.tsx`
 - `src/ui/components/canvas/ModeTabsOverlay.tsx`
+- `src/ui/components/canvas/canvasSnapHelpers.ts`
+- `src/ui/components/canvas/canvasViewportHelpers.ts`
 - `src/ui/components/common/FontPicker.tsx`
 - `src/ui/components/connection/ConnectWizard.tsx`
 - `src/ui/components/connection/ConnectionDetailsPanel.tsx`
@@ -444,19 +494,50 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/connection/StartReadinessPanel.tsx`
 - `src/ui/components/connection/StatusBar.tsx`
 - `src/ui/components/connection/StructuredLogPanel.tsx`
+- `src/ui/components/connection/UnsafeAtConnectBanner.tsx`
 - `src/ui/components/connection/Workflow.tsx`
+- `src/ui/components/connection/buildStartReadiness.ts`
+- `src/ui/components/connection/connectionPanelEquality.ts`
+- `src/ui/components/connection/connectionPanelLabels.ts`
 - `src/ui/components/connection/jobModePlanSummary.ts`
+- `src/ui/components/connection/playCompletionBeep.ts`
+- `src/ui/components/connection/unsafeAtConnectMessages.ts`
 - `src/ui/components/falcon-wifi/FalconAlarmToast.tsx`
 - `src/ui/components/falcon-wifi/FalconWiFiConnectBlock.tsx`
 - `src/ui/components/falcon-wifi/FalconWiFiStatusPanel.tsx`
 - `src/ui/components/falcon-wifi/falconIpc.ts`
 - `src/ui/components/falcon-wifi/index.ts`
 - `src/ui/components/gcodePreviewModel.ts`
+- `src/ui/components/layers/groupMaterialPresets.ts`
+- `src/ui/components/layers/layerPanelStyles.ts`
+- `src/ui/components/layers/layerTransforms.ts`
 - `src/ui/components/materials/CalibrateMaterialDialog.tsx`
+- `src/ui/components/properties/imageSettingsTransforms.ts`
+- `src/ui/components/properties/propertiesPanelStyles.ts`
+- `src/ui/components/properties/traceSceneTransforms.ts`
 - `src/ui/components/settings/CalibrationSettingsTab.tsx`
 - `src/ui/components/settings/GcodeSettingsTab.tsx`
 - `src/ui/components/settings/MachineSettingsTab.tsx`
 - `src/ui/components/settings/ProfilesSettingsTab.tsx`
+- `src/ui/components/workflow/WorkflowPanel.tsx`
+- `src/ui/components/workflow/derivePanelMode.ts`
+- `src/ui/components/workflow/modes/ConnectingMode.tsx`
+- `src/ui/components/workflow/modes/DisconnectedMode.tsx`
+- `src/ui/components/workflow/modes/ModeStub.tsx`
+- `src/ui/components/workflow/modes/PausedMode.tsx`
+- `src/ui/components/workflow/modes/ReadyMode.tsx`
+- `src/ui/components/workflow/modes/RecoveryMode.tsx`
+- `src/ui/components/workflow/modes/RunningMode.tsx`
+- `src/ui/components/workflow/modes/SetupMode.tsx`
+- `src/ui/components/workflow/modes/setup/ConsoleTab.tsx`
+- `src/ui/components/workflow/modes/setup/JobTab.tsx`
+- `src/ui/components/workflow/modes/setup/MoveTab.tsx`
+- `src/ui/components/workflow/modes/setup/TabBar.tsx`
+- `src/ui/components/workflow/modes/setup/setupTabPersistence.ts`
+- `src/ui/components/workflow/recoveryVariantFromState.ts`
+- `src/ui/components/workflow/zones/PrimaryActionFooter.tsx`
+- `src/ui/components/workflow/zones/TopBar.tsx`
+- `src/ui/features/uiFeatureFlags.ts`
 - `src/ui/history/HistoryManager.ts`
 - `src/ui/history/SceneCommands.ts`
 - `src/ui/history/estimateSceneBytes.ts`
@@ -477,6 +558,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/hooks/useFileHandlers.ts`
 - `src/ui/hooks/useGeneratorHandlers.ts`
 - `src/ui/hooks/useGrblConnection.ts`
+- `src/ui/hooks/useGrblDerivedMachineInfo.ts`
 - `src/ui/hooks/useImageCacheWarmer.ts`
 - `src/ui/hooks/useImport.ts`
 - `src/ui/hooks/useKerfHandlers.ts`
@@ -495,6 +577,9 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/recovery/RecoveryCardContent.ts`
 - `src/ui/renderers/SceneRenderer.ts`
 - `src/ui/renderers/SimulationRenderer.ts`
+- `src/ui/renderers/sceneCornerHelpers.ts`
+- `src/ui/renderers/sceneOverlayHelpers.ts`
+- `src/ui/renderers/sceneRendererPredicates.ts`
 - `src/ui/safety/SafetyOutcomeMessages.ts`
 - `src/ui/scene/SceneCommitActions.ts`
 - `src/ui/scene/SceneTransaction.ts`
@@ -527,6 +612,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/active-layer-history-consistent.test.ts`
 - `tests/active-profile-store.test.ts`
 - `tests/analyze-burn-bounds.test.ts`
+- `tests/any-cast-cleanup.test.ts`
 - `tests/app-canvas-viewport-props-extracted.test.ts`
 - `tests/app-connection-panel-props-extracted.test.ts`
 - `tests/app-device-profiles-extracted.test.ts`
@@ -535,20 +621,26 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-generator-workflows-extracted.test.ts`
 - `tests/app-history-manager-owned-by-store.test.ts`
 - `tests/app-keyboard-workflow-extracted.test.ts`
+- `tests/app-layer-mode-helpers.test.ts`
+- `tests/app-layout-helpers.test.ts`
 - `tests/app-material-workflows-extracted.test.ts`
 - `tests/app-no-local-usestate.test.ts`
 - `tests/app-nudge-workflow-extracted.test.ts`
 - `tests/app-profile-apply-import.test.ts`
 - `tests/app-recovery-setup-extracted.test.ts`
+- `tests/app-selection-helpers.test.ts`
 - `tests/app-settings-modal-extracted.test.ts`
 - `tests/app-settings-store.test.ts`
 - `tests/app-size-audit.test.ts`
 - `tests/app-text-dialogs-extracted.test.ts`
 - `tests/app-version-from-package.test.ts`
+- `tests/approval-nonce-store.test.ts`
 - `tests/async-scene-producer-guards.test.ts`
 - `tests/atomic-autosave-record.test.ts`
 - `tests/auto-detect-includes-max-spindle.test.ts`
 - `tests/auto-finalize-without-mounted-ui.test.ts`
+- `tests/auto-m5-listener-cleared-on-disconnect.test.ts`
+- `tests/auto-m5-routes-through-gateway.test.ts`
 - `tests/auto-update-infrastructure.test.ts`
 - `tests/autofocus-timeout-issues-safety-off.test.ts`
 - `tests/autofocus.test.ts`
@@ -559,6 +651,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/autosave-storage.test.ts`
 - `tests/backward-compat-project-fixtures.test.ts`
 - `tests/bed-height-resolver-parity.test.ts`
+- `tests/bezier-flatten.test.ts`
 - `tests/blue-noise-dither.test.ts`
 - `tests/boolean-ops-throws-without-license.test.ts`
 - `tests/box-dimension-modes.test.ts`
@@ -570,18 +663,24 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/box-preset-preview-model.test.ts`
 - `tests/browser-compatibility.test.ts`
 - `tests/build-stamp.test.tsx`
+- `tests/build-start-readiness.test.ts`
+- `tests/burn-envelope-divergence.test.ts`
 - `tests/burn-moves-2d.test.ts`
 - `tests/burn-progress-ack-timing.test.ts`
 - `tests/cable-yanked-mid-job.test.ts`
 - `tests/calibrate-dialog.test.ts`
 - `tests/calibration-analyzer.test.ts`
 - `tests/calibration-grid.test.ts`
+- `tests/canvas-snap-helpers.test.ts`
+- `tests/canvas-viewport-helpers.test.ts`
 - `tests/capability-value-resolution.test.ts`
 - `tests/checksum-validation.test.ts`
 - `tests/ci-installer-builds.test.ts`
 - `tests/clock-tamper.test.ts`
+- `tests/code-signing-config.test.ts`
 - `tests/command-classifier.test.ts`
 - `tests/command-gates-honor-safety-state.test.ts`
+- `tests/community-response-curve.test.ts`
 - `tests/compile-cancellable.test.ts`
 - `tests/compile-complexity-gate.test.ts`
 - `tests/compile-race-guard.test.ts`
@@ -593,6 +692,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/compound-offset-path.test.ts`
 - `tests/compound-output-boundary.test.ts`
 - `tests/compound-path-model.test.ts`
+- `tests/compound-roles.test.ts`
+- `tests/confirm-dialog-surfaces-divergence.test.ts`
 - `tests/connect-abort-signal.test.ts`
 - `tests/connect-browser-guidance.test.tsx`
 - `tests/connect-button-mutex.test.tsx`
@@ -604,11 +705,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/connection-generation-guard.test.ts`
 - `tests/connection-manager-fsm.test.ts`
 - `tests/connection-panel-emergency-stop-service.test.ts`
+- `tests/connection-panel-equality.test.ts`
 - `tests/connection-panel-go-to-last-position.test.ts`
 - `tests/connection-panel-jog-visible-without-scroll.test.ts`
+- `tests/connection-panel-labels.test.ts`
 - `tests/connection-panel-no-design-editing.test.ts`
 - `tests/connection-panel-offset-button-disabled.test.ts`
 - `tests/connection-panel-preflight-no-loop.test.tsx`
+- `tests/connection-panel-unsafe-at-connect-banner.test.tsx`
 - `tests/conservative-unknown-capability-handling.test.ts`
 - `tests/console-input.test.tsx`
 - `tests/controller-bounds-checks-g91.test.ts`
@@ -620,6 +724,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/controller-operations-api.test.ts`
 - `tests/controller-safety-action-result-methods.test.ts`
 - `tests/controller-safety-capabilities.test.ts`
+- `tests/controller-safety-event-sink.test.ts`
 - `tests/controller-settings-snapshot.test.ts`
 - `tests/controller-stop-safety.test.ts`
 - `tests/controller.test.ts`
@@ -645,15 +750,21 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/dialogs-store.test.ts`
 - `tests/dirty-derivation.test.ts`
 - `tests/dirty-state-app-migration.test.ts`
+- `tests/disconnect-emergency-portref-compare-and-swap.test.ts`
+- `tests/disconnect-laser-off-routes-through-notify.test.ts`
 - `tests/disconnect-stops-job-gating.test.ts`
 - `tests/disconnect-transaction.test.ts`
 - `tests/dither-cache-key-content-hash.test.ts`
 - `tests/dither-serpentine.test.ts`
+- `tests/door-status-classification.test.ts`
 - `tests/e2e-semantic-assertions.test.ts`
 - `tests/editor-store.test.ts`
 - `tests/electron-csp-integration.test.ts`
 - `tests/electron-navigation-blocked.test.ts`
 - `tests/electron-renderer-sandbox.test.ts`
+- `tests/emitted-burn-envelope-arcs.test.ts`
+- `tests/emitted-burn-envelope-r-mode-arcs.test.ts`
+- `tests/emitted-burn-envelope.test.ts`
 - `tests/entitlement-api-migration-phase2a.test.ts`
 - `tests/entitlement-api-migration-phase2b.test.ts`
 - `tests/entitlement-api-no-deprecated-export.test.ts`
@@ -673,9 +784,12 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/execution-coordinator-uses-command-gateway.test.ts`
 - `tests/execution-coordinator.test.ts`
 - `tests/failed-start-persists-log.test.ts`
+- `tests/failed-start-preserves-unsafe-state-when-streamed.test.ts`
+- `tests/falcon-autofocus-firmware-gate.test.ts`
 - `tests/falcon-autofocus-heal.test.ts`
 - `tests/falcon-serial-profile.test.ts`
 - `tests/falcon-wifi-fake-server.test.ts`
+- `tests/falcon-wifi-trust-blocks-start.test.ts`
 - `tests/falcon-wifi-trust.test.ts`
 - `tests/falcon-ws-frame-cap.test.ts`
 - `tests/family-agnostic-ticket.test.ts`
@@ -683,8 +797,11 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/fault-injection-scenarios.test.ts`
 - `tests/feature-matrix-enforcement.test.ts`
 - `tests/fill-generator-active-edge-table.test.ts`
+- `tests/fill-geometry-helpers.test.ts`
+- `tests/fill-no-rows-throws-not-outline-fallback.test.ts`
 - `tests/fill-rows-cache.test.ts`
 - `tests/fill-with-holes.test.ts`
+- `tests/firmware-adapter-type-contract.test.ts`
 - `tests/first-run-guide-wiring.test.ts`
 - `tests/first-run-guide.test.ts`
 - `tests/flattening-tolerance-by-operation.test.ts`
@@ -700,26 +817,45 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/frame-gcode-crosshair.test.ts`
 - `tests/frame-gcode-pure.test.ts`
 - `tests/frame-idle-timeout-dynamic.test.ts`
+- `tests/frame-line-delay-profile-driven.test.ts`
 - `tests/frame-required-before-start.test.ts`
 - `tests/frame-result-reasons.test.ts`
+- `tests/frame-saved-origin-verify.test.ts`
 - `tests/frame-state-transitions.test.ts`
 - `tests/frame-vs-burn-equivalence.test.ts`
+- `tests/gated-feature-per-feature.test.ts`
+- `tests/gcode-emitter-purity-and-zero-distance.test.ts`
 - `tests/gcode-header-modal-baseline.test.ts`
 - `tests/gcode-preview-large-job-sampling.test.ts`
 - `tests/gcode-relative-mode.test.ts`
 - `tests/gcode-relative-return-template.test.ts`
 - `tests/gcode-settings-custom-start-end-wiring.test.ts`
+- `tests/gcode-streaming-foundation.test.ts`
 - `tests/gcode-template-sanitization.test.ts`
 - `tests/gcode-template-validator.test.ts`
 - `tests/gcode-templates-safety.test.ts`
 - `tests/gcode-templates.test.ts`
 - `tests/geometry-deep-validation.test.ts`
 - `tests/grbl-connect-abort-signal.test.ts`
+- `tests/grbl-derived-machine-info.test.ts`
 - `tests/grbl-diagnostics-commands.test.ts`
+- `tests/grbl-firmware-adapter.test.ts`
 - `tests/grbl-handshake-rejects-bare-ok.test.ts`
+- `tests/grbl-identity-parser.test.ts`
+- `tests/grbl-identity-verification.test.ts`
+- `tests/grbl-job-bounds-checker.test.ts`
+- `tests/grbl-job-line-parser.test.ts`
 - `tests/grbl-marker-lifecycle.test.ts`
+- `tests/grbl-operation-validators-reject-bad-numbers.test.ts`
 - `tests/grbl-request-work-offsets.test.ts`
+- `tests/grbl-safe-state-classifier.test.ts`
+- `tests/grbl-settings-parser.test.ts`
+- `tests/grbl-status-report-parser.test.ts`
 - `tests/grbl-system-line-tagging.test.ts`
+- `tests/grbl-unsafe-at-connect-types.test.ts`
+- `tests/grbl-wcs-consent-classifier.test.ts`
+- `tests/grbl-wcs-parser.test.ts`
+- `tests/group-material-presets.test.ts`
 - `tests/group-ungroup-integrity.test.ts`
 - `tests/history-entry-metadata.test.ts`
 - `tests/history-memory-budget.test.ts`
@@ -731,12 +867,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/image-processing-worker-equivalence.test.ts`
 - `tests/image-processing.test.ts`
 - `tests/image-reference-validation.test.ts`
+- `tests/image-settings-transforms.test.ts`
 - `tests/import-callback-identity-stable.test.tsx`
 - `tests/import-limits.test.ts`
 - `tests/ipc-attack-surface.test.ts`
 - `tests/ipc-sender-verification.test.ts`
 - `tests/job-checkpoint.test.ts`
 - `tests/job-compiler-curve-flatness.test.ts`
+- `tests/job-compiler-helpers.test.ts`
 - `tests/job-complexity-summary.test.ts`
 - `tests/job-execution-session.test.ts`
 - `tests/job-fingerprint.test.ts`
@@ -759,17 +897,26 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/large-project-handling.test.ts`
 - `tests/laser-mode-banner.test.tsx`
 - `tests/last-machine-position.test.ts`
+- `tests/layer-panel-styles.test.ts`
+- `tests/layer-transforms.test.ts`
 - `tests/license-status-machine.test.ts`
 - `tests/license-status-states.test.ts`
 - `tests/lifecycle-revocation.test.ts`
 - `tests/load-repair-report.test.ts`
 - `tests/local-origin-transform-preserves-orientation.test.ts`
 - `tests/machine-command-gateway.test.ts`
+- `tests/machine-event-ledger-job-lifecycle-wiring.test.ts`
+- `tests/machine-event-ledger-pause-resume-wiring.test.ts`
+- `tests/machine-event-ledger-production-wiring.test.ts`
+- `tests/machine-event-ledger-recovery-cleared-wiring.test.ts`
+- `tests/machine-event-ledger-safety-off-wiring.test.ts`
+- `tests/machine-event-ledger.test.ts`
 - `tests/machine-origin-overlay-marker.test.ts`
 - `tests/machine-plan-bounds-source.test.ts`
 - `tests/machine-safety-state.test.ts`
 - `tests/machine-service-disconnect-safety-result.test.ts`
 - `tests/machine-service-emergency-stop-safety-result.test.ts`
+- `tests/machine-service-helpers.test.ts`
 - `tests/machine-service-job-lifecycle-safety.test.ts`
 - `tests/machine-service-laser-state-subscription.test.ts`
 - `tests/machine-service-pause-resume.test.ts`
@@ -780,9 +927,11 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/machine-settings-capability-indicators.test.ts`
 - `tests/machine-settings-stop-on-error-toggle.test.ts`
 - `tests/machine-start-store.test.ts`
+- `tests/machine-transform-fused-bounds.test.ts`
 - `tests/macos-icon-size.test.ts`
 - `tests/macos-signing-notarization-workflow.test.ts`
 - `tests/manual-save-needs-acknowledgement.test.ts`
+- `tests/marlin-firmware-adapter-stub.test.ts`
 - `tests/material-feedback-storage.test.ts`
 - `tests/material-first-workflow.test.ts`
 - `tests/material-library-storage.test.ts`
@@ -791,6 +940,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/material-presets-storage.test.ts`
 - `tests/materials.test.ts`
 - `tests/maxspindle-precedence-and-mismatch.test.ts`
+- `tests/migration-pipeline-wired-into-loader.test.ts`
 - `tests/migration-pipeline.test.ts`
 - `tests/modal-confirm-with-checkbox.test.tsx`
 - `tests/namespace-isolation.test.ts`
@@ -802,6 +952,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/no-live-pro-flag-writes.test.ts`
 - `tests/no-localstorage-in-core.test.ts`
 - `tests/no-scene-canvas-in-machine-coord.test.ts`
+- `tests/notify-simulator-chunked-warns-on-broken-listener.test.ts`
 - `tests/numberinput-focused-not-overridden.test.tsx`
 - `tests/numberinput-no-loop-on-rapid-prop-change.test.tsx`
 - `tests/numberinput-tolerance-still-works.test.tsx`
@@ -827,12 +978,18 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/placement.test.ts`
 - `tests/plan-accel-sanity.test.ts`
 - `tests/plan-marker-emission.test.ts`
+- `tests/plan-optimizer-helpers.test.ts`
 - `tests/plan-optimizer-large-raster.test.ts`
+- `tests/plan-optimizer-mid-operation-cancel.test.ts`
 - `tests/plan-optimizer-progress-cancel.test.ts`
+- `tests/plan-stats-time-estimation-defaults.test.ts`
+- `tests/play-completion-beep.test.ts`
 - `tests/poll-status-failure-normalized.test.ts`
 - `tests/position-trust-transitions.test.ts`
 - `tests/preflight-blocks-when-maxspindle-unknown.test.ts`
 - `tests/preflight-bounds.test.ts`
+- `tests/preflight-capability-mismatches.test.ts`
+- `tests/preflight-confirm-surfaces-info.test.ts`
 - `tests/preflight-duplicate-geometry.test.ts`
 - `tests/preflight-lightburn-policy.test.ts`
 - `tests/preflight-negative-coords.test.ts`
@@ -843,13 +1000,19 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/preflight-validator-dialect-routing.test.ts`
 - `tests/preflight-warning-confirm-includes-detail.test.ts`
 - `tests/preflight.test.ts`
+- `tests/preset-ops-helpers.test.ts`
 - `tests/production-bundle-smoke.test.ts`
+- `tests/production-security-source-checks.test.ts`
+- `tests/profile-auto-m5-on-connect.test.ts`
 - `tests/profile-change-blocks-start.test.ts`
+- `tests/profile-schema-validation.test.ts`
 - `tests/profile-selector-pinned-to-header.test.ts`
 - `tests/profile-validation.test.ts`
+- `tests/progress-model-multi-domain.test.ts`
 - `tests/project-map-generated.test.ts`
 - `tests/project-profile-snapshot.test.ts`
 - `tests/project-runtime-reset.test.ts`
+- `tests/properties-panel-styles.test.ts`
 - `tests/property-geometry.test.ts`
 - `tests/prt4040-connection-home-gate.test.ts`
 - `tests/prt4040-router-laser-profile.test.ts`
@@ -859,22 +1022,27 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/raster-grayscale-merge-tolerance.test.ts`
 - `tests/raster-m4-no-software-splitting.test.ts`
 - `tests/raster-output-uses-modal-m4.test.ts`
+- `tests/raster-overscan-as-s0-travel.test.ts`
 - `tests/raster-pixel-fixtures.test.ts`
 - `tests/raster-power-min-preflight.test.ts`
 - `tests/raster-with-curve.test.ts`
 - `tests/ready-to-run-panel.test.tsx`
+- `tests/reconnect-same-machine-verification.test.ts`
 - `tests/reconstruction-grade-joblog.test.ts`
 - `tests/recovery-card-ui-wiring.test.ts`
 - `tests/recovery-cards.test.ts`
 - `tests/recovery-eligibility-non-empty-cases.test.ts`
 - `tests/recovery-failure-alerts.test.tsx`
+- `tests/recovery-state-blocks-start.test.ts`
 - `tests/recovery-state-transitions.test.ts`
 - `tests/redaction.test.ts`
 - `tests/release-artifact-integrity.test.ts`
 - `tests/renderer-lifecycle-safety.test.ts`
 - `tests/response-curve.test.ts`
+- `tests/retention-policy.test.ts`
 - `tests/right-origin-x-flip.test.ts`
 - `tests/rollback-crash-loop-detection.test.ts`
+- `tests/rotated-raster-fails-closed.test.ts`
 - `tests/ruida-safety-design-doc.test.ts`
 - `tests/run-frame-fail-fast-on-blocked-command.test.ts`
 - `tests/runner-auto-discovery.test.ts`
@@ -882,6 +1050,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/safety-action-result.test.ts`
 - `tests/safety-controls-bypass-entitlement.test.ts`
 - `tests/safety-off-two-stage.test.ts`
+- `tests/safety-operations-controller-routing.test.ts`
 - `tests/safety-ops-contract.test.ts`
 - `tests/safety-outcome-messages.test.ts`
 - `tests/safety-state-transitions.test.ts`
@@ -894,13 +1063,19 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/scene-bounds-selectors.test.ts`
 - `tests/scene-canvas-machine-coord-check.test.ts`
 - `tests/scene-commit-actions-wired.test.ts`
+- `tests/scene-corner-helpers.test.ts`
 - `tests/scene-history-store.test.ts`
 - `tests/scene-io.test.ts`
+- `tests/scene-overlay-helpers.test.ts`
+- `tests/scene-renderer-predicates.test.ts`
+- `tests/scene-serializer-helpers.test.ts`
+- `tests/scene-serializer-typed-boundaries.test.ts`
 - `tests/scene-store.test.ts`
 - `tests/scene-transaction-app-wired.test.ts`
 - `tests/scene-transaction-unified.test.ts`
 - `tests/security-deps-pinned.test.ts`
 - `tests/selection-restore-on-history.test.ts`
+- `tests/serial-known-port-reuse.test.ts`
 - `tests/serial-navigator-disconnect.test.ts`
 - `tests/serial-port-close-async.test.ts`
 - `tests/server-entitlement-service.test.ts`
@@ -912,6 +1087,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/source-maps-hidden-mode.test.ts`
 - `tests/source-maps-not-shipped.test.ts`
 - `tests/source-text-migration.test.ts`
+- `tests/stale-followup-doc-sweep.test.ts`
 - `tests/stale-gcode-blocks-start.test.ts`
 - `tests/start-mode-labels.test.ts`
 - `tests/start-mode-wcs-reset.test.ts`
@@ -921,13 +1097,16 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/start-validated-job-passes-context.test.ts`
 - `tests/start-validated-job-then-immediately-tryfinalize.test.ts`
 - `tests/startup-diagnostics.test.ts`
+- `tests/stop-on-error-no-bypass-source-guard.test.ts`
 - `tests/stop-on-error-override.test.ts`
+- `tests/stop-on-error-token-in-interface.test.ts`
 - `tests/storage-adapter-contract.test.ts`
 - `tests/storage-filesystem-unit.test.ts`
 - `tests/storage-health.test.ts`
 - `tests/storage-ipc-no-broad-clear.test.ts`
 - `tests/storage-singleton.test.ts`
 - `tests/storage-size-limits.test.ts`
+- `tests/streaming-health-saturation.test.ts`
 - `tests/streaming-health.test.ts`
 - `tests/structured-log-events.test.ts`
 - `tests/structured-rx-tx-entries.test.ts`
@@ -936,12 +1115,16 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/svg-import-placement.test.ts`
 - `tests/svg-import.test.ts`
 - `tests/svg-inherited-group-styles.test.ts`
+- `tests/svg-parser-helpers.test.ts`
 - `tests/svg-text-import-warning.test.ts`
 - `tests/svg-unsupported-feature-warning.test.ts`
 - `tests/svg-use-defs-import.test.ts`
 - `tests/svg-viewbox-unit-choice.test.ts`
+- `tests/t1-26-defense-in-depth-strips-comments.test.ts`
 - `tests/t2-26-operation-routing-static-guard.test.ts`
+- `tests/tab-gap-uses-feed-not-rapid.test.ts`
 - `tests/template-safety-enforcement.test.ts`
+- `tests/template-validation-aggregates-errors.test.ts`
 - `tests/template-validator.test.ts`
 - `tests/test-grid-generator.test.ts`
 - `tests/test-runner-lanes.test.ts`
@@ -952,7 +1135,11 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/text-outline-cache.test.ts`
 - `tests/text-property-edits-undoable.test.ts`
 - `tests/ticket-capability-snapshot-validation.test.ts`
+- `tests/ticket-determinism-entitlement-and-presets.test.ts`
+- `tests/ticket-ledger-format-required.test.ts`
 - `tests/ticket-validation-message-translation.test.ts`
+- `tests/trace-scene-transforms.test.ts`
+- `tests/trace-storm-probe.test.ts`
 - `tests/transport-abstraction.test.ts`
 - `tests/transport-multi-subscribe.test.ts`
 - `tests/troubleshooting-panel.test.ts`
@@ -967,11 +1154,13 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/undo-during-job.test.ts`
 - `tests/undo-redo-invalidation.test.ts`
 - `tests/unsafe-prior-state-persistence.test.ts`
+- `tests/unsafe-state-survives-disconnect-and-estop.test.ts`
 - `tests/update-notice-ui.test.tsx`
 - `tests/usecompilemanager-cancel-progress.test.tsx`
 - `tests/usecompilemanager-stale-no-loop.test.tsx`
 - `tests/user-data-migration.test.ts`
 - `tests/user-mode-gates.test.ts`
+- `tests/validate-job-ticket.test.ts`
 - `tests/validated-job-ticket-mismatch.test.ts`
 - `tests/validated-job-ticket-phase1.test.ts`
 - `tests/velocity-profile.test.ts`
@@ -981,14 +1170,35 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/wake-lock.test.ts`
 - `tests/warm-processed-image-cache-pass4c.test.ts`
 - `tests/wcs-command-helpers-use-gateway.test.ts`
+- `tests/wcs-fail-closed-integration.test.ts`
+- `tests/wcs-fail-closed-on-unknown.test.ts`
 - `tests/wcs-mutation-consent.test.ts`
 - `tests/wcs-no-listener-blocks-job.test.ts`
 - `tests/wcs-no-listener-headless-flag.test.ts`
+- `tests/wcs-query-error-fails-closed.test.ts`
 - `tests/web-serial-byte-stream-harness.test.ts`
 - `tests/web-serial-partial-open-cleanup.test.ts`
 - `tests/webserial-cable-pull-heartbeat.test.ts`
 - `tests/windows-signing-release-workflow.test.ts`
 - `tests/wizard-complete-does-not-enable-material.test.tsx`
+- `tests/workflow-panel-derive-mode.test.ts`
+- `tests/workflow-panel-feature-flag.test.ts`
+- `tests/workflow-panel-phase2-modes.test.ts`
+- `tests/workflow-panel-phase3-setup.test.ts`
+- `tests/workflow-panel-phase4-live-job.test.ts`
+- `tests/workflow-panel-scaffold.test.ts`
+
+### `tests/capability-regression`
+
+- `tests/capability-regression/capability-regression-coverage.test.ts`
+
+### `tests/connection-lifecycle`
+
+- `tests/connection-lifecycle/connection-lifecycle-coverage.test.ts`
+
+### `tests/controller-matrix`
+
+- `tests/controller-matrix/operation-routing-by-family.test.ts`
 
 ### `tests/e2e`
 
@@ -1037,6 +1247,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 - `tests/end-to-end-workflows/end-to-end-workflows.test.ts`
 
+### `tests/entitlement-tamper-resistance`
+
+- `tests/entitlement-tamper-resistance/tamper-resistance.test.ts`
+
 ### `tests/fixtures`
 
 - `tests/fixtures/projects/v1-basic-cut.lfproj`
@@ -1058,6 +1272,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/helpers/parseGcode.ts`
 - `tests/helpers/propertyTesting.ts`
 
+### `tests/ipc-fuzz`
+
+- `tests/ipc-fuzz/ipc-fuzz.test.ts`
+
 ### `tests/malformed`
 
 - `tests/malformed/bad-image.test.ts`
@@ -1065,6 +1283,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/malformed/bad-svg.test.ts`
 - `tests/malformed/bad-template.test.ts`
 - `tests/malformed/extreme-coordinates.test.ts`
+
+### `tests/packaged-app-smoke`
+
+- `tests/packaged-app-smoke/packaged-app-build-config.test.ts`
 
 ### `tests/perf`
 

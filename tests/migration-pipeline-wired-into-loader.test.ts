@@ -205,8 +205,8 @@ console.log('\n=== T1-119 MigrationPipeline wired into SceneSerializer ===\n');
   );
   assert(/from '\.\/migrations\/projectMigrations'/.test(src),
     "SceneSerializer.ts imports from './migrations/projectMigrations'");
-  assert(/migrateSceneEnvelope\(parsed\)/.test(src),
-    'parseSceneEnvelope calls migrateSceneEnvelope(parsed)');
+  assert(/migrateSceneEnvelope\(envelope\)/.test(src),
+    'parseSceneEnvelope calls migrateSceneEnvelope(envelope)');
   assert(/T1-119/.test(src),
     'SceneSerializer carries T1-119 marker for the wiring change');
 }

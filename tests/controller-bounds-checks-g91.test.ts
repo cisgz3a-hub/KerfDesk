@@ -216,27 +216,38 @@ async function run(): Promise<void> {
   assert(/this\._positionConfirmed = false/.test(src),
     'flag cleared on disconnect / connect-entry');
 
-  // Find the _checkJobBounds body and pin the simulation shape.
+  // Find the _checkJobBounds wrapper and pin the delegated simulation shape.
   const start = src.indexOf('private _checkJobBounds(');
   const end = src.indexOf('private _queryFreshStatus', start);
   const body = src.slice(start, end);
   assert(body.length > 200, 'located _checkJobBounds body');
-  assert(/let curX = this\._state\.position\.x/.test(body),
-    '_checkJobBounds seeds curX from _state.position.x');
-  assert(/let curY = this\._state\.position\.y/.test(body),
-    '_checkJobBounds seeds curY from _state.position.y');
-  assert(/if \(!this\._positionConfirmed\)/.test(body),
-    '_checkJobBounds refuses relative moves when _positionConfirmed is false');
-  assert(/Cannot accept relative-mode job/.test(body),
+  assert(/checkGrblJobBounds\(lines,\s*\{/.test(body),
+    '_checkJobBounds delegates to checkGrblJobBounds');
+  assert(/headPosition:\s*\{\s*x:\s*this\._state\.position\.x,\s*y:\s*this\._state\.position\.y\s*\}/.test(body),
+    '_checkJobBounds passes _state.position to the helper');
+  assert(/positionConfirmed:\s*this\._positionConfirmed/.test(body),
+    '_checkJobBounds passes _positionConfirmed to the helper');
+
+  const helperSrc = fs.readFileSync(
+    path.resolve(here, '../src/controllers/grbl/GrblJobBoundsChecker.ts'),
+    'utf-8',
+  );
+  assert(/let curX = ctx\.headPosition\.x/.test(helperSrc),
+    'helper seeds curX from headPosition.x');
+  assert(/let curY = ctx\.headPosition\.y/.test(helperSrc),
+    'helper seeds curY from headPosition.y');
+  assert(/if \(!ctx\.positionConfirmed\)/.test(helperSrc),
+    'helper refuses relative moves when positionConfirmed is false');
+  assert(/Cannot accept relative-mode job/.test(helperSrc),
     'position-unknown message phrasing matches contract');
-  assert(/Reconnect to refresh status/.test(body),
+  assert(/Reconnect to refresh status/.test(helperSrc),
     'position-unknown message names "Reconnect" remediation');
-  assert(/curX \+= parseFloat\(xMatch\[1\]\)/.test(body),
-    'relative branch accumulates X delta');
-  assert(/curY \+= parseFloat\(yMatch\[1\]\)/.test(body),
-    'relative branch accumulates Y delta');
+  assert(/curX \+= parseFloat\(xMatch\[1\]\)/.test(helperSrc),
+    'helper relative branch accumulates X delta');
+  assert(/curY \+= parseFloat\(yMatch\[1\]\)/.test(helperSrc),
+    'helper relative branch accumulates Y delta');
   // The OLD `if (relative) continue` short-circuit must be gone.
-  assert(!/if \(relative\) continue;/.test(body),
+  assert(!/if \(relative\) continue;/.test(helperSrc),
     'OLD `if (relative) continue` short-circuit removed');
 }
 

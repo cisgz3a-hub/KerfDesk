@@ -169,6 +169,7 @@ console.log('\n=== frame-gcode crosshair ===\n');
     [
       'G91',
       'G21',
+      'M5 S0',
       'M4 S5',
       'G1 X100.000 Y0.000 F3000',
       'G1 X0.000 Y-100.000 F3000',

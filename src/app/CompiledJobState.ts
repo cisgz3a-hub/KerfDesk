@@ -27,6 +27,7 @@ import { type AABB } from '../core/types';
 export interface CompileResultLike {
   gcode: string;
   machinePlanBounds: AABB;
+  canvasBurnBounds?: AABB | null;
   canvasPlanBounds?: AABB;
   ticket: { ticketId: string };
   /** Optional fields the result may carry — not part of the contract. */

@@ -45,9 +45,21 @@ export function buildGrblFrameGcode(
 
   if (startMode === 'current') {
     const out: string[] = ['G91', 'G21'];
-    out.push(laserMode === 'dot' ? `M4 S${frameDotS}` : 'M5 S0');
+    out.push('M5 S0');
     let prev = { x: 0, y: 0 };
-    for (let i = 0; i < corners.length; i++) {
+    if (corners.length > 0) {
+      const first = corners[0]!;
+      const dx = first.x - prev.x;
+      const dy = first.y - prev.y;
+      if (Math.abs(dx) >= eps || Math.abs(dy) >= eps) {
+        out.push(`G0 X${dx.toFixed(3)} Y${dy.toFixed(3)}`);
+      }
+      prev = first;
+    }
+    if (laserMode === 'dot') {
+      out.push(`M4 S${frameDotS}`);
+    }
+    for (let i = 1; i < corners.length; i++) {
       const c = corners[i]!;
       const dx = c.x - prev.x;
       const dy = c.y - prev.y;

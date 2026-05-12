@@ -137,6 +137,10 @@ export interface ConnectionPanelMainProps {
   boundsMinY?: number;
   boundsMaxX?: number;
   boundsMaxY?: number;
+  frameTransformBoundsMinX?: number;
+  frameTransformBoundsMinY?: number;
+  frameTransformBoundsMaxX?: number;
+  frameTransformBoundsMaxY?: number;
   onClose: () => void;
   /**
    * Active device profile (memoized in App; re-reads when profileRevision increments).
@@ -204,6 +208,10 @@ export function ConnectionPanelMain({
   boundsMinY,
   boundsMaxX,
   boundsMaxY,
+  frameTransformBoundsMinX,
+  frameTransformBoundsMinY,
+  frameTransformBoundsMaxX,
+  frameTransformBoundsMaxY,
   onClose,
   activeProfile,
   onDisconnect,
@@ -672,6 +680,25 @@ export function ConnectionPanelMain({
     [boundsMinX, boundsMinY, boundsMaxX, boundsMaxY],
   );
 
+  const frameTransformBounds = useMemo(
+    () => ({
+      minX: frameTransformBoundsMinX ?? sceneBounds.minX,
+      minY: frameTransformBoundsMinY ?? sceneBounds.minY,
+      maxX: frameTransformBoundsMaxX ?? sceneBounds.maxX,
+      maxY: frameTransformBoundsMaxY ?? sceneBounds.maxY,
+    }),
+    [
+      frameTransformBoundsMinX,
+      frameTransformBoundsMinY,
+      frameTransformBoundsMaxX,
+      frameTransformBoundsMaxY,
+      sceneBounds.minX,
+      sceneBounds.minY,
+      sceneBounds.maxX,
+      sceneBounds.maxY,
+    ],
+  );
+
   // T1-42: previously `workFrame` used `computeGcodeOffset` directly,
   // which only handles the absolute / current / saved-origin offset
   // shift — it did NOT apply the front-origin Y-flip or the (now-
@@ -693,7 +720,7 @@ export function ConnectionPanelMain({
       bedHeightMm: bedHeight,
       bedWidthMm: bedWidth,
     };
-    const corners = buildFrameCorners(sceneBounds, transformOpts);
+    const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds);
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const c of corners) {
       if (c.x < minX) minX = c.x;
@@ -717,6 +744,10 @@ export function ConnectionPanelMain({
     sceneBounds.minY,
     sceneBounds.maxX,
     sceneBounds.maxY,
+    frameTransformBounds.minX,
+    frameTransformBounds.minY,
+    frameTransformBounds.maxX,
+    frameTransformBounds.maxY,
   ]);
 
   const framePhysicalBounds = useMemo(() => {
@@ -1200,7 +1231,7 @@ export function ConnectionPanelMain({
       ? { x: machineState.position.x, y: machineState.position.y }
       : null;
 
-    const corners = buildFrameCorners(sceneBounds, transformOpts);
+    const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds);
 
     const ys = corners.map(c => c.y);
     const yLo = Math.min(...ys);
@@ -1219,7 +1250,13 @@ export function ConnectionPanelMain({
     // raise it. Pre-T1-172 this was hardcoded 50 ms inside the
     // coordinator with no profile override.
     const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
-    const result = await executionCoordinator.frameSafe({ sceneBounds, transformOpts, idleTimeoutMs, frameLineDelayMs });
+    const result = await executionCoordinator.frameSafe({
+      sceneBounds,
+      transformReferenceBounds: frameTransformBounds,
+      transformOpts,
+      idleTimeoutMs,
+      frameLineDelayMs,
+    });
 
     if (!result.ok) {
       const timeoutSec = Math.round(idleTimeoutMs / 1000);
@@ -1233,7 +1270,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -1272,7 +1309,7 @@ export function ConnectionPanelMain({
       ? { x: machineState.position.x, y: machineState.position.y }
       : null;
 
-    const corners = buildFrameCorners(sceneBounds, transformOpts);
+    const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds);
 
     const ys = corners.map(c => c.y);
     const yLo = Math.min(...ys);
@@ -1289,6 +1326,7 @@ export function ConnectionPanelMain({
 
     const result = await executionCoordinator.frameDot({
       sceneBounds,
+      transformReferenceBounds: frameTransformBounds,
       transformOpts,
       maxSpindle,
       frameDotFeedRateMmPerMin,
@@ -1306,7 +1344,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleHome = useCallback(async () => {
     if (!canHome) {
@@ -1645,14 +1683,13 @@ export function ConnectionPanelMain({
     });
   // T1-30: canStartJob keeps its existing product-level conjuncts
   // (gcode exists / fresh / framed / preflight passed / not running /
-  // machine bounds OK / laser output not unknown / WCS not uncertain)
+  // machine bounds OK / laser output confirmed off / WCS not uncertain)
   // and adds `gates.baseSafe` as a defense-in-depth conjunct. baseSafe
   // collapses status === 'idle', laserOutput === 'off', no active
   // operation, no error code, and no pending recovery into one check;
-  // each of those was already implied by some upstream gate
-  // (preflight covers status; laser-output covers itself via
-  // laserOutputState !== 'unknown'; machineBlocksJobStart covers
-  // errorCode/alarm), but consolidating here makes the safety story
+  // each of those now has a matching visible readiness row
+  // (machine idle, laser off, active operation, controller error, and
+  // recovery state), so consolidating here makes the safety story
   // legible and prevents drift if any upstream gate weakens.
   const canStartJob =
     !!gcode &&
@@ -1719,6 +1756,7 @@ export function ConnectionPanelMain({
     onResetWcsToBaseline: () => {
       controllerRef.current?.applyWcsNormalization?.();
     },
+    recoveryAllowsStart: recoveryAllowsStart(recoveryState),
     wifiTrust,
     wifiStartAllowed,
     isRunning,

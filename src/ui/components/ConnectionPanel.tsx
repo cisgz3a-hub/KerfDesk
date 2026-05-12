@@ -333,7 +333,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     }
   };
   // Shared with the Start-Job wiring below — declared up here so
-  // the frame block (which uses compileResult.canvasPlanBounds and
+  // the frame block (which uses compileResult canvas burn/plan bounds and
   // startMode) doesn't trip a hoisting error.
   const compileResult = props.lastGcodeCompileResult ?? null;
   const compiledTicket = props.compiledJobTicket ?? compileResult?.ticket ?? null;
@@ -342,12 +342,13 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   // T1-211 (Phase 5b): frame wiring for the Move tab.
   // Two buttons: Frame (safe corner trace with laser-off motion) and
   // Frame + Dot (low-power outline + center mark). Both require a
-  // compiled job (we read canvasPlanBounds from lastGcodeCompileResult)
+  // compiled job (we read canvasBurnBounds/canvasPlanBounds from lastGcodeCompileResult)
   // and an idle controller. Saved-origin G54 drift verification is
   // intentionally skipped — the new panel already blocks savedOrigin
   // mode at the Start button, so frame here only runs in absolute /
   // current modes where drift isn't a risk.
-  const sceneBounds = compileResult?.canvasPlanBounds ?? null;
+  const sceneBounds = compileResult?.canvasBurnBounds ?? compileResult?.canvasPlanBounds ?? null;
+  const frameTransformBounds = compileResult?.canvasPlanBounds ?? sceneBounds;
   const canFrame =
     isConnected
     && machineStatus === 'idle'
@@ -363,7 +364,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
           bedHeightMm: props.bedHeight ?? 400,
           bedWidthMm: props.bedWidth ?? 400,
         };
-        const corners = buildFrameCorners(sceneBounds, transformOpts);
+        const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds ?? sceneBounds);
         const ys = corners.map((c) => c.y);
         const xs = corners.map((c) => c.x);
         const ok = window.confirm(
@@ -375,7 +376,13 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
         const activeProfile = getActiveProfile();
         const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
         void executionCoordinator
-          .frameSafe({ sceneBounds, transformOpts, idleTimeoutMs, frameLineDelayMs })
+          .frameSafe({
+            sceneBounds,
+            transformReferenceBounds: frameTransformBounds ?? sceneBounds,
+            transformOpts,
+            idleTimeoutMs,
+            frameLineDelayMs,
+          })
           .catch((err: unknown) => {
             console.warn(
               '[WorkflowPanel T1-211] Frame safe failed:',
@@ -408,7 +415,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
           bedHeightMm: props.bedHeight ?? 400,
           bedWidthMm: props.bedWidth ?? 400,
         };
-        const corners = buildFrameCorners(sceneBounds, transformOpts);
+        const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds ?? sceneBounds);
         const ys = corners.map((c) => c.y);
         const xs = corners.map((c) => c.x);
         const okBounds = window.confirm(
@@ -423,6 +430,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
         void executionCoordinator
           .frameDot({
             sceneBounds,
+            transformReferenceBounds: frameTransformBounds ?? sceneBounds,
             transformOpts,
             maxSpindle,
             frameDotFeedRateMmPerMin,

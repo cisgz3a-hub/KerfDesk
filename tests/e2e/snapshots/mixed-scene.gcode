@@ -2432,11 +2432,11 @@ G1 X1.575 Y-2.314 S800
 G1 X0.535 Y-0.798 S800
 G1 X0.385 Y-0.634 S800
 G1 X0.370 Y-0.685 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X0.366 Y0.685 S800
 G1 X0.392 Y0.634 S800
 G1 X0.538 Y0.798 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X1.604 Y2.314 S800
 G1 X1.575 S800
 G1 X-3.669 Y-5.273 S800
@@ -2445,12 +2445,12 @@ G1 X-1.604 S800
 G1 X-1.912 Y2.769 S800
 G1 X-0.659 Y0.992 S800
 G1 X-0.520 Y0.927 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X-0.520 Y-0.919 S800
 G1 X-0.674 Y-1.000 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X-1.926 Y-2.769 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000008
 G0 X-4.709 Y10.913
@@ -2459,7 +2459,7 @@ G1 X1.392 S800
 G1 Y-10.913 S800
 G1 X-1.392 S800
 G1 Y10.913 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000008
 G0 X-12.224 Y-10.913
@@ -2470,10 +2470,10 @@ G1 X1.978 S800
 G1 X2.688 Y-6.885 S800
 G1 X0.381 Y-1.106 S800
 G1 X0.425 Y-1.377 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X0.417 Y1.359 S800
 G1 X0.388 Y1.124 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X2.651 Y6.885 S800
 G1 X1.985 S800
 G1 Y-10.913 S800
@@ -2481,21 +2481,21 @@ G1 X-1.370 S800
 G1 Y6.233 S800
 G1 X0.015 Y1.472 S800
 G1 X0.037 Y1.721 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X-0.604 Y-1.824 S800
 G1 X-0.494 Y-1.370 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X-2.439 Y-6.233 S800
 G1 X-1.208 S800
 G1 X-2.476 Y6.233 S800
 G1 X-0.480 Y1.337 S800
 G1 X-0.619 Y1.835 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X0.033 Y-1.659 S800
 G1 X0.018 Y-1.512 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 Y-6.233 S800
-G1 S800
+; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 M9 ; air assist OFF
 

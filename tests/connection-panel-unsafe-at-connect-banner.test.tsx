@@ -240,13 +240,14 @@ void (async () => {
     const url = await import('node:url');
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const helperSrc = fs.readFileSync(
-      path.resolve(here, '../src/ui/components/connection/unsafeAtConnectMessages.ts'),
+      path.resolve(here, '../src/app/unsafeAtConnectMessages.ts'),
       'utf-8',
     );
     for (const reason of [
       'alarm',
       'run',
       'hold',
+      'door',
       'check',
       'no-status-response',
       'unsafe-residual-spindle',

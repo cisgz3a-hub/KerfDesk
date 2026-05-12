@@ -20,7 +20,6 @@ import { createScene } from '../src/core/scene/Scene';
 import { createLayer } from '../src/core/scene/Layer';
 import {
   type ImageGeometry,
-  type LineGeometry,
   type RectGeometry,
   type EllipseGeometry,
   type SceneObject,
@@ -145,7 +144,9 @@ function makeNonTrivialScene(seed = 1): ReturnType<typeof createScene> {
     });
   }
 
-  // Engrave ellipse + line
+  // Engrave ellipse + rect. Keep these closed so the fill planner
+  // exercises deterministic scanline output instead of rejecting an
+  // open path as an invalid fill input.
   {
     const ell: EllipseGeometry = { type: 'ellipse', cx: 0, cy: 0, rx: 12, ry: 8 };
     objects.push({
@@ -155,12 +156,12 @@ function makeNonTrivialScene(seed = 1): ReturnType<typeof createScene> {
       geometry: ell, visible: true, locked: false, powerScale: 1,
       _bounds: null, _worldTransform: null,
     });
-    const ln: LineGeometry = { type: 'line', x1: 0, y1: 0, x2: 25, y2: 10 };
+    const fillRect: RectGeometry = { type: 'rect', x: 0, y: 0, width: 25, height: 10, cornerRadius: 0 };
     objects.push({
-      id: makeSeededId(rng), type: 'line', name: 'engrave-line',
+      id: makeSeededId(rng), type: 'rect', name: 'engrave-rect',
       layerId: engraveLayer.id, parentId: null,
       transform: { ...IDENTITY_MATRIX, tx: 130, ty: 80 },
-      geometry: ln, visible: true, locked: false, powerScale: 1,
+      geometry: fillRect, visible: true, locked: false, powerScale: 1,
       _bounds: null, _worldTransform: null,
     });
   }

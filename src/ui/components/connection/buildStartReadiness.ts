@@ -72,6 +72,12 @@ export interface BuildStartReadinessInput {
    * callback) leaves the gate text-only as before T1-205.
    */
   readonly onResetWcsToBaseline: (() => void) | null;
+  /**
+   * True only when the recovery state machine says Start may run.
+   * Kept as a caller-supplied boolean so this pure helper does not
+   * import runtime recovery logic.
+   */
+  readonly recoveryAllowsStart: boolean;
   readonly wifiTrust: TrustClassification;
   readonly wifiStartAllowed: boolean;
   readonly isRunning: boolean;
@@ -278,10 +284,47 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
     },
     {
       id: 'laserState',
-      label: 'Laser-safety state known',
-      status: input.laserOutputState === 'unknown' ? 'fail' : 'ok',
-      failHeadline: 'Laser-safety state unknown',
-      failAction: 'A previous laser-off write failed — disconnect and reconnect to clear',
+      label: 'Laser is off',
+      status: input.laserOutputState === 'off' ? 'ok' : 'fail',
+      failHeadline:
+        input.laserOutputState === 'unknown'
+          ? 'Laser-safety state unknown'
+          : input.laserOutputState === 'on'
+            ? 'Laser is still on'
+            : 'Laser-safety state not confirmed',
+      failAction:
+        input.laserOutputState === 'unknown'
+          ? 'A previous laser-off write failed - disconnect and reconnect to clear'
+          : 'Wait for the laser-off acknowledgement, or click Stop / E-Stop',
+    },
+    {
+      id: 'noActiveOperation',
+      label: 'No active machine operation',
+      status: input.activeOperation == null ? 'ok' : 'fail',
+      failHeadline: input.activeOperation
+        ? `Operation "${input.activeOperation.kind}" is still in progress`
+        : 'A machine operation is still in progress',
+      failAction: 'Wait for the operation to finish, or click Stop to cancel it',
+    },
+    {
+      id: 'noControllerError',
+      label: 'No controller error',
+      status: input.machineState?.errorCode == null ? 'ok' : 'fail',
+      failHeadline: input.machineState?.errorCode != null
+        ? `Controller error ${input.machineState.errorCode}`
+        : 'Controller reported an error',
+      failAction: 'Read the controller log and clear the error before starting',
+    },
+    {
+      id: 'recoveryComplete',
+      label: 'Recovery checklist complete',
+      status: input.recoveryPending || !input.recoveryAllowsStart ? 'fail' : 'ok',
+      failHeadline: input.recoveryPending
+        ? 'Previous-session unsafe state pending'
+        : 'Recovery checklist incomplete',
+      failAction: input.recoveryPending
+        ? 'Acknowledge the recovery dialog that appeared at startup, or open Settings > Recovery'
+        : 'Open the recovery banner above and complete each required step',
     },
     wcsStateGate(input),
     {
