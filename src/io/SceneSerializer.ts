@@ -166,8 +166,14 @@ export function deserializeSceneWithIntegrity(
   return buildSceneFromParsedEnvelope(parsed);
 }
 
-function parseSceneEnvelope(json: string): any {
-  let parsed: any;
+// T1-190 (internal audit F-036): the parsed envelope's runtime
+// shape is structurally unknown until the validator helpers below
+// narrow each field. `Record<string, unknown>` makes that contract
+// explicit (vs the pre-T1-190 `any` which silently allowed any
+// property access). Each field read inside `buildSceneFromParsedEnvelope`
+// is now type-checked against the validator helpers.
+function parseSceneEnvelope(json: string): Record<string, unknown> {
+  let parsed: unknown;
 
   try {
     parsed = JSON.parse(json);
@@ -179,23 +185,27 @@ function parseSceneEnvelope(json: string): any {
   if (!parsed || typeof parsed !== 'object') {
     throw new Error('Invalid file: expected a JSON object');
   }
+  // After the type-guard above, narrow to a string-keyed record so
+  // the field reads below compile under T1-190's tighter signature.
+  // Each field is still validated for the right TYPE before use.
+  const envelope = parsed as Record<string, unknown>;
 
-  if (parsed.format !== 'laserforge') {
-    throw new Error(`Unknown file format: '${parsed.format}' (expected 'laserforge')`);
+  if (envelope.format !== 'laserforge') {
+    throw new Error(`Unknown file format: '${String(envelope.format)}' (expected 'laserforge')`);
   }
 
-  const major = fileFormatMajor(parsed.version);
+  const major = fileFormatMajor(envelope.version);
   if (!Number.isFinite(major) || major < 1) {
     throw new Error('Invalid file: format version is missing or not recognized (expected major version 1)');
   }
   if (major > 1) {
-    const raw = parsed.version == null || parsed.version === '' ? '(unknown)' : String(parsed.version);
+    const raw = envelope.version == null || envelope.version === '' ? '(unknown)' : String(envelope.version);
     throw new Error(
       `This project file uses format version ${raw}, which is not supported by this version of LaserForge. Please update the app to open it.`,
     );
   }
 
-  const vDisplay = parsed.version == null || parsed.version === '' ? '1.0' : String(parsed.version);
+  const vDisplay = envelope.version == null || envelope.version === '' ? '1.0' : String(envelope.version);
   const currentMinor = fileFormatMinor(CURRENT_FILE_FORMAT_VERSION);
   const loadedMinor = fileFormatMinor(vDisplay);
   if (Number.isFinite(loadedMinor) && loadedMinor > currentMinor) {
@@ -212,7 +222,7 @@ function parseSceneEnvelope(json: string): any {
   // current-version files are passthroughs; the wiring matters because
   // future schema bumps register a step in `projectMigrations.ts` and
   // every load path automatically walks the chain.
-  const migration = migrateSceneEnvelope(parsed);
+  const migration = migrateSceneEnvelope(envelope);
   for (const warning of migration.warnings) {
     console.warn(warning);
   }
@@ -296,7 +306,21 @@ export function deserializeSceneWithReport(json: string): ProjectLoadReport {
 
 // T1-159: fileFormatMajor / fileFormatMinor moved to ./sceneSerializerHelpers.
 
-/** Shared load path after envelope checks (format laserforge, major version 1). */
+/**
+ * Shared load path after envelope checks (format laserforge, major version 1).
+ *
+ * T1-190 (internal audit F-036): `parsed: any` is deliberate. The
+ * argument is a JSON-deserialized envelope whose shape was validated
+ * at the type level by `parseSceneEnvelope` (returns
+ * `Record<string, unknown>`) but the field-by-field shape is
+ * structurally unknown until the validator helpers (`validateRequired`,
+ * `validateArray`, `validateTransform`) narrow each field's TYPE at
+ * runtime. Typing `parsed` as `unknown` here would force `as` casts
+ * on every field access without adding safety (the validators already
+ * provide the runtime check). The `any` documents that this function
+ * is the disk-shape ↔ in-memory-shape conversion seam.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): Scene {
   const s = parsed.scene;
   if (!s || typeof s !== 'object') {
@@ -339,8 +363,14 @@ function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): S
       origin: s.canvas.origin || 'top-left',
       units: s.canvas.units || 'mm',
     },
-    layers: s.layers.map((l: any) => restoreLayerDefaults(l)),
-    objects: s.objects.map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
+    // T1-190 (audit F-036): cast through `unknown[]` first so the
+    // `any` annotation on the map callback isn't a sloppy widening
+    // — `s.layers` / `s.objects` ARE unknown at this point; the
+    // restore helpers' documented `any` contract takes over here.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    layers: (s.layers as unknown[]).map((l: any) => restoreLayerDefaults(l)),
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    objects: (s.objects as unknown[]).map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
     material: s.material ?? null,
     startPosition: s.startPosition ?? { x: 0, y: 0 },
     machine: s.machine,
@@ -500,6 +530,13 @@ function mergeLayerSettings(raw: unknown, fallbackMode: LayerMode): LaserSetting
   return out;
 }
 
+// T1-190 (audit F-036): `l: any` is a deliberate disk-shape ↔
+// in-memory-shape boundary. The input is a Layer object as it
+// appeared in the parsed JSON; each field is reconstructed with
+// defaults. The function fills in missing / wrongly-typed fields
+// from the file with safe values, so the input must allow
+// arbitrary partial / malformed shapes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function restoreLayerDefaults(l: any): Layer {
   const fallbackMode = (l.settings?.mode as LayerMode) || 'cut';
   return {
@@ -525,6 +562,11 @@ function migrateGeometry(geom: unknown): Geometry {
   return geom as Geometry;
 }
 
+// T1-190 (audit F-036): same disk-shape boundary as
+// restoreLayerDefaults. The input is a SceneObject as it appeared
+// in the parsed JSON; defaults fill in missing / wrongly-typed
+// fields. The `any` documents the file-format-flexibility contract.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function restoreObjectDefaults(o: any): SceneObject {
   return {
     id: o.id,
@@ -545,8 +587,12 @@ function restoreObjectDefaults(o: any): SceneObject {
 
 // ─── CACHE STRIPPING ─────────────────────────────────────────────
 
-function stripObjectCache(obj: SceneObject): any {
+// T1-190 (internal audit F-036): typed return. Pre-T1-190 this was
+// `: any`; the function strips the two cache fields, so the precise
+// return type is `Omit<SceneObject, '_bounds' | '_worldTransform'>`.
+function stripObjectCache(obj: SceneObject): Omit<SceneObject, '_bounds' | '_worldTransform'> {
   const { _bounds, _worldTransform, ...clean } = obj;
+  void _bounds; void _worldTransform;
   return clean;
 }
 
@@ -558,7 +604,17 @@ function stripObjectCache(obj: SceneObject): any {
  * Encode Uint8Array image buffers as base64 strings for JSON safety.
  * JSON.stringify turns Uint8Array into {"0":128,"1":64,...} which
  * doesn't reconstruct back on parse. Base64 preserves the data correctly.
+ *
+ * T1-190 (audit F-036): `any` on both sides is deliberate. This is
+ * the on-the-way-out serialization seam — the input is a runtime
+ * SceneObject with maybe-Uint8Array fields on its `geometry`, and the
+ * output is a JSON-safe shape with `_grayscaleDataB64` / `_grayscaleDataLength`
+ * substitutions. Typing this precisely would require a
+ * SerializedSceneObject discriminated union that varies per geometry
+ * kind — out of scope for T1-190 (the audit asked for cleanup of
+ * AVOIDABLE `any`, not a full file-format type rewrite).
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function encodeImageBuffers(obj: any): any {
   if (obj.geometry?.type === 'image') {
     const geom = { ...obj.geometry };
@@ -580,7 +636,12 @@ function encodeImageBuffers(obj: any): any {
 /**
  * Decode base64 image buffers back into Uint8Arrays on load.
  * Also handles legacy files where Uint8Array was serialized as a plain object.
+ *
+ * T1-190 (audit F-036): mirror of `encodeImageBuffers` — same
+ * disk-shape ↔ runtime-shape seam; `any` is deliberate for the same
+ * reason. See encodeImageBuffers for the rationale.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function decodeImageBuffers(obj: any): any {
   if (obj.geometry?.type === 'image') {
     const geom = obj.geometry;
