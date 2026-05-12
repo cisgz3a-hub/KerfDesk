@@ -9,17 +9,20 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `68d948a9` (`feat(safety): T1-193 — MachineEventLedger schema +
-  write path (foundation slice)`). Always verify live HEAD with
+  `e30c9f18` (`feat(controllers): T1-196 — MarlinFirmwareAdapter
+  declared-not-supported stub`). Always verify live HEAD with
   `git log --oneline -1` before editing.
-- Last shipped roadmap item: **T1-193** (external-audit Critical #14
-  foundation — `MachineEventLedger` schema + write path). This
-  session-arc shipped **33 consecutive audit-driven tickets**
-  (T1-161 → T1-193): 12 internal + 5 external-Critical + 6 external-
-  High + 5 deferred-Medium/Low (T1-183 → T1-188) + 5 deferred-multi-
-  week-foundation (T1-189 R-mode arcs, T1-190 SceneSerializer any-
-  cleanup, T1-191 burn-envelope divergence UI, T1-192 FirmwareAdapter
-  type contract, T1-193 MachineEventLedger). The first
+- Last shipped roadmap item: **T1-196** (Marlin contract-validation
+  stub). This session-arc shipped **36 consecutive audit-driven
+  tickets** (T1-161 → T1-196). T1-194..T1-196 are implementation
+  slices on top of the T1-192 / T1-193 foundations: T1-194
+  `GrblFirmwareAdapter` implementing the full contract (emit reuses
+  existing GrblOutputStrategy; stream stubs out pending the multi-
+  week MachineService rewire), T1-195 `MachineEventLedger` singleton
+  + first 4 production callers (disconnect-while-running, emergency-
+  stop, failed-to-start, burn-envelope-divergence), T1-196
+  `MarlinFirmwareAdapter` declared-not-supported stub proving the
+  contract works for non-GRBL. The first
   12 (T1-161 → T1-172) addressed findings from the internal audit
   (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
   addressed the external audit (response received 2026-05-11) — both
@@ -56,38 +59,42 @@ chat transcript.
   Each ticket landed as a coupled triple: code change + regression
   test + ROADMAP.md entry with verification, followed by the hash-
   fill commit. TS baseline 0 errors maintained across every commit.
-- Remaining work: every audit finding now has either a code fix OR
-  a documented foundation slice + named-deferred follow-up. The
-  remaining work is **multi-week implementation arcs** on top of
-  the foundations T1-192 / T1-193 shipped:
-  - **GrblAdapter implementing FirmwareAdapter** — wire the new
-    type contract (T1-192) over the existing GrblController +
-    GrblOutputStrategy code; replace `controllerType: 'grbl'` on
-    `ValidatedJobTicket` with `firmware: FirmwareAdapter['id']`;
-    introduce `FirmwareRegistry`.
-  - **MarlinAdapter / RuidaAdapter** — first real non-GRBL
-    firmware-support PRs, each one implements the full
-    `FirmwareAdapter` contract.
-  - **Wire production code to the MachineEventLedger** — every
-    site that currently emits a `console.warn` about a safety
-    event (T1-29 setUnsafePriorState, T1-174 WCS query error,
-    T1-175 emergencyStop/disconnect, T1-176 failed-start, T1-188
-    burn-envelope divergence) calls `ledger.append({...})`. The
-    full SafetySupervisor centralization is the umbrella ticket.
+- Remaining work: every audit finding has either a code fix or a
+  documented foundation/implementation slice. The remaining work is
+  **multi-week implementation arcs** on top of the shipped
+  foundations:
+  - **FirmwareRegistry + ticket migration** — `controllerType:
+    'grbl'` on `ValidatedJobTicket` becomes `firmware:
+    FirmwareAdapter['id']`; `PipelineService.compileGcode` and
+    `MachineService.startValidatedJob` route through the adapter's
+    `emit()` and `stream()`. T1-194 shipped `GrblFirmwareAdapter`;
+    its `emit()` is real but `stream()` is intentionally stubbed
+    pending this wire-up (multi-week).
+  - **Real MarlinAdapter / RuidaAdapter implementations** — T1-196
+    shipped the Marlin contract-validation stub proving the
+    interface works; a real implementation needs a MarlinOutputStrategy
+    + M114 polling protocol + M999 alarm-clear + M150/M151 laser-mode
+    preflight (each adapter is a multi-week PR).
+  - **Wire remaining production sites to MachineEventLedger** —
+    T1-195 wired 4 sites (disconnect-while-running, emergency-stop,
+    failed-to-start, burn-envelope-divergence). The remaining
+    `console.warn` safety events (T1-174 WCS query error, T1-176
+    safety-off outcomes, T1-117 placement-uncertain transitions)
+    need ledger writes. The GrblController WCS-error specifically
+    needs an injected ledger writer to avoid an
+    `app → controllers` reverse dependency.
   - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
     remove all global reads (T1-181 ships the detection gate; the
     compiler still calls `canUseFeature()` / `getActiveProfile()`
     / `getPresetById()` directly).
   - **Affine raster sampling** — emitting actual rotated scanlines
-    so rotated raster images compile (T1-187 closes the safety gap
-    with a fail-closed throw today).
+    (T1-187 closes the safety gap with a fail-closed throw today).
   - **Preview UI rebuild** to consume `ValidatedJobTicket.
-    emittedBurnBounds` from T1-182 + the canonical motion stream
-    from `analyzeEmittedBurnEnvelope` — the SimulationRenderer
-    still reads from `Plan`.
+    emittedBurnBounds` from T1-182 + canonical motion stream from
+    `analyzeEmittedBurnEnvelope` — the SimulationRenderer still
+    reads from `Plan`.
 
-  Internal audit findings: ALL CLEARED. The internal audit ledger
-  has no remaining open Medium/Low items.
+  Internal audit findings: ALL CLEARED.
   Medium / High blocked by integration work: F-002 (Connection-
   GenerationGuard primitive shipped but never wired), F-004 (T1-22
   ForceSafeState orchestration — needs hardware), F-018 (T3-57
