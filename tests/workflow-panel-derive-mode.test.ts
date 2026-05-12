@@ -43,9 +43,14 @@ function assert(cond: unknown, message: string): void {
 
 const idleRecovery: RecoveryState = { status: 'none' };
 const activeRecovery: RecoveryState = {
-  status: 'awaiting-ack',
-  trigger: { kind: 'alarm', occurredAt: 0 },
-  steps: [],
+  status: 'alarm',
+  alarmCode: 1,
+  occurredAt: 0,
+  requiresRehome: true,
+  inspectionDone: false,
+  unlockDone: false,
+  rehomeDone: false,
+  reframeDone: false,
 };
 
 function input(over: Partial<PanelModeInput>): PanelModeInput {

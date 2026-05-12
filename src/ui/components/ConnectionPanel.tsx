@@ -191,27 +191,47 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     void machineService.emergencyStop();
   };
 
-  return React.createElement(WorkflowPanel, {
-    machineState,
-    machineStatus,
-    isConnected,
-    // Phase 1 stub: connecting is detectable today only via app-level
-    // state (active connect promise); Phase 2 threads it through.
-    isConnecting: false,
-    recoveryState,
-    // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
-    // via buildStartReadiness; Phase 2 lifts that computation up so
-    // both panels can share it.
-    canStartJob: false,
-    onEmergencyStop,
-    onConnectUsb: null,
-    onConnectSimulator: null,
-    onCancelConnect: null,
-    onStartJob: null,
-    onPause: null,
-    onResume: null,
-    onStop: null,
-  });
+  // T1-204 follow-up: WorkflowPanel uses width:100% so it inherits
+  // whatever the parent flex slot gives it. The Falcon sidebar
+  // pattern (above) wraps in a fixed-width div with flexShrink:0 so
+  // the canvas keeps its space. The new panel needs the same wrap;
+  // without it the panel takes unbounded width and the canvas is
+  // squeezed out.
+  return React.createElement(
+    'div',
+    {
+      style: {
+        width: props.sidebarWidth ?? 500,
+        flexShrink: 0,
+        height: '100%',
+        minHeight: 0,
+        display: 'flex',
+        flexDirection: 'column' as const,
+        overflow: 'hidden',
+      },
+    },
+    React.createElement(WorkflowPanel, {
+      machineState,
+      machineStatus,
+      isConnected,
+      // Phase 1 stub: connecting is detectable today only via app-level
+      // state (active connect promise); Phase 2 threads it through.
+      isConnecting: false,
+      recoveryState,
+      // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
+      // via buildStartReadiness; Phase 2 lifts that computation up so
+      // both panels can share it.
+      canStartJob: false,
+      onEmergencyStop,
+      onConnectUsb: null,
+      onConnectSimulator: null,
+      onCancelConnect: null,
+      onStartJob: null,
+      onPause: null,
+      onResume: null,
+      onStop: null,
+    }),
+  );
 }
 
 function ConnectionPanelLegacy(props: ConnectionPanelProps) {
