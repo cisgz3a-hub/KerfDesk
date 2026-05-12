@@ -79,6 +79,14 @@ export interface WorkflowPanelProps {
   readonly onResume: (() => void) | null;
   readonly onStop: (() => void) | null;
   /**
+   * T1-212: Frame action surfaced at the footer level (in addition
+   * to the Move tab) so it sits beside Start Job — matches the
+   * legacy panel's layout where Frame and Start were always visible
+   * together. Null when the safety gate (idle + compiled bounds) is
+   * not met; the secondary button is disabled in that case.
+   */
+  readonly onFrameSafe: (() => void) | null;
+  /**
    * T1-206 (Phase 2): additional props for the real
    * disconnected / recovery modes. Defaulted at the adapter layer.
    */
@@ -144,17 +152,26 @@ export function pickActions(
         secondaries: [],
       };
     case 'setup':
-      // Phase 2+ will replace this with the actual blocking-gate
-      // label from buildStartReadiness. For Phase 1 the placeholder
-      // is honest: setup mode has no single primary action.
+      // T1-212: surface Frame in the footer alongside the disabled
+      // primary so the user can frame without diving into the Move
+      // tab. The legacy panel had Frame and Start as siblings; this
+      // mirrors that layout.
       return {
         primary: { label: 'Frame & compile before starting', variant: 'disabled', onClick: null },
-        secondaries: [],
+        secondaries: [
+          { label: 'Frame', onClick: props.onFrameSafe },
+        ],
       };
     case 'ready':
+      // T1-212: Frame stays available next to Start Job — matches
+      // the legacy panel's "Frame and Start always visible
+      // together" layout. The user typically frames once, verifies
+      // the corners look right, then hits Start.
       return {
         primary: { label: 'Start Job', variant: 'success', onClick: props.onStartJob },
-        secondaries: [],
+        secondaries: [
+          { label: 'Frame', onClick: props.onFrameSafe },
+        ],
       };
     case 'running':
       return {

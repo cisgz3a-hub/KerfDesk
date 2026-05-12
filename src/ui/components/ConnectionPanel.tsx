@@ -653,6 +653,9 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       onPause,
       onResume,
       onStop,
+      // T1-212: surface the same Frame action that the Move tab
+      // already uses, so it sits beside Start Job in the footer.
+      onFrameSafe,
       webSerialSupported: WebSerialPort.isSupported(),
       alarmCode: machineState?.alarmCode ?? null,
       onRecoveryAction,

@@ -65,6 +65,7 @@ console.log('\n=== T1-204 WorkflowPanel scaffold ===\n');
     setupModeProps: null,
     liveJobProps: null,
     pauseRequested: false,
+    onFrameSafe: null,
   };
   for (const mode of ALL_MODES) {
     const actions = pickActions(mode, stubProps);
@@ -101,6 +102,7 @@ console.log('\n=== T1-204 WorkflowPanel scaffold ===\n');
     setupModeProps: null,
     liveJobProps: null,
     pauseRequested: false,
+    onFrameSafe: null,
   };
   assert(/Connect/.test(pickActions('disconnected', stubProps).primary.label),
     "'disconnected' primary mentions Connect");
@@ -116,6 +118,16 @@ console.log('\n=== T1-204 WorkflowPanel scaffold ===\n');
     "'ready' primary is Start Job");
   assert(pickActions('ready', stubProps).primary.variant === 'success',
     "'ready' primary is the success variant (green)");
+  // T1-212: Frame sits beside Start Job as a secondary so both
+  // buttons are visible together (matches the legacy panel).
+  assert(
+    pickActions('ready', stubProps).secondaries.some(s => /Frame/.test(s.label)),
+    "'ready' has a Frame secondary (T1-212 — beside Start Job)",
+  );
+  assert(
+    pickActions('setup', stubProps).secondaries.some(s => /Frame/.test(s.label)),
+    "'setup' has a Frame secondary (T1-212 — available before ready)",
+  );
   assert(/Pause/.test(pickActions('running', stubProps).primary.label),
     "'running' primary is Pause");
   assert(
