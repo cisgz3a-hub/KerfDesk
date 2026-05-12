@@ -85,6 +85,25 @@ export interface GrblControllerOptions {
   allowHeadlessWcsAutoNormalize?: boolean;
 }
 
+/**
+ * T1-202: an injected callback that lets the controller surface
+ * controller-layer safety events to the `app` layer without creating
+ * a reverse `controllers → app` dependency. The application (via
+ * `useControllerConnection`) registers a sink that forwards each
+ * event to `MachineEventLedger.append(...)`. Pre-T1-202 these events
+ * existed only as `console.warn` traces in the controller; support
+ * bundles couldn't reconstruct WCS-query failures or placement-
+ * uncertain transitions after a renderer crash.
+ *
+ * The payloads match the MachineEvent discriminated-union shapes
+ * exactly so the sink implementation can pass them through unchanged.
+ */
+export type ControllerSafetyEvent =
+  | { readonly kind: 'wcs-query-error'; readonly t: number; readonly grblErrorLine: string }
+  | { readonly kind: 'placement-uncertain'; readonly t: number; readonly reason: string };
+
+export type ControllerSafetyEventSink = (event: ControllerSafetyEvent) => void;
+
 /** First field inside `<...|...>` GRBL realtime reports (e.g. `Hold:0`). */
 function parseGrblStatusReportStateToken(line: string): string | null {
   if (!line.startsWith('<') || !line.endsWith('>')) return null;
@@ -462,6 +481,16 @@ export class GrblController implements GrblControllerApi {
   private _safeStateWatchdog: ReturnType<typeof setTimeout> | null = null;
   private _unsafeAtConnect: UnsafeAtConnectState | null = null;
 
+  /**
+   * T1-202: optional sink for surfacing controller-layer safety
+   * events (WCS-query-error, placement-uncertain transitions) to the
+   * application layer. Production code wires this to
+   * `MachineEventLedger.append(...)` in `useControllerConnection`
+   * right after construction. Default null = controller runs without
+   * ledger emissions (existing console.warn still fires).
+   */
+  private _safetyEventSink: ControllerSafetyEventSink | null = null;
+
   constructor(options?: GrblControllerOptions) {
     this._allowHeadlessWcsAutoNormalize = options?.allowHeadlessWcsAutoNormalize === true;
     this._state = {
@@ -528,6 +557,22 @@ export class GrblController implements GrblControllerApi {
       );
     }
     this._stopOnError = value;
+  }
+
+  /**
+   * T1-202: register / clear a sink for controller-layer safety events.
+   * Production wiring lives in `useControllerConnection.ts`, which
+   * forwards each event to `MachineEventLedger.append(...)`. Tests
+   * pass a custom sink to assert the emit sites are reached.
+   *
+   * Idempotent: passing `null` clears the sink. Setting twice replaces
+   * the previous reference. The controller does not retain or replay
+   * past events for a late-arriving sink — events that fire before
+   * the sink is set are lost (matches the existing `console.warn`
+   * trace, which never persisted).
+   */
+  setSafetyEventSink(sink: ControllerSafetyEventSink | null): void {
+    this._safetyEventSink = sink;
   }
 
   /** Bed size, feeds, homing mask, and laser mode from the last $$ dump. */
@@ -1608,6 +1653,15 @@ export class GrblController implements GrblControllerApi {
       );
       this._placementUncertain = true;
       this._lastPlacementUncertainReason = verdict.reason;
+      // T1-202: forward to the injected safety-event sink so the
+      // MachineEventLedger records the transition. Pre-T1-202 only
+      // the console.warn above existed; support bundles couldn't see
+      // a placement-uncertain event after a renderer crash.
+      this._safetyEventSink?.({
+        kind: 'placement-uncertain',
+        t: Date.now(),
+        reason: verdict.reason,
+      });
       for (const cb of this._stateListeners) {
         cb({ ...this._state });
       }
@@ -1653,6 +1707,15 @@ export class GrblController implements GrblControllerApi {
         + 'disconnects, attaches a listener, and reconnects.',
       );
       this._placementUncertain = true;
+      // T1-202: forward to the injected safety-event sink (see the
+      // T1-117 site above for rationale). The reason here is the
+      // no-consent-listener fallback rather than a verdict.reason
+      // from classifyWcsConsentInputs.
+      this._safetyEventSink?.({
+        kind: 'placement-uncertain',
+        t: Date.now(),
+        reason: 'no_wcs_consent_listener',
+      });
       // Notify state listeners so the UI re-renders and reads the new
       // gate value via getPlacementUncertain().
       for (const cb of this._stateListeners) {
@@ -1710,6 +1773,24 @@ export class GrblController implements GrblControllerApi {
         this._settingsQueried = true;
         this._placementUncertain = true;
         this._lastPlacementUncertainReason = 'wcs_query_error';
+        // T1-202: emit TWO ledger events for this single transition —
+        // the upstream wcs-query-error (carrying the raw GRBL error
+        // line for forensics) and the resulting placement-uncertain
+        // transition (matching the reason field tracked on the
+        // controller). The two-event pattern lets support bundles
+        // distinguish "$# itself errored" from "placement became
+        // uncertain for a different reason at the same moment".
+        const t = Date.now();
+        this._safetyEventSink?.({
+          kind: 'wcs-query-error',
+          t,
+          grblErrorLine: line,
+        });
+        this._safetyEventSink?.({
+          kind: 'placement-uncertain',
+          t,
+          reason: 'wcs_query_error',
+        });
         for (const cb of this._stateListeners) {
           cb({ ...this._state });
         }

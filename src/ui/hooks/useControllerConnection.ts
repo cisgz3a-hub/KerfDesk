@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { type MachineState, type JobProgress, type LaserController } from '../../controllers/ControllerInterface';
 import { createController, type ControllerId } from '../../controllers/ControllerRegistry';
 import { type SerialPortLike } from '../../communication/SerialPort';
+import { getMachineEventLedger } from '../../app/MachineEventLedger';
+import { GrblController } from '../../controllers/grbl/GrblController';
 
 export function useControllerConnection(controllerId: ControllerId = 'grbl') {
   const [machineState, setMachineState] = useState<MachineState | null>(null);
@@ -22,6 +24,19 @@ export function useControllerConnection(controllerId: ControllerId = 'grbl') {
       setJobProgress({ ...prog });
       setIsJobRunning(controller.isJobRunning);
     });
+    // T1-202: wire the controller's safety-event sink to the shared
+    // MachineEventLedger so wcs-query-error and placement-uncertain
+    // transitions land in support bundles. The `controllers/` layer
+    // cannot import from `app/` directly (the layered architecture
+    // forbids the reverse dependency); injecting the writer here
+    // satisfies the layer rule. Only GrblController exposes the
+    // setter today — Marlin / Ruida adapter stubs don't yet have a
+    // controller implementation.
+    if (controller instanceof GrblController) {
+      controller.setSafetyEventSink((event) => {
+        getMachineEventLedger().append(event);
+      });
+    }
     controllerRef.current = controller;
     setControllerReady(true);
 
