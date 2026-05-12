@@ -23,6 +23,7 @@
 import React from 'react';
 import type { MachineState, MachineStatus } from '../../../controllers/ControllerInterface';
 import type { RecoveryState } from '../../../runtime/RecoveryState';
+import type { RecoveryAction } from '../../recovery/RecoveryCardContent';
 import { derivePanelMode, type PanelMode } from './derivePanelMode';
 import { TopBar } from './zones/TopBar';
 import {
@@ -31,6 +32,11 @@ import {
   type SecondaryActionDescriptor,
 } from './zones/PrimaryActionFooter';
 import { ModeStub } from './modes/ModeStub';
+// T1-206 (Phase 2): real modes for disconnected / connecting /
+// recovery. Other modes still use ModeStub until Phases 3–4 land.
+import { DisconnectedMode } from './modes/DisconnectedMode';
+import { ConnectingMode } from './modes/ConnectingMode';
+import { RecoveryMode } from './modes/RecoveryMode';
 
 const FONT = "'DM Sans', system-ui, sans-serif";
 
@@ -58,6 +64,13 @@ export interface WorkflowPanelProps {
   readonly onPause: (() => void) | null;
   readonly onResume: (() => void) | null;
   readonly onStop: (() => void) | null;
+  /**
+   * T1-206 (Phase 2): additional props for the real
+   * disconnected / recovery modes. Defaulted at the adapter layer.
+   */
+  readonly webSerialSupported: boolean;
+  readonly alarmCode: number | null;
+  readonly onRecoveryAction: ((action: RecoveryAction) => void) | null;
 }
 
 /**
@@ -152,6 +165,43 @@ export function modeImplementationPhase(mode: PanelMode): number {
   }
 }
 
+/**
+ * Mode-content router. Pulled out of the component body so the
+ * mapping is a single switch — easy to audit which modes are
+ * Phase-2 real vs. stubbed-for-later. Phase 2 (T1-206) wires
+ * disconnected / connecting / recovery; Phases 3–4 add the rest.
+ */
+function renderModeContent(
+  mode: PanelMode,
+  props: WorkflowPanelProps,
+): React.ReactElement {
+  switch (mode) {
+    case 'disconnected':
+      return React.createElement(DisconnectedMode, {
+        webSerialSupported: props.webSerialSupported,
+        onConnectUsb: props.onConnectUsb ?? (() => {}),
+        onConnectSimulator: props.onConnectSimulator ?? (() => {}),
+      });
+    case 'connecting':
+      return React.createElement(ConnectingMode);
+    case 'recovery':
+      return React.createElement(RecoveryMode, {
+        recoveryState: props.recoveryState,
+        machineStatus: props.machineStatus,
+        alarmCode: props.alarmCode,
+        onRecoveryAction: props.onRecoveryAction,
+      });
+    case 'setup':
+    case 'ready':
+    case 'running':
+    case 'paused':
+      return React.createElement(ModeStub, {
+        mode,
+        phase: modeImplementationPhase(mode),
+      });
+  }
+}
+
 export function WorkflowPanel(props: WorkflowPanelProps): React.ReactElement {
   const mode = derivePanelMode({
     isConnected: props.isConnected,
@@ -201,10 +251,7 @@ export function WorkflowPanel(props: WorkflowPanelProps): React.ReactElement {
           flexDirection: 'column',
         },
       },
-      React.createElement(ModeStub, {
-        mode,
-        phase: modeImplementationPhase(mode),
-      }),
+      renderModeContent(mode, props),
     ),
     // Zone 3: Primary action footer (always visible)
     React.createElement(PrimaryActionFooter, {

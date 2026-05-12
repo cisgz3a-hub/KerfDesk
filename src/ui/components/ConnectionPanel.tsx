@@ -21,6 +21,7 @@ import {
   UI_FEATURE_FLAG_CHANGED_EVENT,
 } from '../features/uiFeatureFlags';
 import { WorkflowPanel } from './workflow/WorkflowPanel';
+import { WebSerialPort } from '../../communication/WebSerialPort';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -160,14 +161,22 @@ export function ConnectionPanel(props: ConnectionPanelProps) {
 /**
  * T1-204: prop adapter between the existing `ConnectionPanelProps`
  * surface (mirrors ~50 fields from ConnectionPanelMainProps) and the
- * new `WorkflowPanel`'s focused surface. Phase 1 wires only what the
- * scaffold uses — recovery / machine state / connection booleans +
- * a handful of action callbacks. Phase 2 expands this to thread the
- * full set as each mode's real implementation lands.
+ * new `WorkflowPanel`'s focused surface.
+ *
+ * Phase 1 wired the scaffold (recovery + machine state + ESTOP).
+ * Phase 2 (T1-206) expands to the disconnected / connecting /
+ * recovery modes: real Connect USB wiring, the connecting-mode
+ * spinner state, and recovery-action dispatch.
+ *
+ * `onConnectSimulator` and `onCancelConnect` are intentionally
+ * stubbed in this phase — they require local refs (MockSerialPort
+ * + AbortController) the legacy panel holds; threading them up is
+ * Phase 3 work alongside the setup-mode tabs.
  */
 function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const { machineUi } = props;
   const machineService = machineUi.service;
+  const executionCoordinator = machineUi.executionCoordinator;
   const machineState = props.machineState;
   const machineStatus = machineState?.status ?? null;
   // Same isConnected derivation as ConnectionPanelMain.tsx:424.
@@ -183,20 +192,82 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     return machineService.onRecoveryStateChange(setRecoveryState);
   }, [machineService]);
 
-  // Phase 1: keep handler wiring minimal. Real connect / disconnect /
-  // job-control wiring lives in Phase 2+ when each mode's real
-  // implementation lands. For now the footer renders disabled
-  // placeholders for safety paths.
+  // T1-206 (Phase 2): track the connecting flag locally. Set true
+  // when the user fires Connect USB; cleared when isConnected
+  // becomes true OR when an error throws OR when the user cancels.
+  // The "isConnecting" mode is what the user sees during the
+  // controller handshake.
+  const [isConnecting, setIsConnecting] = useState(false);
+  useEffect(() => {
+    if (isConnected) setIsConnecting(false);
+  }, [isConnected]);
+
   const onEmergencyStop = () => {
     void machineService.emergencyStop();
   };
 
-  // T1-204 follow-up: WorkflowPanel uses width:100% so it inherits
-  // whatever the parent flex slot gives it. The Falcon sidebar
-  // pattern (above) wraps in a fixed-width div with flexShrink:0 so
-  // the canvas keeps its space. The new panel needs the same wrap;
-  // without it the panel takes unbounded width and the canvas is
-  // squeezed out.
+  // T1-206: real Connect-USB wiring. Calls machineService directly;
+  // the legacy panel's connect handler does more (mock port for
+  // simulator, abort controller, simulator-mode flag) but the
+  // basic real-hardware path is just connectRealLaser.
+  const onConnectUsb = () => {
+    if (isConnecting) return;
+    setIsConnecting(true);
+    void machineService.connectRealLaser(115200).catch(() => {
+      setIsConnecting(false);
+    });
+  };
+
+  // T1-206: cancel wiring. Goes through MachineService's signal-aware
+  // cancel path (T1-50 + T2-33). On success, the local connecting
+  // flag clears so the panel returns to disconnected mode.
+  const onCancelConnect = () => {
+    void machineService.cancelActiveConnect().finally(() => {
+      setIsConnecting(false);
+    });
+  };
+
+  // T1-206: recovery-action dispatch. Action labels come from
+  // RecoveryCardContent's `RecoveryAction` union. Critical paths
+  // (unlock / re-home / reconnect / stop) get real wiring through
+  // ExecutionCoordinator / MachineService. The remaining actions
+  // (reframe / frame / compile) need scene + canvas context that
+  // the legacy panel holds; they're logged for now and wired in a
+  // Phase 3 follow-up.
+  const onRecoveryAction = (action: string) => {
+    // executionCoordinator owns its own controller / port references;
+    // we don't need to thread the controller object through here. The
+    // "is the controller connected" gate lives inside each coordinator
+    // method.
+    switch (action) {
+      case 'unlock':
+        void executionCoordinator.unlock();
+        return;
+      case 'home':
+      case 're-home':
+        void executionCoordinator.home();
+        return;
+      case 'reconnect':
+        // Send the user back to disconnected — they'll click Connect
+        // again. The full reconnect flow (auto-reconnect with same
+        // device) is Phase 3 / T3-48 work.
+        void machineService.disconnect();
+        return;
+      case 'stop':
+        void machineService.stopAndEnsureLaserOff();
+        return;
+      case 'reframe':
+      case 'frame':
+      case 'compile':
+        console.warn(
+          `[WorkflowPanel T1-206] Recovery action '${action}' is wired in `
+          + 'Phase 3 — disable the workflowPanelV2 flag and use the legacy '
+          + 'panel for this action until then.',
+        );
+        return;
+    }
+  };
+
   return React.createElement(
     'div',
     {
@@ -214,22 +285,24 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       machineState,
       machineStatus,
       isConnected,
-      // Phase 1 stub: connecting is detectable today only via app-level
-      // state (active connect promise); Phase 2 threads it through.
-      isConnecting: false,
+      isConnecting,
       recoveryState,
       // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
-      // via buildStartReadiness; Phase 2 lifts that computation up so
+      // via buildStartReadiness; Phase 3 lifts that computation up so
       // both panels can share it.
       canStartJob: false,
       onEmergencyStop,
-      onConnectUsb: null,
+      onConnectUsb,
+      // Phase 2 deliberate stubs (see component docstring).
       onConnectSimulator: null,
-      onCancelConnect: null,
+      onCancelConnect,
       onStartJob: null,
       onPause: null,
       onResume: null,
       onStop: null,
+      webSerialSupported: WebSerialPort.isSupported(),
+      alarmCode: machineState?.alarmCode ?? null,
+      onRecoveryAction,
     }),
   );
 }
