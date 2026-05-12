@@ -43,9 +43,28 @@ assert(parseWizardWatts('20/40W') === 20, 'wizard watts parser handles slash ran
 assert(parseWizardWatts('20-40W') === 20, 'wizard watts parser handles dash ranges as the first watt value');
 assert(parseWizardWatts('') === 10, 'wizard watts parser falls back to 10W');
 
-assert(/shouldDefaultStartModeToCurrentForProfile/.test(appSrc), 'App imports/uses PRT4040 start-mode helper');
+// T2-6 Phase 3y: PRT4040 start-mode policy lives in two pure
+// predicates in `appStartModeDecisions.ts` rather than inline AND
+// chains in App.tsx. Pin the new shape — App imports both helpers,
+// uses them in the two startMode useEffects, and the helpers
+// themselves consult `shouldDefaultStartModeToCurrentForProfile`.
+assert(
+  /shouldResetStartModeAfterDisconnect[\s\S]{0,80}shouldNudgeStartModeToCurrent/.test(appSrc),
+  'App imports both PRT4040-aware startMode predicates',
+);
 assert(/setStartMode\('current'\)/.test(appSrc), 'App nudges PRT4040 profiles to current/head mode');
-assert(/!shouldDefaultStartModeToCurrentForProfile\(activeProfile\)/.test(appSrc), 'disconnect reset does not force PRT4040 back to bed mode');
+assert(
+  /shouldResetStartModeAfterDisconnect\(\{/.test(appSrc),
+  'App reset-on-disconnect path goes through shouldResetStartModeAfterDisconnect (PRT4040 keeps current)',
+);
+const startModeDecisionsSrc = readFileSync(
+  resolve(here, '../src/ui/components/app/appStartModeDecisions.ts'),
+  'utf-8',
+);
+assert(
+  /shouldDefaultStartModeToCurrentForProfile/.test(startModeDecisionsSrc),
+  'appStartModeDecisions consults shouldDefaultStartModeToCurrentForProfile (PRT4040 carve-out)',
+);
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

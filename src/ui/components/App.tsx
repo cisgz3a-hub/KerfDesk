@@ -123,7 +123,10 @@ import { injectBundledFontFaces } from '../../fonts/injectFontFaces';
 import { type SettingsTab } from './SettingsModal';
 import { AppSettingsModal } from './AppSettingsModal';
 import { type GcodeStartMode } from '../../core/output/GcodeOrigin';
-import { shouldDefaultStartModeToCurrentForProfile } from '../../core/devices/DeviceProfile';
+import {
+  shouldResetStartModeAfterDisconnect,
+  shouldNudgeStartModeToCurrent,
+} from './app/appStartModeDecisions';
 import { type UserMode } from '../../app/UserModeGates';
 import {
   resolveTextOperationLayer,
@@ -398,11 +401,11 @@ export function App(): React.ReactElement {
   );
 
   useEffect(() => {
-    if (
-      grbl.machineState?.status === 'disconnected'
-      && startModeRef.current === 'current'
-      && !shouldDefaultStartModeToCurrentForProfile(activeProfile)
-    ) {
+    if (shouldResetStartModeAfterDisconnect({
+      machineStatus: grbl.machineState?.status,
+      currentStartMode: startModeRef.current,
+      activeProfile,
+    })) {
       resetCurrentModeAfterDisconnect();
     }
   }, [activeProfile, grbl.machineState?.status, resetCurrentModeAfterDisconnect]);
@@ -412,10 +415,10 @@ export function App(): React.ReactElement {
     const profileId = activeProfile?.id ?? null;
     if (profileStartModeNudgedRef.current === profileId) return;
     profileStartModeNudgedRef.current = profileId;
-    if (
-      shouldDefaultStartModeToCurrentForProfile(activeProfile)
-      && startModeRef.current === 'absolute'
-    ) {
+    if (shouldNudgeStartModeToCurrent({
+      activeProfile,
+      currentStartMode: startModeRef.current,
+    })) {
       setStartMode('current');
     }
   }, [activeProfile, setStartMode]);
