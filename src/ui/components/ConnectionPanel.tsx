@@ -23,6 +23,15 @@ import {
 import { WorkflowPanel } from './workflow/WorkflowPanel';
 import { WebSerialPort } from '../../communication/WebSerialPort';
 import { estimateJobTime } from '../../core/output/TimeEstimator';
+// T1-211: frame helpers for the Move tab's Frame / Frame+Dot buttons.
+// getActiveProfile is already imported above; only pull the new
+// helpers here.
+import { buildFrameCorners } from '../../app/frameGcode';
+import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
+import {
+  resolveFrameDotFeedRate,
+  resolveFrameLineDelayMs,
+} from '../../core/devices/DeviceProfile';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -310,6 +319,111 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       console.warn('[WorkflowPanel T1-207] Command rejected:', err);
     }
   };
+  // Shared with the Start-Job wiring below — declared up here so
+  // the frame block (which uses compileResult.canvasPlanBounds and
+  // startMode) doesn't trip a hoisting error.
+  const compileResult = props.lastGcodeCompileResult ?? null;
+  const compiledTicket = props.compiledJobTicket ?? compileResult?.ticket ?? null;
+  const startMode = props.startMode;
+
+  // T1-211 (Phase 5b): frame wiring for the Move tab.
+  // Two buttons: Frame (safe corner trace with laser-off motion) and
+  // Frame + Dot (low-power outline + center mark). Both require a
+  // compiled job (we read canvasPlanBounds from lastGcodeCompileResult)
+  // and an idle controller. Saved-origin G54 drift verification is
+  // intentionally skipped — the new panel already blocks savedOrigin
+  // mode at the Start button, so frame here only runs in absolute /
+  // current modes where drift isn't a risk.
+  const sceneBounds = compileResult?.canvasPlanBounds ?? null;
+  const canFrame =
+    isConnected
+    && machineStatus === 'idle'
+    && sceneBounds !== null;
+
+  const onFrameSafe = canFrame
+    ? () => {
+        if (!sceneBounds) return;
+        const transformOpts = {
+          startMode,
+          savedOrigin: props.savedOrigin,
+          originCorner: props.originCorner,
+          bedHeightMm: props.bedHeight ?? 400,
+          bedWidthMm: props.bedWidth ?? 400,
+        };
+        const corners = buildFrameCorners(sceneBounds, transformOpts);
+        const ys = corners.map((c) => c.y);
+        const xs = corners.map((c) => c.x);
+        const ok = window.confirm(
+          `Frame the bed: X ${Math.min(...xs).toFixed(0)} - ${Math.max(...xs).toFixed(0)} mm, `
+          + `Y ${Math.min(...ys).toFixed(0)} - ${Math.max(...ys).toFixed(0)} mm. Continue?`,
+        );
+        if (!ok) return;
+        const idleTimeoutMs = estimateFrameIdleTimeoutMs(corners);
+        const activeProfile = getActiveProfile();
+        const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
+        void executionCoordinator
+          .frameSafe({ sceneBounds, transformOpts, idleTimeoutMs, frameLineDelayMs })
+          .catch((err: unknown) => {
+            console.warn(
+              '[WorkflowPanel T1-211] Frame safe failed:',
+              err instanceof Error ? err.message : err,
+            );
+          });
+      }
+    : null;
+
+  const onFrameDot = canFrame
+    ? () => {
+        if (!sceneBounds) return;
+        // One-time low-power-fire acknowledgement — matches the
+        // legacy panel's localStorage gate. After the user confirms
+        // once, the bare bounds-confirm is enough.
+        const acked = localStorage.getItem('laserforge_frame_dot_acknowledged_v2');
+        if (!acked) {
+          const ok = window.confirm(
+            'Frame + Mark Center fires the laser at low power to trace the outline and '
+            + 'mark a small + at the center. Use only with eye protection on material that '
+            + 'can handle a brief mark. Continue?',
+          );
+          if (!ok) return;
+          try { localStorage.setItem('laserforge_frame_dot_acknowledged_v2', 'true'); } catch { /* */ }
+        }
+        const transformOpts = {
+          startMode,
+          savedOrigin: props.savedOrigin,
+          originCorner: props.originCorner,
+          bedHeightMm: props.bedHeight ?? 400,
+          bedWidthMm: props.bedWidth ?? 400,
+        };
+        const corners = buildFrameCorners(sceneBounds, transformOpts);
+        const ys = corners.map((c) => c.y);
+        const xs = corners.map((c) => c.x);
+        const okBounds = window.confirm(
+          `Frame + Dot at: X ${Math.min(...xs).toFixed(0)} - ${Math.max(...xs).toFixed(0)} mm, `
+          + `Y ${Math.min(...ys).toFixed(0)} - ${Math.max(...ys).toFixed(0)} mm. Continue?`,
+        );
+        if (!okBounds) return;
+        const activeProfile = getActiveProfile();
+        const maxSpindle = activeProfile?.maxSpindle ?? 1000;
+        const frameDotFeedRateMmPerMin = resolveFrameDotFeedRate(activeProfile);
+        const frameLineDelayMs = resolveFrameLineDelayMs(activeProfile);
+        void executionCoordinator
+          .frameDot({
+            sceneBounds,
+            transformOpts,
+            maxSpindle,
+            frameDotFeedRateMmPerMin,
+            frameLineDelayMs,
+          })
+          .catch((err: unknown) => {
+            console.warn(
+              '[WorkflowPanel T1-211] Frame dot failed:',
+              err instanceof Error ? err.message : err,
+            );
+          });
+      }
+    : null;
+
   const setupModeProps = {
     // Move tab
     jogStep,
@@ -317,6 +431,9 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     onJog,
     onHome,
     canHome: isConnected && machineStatus === 'idle',
+    canFrame,
+    onFrameSafe,
+    onFrameDot,
     // Job tab — bed dimensions fall back to safe defaults when the
     // adapter doesn't have them threaded (Phase 4 will lift the
     // bed-size resolution up).
@@ -445,9 +562,6 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   //     enables this button already requires preflight to pass
   // canvasContext + notifySimulatorTx are read from the same sources
   // the legacy panel uses.
-  const compileResult = props.lastGcodeCompileResult ?? null;
-  const compiledTicket = props.compiledJobTicket ?? compileResult?.ticket ?? null;
-  const startMode = props.startMode;
   const startReady =
     isConnected
     && machineStatus === 'idle'

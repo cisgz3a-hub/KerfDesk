@@ -234,6 +234,60 @@ console.log('\n=== T1-207 WorkflowPanel Phase 3 setup mode ===\n');
   );
 }
 
+// -------- 9b. T1-211: Frame buttons in the Move tab --------
+//
+// User-reported usability gap after the phase rollout: Frame is
+// needed before every job and the new panel had no way to do it
+// without flipping the flag off. T1-211 wires Frame + Frame-Dot
+// buttons through to executionCoordinator.frameSafe / frameDot.
+{
+  const moveSrc = readFileSync(
+    resolve(here, '../src/ui/components/workflow/modes/setup/MoveTab.tsx'),
+    'utf-8',
+  );
+  assert(/T1-211/.test(moveSrc), 'MoveTab.tsx carries T1-211 marker');
+  assert(/workflow-move-frame-safe/.test(moveSrc), 'MoveTab renders Frame button with testid');
+  assert(/workflow-move-frame-dot/.test(moveSrc), 'MoveTab renders Frame+Dot button with testid');
+  // Buttons are gated on canFrame AND non-null callback.
+  assert(
+    /disabled:\s*!props\.canFrame \|\| props\.onFrameSafe === null/.test(moveSrc),
+    'Frame button disables when canFrame is false or callback is null',
+  );
+
+  const setupSrc = readFileSync(
+    resolve(here, '../src/ui/components/workflow/modes/SetupMode.tsx'),
+    'utf-8',
+  );
+  assert(/T1-211/.test(setupSrc), 'SetupMode.tsx carries T1-211 marker');
+  assert(/canFrame: props\.canFrame/.test(setupSrc), 'SetupMode threads canFrame to MoveTab');
+  assert(/onFrameSafe: props\.onFrameSafe/.test(setupSrc), 'SetupMode threads onFrameSafe to MoveTab');
+  assert(/onFrameDot: props\.onFrameDot/.test(setupSrc), 'SetupMode threads onFrameDot to MoveTab');
+
+  const adapterSrc = readFileSync(
+    resolve(here, '../src/ui/components/ConnectionPanel.tsx'),
+    'utf-8',
+  );
+  assert(/T1-211/.test(adapterSrc), 'ConnectionPanel.tsx carries T1-211 marker');
+  assert(
+    /executionCoordinator[\s\S]{0,400}\.frameSafe\(/.test(adapterSrc),
+    'adapter wires onFrameSafe to executionCoordinator.frameSafe',
+  );
+  assert(
+    /executionCoordinator[\s\S]{0,400}\.frameDot\(/.test(adapterSrc),
+    'adapter wires onFrameDot to executionCoordinator.frameDot',
+  );
+  // Frame-dot acknowledgement gate (same localStorage key as legacy).
+  assert(
+    /laserforge_frame_dot_acknowledged_v2/.test(adapterSrc),
+    'adapter shares the frame-dot acknowledgement localStorage key with the legacy panel',
+  );
+  // canFrame requires compiled bounds.
+  assert(
+    /sceneBounds[\s\S]{0,200}canvasPlanBounds/.test(adapterSrc),
+    'adapter resolves sceneBounds from compileResult.canvasPlanBounds',
+  );
+}
+
 // -------- 10. ConnectionPanel adapter wires setupModeProps --------
 {
   const src = readFileSync(

@@ -40,6 +40,12 @@ export interface SetupModeProps {
   readonly canFocus?: boolean;
   readonly focusBusy?: boolean;
   readonly onFocus?: () => void;
+  // T1-211: frame controls. Wired through to executionCoordinator
+  // by the adapter. `canFrame` is the gate; null callbacks render
+  // the buttons disabled.
+  readonly canFrame: boolean;
+  readonly onFrameSafe: (() => void) | null;
+  readonly onFrameDot: (() => void) | null;
   // Job tab
   readonly activeProfile: DeviceProfile | null;
   readonly resolvedBedWidthMm: number;
@@ -77,6 +83,9 @@ export function SetupMode(props: SetupModeProps): React.ReactElement {
         canFocus: props.canFocus,
         focusBusy: props.focusBusy,
         onFocus: props.onFocus,
+        canFrame: props.canFrame,
+        onFrameSafe: props.onFrameSafe,
+        onFrameDot: props.onFrameDot,
       });
       break;
     case 'job':
