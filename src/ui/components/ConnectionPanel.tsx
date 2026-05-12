@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { type JobReplay } from '../../core/replay/JobReplay';
 import {
   ConnectionPanelMain,
@@ -22,6 +22,7 @@ import {
 } from '../features/uiFeatureFlags';
 import { WorkflowPanel } from './workflow/WorkflowPanel';
 import { WebSerialPort } from '../../communication/WebSerialPort';
+import { estimateJobTime } from '../../core/output/TimeEstimator';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -339,18 +340,63 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const jobName = props.scene.metadata?.name ?? 'Untitled';
   const lineCount = jobProgress?.totalLines ?? null;
 
-  // T1-209 follow-up: optimistic-pause local state. Flips true the
-  // moment Pause is clicked so the UI transitions to 'paused' mode
-  // immediately, even before the controller's next status report
-  // confirms Hold:0. Cleared when machineStatus actually reports
-  // 'hold' (real state caught up) OR when the user fires Resume /
-  // Stop. Matches the legacy panel's `isPaused` flag (see
-  // ConnectionPanelMain.tsx:426: `displayPaused = isPaused ||
-  // machineState?.status === 'hold'`).
+  // T1-209 follow-up: optimistic-pause local state. Declared up
+  // here (rather than later next to the pause/resume handlers) so
+  // the elapsed-time effect below can reference it without a
+  // hoisting error.
   const [pauseRequested, setPauseRequested] = useState(false);
   useEffect(() => {
     if (machineStatus === 'hold') setPauseRequested(false);
   }, [machineStatus]);
+
+  // T1-210 (Phase 4 follow-up): live elapsed-time tracking. Mirrors
+  // the legacy panel's pattern (ConnectionPanelMain:253 + 645) —
+  // start time captured when the machine transitions idle → run,
+  // ticked once a second while running (paused or stopped halts the
+  // tick), and reset when the controller returns to idle. The
+  // estimator runs once per gcode-load and yields totalSeconds for
+  // ETA + a pre-start estimate.
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [jobStartTime, setJobStartTime] = useState<number | null>(null);
+  const isControllerRunning = machineStatus === 'run';
+  const isControllerHeld = machineStatus === 'hold' || pauseRequested;
+  useEffect(() => {
+    if (isControllerRunning || isControllerHeld) {
+      if (jobStartTime === null) setJobStartTime(Date.now());
+    } else if (machineStatus === 'idle' || machineStatus === 'disconnected') {
+      if (jobStartTime !== null) {
+        setJobStartTime(null);
+        setElapsedSeconds(0);
+      }
+    }
+  }, [isControllerRunning, isControllerHeld, machineStatus, jobStartTime]);
+  useEffect(() => {
+    if (!isControllerRunning || isControllerHeld || jobStartTime === null) return;
+    const tick = () => {
+      setElapsedSeconds(Math.floor((Date.now() - jobStartTime) / 1000));
+    };
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [isControllerRunning, isControllerHeld, jobStartTime]);
+
+  // Job time estimate — yields totalSeconds and a "M:SS" formatted
+  // string. Called whenever the gcode changes (cheap; runs in the
+  // hundreds of microseconds for typical jobs).
+  const gcode = props.gcode;
+  const estimate = useMemo(
+    () => (typeof gcode === 'string' && gcode.length > 0 ? estimateJobTime(gcode) : null),
+    [gcode],
+  );
+  const estimatedTotalSeconds = estimate?.totalSeconds ?? null;
+  const estimatedRemaining =
+    estimatedTotalSeconds !== null
+      ? Math.max(0, estimatedTotalSeconds - elapsedSeconds)
+      : null;
+
+  // pauseRequested + its sync effect were declared above so the
+  // elapsed-time tracking can reference them. The optimistic-pause
+  // rationale lives there.
 
   const onPause = () => {
     // Optimistically flip the UI to paused mode immediately.
@@ -438,20 +484,20 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     ready: {
       jobName,
       lineCount,
-      estimatedTime: null as string | null,
+      estimatedTime: estimate?.formatted ?? null,
       planSummary: null as string | null,
     },
     running: {
       jobProgress: jobProgress ?? null,
-      elapsedSeconds: 0,
-      estimatedRemaining: null as number | null,
+      elapsedSeconds,
+      estimatedRemaining,
       activeLabel: 'Running',
       planSummary: null as string | null,
     },
     paused: {
       jobProgress: jobProgress ?? null,
-      elapsedSeconds: 0,
-      estimatedRemaining: null as number | null,
+      elapsedSeconds,
+      estimatedRemaining,
       planSummary: null as string | null,
     },
   };
