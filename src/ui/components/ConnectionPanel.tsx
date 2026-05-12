@@ -12,6 +12,15 @@ import {
   type DeviceProfile,
 } from '../../core/devices/DeviceProfile';
 import { FalconWiFiStatusPanel, FalconAlarmToastStack } from './falcon-wifi';
+// T1-204: feature-flag-gated rollout of the new WorkflowPanel
+// (`docs/CONNECTION-PANEL-REDESIGN.md`). Default off — the existing
+// ConnectionPanelMain still renders for every user until parity is
+// confirmed.
+import {
+  getUiFeatureFlag,
+  UI_FEATURE_FLAG_CHANGED_EVENT,
+} from '../features/uiFeatureFlags';
+import { WorkflowPanel } from './workflow/WorkflowPanel';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -98,21 +107,111 @@ function FalconWiFiSidebar({
   );
 }
 
+/**
+ * T1-204: subscribe to the `workflowPanelV2` UI feature flag so the
+ * panel re-renders when the flag is toggled (Settings UI in a future
+ * phase, or DevTools localStorage during the rollout). Polls every
+ * second as a defense-in-depth fallback for environments where
+ * dispatchEvent fires before listeners attach.
+ */
+function useWorkflowPanelV2Flag(): boolean {
+  const [on, setOn] = useState<boolean>(() => getUiFeatureFlag('workflowPanelV2'));
+  useEffect(() => {
+    const refresh = () => setOn(getUiFeatureFlag('workflowPanelV2'));
+    window.addEventListener('storage', refresh);
+    window.addEventListener(UI_FEATURE_FLAG_CHANGED_EVENT, refresh);
+    const pollId = window.setInterval(refresh, 1000);
+    return () => {
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener(UI_FEATURE_FLAG_CHANGED_EVENT, refresh);
+      clearInterval(pollId);
+    };
+  }, []);
+  return on;
+}
+
 export function ConnectionPanel(props: ConnectionPanelProps) {
   const activeProfile = useActiveProfile();
   const isFalcon = activeProfile?.connection?.kind === 'falcon-wifi';
+  const workflowPanelV2 = useWorkflowPanelV2Flag();
 
-  const body = isFalcon && activeProfile
-    ? React.createElement(FalconWiFiSidebar, {
-        profile: activeProfile,
-        sidebarWidth: props.sidebarWidth ?? 500,
-      })
-    : React.createElement(ConnectionPanelLegacy, props);
+  // T1-204: Falcon WiFi sidebar takes precedence over both panel
+  // shapes. When the WorkflowPanelV2 flag is on AND we're not in
+  // Falcon mode, route to the new panel; otherwise fall through to
+  // the existing ConnectionPanelLegacy.
+  let body: React.ReactNode;
+  if (isFalcon && activeProfile) {
+    body = React.createElement(FalconWiFiSidebar, {
+      profile: activeProfile,
+      sidebarWidth: props.sidebarWidth ?? 500,
+    });
+  } else if (workflowPanelV2) {
+    body = React.createElement(WorkflowPanelAdapter, props);
+  } else {
+    body = React.createElement(ConnectionPanelLegacy, props);
+  }
 
   return React.createElement(React.Fragment, null,
     body,
     React.createElement(FalconAlarmToastStack, {}),
   );
+}
+
+/**
+ * T1-204: prop adapter between the existing `ConnectionPanelProps`
+ * surface (mirrors ~50 fields from ConnectionPanelMainProps) and the
+ * new `WorkflowPanel`'s focused surface. Phase 1 wires only what the
+ * scaffold uses — recovery / machine state / connection booleans +
+ * a handful of action callbacks. Phase 2 expands this to thread the
+ * full set as each mode's real implementation lands.
+ */
+function WorkflowPanelAdapter(props: ConnectionPanelProps) {
+  const { machineUi } = props;
+  const machineService = machineUi.service;
+  const machineState = props.machineState;
+  const machineStatus = machineState?.status ?? null;
+  // Same isConnected derivation as ConnectionPanelMain.tsx:424.
+  const isConnected =
+    machineStatus !== 'disconnected'
+    && machineStatus !== 'connecting'
+    && machineState !== null;
+
+  // recoveryState subscription — same pattern as ConnectionPanelMain.
+  const [recoveryState, setRecoveryState] = useState(() => machineService.getRecoveryState());
+  useEffect(() => {
+    setRecoveryState(machineService.getRecoveryState());
+    return machineService.onRecoveryStateChange(setRecoveryState);
+  }, [machineService]);
+
+  // Phase 1: keep handler wiring minimal. Real connect / disconnect /
+  // job-control wiring lives in Phase 2+ when each mode's real
+  // implementation lands. For now the footer renders disabled
+  // placeholders for safety paths.
+  const onEmergencyStop = () => {
+    void machineService.emergencyStop();
+  };
+
+  return React.createElement(WorkflowPanel, {
+    machineState,
+    machineStatus,
+    isConnected,
+    // Phase 1 stub: connecting is detectable today only via app-level
+    // state (active connect promise); Phase 2 threads it through.
+    isConnecting: false,
+    recoveryState,
+    // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
+    // via buildStartReadiness; Phase 2 lifts that computation up so
+    // both panels can share it.
+    canStartJob: false,
+    onEmergencyStop,
+    onConnectUsb: null,
+    onConnectSimulator: null,
+    onCancelConnect: null,
+    onStartJob: null,
+    onPause: null,
+    onResume: null,
+    onStop: null,
+  });
 }
 
 function ConnectionPanelLegacy(props: ConnectionPanelProps) {
