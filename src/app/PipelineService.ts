@@ -46,6 +46,10 @@ import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
 // zero-distance dwell-burn) at compile time, before the ticket is
 // presented for approval.
 import { checkBurnEnvelopeDivergence } from '../core/output/burnEnvelopeDivergence';
+// T1-195 (extends T1-193): persist burn-envelope divergence events
+// to the shared ledger so support bundles can correlate compile-time
+// encoder regressions with the runtime stream they affected.
+import { getMachineEventLedger } from './MachineEventLedger';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -430,6 +434,18 @@ export async function compileGcode(
           + 'The emitted gcode produces a different burn region than the planned preview. '
           + 'Check the encoder for new bugs introduced by recent edits.',
         );
+        // T1-195: persist the divergence event so support bundles
+        // can correlate the runtime stream with the compile-time
+        // detection. The maxEdgeDeltaMm field is finite for
+        // 'envelope-edge-mismatch'; the empty/non-empty cases set
+        // it to Infinity, which we replace with -1 here for JSON
+        // safety (Infinity isn't JSON-representable).
+        getMachineEventLedger().append({
+          kind: 'burn-envelope-divergence',
+          t: Date.now(),
+          divergenceKind: report.kind,
+          maxEdgeDeltaMm: Number.isFinite(report.maxEdgeDeltaMm) ? report.maxEdgeDeltaMm : -1,
+        });
       }
       return report;
     })(),

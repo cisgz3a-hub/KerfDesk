@@ -56,6 +56,10 @@ import { getActiveProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
+// T1-195 (extends T1-193): append every safety-relevant event to the
+// shared MachineEventLedger so support bundles can reconstruct what
+// happened. Pre-T1-195 these events surfaced only via console.warn.
+import { getMachineEventLedger } from './MachineEventLedger';
 // T1-135: ticket validation extracted to a pure helper so each gate
 // (scene/profile/controller/gcode hash) can be tested in isolation.
 // Hashing imports + the ControllerId type moved with the logic.
@@ -909,6 +913,18 @@ export class MachineService {
             + 'Next launch will surface a recovery dialog before further machine commands.',
           );
         }
+        // T1-195: append every failed-start to the persistent ledger
+        // — both the true failed-start case (no streaming evidence)
+        // and the streamed-then-threw case. Support bundles use this
+        // to distinguish ticket-shape errors from mid-stream throws.
+        getMachineEventLedger().append({
+          kind: 'failed-to-start',
+          t: Date.now(),
+          ticketId: ticket.ticketId ?? 'unknown',
+          error: err instanceof Error ? err.message : String(err),
+          sawRun,
+          controllerThinksRunning,
+        });
       }
       throw err;
     }
@@ -1763,6 +1779,13 @@ export class MachineService {
           + 'Preserving unsafe-prior-state flag so the next launch '
           + 'surfaces a recovery dialog before further machine commands.',
         );
+        // T1-195: also write to the persistent ledger so support
+        // bundles capture the event across renderer crashes.
+        getMachineEventLedger().append({
+          kind: 'disconnect-while-running',
+          t: Date.now(),
+          ticketId: this.activeTicket?.ticketId ?? null,
+        });
       }
     }
     return this._recordSafetyResult(result);
@@ -1847,6 +1870,14 @@ export class MachineService {
       // dialog — exactly the case the flag exists for. The flag
       // survives until the user explicitly acknowledges recovery
       // via the App.tsx startup dialog (T1-29 path 3).
+      // T1-195: append to the persistent ledger so support bundles
+      // capture every emergency-stop event.
+      getMachineEventLedger().append({
+        kind: 'emergency-stop',
+        t: Date.now(),
+        accepted: result.accepted,
+        message: result.message,
+      });
       console.warn(
         '[MachineService] T1-175: emergencyStop preserves unsafe-'
         + 'prior-state flag. Next launch will surface a recovery '

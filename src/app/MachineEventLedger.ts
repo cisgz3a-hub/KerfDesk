@@ -180,6 +180,39 @@ export class InMemoryMachineEventLedger implements MachineEventLedger {
  * (10000 entries) is small enough that the JSON round-trip is
  * sub-millisecond.
  */
+/**
+ * T1-195 (extends T1-193): module-level singleton accessor. Picks
+ * the localStorage implementation when `localStorage` is defined
+ * (browser / renderer / test shim) and falls back to in-memory in
+ * pure-Node contexts where the global isn't available.
+ *
+ * Singleton because the ledger is a process-wide diagnostic log;
+ * every caller writing safety events should write into the SAME
+ * ledger so support bundles capture the full session.
+ */
+let _ledgerSingleton: MachineEventLedger | null = null;
+
+export function getMachineEventLedger(): MachineEventLedger {
+  if (_ledgerSingleton !== null) return _ledgerSingleton;
+  const hasLocalStorage =
+    typeof globalThis !== 'undefined'
+    && typeof (globalThis as { localStorage?: unknown }).localStorage === 'object'
+    && (globalThis as { localStorage?: unknown }).localStorage !== null;
+  _ledgerSingleton = hasLocalStorage
+    ? new LocalStorageMachineEventLedger()
+    : new InMemoryMachineEventLedger();
+  return _ledgerSingleton;
+}
+
+/**
+ * Test-only: replace the singleton with the given ledger. Production
+ * code MUST NOT call this; the singleton is a process-wide resource
+ * and replacing it mid-flight loses events.
+ */
+export function _setMachineEventLedgerForTest(ledger: MachineEventLedger | null): void {
+  _ledgerSingleton = ledger;
+}
+
 export class LocalStorageMachineEventLedger implements MachineEventLedger {
   private readonly key = 'laserforge_machine_event_ledger';
 
