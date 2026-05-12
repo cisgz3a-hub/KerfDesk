@@ -153,10 +153,18 @@ console.log('\n=== T1-208 WorkflowPanel Phase 4 live-job modes ===\n');
     /onStop[\s\S]{0,100}stopAndEnsureLaserOff\(\)/.test(src),
     'adapter wires onStop to machineService.stopAndEnsureLaserOff',
   );
-  // Start stays null — the legacy panel owns the full ticket flow.
+  // T1-209 (Phase 5a) wired Start Job. The adapter no longer hard-
+  // codes onStartJob: null; it computes a callable when the start
+  // preconditions are met. Pin the new wiring: executionCoordinator.
+  // startValidatedJob is called and saved-origin mode falls back to
+  // the legacy panel.
   assert(
-    /onStartJob: null,/.test(src),
-    'adapter keeps onStartJob: null (Phase 5 lifts the ticket flow)',
+    /executionCoordinator[\s\S]{0,200}\.startValidatedJob\(\{/.test(src),
+    'adapter wires onStartJob to executionCoordinator.startValidatedJob',
+  );
+  assert(
+    /startMode !== 'savedOrigin'/.test(src),
+    "adapter blocks savedOrigin in the new panel (Phase 5b lifts the G54 drift check)",
   );
   // liveJobProps threaded into the WorkflowPanel call.
   assert(

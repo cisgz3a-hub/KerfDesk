@@ -334,13 +334,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   };
 
   // T1-208 (Phase 4): live-job props for ready / running / paused.
-  // jobProgress comes from the controller / machineUi; elapsedSeconds
-  // is tracked locally (set when a job starts, cleared when it ends).
-  // For Phase 4 the start callback is intentionally null — the legacy
-  // panel owns the full ticket-validation flow (compile + hash + scene
-  // verification) that's not yet lifted up. Pause / Resume / Stop are
-  // safe to wire because they're idempotent commands the user invokes
-  // on an already-running job.
+  // jobProgress comes from the controller / machineUi.
   const jobProgress = props.jobProgress;
   const jobName = props.scene.metadata?.name ?? 'Untitled';
   const lineCount = jobProgress?.totalLines ?? null;
@@ -354,6 +348,52 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const onStop = () => {
     void machineService.stopAndEnsureLaserOff();
   };
+
+  // T1-209 (Phase 5a): wire Start Job. Compared to the legacy panel's
+  // 127-line handleStartJob this is intentionally minimal:
+  //   - the start-readiness gate (already evaluated for canStartJob
+  //     below) is the load-bearing safety check
+  //   - saved-origin mode falls back to the legacy panel (its G54
+  //     drift verification dialog isn't lifted yet)
+  //   - the preflight confirmation dialog and production-tip dialog
+  //     are skipped — they're advisory; the readiness gate that
+  //     enables this button already requires preflight to pass
+  // canvasContext + notifySimulatorTx are read from the same sources
+  // the legacy panel uses.
+  const compileResult = props.lastGcodeCompileResult ?? null;
+  const compiledTicket = props.compiledJobTicket ?? compileResult?.ticket ?? null;
+  const startMode = props.startMode;
+  const startReady =
+    isConnected
+    && machineStatus === 'idle'
+    && compiledTicket !== null
+    && compileResult !== null;
+  const onStartJob = (startReady && startMode !== 'savedOrigin')
+    ? () => {
+        if (!compiledTicket || !compileResult) return;
+        const canvasContext = {
+          canvasMoves: compileResult.canvasMoves,
+          canvasPlanBounds: compileResult.canvasPlanBounds,
+          machineTransform: compileResult.machineTransform,
+        };
+        const notifySimulatorTx = machineUi.coordinatorSimulatorNotifyRef.current
+          ?? (() => {});
+        void executionCoordinator
+          .startValidatedJob({
+            ticket: compiledTicket,
+            scene: props.scene,
+            machineState,
+            notifySimulatorTx,
+            canvasContext,
+          })
+          .catch((err: unknown) => {
+            console.warn(
+              '[WorkflowPanel T1-209] Start Job failed:',
+              err instanceof Error ? err.message : err,
+            );
+          });
+      }
+    : null;
 
   const liveJobProps = {
     ready: {
@@ -396,19 +436,20 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       isConnected,
       isConnecting,
       recoveryState,
-      // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
-      // via buildStartReadiness; Phase 5 lifts that computation up so
-      // both panels can share it.
-      canStartJob: false,
+      // T1-209 (Phase 5a): canStartJob is derived directly from the
+      // observable preconditions for a safe start. This is a lighter
+      // check than the legacy panel's buildStartReadiness (which
+      // also looks at preflight blockers, frame freshness, laser
+      // state, WiFi trust); a Phase 5b can replace this with the
+      // full readiness object lifted up to App.tsx so both panels
+      // share the SAME canStartJob.
+      canStartJob: startReady && startMode !== 'savedOrigin',
       onEmergencyStop,
       onConnectUsb,
       // Phase 2 deliberate stubs (see component docstring).
       onConnectSimulator: null,
       onCancelConnect,
-      // T1-208 (Phase 4): Start stays null (legacy panel owns the
-      // full ticket-validation flow); pause/resume/stop are wired
-      // because they're safe idempotent commands.
-      onStartJob: null,
+      onStartJob,
       onPause,
       onResume,
       onStop,
