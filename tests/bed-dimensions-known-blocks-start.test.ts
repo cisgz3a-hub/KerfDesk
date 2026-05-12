@@ -118,7 +118,7 @@ console.log('\n=== T1-218 bedDimensionsKnown blocks start when unknown ===\n');
     null, // machineState — offline
     300, // bedWidth (the fallback value)
     300, // bedHeight (the fallback value)
-    null, null, null, undefined, null, // optional preflight inputs
+    null, undefined, undefined, undefined, null, // optional preflight inputs
     'absolute',
     null,
     false, // bedDimensionsKnown: NO
@@ -148,7 +148,7 @@ console.log('\n=== T1-218 bedDimensionsKnown blocks start when unknown ===\n');
   // preserved.
   const summary = runPreflightSummary(
     minimalScene,
-    null, null, 300, 300, null, null, null, undefined, null, 'absolute', null,
+    null, null, 300, 300, null, undefined, undefined, undefined, null, 'absolute', null,
     // bedDimensionsKnown omitted → defaults to true
   );
   // The check passes whether or not getActiveProfile() returns a
@@ -176,7 +176,7 @@ console.log('\n=== T1-218 bedDimensionsKnown blocks start when unknown ===\n');
     minimalScene,
     'G21\nG90\n',
     connectedIdle,
-    300, 300, null, null, null, undefined, null, 'absolute', null,
+    300, 300, null, undefined, undefined, undefined, null, 'absolute', null,
     false, // bedDimensionsKnown
   );
   const connectedMissing = findBedSizeIssue(summary);

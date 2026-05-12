@@ -39,12 +39,23 @@ import {
   type SafetyState,
 } from './SafetyStateMachine';
 import {
+  ackInspection,
+  ackUnlock,
+  ackRehome,
+  ackReframe,
+  ackReconnect,
+  ackRecompile,
   recoveryStateInitial,
   recoveryAllowsStart,
   triggerAlarm,
   triggerEmergencyStop,
   type RecoveryState,
 } from '../runtime/RecoveryState';
+// T1-219 (v30 audit #4): token gate for recovery-bypass paths.
+import {
+  isUnsafeRecoveryBypassToken,
+  type UnsafeRecoveryBypassToken,
+} from './RecoveryBypassToken';
 import {
   classifyConnectionTrust,
   evaluateWiFiActionPolicy,
@@ -1130,16 +1141,85 @@ export class MachineService {
   }
 
   /**
-   * T1-122: replace the recovery state. Used by UI surfaces (recovery
-   * card per-step ack buttons) that compute the next state via the
-   * pure helpers in `src/runtime/RecoveryState.ts` (`ackInspection`,
-   * `ackUnlock`, `ackRehome`, `ackReframe`, `ackReconnect`,
-   * `ackRecompile`) and pass the result back here. The pure helpers
-   * automatically transition to `'none'` when every required step for
-   * the active recovery is done; this method is a thin pass-through
-   * that fires the listener notification.
+   * T1-122: replace the recovery state.
+   *
+   * T1-219 (v30 audit #4): direct clears of an active recovery
+   * (transitions from `current.status !== 'none'` to
+   * `next.status === 'none'`) now require an
+   * `UnsafeRecoveryBypassToken`. The legitimate clear path runs
+   * through `applyRecoveryAck(step)` (added below), which advances
+   * the per-step checklist and auto-transitions to `'none'` when
+   * every required step is done. Non-clearing transitions
+   * (entering recovery or moving within recovery) are unchanged —
+   * they don't need a token.
+   *
+   * Used by:
+   *   - the legitimate clear path INSIDE `applyRecoveryAck`
+   *     (calling without a token is safe there because the
+   *     applied ack proves the checklist completed).
+   *   - direct transitions to non-`'none'` states (e.g.
+   *     `triggerAlarm` / `triggerEmergencyStop`) at the service's
+   *     own private call sites.
+   *   - test harnesses that need to set up an arbitrary
+   *     non-`'none'` state for fixture purposes (no token
+   *     required since they're not clearing).
+   *   - bypass paths that explicitly mint a token via
+   *     `createUnsafeRecoveryBypassToken(reason)`.
    */
-  setRecoveryState(next: RecoveryState): void {
+  setRecoveryState(next: RecoveryState, token?: UnsafeRecoveryBypassToken): void {
+    if (
+      next.status === 'none'
+      && this._recoveryState.status !== 'none'
+      && !isUnsafeRecoveryBypassToken(token)
+    ) {
+      throw new Error(
+        'setRecoveryState({status:"none"}) requires an UnsafeRecoveryBypassToken '
+        + 'when an active recovery is in flight. Use applyRecoveryAck(step) for '
+        + 'the legitimate per-step clear path, or mint a token via '
+        + 'createUnsafeRecoveryBypassToken(reason) for an explicit bypass.',
+      );
+    }
+    this._setRecoveryState(next);
+  }
+
+  /**
+   * T1-219 (v30 audit #4): apply a single recovery-checklist step
+   * ack. Replaces the pre-T1-219 pattern where the UI computed
+   * `ackInspection(currentState)` etc. itself and passed the result
+   * to the public `setRecoveryState`. Now the service owns the
+   * transition so a future UI/debug/test cannot bypass the
+   * checklist by calling `setRecoveryState({status:'none'})`
+   * directly — that path now requires a bypass token.
+   *
+   * The runtime helpers (in `src/runtime/RecoveryState.ts`) handle
+   * the discriminated-union per-status logic and the auto-clear
+   * via `checkRecoveryComplete`. This method just applies one and
+   * fires the listener.
+   */
+  applyRecoveryAck(
+    step: 'inspection' | 'unlock' | 'rehome' | 'reframe' | 'reconnect' | 'recompile',
+  ): void {
+    let next: RecoveryState;
+    switch (step) {
+      case 'inspection': next = ackInspection(this._recoveryState); break;
+      case 'unlock':     next = ackUnlock(this._recoveryState); break;
+      case 'rehome':     next = ackRehome(this._recoveryState); break;
+      case 'reframe':    next = ackReframe(this._recoveryState); break;
+      case 'reconnect':  next = ackReconnect(this._recoveryState); break;
+      case 'recompile':  next = ackRecompile(this._recoveryState); break;
+    }
+    // The ack helpers can produce a 'none' transition (the
+    // legitimate auto-clear). Bypass the public setRecoveryState
+    // token gate by going through the private setter directly —
+    // we KNOW this transition is legitimate because we just
+    // computed it from one of the typed ack helpers.
+    if (next.status === 'none' && this._recoveryState.status !== 'none') {
+      getMachineEventLedger().append({
+        kind: 'recovery-cleared',
+        t: Date.now(),
+        acknowledgedBy: 'auto',
+      });
+    }
     this._setRecoveryState(next);
   }
 
@@ -1147,31 +1227,42 @@ export class MachineService {
    * T1-122: user-explicit "I have inspected and acknowledge it's safe"
    * clear. Used by a future "Reset recovery" button that bypasses the
    * per-step checklist when the user has done all the physical-world
-   * steps and just wants to clear the gate. Equivalent to calling
-   * `setRecoveryState({ status: 'none' })` directly; provided as a
-   * named method so call sites read clearly.
+   * steps and just wants to clear the gate.
+   *
+   * T1-219 (v30 audit #4): now requires an
+   * `UnsafeRecoveryBypassToken`. The audit's worry: "a UI path,
+   * debug path, or future feature clears recovery after alarm/
+   * E-stop/disconnect without rehome/reframe/inspection actually
+   * completed." Requiring a token forces every bypass to carry a
+   * reason string and to log a console warning at mint time so
+   * the bypass is attributable in support bundles.
    */
-  acknowledgeRecoveryComplete(): void {
+  acknowledgeRecoveryComplete(token?: UnsafeRecoveryBypassToken): void {
+    // No-op when recovery is already cleared. The token is about
+    // authorizing a BYPASS of an active checklist — there's nothing
+    // to bypass when recovery is already 'none', so don't require
+    // the token for this idempotent call.
+    if (this._recoveryState.status === 'none') {
+      return;
+    }
+    if (!isUnsafeRecoveryBypassToken(token)) {
+      throw new Error(
+        'acknowledgeRecoveryComplete requires an UnsafeRecoveryBypassToken '
+        + 'when an active recovery is in flight. For the normal per-step '
+        + 'checklist clear, use applyRecoveryAck(step). Mint a token via '
+        + 'createUnsafeRecoveryBypassToken(reason) only when intentionally '
+        + 'bypassing the checklist (e.g. a "Reset recovery" diagnostic '
+        + 'button after the user manually inspected the machine).',
+      );
+    }
     // T1-201: record the user-explicit clear in the persistent ledger.
-    // Pre-T1-201 the `recovery-cleared` MachineEvent kind was declared
-    // by T1-193 but had no writer. The auto-clear path (per-step
-    // checklist completion → state machine transitions to 'none' via
-    // checkRecoveryComplete) is intentionally NOT wired in T1-201
-    // because it lives deeper in the runtime state machine; that
-    // wiring is deferred until the step-ack call sites land. The
-    // `acknowledgedBy: 'user'` discriminant carries the source so
-    // support bundles can distinguish "user clicked Acknowledge"
-    // from a future "all steps got auto-checked off".
-    //
     // Append BEFORE the state transition so the ledger entry exists
     // even if _setRecoveryState throws via a listener callback.
-    if (this._recoveryState.status !== 'none') {
-      getMachineEventLedger().append({
-        kind: 'recovery-cleared',
-        t: Date.now(),
-        acknowledgedBy: 'user',
-      });
-    }
+    getMachineEventLedger().append({
+      kind: 'recovery-cleared',
+      t: Date.now(),
+      acknowledgedBy: 'user',
+    });
     this._setRecoveryState({ status: 'none' });
   }
 

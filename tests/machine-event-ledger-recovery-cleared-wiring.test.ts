@@ -30,6 +30,13 @@ import {
 } from '../src/app/MachineEventLedger';
 import { MachineService } from '../src/app/MachineService';
 import { triggerEmergencyStop } from '../src/runtime/RecoveryState';
+// T1-219 (v30 audit #4): acknowledgeRecoveryComplete now requires
+// an UnsafeRecoveryBypassToken when an active recovery is in flight.
+import { createUnsafeRecoveryBypassToken } from '../src/app/RecoveryBypassToken';
+
+const TEST_BYPASS_TOKEN = createUnsafeRecoveryBypassToken(
+  'test fixture: T1-201 / T1-219 recovery-cleared wiring test'
+);
 import { type LaserController, type MachineState } from '../src/controllers/ControllerInterface';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 
@@ -132,7 +139,7 @@ installMockLocalStorage();
   assert(beforeAck !== 'none', 'precondition: recovery state is non-none before ack');
 
   ledger.clear();
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   const events = ledger.query({ kinds: new Set(['recovery-cleared']) });
   assert(events.length === 1, 'recovery-cleared event appended');
   if (events.length === 1 && events[0].kind === 'recovery-cleared') {
@@ -152,7 +159,7 @@ installMockLocalStorage();
   // The default initial recovery state IS 'none'. Calling ack from
   // here should NOT emit a ledger event.
   assert(svc.getRecoveryState().status === 'none', 'precondition: initial recovery state is none');
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   const events = ledger.query({ kinds: new Set(['recovery-cleared']) });
   assert(events.length === 0, 'no recovery-cleared event when ack is a no-op');
 }
@@ -164,12 +171,12 @@ installMockLocalStorage();
   resetMemoryStore();
   const svc = buildService(makeController());
   svc.notifyLaserSafetyOutcome('failed');
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   // Second invocation from 'none' is a no-op.
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   // Third: re-enter recovery, then clear.
   svc.notifyLaserSafetyOutcome('failed');
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   const events = ledger.query({ kinds: new Set(['recovery-cleared']) });
   assert(events.length === 2, '2 recovery-cleared events accumulated (one no-op skipped)');
   const allUser = events

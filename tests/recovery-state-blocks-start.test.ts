@@ -28,7 +28,14 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { type MutableRefObject } from 'react';
 import { MachineService } from '../src/app/MachineService';
+// T1-219: acknowledgeRecoveryComplete now requires a bypass token
+// when an active recovery is in flight.
+import { createUnsafeRecoveryBypassToken } from '../src/app/RecoveryBypassToken';
 import { type SerialPortLike } from '../src/communication/SerialPort';
+
+const TEST_BYPASS_TOKEN = createUnsafeRecoveryBypassToken(
+  'test fixture: T1-122 recovery-state-blocks-start coverage'
+);
 import {
   type LaserController,
   type MachineState,
@@ -160,12 +167,12 @@ void (async () => {
   assert(seen.length === 1 && seen[0] === 'alarm',
     'setRecoveryState fires listener with new status');
 
-  svc.acknowledgeRecoveryComplete();
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN);
   assert(seen.length === 2 && seen[1] === 'none',
     'acknowledgeRecoveryComplete transitions to none and fires listener');
 
   unsub();
-  svc.acknowledgeRecoveryComplete(); // no-op (already none) — no extra fire
+  svc.acknowledgeRecoveryComplete(TEST_BYPASS_TOKEN); // no-op (already none) — no extra fire
   assert(seen.length === 2, 'unsubscribed listener stops receiving updates');
 }
 
@@ -226,11 +233,18 @@ void (async () => {
     reframeDone: false,
   });
 
-  // Walk the per-step ack chain.
-  svc.setRecoveryState(ackInspection(svc.getRecoveryState()));
-  svc.setRecoveryState(ackUnlock(svc.getRecoveryState()));
-  svc.setRecoveryState(ackRehome(svc.getRecoveryState()));
-  svc.setRecoveryState(ackReframe(svc.getRecoveryState()));
+  // T1-219: walk the per-step ack chain via the new
+  // applyRecoveryAck API. Pre-T1-219 the test computed
+  // `ackInspection(svc.getRecoveryState())` itself and passed the
+  // result to `setRecoveryState` — that path is now gated for the
+  // 'none' auto-clear transition (anti-bypass). The new
+  // applyRecoveryAck method on the service applies the runtime
+  // ack helper internally so the legitimate clear remains
+  // token-free.
+  svc.applyRecoveryAck('inspection');
+  svc.applyRecoveryAck('unlock');
+  svc.applyRecoveryAck('rehome');
+  svc.applyRecoveryAck('reframe');
 
   assert(svc.getRecoveryState().status === 'none',
     'four required acks → recovery transitions to "none"');
