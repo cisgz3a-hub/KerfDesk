@@ -25,7 +25,10 @@ export interface StartReadinessGate {
     | 'laserState'
     | 'wcsState'
     | 'connectionTrust'
-    | 'controllerConnected';
+    | 'controllerConnected'
+    | 'noActiveOperation'
+    | 'noControllerError'
+    | 'recoveryComplete';
   label: string;
   status: GateStatus;
   /** One-line headline — shown when a gate is failing. */
