@@ -88,7 +88,6 @@ function happy(): BuildStartReadinessInput {
     placementUncertain: false,
     placementUncertainReason: null,
     onResetWcsToBaseline: null,
-    recoveryAllowsStart: true,
     wifiTrust: trustedTrust,
     wifiStartAllowed: true,
     isRunning: false,
@@ -103,10 +102,7 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   const r = buildStartReadiness(happy());
   assert(r.ready === true, 'happy path: ready=true');
   assert(r.blockingGate === null, 'happy path: no blocking gate');
-  // T1-215: gate count grew from 11 → 14 with the explicit
-  // noActiveOperation / noControllerError / recoveryComplete
-  // gates that surface previously-hidden canStartJob conjuncts.
-  assert(r.gates.length === 14, `14 gates rendered (got ${r.gates.length})`);
+  assert(r.gates.length === 11, `11 gates rendered (got ${r.gates.length})`);
   assert(r.gates.every((g) => g.status === 'ok'),
     'happy path: every gate status ok');
 }
@@ -123,11 +119,6 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     'framing',
     'currentModeAnchor',
     'laserState',
-    // T1-215: new explicit gates surfacing canStartJob conjuncts
-    // that pre-T1-215 were hidden.
-    'noActiveOperation',
-    'noControllerError',
-    'recoveryComplete',
     'wcsState',
     'connectionTrust',
   ];
@@ -673,80 +664,6 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       /onResetWcsToBaseline:[\s\S]{0,200}applyWcsNormalization/.test(panelSrc),
       'ConnectionPanelMain wires onResetWcsToBaseline to applyWcsNormalization',
     );
-  }
-}
-
-// -------- 17. T1-215: hidden canStartJob conjuncts are now visible --------
-//
-// User-reported bug: all readiness rows green but Start still
-// blocked. Cause: canStartJob had three conjuncts with no visible
-// gate (activeOperation, errorCode, recoveryAllowsStart) AND the
-// laserState gate passed when laserOutput was 'on' even though
-// baseSafe requires 'off'. Each missing case is now its own gate.
-{
-  // activeOperation: gate fails when an op is in flight.
-  {
-    const r = buildStartReadiness({
-      ...happy(),
-      activeOperation: { kind: 'jog' } as any, // shape is opaque to this test
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'noActiveOperation');
-    assert(g?.status === 'fail', 'activeOperation set → noActiveOperation fails');
-    assert(/jog/i.test(g?.failHeadline ?? ''), 'failHeadline names the operation kind');
-  }
-  // controller errorCode: gate fails when machineState.errorCode is set.
-  {
-    const r = buildStartReadiness({
-      ...happy(),
-      machineState: { ...happy().machineState!, errorCode: 9 },
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'noControllerError');
-    assert(g?.status === 'fail', 'machineState.errorCode set → noControllerError fails');
-    assert(/9/.test(g?.failHeadline ?? ''), 'failHeadline names the error code');
-  }
-  // recoveryAllowsStart false: gate fails when recovery is non-none.
-  {
-    const r = buildStartReadiness({
-      ...happy(),
-      recoveryAllowsStart: false,
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'recoveryComplete');
-    assert(g?.status === 'fail', 'recoveryAllowsStart=false → recoveryComplete fails');
-  }
-  // recoveryPending true: gate also fails (unsafe prior state flag).
-  {
-    const r = buildStartReadiness({
-      ...happy(),
-      recoveryPending: true,
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'recoveryComplete');
-    assert(g?.status === 'fail', 'recoveryPending=true → recoveryComplete fails');
-    assert(/unsafe state pending/i.test(g?.failHeadline ?? ''),
-      'recoveryPending failHeadline names the unsafe-prior-state flag');
-  }
-  // laserState now fails on 'on' too (was only failing on 'unknown').
-  {
-    const r = buildStartReadiness({
-      ...happy(),
-      laserOutputState: 'on',
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'laserState');
-    assert(g?.status === 'fail', "laserOutputState 'on' → laserState fails (T1-215 widened)");
-  }
-  // Happy path keeps all three new gates ok.
-  {
-    const r = buildStartReadiness(happy());
-    const op = r.gates.find((g) => g.id === 'noActiveOperation');
-    const err = r.gates.find((g) => g.id === 'noControllerError');
-    const rec = r.gates.find((g) => g.id === 'recoveryComplete');
-    assert(op?.status === 'ok', 'happy: noActiveOperation ok');
-    assert(err?.status === 'ok', 'happy: noControllerError ok');
-    assert(rec?.status === 'ok', 'happy: recoveryComplete ok');
   }
 }
 

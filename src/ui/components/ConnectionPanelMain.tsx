@@ -1719,9 +1719,6 @@ export function ConnectionPanelMain({
     onResetWcsToBaseline: () => {
       controllerRef.current?.applyWcsNormalization?.();
     },
-    // T1-215: surface the recovery-state conjunct as a visible
-    // readiness gate (it was a hidden block inside canStartJob).
-    recoveryAllowsStart: recoveryAllowsStart(recoveryState),
     wifiTrust,
     wifiStartAllowed,
     isRunning,

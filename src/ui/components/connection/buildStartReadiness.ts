@@ -72,15 +72,6 @@ export interface BuildStartReadinessInput {
    * callback) leaves the gate text-only as before T1-205.
    */
   readonly onResetWcsToBaseline: (() => void) | null;
-  /**
-   * T1-215: result of `recoveryAllowsStart(recoveryState)` —
-   * essentially `recoveryState.status === 'none'`. Caller is
-   * responsible for the import and the call so the readiness
-   * helper stays free of runtime imports. Pre-T1-215 this conjunct
-   * lived inside `canStartJob` but had no visible gate; the user
-   * would see all readiness rows green but Start still blocked.
-   */
-  readonly recoveryAllowsStart: boolean;
   readonly wifiTrust: TrustClassification;
   readonly wifiStartAllowed: boolean;
   readonly isRunning: boolean;
@@ -287,61 +278,10 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
     },
     {
       id: 'laserState',
-      // T1-215: also fail on 'on'. Pre-T1-215 the gate only failed
-      // on 'unknown', but baseSafe (the underlying canStartJob
-      // conjunct) requires 'off'. If laserOutput was 'on' (test-fire
-      // mid-flight, modal-state quirk), the readiness row showed ok
-      // but canStartJob was false — silent block.
-      label: 'Laser is off',
-      status: input.laserOutputState === 'off' ? 'ok' : 'fail',
-      failHeadline:
-        input.laserOutputState === 'unknown'
-          ? 'Laser-safety state unknown'
-          : input.laserOutputState === 'on'
-            ? 'Laser is still on'
-            : 'Laser-safety state not confirmed',
-      failAction:
-        input.laserOutputState === 'unknown'
-          ? 'A previous laser-off write failed — disconnect and reconnect to clear'
-          : 'Wait for the laser-off acknowledgement, or click Stop / E-Stop',
-    },
-    // T1-215: new explicit gates surfacing the conjuncts that
-    // previously lived inside canStartJob without a visible row.
-    // Each maps 1:1 to a `baseSafe` / `recoveryAllowsStart`
-    // condition so a green readiness panel guarantees a clickable
-    // Start button.
-    {
-      id: 'noActiveOperation',
-      label: 'No active machine operation',
-      status: input.activeOperation == null ? 'ok' : 'fail',
-      failHeadline: input.activeOperation
-        ? `Operation "${input.activeOperation.kind}" is still in progress`
-        : 'A machine operation is still in progress',
-      failAction: 'Wait for the operation to finish, or click Stop to cancel it',
-    },
-    {
-      id: 'noControllerError',
-      label: 'No controller error',
-      status:
-        input.machineState?.errorCode == null
-          ? 'ok'
-          : 'fail',
-      failHeadline:
-        input.machineState?.errorCode != null
-          ? `Controller error ${input.machineState.errorCode}`
-          : 'Controller reported an error',
-      failAction: 'Read the controller log and clear the error before starting',
-    },
-    {
-      id: 'recoveryComplete',
-      label: 'Recovery checklist complete',
-      status: input.recoveryPending || !input.recoveryAllowsStart ? 'fail' : 'ok',
-      failHeadline: input.recoveryPending
-        ? 'Previous-session unsafe state pending'
-        : 'Recovery checklist incomplete',
-      failAction: input.recoveryPending
-        ? 'Acknowledge the recovery dialog that appeared at startup, or open Settings → Recovery'
-        : 'Open the recovery banner above and complete each required step',
+      label: 'Laser-safety state known',
+      status: input.laserOutputState === 'unknown' ? 'fail' : 'ok',
+      failHeadline: 'Laser-safety state unknown',
+      failAction: 'A previous laser-off write failed — disconnect and reconnect to clear',
     },
     wcsStateGate(input),
     {
