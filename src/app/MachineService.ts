@@ -600,6 +600,37 @@ export class MachineService {
     const status =
       log.errors > 0 ? 'failed' : linesCompleted >= log.gcodeLines ? 'completed' : 'stopped';
 
+    // T1-199: append the terminal lifecycle event to the persistent
+    // ledger before finalizing the log. Mirrors the job-start append
+    // at startValidatedJob — together the pair lets support bundles
+    // reconstruct duration and outcome of every job. The ticketId
+    // comes from the active ticket (we're still inside the job
+    // session at this point — activeTicket isn't cleared until the
+    // end of this method).
+    const finalTicketId = this.activeTicket?.ticketId ?? 'unknown';
+    if (status === 'completed') {
+      getMachineEventLedger().append({
+        kind: 'job-completed',
+        t: Date.now(),
+        ticketId: finalTicketId,
+        linesAcknowledged: linesCompleted,
+      });
+    } else if (status === 'failed') {
+      getMachineEventLedger().append({
+        kind: 'job-failed',
+        t: Date.now(),
+        ticketId: finalTicketId,
+        error: `Job finalized with ${log.errors} error(s); ${linesCompleted} of ${log.gcodeLines} lines acknowledged.`,
+      });
+    } else {
+      getMachineEventLedger().append({
+        kind: 'job-stopped',
+        t: Date.now(),
+        ticketId: finalTicketId,
+        reason: `Lines acknowledged ${linesCompleted} of ${log.gcodeLines}; controller returned to idle before completion.`,
+      });
+    }
+
     finalizeLog(log, status, linesCompleted);
     addLogEntry(
       log,
@@ -752,6 +783,23 @@ export class MachineService {
       kind: 'job-running',
       ticketId: ticket.ticketId ?? null,
       startedAt: Date.now(),
+    });
+    // T1-199: append job-start to the persistent ledger. The
+    // commitment point is here — unsafePriorState is set and the
+    // controller is about to receive bytes. If the renderer dies
+    // between this line and tryFinalizeJobLog, the next session
+    // can read the ledger and see the started-but-never-finished
+    // job. Pre-T1-199 the job-start event kind was declared but
+    // had no writer; ticket arc T1-195 wired emergency-stop +
+    // disconnect-while-running + failed-to-start + burn-envelope-
+    // divergence, but the four `job-*` lifecycle events were
+    // deferred. T1-199 wires job-start here and job-completed /
+    // job-stopped / job-failed inside tryFinalizeJobLog.
+    getMachineEventLedger().append({
+      kind: 'job-start',
+      t: Date.now(),
+      ticketId: ticket.ticketId,
+      sceneHash: ticket.sceneHash,
     });
     try {
       this.jobObservedRunning = false;
