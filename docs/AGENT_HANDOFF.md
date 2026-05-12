@@ -9,20 +9,31 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `e30c9f18` (`feat(controllers): T1-196 — MarlinFirmwareAdapter
-  declared-not-supported stub`). Always verify live HEAD with
+  `25c32c8d` (`feat(safety): T1-202 — inject controller-layer
+  safety-event sink`). Always verify live HEAD with
   `git log --oneline -1` before editing.
-- Last shipped roadmap item: **T1-196** (Marlin contract-validation
-  stub). This session-arc shipped **36 consecutive audit-driven
-  tickets** (T1-161 → T1-196). T1-194..T1-196 are implementation
-  slices on top of the T1-192 / T1-193 foundations: T1-194
-  `GrblFirmwareAdapter` implementing the full contract (emit reuses
-  existing GrblOutputStrategy; stream stubs out pending the multi-
-  week MachineService rewire), T1-195 `MachineEventLedger` singleton
-  + first 4 production callers (disconnect-while-running, emergency-
-  stop, failed-to-start, burn-envelope-divergence), T1-196
-  `MarlinFirmwareAdapter` declared-not-supported stub proving the
-  contract works for non-GRBL. The first
+- Last shipped roadmap item: **T1-202** (controller-layer safety-event
+  sink). This session-arc shipped **41 consecutive audit-driven
+  tickets** (T1-161 → T1-202). T1-198..T1-202 finished wiring every
+  declared `MachineEvent` kind to a production writer: T1-198
+  `safety-off` from `notifyLaserSafetyOutcome`, T1-199 `job-start`
+  + `job-completed`/`job-failed`/`job-stopped` from
+  `startValidatedJob` + `tryFinalizeJobLog`, T1-200 `pause-requested`
+  + `paused-verified` + `resume-requested`, T1-201 `recovery-cleared
+  { acknowledgedBy: 'user' }` from `acknowledgeRecoveryComplete`,
+  T1-202 closes the layered-architecture gap with an injected sink
+  pattern — `GrblController.setSafetyEventSink(sink)` accepts a
+  callback registered from `useControllerConnection.ts` (the `ui/`
+  layer, which is allowed to import `app/`), so `wcs-query-error`
+  and `placement-uncertain` reach the ledger without violating the
+  `controllers/ → app/` reverse-dep rule. The earlier T1-194..T1-196
+  slice shipped the FirmwareAdapter foundation: T1-194
+  `GrblFirmwareAdapter` (emit reuses existing GrblOutputStrategy;
+  stream stubs pending the multi-week MachineService rewire), T1-195
+  `MachineEventLedger` singleton + first 4 production callers
+  (disconnect-while-running, emergency-stop, failed-to-start,
+  burn-envelope-divergence), T1-196 `MarlinFirmwareAdapter` declared-
+  not-supported stub proving the contract works for non-GRBL. The first
   12 (T1-161 → T1-172) addressed findings from the internal audit
   (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
   addressed the external audit (response received 2026-05-11) — both
@@ -76,13 +87,16 @@ chat transcript.
     + M114 polling protocol + M999 alarm-clear + M150/M151 laser-mode
     preflight (each adapter is a multi-week PR).
   - **Wire remaining production sites to MachineEventLedger** —
-    T1-195 wired 4 sites (disconnect-while-running, emergency-stop,
-    failed-to-start, burn-envelope-divergence). The remaining
-    `console.warn` safety events (T1-174 WCS query error, T1-176
-    safety-off outcomes, T1-117 placement-uncertain transitions)
-    need ledger writes. The GrblController WCS-error specifically
-    needs an injected ledger writer to avoid an
-    `app → controllers` reverse dependency.
+    CLEARED. T1-198 wired safety-off; T1-199 wired the full job-*
+    lifecycle (job-start + job-completed + job-failed + job-stopped);
+    T1-200 wired pause-requested + paused-verified + resume-requested;
+    T1-201 wired recovery-cleared with acknowledgedBy='user'; T1-202
+    closed the controllers/ → app/ layering gap with an injected
+    safety-event sink and used it to wire wcs-query-error and
+    placement-uncertain from GrblController. The only deferred
+    discriminant is `recovery-cleared { acknowledgedBy: 'auto' }` —
+    the auto-clear path lives deeper in the runtime recovery state
+    machine and is gated on the per-step-ack call sites landing.
   - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
     remove all global reads (T1-181 ships the detection gate; the
     compiler still calls `canUseFeature()` / `getActiveProfile()`
