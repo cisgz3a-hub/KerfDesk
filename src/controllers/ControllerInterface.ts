@@ -281,7 +281,15 @@ export interface GrblControllerApi extends GcodeLineController {
   executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
   pause(): SafetyActionResult;
-  resume(): SafetyActionResult;
+  /**
+   * T1-216 (v30 audit #3): resume awaits the modal-spindle reassert
+   * (`M3 S0` / `M4 S0`) before issuing the cycle-start byte. Pre-
+   * T1-216 the modal write was fire-and-forget, so motion could
+   * resume with whatever modal state the controller had if the
+   * critical-write failed. The async contract is required to gate
+   * the cycle-start byte on confirmed-on-the-wire modal restore.
+   */
+  resume(): Promise<SafetyActionResult>;
   stop(): SafetyActionResult;
   /** Soft reset — use only for true emergency (position may be lost). */
   emergencyStop(): SafetyActionResult;

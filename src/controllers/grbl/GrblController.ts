@@ -302,7 +302,10 @@ export class GrblController implements GrblControllerApi {
     },
     resumeJob: async (): Promise<OperationResult> => {
       try {
-        return this._operationFromSafetyResult(this.resume());
+        // T1-216: this.resume() is now async (awaits the modal
+        // reassert before cycle-start). Await it here before
+        // unwrapping into the OperationResult shape.
+        return this._operationFromSafetyResult(await this.resume());
       } catch (err: unknown) {
         return this._operationError(err);
       }
@@ -1090,7 +1093,7 @@ export class GrblController implements GrblControllerApi {
   /**
    * Resume a feed-hold pause. Only meaningful after pause().
    */
-  resume(): SafetyActionResult {
+  async resume(): Promise<SafetyActionResult> {
     if (!this._port?.isOpen) return makeNotConnectedResult('resume');
     if (this._state.status !== 'hold' && !this._pausePending) {
       return {
@@ -1109,15 +1112,45 @@ export class GrblController implements GrblControllerApi {
     // T1-23: pause() emitted M5. Reassert the captured modal spindle
     // mode with S0 before cycle-start so the resumed stream has the
     // expected M3/M4 mode without firing before motion resumes.
+    //
+    // T1-216 (v30 audit #3): pre-T1-216 the modal reassert was
+    // fire-and-forget (`void ... .catch(...)`) and the cycle-start
+    // byte was issued synchronously on the next line. If the modal
+    // write FAILED (transport closed, queue full, dropped line),
+    // motion resumed with whatever modal state GRBL happened to
+    // have — not the safe `M3 S0` / `M4 S0` the resume contract
+    // promised. Awaiting the write makes resume a transaction:
+    // motion does NOT restart until the modal contract is
+    // confirmed on the wire. On write failure we return
+    // `accepted: false` and skip the cycle-start byte entirely so
+    // the controller stays in feed-hold.
     if (this._lastSpindleMode && this._port?.isOpen) {
       const mode = this._lastSpindleMode;
-      void this._writeCriticalSystemLine(`${mode} S0`, { trackSpindleMode: false }).catch(
-        (err: unknown) =>
-          console.warn(
-            '[GrblController] T1-23 resume: spindle-mode reassert writeCritical failed:',
-            err instanceof Error ? err.message : String(err),
-          ),
-      );
+      try {
+        await this._writeCriticalSystemLine(`${mode} S0`, { trackSpindleMode: false });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(
+          '[GrblController] T1-216 resume: spindle-mode reassert writeCritical failed; '
+          + 'NOT sending cycle-start. Controller remains in feed-hold:',
+          message,
+        );
+        return {
+          action: 'resume',
+          accepted: false,
+          motionState: 'unknown',
+          laserState: 'unknown',
+          positionTrusted: 'unknown',
+          requiresRehome: 'unknown',
+          requiresReconnect: false,
+          requiresInspection: false,
+          message:
+            `Resume blocked: spindle-mode reassert (${mode} S0) failed before cycle-start. `
+            + 'Motion did NOT restart — the controller remains in feed-hold. '
+            + `Underlying error: ${message}`,
+          timestamp: Date.now(),
+        };
+      }
     }
     // Realtime `~` releases GRBL feed-hold; only continues streaming when a job is active.
     console.info('[GrblController] feed-hold release (~ / cycle-start)');

@@ -105,7 +105,8 @@ function makeController(opts: { throwOnSend?: boolean } = {}): {
     executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 0 }),
     sendJob: async () => {},
     pause: () => acceptedSafety('pause'),
-    resume: () => acceptedSafety('resume'),
+    // T1-216: resume is async (awaits modal reassert).
+    resume: async () => acceptedSafety('resume'),
     stop: () => acceptedSafety('abortJob'),
     emergencyStop: () => acceptedSafety('emergencyStop'),
     sendCommand: send,

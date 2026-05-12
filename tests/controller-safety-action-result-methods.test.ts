@@ -45,7 +45,10 @@ async function main(): Promise<void> {
   {
     const ctrl = new GrblController();
     const pause = ctrl.pause();
-    const resume = ctrl.resume();
+    // T1-216 (v30 audit #3): resume is async — awaits the modal
+    // spindle reassert (`M3/M4 S0`) before issuing cycle-start so
+    // a failed reassert blocks motion restart.
+    const resume = await ctrl.resume();
     const stop = ctrl.stop();
     const emergency = ctrl.emergencyStop();
 
@@ -94,7 +97,9 @@ async function main(): Promise<void> {
     assert(pause.laserState === 'commandedOff', 'connected pause() reports commanded laser off');
     assert(port.realtimeBytes.includes(0x21), 'connected pause() still sends feed hold');
 
-    const resume = ctrl.resume();
+    // T1-216 (v30 audit #3): resume is async — await the modal
+    // reassert before checking the result.
+    const resume = await ctrl.resume();
     assert(isSafetyActionResult(resume, 'resume'), 'connected resume() returns a typed result');
     assert(resume.accepted === true, 'resume() after pause is accepted');
     assert(resume.motionState === 'running', 'resume() reports running motion');

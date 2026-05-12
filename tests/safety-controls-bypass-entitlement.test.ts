@@ -90,7 +90,8 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
     sendCommand: () => {},
     sendJob: async () => {},
     pause: () => { calls.pause++; return acceptedSafety('pause'); },
-    resume: () => { calls.resume++; return acceptedSafety('resume'); },
+    // T1-216: resume is async (awaits modal reassert).
+    resume: async () => { calls.resume++; return acceptedSafety('resume'); },
     stop: () => { calls.stop++; return acceptedSafety('abortJob'); },
     emergencyStop: () => { calls.emergency++; return acceptedSafety('emergencyStop'); },
     requestStatusReport: () => {},
