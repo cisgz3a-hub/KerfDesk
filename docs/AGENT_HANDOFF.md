@@ -9,18 +9,17 @@ chat transcript.
 - Branch: `master`.
 - Repo state at handoff: clean; local `master` equals `origin/master`.
 - Current HEAD when this handoff was written: hash-fill commit on top of
-  `1ef93514` (`feat(output): T1-188 — HIGH compile-time burn-envelope
-  divergence check`). Always verify live HEAD with `git log --oneline
-  -1` before editing.
-- Last shipped roadmap item: **T1-188** (external-audit High #2 + #8
-  wiring — compile-time burn-envelope divergence check). This
-  session-arc shipped **29 consecutive audit-driven tickets**
-  (T1-161 → T1-188): 12 internal + 5 external-Critical + 6 external-
-  High + 6 deferred follow-ups (T1-183 F-022 info findings, T1-184
-  F-026 fused MachineTransform iterations, T1-185 F-034+F-048 any-
-  cast cleanup, T1-186 arc support in emittedBurnEnvelope, T1-187
-  rotated-raster fail-closed, T1-188 plan-vs-emitted burn divergence
-  check). The first
+  `68d948a9` (`feat(safety): T1-193 — MachineEventLedger schema +
+  write path (foundation slice)`). Always verify live HEAD with
+  `git log --oneline -1` before editing.
+- Last shipped roadmap item: **T1-193** (external-audit Critical #14
+  foundation — `MachineEventLedger` schema + write path). This
+  session-arc shipped **33 consecutive audit-driven tickets**
+  (T1-161 → T1-193): 12 internal + 5 external-Critical + 6 external-
+  High + 5 deferred-Medium/Low (T1-183 → T1-188) + 5 deferred-multi-
+  week-foundation (T1-189 R-mode arcs, T1-190 SceneSerializer any-
+  cleanup, T1-191 burn-envelope divergence UI, T1-192 FirmwareAdapter
+  type contract, T1-193 MachineEventLedger). The first
   12 (T1-161 → T1-172) addressed findings from the internal audit
   (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
   addressed the external audit (response received 2026-05-11) — both
@@ -57,29 +56,38 @@ chat transcript.
   Each ticket landed as a coupled triple: code change + regression
   test + ROADMAP.md entry with verification, followed by the hash-
   fill commit. TS baseline 0 errors maintained across every commit.
-- Next roadmap item: remaining structural work explicitly NOT shipped
-  in this arc (each is multi-week and deferred to a focused future
-  arc):
-  - **Preview UI rebuild** to consume `ValidatedJobTicket.
-    emittedBurnBounds` from T1-182 (the parser + divergence check
-    are in place; the SimulationRenderer still reads from `Plan`).
+- Remaining work: every audit finding now has either a code fix OR
+  a documented foundation slice + named-deferred follow-up. The
+  remaining work is **multi-week implementation arcs** on top of
+  the foundations T1-192 / T1-193 shipped:
+  - **GrblAdapter implementing FirmwareAdapter** — wire the new
+    type contract (T1-192) over the existing GrblController +
+    GrblOutputStrategy code; replace `controllerType: 'grbl'` on
+    `ValidatedJobTicket` with `firmware: FirmwareAdapter['id']`;
+    introduce `FirmwareRegistry`.
+  - **MarlinAdapter / RuidaAdapter** — first real non-GRBL
+    firmware-support PRs, each one implements the full
+    `FirmwareAdapter` contract.
+  - **Wire production code to the MachineEventLedger** — every
+    site that currently emits a `console.warn` about a safety
+    event (T1-29 setUnsafePriorState, T1-174 WCS query error,
+    T1-175 emergencyStop/disconnect, T1-176 failed-start, T1-188
+    burn-envelope divergence) calls `ledger.append({...})`. The
+    full SafetySupervisor centralization is the umbrella ticket.
   - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
-    remove all global reads (T1-181 ships the detection gate but
-    the compiler still calls `canUseFeature()` / `getActiveProfile()`
+    remove all global reads (T1-181 ships the detection gate; the
+    compiler still calls `canUseFeature()` / `getActiveProfile()`
     / `getPresetById()` directly).
-  - **Affine raster sampling** for rotated / skewed images. T1-187
-    closes the safety gap with a fail-closed throw; emitting actual
-    rotated scanlines is the deferred follow-up.
-  - **Per-firmware adapter contract** (`FirmwareAdapter`) for real
-    Marlin / Ruida support (audit High #15).
-  - **Persistent event ledger** + recovery state machine (audit
-    Critical #14 — partial work shipped in T1-175/T1-176; full
-    centralization is a multi-week SafetySupervisor refactor).
-  - **R-mode arc parsing** in `analyzeEmittedBurnEnvelope` (T1-186
-    supports I/J only; GRBL `G2 X.. Y.. R..` is a future extension).
-  Internal audit Medium/Low items still open: F-036 (10 any-casts
-  in SceneSerializer — kept as the largest remaining cluster; would
-  benefit from a focused refactor pass).
+  - **Affine raster sampling** — emitting actual rotated scanlines
+    so rotated raster images compile (T1-187 closes the safety gap
+    with a fail-closed throw today).
+  - **Preview UI rebuild** to consume `ValidatedJobTicket.
+    emittedBurnBounds` from T1-182 + the canonical motion stream
+    from `analyzeEmittedBurnEnvelope` — the SimulationRenderer
+    still reads from `Plan`.
+
+  Internal audit findings: ALL CLEARED. The internal audit ledger
+  has no remaining open Medium/Low items.
   Medium / High blocked by integration work: F-002 (Connection-
   GenerationGuard primitive shipped but never wired), F-004 (T1-22
   ForceSafeState orchestration — needs hardware), F-018 (T3-57
