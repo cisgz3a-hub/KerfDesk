@@ -67,6 +67,56 @@ const ENV_EMPTY: AABB = {
   minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity,
 };
 
+/**
+ * T1-189 (extends T1-186): compute arc center from `R` word mode.
+ *
+ * GRBL accepts `G2/G3 X.. Y.. R..` as an alternative to I/J. The R
+ * word specifies the arc radius; the center is computed from the
+ * chord between start and end plus the GRBL sign convention:
+ *
+ *   - |R| < chordLength/2 → bad arc (chord longer than diameter);
+ *     returns null so the caller skips the expansion.
+ *   - +R = shorter arc (< 180° sweep)
+ *   - -R = longer arc (> 180° sweep)
+ *
+ * Combined with direction (G2 = CW, G3 = CCW), the center sits on:
+ *   - LEFT  of chord direction when (R > 0) === (direction === 'G3')
+ *   - RIGHT of chord direction otherwise.
+ *
+ * Returns `{cx, cy}` or `null` for bad arcs (zero chord with R≠0,
+ * |R| smaller than half-chord). The caller treats null as "skip
+ * arc expansion; endpoints already added to the AABB."
+ */
+function centerFromRMode(
+  direction: 'G2' | 'G3',
+  x0: number, y0: number,
+  x1: number, y1: number,
+  r: number,
+): { cx: number; cy: number } | null {
+  const cdx = x1 - x0;
+  const cdy = y1 - y0;
+  const d = Math.hypot(cdx, cdy);
+  // Zero-chord arc with R != 0 is ambiguous (could be a full circle
+  // or just bad input). GRBL treats it as an error; we skip the
+  // expansion (the endpoint, which equals the start, is already in
+  // the AABB via expandWithArc's endpoint adds).
+  if (d < 1e-9) return null;
+  const h = d / 2;
+  const absR = Math.abs(r);
+  if (absR < h - 1e-6) return null; // chord longer than diameter — invalid
+  const t = Math.sqrt(Math.max(0, absR * absR - h * h));
+  const mx = (x0 + x1) / 2;
+  const my = (y0 + y1) / 2;
+  // Unit chord direction.
+  const ux = cdx / d;
+  const uy = cdy / d;
+  // Left perpendicular = (-uy, ux); right perpendicular = (uy, -ux).
+  const centerLeft = (r > 0) === (direction === 'G3');
+  const px = centerLeft ? -uy : uy;
+  const py = centerLeft ? ux : -ux;
+  return { cx: mx + t * px, cy: my + t * py };
+}
+
 function expand(env: { minX: number; minY: number; maxX: number; maxY: number }, x: number, y: number): void {
   if (x < env.minX) env.minX = x;
   if (x > env.maxX) env.maxX = x;
@@ -274,13 +324,40 @@ export function analyzeEmittedBurnEnvelope(gcode: string): EmittedBurnEnvelope {
       // offsets relative to the START position regardless of
       // distance mode (GRBL spec; G91 affects X/Y but I/J are
       // ALWAYS center-relative). The parser reads them as such.
+      //
+      // T1-189: also accept R-mode (`G2/G3 X.. Y.. R..`). When R is
+      // present (and I/J are not), compute the center via
+      // `centerFromRMode`. The GRBL sign convention: +R = short arc,
+      // -R = long arc; combined with direction this selects which
+      // side of the chord the center lies on.
       if (laserMode !== 'off' && spindle > 0) {
-        const iOffset = words.I ?? 0;
-        const jOffset = words.J ?? 0;
-        const cx = posX + iOffset;
-        const cy = posY + jOffset;
-        expandWithArc(burnBounds, motionMode, posX, posY, nextX, nextY, cx, cy);
-        burnMoveCount++;
+        let cx: number;
+        let cy: number;
+        let arcValid = true;
+        if (words.R !== undefined && words.I === undefined && words.J === undefined) {
+          const c = centerFromRMode(motionMode, posX, posY, nextX, nextY, words.R);
+          if (c === null) {
+            // Bad R-arc: chord longer than diameter, or zero chord.
+            // Expand by endpoints only (no compass-extrema enrichment).
+            expand(burnBounds, posX, posY);
+            expand(burnBounds, nextX, nextY);
+            burnMoveCount++;
+            arcValid = false;
+            cx = 0; cy = 0; // unused
+          } else {
+            cx = c.cx;
+            cy = c.cy;
+          }
+        } else {
+          const iOffset = words.I ?? 0;
+          const jOffset = words.J ?? 0;
+          cx = posX + iOffset;
+          cy = posY + jOffset;
+        }
+        if (arcValid) {
+          expandWithArc(burnBounds, motionMode, posX, posY, nextX, nextY, cx, cy);
+          burnMoveCount++;
+        }
       }
     }
 
