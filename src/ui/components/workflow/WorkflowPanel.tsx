@@ -37,6 +37,8 @@ import { ModeStub } from './modes/ModeStub';
 import { DisconnectedMode } from './modes/DisconnectedMode';
 import { ConnectingMode } from './modes/ConnectingMode';
 import { RecoveryMode } from './modes/RecoveryMode';
+// T1-207 (Phase 3): real setup mode with tabs.
+import { SetupMode, type SetupModeProps } from './modes/SetupMode';
 
 const FONT = "'DM Sans', system-ui, sans-serif";
 
@@ -71,6 +73,12 @@ export interface WorkflowPanelProps {
   readonly webSerialSupported: boolean;
   readonly alarmCode: number | null;
   readonly onRecoveryAction: ((action: RecoveryAction) => void) | null;
+  /**
+   * T1-207 (Phase 3): bundled setup-mode context. When null, setup
+   * mode falls back to the Phase-1 stub. Bundling keeps this
+   * WorkflowPanelProps surface compact (avoids ~15 extra fields).
+   */
+  readonly setupModeProps: SetupModeProps | null;
 }
 
 /**
@@ -192,6 +200,16 @@ function renderModeContent(
         onRecoveryAction: props.onRecoveryAction,
       });
     case 'setup':
+      // T1-207 (Phase 3): real Setup mode when context is wired.
+      // Falls back to ModeStub if the caller didn't provide it
+      // (early test callers / partial integrations).
+      if (props.setupModeProps !== null) {
+        return React.createElement(SetupMode, props.setupModeProps);
+      }
+      return React.createElement(ModeStub, {
+        mode,
+        phase: modeImplementationPhase(mode),
+      });
     case 'ready':
     case 'running':
     case 'paused':

@@ -177,6 +177,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const { machineUi } = props;
   const machineService = machineUi.service;
   const executionCoordinator = machineUi.executionCoordinator;
+  const controller = props.controller;
   const machineState = props.machineState;
   const machineStatus = machineState?.status ?? null;
   // Same isConnected derivation as ConnectionPanelMain.tsx:424.
@@ -268,6 +269,69 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     }
   };
 
+  // T1-207 (Phase 3): bundle the setup-mode props. Jog step is
+  // tracked locally — the legacy panel uses the same pattern.
+  // `sendUserCommand` is a minimal wrapper around
+  // machineService.sendCommand: safe commands flow through, warn /
+  // dangerous classifications log + return without sending (the
+  // approval-token flow is wired in the legacy panel; users
+  // needing it should flip workflowPanelV2 off until Phase 4
+  // lifts that flow into a shared helper).
+  const [jogStep, setJogStep] = useState(1);
+  // ExecutionCoordinator.jog requires a feedRate; use a conservative
+  // 1000 mm/min default — the legacy panel resolves from the active
+  // profile, but Phase 3 ships a literal default to avoid threading
+  // profile state through. Phase 4 will lift the profile-aware feed
+  // resolution up.
+  const JOG_DEFAULT_FEED_MM_PER_MIN = 1000;
+  const onJog = (axis: 'X' | 'Y', distance: number) => {
+    void executionCoordinator.jog(axis, distance, JOG_DEFAULT_FEED_MM_PER_MIN);
+  };
+  const onHome = () => {
+    void executionCoordinator.home();
+  };
+  const sendUserCommand = async (cmd: string) => {
+    if (!cmd.trim()) return;
+    const classification = machineService.classifyUserCommand(cmd);
+    if (classification.severity === 'dangerous' || classification.severity === 'warn') {
+      console.warn(
+        `[WorkflowPanel T1-207] Command "${classification.command}" needs `
+        + `approval (${classification.severity}: ${classification.reason}). `
+        + 'The approval-token flow is wired in the legacy panel — flip the '
+        + 'workflowPanelV2 flag off to use it.',
+      );
+      return;
+    }
+    try {
+      await machineService.sendCommand(cmd, 'user', undefined);
+    } catch (err: unknown) {
+      console.warn('[WorkflowPanel T1-207] Command rejected:', err);
+    }
+  };
+  const setupModeProps = {
+    // Move tab
+    jogStep,
+    setJogStep,
+    onJog,
+    onHome,
+    canHome: isConnected && machineStatus === 'idle',
+    // Job tab — bed dimensions fall back to safe defaults when the
+    // adapter doesn't have them threaded (Phase 4 will lift the
+    // bed-size resolution up).
+    activeProfile: null,
+    resolvedBedWidthMm: props.bedWidth ?? 400,
+    resolvedBedHeightMm: props.bedHeight ?? 400,
+    gcodeLoaded: typeof props.gcode === 'string' && props.gcode.length > 0,
+    gcodeStale: false,
+    onRecompile: null,
+    // Console tab
+    isConnected,
+    isRunning: controller?.isJobRunning ?? false,
+    controller,
+    sendUserCommand,
+    messageEvents: machineUi.messageEvents,
+  };
+
   return React.createElement(
     'div',
     {
@@ -303,6 +367,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       webSerialSupported: WebSerialPort.isSupported(),
       alarmCode: machineState?.alarmCode ?? null,
       onRecoveryAction,
+      setupModeProps,
     }),
   );
 }

@@ -95,7 +95,7 @@ console.log('\n=== T1-206 WorkflowPanel Phase 2 modes ===\n');
 {
   const state: RecoveryState = {
     status: 'frameFailed',
-    reason: 'timeout',
+    reason: 'idle-timeout',
     occurredAt: 0,
     reframeDone: false,
   };
