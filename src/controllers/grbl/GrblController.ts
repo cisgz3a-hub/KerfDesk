@@ -329,6 +329,22 @@ export class GrblController implements GrblControllerApi {
   private _state: MachineState;
   private _port: SerialPortLike | null = null;
   private _isJobRunning = false;
+  /**
+   * T1-220 (v30 audit #8): monotonic counter of job lines written
+   * to the transport since the most recent sendJob() call. Used by
+   * MachineService.startValidatedJob's failed-start carve-out to
+   * decide whether to clear the unsafe-prior-state flag. Unlike
+   * _isJobRunning (a boolean that an aborted-job code path can
+   * synchronously clear before the catch sees it), this counter
+   * survives the abort — once a byte hits the wire, the count is
+   * non-zero, and the failed-start branch knows machine-affecting
+   * output was streamed regardless of current flag state.
+   *
+   * Reset to 0 in sendJob() and on _abortJob() / _completeJob().
+   * Incremented inside _drainQueue() AFTER each line write so a
+   * write that throws never counts.
+   */
+  private _jobLinesWrittenSinceJobStart = 0;
 
   private _jobLines: string[] = [];
   /**
@@ -591,6 +607,23 @@ export class GrblController implements GrblControllerApi {
       maxAccelX: this._maxAccelX,
       maxAccelY: this._maxAccelY,
     };
+  }
+
+  /**
+   * T1-220 (v30 audit #8): number of job lines this controller has
+   * written to the transport since the most recent `sendJob()`
+   * call. Consumed by `MachineService.startValidatedJob`'s failed-
+   * start carve-out: if a non-zero count is observed at the catch
+   * site, machine-affecting output streamed and the unsafe-prior-
+   * state flag MUST survive regardless of current `isJobRunning`
+   * or controller status (both of which a synchronous
+   * `_abortJob()` can clear before the catch reads them).
+   *
+   * Monotonic during a job; reset to 0 at the start of every
+   * `sendJob()`. Never decremented.
+   */
+  getJobLinesWrittenSinceJobStart(): number {
+    return this._jobLinesWrittenSinceJobStart;
   }
 
   // ─── LIFECYCLE ──────────────────────────────────────────────
@@ -966,6 +999,10 @@ export class GrblController implements GrblControllerApi {
     this._resumeRequested = false;
     this._ackTimestamps = [];
     this._sendTimestamps = [];
+    // T1-220: reset the bytes-written counter at the start of every
+    // new job so a stale value from a previous job can't influence
+    // the failed-start carve-out.
+    this._jobLinesWrittenSinceJobStart = 0;
 
     this._lastLifecycleKey = null;
     this._emitObjectLifecycle([]);
@@ -2226,6 +2263,12 @@ export class GrblController implements GrblControllerApi {
 
       const marker = this._lineMarkers[this._queueIndex];
       this._writeLine(line);
+      // T1-220: count AFTER the write so a throw doesn't credit a
+      // failed write to the running total. This counter is the
+      // load-bearing signal for the failed-start unsafe-prior-state
+      // carve-out in MachineService — any non-zero count means at
+      // least one machine-affecting line hit the transport.
+      this._jobLinesWrittenSinceJobStart++;
       this._pending.push({ text: line, byteCount, marker });
       this._bufferAvailable -= byteCount;
       this._queueIndex++;

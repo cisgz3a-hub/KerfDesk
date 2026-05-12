@@ -211,15 +211,19 @@ installMockLocalStorage();
     /const controllerThinksRunning = this\.controllerRef\.current\?\.isJobRunning === true;/.test(src),
     'failed-start catch captures controllerThinksRunning from the controller',
   );
-  // The clear is now gated on !sawRun && !controllerThinksRunning.
+  // T1-220 (v30 audit #8): the gate now also ANDs jobLinesWritten
+  // === 0 (a monotonic byte-count counter from the controller) so
+  // bytes that hit the wire before _isJobRunning was reliably set
+  // still preserve the unsafe flag.
   assert(
-    /if \(!sawRun && !controllerThinksRunning\) \{\s*clearUnsafePriorState\(\);/.test(src),
-    'failed-start catch gates clearUnsafePriorState on !sawRun && !controllerThinksRunning',
+    /if \(!sawRun && !controllerThinksRunning && jobLinesWritten === 0\) \{\s*clearUnsafePriorState\(\);/.test(src),
+    'failed-start catch gates clearUnsafePriorState on !sawRun && !controllerThinksRunning && jobLinesWritten === 0 (T1-220)',
   );
-  // The else branch warns with the diagnostic tuple.
+  // The else branch warns with the diagnostic tuple (now includes
+  // jobLinesWritten — T1-220 extension).
   assert(
-    /T1-176: failed-start preserves unsafe-prior-state/.test(src),
-    'failed-start catch warns with the T1-176 audit-grade message',
+    /T1-176\/T1-220: failed-start preserves unsafe-prior-state/.test(src),
+    'failed-start catch warns with the T1-176/T1-220 audit-grade message',
   );
   assert(
     /sawRun=\$\{sawRun\}/.test(src) && /controllerThinksRunning=\$\{controllerThinksRunning\}/.test(src),

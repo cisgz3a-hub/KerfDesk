@@ -417,6 +417,18 @@ export interface GrblControllerApi extends GcodeLineController {
    */
   getPlacementUncertainReason?(): string | null;
   /**
+   * T1-220 (v30 audit #8): number of job lines this controller has
+   * written to the transport since the most recent `sendJob()` /
+   * `executeJob()` call. Used by MachineService's failed-start
+   * carve-out to decide whether to clear the unsafe-prior-state
+   * flag — any non-zero count means machine-affecting output
+   * streamed.
+   *
+   * Optional; non-GRBL controllers can omit. Callers default to
+   * 0 when not implemented (matches the pre-T1-220 behaviour).
+   */
+  getJobLinesWrittenSinceJobStart?(): number;
+  /**
    * Configure whether a running job is aborted on GRBL `error:` responses.
    * Optional; defaults to true when not implemented.
    *

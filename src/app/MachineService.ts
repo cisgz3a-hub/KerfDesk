@@ -940,6 +940,14 @@ export class MachineService {
         // unsafe-prior-state flag MUST survive.
         const sawRun = this.jobObservedRunning;
         const controllerThinksRunning = this.controllerRef.current?.isJobRunning === true;
+        // T1-220 (v30 audit #8): defense-in-depth. The two flags
+        // above can both be cleared synchronously by a controller's
+        // `_abortJob()` between the throw and the catch site. A
+        // monotonic byte-count counter survives that — once a job
+        // line hits the wire, the counter is non-zero, and the
+        // carve-out below preserves the unsafe flag accordingly.
+        const jobLinesWritten =
+          this.controllerRef.current?.getJobLinesWrittenSinceJobStart?.() ?? 0;
 
         this.activeReplay = null;
         this.currentJobLog = null;
@@ -959,16 +967,20 @@ export class MachineService {
         // transport error. If any byte hit the wire, the recovery
         // flag must survive to the next launch.
         //
-        // Strongest positive evidence that NOTHING streamed: the host
-        // never observed 'run' state AND the controller's own
-        // `isJobRunning` flag is false. If either was true, preserve
-        // the flag and warn so support bundles capture the event.
-        if (!sawRun && !controllerThinksRunning) {
+        // T1-220 (v30 audit #8): strongest positive evidence that
+        // NOTHING streamed is the conjunction of THREE signals all
+        // being clean — host never observed 'run' state AND the
+        // controller's own `isJobRunning` flag is false AND the
+        // transport-level byte counter is zero. The counter is the
+        // load-bearing one; flags can be cleared synchronously by a
+        // controller-side abort, the counter cannot.
+        if (!sawRun && !controllerThinksRunning && jobLinesWritten === 0) {
           clearUnsafePriorState();
         } else {
           console.warn(
-            `[MachineService] T1-176: failed-start preserves unsafe-prior-state flag `
-            + `(sawRun=${sawRun}, controllerThinksRunning=${controllerThinksRunning}). `
+            `[MachineService] T1-176/T1-220: failed-start preserves unsafe-prior-state flag `
+            + `(sawRun=${sawRun}, controllerThinksRunning=${controllerThinksRunning}, `
+            + `jobLinesWritten=${jobLinesWritten}). `
             + 'Next launch will surface a recovery dialog before further machine commands.',
           );
         }
