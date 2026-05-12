@@ -2500,14 +2500,19 @@ export function ConnectionPanelMain({
         laserModeBanner: detailsPanel == null ? laserModeBanner : null,
         connectSection,
       }),
+      // T1-214: keep recovery cards pinned at the top (always visible
+      // regardless of how much prep content there is), but move the
+      // prep sections (profile + controls + job position + detail
+      // launchers + ready-to-run + move controls) into the single
+      // scrollable middle area below. Pre-T1-214 each prep section
+      // was its own flex sibling with no `flex-shrink: 0`, so they
+      // collectively pushed JobControls + E-Stop off-screen on smaller
+      // windows. Now only the scrollable middle absorbs height
+      // pressure; the E-Stop button at the bottom is always visible.
       detailsPanel == null && connectionRecoveryCard,
       detailsPanel == null && frameRecoveryCard,
       detailsPanel == null && jobFailedRecoveryCard,
       detailsPanel == null && safetyRecoveryCard,
-      isConnected && detailsPanel == null && profileSection,
-      isConnected && detailsPanel == null && !isRunning && !displayPaused && controlsSection,
-      isConnected && detailsPanel == null && !isRunning && !displayPaused && jobPositionSection,
-      isConnected && detailsPanel == null && !isRunning && !displayPaused && detailLaunchersSection,
       isConnected && React.createElement('div', {
         style: {
           flex: 1,
@@ -2529,6 +2534,10 @@ export function ConnectionPanelMain({
               advancedSection,
             })
           : React.createElement(React.Fragment, null,
+              profileSection,
+              !isRunning && !displayPaused && controlsSection,
+              !isRunning && !displayPaused && jobPositionSection,
+              !isRunning && !displayPaused && detailLaunchersSection,
               readyToRunSection,
               React.createElement(MoveControls, {
                 isConnected,
@@ -2539,6 +2548,15 @@ export function ConnectionPanelMain({
               }),
             ),
       ),
+      // T1-214: wrap JobControls + E-Stop in a single bottom bar
+      // with flexShrink: 0 so they form an indivisible footer that
+      // cannot be pushed off-screen by the scrollable middle. The
+      // E-Stop button's own flexShrink:0 wasn't enough — its
+      // parent (the panel root) didn't reserve space for it when
+      // the middle column overflowed.
+      React.createElement('div', {
+        style: { flexShrink: 0, display: 'flex', flexDirection: 'column' as const },
+      },
       React.createElement(JobControls, {
         isConnected,
         isRunning,
@@ -2586,6 +2604,7 @@ export function ConnectionPanelMain({
           },
         }, '⚠ EMERGENCY STOP'),
       ),
+      ), // T1-214: close the bottom-bar wrapper added above.
     ),
   );
 }
