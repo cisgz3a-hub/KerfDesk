@@ -1491,6 +1491,19 @@ export class MachineService {
    * `'unknown'` so {@link startValidatedJob} refuses until cleared. T1-22.
    */
   notifyLaserSafetyOutcome(stage: 'm5' | 'soft-reset' | 'failed'): void {
+    // T1-198: persist the safetyOff outcome to the MachineEventLedger
+    // so support bundles can reconstruct the full safety-action
+    // sequence. The 'm5' outcome confirms laser-off; 'soft-reset' and
+    // 'failed' raise the safety-state machine to 'unknown' AND trigger
+    // the recovery checklist below. Persisting the stage here is the
+    // observability counterpart to the in-memory state change — a
+    // future support bundle can show "M5 succeeded twice, soft-reset
+    // once, failed once" without depending on console.warn capture.
+    getMachineEventLedger().append({
+      kind: 'safety-off',
+      t: Date.now(),
+      stage,
+    });
     if (stage === 'm5') {
       this._setLaserOutputState('off');
     } else {

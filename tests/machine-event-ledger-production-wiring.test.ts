@@ -193,9 +193,13 @@ void (async () => {
       /import \{ getMachineEventLedger \} from '\.\/MachineEventLedger'/.test(svcSrc),
       'MachineService imports the ledger singleton',
     );
-    // 3 expected production wire points in MachineService.
+    // T1-195 added 3 wire points (disconnect-while-running, emergency-
+    // stop, failed-to-start). T1-198 added a 4th (safety-off inside
+    // notifyLaserSafetyOutcome). Pin "at least 3" so future site
+    // additions don't break this test, but the lower bound still
+    // proves the T1-195 sites are present.
     const appendCount = (svcSrc.match(/getMachineEventLedger\(\)\.append\(/g) ?? []).length;
-    assert(appendCount === 3, `MachineService appends to the ledger 3 times (got ${appendCount})`);
+    assert(appendCount >= 3, `MachineService appends to the ledger ≥3 times (got ${appendCount})`);
 
     const pipelineSrc = readFileSync(resolve(here, '../src/app/PipelineService.ts'), 'utf-8');
     assert(/T1-195/.test(pipelineSrc), 'PipelineService.ts carries T1-195 marker');
