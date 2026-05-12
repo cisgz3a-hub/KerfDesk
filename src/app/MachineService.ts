@@ -2109,11 +2109,22 @@ export class MachineService {
 
   /** Pause the currently running job (feed-hold). */
   async pause(): Promise<SafetyActionResult> {
+    // T1-200: record every user pause request even before we know
+    // whether the controller is connected. Support bundles use the
+    // (pause-requested, paused-verified) pair to detect dropped pauses
+    // — a request without a matching verification means feed-hold
+    // didn't take, which is a safety-relevant event.
+    getMachineEventLedger().append({ kind: 'pause-requested', t: Date.now() });
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('pause'));
     try {
       const result = await ctrl.operations.pauseJob();
       if (!result.ok) throw new Error(result.reason);
+      // T1-200: paused-verified fires only after the controller
+      // confirms the operation succeeded. A throw between this and
+      // the catch leaves a pause-requested without a paused-verified
+      // — that asymmetry is the diagnostic signal.
+      getMachineEventLedger().append({ kind: 'paused-verified', t: Date.now() });
       return this._recordSafetyResult(makePauseResult());
     } catch (err: unknown) {
       return this._recordSafetyResult({
@@ -2126,6 +2137,12 @@ export class MachineService {
 
   /** Resume a paused job. */
   async resume(): Promise<SafetyActionResult> {
+    // T1-200: record every user resume request. Resume has no
+    // "verified" counterpart in the MachineEvent union (the
+    // observability bar is lower than pause — a missed resume just
+    // means the job stays paused, which is the safe default). A
+    // future expansion could add 'resume-verified' if needed.
+    getMachineEventLedger().append({ kind: 'resume-requested', t: Date.now() });
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('resume'));
     try {
