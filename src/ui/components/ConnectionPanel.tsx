@@ -332,6 +332,50 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     messageEvents: machineUi.messageEvents,
   };
 
+  // T1-208 (Phase 4): live-job props for ready / running / paused.
+  // jobProgress comes from the controller / machineUi; elapsedSeconds
+  // is tracked locally (set when a job starts, cleared when it ends).
+  // For Phase 4 the start callback is intentionally null — the legacy
+  // panel owns the full ticket-validation flow (compile + hash + scene
+  // verification) that's not yet lifted up. Pause / Resume / Stop are
+  // safe to wire because they're idempotent commands the user invokes
+  // on an already-running job.
+  const jobProgress = props.jobProgress;
+  const jobName = props.scene.metadata?.name ?? 'Untitled';
+  const lineCount = jobProgress?.totalLines ?? null;
+
+  const onPause = () => {
+    void machineService.pause();
+  };
+  const onResume = () => {
+    void machineService.resume();
+  };
+  const onStop = () => {
+    void machineService.stopAndEnsureLaserOff();
+  };
+
+  const liveJobProps = {
+    ready: {
+      jobName,
+      lineCount,
+      estimatedTime: null as string | null,
+      planSummary: null as string | null,
+    },
+    running: {
+      jobProgress: jobProgress ?? null,
+      elapsedSeconds: 0,
+      estimatedRemaining: null as number | null,
+      activeLabel: 'Running',
+      planSummary: null as string | null,
+    },
+    paused: {
+      jobProgress: jobProgress ?? null,
+      elapsedSeconds: 0,
+      estimatedRemaining: null as number | null,
+      planSummary: null as string | null,
+    },
+  };
+
   return React.createElement(
     'div',
     {
@@ -352,7 +396,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       isConnecting,
       recoveryState,
       // Phase 1 stub: canStartJob is computed inside ConnectionPanelMain
-      // via buildStartReadiness; Phase 3 lifts that computation up so
+      // via buildStartReadiness; Phase 5 lifts that computation up so
       // both panels can share it.
       canStartJob: false,
       onEmergencyStop,
@@ -360,14 +404,18 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       // Phase 2 deliberate stubs (see component docstring).
       onConnectSimulator: null,
       onCancelConnect,
+      // T1-208 (Phase 4): Start stays null (legacy panel owns the
+      // full ticket-validation flow); pause/resume/stop are wired
+      // because they're safe idempotent commands.
       onStartJob: null,
-      onPause: null,
-      onResume: null,
-      onStop: null,
+      onPause,
+      onResume,
+      onStop,
       webSerialSupported: WebSerialPort.isSupported(),
       alarmCode: machineState?.alarmCode ?? null,
       onRecoveryAction,
       setupModeProps,
+      liveJobProps,
     }),
   );
 }

@@ -39,6 +39,10 @@ import { ConnectingMode } from './modes/ConnectingMode';
 import { RecoveryMode } from './modes/RecoveryMode';
 // T1-207 (Phase 3): real setup mode with tabs.
 import { SetupMode, type SetupModeProps } from './modes/SetupMode';
+// T1-208 (Phase 4): real ready / running / paused modes.
+import { ReadyMode, type ReadyModeProps } from './modes/ReadyMode';
+import { RunningMode, type RunningModeProps } from './modes/RunningMode';
+import { PausedMode, type PausedModeProps } from './modes/PausedMode';
 
 const FONT = "'DM Sans', system-ui, sans-serif";
 
@@ -79,6 +83,18 @@ export interface WorkflowPanelProps {
    * WorkflowPanelProps surface compact (avoids ~15 extra fields).
    */
   readonly setupModeProps: SetupModeProps | null;
+  /**
+   * T1-208 (Phase 4): bundled props for the three live-job modes
+   * (ready / running / paused). The same three pieces of state
+   * apply to all three — jobProgress + elapsedSeconds +
+   * estimatedRemaining + planSummary — plus ready-mode-only summary
+   * fields. When null, the live-job modes fall back to ModeStub.
+   */
+  readonly liveJobProps: {
+    readonly ready: ReadyModeProps;
+    readonly running: RunningModeProps;
+    readonly paused: PausedModeProps;
+  } | null;
 }
 
 /**
@@ -211,12 +227,20 @@ function renderModeContent(
         phase: modeImplementationPhase(mode),
       });
     case 'ready':
+      if (props.liveJobProps !== null) {
+        return React.createElement(ReadyMode, props.liveJobProps.ready);
+      }
+      return React.createElement(ModeStub, { mode, phase: modeImplementationPhase(mode) });
     case 'running':
+      if (props.liveJobProps !== null) {
+        return React.createElement(RunningMode, props.liveJobProps.running);
+      }
+      return React.createElement(ModeStub, { mode, phase: modeImplementationPhase(mode) });
     case 'paused':
-      return React.createElement(ModeStub, {
-        mode,
-        phase: modeImplementationPhase(mode),
-      });
+      if (props.liveJobProps !== null) {
+        return React.createElement(PausedMode, props.liveJobProps.paused);
+      }
+      return React.createElement(ModeStub, { mode, phase: modeImplementationPhase(mode) });
   }
 }
 
