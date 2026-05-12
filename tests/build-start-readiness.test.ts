@@ -86,6 +86,7 @@ function happy(): BuildStartReadinessInput {
     startMode: 'absolute',
     currentModeFrameAnchorValid: true,
     placementUncertain: false,
+    placementUncertainReason: null,
     wifiTrust: trustedTrust,
     wifiStartAllowed: true,
     isRunning: false,
@@ -394,6 +395,163 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     `first-fail-in-canonical-order wins (got '${r.blockingGate?.id}')`);
 }
 
+// -------- 15. T1-203: WCS-state gate surfaces the reason --------
+//
+// Pre-T1-203 every placement-uncertain trigger produced the same
+// "No WCS consent prompt was shown on connect" message. Only the
+// T1-20 no-listener race (reason === null) actually matched that
+// description. T1-203 routes each reason to a cause-specific
+// failHeadline + failAction so the user knows whether to clear an
+// alarm, check the cable, or just reconnect.
+{
+  // Default: placement is fine, gate is ok.
+  {
+    const r = buildStartReadiness(happy());
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(g?.status === 'ok', 'placement ok → wcsState gate ok');
+  }
+
+  // reason === null (T1-20 no-listener race) keeps the legacy text.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: null,
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(g?.status === 'fail', 'reason=null → wcsState fails');
+    assert(
+      /No WCS consent prompt was shown/.test(g?.failAction ?? ''),
+      'reason=null → original "no consent prompt" message preserved',
+    );
+  }
+
+  // reason === 'wcs_query_error' (T1-174): GRBL returned error to $#.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'wcs_query_error',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      /refused the WCS query/i.test(g?.failHeadline ?? ''),
+      "wcs_query_error → headline names the refused $# query",
+    );
+    assert(
+      /soft-reset|M999/.test(g?.failAction ?? ''),
+      'wcs_query_error → recovery action mentions soft-reset / M999',
+    );
+  }
+
+  // reason === 'missing_g54': $# response missing [G54:...].
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'missing_g54',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      /did not report a G54 offset/i.test(g?.failHeadline ?? ''),
+      'missing_g54 → headline names the missing G54',
+    );
+    assert(
+      /firmware|cable/i.test(g?.failAction ?? ''),
+      'missing_g54 → recovery hint mentions firmware/cable',
+    );
+  }
+
+  // reason === 'malformed_g54': $# returned unparseable G54.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'malformed_g54',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      /malformed G54 offset/i.test(g?.failHeadline ?? ''),
+      'malformed_g54 → headline names the malformed G54',
+    );
+    assert(
+      /cable noise/i.test(g?.failAction ?? ''),
+      'malformed_g54 → recovery hint mentions cable noise',
+    );
+  }
+
+  // reason === 'missing_status_mask': $$ dump had no $10.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'missing_status_mask',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      /\$10 status mask/i.test(g?.failHeadline ?? ''),
+      'missing_status_mask → headline names $10',
+    );
+    assert(
+      /firmware/i.test(g?.failAction ?? ''),
+      'missing_status_mask → recovery hint mentions firmware',
+    );
+  }
+
+  // reason === 'malformed_status_mask': $10= had unparseable value.
+  {
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'malformed_status_mask',
+      canStartJob: false,
+    });
+    const g = r.gates.find((g) => g.id === 'wcsState');
+    assert(
+      /malformed \$10/i.test(g?.failHeadline ?? ''),
+      'malformed_status_mask → headline names the malformed $10',
+    );
+    assert(
+      /cable noise/i.test(g?.failAction ?? ''),
+      'malformed_status_mask → recovery hint mentions cable noise',
+    );
+  }
+
+  // Each reason produces a DISTINCT (failHeadline, failAction) pair
+  // — guards against the pre-T1-203 single-message bug regressing.
+  {
+    const reasons = [
+      null,
+      'wcs_query_error',
+      'missing_g54',
+      'malformed_g54',
+      'missing_status_mask',
+      'malformed_status_mask',
+    ] as const;
+    const seen = new Set<string>();
+    for (const reason of reasons) {
+      const r = buildStartReadiness({
+        ...happy(),
+        placementUncertain: true,
+        placementUncertainReason: reason,
+        canStartJob: false,
+      });
+      const g = r.gates.find((g) => g.id === 'wcsState');
+      const key = `${g?.failHeadline}||${g?.failAction}`;
+      seen.add(key);
+    }
+    assert(
+      seen.size === reasons.length,
+      `each of the ${reasons.length} reasons produces a distinct message pair (got ${seen.size})`,
+    );
+  }
+}
+
 // -------- Source-level pin: ConnectionPanelMain delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -412,6 +570,43 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   assert(
     !/const blockerCount = preflight\?\.blockers \?\? 0;[\s\S]{0,5000}gates: StartReadinessGate\[\] = \[/.test(panelSrc),
     'inline 142-line readiness IIFE is gone from ConnectionPanelMain',
+  );
+  // T1-203 source-pins: the panel reads the placement-uncertain
+  // reason from the controller and threads it into the readiness
+  // input.
+  assert(/T1-203/.test(panelSrc), 'ConnectionPanelMain carries T1-203 marker');
+  assert(
+    /controllerRef\.current\?\.getPlacementUncertainReason\?\.\(\)/.test(panelSrc),
+    'ConnectionPanelMain reads getPlacementUncertainReason from the controller',
+  );
+  assert(
+    /placementUncertainReason,/.test(panelSrc),
+    'ConnectionPanelMain threads placementUncertainReason into buildStartReadiness',
+  );
+
+  // T1-203 source-pins on the helper module + interface.
+  const helperSrc = readFileSync(
+    resolve(here, '../src/ui/components/connection/buildStartReadiness.ts'),
+    'utf-8',
+  );
+  assert(/T1-203/.test(helperSrc), 'buildStartReadiness.ts carries T1-203 marker');
+  assert(
+    /function wcsStateGate\(input: BuildStartReadinessInput\): StartReadinessGate/.test(helperSrc),
+    'wcsStateGate helper extracted',
+  );
+  assert(
+    /placementUncertainReason:\s*WcsUncertainReason \| null/.test(helperSrc),
+    'BuildStartReadinessInput declares placementUncertainReason field',
+  );
+
+  const ifaceSrc = readFileSync(
+    resolve(here, '../src/controllers/ControllerInterface.ts'),
+    'utf-8',
+  );
+  assert(/T1-203/.test(ifaceSrc), 'ControllerInterface.ts carries T1-203 marker');
+  assert(
+    /getPlacementUncertainReason\?\(\): string \| null;/.test(ifaceSrc),
+    'LaserController interface declares optional getPlacementUncertainReason',
   );
 }
 

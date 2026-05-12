@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
+import { type WcsUncertainReason } from '../../controllers/grbl/GrblWcsConsentClassifier';
 import { MockSerialPort, type SerialPortLike } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
 import { createSerialPort } from '../../communication/SerialPortFactory';
@@ -1593,6 +1594,15 @@ export function ConnectionPanelMain({
   // controllers that don't implement it.
   const placementUncertain =
     controllerRef.current?.getPlacementUncertain?.() ?? false;
+  // T1-203: surface the reason behind placement-uncertain so the
+  // start-readiness gate can tailor the failHeadline + failAction to
+  // the actual cause (alarm / firmware quirk / cable noise / listener
+  // race), not the misleading one-size-fits-all "no consent prompt"
+  // message every cause used to share.
+  const placementUncertainReason =
+    (controllerRef.current?.getPlacementUncertainReason?.() ?? null) as
+      | WcsUncertainReason
+      | null;
   // T1-122: live RecoveryState. Pre-T1-122 the runtime RecoveryState
   // type was defined but no production owner held an instance and no
   // canonical canStartJob consulted `recoveryAllowsStart`. Now
@@ -1701,6 +1711,7 @@ export function ConnectionPanelMain({
     startMode,
     currentModeFrameAnchorValid,
     placementUncertain,
+    placementUncertainReason,
     wifiTrust,
     wifiStartAllowed,
     isRunning,

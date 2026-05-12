@@ -22,6 +22,7 @@
  */
 import type { ActiveOperationState, LaserOutputState } from '../../../app/MachineService';
 import type { MachineState, MachineStatus } from '../../../controllers/ControllerInterface';
+import type { WcsUncertainReason } from '../../../controllers/grbl/GrblWcsConsentClassifier';
 import type { GcodeStartMode } from '../../../core/output/GcodeOrigin';
 import type { PreflightSummary } from '../../../core/preflight/Preflight';
 import type { TrustClassification } from '../../../security/FalconWiFiTrust';
@@ -51,10 +52,79 @@ export interface BuildStartReadinessInput {
   readonly startMode: GcodeStartMode;
   readonly currentModeFrameAnchorValid: boolean;
   readonly placementUncertain: boolean;
+  /**
+   * T1-203: when the controller declared placement uncertain, why. The
+   * controller knows (`getPlacementUncertainReason()`) but pre-T1-203
+   * the gate showed a single misleading message ("No WCS consent
+   * prompt was shown") for all four causes. `null` means either the
+   * gate is passing OR the T1-20 no-listener path fired (which is the
+   * only case the original message describes correctly).
+   */
+  readonly placementUncertainReason: WcsUncertainReason | null;
   readonly wifiTrust: TrustClassification;
   readonly wifiStartAllowed: boolean;
   readonly isRunning: boolean;
   readonly canStartJob: boolean;
+}
+
+/**
+ * T1-203: produce the WCS-state gate row with a reason-tailored
+ * failHeadline + failAction. Pre-T1-203 the gate showed a single
+ * misleading message ("No WCS consent prompt was shown") for all
+ * four trigger paths — which only describes the T1-20 no-listener
+ * race. Users hitting T1-117 (malformed G54 / $10) or T1-174 ($#
+ * returned error:) saw advice that didn't match their actual
+ * problem. T1-203 surfaces the reason from
+ * `GrblController.getPlacementUncertainReason()` (already stored,
+ * just unwired in the UI) so each cause gets its own recovery path.
+ */
+function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
+  if (!input.placementUncertain) {
+    return {
+      id: 'wcsState',
+      label: 'Work-coordinate state confirmed',
+      status: 'ok',
+      failHeadline: 'Work-coordinate state could not be confirmed',
+      failAction: 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry',
+    };
+  }
+  let failHeadline: string;
+  let failAction: string;
+  switch (input.placementUncertainReason) {
+    case 'wcs_query_error':
+      failHeadline = 'Controller refused the WCS query ($#)';
+      failAction = 'The controller returned an error to $#. Clear any alarm (soft-reset / M999) and reconnect.';
+      break;
+    case 'missing_g54':
+      failHeadline = 'Controller did not report a G54 offset';
+      failAction = 'The $# response contained no [G54:...] line. Check firmware version and cable; reconnect to retry.';
+      break;
+    case 'malformed_g54':
+      failHeadline = 'Controller reported a malformed G54 offset';
+      failAction = 'The [G54:...] response had unparseable coordinates. Check for cable noise; reconnect to retry.';
+      break;
+    case 'missing_status_mask':
+      failHeadline = 'Controller did not report a $10 status mask';
+      failAction = 'The $$ settings dump did not include $10. Check firmware version; reconnect to retry.';
+      break;
+    case 'malformed_status_mask':
+      failHeadline = 'Controller reported a malformed $10 value';
+      failAction = 'The $10= value was unparseable. Check for cable noise; reconnect to retry.';
+      break;
+    case null:
+      // T1-20 no-listener fallback: no reason stored. The original
+      // pre-T1-203 message is correct for exactly this case.
+      failHeadline = 'Work-coordinate state could not be confirmed';
+      failAction = 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry.';
+      break;
+  }
+  return {
+    id: 'wcsState',
+    label: 'Work-coordinate state confirmed',
+    status: 'fail',
+    failHeadline,
+    failAction,
+  };
 }
 
 /** Frame-control fail headline — computed inline pre-T1-129. */
@@ -181,13 +251,7 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
       failHeadline: 'Laser-safety state unknown',
       failAction: 'A previous laser-off write failed — disconnect and reconnect to clear',
     },
-    {
-      id: 'wcsState',
-      label: 'Work-coordinate state confirmed',
-      status: input.placementUncertain ? 'fail' : 'ok',
-      failHeadline: 'Work-coordinate state could not be confirmed',
-      failAction: 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry',
-    },
+    wcsStateGate(input),
     {
       id: 'connectionTrust',
       label: `Connection trust (${input.wifiTrust.label})`,

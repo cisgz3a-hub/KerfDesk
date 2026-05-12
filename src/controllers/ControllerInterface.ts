@@ -396,6 +396,19 @@ export interface GrblControllerApi extends GcodeLineController {
    */
   getPlacementUncertain?(): boolean;
   /**
+   * T1-203: when `getPlacementUncertain()` returns true, returns the
+   * structured reason (one of the `WcsUncertainReason` literals or
+   * null). UI code reads this so the start-readiness gate can show a
+   * cause-specific recovery hint instead of a single misleading "no
+   * consent prompt" message that applied to only one of four causes.
+   *
+   * The return type is structurally typed (any string-or-null) at the
+   * interface layer so non-GRBL controllers can stay free of GRBL
+   * dialect concerns. The UI narrows via `as WcsUncertainReason |
+   * null` at the call site.
+   */
+  getPlacementUncertainReason?(): string | null;
+  /**
    * Configure whether a running job is aborted on GRBL `error:` responses.
    * Optional; defaults to true when not implemented.
    *
