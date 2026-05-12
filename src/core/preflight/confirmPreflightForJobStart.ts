@@ -1,5 +1,32 @@
 import type { PreflightSummary } from './Preflight';
 import type { ValidatedJobTicket } from '../job/ValidatedJobTicket';
+import type { BurnEnvelopeDivergenceReport } from '../output/burnEnvelopeDivergence';
+
+// T1-191: human-readable label for each divergence kind.
+function divergenceKindLabel(kind: BurnEnvelopeDivergenceReport['kind']): string {
+  switch (kind) {
+    case 'emitted-empty-plan-non-empty':
+      return 'The emitted G-code contains no burn moves, but the plan does.';
+    case 'plan-empty-emitted-non-empty':
+      return 'The emitted G-code contains burn moves the plan does not.';
+    case 'envelope-edge-mismatch':
+      return 'The emitted G-code\'s burn region differs from the plan\'s by more than the tolerance.';
+  }
+}
+
+function divergenceMessage(report: BurnEnvelopeDivergenceReport): string {
+  const lines: string[] = [
+    '⚠ Burn-region divergence detected between the planned preview and the emitted G-code.',
+    divergenceKindLabel(report.kind),
+    '',
+    `Max edge delta: ${report.maxEdgeDeltaMm.toFixed(3)} mm (tolerance: ${report.toleranceMm} mm)`,
+    `Plan burn moves: ${report.planBurnMoveCount}`,
+    `Emitted burn moves: ${report.emittedBurnMoveCount}`,
+    '',
+    'This may indicate a compile-time bug. The job MAY still run correctly, but the visual preview does not match the bytes that will be streamed to the machine. Inspect the support log before proceeding.',
+  ];
+  return lines.join('\n');
+}
 
 /** Ticket + preflight snapshot after the user confirms the preflight dialog. */
 export interface ConfirmedJobTicket {
@@ -22,6 +49,21 @@ export async function confirmPreflightForJobStart(
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>,
   validatedTicket?: ValidatedJobTicket,
 ): Promise<ConfirmedJobTicketResult> {
+  // T1-191 (external audit High #2 + #8 surfacing): if the compile
+  // detected a burn-envelope divergence (T1-188), present a dedicated
+  // confirm dialog BEFORE the blocker / warning flow. The user
+  // explicitly accepts the risk of running output that doesn't match
+  // the preview — the audit's "fail-soft" design choice.
+  if (validatedTicket?.burnEnvelopeDivergence) {
+    const accept = await showConfirm(
+      'Preview ↔ output mismatch',
+      divergenceMessage(validatedTicket.burnEnvelopeDivergence) + '\n\nProceed anyway?',
+    );
+    if (!accept) {
+      return { confirmed: false, ticket: null };
+    }
+  }
+
   if (preflight && !preflight.canStart) {
     await showAlert(
       'Cannot start job',
