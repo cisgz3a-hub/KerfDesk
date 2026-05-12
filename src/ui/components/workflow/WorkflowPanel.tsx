@@ -54,6 +54,14 @@ export interface WorkflowPanelProps {
   readonly recoveryState: RecoveryState;
   readonly canStartJob: boolean;
   /**
+   * T1-209 follow-up: optimistic pause state — set true the moment
+   * the user clicks Pause, cleared when machineStatus actually
+   * reports `hold` or when Resume / Stop fires. Without this the
+   * UI sits in `running` mode for the ~100-500ms streaming queue
+   * lag and feels like pause did nothing.
+   */
+  readonly pauseRequested: boolean;
+  /**
    * Optional handlers. Phase 1 passes them through to the footer /
    * top bar but the stub modes don't fire them. Phase 2 wires them
    * to MachineService / ExecutionCoordinator.
@@ -251,6 +259,7 @@ export function WorkflowPanel(props: WorkflowPanelProps): React.ReactElement {
     machineStatus: props.machineStatus,
     recoveryState: props.recoveryState,
     canStartJob: props.canStartJob,
+    pauseRequested: props.pauseRequested,
   });
 
   const actions = pickActions(mode, props);

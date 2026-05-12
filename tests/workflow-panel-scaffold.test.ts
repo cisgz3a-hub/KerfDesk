@@ -64,6 +64,7 @@ console.log('\n=== T1-204 WorkflowPanel scaffold ===\n');
     onRecoveryAction: null,
     setupModeProps: null,
     liveJobProps: null,
+    pauseRequested: false,
   };
   for (const mode of ALL_MODES) {
     const actions = pickActions(mode, stubProps);
@@ -99,6 +100,7 @@ console.log('\n=== T1-204 WorkflowPanel scaffold ===\n');
     onRecoveryAction: null,
     setupModeProps: null,
     liveJobProps: null,
+    pauseRequested: false,
   };
   assert(/Connect/.test(pickActions('disconnected', stubProps).primary.label),
     "'disconnected' primary mentions Connect");

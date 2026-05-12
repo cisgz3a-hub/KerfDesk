@@ -142,11 +142,11 @@ console.log('\n=== T1-208 WorkflowPanel Phase 4 live-job modes ===\n');
   );
   // Pause / Resume / Stop are wired (Start stays null).
   assert(
-    /onPause[\s\S]{0,100}machineService\.pause\(\)/.test(src),
+    /onPause[\s\S]{0,500}machineService\.pause\(\)/.test(src),
     'adapter wires onPause to machineService.pause',
   );
   assert(
-    /onResume[\s\S]{0,100}machineService\.resume\(\)/.test(src),
+    /onResume[\s\S]{0,500}machineService\.resume\(\)/.test(src),
     'adapter wires onResume to machineService.resume',
   );
   assert(

@@ -168,6 +168,38 @@ console.log('\n=== T1-204 derivePanelMode ===\n');
   );
 }
 
+// -------- 5b. T1-209 follow-up: optimistic pauseRequested --------
+//
+// Pre-fix the UI sat in 'running' mode for the ~100-500ms streaming
+// queue lag between Pause click and the controller actually
+// reporting Hold:0. With pauseRequested the panel flips immediately.
+{
+  // pauseRequested + machineStatus='run' → 'paused' (optimistic).
+  assert(
+    derivePanelMode(input({ machineStatus: 'run', pauseRequested: true })) === 'paused',
+    "pauseRequested=true + machineStatus='run' → 'paused' (optimistic flip)",
+  );
+  // pauseRequested without an active job has no effect: idle stays idle.
+  assert(
+    derivePanelMode(input({ machineStatus: 'idle', pauseRequested: true })) !== 'paused',
+    'pauseRequested with idle status does NOT flip to paused (only meaningful while running)',
+  );
+  // pauseRequested doesn't override recovery — safety first.
+  assert(
+    derivePanelMode(input({
+      machineStatus: 'run',
+      pauseRequested: true,
+      recoveryState: activeRecovery,
+    })) === 'recovery',
+    'recovery beats pauseRequested',
+  );
+  // pauseRequested=false matches the original behaviour.
+  assert(
+    derivePanelMode(input({ machineStatus: 'run', pauseRequested: false })) === 'running',
+    "pauseRequested=false → still 'running'",
+  );
+}
+
 // -------- 6. Mutual exclusion (every input → exactly one mode) --------
 {
   const statuses = [

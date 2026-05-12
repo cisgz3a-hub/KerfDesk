@@ -339,13 +339,52 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const jobName = props.scene.metadata?.name ?? 'Untitled';
   const lineCount = jobProgress?.totalLines ?? null;
 
+  // T1-209 follow-up: optimistic-pause local state. Flips true the
+  // moment Pause is clicked so the UI transitions to 'paused' mode
+  // immediately, even before the controller's next status report
+  // confirms Hold:0. Cleared when machineStatus actually reports
+  // 'hold' (real state caught up) OR when the user fires Resume /
+  // Stop. Matches the legacy panel's `isPaused` flag (see
+  // ConnectionPanelMain.tsx:426: `displayPaused = isPaused ||
+  // machineState?.status === 'hold'`).
+  const [pauseRequested, setPauseRequested] = useState(false);
+  useEffect(() => {
+    if (machineStatus === 'hold') setPauseRequested(false);
+  }, [machineStatus]);
+
   const onPause = () => {
-    void machineService.pause();
+    // Optimistically flip the UI to paused mode immediately.
+    setPauseRequested(true);
+    void machineService.pause().catch((err: unknown) => {
+      // If the pause command failed, the UI is stuck in 'paused'
+      // mode but the job is still running. Roll back the optimistic
+      // flag AND warn so the user can hit Stop. Mirrors the legacy
+      // panel's pause-failed alert (ConnectionPanelMain.tsx:1403).
+      setPauseRequested(false);
+      console.warn(
+        '[WorkflowPanel T1-209] Pause command not accepted:',
+        err instanceof Error ? err.message : err,
+      );
+      try {
+        window.alert(
+          'Pause failed — the machine did not accept the command. The job may still be running. Use Stop to halt it.',
+        );
+      } catch {
+        /* non-DOM env */
+      }
+    });
   };
   const onResume = () => {
-    void machineService.resume();
+    setPauseRequested(false);
+    void machineService.resume().catch((err: unknown) => {
+      console.warn(
+        '[WorkflowPanel T1-209] Resume command not accepted:',
+        err instanceof Error ? err.message : err,
+      );
+    });
   };
   const onStop = () => {
+    setPauseRequested(false);
     void machineService.stopAndEnsureLaserOff();
   };
 
@@ -444,6 +483,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       // full readiness object lifted up to App.tsx so both panels
       // share the SAME canStartJob.
       canStartJob: startReady && startMode !== 'savedOrigin',
+      pauseRequested,
       onEmergencyStop,
       onConnectUsb,
       // Phase 2 deliberate stubs (see component docstring).

@@ -64,6 +64,18 @@ export interface PanelModeInput {
    * for the conjunction — this module doesn't recompute readiness.
    */
   readonly canStartJob: boolean;
+  /**
+   * T1-209 follow-up: local "pause has been requested but the
+   * controller hasn't reported hold status yet" flag. The legacy
+   * panel uses the same pattern (`displayPaused = isPaused ||
+   * machineState?.status === 'hold'` in ConnectionPanelMain:426).
+   * Without this the panel can sit in `'running'` mode for the
+   * 100–500ms between the realtime feed-hold byte being sent and
+   * the next status report parsing as `Hold:0` — feels like the
+   * pause button didn't do anything. With this, the UI flips
+   * immediately and the machineStatus catches up.
+   */
+  readonly pauseRequested?: boolean;
 }
 
 export function derivePanelMode(input: PanelModeInput): PanelMode {
@@ -73,6 +85,13 @@ export function derivePanelMode(input: PanelModeInput): PanelMode {
   if (input.recoveryState.status !== 'none') return 'recovery';
   if (input.machineStatus === 'alarm') return 'recovery';
   if (input.machineStatus === 'faulted_requires_inspection') return 'recovery';
+  // T1-209 follow-up: pauseRequested takes precedence over the
+  // 'run' status so the UI flips immediately on Pause click — the
+  // controller can still be reporting 'Run:0' for a few hundred ms
+  // while the realtime feed-hold byte propagates through the
+  // streaming queue. Once a status report comes back as 'Hold:0',
+  // machineStatus === 'hold' takes over.
+  if (input.pauseRequested === true && input.machineStatus === 'run') return 'paused';
   if (input.machineStatus === 'run') return 'running';
   if (input.machineStatus === 'hold') return 'paused';
   if (input.canStartJob) return 'ready';
