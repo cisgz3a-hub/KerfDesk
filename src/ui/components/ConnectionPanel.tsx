@@ -141,15 +141,28 @@ function useWorkflowPanelV2Flag(): boolean {
   return on;
 }
 
+/**
+ * T1-213: WorkflowPanel routing temporarily disabled at the user's
+ * request — they preferred the legacy layout and asked to "go back
+ * to that one and make some adjustments." The WorkflowPanel code,
+ * feature-flag plumbing, and adapter all remain in the tree (the
+ * flag still round-trips through localStorage; tests still pass)
+ * but ConnectionPanel always renders the legacy panel here.
+ *
+ * To re-enable the routing during a future revisit, change this
+ * constant to `true` and the existing
+ * `useWorkflowPanelV2Flag` subscription is reinstated.
+ */
+const WORKFLOW_PANEL_V2_ENABLED = false;
+
 export function ConnectionPanel(props: ConnectionPanelProps) {
   const activeProfile = useActiveProfile();
   const isFalcon = activeProfile?.connection?.kind === 'falcon-wifi';
-  const workflowPanelV2 = useWorkflowPanelV2Flag();
+  // Always call the hook to keep rules-of-hooks happy; ignore its
+  // value when the routing is gated off.
+  const workflowFlagOn = useWorkflowPanelV2Flag();
+  const workflowPanelV2 = WORKFLOW_PANEL_V2_ENABLED && workflowFlagOn;
 
-  // T1-204: Falcon WiFi sidebar takes precedence over both panel
-  // shapes. When the WorkflowPanelV2 flag is on AND we're not in
-  // Falcon mode, route to the new panel; otherwise fall through to
-  // the existing ConnectionPanelLegacy.
   let body: React.ReactNode;
   if (isFalcon && activeProfile) {
     body = React.createElement(FalconWiFiSidebar, {
