@@ -278,12 +278,13 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   // needing it should flip workflowPanelV2 off until Phase 4
   // lifts that flow into a shared helper).
   const [jogStep, setJogStep] = useState(1);
-  // ExecutionCoordinator.jog requires a feedRate; use a conservative
-  // 1000 mm/min default — the legacy panel resolves from the active
-  // profile, but Phase 3 ships a literal default to avoid threading
-  // profile state through. Phase 4 will lift the profile-aware feed
-  // resolution up.
-  const JOG_DEFAULT_FEED_MM_PER_MIN = 1000;
+  // ExecutionCoordinator.jog requires a feedRate. The legacy panel
+  // also hardcodes 3000 mm/min (see ConnectionPanelMain.handleJog
+  // line 903 + the saved-origin-go path line 942); there's no
+  // profile field for jog feed today. T1-207 originally shipped 1000
+  // mm/min which felt sluggish; matching the legacy panel exactly is
+  // the safest fix — same speed in both panels.
+  const JOG_DEFAULT_FEED_MM_PER_MIN = 3000;
   const onJog = (axis: 'X' | 'Y', distance: number) => {
     void executionCoordinator.jog(axis, distance, JOG_DEFAULT_FEED_MM_PER_MIN);
   };
