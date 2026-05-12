@@ -2214,20 +2214,35 @@ export class MachineService {
   async jog(axis: 'X' | 'Y', distance: number, feedRate: number): Promise<{ ok: boolean; reason?: string }> {
     const ctrl = this.controllerRef.current;
     if (!ctrl) return { ok: false, reason: 'no-controller' };
-    try {
-      const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
-      if (!result.ok) return { ok: false, reason: result.reason };
-    } catch (err: unknown) {
-      return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+    // T1-221 (v30 audit #9, bypass plug): acquire the operation
+    // mutex for the duration of the jog. Pre-T1-221 this method
+    // skipped the mutex entirely — `ExecutionCoordinator.jog`
+    // acquired it, but a future UI path / test harness calling
+    // `MachineService.jog` directly could interleave with an
+    // active test-fire / frame-dot / autoFocus operation (all of
+    // which issue motion + modal commands that would race on
+    // GRBL's command queue).
+    if (!this.tryAcquireOperation('jog')) {
+      return { ok: false, reason: 'operation-busy' };
     }
-    setTimeout(() => {
+    try {
       try {
-        this.controllerRef.current.requestStatusReport();
-      } catch {
-        /* ignore */
+        const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
+        if (!result.ok) return { ok: false, reason: result.reason };
+      } catch (err: unknown) {
+        return { ok: false, reason: err instanceof Error ? err.message : String(err) };
       }
-    }, 100);
-    return { ok: true };
+      setTimeout(() => {
+        try {
+          this.controllerRef.current.requestStatusReport();
+        } catch {
+          /* ignore */
+        }
+      }, 100);
+      return { ok: true };
+    } finally {
+      this.releaseOperation('jog');
+    }
   }
 
   /** Pause the currently running job (feed-hold). */
