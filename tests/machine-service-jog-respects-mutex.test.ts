@@ -121,8 +121,9 @@ void (async () => {
 
   // Acquire a different operation kind (testFire) to simulate
   // contention. tryAcquireOperation is public.
-  const acquired = svc.tryAcquireOperation('testFire');
-  assert(acquired === true, 'precondition: testFire mutex acquired');
+  // T1-222: tryAcquireOperation returns an OperationLease (or null).
+  const testFireLease = svc.tryAcquireOperation('testFire');
+  assert(testFireLease !== null, 'precondition: testFire mutex acquired');
 
   const counter = { count: 0 };
   // Replace the ctrl's jog with a counting variant.
@@ -135,7 +136,7 @@ void (async () => {
   assert(counter.count === 0,
     'controller.operations.jog was NOT called (mutex prevented bypass)');
 
-  svc.releaseOperation('testFire');
+  if (testFireLease) svc.releaseOperation(testFireLease);
   assert(svc.getActiveOperation() === null, 'mutex released for cleanup');
 }
 
@@ -170,12 +171,13 @@ void (async () => {
     /this\.tryAcquireOperation\('jog'\)/.test(jogBody),
     'jog() acquires the mutex via tryAcquireOperation(\'jog\')',
   );
+  // T1-222: release now threads the OperationLease (not the kind string).
   assert(
-    /this\.releaseOperation\('jog'\)/.test(jogBody),
-    'jog() releases the mutex via releaseOperation(\'jog\')',
+    /this\.releaseOperation\(lease\)/.test(jogBody),
+    'jog() releases the mutex via releaseOperation(lease) (T1-222 lease-token API)',
   );
   assert(
-    /finally\s*\{[\s\S]{0,200}this\.releaseOperation\('jog'\)/.test(jogBody),
+    /finally\s*\{[\s\S]{0,200}this\.releaseOperation\(lease\)/.test(jogBody),
     'release is inside a finally block (handles throws)',
   );
   // Refusal returns 'operation-busy' (matches ExecutionCoordinator).

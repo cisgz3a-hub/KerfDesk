@@ -1,5 +1,5 @@
 import { type MutableRefObject } from 'react';
-import { type MachineService, type ActiveOperationKind } from './MachineService';
+import { type MachineService, type ActiveOperationKind, type OperationLease } from './MachineService';
 import { type LaserController } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
 import { type MachineState } from '../controllers/ControllerInterface';
@@ -104,6 +104,16 @@ export class ExecutionCoordinator {
    * stop cannot race with the timer's own laser-off. T1-18.
    */
   private _testFireTimerHandle: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * T1-222 (v30 audit #9, lease tokens): the active test-fire's
+   * mutex lease. Captured at `beginTestFire` and read by both
+   * `endTestFire` and the deadman timer's release `.finally` so all
+   * three release paths use the same lease — releases are guarded
+   * by the service's stale-session check, so the second of the two
+   * release calls becomes a silent no-op without depending on
+   * release ordering.
+   */
+  private _testFireLease: OperationLease | null = null;
 
   constructor(private readonly deps: ExecutionCoordinatorDeps) {}
 
@@ -120,7 +130,10 @@ export class ExecutionCoordinator {
     // interleaving with test-fire / frame-dot / autoFocus, which
     // matters because all of those issue motion + modal-state commands
     // that would race on GRBL's command queue.
-    if (!this.deps.machineService.tryAcquireOperation('jog')) {
+    // T1-222: release via the lease returned by acquire so a stale-
+    // round release cannot corrupt a fresh same-kind session.
+    const lease = this.deps.machineService.tryAcquireOperation('jog');
+    if (lease == null) {
       return { ok: false, reason: 'operation-busy' };
     }
     try {
@@ -144,7 +157,7 @@ export class ExecutionCoordinator {
       }, 100);
       return { ok: true };
     } finally {
-      this.deps.machineService.releaseOperation('jog');
+      this.deps.machineService.releaseOperation(lease);
     }
   }
 
@@ -174,13 +187,15 @@ export class ExecutionCoordinator {
     // controller's runAutoFocus uses a probe-pin sequence that conflicts
     // with any other modal-state mutation (test-fire's M3, frame-dot's
     // M4, set-origin's G10). The mutex prevents those from racing.
-    if (!this.deps.machineService.tryAcquireOperation('autoFocus')) {
+    // T1-222: release via the lease.
+    const lease = this.deps.machineService.tryAcquireOperation('autoFocus');
+    if (lease == null) {
       return { ok: false, error: 'Another machine operation is in progress.' };
     }
     try {
       return await this.deps.machineService.autoFocus();
     } finally {
-      this.deps.machineService.releaseOperation('autoFocus');
+      this.deps.machineService.releaseOperation(lease);
     }
   }
 
@@ -288,8 +303,10 @@ export class ExecutionCoordinator {
     // differ (frame-off doesn't fire the laser; frame-dot does at low
     // power). Mutex held across the entire corner-stream + idle-wait
     // span, plus across the laser-off finally for frame-dot.
+    // T1-222: release via the lease returned by acquire.
     const opKind: ActiveOperationKind = args.laserMode === 'dot' ? 'frameDot' : 'frame';
-    if (!this.deps.machineService.tryAcquireOperation(opKind)) {
+    const lease = this.deps.machineService.tryAcquireOperation(opKind);
+    if (lease == null) {
       return { ok: false, reason: 'operation-busy' };
     }
 
@@ -360,7 +377,7 @@ export class ExecutionCoordinator {
       // held across the entire frame operation including its safety
       // teardown. Releasing earlier would let another operation begin
       // before emergencyLaserOff finishes.
-      this.deps.machineService.releaseOperation(opKind);
+      this.deps.machineService.releaseOperation(lease);
     }
   }
 
@@ -377,11 +394,12 @@ export class ExecutionCoordinator {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
     // T2-11: acquire the mutex before issuing the M3 + arming the deadman.
-    // Re-entry: same-kind acquire returns true (preserves the existing
-    // "second beginTestFire resets the timer" semantics — the spec
-    // already wanted that behavior). Different-kind acquire fails;
-    // beginTestFire returns false same as no-controller.
-    if (!this.deps.machineService.tryAcquireOperation('testFire')) {
+    // Re-entry: same-kind acquire returns a fresh lease (T1-222 — the
+    // sessionId is bumped on every successful acquire, so an old
+    // deadman's stale-release becomes a silent no-op). Different-kind
+    // acquire fails; beginTestFire returns false same as no-controller.
+    const lease = this.deps.machineService.tryAcquireOperation('testFire');
+    if (lease == null) {
       return false;
     }
     const result = await ctrl.operations.testFire({
@@ -393,12 +411,19 @@ export class ExecutionCoordinator {
       console.warn('[TestFire] start blocked:', result.message ?? result.reason);
       // T2-11: release on failed start. The mutex is only useful if it's
       // actually freed when the operation didn't begin.
-      this.deps.machineService.releaseOperation('testFire');
+      this.deps.machineService.releaseOperation(lease);
       return false;
     }
     // T1-22: notify the service that the laser is intentionally on so
     // job-start gates and the laser-output-state surface stay accurate.
     this.deps.machineService.notifyTestFire('begin');
+    // T1-222: store the lease so endTestFire and the deadman timer
+    // closure below release the SAME lease. If beginTestFire is
+    // re-entered (a second click) the new lease overwrites this
+    // field — the old timer was clearTimeout'd, so its closure never
+    // runs to release the stale lease anyway, but the lease swap
+    // keeps endTestFire releasing the freshest round.
+    this._testFireLease = lease;
     // Arm the deadman synchronously after the laser-on command succeeds so there is no window
     // in which the laser is on but the auto-stop is unscheduled. Re-entry: clear
     // any prior handle first (a second beginTestFire resets the timer).
@@ -416,12 +441,14 @@ export class ExecutionCoordinator {
       // laser-output-state transitions back to 'off' (or 'unknown' if the
       // safetyOff path took the soft-reset fallback).
       this.deps.machineService.notifyTestFire('end');
-      // T2-11: deadman release pairs with beginTestFire's acquire. The
-      // .finally chain ensures release fires whether emergencyLaserOff
-      // resolves or rejects. releaseOperation is idempotent in case
-      // endTestFire raced ahead of the deadman.
+      // T2-11 / T1-222: deadman release pairs with beginTestFire's
+      // acquire. The closure captures the lease minted at acquire
+      // time. If endTestFire ran first and freed the mutex (then a
+      // new beginTestFire acquired a fresh sessionId), this stale
+      // lease will silently no-op inside releaseOperation — the
+      // fresh round's mutex is preserved.
       void this.emergencyLaserOff().finally(() => {
-        this.deps.machineService.releaseOperation('testFire');
+        this.deps.machineService.releaseOperation(lease);
       });
     }, deadmanMs);
     return true;
@@ -476,6 +503,14 @@ export class ExecutionCoordinator {
       clearTimeout(this._testFireTimerHandle);
       this._testFireTimerHandle = null;
     }
+    // T1-222: snapshot the stored lease and clear the field before
+    // awaiting laser-off — a concurrent beginTestFire would otherwise
+    // overwrite `_testFireLease` while we're awaiting. The captured
+    // lease is the one to release; releaseOperation's stale-session
+    // check handles the case where the deadman raced ahead (silent
+    // no-op).
+    const lease = this._testFireLease;
+    this._testFireLease = null;
     // T1-22: notify the service that the user-driven laser-on phase is over.
     // The subsequent emergencyLaserOff will further refine the state via
     // notifyLaserSafetyOutcome (M5 → 'off', soft-reset/failed → 'unknown').
@@ -483,12 +518,14 @@ export class ExecutionCoordinator {
     try {
       await this.emergencyLaserOff();
     } finally {
-      // T2-11: release after the laser-off attempt regardless of outcome.
-      // releaseOperation is idempotent — if the deadman raced ahead and
-      // already released, this is a no-op. Holding the mutex through
-      // emergencyLaserOff prevents another operation from starting
-      // while M5 / soft-reset is still in flight.
-      this.deps.machineService.releaseOperation('testFire');
+      // T2-11 / T1-222: release the captured lease after the laser-off
+      // attempt regardless of outcome. releaseOperation is idempotent —
+      // if the deadman raced ahead and already released, this lease
+      // points at a stale sessionId and the call is a silent no-op.
+      // Holding the mutex through emergencyLaserOff prevents another
+      // operation from starting while M5 / soft-reset is still in
+      // flight.
+      if (lease != null) this.deps.machineService.releaseOperation(lease);
     }
   }
 
@@ -540,7 +577,9 @@ export class ExecutionCoordinator {
     // autoFocus's probe sequence — any of those could land between the
     // simulator notify and the actual sendCommand and corrupt the
     // resulting WCS state.
-    if (!this.deps.machineService.tryAcquireOperation('setOrigin')) {
+    // T1-222: release via the lease.
+    const lease = this.deps.machineService.tryAcquireOperation('setOrigin');
+    if (lease == null) {
       return { ok: false, reason: 'operation-busy' };
     }
     try {
@@ -548,7 +587,7 @@ export class ExecutionCoordinator {
         onCommand: line => this.notifySimulator(line),
       });
     } finally {
-      this.deps.machineService.releaseOperation('setOrigin');
+      this.deps.machineService.releaseOperation(lease);
     }
   }
 }

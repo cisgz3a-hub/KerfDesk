@@ -118,40 +118,44 @@ function makeService(ctrl: LaserController): MachineService {
 // 2. Acquire 'jog' → success; getActiveOperation reflects it
 {
   const svc = makeService(makeController());
-  const ok = svc.tryAcquireOperation('jog');
-  assert(ok, 'tryAcquireOperation("jog") on fresh service returns true');
+  const lease = svc.tryAcquireOperation('jog');
+  assert(lease !== null, 'tryAcquireOperation("jog") on fresh service returns a lease');
+  assert(lease?.kind === 'jog', `lease.kind === 'jog' (got ${lease?.kind})`);
+  assert(typeof lease?.sessionId === 'number' && lease!.sessionId > 0,
+    'lease.sessionId is a positive number');
   const active = svc.getActiveOperation();
   assert(active != null && active.kind === 'jog',
     `getActiveOperation reflects 'jog' (got ${active?.kind})`);
   assert(typeof active?.startedAt === 'number' && active!.startedAt > 0,
     'startedAt is a positive number');
-  assert(typeof active?.sessionId === 'number' && active!.sessionId > 0,
-    'sessionId is a positive number');
+  assert(active?.sessionId === lease?.sessionId,
+    'getActiveOperation().sessionId matches the lease sessionId');
 }
 
-// 3. Acquire 'jog' twice → second call still returns true (re-entry policy)
+// 3. Acquire 'jog' twice → second call still returns a lease (re-entry policy)
 {
   const svc = makeService(makeController());
-  svc.tryAcquireOperation('jog');
+  const first = svc.tryAcquireOperation('jog');
   const second = svc.tryAcquireOperation('jog');
-  assert(second, 'same-kind re-acquire returns true (test-fire deadman re-entry preserved)');
+  assert(first !== null && second !== null,
+    'same-kind re-acquire returns a lease (deadman re-entry preserved)');
 }
 
-// 4. Acquire 'jog', then try 'testFire' → second call returns false
+// 4. Acquire 'jog', then try 'testFire' → second call returns null
 {
   const svc = makeService(makeController());
   svc.tryAcquireOperation('jog');
   const second = svc.tryAcquireOperation('testFire');
-  assert(!second, 'different-kind acquire returns false while jog held');
+  assert(second === null, 'different-kind acquire returns null while jog held');
   const active = svc.getActiveOperation();
   assert(active?.kind === 'jog', 'jog kind preserved after rejected testFire acquire');
 }
 
-// 5. Release 'jog' → getActiveOperation === null
+// 5. Release lease → getActiveOperation === null
 {
   const svc = makeService(makeController());
-  svc.tryAcquireOperation('jog');
-  svc.releaseOperation('jog');
+  const lease = svc.tryAcquireOperation('jog')!;
+  svc.releaseOperation(lease);
   assert(svc.getActiveOperation() === null, 'release clears the mutex');
 }
 
@@ -159,20 +163,44 @@ function makeService(ctrl: LaserController): MachineService {
 {
   const svc = makeService(makeController());
   let threw = false;
-  try { svc.releaseOperation('jog'); } catch { threw = true; }
+  // Hand-construct a fake lease (no acquire to mint a real one) and try to release.
+  try { svc.releaseOperation({ kind: 'jog', sessionId: 999 }); } catch { threw = true; }
   assert(!threw, 'release without prior acquire does not throw');
   assert(svc.getActiveOperation() === null, 'release without acquire leaves null');
 }
 
-// 7. Mismatched-kind release → warns, does NOT release the held kind
+// 7. Stale lease release → silent no-op, does NOT clear the held kind
+{
+  // T1-222: this is the audit-flagged race. A lease from a prior round
+  // must NOT clear a fresh round's mutex even if both rounds are the
+  // same kind. Pre-T1-222 the release was keyed only on kind, so this
+  // contract did not hold.
+  const svc = makeService(makeController());
+  const staleLease = svc.tryAcquireOperation('testFire')!;
+  svc.releaseOperation(staleLease);  // round 1 ends
+  const freshLease = svc.tryAcquireOperation('testFire')!;
+  assert(freshLease.sessionId > staleLease.sessionId,
+    `fresh acquire mints a new sessionId (${staleLease.sessionId} → ${freshLease.sessionId})`);
+  svc.releaseOperation(staleLease);  // simulate stale .finally firing
+  assert(svc.getActiveOperation()?.kind === 'testFire',
+    'stale-lease release does NOT clear the fresh round (race protection)');
+  assert(svc.getActiveOperation()?.sessionId === freshLease.sessionId,
+    'fresh round preserved (sessionId unchanged by stale release)');
+  svc.releaseOperation(freshLease);
+}
+
+// 8. Mismatched-kind lease release → warns, does NOT release the held kind
 {
   const svc = makeService(makeController());
-  svc.tryAcquireOperation('jog');
+  const jogLease = svc.tryAcquireOperation('jog')!;
   const origWarn = console.warn;
   let warnedMessage: string | null = null;
   console.warn = (msg: string) => { warnedMessage = msg; };
   try {
-    svc.releaseOperation('testFire');
+    // Hand-construct a lease for testFire that happens to share the
+    // current sessionId. In production this is unreachable (acquire
+    // bakes kind into the lease), but it pins the defensive warn path.
+    svc.releaseOperation({ kind: 'testFire', sessionId: jogLease.sessionId });
   } finally {
     console.warn = origWarn;
   }
@@ -180,32 +208,42 @@ function makeService(ctrl: LaserController): MachineService {
     'mismatched-kind release emits a warn');
   assert(svc.getActiveOperation()?.kind === 'jog',
     'mismatched-kind release does NOT clear the held kind (jog still active)');
-  svc.releaseOperation('jog');
+  svc.releaseOperation(jogLease);
 }
 
-// 8. Release returns to baseline; new acquire bumps sessionId
+// 9. Release returns to baseline; new acquire bumps sessionId
 {
   const svc = makeService(makeController());
-  svc.tryAcquireOperation('jog');
-  const firstSession = svc.getActiveOperation()!.sessionId;
-  svc.releaseOperation('jog');
-  svc.tryAcquireOperation('frame');
-  const secondSession = svc.getActiveOperation()!.sessionId;
+  const first = svc.tryAcquireOperation('jog')!;
+  const firstSession = first.sessionId;
+  svc.releaseOperation(first);
+  const second = svc.tryAcquireOperation('frame')!;
+  const secondSession = second.sessionId;
   assert(secondSession > firstSession,
     `sessionId increases across acquire cycles (${firstSession} → ${secondSession})`);
-  svc.releaseOperation('frame');
+  svc.releaseOperation(second);
 }
 
-// 9. Same-kind re-acquire does NOT bump sessionId (re-entry preserves identity)
+// 10. T1-222: same-kind re-acquire BUMPS sessionId (race protection)
 {
+  // Pre-T1-222 same-kind re-acquire preserved sessionId — but that's
+  // exactly what made the deadman-vs-endTestFire race exploitable.
+  // Post-T1-222 every successful acquire mints a fresh sessionId;
+  // the deadman re-entry pattern still works because the OLD timer
+  // is clearTimeout'd before the second acquire.
   const svc = makeService(makeController());
-  svc.tryAcquireOperation('testFire');
-  const firstSession = svc.getActiveOperation()!.sessionId;
-  svc.tryAcquireOperation('testFire');
-  const secondSession = svc.getActiveOperation()!.sessionId;
-  assert(firstSession === secondSession,
-    'same-kind re-acquire preserves sessionId (no churn for deadman re-entry)');
-  svc.releaseOperation('testFire');
+  const first = svc.tryAcquireOperation('testFire')!;
+  const firstSession = first.sessionId;
+  const second = svc.tryAcquireOperation('testFire')!;
+  const secondSession = second.sessionId;
+  assert(secondSession > firstSession,
+    `same-kind re-acquire bumps sessionId for race protection (${firstSession} → ${secondSession})`);
+  // The first lease is now stale; releasing with it is a no-op.
+  svc.releaseOperation(first);
+  assert(svc.getActiveOperation()?.kind === 'testFire',
+    'stale first-lease release does not clear the active operation');
+  svc.releaseOperation(second);
+  assert(svc.getActiveOperation() === null, 'fresh lease release clears the mutex');
 }
 
 // ─── Surface 2: ExecutionCoordinator integration ───
@@ -233,27 +271,27 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
 {
   const ctrl = makeController();
   const svc = makeService(ctrl);
-  svc.tryAcquireOperation('testFire');  // simulate test-fire in flight
+  const heldLease = svc.tryAcquireOperation('testFire')!;  // simulate test-fire in flight
   const coord = makeCoord(svc, ctrl);
   const r = await coord.jog('X', 5, 1500);
   assert(r.ok === false && r.reason === 'operation-busy',
     'jog refuses with operation-busy when testFire is held');
   assert(svc.getActiveOperation()?.kind === 'testFire',
     'jog refusal does NOT release the holding kind');
-  svc.releaseOperation('testFire');
+  svc.releaseOperation(heldLease);
 }
 
 // 12. coord.beginTestFire fails when another op holds the mutex
 {
   const ctrl = makeController({ sendCommand: () => {} });
   const svc = makeService(ctrl);
-  svc.tryAcquireOperation('frame');
+  const heldLease = svc.tryAcquireOperation('frame')!;
   const coord = makeCoord(svc, ctrl);
   const ok = await coord.beginTestFire({ maxSpindle: 1000 });
   assert(ok === false, 'beginTestFire returns false when frame is held');
   assert(svc.getActiveOperation()?.kind === 'frame',
     'frame still held after beginTestFire refusal');
-  svc.releaseOperation('frame');
+  svc.releaseOperation(heldLease);
 }
 
 // 13. coord.beginTestFire releases mutex on rejected testFire operation
@@ -287,27 +325,27 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
 {
   const ctrl = makeController();
   const svc = makeService(ctrl);
-  svc.tryAcquireOperation('frameDot');
+  const heldLease = svc.tryAcquireOperation('frameDot')!;
   const coord = makeCoord(svc, ctrl);
   const r = await coord.autoFocus();
   assert(r.ok === false && 'error' in r && /Another machine operation/.test(r.error),
     'autoFocus refuses with operation-in-progress message when frameDot is held');
-  svc.releaseOperation('frameDot');
+  svc.releaseOperation(heldLease);
 }
 
 // 16. coord.setOriginAtCurrentPosition refuses while another op holds the mutex
 {
   const ctrl = makeController({ sendCommand: () => {} });
   const svc = makeService(ctrl);
-  svc.tryAcquireOperation('autoFocus');
+  const heldLease = svc.tryAcquireOperation('autoFocus')!;
   const coord = makeCoord(svc, ctrl);
   const r = await coord.setOriginAtCurrentPosition();
   assert(r.ok === false && r.reason === 'operation-busy',
     'setOriginAtCurrentPosition refuses with operation-busy when autoFocus is held');
-  svc.releaseOperation('autoFocus');
+  svc.releaseOperation(heldLease);
 }
 
-// 17. Source-level pin: T2-11 markers in both files
+// 17. Source-level pin: T2-11 + T1-222 markers in both files
 {
   const fs = await import('node:fs');
   const url = await import('node:url');
@@ -319,12 +357,16 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
     'utf-8',
   );
   assert(/T2-11/.test(svcSrc), 'T2-11 marker present in MachineService.ts');
+  assert(/T1-222/.test(svcSrc), 'T1-222 marker present in MachineService.ts');
   assert(/_activeOperation: ActiveOperationState \| null = null/.test(svcSrc),
     '_activeOperation field declared');
-  assert(/tryAcquireOperation\(kind: ActiveOperationKind\): boolean/.test(svcSrc),
-    'tryAcquireOperation public method declared');
-  assert(/releaseOperation\(kind: ActiveOperationKind\): void/.test(svcSrc),
-    'releaseOperation public method declared');
+  // T1-222: signatures now use OperationLease instead of returning boolean / taking kind.
+  assert(/tryAcquireOperation\(kind: ActiveOperationKind\): OperationLease \| null/.test(svcSrc),
+    'tryAcquireOperation public method declared with lease return type');
+  assert(/releaseOperation\(lease: OperationLease\): void/.test(svcSrc),
+    'releaseOperation public method takes an OperationLease');
+  assert(/export interface OperationLease/.test(svcSrc),
+    'OperationLease interface exported');
   assert(/getActiveOperation\(\): ActiveOperationState \| null/.test(svcSrc),
     'getActiveOperation public method declared');
   // ActiveOperationKind union shape — each member checked individually

@@ -105,8 +105,9 @@ function makeController(config: Partial<MockController> = {}): MockController & 
 function makeCoordinator(ctrl: LaserController | null): ExecutionCoordinator {
   return new ExecutionCoordinator({
     controllerRef: { current: ctrl },
+    // T2-11 / T1-222: runFrame acquires/releases the mutex via lease.
     machineService: {
-      tryAcquireOperation: () => true,
+      tryAcquireOperation: (kind: string) => ({ kind, sessionId: Date.now() }),
       releaseOperation: () => {},
     } as never,
     notifySimulatorRef: { current: () => {} },

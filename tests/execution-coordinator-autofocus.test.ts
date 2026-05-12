@@ -31,13 +31,15 @@ function makeCoordinator(machineService: MachineService): ExecutionCoordinator {
 void (async () => {
   console.log('\n=== execution-coordinator autofocus facade ===\n');
 
-  // T2-11: ExecutionCoordinator.autoFocus now acquires/releases the
-  // operation mutex around the delegated call. Mocks need to expose
-  // tryAcquireOperation + releaseOperation; the simplest stub returns
-  // true unconditionally + no-op release, preserving the pre-T2-11
-  // pass-through semantics for these tests.
+  // T2-11 / T1-222: ExecutionCoordinator.autoFocus acquires/releases
+  // the operation mutex around the delegated call. Mocks need to
+  // return an OperationLease (kind + sessionId) from acquire and a
+  // no-op release; the simplest stub mints a fresh lease per call,
+  // preserving the pre-T2-11 pass-through semantics.
+  let leaseCounter = 0;
   const muStub = {
-    tryAcquireOperation: () => true,
+    tryAcquireOperation: (kind: 'jog' | 'frame' | 'frameDot' | 'testFire' | 'autoFocus' | 'setOrigin') =>
+      ({ kind, sessionId: ++leaseCounter }),
     releaseOperation: () => {},
   };
 

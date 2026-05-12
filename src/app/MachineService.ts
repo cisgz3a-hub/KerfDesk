@@ -187,6 +187,28 @@ export interface ActiveOperationState {
   sessionId: number;
 }
 
+/**
+ * T1-222 (v30 audit #9, lease tokens): handle returned by
+ * {@link MachineService.tryAcquireOperation} and required by
+ * {@link MachineService.releaseOperation}. Pre-T1-222 release was
+ * keyed only on `kind`, which let a caller from a stale operation
+ * round release the mutex held by a fresh round of the SAME kind
+ * (e.g. test-fire deadman fires its release `.finally` after the
+ * user has already called `endTestFire` AND started a new
+ * `beginTestFire`). The lease pairs `kind` with the `sessionId` so
+ * a stale release becomes a silent no-op instead of corrupting the
+ * current session.
+ *
+ * Lease objects are immutable value handles — equality is by
+ * (`kind`, `sessionId`). Same-kind re-acquire returns a fresh
+ * lease that points at the SAME `sessionId` (the re-entry policy
+ * is unchanged), so either lease can release the operation.
+ */
+export interface OperationLease {
+  readonly kind: ActiveOperationKind;
+  readonly sessionId: number;
+}
+
 // T1-145: emptyBurnState moved to ./machineServiceHelpers.
 
 export interface MachineServiceState {
@@ -1047,49 +1069,72 @@ export class MachineService {
   }
 
   /**
-   * T2-11: try to acquire the operation mutex for `kind`. Returns true on
-   * success (caller now holds the mutex), false if another kind is
-   * already active. Same-kind re-acquire returns true without changing
-   * `startedAt` / `sessionId` — preserves the test-fire deadman re-entry
-   * pattern where a second `beginTestFire` cancels the existing timer
-   * and re-arms it without bouncing through release/acquire.
+   * T2-11 / T1-222: try to acquire the operation mutex for `kind`.
+   * Returns an {@link OperationLease} on success (caller now holds the
+   * mutex), `null` if a different kind is already active.
    *
-   * Failure modes returned as `false`:
+   * **Every successful acquire mints a FRESH `sessionId`**, even on
+   * same-kind re-acquire. This is the core of the lease-token race
+   * protection (T1-222): a stale release from a prior round
+   * (deadman `.finally`, cancelled-but-still-pending callback) finds
+   * its lease's `sessionId` no longer matches the current operation
+   * and becomes a silent no-op. Pre-T1-222 the same `sessionId` was
+   * shared across same-kind re-acquires, so the deadman `.finally`
+   * could clear a fresh round's mutex.
+   *
+   * The deadman re-entry pattern in `beginTestFire` continues to
+   * work because the OLD `setTimeout` handle is `clearTimeout`'d
+   * before the second acquire — the old callback never runs, so the
+   * stale-release path is the relevant defense, and the fresh
+   * `sessionId` ensures it stays silent.
+   *
+   * Failure modes returned as `null`:
    *   - A different operation is currently active (e.g. test-fire is
    *     held; caller asked for frame-dot).
    *
    * Caller MUST pair every successful acquire with exactly one
-   * {@link releaseOperation} call (try/finally is the right shape for
-   * synchronous and async operations alike). Same-kind re-acquire still
-   * counts as one acquire — release once is sufficient.
+   * {@link releaseOperation} call passing the returned lease
+   * (try/finally is the right shape for synchronous and async
+   * operations alike).
    */
-  tryAcquireOperation(kind: ActiveOperationKind): boolean {
-    if (this._activeOperation == null) {
+  tryAcquireOperation(kind: ActiveOperationKind): OperationLease | null {
+    if (this._activeOperation == null || this._activeOperation.kind === kind) {
       this._activeOperation = {
         kind,
         startedAt: Date.now(),
         sessionId: ++this._operationSessionCounter,
       };
-      return true;
+      return { kind, sessionId: this._activeOperation.sessionId };
     }
-    if (this._activeOperation.kind === kind) {
-      return true;
-    }
-    return false;
+    return null;
   }
 
   /**
-   * T2-11: release the operation mutex if currently held by `kind`.
-   * Idempotent — calling release for a kind that's not held is a no-op
-   * and does NOT disturb a different kind that may be active. A warn is
-   * emitted on a kind-mismatch (caller is releasing the wrong kind),
-   * because that almost certainly means a try/finally pair is wrong.
+   * T2-11 / T1-222: release the operation mutex if the supplied lease
+   * matches the active operation. Both `kind` AND `sessionId` must
+   * match — a stale-round lease (operation was already released and a
+   * fresh same-kind round was acquired) is a SILENT no-op. This is
+   * the race the lease tokens close: pre-T1-222 a stale `releaseOperation('testFire')`
+   * from a deadman `.finally` running after a fresh `beginTestFire`
+   * would clear the new round's mutex.
+   *
+   * Idempotent — calling release with no operation held is a no-op.
+   * A kind-mismatch lease (which shouldn't be reachable via the
+   * production API surface but is possible for hand-constructed
+   * leases in tests) emits a warn, because it almost certainly means
+   * a try/finally pair is wrong.
    */
-  releaseOperation(kind: ActiveOperationKind): void {
+  releaseOperation(lease: OperationLease): void {
     if (this._activeOperation == null) return;
-    if (this._activeOperation.kind !== kind) {
+    if (this._activeOperation.sessionId !== lease.sessionId) {
+      // Stale lease — the round this lease was minted in has already
+      // ended and a fresh round (possibly of the same kind) is in
+      // flight. Silent no-op preserves the fresh round's mutex.
+      return;
+    }
+    if (this._activeOperation.kind !== lease.kind) {
       console.warn(
-        `[T2-11] releaseOperation('${kind}') called while '${this._activeOperation.kind}' is active; ignoring`,
+        `[T1-222] releaseOperation(lease kind='${lease.kind}', sid=${lease.sessionId}) called while '${this._activeOperation.kind}' (sid=${this._activeOperation.sessionId}) is active; ignoring`,
       );
       return;
     }
@@ -2222,7 +2267,10 @@ export class MachineService {
     // active test-fire / frame-dot / autoFocus operation (all of
     // which issue motion + modal commands that would race on
     // GRBL's command queue).
-    if (!this.tryAcquireOperation('jog')) {
+    // T1-222 (v30 audit #9, lease tokens): release via the lease so a
+    // stale-round release cannot clear a fresh same-kind session.
+    const lease = this.tryAcquireOperation('jog');
+    if (lease == null) {
       return { ok: false, reason: 'operation-busy' };
     }
     try {
@@ -2241,7 +2289,7 @@ export class MachineService {
       }, 100);
       return { ok: true };
     } finally {
-      this.releaseOperation('jog');
+      this.releaseOperation(lease);
     }
   }
 
