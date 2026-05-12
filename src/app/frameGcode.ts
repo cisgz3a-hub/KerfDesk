@@ -56,6 +56,37 @@ export function resolveFrameSceneBounds(args: {
   return copyBounds(args.outputBounds);
 }
 
+/**
+ * T2-6 Phase 3x: choose the bounds the frame-command machine
+ * transform should use as its reference rectangle.
+ *
+ * Companion to `resolveFrameSceneBounds`: where that picks the
+ * scene-space bounds the framing PATH is built from (preferring the
+ * tighter burn envelope), this picks the bounds the AXIS-MIRROR /
+ * front-right-corner transform anchors on. The transform side
+ * intentionally ignores burn bounds — it only cares about the planar
+ * extent of the emitted toolpath so the transform's "rectangle the
+ * head will sweep" stays the same as what the planner already
+ * produced. When there's no fresh compile, falls back to the raw
+ * output-object bounds (same as the scene path).
+ *
+ * Pre-Phase-3x this lived inline in `App.tsx` as a ternary
+ * (`!gcodeStale && currentGcode && lastResult?.canvasPlanBounds`).
+ * Extracting it co-locates the bounds-resolution policy with the
+ * sister scene-bounds helper above so a future framing-bounds
+ * change touches one file.
+ */
+export function resolveFrameTransformBounds(args: {
+  outputBounds: AABB;
+  compiledCanvasPlanBounds: AABB | null | undefined;
+  hasFreshCompile: boolean;
+}): AABB {
+  if (args.hasFreshCompile && isUsableFrameBounds(args.compiledCanvasPlanBounds)) {
+    return copyBounds(args.compiledCanvasPlanBounds);
+  }
+  return copyBounds(args.outputBounds);
+}
+
 export function buildFrameCorners(
   sceneBounds: AABB,
   transformOpts: MachineTransformOptions,

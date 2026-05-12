@@ -98,7 +98,7 @@ import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
 import { selectSceneBounds } from '../../core/scene/bounds';
-import { resolveFrameSceneBounds } from '../../app/frameGcode';
+import { resolveFrameSceneBounds, resolveFrameTransformBounds } from '../../app/frameGcode';
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
@@ -358,11 +358,11 @@ export function App(): React.ReactElement {
   );
 
   const frameTransformBounds = useMemo(
-    () => (
-      !gcodeStale && currentGcode && lastResult?.canvasPlanBounds
-        ? lastResult.canvasPlanBounds
-        : outputSceneBounds
-    ),
+    () => resolveFrameTransformBounds({
+      outputBounds: outputSceneBounds,
+      compiledCanvasPlanBounds: lastResult?.canvasPlanBounds ?? null,
+      hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
+    }),
     [outputSceneBounds, gcodeStale, currentGcode, lastResult],
   );
 
