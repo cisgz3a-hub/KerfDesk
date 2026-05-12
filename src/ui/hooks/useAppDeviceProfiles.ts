@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from 'react';
-import { resolveBedHeightMm, resolveBedWidthMm } from '../../app/PipelineService';
+import { bedDimensionsKnown, resolveBedHeightMm, resolveBedWidthMm } from '../../app/PipelineService';
 import {
   applyProfileToScene,
   deleteDeviceProfile,
@@ -98,6 +98,17 @@ export function useAppDeviceProfiles({
 
   const resolvedMachineBedHeightMm = useMemo(
     () => resolveBedHeightMm(getActiveProfile(), machineBedFromGrbl),
+    [profileRevision, machineBedFromGrbl],
+  );
+
+  // T1-218 (v30 audit #1): true iff BOTH dimensions came from a
+  // real source (controller-reported $130/$131 or explicit profile
+  // setting). When false, the resolved values above are the 300mm
+  // fallback — preflight will block job start on
+  // `MISSING_BED_SIZE` rather than silently authorizing motion
+  // against a phantom 300mm bed.
+  const resolvedMachineBedDimensionsKnown = useMemo(
+    () => bedDimensionsKnown(getActiveProfile(), machineBedFromGrbl),
     [profileRevision, machineBedFromGrbl],
   );
 
@@ -290,6 +301,7 @@ export function useAppDeviceProfiles({
     activeProfileId,
     resolvedMachineBedWidthMm,
     resolvedMachineBedHeightMm,
+    resolvedMachineBedDimensionsKnown,
     allProfiles,
     refreshProfiles,
     updateActiveProfile,

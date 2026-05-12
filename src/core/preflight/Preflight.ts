@@ -398,17 +398,39 @@ export function runPreflightSummary(
     | null,
   startMode: GcodeStartMode = 'absolute',
   savedOriginForPreflight?: { x: number; y: number } | null,
+  /**
+   * T1-218 (v30 audit #1): when false, the incoming `bedWidth` /
+   * `bedHeight` came from `DEFAULT_MACHINE_BED_MM` (the 300mm
+   * fallback) rather than from a connected controller or an
+   * explicit profile. We synthesize the preflight profile with
+   * bedWidth/bedHeight = 0 in that case so the existing
+   * `MISSING_BED_SIZE` blocker fires instead of silently letting a
+   * phantom 300mm bed authorize motion that could exceed the
+   * actual work envelope.
+   *
+   * Defaults to `true` so the 20+ existing test callers don't
+   * change behaviour. Production caller (ConnectionPanelMain)
+   * computes the flag via `bedDimensionsKnown(profile,
+   * controllerBed)` in PipelineService.
+   */
+  bedDimensionsKnown: boolean = true,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
-  const preflightBedWidthMm = bedWidth > 0 ? bedWidth : 300;
-  const preflightBedHeightMm = bedHeight > 0 ? bedHeight : 300;
+  // T1-218: when the caller signals the bed dimensions are
+  // fallback-only, propagate that as zero into the synthesized
+  // profile so the MISSING_BED_SIZE rule (OutputBoundsPreflight)
+  // triggers. The pre-T1-218 code substituted 300 here too, which
+  // hid the unknown-bed state from every downstream rule.
+  const preflightBedWidthMm = bedDimensionsKnown && bedWidth > 0 ? bedWidth : 0;
+  const preflightBedHeightMm = bedDimensionsKnown && bedHeight > 0 ? bedHeight : 0;
   const profile =
-    activeProfile ??
-    {
-      ...createBlankProfile('Bed (scene)'),
-      bedWidth: preflightBedWidthMm,
-      bedHeight: preflightBedHeightMm,
-    };
+    activeProfile && bedDimensionsKnown
+      ? activeProfile
+      : {
+          ...createBlankProfile('Bed (scene)'),
+          bedWidth: preflightBedWidthMm,
+          bedHeight: preflightBedHeightMm,
+        };
 
   const ctx: PreflightContext = {
     scene,

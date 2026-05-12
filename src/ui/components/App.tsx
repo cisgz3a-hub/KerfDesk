@@ -301,6 +301,7 @@ export function App(): React.ReactElement {
     activeProfileId,
     resolvedMachineBedWidthMm,
     resolvedMachineBedHeightMm,
+    resolvedMachineBedDimensionsKnown,
     allProfiles,
     refreshProfiles,
     updateActiveProfile,
@@ -1697,6 +1698,10 @@ export function App(): React.ReactElement {
       },
         bedWidth: resolvedMachineBedWidthMm,
         bedHeight: resolvedMachineBedHeightMm,
+        // T1-218 (v30 audit #1): pass through so preflight can fire
+        // MISSING_BED_SIZE when neither controller nor profile knows
+        // the bed, instead of accepting the 300mm fallback as truth.
+        bedDimensionsKnown: resolvedMachineBedDimensionsKnown,
         // T1-100: activeJobTransform is populated only after Start, so
         // pre-Start preflight should use the current fresh compile bounds
         // instead of falling back to fragile raw G-code text scanning.

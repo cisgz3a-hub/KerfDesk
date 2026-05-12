@@ -148,6 +148,41 @@ export function resolveBedHeightMm(
   return DEFAULT_MACHINE_BED_MM;
 }
 
+/**
+ * T1-218 (v30 audit #1): companion to `resolveBedWidthMm` /
+ * `resolveBedHeightMm` that returns `true` when BOTH dimensions
+ * came from a real source (controller-reported `$130/$131` or an
+ * explicit profile setting) and `false` when either falls back to
+ * `DEFAULT_MACHINE_BED_MM` (the 300mm safety hole the audit
+ * flagged).
+ *
+ * Audit's real-world failure: a 100×100 mm or 220×220 mm laser
+ * with missing `$130/$131` and missing profile dimensions
+ * silently compiles/transforms against a phantom 300mm bed, then
+ * drives motion outside its actual work envelope.
+ *
+ * Caller (UI) passes this into preflight so the existing
+ * `MISSING_BED_SIZE` blocker fires when the bed is fallback-only,
+ * rather than being masked by the 300mm substitution.
+ */
+export function bedDimensionsKnown(
+  profile: ReturnType<typeof getActiveProfile>,
+  machineBedFromController: { width: number; height: number } | null | undefined,
+): boolean {
+  const wCtrl = machineBedFromController?.width;
+  const hCtrl = machineBedFromController?.height;
+  const ctrlKnown =
+    typeof wCtrl === 'number' && Number.isFinite(wCtrl) && wCtrl > 0
+    && typeof hCtrl === 'number' && Number.isFinite(hCtrl) && hCtrl > 0;
+  if (ctrlKnown) return true;
+  const wProf = profile?.bedWidth;
+  const hProf = profile?.bedHeight;
+  return (
+    typeof wProf === 'number' && Number.isFinite(wProf) && wProf > 0
+    && typeof hProf === 'number' && Number.isFinite(hProf) && hProf > 0
+  );
+}
+
 function resolveOriginCorner(profile: ReturnType<typeof getActiveProfile>): MachineOriginCorner {
   return profile?.originCorner
     ?? (profile?.invertY === false ? 'rear-left' : 'front-left');

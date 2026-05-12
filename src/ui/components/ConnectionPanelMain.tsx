@@ -127,6 +127,17 @@ export interface ConnectionPanelMainProps {
   gcode: string | null;
   bedWidth: number;
   bedHeight: number;
+  /**
+   * T1-218 (v30 audit #1): false when bedWidth/bedHeight came from
+   * the 300mm DEFAULT_MACHINE_BED_MM fallback rather than a real
+   * source (controller `$130/$131` or explicit profile setting).
+   * Threaded through to preflight so MISSING_BED_SIZE blocks job
+   * start instead of accepting a phantom bed. Defaults to `true`
+   * for backwards-compatibility with test callers; production
+   * (App.tsx) always supplies the real flag from
+   * `bedDimensionsKnown(profile, machineBedFromGrbl)`.
+   */
+  bedDimensionsKnown?: boolean;
   /** Machine-space plan bounds for preflight validation (from applyMachineTransform). */
   machinePlanBounds?: { minX: number; minY: number; maxX: number; maxY: number } | null;
   /** Latest compile ticket (phase 1: threaded for confirm only; job path unchanged). */
@@ -201,6 +212,7 @@ export function ConnectionPanelMain({
   gcode,
   bedWidth,
   bedHeight,
+  bedDimensionsKnown = true,
   machinePlanBounds = null,
   compiledJobTicket = null,
   lastGcodeCompileResult = null,
@@ -401,6 +413,9 @@ export function ConnectionPanelMain({
       unsafeAtConnect != null ? unsafeAtConnect.reason : null,
       startMode,
       savedOrigin,
+      // T1-218 (v30 audit #1): tell preflight whether the bed
+      // dimensions are real or a 300mm fallback.
+      bedDimensionsKnown,
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
@@ -427,6 +442,7 @@ export function ConnectionPanelMain({
     compiledJobTicket,
     startMode,
     savedOrigin,
+    bedDimensionsKnown,
   ]);
 
   const isConnected = machineState?.status !== 'disconnected' && machineState?.status !== 'connecting' && machineState !== null;
