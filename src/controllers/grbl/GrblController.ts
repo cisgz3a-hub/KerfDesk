@@ -1295,20 +1295,51 @@ export class GrblController implements GrblControllerApi {
       // Idempotent — nothing to clear.
       return { ok: true };
     }
-    // Defense-in-depth laser-off. Fire-and-forget; the error path that
-    // produced the fault already issued one safetyOff. A second one
-    // can't hurt and protects against the edge case where the prior
-    // safetyOff was racing with new RX that re-modal-set M3.
-    void this.safetyOff().then(result => {
-      if (result.stage === 'failed') {
-        console.warn(
-          '[GrblController] T2-12: safetyOff during acknowledgeFault returned failed:',
-          result.error,
-        );
-      }
-    }).catch((err: unknown) => {
-      console.warn('[GrblController] T2-12: safetyOff during acknowledgeFault threw:', err);
-    });
+    // T1-217 (v30 audit #2): await the safety-off and only flip out
+    // of the fault state when the laser-off contract actually
+    // succeeded. Pre-T1-217 the safetyOff() promise was fire-and-
+    // forget (`void this.safetyOff().then(...).catch(...)`) and the
+    // status was flipped to 'idle' synchronously on the next line —
+    // so if BOTH the fault-time safetyOff AND this defense-in-depth
+    // safetyOff failed, the controller reported idle to the UI
+    // without any enforcement that the laser was actually off.
+    //
+    // New behaviour:
+    //   - safetyOff() returns 'm5'         → laser commanded off via
+    //     M5 S0. Clear fault, flip to idle.
+    //   - safetyOff() returns 'soft-reset' → M5 failed but soft
+    //     reset succeeded. GRBL is forcibly halted; laser is off
+    //     because the controller was reset. Clear fault, flip to
+    //     idle.
+    //   - safetyOff() returns 'failed'     → BOTH M5 and soft reset
+    //     failed. Laser-off contract is indeterminate. Stay in the
+    //     faulted state and surface the error to the caller. UI
+    //     already renders `result.ok === false` (see
+    //     ConnectionPanelMain.handleAcknowledgeFault).
+    const result = await this.safetyOff();
+    if (result.stage === 'failed') {
+      const msg = result.error?.message ?? 'safetyOff returned failed';
+      console.warn(
+        '[GrblController] T1-217: safetyOff during acknowledgeFault failed; '
+        + 'NOT clearing fault state. Laser-off contract is indeterminate:',
+        msg,
+      );
+      return {
+        ok: false,
+        reason:
+          `Cannot clear fault: laser-off failed (${msg}). `
+          + 'Disconnect, power-cycle the controller, and reconnect '
+          + 'before resuming. Use the physical E-stop or power '
+          + 'disconnect first if the laser may still be active.',
+      };
+    }
+    if (result.stage === 'soft-reset') {
+      console.warn(
+        '[GrblController] T1-217: safetyOff during acknowledgeFault took the '
+        + 'soft-reset fallback. M5 critical-write failed; controller was '
+        + 'force-reset. Position is lost; rehome required before next job.',
+      );
+    }
     this._state.errorCode = null;
     this._updateStatus('idle');
     return { ok: true };
