@@ -46,7 +46,7 @@ console.log('\n=== T1-162 stale T*-followup doc-string sweep ===\n');
 // -------- 1. SafetyActionResult.ts: stale T2-41-followup language gone --------
 {
   const src = readFileSync(
-    resolve(here, '../src/app/SafetyActionResult.ts'),
+    resolve(here, '../src/controllers/SafetyActionResult.ts'),
     'utf-8',
   );
   // The pre-T1-162 doc said the "remaining methods stay void for now"
@@ -132,9 +132,15 @@ console.log('\n=== T1-162 stale T*-followup doc-string sweep ===\n');
     resolve(here, '../src/controllers/grbl/GrblController.ts'),
     'utf-8',
   );
-  // Each safety method's signature should declare SafetyActionResult.
-  for (const method of ['pause', 'resume', 'stop', 'emergencyStop']) {
-    const sig = new RegExp(`^\\s*${method}\\(\\)\\s*:\\s*SafetyActionResult`, 'm');
+  // Each safety method's signature should declare SafetyActionResult. T1-216 made
+  // resume async so it declares Promise<SafetyActionResult>.
+  const expected = new Map([
+    ['pause', /^\s*pause\(\)\s*:\s*SafetyActionResult/m],
+    ['resume', /^\s*async\s+resume\(\)\s*:\s*Promise<SafetyActionResult>/m],
+    ['stop', /^\s*stop\(\)\s*:\s*SafetyActionResult/m],
+    ['emergencyStop', /^\s*emergencyStop\(\)\s*:\s*SafetyActionResult/m],
+  ]);
+  for (const [method, sig] of expected) {
     assert(
       sig.test(ctrl),
       `GrblController.${method} returns SafetyActionResult (post-migration)`,

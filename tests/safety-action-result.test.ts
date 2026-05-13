@@ -228,7 +228,7 @@ void (async () => {
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
   const src = fs.readFileSync(
-    path.resolve(here, '../src/app/SafetyActionResult.ts'),
+    path.resolve(here, '../src/controllers/SafetyActionResult.ts'),
     'utf-8',
   );
   assert(/T2-41/.test(src), 'T2-41 marker in SafetyActionResult.ts');

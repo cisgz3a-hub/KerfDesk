@@ -28,7 +28,7 @@
 import type {
   SafetyActionResult,
   SafetyAction,
-} from '../app/SafetyActionResult';
+} from './SafetyActionResult';
 
 export type SafetyUrgency = 'normal' | 'urgent' | 'emergency';
 

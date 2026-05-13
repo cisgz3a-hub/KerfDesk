@@ -19,10 +19,11 @@
  * pass.
  */
 
-/** GRBL-style status string the controller reports today. */
-export type ControllerStatus =
-  | 'idle' | 'run' | 'hold' | 'jog' | 'alarm' | 'door' | 'check' | 'home' | 'sleep'
-  | 'unknown';
+import type { ControllerStatus } from '../controllers/ControllerStatus';
+
+// T1-230: re-export the controller-owned status vocabulary for compatibility
+// with existing app/UI callers that import from MachineSafetyState.
+export type { ControllerStatus };
 
 /**
  * Confidence of the laser-output state. T1-22 introduced

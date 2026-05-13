@@ -46,7 +46,7 @@ export type SafetyTristate = boolean | 'unknown';
 /**
  * Subset of T2-41's `SafetyActionResult` consumed by the transition
  * function. Re-declared here so this module can compile without a
- * dependency on `src/app/SafetyActionResult.ts` (the existing file
+ * dependency on `src/controllers/SafetyActionResult.ts` (the canonical file
  * is a per-method shape; T2-44 only needs the discriminating fields).
  */
 export interface SafetyResultLike {

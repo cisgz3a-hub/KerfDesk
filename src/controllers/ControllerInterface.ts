@@ -8,7 +8,7 @@
  */
 
 import { type SerialPortLike } from '../communication/SerialPort';
-import type { SafetyActionResult } from '../app/SafetyActionResult';
+import type { SafetyActionResult } from './SafetyActionResult';
 import type { GcodeStartMode } from '../core/output/GcodeOrigin';
 // T1-163 (audit F-001): surface the T1-116 token type so the
 // setStopOnError signature declares its safety contract.

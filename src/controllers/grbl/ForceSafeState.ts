@@ -16,7 +16,7 @@
  * a 'Hardware verification needed' note in the commit message").
  */
 
-import type { ControllerStatus } from '../../app/MachineSafetyState';
+import type { ControllerStatus } from '../ControllerStatus';
 
 export type ForceSafeStateFailureReason =
   | 'no-banner-response'

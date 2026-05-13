@@ -49,7 +49,7 @@ import {
   makePauseResult,
   makeResumeResult,
   makeSoftResetStopResult,
-} from '../../app/SafetyActionResult';
+} from '../SafetyActionResult';
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
