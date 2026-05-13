@@ -45,8 +45,8 @@
  * bounding box (a 50×50 square and a 50-radius circle both fit a
  * 50×50 box but have different geometry signatures and different types).
  */
-import type { PreflightContext, PreflightResult } from '../Preflight';
-import { PREFLIGHT_CODES } from '../Preflight';
+import type { PreflightContext, PreflightResult } from '../PreflightContext';
+import { PREFLIGHT_CODES } from '../PreflightContext';
 import type { SceneObject } from '../../scene/SceneObject';
 
 const ROUND = 1000; // 0.001 = 1 µm

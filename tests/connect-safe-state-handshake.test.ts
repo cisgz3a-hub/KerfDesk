@@ -273,12 +273,16 @@ function ctxFor(unsafeReason:
     path.resolve(here, '../src/core/preflight/Preflight.ts'),
     'utf-8',
   );
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
+    'utf-8',
+  );
   assert(/T1-25/.test(ruleSrc), 'T1-25 marker present in MachinePreflight.ts');
-  assert(/MACHINE_UNSAFE_AT_CONNECT:\s*'MACHINE_UNSAFE_AT_CONNECT'/.test(preflightSrc),
+  assert(/MACHINE_UNSAFE_AT_CONNECT:\s*'MACHINE_UNSAFE_AT_CONNECT'/.test(preflightContextSrc),
     'MACHINE_UNSAFE_AT_CONNECT preflight code constant declared');
   assert(/firmwareUnsafeAtConnect\?:/.test(preflightSrc),
     'runPreflightSummary takes firmwareUnsafeAtConnect parameter');
-  assert(/unsafeAtConnect\?:/.test(preflightSrc),
+  assert(/unsafeAtConnect\?:/.test(preflightContextSrc),
     'liveMachineInfo.unsafeAtConnect declared');
   // ConnectionPanelMain wires it in
   const panelSrc = fs.readFileSync(

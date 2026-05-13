@@ -281,10 +281,14 @@ void (async () => {
     path.resolve(here, '../src/core/preflight/Preflight.ts'),
     'utf-8',
   );
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
+    'utf-8',
+  );
   assert(/runCompileComplexityChecks/.test(preflightSrc),
     'runPreflight invokes runCompileComplexityChecks');
-  assert(/COMPILE_COMPLEXITY_BLOCK/.test(preflightSrc),
-    'PREFLIGHT_CODES.COMPILE_COMPLEXITY_BLOCK declared');
+  assert(/COMPILE_COMPLEXITY_BLOCK/.test(preflightContextSrc),
+    'PREFLIGHT_CODES.COMPILE_COMPLEXITY_BLOCK declared in PreflightContext.ts');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

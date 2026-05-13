@@ -210,11 +210,15 @@ function findDup(scene: Scene): { count: number; first?: string } {
   assert(/export function runDuplicateGeometryChecks/.test(ruleSrc),
     'runDuplicateGeometryChecks exported');
 
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
+    'utf-8',
+  );
   const preflightSrc = fs.readFileSync(
     path.resolve(here, '../src/core/preflight/Preflight.ts'),
     'utf-8',
   );
-  assert(/GEOMETRY_DUPLICATE:\s*'GEOMETRY_DUPLICATE'/.test(preflightSrc),
+  assert(/GEOMETRY_DUPLICATE:\s*'GEOMETRY_DUPLICATE'/.test(preflightContextSrc),
     'GEOMETRY_DUPLICATE preflight code constant declared');
   assert(/runDuplicateGeometryChecks\(ctx, results\)/.test(preflightSrc),
     'runPreflight orchestrator calls runDuplicateGeometryChecks');

@@ -138,11 +138,15 @@ function ctx(opts: {
     path.resolve(here, '../src/core/preflight/Preflight.ts'),
     'utf-8',
   );
-  assert(/outputUsesM4\?:\s*boolean/.test(preflightSrc),
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
+    'utf-8',
+  );
+  assert(/outputUsesM4\?:\s*boolean/.test(preflightContextSrc),
     'PreflightContext.outputUsesM4 declared');
-  assert(/laserMode\?:\s*boolean/.test(preflightSrc),
+  assert(/laserMode\?:\s*boolean/.test(preflightContextSrc),
     'liveMachineInfo.laserMode declared');
-  assert(/MACHINE_LASER_MODE_DISABLED:\s*'MACHINE_LASER_MODE_DISABLED'/.test(preflightSrc),
+  assert(/MACHINE_LASER_MODE_DISABLED:\s*'MACHINE_LASER_MODE_DISABLED'/.test(preflightContextSrc),
     'MACHINE_LASER_MODE_DISABLED preflight code constant declared');
   assert(/firmwareLaserModeFromMachine\?:\s*boolean/.test(preflightSrc),
     'runPreflightSummary takes firmwareLaserModeFromMachine parameter');

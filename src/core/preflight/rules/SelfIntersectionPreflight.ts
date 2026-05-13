@@ -9,8 +9,8 @@
 import type { Point } from '../../types';
 import type { SceneObject, SubPath } from '../../scene/SceneObject';
 import { subPathToPoints } from '../../job/JobCompiler';
-import type { PreflightContext, PreflightResult } from '../Preflight';
-import { PREFLIGHT_CODES } from '../Preflight';
+import type { PreflightContext, PreflightResult } from '../PreflightContext';
+import { PREFLIGHT_CODES } from '../PreflightContext';
 
 const EPS = 1e-9;
 const PATH_FLATTEN_TOLERANCE_MM = 0.05;

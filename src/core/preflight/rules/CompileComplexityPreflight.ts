@@ -22,8 +22,8 @@
  * grayscale photo). It's a heuristic upper bound, not a planner
  * simulation.
  */
-import type { PreflightContext, PreflightResult } from '../Preflight';
-import { PREFLIGHT_CODES } from '../Preflight';
+import type { PreflightContext, PreflightResult } from '../PreflightContext';
+import { PREFLIGHT_CODES } from '../PreflightContext';
 import type { Scene } from '../../scene/Scene';
 
 export interface ComplexityEstimate {

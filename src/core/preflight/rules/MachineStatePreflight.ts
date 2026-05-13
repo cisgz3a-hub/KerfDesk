@@ -1,5 +1,5 @@
-import type { PreflightContext, PreflightResult } from '../Preflight';
-import { PREFLIGHT_CODES } from '../Preflight';
+import type { PreflightContext, PreflightResult } from '../PreflightContext';
+import { PREFLIGHT_CODES } from '../PreflightContext';
 
 export function runMachineStateChecks(ctx: PreflightContext, out: PreflightResult[]): void {
   if (ctx.connectedToMachine === false) {

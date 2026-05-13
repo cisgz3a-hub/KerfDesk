@@ -162,8 +162,8 @@ function ctx(opts: {
     'PipelineService.compileGcode picks controllerMaxSpindle when present',
   );
   assert(
-    /:\s*\(profile\?\.maxSpindle \?\? 1000\)/.test(pipelineSrc),
-    'PipelineService.compileGcode falls back to profile.maxSpindle when no controller value',
+    /:\s*\(controllerCapabilities\.laser\.maxPowerValue > 0\s*\?\s*controllerCapabilities\.laser\.maxPowerValue\s*:\s*1000\)/.test(pipelineSrc),
+    'PipelineService.compileGcode falls back to resolved controller capability maxPowerValue when no controller value',
   );
 
   // Ensure the OLD precedence is gone (profile wins line removed).
@@ -176,7 +176,11 @@ function ctx(opts: {
     path.resolve(here, '../src/core/preflight/Preflight.ts'),
     'utf-8',
   );
-  assert(/MACHINE_MAXSPINDLE_MISMATCH:\s*'MACHINE_MAXSPINDLE_MISMATCH'/.test(preflightSrc),
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
+    'utf-8',
+  );
+  assert(/MACHINE_MAXSPINDLE_MISMATCH:\s*'MACHINE_MAXSPINDLE_MISMATCH'/.test(preflightContextSrc),
     'MACHINE_MAXSPINDLE_MISMATCH preflight code constant declared');
   assert(/firmwareMaxSpindleFromMachine\?:\s*number/.test(preflightSrc),
     'runPreflightSummary takes firmwareMaxSpindleFromMachine parameter');

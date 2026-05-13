@@ -120,9 +120,10 @@ console.log('\n=== T3-56 conservative unknown capability handling ===\n');
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const preflightSource = readFileSync(resolve(here, '../src/core/preflight/Preflight.ts'), 'utf-8');
+  const preflightContextSource = readFileSync(resolve(here, '../src/core/preflight/PreflightContext.ts'), 'utf-8');
   const machineSource = readFileSync(resolve(here, '../src/core/preflight/rules/MachinePreflight.ts'), 'utf-8');
 
-  assert(/MACHINE_LASER_MODE_UNKNOWN:\s*'MACHINE_LASER_MODE_UNKNOWN'/.test(preflightSource),
+  assert(/MACHINE_LASER_MODE_UNKNOWN:\s*'MACHINE_LASER_MODE_UNKNOWN'/.test(preflightContextSource),
     'MACHINE_LASER_MODE_UNKNOWN code is declared');
   assert(/connectedToMachine:\s*machineState != null &&\s*machineState\.status !== 'disconnected'/.test(preflightSource),
     'runPreflightSummary does not treat disconnected MachineState as connected');

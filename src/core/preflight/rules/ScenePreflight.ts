@@ -1,5 +1,5 @@
-import type { PreflightContext, PreflightResult } from '../Preflight';
-import { PREFLIGHT_CODES } from '../Preflight';
+import type { PreflightContext, PreflightResult } from '../PreflightContext';
+import { PREFLIGHT_CODES } from '../PreflightContext';
 import { getOutputLayers } from '../../scene/Scene';
 import type { SceneObject } from '../../scene/SceneObject';
 import { computeObjectBounds } from '../../../geometry/bounds';

@@ -154,11 +154,11 @@ function ctx(opts: {
   const url = await import('node:url');
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
-  const preflightSrc = fs.readFileSync(
-    path.resolve(here, '../src/core/preflight/Preflight.ts'),
+  const preflightContextSrc = fs.readFileSync(
+    path.resolve(here, '../src/core/preflight/PreflightContext.ts'),
     'utf-8',
   );
-  assert(/MACHINE_MAXSPINDLE_UNKNOWN:\s*'MACHINE_MAXSPINDLE_UNKNOWN'/.test(preflightSrc),
+  assert(/MACHINE_MAXSPINDLE_UNKNOWN:\s*'MACHINE_MAXSPINDLE_UNKNOWN'/.test(preflightContextSrc),
     'MACHINE_MAXSPINDLE_UNKNOWN constant declared');
 
   const ruleSrc = fs.readFileSync(

@@ -217,12 +217,12 @@ async function run(): Promise<void> {
     assert(/\|\s*'door'/.test(ifaceSrc),
       "ControllerInterface.ts MachineStatus union includes 'door'");
 
-    const preflightSrc = readFileSync(
-      resolve(here, '../src/core/preflight/Preflight.ts'),
+    const preflightContextSrc = readFileSync(
+      resolve(here, '../src/core/preflight/PreflightContext.ts'),
       'utf-8',
     );
-    assert(/MACHINE_DOOR:\s*'MACHINE_DOOR'/.test(preflightSrc),
-      'Preflight.ts PREFLIGHT_CODES includes MACHINE_DOOR');
+    assert(/MACHINE_DOOR:\s*'MACHINE_DOOR'/.test(preflightContextSrc),
+      'PreflightContext.ts PREFLIGHT_CODES includes MACHINE_DOOR');
 
     const ruleSrc = readFileSync(
       resolve(here, '../src/core/preflight/rules/MachineStatePreflight.ts'),

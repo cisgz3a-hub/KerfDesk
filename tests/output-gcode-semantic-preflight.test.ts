@@ -121,8 +121,9 @@ console.log('\n=== T3-18 emitted G-code semantic preflight ===\n');
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const preflightSrc = readFileSync(resolve(here, '../src/core/preflight/Preflight.ts'), 'utf-8');
+  const preflightContextSrc = readFileSync(resolve(here, '../src/core/preflight/PreflightContext.ts'), 'utf-8');
   const ruleSrc = readFileSync(resolve(here, '../src/core/preflight/rules/OutputValidator.ts'), 'utf-8');
-  assert(/emittedGcode\?:\s*string \| null/.test(preflightSrc), 'PreflightContext exposes emittedGcode');
+  assert(/emittedGcode\?:\s*string \| null/.test(preflightContextSrc), 'PreflightContext exposes emittedGcode');
   assert(/runOutputGcodeSemanticChecks\(ctx, results\)/.test(preflightSrc),
     'runPreflight calls runOutputGcodeSemanticChecks');
   assert(/T3-18/.test(ruleSrc), 'OutputValidator carries T3-18 marker');
