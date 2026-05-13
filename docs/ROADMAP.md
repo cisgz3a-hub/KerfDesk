@@ -6976,6 +6976,26 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `4b1310f`. Hardware verification not required; this is an observability-only routing change with no controller commands, generated output, or machine-state transitions changed.
 
 ---
+### T1-233 | Type WebSerialPort catch paths as unknown
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-002.
+
+**Problem:** The WebSerial read loop used `catch (e: any)` and assumed `e.message` existed. Browser stream and writer promises can reject with non-`Error` values, producing weak diagnostics such as `Read error: undefined`. Two fire-and-forget write catches had the same typed-as-`Error` assumption.
+
+**Fix:** Added a `messageFromUnknownError(...)` normalizer, changed the WebSerial open/read/write catch paths to treat thrown values as `unknown`, and converted non-`Error` write rejections back into `Error` objects before invoking `onError`. The fake WebSerial harness now supports non-`Error` reader and writer faults so this remains behavior-tested.
+
+**Verification:**
+- `npx tsx tests\webserial-unknown-catch.test.ts`
+- `npx tsx tests\web-serial-byte-stream-harness.test.ts`
+- `npx tsx tests\web-serial-partial-open-cleanup.test.ts`
+- `npx tsx tests\serial-known-port-reuse.test.ts`
+- `npx tsx tests\serial-navigator-disconnect.test.ts`
+- `npx tsx tests\webserial-cable-pull-heartbeat.test.ts`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is transport diagnostics and TypeScript boundary hygiene with no serial command semantics changed.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20832,6 +20852,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-230 MEDIUM move SafetyActionResult and ControllerStatus to neutral controller-owned modules (shipped in 05efdb38) - closes audit F-006 by removing the remaining controller-to-app shared-type imports while preserving app-level compatibility wrappers.
 - [x] T1-229 MEDIUM backfill ROADMAP + shipped ledger for T1-209..T1-222 (shipped in 834b70f8) - closes audit F-014 by recording the missing coupled-triple docs for the WorkflowPanel and v30 audit-response tickets.
 - [x] T1-232 LOW route production diagnostics through structured logging (shipped in 4b1310f) - closes audit F-003 by replacing the remaining `src/` `console.log` breadcrumbs with a bounded structured diagnostic log sink.
+- [x] T1-233 LOW type WebSerialPort catch paths as unknown (shipped in <TBD>) - closes audit F-002 by normalizing non-Error WebSerial read/write failures without `any` catch typing.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

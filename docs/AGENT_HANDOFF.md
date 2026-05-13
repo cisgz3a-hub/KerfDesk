@@ -7,9 +7,9 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-232** (structured production diagnostics, shipped in 4b1310f).
-- Current audit-fix run completed: **T1-223 through T1-232**.
-- Next audit-fix ticket: **T1-233** - type `WebSerialPort` catch paths as `unknown` (audit F-002).
+- Last shipped roadmap item: **T1-233** (WebSerial unknown catch typing, hash fill pending until commit).
+- Current audit-fix run completed: **T1-223 through T1-233**.
+- Next audit-fix ticket: **T1-234** - eslint cleanup sweep for F-001/F-004.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
 
 ## What Just Shipped In This Run
@@ -28,6 +28,7 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T1-230 | F-006 | Controller shared safety types moved out of app layer. |
 | T1-231 | F-015 | This handoff refreshed so future agents do not resume from T1-202. |
 | T1-232 | F-003 | Production diagnostic breadcrumbs routed through structured logging. |
+| T1-233 | F-002 | WebSerialPort catch paths typed as unknown. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -43,8 +44,8 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 ## Verification Baseline
 
-- `npx tsc --noEmit --pretty false` passed during the T1-223..T1-232 run.
-- Focused tests for T1-223 through T1-232 passed at their commits.
+- `npx tsc --noEmit --pretty false` passed during the T1-223..T1-233 run.
+- Focused tests for T1-223 through T1-233 passed at their commits.
 - Full `npm test` currently times out under F-019. Do not report full-suite green until F-019 is fixed.
 - `tests/end-to-end-workflows/end-to-end-workflows.test.ts` passes when run directly, but the full runner can hang waiting on it.
 - `npm run project-map:check` was stale under F-018 before this run; regenerate/check when reaching T1-240.
@@ -54,15 +55,14 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 Continue in this order unless a newer owner instruction says otherwise:
 
-1. **T1-233** - F-002: type `WebSerialPort` catch paths as `unknown`.
-2. **T1-234** - F-001/F-004: eslint cleanup sweep.
-3. **T1-235** - F-008: review `core/` `Date.now` / `Math.random` per site.
-4. **T1-236** - F-013: route inline ID generators through `generateId()` where appropriate.
-5. **T1-237** - firmware adapter wiring remains deferred/multi-week.
-6. **T1-238** - F-016: no-skip exported-symbol audit.
-7. **T1-239** - F-017: hook dependency triage.
-8. **T1-240** - F-018: regenerate/check `PROJECT_MAP.md`.
-9. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
+1. **T1-234** - F-001/F-004: eslint cleanup sweep.
+2. **T1-235** - F-008: review `core/` `Date.now` / `Math.random` per site.
+3. **T1-236** - F-013: route inline ID generators through `generateId()` where appropriate.
+4. **T1-237** - firmware adapter wiring remains deferred/multi-week.
+5. **T1-238** - F-016: no-skip exported-symbol audit.
+6. **T1-239** - F-017: hook dependency triage.
+7. **T1-240** - F-018: regenerate/check `PROJECT_MAP.md`.
+8. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
 
 ## Known Caveats
 
@@ -73,4 +73,4 @@ Continue in this order unless a newer owner instruction says otherwise:
 
 ## Current Ticket Note
 
-T1-232 routed the remaining production diagnostic breadcrumbs through `src/core/logging/StructuredDiagnosticLog.ts`. Its verification is pinned by `tests/production-console-log-structured.test.ts`.
+T1-233 tightened WebSerial error boundaries so non-`Error` reader/writer failures keep useful diagnostics. Its verification is pinned by `tests/webserial-unknown-catch.test.ts`.

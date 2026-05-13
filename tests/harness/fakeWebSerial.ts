@@ -46,7 +46,7 @@ export class FakeSerialPort implements SerialPort {
   private readErrored = false;
   private opened = false;
   private writeCount = 0;
-  private rejectWriteError: Error | null = null;
+  private rejectWriteError: unknown = null;
   private closeAfterWriteCount: number | null = null;
   private readonly timers = new Set<TimerHandle>();
   private readonly decoder = new TextDecoder();
@@ -102,10 +102,14 @@ export class FakeSerialPort implements SerialPort {
   }
 
   scheduleReaderError(message: string, atVirtualMs = 0): void {
+    this.scheduleReaderFault(new Error(message), atVirtualMs);
+  }
+
+  scheduleReaderFault(reason: unknown, atVirtualMs = 0): void {
     this.schedule(() => {
       if (!this.readController || this.readClosed || this.readErrored) return;
       this.readErrored = true;
-      this.readController.error(new Error(message));
+      this.readController.error(reason);
     }, atVirtualMs);
   }
 
@@ -119,6 +123,10 @@ export class FakeSerialPort implements SerialPort {
 
   rejectNextWrite(reason: string | Error): void {
     this.rejectWriteError = errorFrom(reason);
+  }
+
+  rejectNextWriteFault(reason: unknown): void {
+    this.rejectWriteError = reason;
   }
 
   closeAfterWrites(writeCount: number): void {
@@ -153,7 +161,7 @@ export class FakeSerialPort implements SerialPort {
     const bytes = cloneBytes(chunk);
     this.writeCount++;
 
-    if (this.rejectWriteError) {
+    if (this.rejectWriteError !== null) {
       const error = this.rejectWriteError;
       this.rejectWriteError = null;
       throw error;

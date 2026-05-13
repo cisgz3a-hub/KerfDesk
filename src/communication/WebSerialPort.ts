@@ -112,7 +112,7 @@ export class WebSerialPort implements SerialPortLike {
       this._isOpen = true;
       this._attachNavigatorDisconnectListener(port);
       this._startReadLoop();
-    } catch (e) {
+    } catch (e: unknown) {
       // Unwind in reverse order. Each unwind step is best-effort; we
       // don't want one failing cleanup to mask the original error.
       if (reader) {
@@ -133,7 +133,7 @@ export class WebSerialPort implements SerialPortLike {
       if (signal?.aborted) {
         throw new Error('Connection aborted by user');
       }
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = messageFromUnknownError(e);
       throw new Error(`Failed to open serial port: ${msg}`);
     }
   }
@@ -222,7 +222,7 @@ export class WebSerialPort implements SerialPortLike {
       this._isOpen = true;
       this._attachNavigatorDisconnectListener(port);
       this._startReadLoop();
-    } catch (e) {
+    } catch (e: unknown) {
       if (reader) {
         try { await reader.cancel(); } catch { /* ignore */ }
         try { reader.releaseLock(); } catch { /* ignore */ }
@@ -241,7 +241,7 @@ export class WebSerialPort implements SerialPortLike {
       if (signal?.aborted) {
         throw new Error('Connection aborted by user');
       }
-      const msg = e instanceof Error ? e.message : String(e);
+      const msg = messageFromUnknownError(e);
       throw new Error(`Failed to open serial port: ${msg}`);
     }
   }
@@ -310,15 +310,15 @@ export class WebSerialPort implements SerialPortLike {
     if (!this._isOpen || !this._writer) throw new Error('Port is not open');
     const encoder = new TextEncoder();
     // Don't await — fire and forget for streaming performance
-    this._writer.write(encoder.encode(data)).catch((e: Error) => {
-      this._errorCallback?.(e);
+    this._writer.write(encoder.encode(data)).catch((e: unknown) => {
+      this._errorCallback?.(errorFromUnknownError(e));
     });
   }
 
   writeByte(byte: number): void {
     if (!this._isOpen || !this._writer) throw new Error('Port is not open');
-    this._writer.write(new Uint8Array([byte])).catch((e: Error) => {
-      this._errorCallback?.(e);
+    this._writer.write(new Uint8Array([byte])).catch((e: unknown) => {
+      this._errorCallback?.(errorFromUnknownError(e));
     });
   }
 
@@ -529,9 +529,9 @@ export class WebSerialPort implements SerialPortLike {
           }
         }
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (this._readLoopActive) {
-        this._errorCallback?.(new Error(`Read error: ${e.message}`));
+        this._errorCallback?.(new Error(`Read error: ${messageFromUnknownError(e)}`));
       }
     }
 
@@ -558,6 +558,20 @@ function extractFingerprint(port: SerialPort): DeviceFingerprint {
   } catch {
     return {};
   }
+}
+
+export function messageFromUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  try {
+    return String(error);
+  } catch {
+    return 'Unknown error';
+  }
+}
+
+function errorFromUnknownError(error: unknown): Error {
+  return error instanceof Error ? error : new Error(messageFromUnknownError(error));
 }
 
 /**
