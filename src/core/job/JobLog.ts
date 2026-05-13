@@ -3,6 +3,7 @@
  * for post-job review and "why did this fail?" debugging.
  */
 import { getStorage } from '../storage/storage';
+import { generateId } from '../types';
 
 export interface JobLogEntry {
   timestamp: number;    // Date.now()
@@ -84,7 +85,7 @@ export function createJobLog(
   startPosition: { x: number; y: number },
 ): JobLog {
   return {
-    id: `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: `job_${generateId()}`,
     startedAt: new Date().toISOString(),
     completedAt: null,
     status: 'running',

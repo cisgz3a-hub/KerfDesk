@@ -14,6 +14,7 @@
  */
 
 import { getStorage } from '../storage/storage';
+import { generateId } from '../types';
 
 export interface StarterPreset {
   name: string;
@@ -523,7 +524,7 @@ export function createUserMaterialFromLayer(
 
   const now = new Date().toISOString();
   return {
-    id: `user_mat_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `user_mat_${generateId()}`,
     name,
     category,
     thickness,
@@ -604,7 +605,7 @@ export function importUserMaterials(jsonString: string): number {
       }
 
       const idBase = typeof m.id === 'string' ? m.id : `import_${imported}`;
-      const newId = existingIds.has(idBase) ? `user_mat_${Date.now()}_${imported}_${Math.random().toString(36).slice(2, 5)}` : idBase;
+      const newId = existingIds.has(idBase) ? `user_mat_${imported}_${generateId()}` : idBase;
       existingIds.add(newId);
 
       const newMat: UserStarterMaterial = {

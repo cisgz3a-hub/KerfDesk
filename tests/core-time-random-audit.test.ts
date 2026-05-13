@@ -23,16 +23,10 @@ interface Occurrence {
 }
 
 const expectedCounts: Record<string, Partial<Record<Token, number>>> = {
-  'src/core/devices/DeviceProfile.ts': { 'Date.now': 1, 'Math.random': 1 },
-  'src/core/job/JobLog.ts': { 'Date.now': 5, 'Math.random': 1 },
+  'src/core/job/JobLog.ts': { 'Date.now': 4 },
   'src/core/job/ticketHashing.ts': { 'Date.now': 1, 'Math.random': 1 },
   'src/core/logging/StructuredDiagnosticLog.ts': { 'Date.now': 2 },
-  'src/core/materials/CalibrationAnalyzer.ts': { 'Date.now': 1 },
-  'src/core/materials/MaterialLibrary.ts': { 'Date.now': 1 },
-  'src/core/materials/MaterialPresets.ts': { 'Date.now': 2, 'Math.random': 2 },
-  'src/core/materials/MaterialSettingConfidence.ts': { 'Date.now': 1 },
-  'src/core/replay/JobReplay.ts': { 'Date.now': 3, 'Math.random': 1 },
-  'src/core/scene/SceneOps.ts': { 'Date.now': 1 },
+  'src/core/replay/JobReplay.ts': { 'Date.now': 2 },
   'src/core/types.ts': { 'Date.now': 1, 'Math.random': 1 },
 };
 
@@ -43,13 +37,6 @@ const deterministicPathFiles = [
   'src/core/plan/PlanOptimizer.ts',
   'src/core/plan/MachineTransform.ts',
 ];
-
-const deferredInlineIdFiles = new Set([
-  'src/core/devices/DeviceProfile.ts',
-  'src/core/job/JobLog.ts',
-  'src/core/materials/MaterialPresets.ts',
-  'src/core/replay/JobReplay.ts',
-]);
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -142,7 +129,7 @@ test('critical random ID surfaces keep deterministic-mode guards', () => {
   assert.match(ticketHashing, /return `tkt_det_\$\{String\(ticketSeq\)\.padStart\(6, '0'\)\}`/);
 });
 
-test('remaining Math.random ID generators are isolated for T1-236', () => {
+test('Math.random is centralized behind deterministic-aware helpers', () => {
   const randomFiles = new Set(
     occurrences
       .filter(occurrence => occurrence.token === 'Math.random')
@@ -151,5 +138,5 @@ test('remaining Math.random ID generators are isolated for T1-236', () => {
 
   randomFiles.delete('src/core/types.ts');
   randomFiles.delete('src/core/job/ticketHashing.ts');
-  assert.deepEqual(randomFiles, deferredInlineIdFiles);
+  assert.deepEqual(randomFiles, new Set());
 });

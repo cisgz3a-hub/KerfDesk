@@ -16,6 +16,7 @@ import {
   LEGACY_FOOTER_BODY__WITH_BEEP,
 } from '../plan/GcodeTemplates';
 import { getStorage } from '../storage/storage';
+import { generateId } from '../types';
 import { validateProfile, type ProfileValidationIssue } from './validateProfile';
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
@@ -455,7 +456,7 @@ export function getActiveProfile(): DeviceProfile | null {
 /** Create a new blank profile */
 export function createBlankProfile(name: string): DeviceProfile {
   return {
-    id: `dev_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: `dev_${generateId()}`,
     name,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),

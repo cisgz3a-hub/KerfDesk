@@ -1,4 +1,5 @@
 import type { LaserSettings, Layer, LayerMode } from '../scene/Layer';
+import { generateId } from '../types';
 import type { MaterialOperation, MaterialPreset } from './MaterialPreset';
 import { isDefaultMaterialPresetId } from './defaultPresets';
 
@@ -108,7 +109,7 @@ export function buildUserSavedPresetFromLayer(
   layer: Layer,
   args: SaveLayerSettingsAsUserPresetArgs,
 ): MaterialPreset {
-  const id = args.id ?? `preset-user-${Math.max(0, Math.floor(args.nowMs ?? Date.now()))}`;
+  const id = args.id ?? `preset-user-${args.nowMs != null ? Math.max(0, Math.floor(args.nowMs)) : generateId()}`;
   return {
     id,
     name: args.name,

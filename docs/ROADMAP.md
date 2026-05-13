@@ -7035,6 +7035,31 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `49ed6bb2`. Hardware verification not required; this is source-level determinism review coverage only and does not alter G-code, controller commands, or machine state.
 
 ---
+### T1-236 | Route inline core ID generators through generateId
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-013, plus T1-235's per-site review.
+
+**Problem:** Several `src/core/` factories duplicated `Date.now() + Math.random()` ID formulas instead of using the shared deterministic-aware `generateId()` helper. In normal use this only produced unique IDs, but in deterministic test mode these IDs stayed random while scene/job IDs generated through `generateId()` became stable.
+
+**Fix:** Routed device profile, job log, replay, user-material, response-curve, default-preset copy, layer-saved preset, and duplicate-object clone IDs through `generateId()` while preserving their user-facing prefixes (`dev_`, `job_`, `replay_`, `user_mat_`, `resp_`, `preset-user-`, and `obj-copy-...`). Explicit preset IDs and the historical `nowMs` override remain honored. T1-235's audit guard now shows `Math.random()` centralized behind `generateId()` / `generateTicketId()` only.
+
+**Verification:**
+- `npx tsx tests\core-inline-id-generators.test.ts`
+- `npx tsx tests\core-time-random-audit.test.ts`
+- `npx tsx tests\deterministic-ids.test.ts`
+- `npx tsx tests\device-profile-basic-api.test.ts`
+- `npx tsx tests\materials.test.ts`
+- `npx tsx tests\material-library-storage.test.ts`
+- `npx tsx tests\calibration-analyzer.test.ts`
+- `npx tsx tests\job-outcome-enum-failed-to-start.test.ts`
+- `npx tsx tests\job-replay-capture-not-gated.test.ts`
+- `npx tsx tests\job-log-quota.test.ts`
+- `npx tsx tests\dirty-derivation.test.ts`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is deterministic ID plumbing and does not change controller commands, emitted G-code, or machine state.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20894,6 +20919,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-233 LOW type WebSerialPort catch paths as unknown (shipped in 3c82189) - closes audit F-002 by normalizing non-Error WebSerial read/write failures without `any` catch typing.
 - [x] T1-234 LOW eslint cleanup sweep (shipped in 10cd1bab) - closes audit F-001/F-004 by renaming the hook-shaped SVG helper and removing stale `no-explicit-any` disable directives while keeping intentional `any` boundaries documented.
 - [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in 49ed6bb2) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
+- [x] T1-236 INFO route inline core ID generators through `generateId()` (shipped in `<TBD>`) - closes audit F-013 by centralizing core factory ID randomness behind deterministic-aware helpers while preserving existing prefixes.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

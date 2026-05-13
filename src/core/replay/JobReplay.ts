@@ -4,6 +4,7 @@
  * Used for debugging failed jobs and feeding the self-learning material system.
  */
 import { getStorage } from '../storage/storage';
+import { generateId } from '../types';
 
 export interface JobReplayEntry {
   timestamp: number;    // ms since job start
@@ -59,7 +60,7 @@ export function createReplay(
   estimatedMs: number | null,
 ): JobReplay {
   return {
-    id: `replay_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: `replay_${generateId()}`,
     startedAt: new Date().toISOString(),
     completedAt: null,
     status: 'running',

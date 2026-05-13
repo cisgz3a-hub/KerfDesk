@@ -1,7 +1,7 @@
 import type { MaterialPreset, MaterialOperation } from './MaterialPreset';
 import { getDefaultMaterialPresets, isDefaultMaterialPresetId } from './defaultPresets';
 import { type Layer, type LaserSettings, type LayerMode } from '../scene/Layer';
-import { MAX_LASER_SPEED } from '../types';
+import { MAX_LASER_SPEED, generateId } from '../types';
 import { getDeviceProfiles, saveDeviceProfile, type DeviceProfile } from '../devices/DeviceProfile';
 import { appendStructuredDiagnosticLogEvent } from '../logging/StructuredDiagnosticLog';
 import type { ResponseCurve } from './ResponseCurve';
@@ -105,7 +105,7 @@ export function getPresetById(id: string): MaterialPreset | undefined {
 export function savePreset(preset: MaterialPreset): void {
   let toStore = preset;
   if (isDefaultMaterialPresetId(preset.id)) {
-    toStore = { ...preset, id: `preset-user-${Date.now()}` };
+    toStore = { ...preset, id: `preset-user-${generateId()}` };
   }
   const user = readUserPresets().filter(p => p.id !== toStore.id);
   user.push(toStore);

@@ -316,7 +316,7 @@ export function duplicateObjects(
   for (const obj of scene.objects) {
     if (!objectIds.has(obj.id)) continue;
 
-    const cloneId = `${obj.id}-copy-${Date.now().toString(36)}`;
+    const cloneId = `${obj.id}-copy-${generateId()}`;
     oldToNewId.set(obj.id, cloneId);
     clones.push({
       ...obj,

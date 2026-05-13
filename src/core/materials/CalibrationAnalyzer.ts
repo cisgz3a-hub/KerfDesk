@@ -1,4 +1,5 @@
 import type { CalibrationGridResult } from './CalibrationGrid';
+import { generateId } from '../types';
 import { type ResponseCurve, type ResponseCurvePoint, validateCurve } from './ResponseCurve';
 
 export interface AnalyzePhotoInput {
@@ -140,7 +141,7 @@ export function analyzeCalibrationPhoto(
   if (points.length < 3) return { ok: false, error: 'Fewer than 3 monotonic calibration points survived.' };
 
   const curve: ResponseCurve = {
-    id: `resp_${Date.now()}`,
+    id: `resp_${generateId()}`,
     materialName,
     calibrationSpeed,
     points,
