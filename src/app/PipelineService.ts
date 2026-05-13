@@ -20,9 +20,11 @@ import { getOutputStrategy } from '../core/output/Output';
 import '../core/output/GrblStrategy';
 import { getActiveProfile, type DeviceProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import {
+  applyProfileOverrides,
   grblCapabilities,
   type ControllerCapabilities,
   type OutputFormat as ControllerCapabilityOutputFormat,
+  type ProfileOverrides,
 } from '../controllers/ControllerCapabilities';
 import { expandTextOutlinesForCompile } from '../geometry/expandTextForCompile';
 import { generateTicketId, hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
@@ -188,6 +190,39 @@ function resolveOriginCorner(profile: ReturnType<typeof getActiveProfile>): Mach
     ?? (profile?.invertY === false ? 'rear-left' : 'front-left');
 }
 
+/**
+ * T1-224 / F-011: map the active `DeviceProfile` fields into the
+ * first-class `ControllerCapabilities` model. Pre-T1-224,
+ * `applyProfileOverrides` was tested in isolation but no production
+ * compile path consumed it, so profile-specific authority such as
+ * `homingEnabled`, autofocus support, bed size, and max spindle never
+ * reached the capability model.
+ */
+export function profileToControllerCapabilityOverrides(
+  profile: DeviceProfile | null,
+): ProfileOverrides {
+  if (!profile) return {};
+  return {
+    homingEnabled: profile.homingEnabled,
+    autofocusSupported: profile.autoFocusSupported,
+    bedWidthMm: profile.bedWidth,
+    bedHeightMm: profile.bedHeight,
+    maxPowerValue: profile.maxSpindle,
+  };
+}
+
+/**
+ * Production capability resolver for the pipeline. Callers may pass a
+ * controller-family capability declaration; the active profile then
+ * narrows/overrides the parts that are user/profile authority.
+ */
+export function resolvePipelineControllerCapabilities(
+  profile: DeviceProfile | null,
+  base: ControllerCapabilities = grblCapabilities,
+): ControllerCapabilities {
+  return applyProfileOverrides(base, profileToControllerCapabilityOverrides(profile));
+}
+
 // ─── RESULT TYPES ──────────────────────────────────────────────
 
 export interface CompileGcodeResult {
@@ -320,7 +355,8 @@ export async function compileGcode(
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
   reportPhase(opts, 'text-expansion', 1);
 
-  const outputTarget = resolveOutputTarget(profile, opts.controllerCapabilities ?? grblCapabilities, outputFormat);
+  const controllerCapabilities = resolvePipelineControllerCapabilities(profile, opts.controllerCapabilities ?? grblCapabilities);
+  const outputTarget = resolveOutputTarget(profile, controllerCapabilities, outputFormat);
   const strategy = getOutputStrategy(outputTarget.format);
   if (!strategy) return null;
 
@@ -380,7 +416,9 @@ export async function compileGcode(
   const maxSpindle =
     (controllerMaxSpindle != null && controllerMaxSpindle > 0)
       ? controllerMaxSpindle
-      : (profile?.maxSpindle ?? 1000);
+      : (controllerCapabilities.laser.maxPowerValue > 0
+          ? controllerCapabilities.laser.maxPowerValue
+          : 1000);
 
   // Machine-space data for output. T1-40: bedWidthMm is required when
   // originCorner is front-right or rear-right; we always pass it so
@@ -529,7 +567,8 @@ export async function compileToolpath(
   controllerCapabilities: ControllerCapabilities = grblCapabilities,
 ): Promise<CompileToolpathResult | null> {
   const { scene: sceneForJob, failedTextObjects } = await expandTextOutlinesForCompile(scene);
-  const outputTarget = resolveOutputTarget(profile, controllerCapabilities, outputFormat);
+  const resolvedControllerCapabilities = resolvePipelineControllerCapabilities(profile, controllerCapabilities);
+  const outputTarget = resolveOutputTarget(profile, resolvedControllerCapabilities, outputFormat);
   const strategy = getOutputStrategy(outputTarget.format);
 
   if (failedTextObjects.length > 0) {
