@@ -1,263 +1,76 @@
 # Agent Handoff
 
-This file captures the current continuation state for Claude Code or any other
-AI coding agent that picks up the LaserForge roadmap work without access to the
-chat transcript.
+This file is the current continuation note for Claude Code, Codex, or any other agent resuming LaserForge roadmap work without this chat transcript.
 
 ## Current State
 
 - Branch: `master`.
-- Repo state at handoff: clean; local `master` equals `origin/master`.
-- Current HEAD when this handoff was written: hash-fill commit on top of
-  `25c32c8d` (`feat(safety): T1-202 — inject controller-layer
-  safety-event sink`). Always verify live HEAD with
-  `git log --oneline -1` before editing.
-- Last shipped roadmap item: **T1-202** (controller-layer safety-event
-  sink). This session-arc shipped **41 consecutive audit-driven
-  tickets** (T1-161 → T1-202). T1-198..T1-202 finished wiring every
-  declared `MachineEvent` kind to a production writer: T1-198
-  `safety-off` from `notifyLaserSafetyOutcome`, T1-199 `job-start`
-  + `job-completed`/`job-failed`/`job-stopped` from
-  `startValidatedJob` + `tryFinalizeJobLog`, T1-200 `pause-requested`
-  + `paused-verified` + `resume-requested`, T1-201 `recovery-cleared
-  { acknowledgedBy: 'user' }` from `acknowledgeRecoveryComplete`,
-  T1-202 closes the layered-architecture gap with an injected sink
-  pattern — `GrblController.setSafetyEventSink(sink)` accepts a
-  callback registered from `useControllerConnection.ts` (the `ui/`
-  layer, which is allowed to import `app/`), so `wcs-query-error`
-  and `placement-uncertain` reach the ledger without violating the
-  `controllers/ → app/` reverse-dep rule. The earlier T1-194..T1-196
-  slice shipped the FirmwareAdapter foundation: T1-194
-  `GrblFirmwareAdapter` (emit reuses existing GrblOutputStrategy;
-  stream stubs pending the multi-week MachineService rewire), T1-195
-  `MachineEventLedger` singleton + first 4 production callers
-  (disconnect-while-running, emergency-stop, failed-to-start,
-  burn-envelope-divergence), T1-196 `MarlinFirmwareAdapter` declared-
-  not-supported stub proving the contract works for non-GRBL. The first
-  12 (T1-161 → T1-172) addressed findings from the internal audit
-  (`docs/AUDIT-2026-05-11.md`); the next 11 (T1-173 → T1-182)
-  addressed the external audit (response received 2026-05-11) — both
-  its 5 Critical findings AND its 6 High-severity architectural items:
-  - **Critical** (T1-173 → T1-176): raster overscan as S0 travel,
-    WCS query error fails closed, emergencyStop + disconnect preserve
-    unsafe state, failed-start preserves unsafe state when streamed.
-  - **High** (T1-177 → T1-182): fill silent fallback to outline
-    tracing → thrown error (T1-177); controller numeric validation
-    at the boundary (T1-178); tab gaps use G1 feed not G0 rapid
-    (T1-179); G-code emitter purity (zero-distance suppression +
-    footer-preview state snapshot) (T1-180); compile determinism
-    via entitlement + material-preset hashes attached to the ticket
-    (T1-181); canonical burn-envelope parser for the EMITTED gcode
-    (T1-182).
-  Each ticket landed as a coupled triple. TS baseline 0 errors
-  maintained across every commit. Full Critical / High coverage list:
-  - **T1-173** (external Critical #1): raster overscan as S0 travel.
-    Pre-T1-173 a 3mm overscan engraved 3mm beyond the artwork on every
-    segment edge — the laser fired outside the intended image.
-  - **T1-174** (external Critical #5): WCS query error fails closed.
-    Pre-T1-174 a `$#` error response called `skipWcsNormalization()`
-    which marked placement TRUSTED — saved-origin jobs could start
-    from an unknown WCS offset.
-  - **T1-175** (external Critical #2 + #3): emergencyStop + disconnect-
-    during-job preserve the unsafe-prior-state flag. Pre-T1-175 both
-    paths unconditionally cleared the flag → next launch wouldn't
-    surface a recovery dialog even after E-stop mid-burn.
-  - **T1-176** (external Critical #4): failed-start preserves unsafe-
-    state when ANY streaming evidence exists. Pre-T1-176 the catch
-    cleared the flag based on "exception = job never started" — but
-    if `executeJob` set `_isJobRunning=true` and wrote header lines
-    BEFORE throwing, the recovery flag was lost.
-  Each ticket landed as a coupled triple: code change + regression
-  test + ROADMAP.md entry with verification, followed by the hash-
-  fill commit. TS baseline 0 errors maintained across every commit.
-- Remaining work: every audit finding has either a code fix or a
-  documented foundation/implementation slice. The remaining work is
-  **multi-week implementation arcs** on top of the shipped
-  foundations:
-  - **FirmwareRegistry + ticket migration** — `controllerType:
-    'grbl'` on `ValidatedJobTicket` becomes `firmware:
-    FirmwareAdapter['id']`; `PipelineService.compileGcode` and
-    `MachineService.startValidatedJob` route through the adapter's
-    `emit()` and `stream()`. T1-194 shipped `GrblFirmwareAdapter`;
-    its `emit()` is real but `stream()` is intentionally stubbed
-    pending this wire-up (multi-week).
-  - **Real MarlinAdapter / RuidaAdapter implementations** — T1-196
-    shipped the Marlin contract-validation stub proving the
-    interface works; a real implementation needs a MarlinOutputStrategy
-    + M114 polling protocol + M999 alarm-clear + M150/M151 laser-mode
-    preflight (each adapter is a multi-week PR).
-  - **Wire remaining production sites to MachineEventLedger** —
-    CLEARED. T1-198 wired safety-off; T1-199 wired the full job-*
-    lifecycle (job-start + job-completed + job-failed + job-stopped);
-    T1-200 wired pause-requested + paused-verified + resume-requested;
-    T1-201 wired recovery-cleared with acknowledgedBy='user'; T1-202
-    closed the controllers/ → app/ layering gap with an injected
-    safety-event sink and used it to wire wcs-query-error and
-    placement-uncertain from GrblController. The only deferred
-    discriminant is `recovery-cleared { acknowledgedBy: 'auto' }` —
-    the auto-clear path lives deeper in the runtime recovery state
-    machine and is gated on the per-step-ack call sites landing.
-  - **Full `CompileInputSnapshot` refactor** of `JobCompiler` to
-    remove all global reads (T1-181 ships the detection gate; the
-    compiler still calls `canUseFeature()` / `getActiveProfile()`
-    / `getPresetById()` directly).
-  - **Affine raster sampling** — emitting actual rotated scanlines
-    (T1-187 closes the safety gap with a fail-closed throw today).
-  - **Preview UI rebuild** to consume `ValidatedJobTicket.
-    emittedBurnBounds` from T1-182 + canonical motion stream from
-    `analyzeEmittedBurnEnvelope` — the SimulationRenderer still
-    reads from `Plan`.
+- Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
+- Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
+- Last shipped roadmap item: **T1-231** (handoff refresh, shipped in <TBD>).
+- Current audit-fix run completed: **T1-223 through T1-231**.
+- Next audit-fix ticket: **T1-232** - route the remaining production `console.log` calls through the structured logger (audit F-003).
+- Do not stage `.claude/`; it is local agent state and may be untracked.
 
-  Internal audit findings: ALL CLEARED.
-  Medium / High blocked by integration work: F-002 (Connection-
-  GenerationGuard primitive shipped but never wired), F-004 (T1-22
-  ForceSafeState orchestration — needs hardware), F-018 (T3-57
-  CapabilityMismatchRules unwired), F-050 (diagnostics cluster
-  wiring).
+## What Just Shipped In This Run
 
-## What To Read First
+The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes:
+
+| Ticket | Finding | Status |
+|---|---|---|
+| T1-223 | F-010 | Service-side placement-uncertain gate for Start. |
+| T1-224 | F-011 | Production pipeline now wires profile capability overrides. |
+| T1-225 | F-007 | Scene dirty hash moved from app to core scene. |
+| T1-226 | F-012 | PathOptimizer no longer uses wall-clock budget for emitted order. |
+| T1-227 | F-009 | PreflightContext extracted; rule files no longer import their orchestrator. |
+| T1-228 | F-005 | JobCompiler runtime helpers moved out of plan layer. |
+| T1-229 | F-014 | ROADMAP and shipped-audit backfilled for T1-209..T1-222. |
+| T1-230 | F-006 | Controller shared safety types moved out of app layer. |
+| T1-231 | F-015 | This handoff refreshed so future agents do not resume from T1-202. |
+
+Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
+
+## Read First
 
 1. `CLAUDE.md`
 2. `.cursor/rules/laserforge.md`
-3. `docs/ROADMAP.md`
-4. `docs/ROADMAP-shipped-audit.md`
-5. `PROJECT_MAP.md`
+3. `docs/AGENT_HANDOFF.md` (this file)
+4. `docs/ROADMAP.md`
+5. `docs/ROADMAP-shipped-audit.md`
+6. `docs/AUDIT-2026-05-12.md`
+7. `PROJECT_MAP.md` (currently stale per F-018; do not rely on it without regenerating/checking)
 
-The roadmap is current through T3-43 (first slice). Use the master checklist
-at the bottom of `docs/ROADMAP.md` for current open-ticket counts. Some
-historical "Open" sections in `docs/ROADMAP-shipped-audit.md` are audit
-evidence from 2026-04-30 and must not be treated as current planning counts —
-the planning note at the top of that file (commit `bcd31c2`) explains.
+## Verification Baseline
 
-## T3-43 / T3-44 — what shipped, what was deferred
+- `npx tsc --noEmit --pretty false` passed during the T1-223..T1-231 run.
+- Focused tests for T1-223 through T1-231 passed at their commits.
+- Full `npm test` currently times out under F-019. Do not report full-suite green until F-019 is fixed.
+- `tests/end-to-end-workflows/end-to-end-workflows.test.ts` passes when run directly, but the full runner can hang waiting on it.
+- `npm run project-map:check` was stale under F-018 before this run; regenerate/check when reaching T1-240.
+- Dependabot PRs must not be merged blindly; previous local test-merge attempts could not be safely verified.
 
-**T3-43** first slice covers four of the five T3-43 categories using pure
-capability fixtures plus the existing operation gate (`canExecuteOperation`
-/ T2-40):
+## Next Audit-Fix Queue
 
-- Operation routing (T2-26): `GrblController.operations.{jog,home,unlockAlarm,
-  frame,testFire,laserOff}` source-pinned as semantic methods.
-- Capability gating (T2-25): per-family allow/refuse decisions across GRBL,
-  Marlin-shape, Ruida-shape, file-upload, and no-output fixtures.
-- Output-format gating (T2-29): `job-start` refuses when no executable output
-  is advertised.
-- Profile-override propagation (T2-25): `applyProfileOverrides` flips
-  capability decisions without mutating static capabilities.
-- GRBL regression: `grblCapabilities` still advertises gcode-text/line-stream/
-  M3+M4/M5/ok-line and the full operator operations set.
+Continue in this order unless a newer owner instruction says otherwise:
 
-T3-43 deferred: profile / controller-family transport mismatch (T2-30 Falcon
-WiFi as real transport — still blocked on real WiFi controller plumbing) and
-live `FakeMarlinController` / `FakeBinaryController` production stubs (the
-capability fixtures cover the contract surface without duplicating controller
-plumbing; add only when a non-GRBL controller actually ships).
+1. **T1-232** - F-003: route 3 production `console.log` calls through structured logging.
+2. **T1-233** - F-002: type `WebSerialPort` catch paths as `unknown`.
+3. **T1-234** - F-001/F-004: eslint cleanup sweep.
+4. **T1-235** - F-008: review `core/` `Date.now` / `Math.random` per site.
+5. **T1-236** - F-013: route inline ID generators through `generateId()` where appropriate.
+6. **T1-237** - firmware adapter wiring remains deferred/multi-week.
+7. **T1-238** - F-016: no-skip exported-symbol audit.
+8. **T1-239** - F-017: hook dependency triage.
+9. **T1-240** - F-018: regenerate/check `PROJECT_MAP.md`.
+10. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
 
-**T3-44** first slice ships only the type foundation in
-`src/controllers/JobProgressMultiDomain.ts`: `JobPhase`, `ProgressUnit`,
-`GrblHealth`, `MultiDomainJobProgress`, plus three constructors / converters
-(`toMultiDomainGrblProgress` losslessly maps the legacy GRBL shape;
-`makeUploadProgress` builds the `unit:'byte'` upload shape with input
-clamping; `makeDeviceReportedProgress` builds the Ruida-style
-`unit:'device-reported'` shape with percentComplete clamped to [0, 100]) and
-type-narrowing guards (`hasGrblHealth`, `hasCountProgress`, `isActivePhase`,
-`isTerminalPhase`). The module is intentionally type-only — the test file
-source-pins that it does not import from `GrblController` or `MachineService`.
+## Known Caveats
 
-T3-44 deferred: migrating `GrblController` progress emission to the
-multi-domain shape, threading the new shape through
-`MachineService.onProgress` callbacks, and replacing UI rendering in
-`ConnectionPanel` / `Progress.tsx` to gate the GRBL-health panel on
-`hasGrblHealth(progress)`. Same gating rule as T3-43: do these only when a
-non-GRBL controller actually ships, and file each as a fresh T3-44
-follow-up commit rather than re-opening the master-checklist line.
+- Hardware verification is still required before release tagging for live laser paths called out in ROADMAP and shipped-audit rows.
+- The T1-229 backfill recorded several already-shipped live UI/safety tickets; it did not newly hardware-verify them.
+- The T1-230 type move kept compatibility wrappers at `src/app/SafetyActionResult.ts` and `src/app/MachineSafetyState.ts`; do not remove those wrappers until all old app/UI/tests imports are intentionally migrated.
+- The trace-storm diagnostic probe row still contains a historical `<TBD>` note in `docs/ROADMAP-shipped-audit.md`; do not treat that as the active audit queue.
 
-## Continuation Notes
+## Current Ticket Note
 
-- Do not merge Dependabot PRs blindly. Most open Dependabot PRs had failing
-  checks at the prior handoff.
-- Dependabot PR #3 was green on GitHub, but a local no-commit test merge was
-  aborted because full `npm test` timed out, and a direct run of
-  `tests/end-to-end-workflows/end-to-end-workflows.test.ts` also timed out.
-- On clean `master`, `npm ci` completed and
-  `npx tsc --noEmit --pretty false` passed.
-
-## What's blocked and why
-
-After this session's run, the remaining open lines on the master
-checklist all hit a real blocker. A future session that wants to
-make further progress needs one of the following inputs:
-
-**Hardware verification (10 T1 tickets):** T1-17, T1-28, T1-31,
-T1-34, T1-36, T1-39, T1-40, T1-41, T1-42, T1-51. Each has code
-shipped and pinned by tests; the close-out gate is a Falcon A1 Pro
-burn / connect / frame test that a software-only agent cannot
-perform.
-
-**Hardware investigation required:** T2-30 Falcon WiFi as real
-controller, T3-17 Wi-Fi safety model, T3-12 hardware-in-the-loop
-test framework. These need someone to capture the real Falcon WiFi
-protocol (HTTP + WebSocket message shapes, file-upload semantics,
-progress callbacks) on real hardware before any production code
-can land safely.
-
-**External / business decisions:** T3-4 (code-signing certs from
-Apple / Microsoft), T3-84 (Linux packaging — explicit "defer until
-business decides"), T3-85 (release-time installer QA matrix),
-T2-95 (real trial model — gated on monetization decision).
-
-**Multi-week refactor:** T2-6 App.tsx file split (still 1987 lines
-after 19 phases). Each remaining phase is a discrete extraction
-that needs careful before/after verification — not safe to ship
-quickly. T3-34 (stripe-based raster) depends on the live emitter
-migration of T3-15 (multi-week itself).
-
-## Expected Next Step
-
-Pick one of the blockers above with the right input, or take a
-T2/T3 follow-up not in the master checklist (e.g., wire the
-T3-91 banner into `ConnectionPanelMain`, or wire the T3-90
-Settings UI checkbox).
-
-## Hardware verification still owed before release tagging
-
-- T3-48 device-reuse flow: connect, disconnect, reconnect on
-  Falcon A1 Pro; confirm second connect prompt is not shown.
-- T3-50 device identity capture: confirm `[VER:1.1h:]` parses on
-  the real Falcon and `getDeviceIdentity()` returns expected
-  fields after a real connect.
-- T3-55 Falcon autofocus firmware gate: once a profile-load
-  caller threads the live firmware version through, confirm
-  autofocus is correctly gated on a known-old firmware build.
-- T3-90 auto-M5: enable `autoM5OnConnect` in a profile, connect,
-  and confirm M5 lands shortly after the first idle status.
-
-## Foundation slices shipped without caller migration
-
-Many of this session's slices landed only the contract surface
-(types + comparators + selectors + helpers) with explicit caller-
-migration follow-ups deferred. Watch for those in future sessions:
-
-  - T3-44 progress emission: `GrblController` emit + UI render.
-  - T3-46 split-profile storage migration when a non-GRBL
-    profile lands.
-  - T3-50 mandatory-fail handshake when T2-32 ConnectionManager
-    lands.
-  - T3-51 IdentitySnapshot persistence + ConnectionManager wiring.
-  - T3-55 profile-load callers thread live firmware version.
-  - T3-57 `runPreflight` threads `getDeviceIdentity` through
-    `PreflightContext`.
-  - T3-83 signed-token / clock-rollback / monkey-patch defenses
-    once T2-90 / T2-91 / T2-94 ship.
-  - T3-86 Playwright runner once T2-98 CI runners land.
-  - T3-87 wire selectors into `JobLog.ts` / `JobReplay.ts`.
-  - T3-88 behavioral end-to-end fuzz once T2-122 typed-IPC.
-  - T3-89 dedicated `.github/workflows/security-checks.yml` once
-    T2-99 / T2-100 release signing infrastructure ships.
-  - T3-90 Settings UI checkbox + explanatory text in the
-    device-profile editor.
-  - T3-91 wire `<UnsafeAtConnectBanner>` into `ConnectionPanelMain`
-    and the recovery-action handler dispatcher.
-  - T3-24 bundled calibrated curves once a contributor with
-    real material data submits via the now-shipped pipeline.
-  - T3-15 live emitter / ticket / controller / preview
-    migration to `AsyncIterable<GcodeChunk>` (multi-week each).
+T1-231 is this handoff refresh. Its verification is pinned by `tests/agent-handoff-current-state.test.ts`.
