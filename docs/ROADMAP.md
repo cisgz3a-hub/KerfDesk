@@ -7060,6 +7060,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `fe7b4bc4`. Hardware verification not required; this is deterministic ID plumbing and does not change controller commands, emitted G-code, or machine state.
 
 ---
+### T1-238 | Finish no-skip exported-symbol audit inventory
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-016 and `docs/AUDIT.md` Phase 4.
+
+**Problem:** Claude's sealed 2026-05-12 audit was useful but risk-weighted, not the literal no-skip function-level pass required by the master audit prompt. Live verification found 2,622 exported symbols across 481 `src/` and `electron/` files, while the dated audit's Phase 4 table covered only the hot-path slice. Without a durable inventory, future agents could call the audit "full" while entire exported surfaces remained absent from the checklist.
+
+**Fix:** Added `scripts/exported-symbol-inventory.mjs`, a TypeScript-AST inventory generator/checker, and generated `docs/AUDIT-EXPORTED-SYMBOL-INVENTORY.md` with one row per live exported symbol. Each row carries the file, line, export kind, audit-domain bucket, review posture, and test-evidence hint. Added `tests/exported-symbol-inventory.test.ts` so the inventory fails when future exports are added without refreshing the checklist. The wording deliberately stays honest: T1-238 closes the no-skip inventory gap, not a claim that every symbol has already received a full manual control-flow/data-flow/taint/trust-boundary deep review.
+
+**Verification:**
+- `node scripts\exported-symbol-inventory.mjs --check`
+- `npx tsx tests\exported-symbol-inventory.test.ts`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is audit documentation/tooling only.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20920,6 +20936,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-234 LOW eslint cleanup sweep (shipped in 10cd1bab) - closes audit F-001/F-004 by renaming the hook-shaped SVG helper and removing stale `no-explicit-any` disable directives while keeping intentional `any` boundaries documented.
 - [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in 49ed6bb2) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
 - [x] T1-236 INFO route inline core ID generators through `generateId()` (shipped in fe7b4bc4) - closes audit F-013 by centralizing core factory ID randomness behind deterministic-aware helpers while preserving existing prefixes.
+- [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `<TBD>`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
