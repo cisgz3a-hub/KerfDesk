@@ -320,7 +320,6 @@ export function deserializeSceneWithReport(json: string): ProjectLoadReport {
  * provide the runtime check). The `any` documents that this function
  * is the disk-shape ↔ in-memory-shape conversion seam.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): Scene {
   const s = parsed.scene;
   if (!s || typeof s !== 'object') {
@@ -367,9 +366,7 @@ function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): S
     // `any` annotation on the map callback isn't a sloppy widening
     // — `s.layers` / `s.objects` ARE unknown at this point; the
     // restore helpers' documented `any` contract takes over here.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     layers: (s.layers as unknown[]).map((l: any) => restoreLayerDefaults(l)),
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     objects: (s.objects as unknown[]).map((o: any) => decodeImageBuffers(restoreObjectDefaults(o))),
     material: s.material ?? null,
     startPosition: s.startPosition ?? { x: 0, y: 0 },
@@ -536,7 +533,6 @@ function mergeLayerSettings(raw: unknown, fallbackMode: LayerMode): LaserSetting
 // defaults. The function fills in missing / wrongly-typed fields
 // from the file with safe values, so the input must allow
 // arbitrary partial / malformed shapes.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function restoreLayerDefaults(l: any): Layer {
   const fallbackMode = (l.settings?.mode as LayerMode) || 'cut';
   return {
@@ -566,7 +562,6 @@ function migrateGeometry(geom: unknown): Geometry {
 // restoreLayerDefaults. The input is a SceneObject as it appeared
 // in the parsed JSON; defaults fill in missing / wrongly-typed
 // fields. The `any` documents the file-format-flexibility contract.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function restoreObjectDefaults(o: any): SceneObject {
   return {
     id: o.id,
@@ -614,7 +609,6 @@ function stripObjectCache(obj: SceneObject): Omit<SceneObject, '_bounds' | '_wor
  * kind — out of scope for T1-190 (the audit asked for cleanup of
  * AVOIDABLE `any`, not a full file-format type rewrite).
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function encodeImageBuffers(obj: any): any {
   if (obj.geometry?.type === 'image') {
     const geom = { ...obj.geometry };
@@ -641,7 +635,6 @@ function encodeImageBuffers(obj: any): any {
  * disk-shape ↔ runtime-shape seam; `any` is deliberate for the same
  * reason. See encodeImageBuffers for the rationale.
  */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function decodeImageBuffers(obj: any): any {
   if (obj.geometry?.type === 'image') {
     const geom = obj.geometry;

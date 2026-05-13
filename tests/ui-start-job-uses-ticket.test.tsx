@@ -34,17 +34,12 @@ import type { AABB } from '../src/core/types';
 
 const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { url: 'http://localhost' });
 const win = dom.window;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).window = win;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).document = win.document;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 if (typeof (globalThis as any).requestAnimationFrame !== 'function') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
     setTimeout(() => cb(0), 0) as unknown as number;
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 let passed = 0;
@@ -290,7 +285,6 @@ async function run(): Promise<void> {
 
   const startCalls: StartArgs[] = [];
   const realStart = machineService.startValidatedJob.bind(machineService);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (machineService as any).startValidatedJob = async (args: StartArgs) => {
     startCalls.push(args);
     return realStart(args);
@@ -383,7 +377,6 @@ async function run(): Promise<void> {
   const machineService2 = new MachineService(controllerRef2, portRef2);
   const startCalls2: StartArgs[] = [];
   const realStart2 = machineService2.startValidatedJob.bind(machineService2);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (machineService2 as any).startValidatedJob = async (args: StartArgs) => {
     startCalls2.push(args);
     return realStart2(args);
@@ -424,7 +417,6 @@ async function run(): Promise<void> {
   const machineService3 = new MachineService(controllerRef3, portRef3);
   const startCalls3: StartArgs[] = [];
   const realStart3 = machineService3.startValidatedJob.bind(machineService3);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (machineService3 as any).startValidatedJob = async (args: StartArgs) => {
     startCalls3.push(args);
     return realStart3(args);

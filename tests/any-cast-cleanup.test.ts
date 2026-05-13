@@ -26,7 +26,7 @@
  *      `classList`/`clientHeight`/etc that xmldom omits). The `any`
  *      here documents that real type-system limitation — it's not a
  *      sloppy cast, it's a deliberate bridge between two DOM libs.
- *      → Kept as `any` with an eslint-disable line + a doc comment.
+ *      → Kept as `any` with a doc comment. T1-234 removed the stale eslint-disable line because no-explicit-any is not enabled.
  *
  * Run: npx tsx tests/any-cast-cleanup.test.ts
  */
@@ -98,11 +98,11 @@ console.log('\n=== T1-185 any-cast cleanup (audit F-034 + F-048) ===\n');
   const src = readFileSync(resolve(here, '../src/import/svg/SvgParser.ts'), 'utf-8');
   assert(/T1-185/.test(src), 'SvgParser.ts carries T1-185 marker');
   assert(/audit F-048/.test(src), 'SvgParser.ts cross-references audit F-048');
-  // The `any` is now ESLint-disabled with an explicit annotation
-  // documenting the lib.dom / xmldom incompatibility.
+  // The `any` remains documented, but T1-234 removed the unused
+  // eslint-disable directive because no-explicit-any is not enabled.
   assert(
-    /eslint-disable-next-line @typescript-eslint\/no-explicit-any/.test(src),
-    'SvgParser.ts disables the no-explicit-any rule on the documented line',
+    !/eslint-disable-next-line @typescript-eslint\/no-explicit-any/.test(src),
+    'SvgParser.ts no longer carries an unused no-explicit-any disable',
   );
   assert(
     /xmldom|@xmldom\/xmldom/.test(src),

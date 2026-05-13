@@ -26,11 +26,8 @@ import { ConnectionPanelMain } from '../src/ui/components/ConnectionPanelMain';
 
 const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { url: 'http://localhost' });
 const win = dom.window;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).window = win;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).document = win.document;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 let passed = 0;

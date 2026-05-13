@@ -21,12 +21,10 @@
  *
  *   4. `buildSceneFromParsedEnvelope`, `restoreLayerDefaults`,
  *      `restoreObjectDefaults`, `encodeImageBuffers`, `decodeImageBuffers`:
- *      KEEP `any` with `// eslint-disable-next-line ...no-explicit-any`
- *      AND a documenting comment naming F-036 and explaining why
+ *      KEEP `any` with documenting comments naming F-036 and explaining why
  *      the boundary is structurally `any` (file-format flexibility,
- *      partial / malformed shape tolerance). Same pattern as T1-185's
- *      SvgParser bridge — the `any` is the intentional seam, the
- *      comment makes that intent explicit.
+ *      partial / malformed shape tolerance). T1-234 removed the stale
+ *      no-explicit-any disable comments because that rule is not enabled.
  *
  * Run: npx tsx tests/scene-serializer-typed-boundaries.test.ts
  */
@@ -95,9 +93,11 @@ const src = readFileSync(resolve(here, '../src/io/SceneSerializer.ts'), 'utf-8')
   );
 }
 
-// -------- 5. Each remaining `any` is documented + eslint-disabled --------
+// -------- 5. Each remaining `any` is documented --------
 {
-  // Find every `: any` and check the preceding line has the eslint-disable comment.
+  // Find every `: any` and check nearby comments still explain why the
+  // boundary is intentional. T1-234 removes stale eslint disables, but it
+  // does not remove the rationale that made the remaining any safe to keep.
   const lines = src.split('\n');
   const undocumentedAny: string[] = [];
   for (let i = 0; i < lines.length; i++) {
@@ -108,28 +108,23 @@ const src = readFileSync(resolve(here, '../src/io/SceneSerializer.ts'), 'utf-8')
     if (!/:\s*any(\b|<)/.test(line)) continue;
     // Skip lines where `any` is in a string literal.
     if (/['"`].*:\s*any.*['"`]/.test(line)) continue;
-    // Look for the eslint-disable on the previous non-blank line.
-    let prev = i - 1;
-    while (prev >= 0 && lines[prev].trim().length === 0) prev--;
-    const prevLine = prev >= 0 ? lines[prev] : '';
-    if (!/eslint-disable-next-line.*no-explicit-any/.test(prevLine)) {
+    const windowStart = Math.max(0, i - 12);
+    const windowEnd = Math.min(lines.length, i + 3);
+    const nearby = lines.slice(windowStart, windowEnd).join('\n');
+    if (!/(T1-190|F-036|disk-shape|file-format|partial \/ malformed|unknown\[\])/.test(nearby)) {
       undocumentedAny.push(`line ${i + 1}: ${trimmed}`);
     }
   }
   assert(
     undocumentedAny.length === 0,
-    `every executable-code \`any\` is preceded by eslint-disable (undocumented: ${undocumentedAny.join('; ')})`,
+    `every executable-code \`any\` has nearby rationale (undocumented: ${undocumentedAny.join('; ')})`,
   );
 }
 
-// -------- 6. eslint-disable annotations carry F-036 + T1-190 context nearby --------
+// -------- 6. stale no-explicit-any disables are gone --------
 {
-  // Pre-T1-190 a bare `any` had no rationale; post-T1-190 each
-  // disable-next-line annotation should appear NEAR a comment that
-  // mentions T1-190 or F-036 (so future readers can find the audit
-  // context without grepping).
   const disableCount = (src.match(/eslint-disable-next-line.*no-explicit-any/g) ?? []).length;
-  assert(disableCount >= 4, `at least 4 eslint-disable annotations (got ${disableCount})`);
+  assert(disableCount === 0, `no stale no-explicit-any disables remain (got ${disableCount})`);
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

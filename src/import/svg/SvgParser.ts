@@ -104,7 +104,6 @@ export function parseSvg(svgString: string, options?: ParseSvgOptions): SvgParse
   // Casting through `any` lets the runtime-compatible subset flow
   // through both code paths. Pre-T1-185 this had no comment; the
   // audit asked for cleanup but the constraint is structural.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let doc: any;
   try {
     doc = new DOMParser().parseFromString(svgString, 'image/svg+xml');
@@ -366,7 +365,7 @@ function resolveUseElement(
   const referenced = definitions.get(refId);
   if (!referenced) return;
 
-  const translatedTransform = multiplyMatrix(useTransform, usePositionTransform(useNode));
+  const translatedTransform = multiplyMatrix(useTransform, positionTransformForUseElement(useNode));
   visitSvgElement(
     referenced,
     translatedTransform,
@@ -448,7 +447,7 @@ function getUseReferenceId(node: Element): string | null {
   return urlMatch ? urlMatch[1] : null;
 }
 
-function usePositionTransform(node: Element): Matrix3x2 {
+function positionTransformForUseElement(node: Element): Matrix3x2 {
   return {
     a: 1,
     b: 0,

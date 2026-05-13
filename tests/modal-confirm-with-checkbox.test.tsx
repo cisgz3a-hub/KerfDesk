@@ -10,18 +10,13 @@ const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { url: 'http://loc
 const win = dom.window;
 // Make React DOM’s createRoot / scheduler see a minimal browser-like global (Node 22+ has
 // a read-only navigator, so we avoid clobbering it and only set document/window).
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).window = win;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).document = win.document;
 // React 19 scheduler can use rAF
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 if (typeof (globalThis as any).requestAnimationFrame !== 'function') {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).requestAnimationFrame = (cb: FrameRequestCallback) =>
     setTimeout(() => cb(0), 0) as unknown as number;
 }
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
 
 let passed = 0;
