@@ -50,7 +50,7 @@ export function useQuickActionHandlers(params: UseQuickActionHandlersParams): Qu
     const newScene = { ...scene, objects: [...scene.objects, ...remapClonedParentIds(clones, oldToNewId)] };
     handleSceneCommit(newScene);
     setSelectedIds(newIds);
-  }, [scene, selectedIds, handleSceneCommit]);
+  }, [scene, selectedIds, handleSceneCommit, setSelectedIds]);
 
   const handleQuickActionDelete = useCallback(() => {
     handleDelete();

@@ -449,8 +449,10 @@ export function ConnectionPanelMain({
   const isRunning = controllerRef.current?.isJobRunning || false;
   const displayPaused = isPaused || machineState?.status === 'hold';
   const showAutoFocus = activeProfile?.autoFocusSupported === true;
-  const currentMachinePosition = machinePosition
-    ?? (machineState ? { x: machineState.position.x, y: machineState.position.y } : null);
+  const currentMachinePosition = useMemo(
+    () => machinePosition ?? (machineState ? { x: machineState.position.x, y: machineState.position.y } : null),
+    [machinePosition, machineState],
+  );
 
   useEffect(() => {
     if (!isConnected || isRunning || displayPaused) {
@@ -756,14 +758,8 @@ export function ConnectionPanelMain({
     originCorner,
     bedHeight,
     bedWidth,
-    sceneBounds.minX,
-    sceneBounds.minY,
-    sceneBounds.maxX,
-    sceneBounds.maxY,
-    frameTransformBounds.minX,
-    frameTransformBounds.minY,
-    frameTransformBounds.maxX,
-    frameTransformBounds.maxY,
+    sceneBounds,
+    frameTransformBounds,
   ]);
 
   const framePhysicalBounds = useMemo(() => {
@@ -777,10 +773,8 @@ export function ConnectionPanelMain({
   }, [
     frameMachineBounds,
     startMode,
-    machineState?.position?.x,
-    machineState?.position?.y,
-    savedOrigin?.x,
-    savedOrigin?.y,
+    machineState?.position,
+    savedOrigin,
   ]);
 
   // T1-104 + T1-30: exact-idle gate via the centralized helper. Frame,
@@ -1286,7 +1280,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
-  }, [canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -1360,7 +1354,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleHome = useCallback(async () => {
     if (!canHome) {

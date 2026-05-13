@@ -119,7 +119,7 @@ export function useFileHandlers(params: UseFileHandlersParams): FileHandlers {
 
   const handleClearSelection = useCallback(() => {
     setSelectedIds(new Set());
-  }, []);
+  }, [setSelectedIds]);
 
   return {
     syncAutosaveAfterFileSave,

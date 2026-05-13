@@ -8,6 +8,7 @@ export function useSettingsLiveCapabilities(
   machineState: MachineState | null,
 ): MachineSettingsLiveCapabilities | null {
   return useMemo(() => {
+    void machineState;
     if (!controller || !(controller instanceof GrblController)) return null;
     const info = controller.getMachineInfo();
     return {

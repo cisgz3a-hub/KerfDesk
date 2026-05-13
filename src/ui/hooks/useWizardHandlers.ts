@@ -221,7 +221,7 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
     if (shouldShowFirstRunGuide()) {
       setShowFirstRunGuide?.(true);
     }
-  }, [scene, handleSceneCommit, setShowSetup, setShowFirstRunGuide, refreshProfiles]);
+  }, [scene, handleSceneCommit, setShowSetup, setShowFirstRunGuide, refreshProfiles, viewportActionsRef]);
 
   const handleWizardSkip = useCallback(() => {
     setShowSetup(false);

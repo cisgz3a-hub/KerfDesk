@@ -31,12 +31,12 @@ export function useMaterialHandlers(params: UseMaterialHandlersParams): Material
       },
     };
     handleSceneCommit(newScene);
-  }, [scene, handleSceneCommit]);
+  }, [scene, handleSceneCommit, setShowMaterial]);
 
   const handleMaterialClear = useCallback(() => {
     setShowMaterial(false);
     handleSceneCommit({ ...scene, material: null });
-  }, [scene, handleSceneCommit]);
+  }, [scene, handleSceneCommit, setShowMaterial]);
 
   /** Apply a material preset — updates scene.material and adjusts ALL output layers. */
   const handleMaterialPresetApply = useCallback((presetName: string): boolean => {

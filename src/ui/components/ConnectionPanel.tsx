@@ -726,6 +726,7 @@ function ConnectionPanelLegacy(props: ConnectionPanelProps) {
     appendMessage,
     machineState,
     jobProgress,
+    controller.isJobRunning,
   ]);
 
   const outcomeReplaySection =

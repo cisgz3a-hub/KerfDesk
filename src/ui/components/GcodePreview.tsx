@@ -226,7 +226,7 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     return () => {
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
     };
-  }, [isPlaying, playSpeed, renderFrame, totalDuration, parsedMoves.length]);
+  }, [isPlaying, playProgress, playSpeed, renderFrame, totalDuration, parsedMoves.length]);
 
   const font = "'DM Sans', 'Segoe UI', system-ui, sans-serif";
 

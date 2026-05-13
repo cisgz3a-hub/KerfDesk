@@ -152,7 +152,7 @@ export function LayerPanel({
     }
     setMaterialPresetWarning(null);
     onSceneCommit(updateLayer(scene, activeLayer.id, () => next));
-  }, [selectedMaterialPresetId, activeLayer?.settings.mode, activeLayer?.id]);
+  }, [selectedMaterialPresetId, activeLayer?.settings.mode, activeLayer?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- T1-239: preset application must run only when the user chooses a preset or the target layer/mode changes; adding scene/onSceneCommit would reapply the preset after the commit it just made.
 
   const simpleTabsOn = activeLayer?.settings.tabs?.enabled === true;
   const detailTabCount =

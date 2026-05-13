@@ -9,9 +9,9 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-238\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-238\*\*/);
-  assert.match(handoff, /Next active audit-fix ticket: \*\*T1-239\*\*/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-239\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-239\*\*/);
+  assert.match(handoff, /Next active audit-fix ticket: \*\*T1-240\*\*/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {

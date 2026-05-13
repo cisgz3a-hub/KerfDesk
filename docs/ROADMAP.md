@@ -7076,6 +7076,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `bdf928ac`. Hardware verification not required; this is audit documentation/tooling only.
 
 ---
+### T1-239 | Triage React hook dependency warnings in safety UI
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-017.
+
+**Problem:** The audit addendum found 45 `react-hooks/exhaustive-deps` warnings, with the highest-risk concentration in `App.tsx` and `ConnectionPanelMain.tsx`, the surfaces that own frame/start readiness, machine-control buttons, toolpath preview, saved origin, and active job state. Leaving those warnings untriaged made stale-closure bugs too easy to hide under a generic lint warning count.
+
+**Fix:** Cleared the hook-dependency warnings instead of only documenting them. The pass moved the debug-state graph effect below the GRBL hook so the controller ref can be a real dependency, added missing setter/service/scene dependencies across the App shell and machine panel, memoized the current machine position in `ConnectionPanelMain`, removed unnecessary preview/canvas dependencies, and added one explicit T1-239 rationale for the material-preset application effect that intentionally does not depend on the whole scene because doing so would reapply the preset after its own commit. Added `tests/react-hooks-clean.test.ts`, which runs the local ESLint binary and fails if any `react-hooks/exhaustive-deps` warning returns.
+
+**Verification:**
+- `npx eslint . --max-warnings 0`
+- `npx tsx tests\react-hooks-clean.test.ts`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is React dependency/lint hygiene only.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20937,6 +20953,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in 49ed6bb2) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
 - [x] T1-236 INFO route inline core ID generators through `generateId()` (shipped in fe7b4bc4) - closes audit F-013 by centralizing core factory ID randomness behind deterministic-aware helpers while preserving existing prefixes.
 - [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `bdf928ac`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
+- [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `<TBD>`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

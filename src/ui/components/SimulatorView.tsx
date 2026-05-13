@@ -302,7 +302,7 @@ export function SimulatorView({
     s.x = liveHead.x + s.workOffsetX;
     s.y = liveHead.y + s.workOffsetY;
     drawRef.current();
-  }, [liveHead?.x, liveHead?.y]);
+  }, [liveHead]);
 
   /** Keep echo trail cursor aligned with machine/head when toggling job mode so the next gcode line parses from the right base. */
   useEffect(() => {

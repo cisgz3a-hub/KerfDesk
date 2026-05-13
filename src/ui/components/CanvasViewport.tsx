@@ -403,7 +403,7 @@ export function CanvasViewport({
     const screen = transform.worldToScreen({ x: cx, y: minY });
     const rect = canvas.getBoundingClientRect();
     return { x: rect.left + screen.x, y: rect.top + screen.y };
-  }, [scene, viewport, selectedIds, quickActions?.enabled, width, height, interactableLayerIds]);
+  }, [scene, viewport, selectedIds, quickActions?.enabled, interactableLayerIds]);
 
   useEffect(() => {
     if (!actionsRef) return;
@@ -898,7 +898,7 @@ export function CanvasViewport({
 
     animFrameRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(animFrameRef.current);
-  }, [isPlaying, simulation]);
+  }, [isPlaying, playbackTime, simulation]);
 
   // ─── MOUSE HANDLERS ──────────────────────────────────────────
 
@@ -1231,7 +1231,7 @@ export function CanvasViewport({
       dragRef.current.hitSelectedObject = true;
       dragRef.current.dragIds = newSel;
     }
-  }, [viewport, scene, selectedIds, onSelectionChange, onSceneCommit, activeTool, getHandleAtPoint, onRequestTextPlacement, interactableLayerIds, onActivateLayer]);
+  }, [viewport, scene, selectedIds, onSelectionChange, activeTool, getHandleAtPoint, onRequestTextPlacement, interactableLayerIds, onActivateLayer]);
 
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();

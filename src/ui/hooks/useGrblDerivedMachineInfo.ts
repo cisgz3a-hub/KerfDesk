@@ -117,11 +117,13 @@ export function useGrblDerivedMachineInfo(
   }, [_bedWidth, _bedHeight]);
 
   const machineAccelFromGrbl = useMemo(() => {
+    void machineState;
     if (!(controller instanceof GrblController)) return null;
     return resolveAccelFromGrblInfo(controller.getMachineInfo());
   }, [controller, machineState]);
 
   const grblMachineInfo = useMemo<GrblMachineInfo | null>(() => {
+    void machineState;
     if (!(controller instanceof GrblController)) return null;
     return controller.getMachineInfo();
   }, [controller, machineState]);

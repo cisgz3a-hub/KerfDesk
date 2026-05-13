@@ -93,7 +93,7 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
 
     const newScene = { ...scene, objects: [...scene.objects, ...allClones] };
     handleSceneCommit(newScene, 'array-clone');
-  }, [scene, selectedIds, handleSceneCommit]);
+  }, [scene, selectedIds, handleSceneCommit, setShowGridArray]);
 
   const handleNestingApply = useCallback((newObjects: SceneObject[]) => {
     const newScene = { ...scene, objects: newObjects };
@@ -155,7 +155,7 @@ export function useGeneratorHandlers(params: UseGeneratorHandlersParams): Genera
     } catch (e) {
       await showAlert('Template', 'Failed to load template: ' + (e as Error).message);
     }
-  }, [scene, handleSceneCommit, showAlert]);
+  }, [scene, handleSceneCommit, setShowTemplates, showAlert]);
 
   return {
     handleGridArrayConfirm,

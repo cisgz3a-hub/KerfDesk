@@ -161,6 +161,14 @@ export function App(): React.ReactElement {
     finishPrompt,
   } = useModal();
   const dialogs = useDialogs();
+  const {
+    closeTextDialog,
+    openTextEdit,
+    setEditingTextId,
+    setShowSetup,
+    setShowTextDialog,
+    setTextOperationMode,
+  } = dialogs;
   const zoomLevel = useViewportStore(s => s.zoomLevel);
   const setZoomLevel = useViewportStore(s => s.setZoomLevel);
   const viewportActionsRef = useRef<ViewportActions | null>(null);
@@ -199,15 +207,6 @@ export function App(): React.ReactElement {
   useEffect(() => {
     selectedIdsRef.current = selectedIds;
   }, [selectedIds]);
-
-  useEffect(() => {
-    installAppDebugStateGraph({
-      sceneRef,
-      selectedIdsRef,
-      hashScene: hashSceneForPersistence,
-      controllerRef: grbl.controllerRef,
-    });
-  }, []);
 
   const activeTool = useEditorStore(s => s.activeTool);
   const setActiveTool = useEditorStore(s => s.setActiveTool);
@@ -276,6 +275,15 @@ export function App(): React.ReactElement {
     controllerReady: grbl.controllerReady,
   });
   const wasJobRunningRef = useRef(false);
+
+  useEffect(() => {
+    installAppDebugStateGraph({
+      sceneRef,
+      selectedIdsRef,
+      hashScene: hashSceneForPersistence,
+      controllerRef: grbl.controllerRef,
+    });
+  }, [grbl.controllerRef]);
 
   // T2-6 Phase 3t: GRBL machine-info derivations extracted into a single
   // hook. Memoization keys mirror the originals exactly.
@@ -450,7 +458,7 @@ export function App(): React.ReactElement {
     window.addEventListener('beforeunload', handler);
     window.addEventListener('pagehide', handler);
     return () => { window.removeEventListener('beforeunload', handler); window.removeEventListener('pagehide', handler); };
-  }, [machineUi.executionCoordinator]);
+  }, [grbl.controllerRef, machineUi.executionCoordinator]);
 
   const handleSaveOrigin = useCallback(async () => {
     // T1-104: exact-idle gate. T1-105: state and storage update only
@@ -484,7 +492,7 @@ export function App(): React.ReactElement {
         'Set Origin succeeded, but the controller did not respond to the work-offset query. Saved-origin jobs will be blocked until you Set Origin again with a responsive controller. (T1-41)',
       );
     }
-  }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, showAlert]);
+  }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, setSavedOrigin, showAlert]);
   const lastSavedSceneHashRef = useRef<string>(hashSceneForPersistence(scene));
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5
   // (extended via unified function): bridge counter for
@@ -613,7 +621,7 @@ export function App(): React.ReactElement {
     if (!textPlacementHint) return;
     const id = window.setTimeout(() => setTextPlacementHint(null), 5000);
     return () => clearTimeout(id);
-  }, [textPlacementHint]);
+  }, [setTextPlacementHint, textPlacementHint]);
 
   useEffect(() => {
     if (!dialogs.showTextDialog) return;
@@ -649,24 +657,25 @@ export function App(): React.ReactElement {
     dialogs.textInput,
     dialogs.textItalic,
     dialogs.textSize,
+    setTextPreviewFontReady,
   ]);
 
   const handleTextPlaced = useCallback(() => {
     setTextPlacementHint('Tip: Names default to Engrave. Choose Cut only when you want outlines.');
-  }, []);
+  }, [setTextPlacementHint]);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
-    dialogs.setEditingTextId(null);
-    dialogs.setTextOperationMode('engrave');
+    setEditingTextId(null);
+    setTextOperationMode('engrave');
     setTextPlacementPt({ x: world.x, y: world.y });
-    dialogs.setShowTextDialog(true);
-  }, [dialogs.setEditingTextId, dialogs.setShowTextDialog, dialogs.setTextOperationMode]);
+    setShowTextDialog(true);
+  }, [setEditingTextId, setShowTextDialog, setTextOperationMode, setTextPlacementPt]);
 
   const handleEditText = useCallback((obj: SceneObject) => {
-    dialogs.openTextEdit(obj, textOperationModeForObject(scene, obj));
+    openTextEdit(obj, textOperationModeForObject(scene, obj));
     setTextPlacementPt(null);
     setSelectedIds(new Set([obj.id]));
-  }, [dialogs.openTextEdit, scene]);
+  }, [openTextEdit, scene, setSelectedIds, setTextPlacementPt]);
 
   useEffect(() => {
     const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
@@ -680,12 +689,12 @@ export function App(): React.ReactElement {
     const id = requestAnimationFrame(() => {
       try {
         if (!localStorage.getItem(getSetupStorageKey())) {
-          dialogs.setShowSetup(true);
+          setShowSetup(true);
         }
       } catch { /* ignore */ }
     });
     return () => cancelAnimationFrame(id);
-  }, [dialogs.setShowSetup]);
+  }, [setShowSetup]);
 
   const canUndo = useSceneHistoryStore(s => s.canUndo);
   const canRedo = useSceneHistoryStore(s => s.canRedo);
@@ -728,7 +737,7 @@ export function App(): React.ReactElement {
         },
       },
     }),
-    [setGcodeStale, bumpHistoryVersion, pushHistory, resetHistory],
+    [setGcodeStale, bumpHistoryVersion, pushHistory, resetHistory, setScene, setSelectedIds],
   );
   void commitSceneTransaction;
 
@@ -843,7 +852,7 @@ export function App(): React.ReactElement {
       handleTextPlaced();
     }
 
-    dialogs.closeTextDialog();
+    closeTextDialog();
     setTextPlacementPt(null);
     setActiveTool('select');
   }, [
@@ -856,7 +865,9 @@ export function App(): React.ReactElement {
     dialogs.textItalic,
     dialogs.textOperationMode,
     dialogs.editingTextId,
-    dialogs.closeTextDialog,
+    closeTextDialog,
+    setActiveTool,
+    setTextPlacementPt,
     textPlacementPt,
     handleTextPlaced,
   ]);
@@ -881,12 +892,12 @@ export function App(): React.ReactElement {
   // T2-6 Phase 3v: derivations delegated to pure helpers.
   const activeLayerMode = useMemo(
     () => deriveActiveLayerMode(scene),
-    [scene.layers, scene.activeLayerId],
+    [scene],
   );
 
   const interactableLayerIds = useMemo(
     () => deriveInteractableLayerIds(scene),
-    [scene.layers, scene.activeLayerId],
+    [scene],
   );
 
   const handleModeTabSelect = useCallback(
@@ -943,7 +954,7 @@ export function App(): React.ReactElement {
       // objects.
       handleSceneCommit(next, 'mode-select', modeSelection);
     },
-    [handleSceneCommit],
+    [handleSceneCommit, setScene, setSelectedIds],
   );
 
   const handleActivateLayer = useCallback((layerId: string) => {
@@ -973,7 +984,7 @@ export function App(): React.ReactElement {
     if (mode !== 'savedOrigin') {
       void sendResetWcsCommand(grbl.controller);
     }
-  }, [scene, handleSceneCommit, grbl.controller]);
+  }, [scene, handleSceneCommit, grbl.controller, setStartMode]);
 
   const handleExit = useCallback(async () => {
     const ctrl = grbl.controllerRef.current;
@@ -1001,7 +1012,7 @@ export function App(): React.ReactElement {
     }
 
     window.location.href = '/landing.html';
-  }, [grbl.machineState?.status, machineUi.executionCoordinator, scene]);
+  }, [grbl.controllerRef, grbl.machineState?.status, machineUi.executionCoordinator, scene]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
     if (selectedIds.size === 0) {
@@ -1110,7 +1121,7 @@ export function App(): React.ReactElement {
       setToolpathPreviewMoves(m);
     });
     return () => { cancelled = true; };
-  }, [showToolpathPreview, sceneCompileTick, compileToolpath, showAlert, grbl.isJobRunning, clearToolpathPreview, setToolpathPreviewMoves]);
+  }, [showToolpathPreview, sceneCompileTick, scene, compileToolpath, showAlert, grbl.isJobRunning, clearToolpathPreview, setToolpathPreviewMoves]);
 
   const { clipboard, handleCopy, handlePaste, handleDuplicate } = useClipboard(
     scene,
@@ -1195,7 +1206,7 @@ export function App(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [scene.material?.name, scene.machine?.type, scene.activeLayerId, activeLayerModeForSuggestion]);
+  }, [scene.material?.name, scene.machine?.type, scene.activeLayerId, scene.layers, activeLayerModeForSuggestion, setToastSuggestion]);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 
@@ -1263,7 +1274,7 @@ export function App(): React.ReactElement {
 
   const handleSelectAll = useCallback(() => {
     setSelectedIds(selectAllSelectableIds(scene));
-  }, [scene]);
+  }, [scene, setSelectedIds]);
 
   const handleDelete = useCallback(() => {
     if (selectedIds.size === 0) return;

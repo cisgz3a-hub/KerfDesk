@@ -91,15 +91,15 @@ export function useAppDeviceProfiles({
     return getActiveProfileId();
   }, [profileRevision]);
 
-  const resolvedMachineBedWidthMm = useMemo(
-    () => resolveBedWidthMm(getActiveProfile(), machineBedFromGrbl),
-    [profileRevision, machineBedFromGrbl],
-  );
+  const resolvedMachineBedWidthMm = useMemo(() => {
+    void profileRevision;
+    return resolveBedWidthMm(getActiveProfile(), machineBedFromGrbl);
+  }, [profileRevision, machineBedFromGrbl]);
 
-  const resolvedMachineBedHeightMm = useMemo(
-    () => resolveBedHeightMm(getActiveProfile(), machineBedFromGrbl),
-    [profileRevision, machineBedFromGrbl],
-  );
+  const resolvedMachineBedHeightMm = useMemo(() => {
+    void profileRevision;
+    return resolveBedHeightMm(getActiveProfile(), machineBedFromGrbl);
+  }, [profileRevision, machineBedFromGrbl]);
 
   // T1-218 (v30 audit #1): true iff BOTH dimensions came from a
   // real source (controller-reported $130/$131 or explicit profile
@@ -107,10 +107,10 @@ export function useAppDeviceProfiles({
   // fallback — preflight will block job start on
   // `MISSING_BED_SIZE` rather than silently authorizing motion
   // against a phantom 300mm bed.
-  const resolvedMachineBedDimensionsKnown = useMemo(
-    () => bedDimensionsKnown(getActiveProfile(), machineBedFromGrbl),
-    [profileRevision, machineBedFromGrbl],
-  );
+  const resolvedMachineBedDimensionsKnown = useMemo(() => {
+    void profileRevision;
+    return bedDimensionsKnown(getActiveProfile(), machineBedFromGrbl);
+  }, [profileRevision, machineBedFromGrbl]);
 
   const allProfiles = useMemo(() => {
     void profileRevision;

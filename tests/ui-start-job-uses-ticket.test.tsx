@@ -443,7 +443,7 @@ async function run(): Promise<void> {
           controllerRef: props.controllerRef,
           notifySimulatorRef: coordinatorSimulatorNotifyRef,
         }),
-      [],
+      [props.controllerRef, props.machineService],
     );
     return React.createElement(ConnectionPanelMain, {
       controller: props.controller,
