@@ -7133,6 +7133,42 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `e66b7baf`. Hardware verification not required; this is test-runner diagnostics and test hygiene only.
 
 ---
+### T1-242 | Recovery-card actions must clear runtime recovery checklist
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-020 (Codex 2026-05-13 current-state addendum).
+
+**Problem:** Recovery cards rendered action buttons for alarm / disconnect / frame-failed / emergency-stop / job-failed states, but the buttons only invoked the visible machine/UI action. They did not acknowledge the corresponding `MachineService.applyRecoveryAck(...)` step, so a user could click Unlock, Home, and Frame after an alarm and still have `RecoveryState.status !== 'none'`. The canonical Start gate correctly refused while recovery was incomplete, which made the Start button appear permanently stuck even after the operator followed the visible recovery steps. The alarm card also had no explicit "inspection done" action even though alarm recovery requires `inspectionDone`.
+
+**Fix:** Added an explicit `inspect` recovery action, made Unlock/Home/Frame handlers report boolean success, and wired `ConnectionPanelMain.handleRecoveryAction` to call `machineService.applyRecoveryAck('inspection' | 'unlock' | 'rehome' | 'reframe' | 'reconnect' | 'recompile')` only after the matching recovery action is completed or acknowledged. Homing-disabled profiles now get a manual-position confirmation path for the recovery rehome step, so PRT4040-style manual-zero workflows are not trapped behind a disabled Home button. The emergency/safety recovery card now passes `onAction`, so its buttons are no longer disabled.
+
+**Verification:**
+- `npx tsx tests\recovery-card-actions-advance-state.test.ts` failed before the fix and passes after.
+- `npx tsx tests\recovery-cards.test.ts`
+- `npx tsx tests\recovery-state-blocks-start.test.ts`
+- `npx tsx tests\recovery-card-ui-wiring.test.ts`
+- `npx tsx tests\machine-event-ledger-recovery-cleared-wiring.test.ts`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: trigger an alarm during/around a test job, complete Inspect -> Unlock -> Re-home/manual-position -> Frame, and confirm Start re-enables only after the checklist clears.
+
+---
+### T1-243 | T3-81 end-to-end workflow suite must exit under the runner
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-021 (Codex 2026-05-13 current-state addendum).
+
+**Problem:** `tests/end-to-end-workflows/end-to-end-workflows.test.ts` reported `40 passed, 0 failed` but then hung when spawned by `scripts/run-tests.mjs`, causing `npm test` to fail after the per-file timeout. Direct command-line runs could exit, but the runner-spawned Windows child stayed alive after the test called `process.exit()` immediately after a large stdout burst.
+
+**Fix:** The T3-81 suite now sets `process.exitCode` and lets Node exit naturally instead of forcing `process.exit()` in the success/error paths. Added `tests/end-to-end-workflows-exits-naturally.test.ts`, which spawns the T3-81 test the same way the runner does and fails if the child times out.
+
+**Verification:**
+- `node --import tsx tests/end-to-end-workflows/end-to-end-workflows.test.ts`
+- `npx tsx tests\end-to-end-workflows-exits-naturally.test.ts`
+- runner-style spawn reproduction exits with code 0 in under one second
+- `npm test`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is test-runner/test-hygiene only.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20997,6 +21033,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-240 LOW regenerate `PROJECT_MAP.md` (shipped in `a63a8430`) - closes audit F-018 by refreshing the generated orientation map and re-running the existing project-map check/test.
 - [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `e66b7baf`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
+- [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `<TBD>`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
+- [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `<TBD>`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

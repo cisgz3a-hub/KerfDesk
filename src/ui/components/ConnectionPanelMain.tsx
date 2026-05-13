@@ -1215,17 +1215,17 @@ export function ConnectionPanelMain({
     return false;
   }, [startMode, machineService, showAlert, setMessages]);
 
-  const handleFrameSafe = useCallback(async () => {
-    if (!canFrame) return;
+  const handleFrameSafe = useCallback(async (): Promise<boolean> => {
+    if (!canFrame) return false;
 
     // T1-41-followup: refuse Frame when saved-origin G54 has drifted
     // since Set Origin (e.g. user typed G10 / G92 in the console).
     // Same check as the Start handler; runs before bounds confirmation
     // so a drifted G54 surfaces a clear "saved origin invalid" alert
     // instead of an off-bed bounds alert.
-    if (!(await verifySavedOriginForFrame())) return;
+    if (!(await verifySavedOriginForFrame())) return false;
 
-    if (!(await confirmFrameBounds())) return;
+    if (!(await confirmFrameBounds())) return false;
 
     const transformOpts = {
       startMode,
@@ -1272,7 +1272,7 @@ export function ConnectionPanelMain({
       const timeoutSec = Math.round(idleTimeoutMs / 1000);
       setFrameRecoveryTimeoutSec(timeoutSec);
       setMessages(prev => [...prev, frameFailureLogLine(result, 'Frame (Safe)', timeoutSec)]);
-      return;
+      return false;
     }
 
     hasFramed.current = true;
@@ -1280,6 +1280,7 @@ export function ConnectionPanelMain({
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
+    return true;
   }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleFrameDot = useCallback(async () => {
@@ -1356,17 +1357,26 @@ export function ConnectionPanelMain({
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
   }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
-  const handleHome = useCallback(async () => {
+  const handleHome = useCallback(async (): Promise<boolean> => {
     if (!canHome) {
       setMessages(prev => [
         ...prev,
         'Home disabled for this profile. Use manual zero until homing settings are verified.',
       ]);
-      return;
+      return false;
     }
     const ok = await showConfirm('Homing', 'Homing moves to limit switches. Continue?');
-    if (ok) await executionCoordinator.home();
-  }, [canHome, showConfirm, executionCoordinator, setMessages]);
+    if (!ok) return false;
+    try {
+      await executionCoordinator.home();
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setMessages(prev => [...prev, `âš  Homing failed: ${msg}`]);
+      await showAlert('Homing failed', msg);
+      return false;
+    }
+  }, [canHome, showAlert, showConfirm, executionCoordinator, setMessages]);
 
   const handleAutoFocus = useCallback(async () => {
     if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
@@ -1385,7 +1395,7 @@ export function ConnectionPanelMain({
     }
   }, [canAutoFocus, executionCoordinator, isAutoFocusing, setMessages, showAlert, showAutoFocus]);
 
-  const handleUnlock = useCallback(async () => {
+  const handleUnlock = useCallback(async (): Promise<boolean> => {
     const classification = machineService.classifyUserCommand(GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY);
     const ok = await showConfirm(
       'Dangerous command',
@@ -1393,10 +1403,18 @@ export function ConnectionPanelMain({
     );
     if (!ok) {
       appendMessage(`Blocked: ${classification.command}`);
-      return;
+      return false;
     }
-    await executionCoordinator.unlock();
-  }, [appendMessage, machineService, showConfirm, executionCoordinator]);
+    try {
+      await executionCoordinator.unlock();
+      return true;
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      appendMessage(`âš  Unlock failed: ${msg}`);
+      await showAlert('Unlock failed', msg);
+      return false;
+    }
+  }, [appendMessage, machineService, showAlert, showConfirm, executionCoordinator]);
 
   /**
    * T2-12 part 2: clear a 'faulted_requires_inspection' state after
@@ -1487,32 +1505,75 @@ export function ConnectionPanelMain({
   }, [appendMessage, notifySimulatorTx, machineService, showAlert]);
 
   const handleRecoveryAction = useCallback((action: RecoveryAction) => {
-    switch (action) {
-      case 'unlock':
-        void handleUnlock();
-        break;
-      case 'home':
-      case 're-home':
-        void handleHome();
-        break;
-      case 'frame':
-      case 'reframe':
-        void handleFrameSafe();
-        break;
-      case 'reconnect':
-        setConnectionRecoveryVisible(false);
-        break;
-      case 'stop':
-        void handleStop();
-        break;
-      case 'compile':
-        setJobFailedRecoveryMessage(null);
-        onRecompile?.();
-        break;
-      default:
-        break;
-    }
-  }, [handleFrameSafe, handleHome, handleStop, handleUnlock, onRecompile]);
+    void (async () => {
+      // T1-242: recovery cards are not just command shortcuts. They
+      // are the visible UI for RecoveryState's typed checklist, so
+      // successful actions must acknowledge the matching runtime step.
+      switch (action) {
+        case 'inspect':
+          machineService.applyRecoveryAck('inspection');
+          appendMessage('Recovery step acknowledged: inspection complete.');
+          break;
+        case 'unlock':
+          if (await handleUnlock()) {
+            machineService.applyRecoveryAck('unlock');
+            appendMessage('Recovery step acknowledged: alarm cleared.');
+          }
+          break;
+        case 'home':
+        case 're-home':
+          if (canHome) {
+            if (await handleHome()) {
+              machineService.applyRecoveryAck('rehome');
+              appendMessage('Recovery step acknowledged: position re-homed.');
+            }
+          } else {
+            const ok = await showConfirm(
+              'Manual position recovery',
+              'This profile has homing disabled. Confirm you have manually re-established a safe zero point or verified the machine position before continuing.',
+            );
+            if (ok) {
+              machineService.applyRecoveryAck('rehome');
+              appendMessage('Recovery step acknowledged: position verified manually.');
+            }
+          }
+          break;
+        case 'frame':
+        case 'reframe':
+          if (await handleFrameSafe()) {
+            machineService.applyRecoveryAck('reframe');
+            appendMessage('Recovery step acknowledged: frame complete.');
+          }
+          break;
+        case 'reconnect':
+          setConnectionRecoveryVisible(false);
+          machineService.applyRecoveryAck('reconnect');
+          appendMessage('Recovery step acknowledged: reconnect complete.');
+          break;
+        case 'stop':
+          await handleStop();
+          break;
+        case 'compile':
+          setJobFailedRecoveryMessage(null);
+          onRecompile?.();
+          machineService.applyRecoveryAck('recompile');
+          appendMessage('Recovery step acknowledged: job recompiled.');
+          break;
+        default:
+          break;
+      }
+    })();
+  }, [
+    appendMessage,
+    canHome,
+    handleFrameSafe,
+    handleHome,
+    handleStop,
+    handleUnlock,
+    machineService,
+    onRecompile,
+    showConfirm,
+  ]);
 
   /** Deadman: laser is on only while primary pointer is held on the button. */
   const beginTestFire = useCallback(
@@ -2253,6 +2314,7 @@ export function ConnectionPanelMain({
   const safetyRecoveryCard = safetyRecoveryContent &&
     React.createElement(RecoveryCard, {
       content: safetyRecoveryContent,
+      onAction: handleRecoveryAction,
     });
 
   const outcomeExtrasSection = isConnected && !isRunning && !displayPaused && React.createElement(React.Fragment, null,

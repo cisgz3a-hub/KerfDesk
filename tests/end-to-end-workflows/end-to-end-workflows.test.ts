@@ -558,10 +558,15 @@ async function run(): Promise<void> {
 
   resetEnvironment();
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
-  process.exit(failed > 0 ? 1 : 0);
+  // T1-243: this suite writes enough output that an immediate
+  // process.exit() can hang under scripts/run-tests.mjs on Windows
+  // while child-process stdio is still draining. Set the exit code
+  // and let Node close naturally; direct and runner-spawned runs then
+  // both terminate cleanly.
+  process.exitCode = failed > 0 ? 1 : 0;
 }
 
 void run().catch((err: unknown) => {
   console.error(err);
-  process.exit(1);
+  process.exitCode = 1;
 });

@@ -4,6 +4,7 @@ import type { RecoveryAction, RecoveryCardContent } from './RecoveryCardContent'
 const font = "'DM Sans', system-ui, sans-serif";
 
 const actionLabel: Record<string, string> = {
+  inspect: 'Inspect done',
   unlock: 'Unlock',
   home: 'Home',
   're-home': 'Re-home',

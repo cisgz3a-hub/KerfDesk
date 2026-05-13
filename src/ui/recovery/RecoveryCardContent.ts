@@ -24,6 +24,7 @@ export type RecoveryVariant =
   | 'job-failed';
 
 export type RecoveryAction =
+  | 'inspect'
   | 'unlock'
   | 'home'
   | 're-home'
@@ -61,7 +62,10 @@ export function alarmRecoveryCard(alarmCode: number | null): RecoveryCardContent
     whatItMeans:
       'The machine attempted a move outside its known safe area, or homing did not succeed. Position may be unreliable.',
     steps: [
-      { text: 'Inspect the machine for obstructions or material in the way.' },
+      // T1-242: alarm recovery's runtime checklist has an
+      // inspectionDone step. The UI needs a real action button for it;
+      // otherwise the visible recovery flow can never clear Start.
+      { text: 'Inspect the machine for obstructions or material in the way.', action: 'inspect' },
       { text: 'If safe, click Unlock to clear the alarm.', action: 'unlock' },
       { text: 'Re-home the machine to re-establish position.', action: 're-home' },
       { text: 'Re-frame the job before starting again. (Required by app)', action: 'reframe' },
