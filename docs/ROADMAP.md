@@ -7130,7 +7130,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npm run project-map:check`
 - `git diff --check`
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is test-runner diagnostics and test hygiene only.
+**Status:** Shipped in `e66b7baf`. Hardware verification not required; this is test-runner diagnostics and test hygiene only.
 
 ---
 ## Tier 2 鈥?This month
@@ -20996,7 +20996,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `bdf928ac`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
 - [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-240 LOW regenerate `PROJECT_MAP.md` (shipped in `a63a8430`) - closes audit F-018 by refreshing the generated orientation map and re-running the existing project-map check/test.
-- [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `<TBD>`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
+- [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `e66b7baf`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
