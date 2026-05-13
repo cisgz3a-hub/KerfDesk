@@ -15,19 +15,20 @@
  * it requires per-test refactor and is multi-session.
  */
 import { readFileSync, readdirSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, relative } from 'node:path';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const projectRoot = join(root, '..');
-const tsxCli = join(projectRoot, 'node_modules', 'tsx', 'dist', 'cli.mjs');
+const tsxImportSpecifier = 'tsx';
 const testsDir = join(projectRoot, 'tests');
 
 const testEnv = {
   ...process.env,
   LASERFORGE_DETERMINISTIC_IDS: '1',
 };
+const DEFAULT_TEST_TIMEOUT_MS = 180_000;
 
 const TEST_FILE_PATTERN = /\.test\.tsx?$/;
 const EXCLUDED_DIRS = new Set(['snapshots', 'helpers', 'fixtures', 'node_modules']);
@@ -71,7 +72,7 @@ const LANE_DEFINITIONS = {
 const laneDeclarationCache = new Map();
 
 function printUsage() {
-  console.error('Usage: node scripts/run-tests.mjs [--lane=<lane>] [--list]');
+  console.error('Usage: node scripts/run-tests.mjs [--lane=<lane>] [--list] [--timeout-ms=<ms>]');
   console.error('Lanes: all, unit, output, controller-sim, transport-sim, sim, perf');
 }
 
@@ -79,6 +80,11 @@ function parseArgs(argv) {
   const options = {
     lane: 'all',
     listOnly: false,
+    timeoutMs: parsePositiveInt(
+      process.env.LASERFORGE_TEST_TIMEOUT_MS,
+      DEFAULT_TEST_TIMEOUT_MS,
+      'LASERFORGE_TEST_TIMEOUT_MS',
+    ),
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -98,6 +104,16 @@ function parseArgs(argv) {
       i++;
     } else if (arg.startsWith('--lane=')) {
       options.lane = arg.slice('--lane='.length);
+    } else if (arg === '--timeout-ms') {
+      const value = argv[i + 1];
+      if (value === undefined) {
+        printUsage();
+        throw new Error('--timeout-ms requires a value');
+      }
+      options.timeoutMs = parsePositiveInt(value, DEFAULT_TEST_TIMEOUT_MS, '--timeout-ms');
+      i++;
+    } else if (arg.startsWith('--timeout-ms=')) {
+      options.timeoutMs = parsePositiveInt(arg.slice('--timeout-ms='.length), DEFAULT_TEST_TIMEOUT_MS, '--timeout-ms');
     } else {
       printUsage();
       throw new Error(`Unknown test runner option: ${arg}`);
@@ -105,6 +121,15 @@ function parseArgs(argv) {
   }
 
   return options;
+}
+
+function parsePositiveInt(value, fallback, label) {
+  if (value == null || value === '') return fallback;
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error(`${label} must be a positive integer number of milliseconds`);
+  }
+  return parsed;
 }
 
 function expandLaneSpec(spec) {
@@ -244,6 +269,68 @@ function walkTests(dir, out = []) {
   return out;
 }
 
+function killProcessTree(child) {
+  if (child.pid == null) return;
+  if (process.platform === 'win32') {
+    spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+      stdio: 'ignore',
+      windowsHide: true,
+    });
+    return;
+  }
+  try {
+    child.kill('SIGKILL');
+  } catch {
+    // The process may have exited between timeout and kill.
+  }
+}
+
+function runTestFile(file, timeoutMs) {
+  return new Promise((resolve) => {
+    const testPath = `tests/${file}`;
+    const child = spawn(process.execPath, ['--import', tsxImportSpecifier, testPath], {
+      cwd: projectRoot,
+      env: testEnv,
+      stdio: 'inherit',
+      windowsHide: true,
+    });
+    let settled = false;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      console.error(`\n✗ ${file} timed out after ${timeoutMs}ms`);
+      console.error(`  Child PID: ${child.pid ?? 'unknown'}`);
+      console.error(`  Re-run directly: node --import ${tsxImportSpecifier} ${testPath}`);
+      killProcessTree(child);
+    }, timeoutMs);
+    timeout.unref?.();
+
+    child.on('error', (err) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      console.error(`\n✗ ${file} failed to start: ${err instanceof Error ? err.message : String(err)}`);
+      resolve(1);
+    });
+
+    child.on('close', (code, signal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (timedOut) {
+        resolve(1);
+        return;
+      }
+      if (signal != null) {
+        console.error(`\n✗ ${file} exited via signal ${signal}`);
+        resolve(1);
+        return;
+      }
+      resolve(code == null ? 1 : code);
+    });
+  });
+}
+
 const options = parseArgs(process.argv.slice(2));
 const files = selectFilesForLane(walkTests(testsDir).sort(), options.lane);
 
@@ -259,7 +346,7 @@ if (options.listOnly) {
   process.exit(0);
 }
 
-console.error(`\nRunning ${files.length} test files (lane: ${options.lane})\n`);
+console.error(`\nRunning ${files.length} test files (lane: ${options.lane}, timeout: ${options.timeoutMs}ms/file)\n`);
 
 for (const f of files) {
   // T2-22: skip-with-citation for known-failing tests. Visible in CI
@@ -271,13 +358,7 @@ for (const f of files) {
   }
   // stderr so it appears even when stdout is fully buffered
   console.error(`\n▶ ${f}\n`);
-  const r = spawnSync(process.execPath, [tsxCli, join(projectRoot, 'tests', f)], {
-    cwd: projectRoot,
-    env: testEnv,
-    stdio: 'inherit',
-    windowsHide: true,
-  });
-  const code = r.status === null ? 1 : r.status;
+  const code = await runTestFile(f, options.timeoutMs);
   if (code !== 0) {
     process.exit(code);
   }

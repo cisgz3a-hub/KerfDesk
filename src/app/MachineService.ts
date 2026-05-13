@@ -1498,6 +1498,10 @@ export class MachineService {
         // first doesn't get clobbered.
         if (this._wifiOverride === next) this._setWiFiOverride(null);
       }, remaining);
+      // Browser timers do not expose unref(), but Node-backed tests do.
+      // Do not let the default 5-minute override expiry keep a passed
+      // one-file test process alive.
+      (this._wifiOverrideTimer as { unref?: () => void }).unref?.();
     }
     for (const cb of this._wifiOverrideListeners) {
       cb(next);

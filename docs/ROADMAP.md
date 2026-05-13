@@ -7109,6 +7109,30 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `a63a8430`. Hardware verification not required; this is generated documentation only.
 
 ---
+### T1-241 | Fix full-suite test runner hang and diagnostics
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-019.
+
+**Problem:** The full auto-discovered test suite could time out under `npm test`, while direct focused test runs looked green. The runner used blocking child execution with no per-file timeout, so one passed-but-still-open test process could wedge the entire suite without a durable diagnostic. Reproduction found two concrete leaks/stale checks once the runner could name the stuck file: the Falcon WiFi trust test left a five-minute override expiry timer alive, and full-suite execution exposed stale source pins in recovery-cleared and GRBL resume routing tests.
+
+**Fix:** `scripts/run-tests.mjs` now runs each test file through a timeout-aware async child process, accepts `--timeout-ms` and `LASERFORGE_TEST_TIMEOUT_MS`, prints the stuck file, child PID, and direct re-run command, and kills the child process tree on Windows before failing. The runner also invokes tests as `node --import tsx tests/<file>` using a repo-relative test path, avoiding the TSX CLI/absolute-path child behavior observed during F-019 debugging. `MachineService` now calls `unref?.()` on the WiFi override expiry timer so Node-backed tests can exit after success while browser behavior is unchanged. Added `tests/test-runner-timeout-diagnostics.test.ts`, extended `tests/test-runner-lanes.test.ts`, pinned the WiFi timer unref in `tests/falcon-wifi-trust-blocks-start.test.ts`, and refreshed stale source pins in `tests/machine-event-ledger-recovery-cleared-wiring.test.ts` and `tests/safety-operations-controller-routing.test.ts`.
+
+**Verification:**
+- `npx tsx tests\test-runner-timeout-diagnostics.test.ts`
+- `npx tsx tests\test-runner-lanes.test.ts`
+- `npx tsx tests\falcon-wifi-trust-blocks-start.test.ts`
+- `npx tsx tests\machine-event-ledger-recovery-cleared-wiring.test.ts`
+- `npx tsx tests\safety-operations-controller-routing.test.ts`
+- `npm test`
+- `npx tsc --noEmit --pretty false`
+- `npm run build`
+- `npx eslint . --max-warnings 0`
+- `npm run project-map:check`
+- `git diff --check`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is test-runner diagnostics and test hygiene only.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20972,6 +20996,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `bdf928ac`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
 - [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-240 LOW regenerate `PROJECT_MAP.md` (shipped in `a63a8430`) - closes audit F-018 by refreshing the generated orientation map and re-running the existing project-map check/test.
+- [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `<TBD>`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

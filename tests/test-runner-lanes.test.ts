@@ -35,6 +35,7 @@ assert(/T3-66/.test(runnerSource), 'runner documents the T3-66 lane split');
 assert(/LANE_DEFINITIONS/.test(runnerSource), 'runner has explicit lane definitions');
 assert(/--lane/.test(runnerSource), 'runner accepts a --lane option');
 assert(/--list/.test(runnerSource), 'runner can list selected tests without running them');
+assert(/--timeout-ms/.test(runnerSource), 'runner accepts a per-file timeout option');
 
 assert(
   packageJson.scripts?.['test'] === 'node scripts/run-tests.mjs',

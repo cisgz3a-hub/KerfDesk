@@ -7,9 +7,9 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-240** (regenerate `PROJECT_MAP.md`, shipped in a63a8430).
-- Current audit-fix run completed: **T1-223 through T1-240**, with T1-237 still deferred as multi-week firmware-adapter wiring.
-- Next active audit-fix ticket: **T1-241** - F-019 diagnose/fix the full-suite test runner hang.
+- Last shipped roadmap item: **T1-241** (full-suite test runner hang/diagnostics, shipped in `<TBD>`).
+- Current audit-fix run completed: **T1-223 through T1-241**, with T1-237 still deferred as multi-week firmware-adapter wiring.
+- Next active audit-fix ticket: none from `docs/AUDIT-2026-05-12.md`; T1-237 remains the deferred multi-week firmware-adapter wiring decision.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
 
 ## What Just Shipped In This Run
@@ -35,6 +35,7 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T1-238 | F-016 | No-skip exported-symbol inventory generated and pinned against drift. |
 | T1-239 | F-017 | React hook dependency warnings reduced from 45 to 0 and pinned. |
 | T1-240 | F-018 | `PROJECT_MAP.md` regenerated and project-map check restored. |
+| T1-241 | F-019 | Full-suite runner hang fixed; per-file timeout diagnostics added; full `npm test` restored to green. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -50,10 +51,10 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 ## Verification Baseline
 
-- `npx tsc --noEmit --pretty false` passed during the T1-223..T1-239 run.
-- Focused tests for T1-223 through T1-239 passed at their commits.
-- Full `npm test` currently times out under F-019. Do not report full-suite green until F-019 is fixed.
-- `tests/end-to-end-workflows/end-to-end-workflows.test.ts` passes when run directly, but the full runner can hang waiting on it.
+- `npx tsc --noEmit --pretty false` passed during the T1-241 close-out.
+- Focused tests for T1-223 through T1-241 passed at their commits.
+- Full `npm test` passed during T1-241 after the runner timeout/diagnostics fix.
+- `scripts/run-tests.mjs` now names and kills timed-out per-file children instead of wedging silently.
 - `npm run project-map:check` passed during T1-240 after regenerating `PROJECT_MAP.md`.
 - Dependabot PRs must not be merged blindly; previous local test-merge attempts could not be safely verified.
 
@@ -62,7 +63,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 Continue in this order unless a newer owner instruction says otherwise:
 
 1. **T1-237** - firmware adapter wiring remains deferred/multi-week.
-2. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
+2. Resume the normal roadmap queue after deciding whether to take T1-237 now or keep it deferred.
 
 ## Known Caveats
 
@@ -73,4 +74,4 @@ Continue in this order unless a newer owner instruction says otherwise:
 
 ## Current Ticket Note
 
-T1-240 closed F-018 by regenerating `PROJECT_MAP.md`; `npm run project-map:check` and `tests/project-map-generated.test.ts` pass. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work; the next active ticket is T1-241.
+T1-241 closed F-019 by making the auto-discovery runner timeout-aware, fixing the WiFi override timer leak, refreshing stale source pins exposed by the full suite, and restoring full `npm test` to green. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work.

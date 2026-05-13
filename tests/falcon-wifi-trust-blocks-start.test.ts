@@ -304,6 +304,8 @@ void (async () => {
     'MachineService exposes evaluateActionAllowed');
   assert(/this\.evaluateActionAllowed\('start-job'\)/.test(svcSrc),
     'startValidatedJob calls evaluateActionAllowed(start-job)');
+  assert(/\.unref\?\.\(\)/.test(svcSrc),
+    'WiFi override expiry timer is unrefed in Node-backed tests');
 
   const panelSrc = readFileSync(
     resolve(repoRoot, 'src/ui/components/ConnectionPanelMain.tsx'),

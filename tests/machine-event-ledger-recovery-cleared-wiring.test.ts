@@ -195,9 +195,10 @@ void triggerEmergencyStop;
   const src = readFileSync(resolve(here, '../src/app/MachineService.ts'), 'utf-8');
   assert(/T1-201/.test(src), 'MachineService.ts carries T1-201 marker');
 
-  const methodIdx = src.indexOf('acknowledgeRecoveryComplete():');
-  const methodEnd = src.indexOf('\n  }', methodIdx);
+  const methodIdx = src.indexOf('acknowledgeRecoveryComplete(token?: UnsafeRecoveryBypassToken): void');
+  const methodEnd = src.indexOf('\n  private _setRecoveryState', methodIdx);
   const methodBody = src.slice(methodIdx, methodEnd);
+  assert(methodIdx >= 0 && methodEnd > methodIdx, 'acknowledgeRecoveryComplete method body located');
   assert(
     /getMachineEventLedger\(\)\.append\(\{\s*kind:\s*'recovery-cleared'/.test(methodBody),
     'acknowledgeRecoveryComplete appends recovery-cleared event',
@@ -206,13 +207,12 @@ void triggerEmergencyStop;
     /acknowledgedBy:\s*'user'/.test(methodBody),
     'event payload carries acknowledgedBy: user',
   );
-  // The append must be inside the "current state is not 'none'"
-  // guard so a redundant ack is a no-op.
-  const guardIdx = methodBody.indexOf("this._recoveryState.status !== 'none'");
-  assert(guardIdx > 0, 'append guarded by current-state !== none check');
+  // The early return must precede the append so a redundant ack is a no-op.
+  const guardIdx = methodBody.indexOf("this._recoveryState.status === 'none'");
+  const appendIdx = methodBody.indexOf("kind: 'recovery-cleared'");
+  assert(guardIdx > 0 && appendIdx > guardIdx, 'append guarded by current-state !== none check');
   // The append must precede the _setRecoveryState transition so the
   // ledger captures the clear even if a listener throws.
-  const appendIdx = methodBody.indexOf("kind: 'recovery-cleared'");
   const setStateIdx = methodBody.indexOf("this._setRecoveryState({ status: 'none' })");
   assert(
     appendIdx > 0 && setStateIdx > 0 && appendIdx < setStateIdx,

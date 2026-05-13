@@ -136,7 +136,7 @@ void (async () => {
       'GRBL: pause() emits REALTIME_FEED_HOLD',
     );
     assert(
-      /\bresume\s*\(\s*\)\s*:\s*SafetyActionResult\s*\{[\s\S]{0,2000}?_sendRealtime\(REALTIME_CYCLE_START\)/.test(grbl),
+      /\basync\s+resume\s*\(\s*\)\s*:\s*Promise<\s*SafetyActionResult\s*>\s*\{[\s\S]{0,5000}?_sendRealtime\(REALTIME_CYCLE_START\)/.test(grbl),
       'GRBL: resume() emits REALTIME_CYCLE_START',
     );
     assert(
