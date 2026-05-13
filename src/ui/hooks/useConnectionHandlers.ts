@@ -18,7 +18,7 @@ export interface UseConnectionHandlersParams {
 }
 
 export interface ConnectionHandlers {
-  handleConnectionRecompile: () => void;
+  handleConnectionRecompile: () => Promise<boolean>;
 }
 
 export function useConnectionHandlers(params: UseConnectionHandlersParams): ConnectionHandlers {
@@ -36,11 +36,10 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
   const isJobRunningRef = useRef(grbl.isJobRunning);
   isJobRunningRef.current = grbl.isJobRunning;
 
-  const handleConnectionRecompile = useCallback(() => {
-    void (async () => {
-      const gc = await compileGcode(scene);
-      setCurrentGcode(gc);
-    })();
+  const handleConnectionRecompile = useCallback(async (): Promise<boolean> => {
+    const gc = await compileGcode(scene);
+    setCurrentGcode(gc);
+    return gc !== null;
   }, [scene, compileGcode, setCurrentGcode]);
 
   // Auto-recompile G-code when the design changes (debounced).
@@ -54,7 +53,7 @@ export function useConnectionHandlers(params: UseConnectionHandlersParams): Conn
       // Re-check at fire time - job may have started between scheduling and firing.
       // The effect-level guard only covers scheduling time.
       if (isJobRunningRef.current) return;
-      handleConnectionRecompile();
+      void handleConnectionRecompile();
     }, 500);
 
     return () => clearTimeout(timer);

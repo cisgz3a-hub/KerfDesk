@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 475 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 682 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 683 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 608 | - |
+| `tests/` | 609 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1058,6 +1058,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/reconnect-same-machine-verification.test.ts`
 - `tests/reconstruction-grade-joblog.test.ts`
 - `tests/recovery-bypass-requires-token.test.ts`
+- `tests/recovery-card-actions-ack-after-work.test.ts`
 - `tests/recovery-card-actions-advance-state.test.ts`
 - `tests/recovery-card-ui-wiring.test.ts`
 - `tests/recovery-cards.test.ts`

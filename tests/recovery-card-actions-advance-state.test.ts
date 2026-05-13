@@ -37,16 +37,20 @@ assert(/actionLabel:[^]*inspect:\s*'Inspect done'/.test(surface), 'RecoveryCard 
 assert(/Inspect the machine[^]*action:\s*'inspect'/.test(cards), 'Alarm recovery has an inspection action');
 
 // 2. ConnectionPanelMain acknowledges each runtime recovery step from
-// the recovery-card action router. These are the only production UI
-// buttons that can legitimately clear RecoveryState without a bypass
-// token.
+// production UI actions. T1-244 refines the contract: reconnect and
+// recompile are acknowledged only after successful reconnect/recompile
+// work, not merely because the recovery-card button was clicked.
 assert(/T1-242/.test(panel), 'ConnectionPanelMain carries T1-242 marker');
-for (const step of ['inspection', 'unlock', 'rehome', 'reframe', 'reconnect', 'recompile']) {
+for (const step of ['inspection', 'unlock', 'rehome', 'reframe']) {
   assert(
     new RegExp(`applyRecoveryAck\\('${step}'\\)`).test(panel),
     `handleRecoveryAction acknowledges ${step}`,
   );
 }
+assert(/const acknowledgeReconnectRecovery = useCallback[\s\S]*applyRecoveryAck\('reconnect'\)/.test(panel),
+  'successful reconnect acknowledges reconnect');
+assert(/recompileOk\s*!==\s*false[\s\S]*applyRecoveryAck\('recompile'\)/.test(panel),
+  'successful recompile acknowledges recompile');
 
 // 3. Machine actions that must succeed before acknowledgement return a
 // boolean success value. Otherwise a cancelled Home prompt or failed

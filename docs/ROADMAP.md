@@ -7139,7 +7139,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 
 **Problem:** Recovery cards rendered action buttons for alarm / disconnect / frame-failed / emergency-stop / job-failed states, but the buttons only invoked the visible machine/UI action. They did not acknowledge the corresponding `MachineService.applyRecoveryAck(...)` step, so a user could click Unlock, Home, and Frame after an alarm and still have `RecoveryState.status !== 'none'`. The canonical Start gate correctly refused while recovery was incomplete, which made the Start button appear permanently stuck even after the operator followed the visible recovery steps. The alarm card also had no explicit "inspection done" action even though alarm recovery requires `inspectionDone`.
 
-**Fix:** Added an explicit `inspect` recovery action, made Unlock/Home/Frame handlers report boolean success, and wired `ConnectionPanelMain.handleRecoveryAction` to call `machineService.applyRecoveryAck('inspection' | 'unlock' | 'rehome' | 'reframe' | 'reconnect' | 'recompile')` only after the matching recovery action is completed or acknowledged. Homing-disabled profiles now get a manual-position confirmation path for the recovery rehome step, so PRT4040-style manual-zero workflows are not trapped behind a disabled Home button. The emergency/safety recovery card now passes `onAction`, so its buttons are no longer disabled.
+**Fix:** Added an explicit `inspect` recovery action, made Unlock/Home/Frame handlers report boolean success, and wired `ConnectionPanelMain.handleRecoveryAction` to call `machineService.applyRecoveryAck(...)` after the matching recovery action is completed or acknowledged. Homing-disabled profiles now get a manual-position confirmation path for the recovery rehome step, so PRT4040-style manual-zero workflows are not trapped behind a disabled Home button. The emergency/safety recovery card now passes `onAction`, so its buttons are no longer disabled. T1-244 later tightened the reconnect/recompile timing so those two steps acknowledge only after successful reconnect/recompile work.
 
 **Verification:**
 - `npx tsx tests\recovery-card-actions-advance-state.test.ts` failed before the fix and passes after.
@@ -7167,6 +7167,23 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npm test`
 
 **Status:** Shipped in `3c163ce0`. Hardware verification not required; this is test-runner/test-hygiene only.
+
+---
+### T1-244 | Recovery reconnect/recompile acknowledgements must wait for successful work
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-022 (Codex 2026-05-13 post-fix detail audit).
+
+**Problem:** The T1-242 recovery-card fix made recovery actions live, but the reconnect and recompile steps still acknowledged the runtime checklist too early. `handleRecoveryAction('reconnect')` marked `reconnectDone` immediately, before a successful USB/simulator reconnect. `handleRecoveryAction('compile')` fired `onRecompile?.()` and then marked `recompileDone` immediately, even if the compile later failed or produced no G-code. That could make recovery state look complete while Start was still blocked by a different gate, or worse, while a required reconnect/recompile had not actually happened.
+
+**Fix:** Added a post-fix acknowledgement contract. The reconnect recovery action now sends the user through an actual disconnect/reconnect path and does not acknowledge the step itself. Successful USB/simulator connect now acknowledges pending reconnect recovery. The connection recompile callback now returns `Promise<boolean>` and reports `false` when compilation produces no G-code. Compile recovery awaits that callback and acknowledges `recompileDone` only when it does not report failure.
+
+**Verification:**
+- `npx tsx tests\recovery-card-actions-ack-after-work.test.ts` failed before the fix and passes after.
+- `npx tsx tests\recovery-card-actions-advance-state.test.ts`
+- `npx tsc --noEmit --pretty false`
+- `npx eslint . --max-warnings 0`
+
+**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: after disconnect/emergency-stop/failed-compile recovery, confirm Reconnect and Recompile steps clear only after the actual reconnect/recompile path succeeds.
 
 ---
 ## Tier 2 鈥?This month
@@ -21035,6 +21052,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `e66b7baf`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
 - [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `3c163ce0`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
 - [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
+- [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `<TBD>`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

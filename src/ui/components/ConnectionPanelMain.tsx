@@ -184,7 +184,7 @@ export interface ConnectionPanelMainProps {
    * current scene). Initial value 0 from App.tsx.
    */
   historyVersion?: number;
-  onRecompile?: () => void;
+  onRecompile?: () => void | boolean | Promise<boolean>;
   onOpenSettings?: (tab?: SettingsTab) => void;
   /** Panel width in px (host computes min(500, 45% window)). */
   sidebarWidth?: number;
@@ -797,6 +797,17 @@ export function ConnectionPanelMain({
             ? `Job starts at X${fmtMm(savedOrigin.x)}, Y${fmtMm(savedOrigin.y)} (saved)`
             : 'No origin saved — save one below';
 
+  const acknowledgeReconnectRecovery = useCallback(() => {
+    const recovery = machineService.getRecoveryState();
+    if (
+      (recovery.status === 'disconnectDuringJob' || recovery.status === 'emergencyStopped') &&
+      !recovery.reconnectDone
+    ) {
+      machineService.applyRecoveryAck('reconnect');
+      appendMessage('Recovery step acknowledged: reconnect complete.');
+    }
+  }, [appendMessage, machineService]);
+
   // ─── Connection handlers ─────────────────────────────────
 
   const connectSimulator = async () => {
@@ -814,6 +825,7 @@ export function ConnectionPanelMain({
       await ctrl.connect(mock);
       setSimulator(true);
       appendMessage('✓ Simulator connected');
+      acknowledgeReconnectRecovery();
     } catch (e: any) {
       appendMessage(`Connection failed: ${e.message}`);
     } finally {
@@ -836,6 +848,7 @@ export function ConnectionPanelMain({
       await machineService.connectRealLaser(activeProfile?.baudRate ?? 115200, connectAbortController.signal);
       setSimulator(false);
       appendMessage('✓ Real laser connected via USB');
+      acknowledgeReconnectRecovery();
     } catch (e: any) {
       if (connectAbortController.signal.aborted) {
         appendMessage('Connection cancelled by user');
@@ -1546,18 +1559,30 @@ export function ConnectionPanelMain({
           }
           break;
         case 'reconnect':
+          await machineService.disconnect();
           setConnectionRecoveryVisible(false);
-          machineService.applyRecoveryAck('reconnect');
-          appendMessage('Recovery step acknowledged: reconnect complete.');
+          appendMessage('Reconnect required: choose USB laser or Simulator to confirm recovery.');
           break;
         case 'stop':
           await handleStop();
           break;
         case 'compile':
           setJobFailedRecoveryMessage(null);
-          onRecompile?.();
-          machineService.applyRecoveryAck('recompile');
-          appendMessage('Recovery step acknowledged: job recompiled.');
+          if (!onRecompile) {
+            appendMessage('Recovery step not acknowledged: no recompile action is available.');
+            break;
+          }
+          try {
+            const recompileOk = await onRecompile?.();
+            if (recompileOk !== false) {
+              machineService.applyRecoveryAck('recompile');
+              appendMessage('Recovery step acknowledged: job recompiled.');
+            } else {
+              appendMessage('Recovery step not acknowledged: recompile did not produce G-code.');
+            }
+          } catch (err: unknown) {
+            appendMessage(`Recovery step not acknowledged: ${err instanceof Error ? err.message : String(err)}`);
+          }
           break;
         default:
           break;
