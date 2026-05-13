@@ -7,6 +7,7 @@
  */
 
 import type { Operation } from './Job';
+import { appendStructuredDiagnosticLogEvent } from '../logging/StructuredDiagnosticLog';
 
 export type OperationMode = 'engrave' | 'score' | 'cut';
 
@@ -220,10 +221,21 @@ export function orderOperationsWithMetrics(
   const travelOptimized = estimateTravelMm(ordered);
   const travelSavedMm = Math.max(0, travelOriginal - travelOptimized);
 
-  console.log(
-    `${logTag} Reordered ${shapes.length} shapes: ${engraveCount} engrave, ${scoreCount} score, ${innerCount} inner cuts, ${outerCount} outer cuts`,
-  );
-  console.log(`${logTag} Estimated travel saved: ${Math.round(travelSavedMm)}mm`);
+  appendStructuredDiagnosticLogEvent({
+    domain: 'optimizer',
+    event: 'operation-order-optimized',
+    message: `${logTag} Reordered ${shapes.length} shapes; estimated travel saved ${Math.round(travelSavedMm)}mm.`,
+    details: {
+      shapeCount: shapes.length,
+      engraveCount,
+      scoreCount,
+      innerCount,
+      outerCount,
+      travelOriginalMm: travelOriginal,
+      travelOptimizedMm: travelOptimized,
+      travelSavedMm,
+    },
+  });
 
   return {
     ordered,

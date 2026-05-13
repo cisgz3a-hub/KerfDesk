@@ -3,6 +3,7 @@ import { getDefaultMaterialPresets, isDefaultMaterialPresetId } from './defaultP
 import { type Layer, type LaserSettings, type LayerMode } from '../scene/Layer';
 import { MAX_LASER_SPEED } from '../types';
 import { getDeviceProfiles, saveDeviceProfile, type DeviceProfile } from '../devices/DeviceProfile';
+import { appendStructuredDiagnosticLogEvent } from '../logging/StructuredDiagnosticLog';
 import type { ResponseCurve } from './ResponseCurve';
 import { getStorage } from '../storage/storage';
 import {
@@ -279,8 +280,11 @@ export function migrateDeviceProfileResponseCurves(): void {
   }
 
   if (profilesChanged) {
-    // eslint-disable-next-line no-console
-    console.log('[MaterialLibrary] Migrated response curves to presets');
+    appendStructuredDiagnosticLogEvent({
+      domain: 'materials',
+      event: 'material-response-curves-migrated',
+      message: 'Migrated material response curves to presets.',
+    });
   }
 }
 

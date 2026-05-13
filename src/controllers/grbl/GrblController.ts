@@ -50,6 +50,7 @@ import {
   makeResumeResult,
   makeSoftResetStopResult,
 } from '../SafetyActionResult';
+import { appendStructuredDiagnosticLogEvent } from '../../core/logging/StructuredDiagnosticLog';
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
@@ -1617,16 +1618,17 @@ export class GrblController implements GrblControllerApi {
     // resolved.
     this._placementUncertain = false;
     this._lastPlacementUncertainReason = null;
-    console.log(
-      '[GRBL] Machine: ' +
-        this._bedWidth +
-        'x' +
-        this._bedHeight +
-        'mm, $23=' +
-        this._homingDir +
-        ', laser=' +
-        this._laserMode
-    );
+    appendStructuredDiagnosticLogEvent({
+      domain: 'controller',
+      event: 'grbl-wcs-normalized',
+      message: 'GRBL machine baseline resolved.',
+      details: {
+        bedWidth: this._bedWidth,
+        bedHeight: this._bedHeight,
+        homingDir: this._homingDir,
+        laserMode: this._laserMode,
+      },
+    });
     for (const cb of this._stateListeners) {
       cb({ ...this._state });
     }

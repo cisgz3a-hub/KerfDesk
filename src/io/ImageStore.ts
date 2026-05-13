@@ -8,6 +8,8 @@
  * Images are stored by content hash. Scene objects reference them by ID.
  */
 
+import { appendStructuredDiagnosticLogEvent } from '../core/logging/StructuredDiagnosticLog';
+
 const DB_NAME = 'laserforge_images';
 const DB_VERSION = 1;
 const STORE_NAME = 'images';
@@ -168,7 +170,12 @@ export async function pruneUnusedImages(sceneObjects: Array<{ geometry: { src?: 
     }
 
     if (pruned > 0) {
-      console.log(`[ImageStore] Pruned ${pruned} unused image(s)`);
+      appendStructuredDiagnosticLogEvent({
+        domain: 'storage',
+        event: 'image-store-pruned-unused-images',
+        message: `Pruned ${pruned} unused image(s).`,
+        details: { pruned },
+      });
     }
 
     return pruned;

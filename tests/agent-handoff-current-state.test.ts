@@ -1,6 +1,6 @@
 /**
- * T1-231: the handoff file is the local continuation contract for other agents.
- * It must reflect the current audit-fix queue, not an older T1-202 snapshot.
+ * T1-231 introduced the handoff file as the local continuation contract for other agents.
+ * Later audit-fix tickets keep it current so it does not drift back to an old snapshot.
  */
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -9,9 +9,9 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-231\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-231\*\*/);
-  assert.match(handoff, /Next audit-fix ticket: \*\*T1-232\*\*/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-232\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-232\*\*/);
+  assert.match(handoff, /Next audit-fix ticket: \*\*T1-233\*\*/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {
@@ -24,4 +24,3 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);
 });
-

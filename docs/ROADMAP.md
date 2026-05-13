@@ -6955,6 +6955,27 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in d3e84255. Hardware verification not required; this is a docs and handoff-integrity update.
 
 ---
+### T1-232 | Route production diagnostics through structured log sink
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-003.
+
+**Problem:** Production code still wrote operational breadcrumbs with direct `console.log` calls. The audit described three callsites, but live verification found five: GRBL WCS normalization, operation-order optimizer metrics, image-store pruning, and material response-curve migration. Console-only breadcrumbs are easy to lose and cannot be assembled into support bundles.
+
+**Fix:** Added `src/core/logging/StructuredDiagnosticLog.ts`, a bounded process-local diagnostic event sink with support-bundle serialization helpers, and routed the five production callsites through `appendStructuredDiagnosticLogEvent(...)`. The old event details are preserved as structured fields instead of unstructured console text.
+
+**Verification:**
+- `npx tsx tests\production-console-log-structured.test.ts`
+- `npx tsx tests\operation-ordering.test.ts`
+- `npx tsx tests\material-library-storage.test.ts`
+- `npx tsx tests\materials.test.ts`
+- `npx tsx tests\autosave-preserves-images.test.ts`
+- `npx tsx tests\wcs-mutation-consent.test.ts`
+- `rg -n "console\.log\(" src --glob "*.ts" --glob "*.tsx"` (no matches)
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is an observability-only routing change with no controller commands, generated output, or machine-state transitions changed.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20810,6 +20831,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-231 LOW refresh AGENT_HANDOFF.md after audit-fix run (shipped in d3e84255) - closes audit F-015 by replacing the stale T1-202 handoff with the current T1-223..T1-231 continuation state and next ticket.
 - [x] T1-230 MEDIUM move SafetyActionResult and ControllerStatus to neutral controller-owned modules (shipped in 05efdb38) - closes audit F-006 by removing the remaining controller-to-app shared-type imports while preserving app-level compatibility wrappers.
 - [x] T1-229 MEDIUM backfill ROADMAP + shipped ledger for T1-209..T1-222 (shipped in 834b70f8) - closes audit F-014 by recording the missing coupled-triple docs for the WorkflowPanel and v30 audit-response tickets.
+- [x] T1-232 LOW route production diagnostics through structured logging (shipped in <TBD>) - closes audit F-003 by replacing the remaining `src/` `console.log` breadcrumbs with a bounded structured diagnostic log sink.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
