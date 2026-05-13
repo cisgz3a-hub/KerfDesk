@@ -7183,7 +7183,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsc --noEmit --pretty false`
 - `npx eslint . --max-warnings 0`
 
-**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: after disconnect/emergency-stop/failed-compile recovery, confirm Reconnect and Recompile steps clear only after the actual reconnect/recompile path succeeds.
+**Status:** Shipped in `8c34dd58`. Hardware verification recommended before release tagging: after disconnect/emergency-stop/failed-compile recovery, confirm Reconnect and Recompile steps clear only after the actual reconnect/recompile path succeeds.
 
 ---
 ## Tier 2 鈥?This month
@@ -21052,7 +21052,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `e66b7baf`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
 - [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `3c163ce0`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
 - [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
-- [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `<TBD>`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
+- [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
