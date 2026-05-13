@@ -6973,7 +6973,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `rg -n "console\.log\(" src --glob "*.ts" --glob "*.tsx"` (no matches)
 - `npx tsc --noEmit --pretty false`
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is an observability-only routing change with no controller commands, generated output, or machine-state transitions changed.
+**Status:** Shipped in `4b1310f`. Hardware verification not required; this is an observability-only routing change with no controller commands, generated output, or machine-state transitions changed.
 
 ---
 ## Tier 2 鈥?This month
@@ -20831,7 +20831,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-231 LOW refresh AGENT_HANDOFF.md after audit-fix run (shipped in d3e84255) - closes audit F-015 by replacing the stale T1-202 handoff with the current T1-223..T1-231 continuation state and next ticket.
 - [x] T1-230 MEDIUM move SafetyActionResult and ControllerStatus to neutral controller-owned modules (shipped in 05efdb38) - closes audit F-006 by removing the remaining controller-to-app shared-type imports while preserving app-level compatibility wrappers.
 - [x] T1-229 MEDIUM backfill ROADMAP + shipped ledger for T1-209..T1-222 (shipped in 834b70f8) - closes audit F-014 by recording the missing coupled-triple docs for the WorkflowPanel and v30 audit-response tickets.
-- [x] T1-232 LOW route production diagnostics through structured logging (shipped in <TBD>) - closes audit F-003 by replacing the remaining `src/` `console.log` breadcrumbs with a bounded structured diagnostic log sink.
+- [x] T1-232 LOW route production diagnostics through structured logging (shipped in 4b1310f) - closes audit F-003 by replacing the remaining `src/` `console.log` breadcrumbs with a bounded structured diagnostic log sink.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
