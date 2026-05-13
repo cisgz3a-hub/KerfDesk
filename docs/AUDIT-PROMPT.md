@@ -1,5 +1,13 @@
 # LaserForge full-code audit — self-prompt
 
+> **Superseded by [`docs/AUDIT.md`](AUDIT.md).** The current master
+> prompt is grounded in IEEE 1028, ISO/IEC 25010, NIST SSDF, OWASP
+> CRG / ASVS, CWE Top 25, STPA / FMEA, and IEC 60825-1, adds an
+> explicit function-by-function pass, and bolts on a Phase 9
+> hallucination & drift-detection module. This file is retained
+> for git history and as a backlink target; new audit passes start
+> from `docs/AUDIT.md`.
+
 This is the prompt the audit follows. The audit's goal is a
 **professional, code-by-code review of every sector of the
 LaserForge codebase**, suitable for handing to an engineering

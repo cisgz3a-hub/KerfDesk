@@ -7,6 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **`.cursor/rules/laserforge.md` is the binding workflow contract** for this repo and applies to Claude Code as much as to Cursor. Read it before proposing any change. The non-negotiables it encodes:
 
 - **`docs/AGENT_HANDOFF.md`** captures the latest agent-to-agent continuation note. Read it after this file so you know the current clean HEAD, last shipped ticket, next ticket, and any local verification caveats.
+- **`docs/AUDIT.md`** is the master audit prompt — the by-the-book procedure for the next full-codebase audit pass. Read it before opening an audit; it grounds the audit in IEEE 1028 / ISO/IEC 25010 / NIST SSDF / OWASP CRG / CWE Top 25 / STPA + FMEA / IEC 60825-1, requires a function-by-function checklist, and includes a Phase 9 hallucination & drift-detection module. Supersedes the older `docs/AUDIT-PROMPT.md`.
 - **`docs/ROADMAP.md`** is the authoritative ticket list (323 tickets, Tier 0–4). **`docs/ROADMAP-shipped-audit.md`** is the verified ledger of what has shipped, with hashes. Both are source of truth — don't propose work that isn't on them without explicit approval.
 - **Strict tier order, lower number first.** No skipping. Partial tickets must be finished before adjacent ones are started.
 - **Every shipped fix is a coupled triple** in one commit: code change + test, `ROADMAP.md` ticket marked `**Status:** Shipped in <hash>`, and `ROADMAP-shipped-audit.md` row moved to Shipped. A patch missing any of the three is incomplete.
