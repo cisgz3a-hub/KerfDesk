@@ -14,7 +14,7 @@ import {
   hashSceneForPersistence,
   isDirty,
   hasMeaningfulContent,
-} from '../src/app/sceneDirtyHash';
+} from '../src/core/scene/sceneDirtyHash';
 import { createScene } from '../src/core/scene/Scene';
 import { createLayer } from '../src/core/scene/Layer';
 import { type RectGeometry, type SceneObject } from '../src/core/scene/SceneObject';
@@ -204,10 +204,11 @@ void (async () => {
   const path = await import('node:path');
   const here = path.dirname(url.fileURLToPath(import.meta.url));
   const src = fs.readFileSync(
-    path.resolve(here, '../src/app/sceneDirtyHash.ts'),
+    path.resolve(here, '../src/core/scene/sceneDirtyHash.ts'),
     'utf-8',
   );
   assert(/T2-88/.test(src), 'T2-88 marker in sceneDirtyHash.ts');
+  assert(/T1-225/.test(src), 'T1-225 marker in sceneDirtyHash.ts');
   assert(/hashSceneForPersistence/.test(src), 'hashSceneForPersistence exported');
   assert(/isDirty/.test(src), 'isDirty exported');
   assert(/hasMeaningfulContent/.test(src), 'hasMeaningfulContent exported');

@@ -93,7 +93,7 @@ import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
-import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash';
+import { hashSceneForPersistence, isDirty } from '../../core/scene/sceneDirtyHash';
 import { generateId, IDENTITY_MATRIX } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';

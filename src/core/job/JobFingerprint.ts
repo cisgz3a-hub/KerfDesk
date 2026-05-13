@@ -17,7 +17,7 @@
 
 import type { Scene } from '../scene/Scene';
 import type { DeviceProfile } from '../devices/DeviceProfile';
-import { hashSceneForPersistence } from '../../app/sceneDirtyHash';
+import { hashSceneForPersistence } from '../scene/sceneDirtyHash';
 
 export type StartMode = 'absolute' | 'current' | 'savedOrigin';
 

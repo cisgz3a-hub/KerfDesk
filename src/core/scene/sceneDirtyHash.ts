@@ -1,5 +1,8 @@
 /**
  * T2-88: hash-derived dirty state.
+ * T1-225 / F-007: moved from `src/app/sceneDirtyHash.ts` into
+ * `src/core/scene/sceneDirtyHash.ts` so core job fingerprinting does
+ * not runtime-import the app layer.
  *
  * Pre-T2-88 the project's dirty flag was a manually-set boolean
  * (`sceneIsDirtyRef.current = true`) toggled at every mutation site.
@@ -28,9 +31,9 @@
  * incrementally.
  */
 
-import type { Scene } from '../core/scene/Scene';
-import type { Layer } from '../core/scene/Layer';
-import type { SceneObject } from '../core/scene/SceneObject';
+import type { Scene } from './Scene';
+import type { Layer } from './Layer';
+import type { SceneObject } from './SceneObject';
 
 /**
  * FNV-1a 32-bit hex of a UTF-16 string. Same shape as the autosave

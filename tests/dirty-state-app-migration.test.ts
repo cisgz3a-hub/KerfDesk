@@ -9,7 +9,7 @@ const appSource = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'compone
 const fileHandlersSource = fs.readFileSync(path.join(process.cwd(), 'src', 'ui', 'hooks', 'useFileHandlers.ts'), 'utf8');
 
 assert(
-  appSource.includes("import { hashSceneForPersistence, isDirty } from '../../app/sceneDirtyHash'"),
+  appSource.includes("import { hashSceneForPersistence, isDirty } from '../../core/scene/sceneDirtyHash'"),
   'App.tsx imports hash-derived dirty helpers',
 );
 assert(
