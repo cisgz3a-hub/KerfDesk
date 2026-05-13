@@ -7206,7 +7206,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npm run project-map:check`
 - `git diff --check`
 
-**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: run a long Falcon burn from USB and Falcon WiFi paths, confirm no false disconnect while `ok` traffic is flowing, and confirm autosave resumes after the job completes.
+**Status:** Shipped in `1ff912a3`. Hardware verification recommended before release tagging: run a long Falcon burn from USB and Falcon WiFi paths, confirm no false disconnect while `ok` traffic is flowing, and confirm autosave resumes after the job completes.
 
 ---
 ## Tier 2 鈥?This month
@@ -21077,7 +21077,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `3c163ce0`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
 - [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
 - [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
-- [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `<TBD>`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
+- [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `1ff912a3`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
