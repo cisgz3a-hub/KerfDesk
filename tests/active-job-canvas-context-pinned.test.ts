@@ -133,6 +133,8 @@ void (async () => {
     machineState: idle,
     notifySimulatorTx: () => {},
     canvasContext: ctxA,
+    currentStartMode: first.ticket.startMode,
+    currentSavedOrigin: first.ticket.savedOrigin,
   });
 
   const during = svc.getActiveJobCanvasContext();

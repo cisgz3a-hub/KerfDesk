@@ -30,6 +30,7 @@ import { validateJobTicket } from '../src/app/validateJobTicket';
 import type { ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { createScene } from '../src/core/scene/Scene';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -110,6 +111,12 @@ console.log('\n=== T1-181 compile determinism: entitlement + material-preset has
     materialPresetsHash: hashReferencedMaterialPresets(scene),
     emittedBurnBounds: null,
     burnEnvelopeDivergence: null,
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile: null,
+      startMode: 'absolute',
+      savedOrigin: null,
+    }),
     gcodeLines: ['G0 X1'],
     gcodeText: 'G0 X1',
     machinePlanBounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },

@@ -7127,6 +7127,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\safety-operations-controller-routing.test.ts`
 - `npm test`
 - `npx tsc --noEmit --pretty false`
+- `npm test`
 - `npm run build`
 - `npx eslint . --max-warnings 0`
 - `npm run project-map:check`
@@ -7207,6 +7208,26 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `git diff --check`
 
 **Status:** Shipped in `1ff912a3`. Hardware verification recommended before release tagging: run a long Falcon burn from USB and Falcon WiFi paths, confirm no false disconnect while `ok` traffic is flowing, and confirm autosave resumes after the job completes.
+
+---
+### T1-246 | Runtime JobFingerprint enforcement must block stale starts
+
+**Audit source:** User-provided release-readiness audit, 2026-05-13. The audit found that `JobFingerprint` existed as a type/helper but was not fully wired into the final start path, leaving stale output possible when start mode, saved origin, controller capability assumptions, bed dimensions, max spindle, or compile options changed after compile.
+
+**Problem:** `ValidatedJobTicket` still depended mostly on the older scene/profile/controller/material/G-code hashes. That helped, but it did not prove the actual runtime assumptions used to emit the toolpath still matched the connected machine and selected job-position mode at Start. The code comments in `JobFingerprint.ts` still described the start-path migration as follow-up work, which meant the fix did not count as a runtime guarantee.
+
+**Fix:** `ValidatedJobTicket` now carries a required `fingerprint: JobFingerprint`. `PipelineService.compileGcode(...)` builds the fingerprint from the same compile inputs that affect emitted output: scene, active profile, referenced material presets, start mode, saved origin, resolved controller capabilities/output target, max spindle, bed size, origin corner, return-to-origin behavior, controller acceleration snapshot, output format, and scene compile options. `MachineService.startValidatedJob(...)` now requires the current start mode and saved origin, rebuilds the current fingerprint immediately before any G-code streams, and passes it into `validateJobTicket(...)`. The validator fails closed on missing fingerprints and rejects any fingerprint mismatch with a field-specific recompile message.
+
+**Verification:**
+- `npx tsx tests\job-fingerprint-start-validation.test.ts` failed before the fix and passes after. It proves compile embeds a fingerprint, `validateJobTicket` rejects changed start mode and missing fingerprints, `MachineService.startValidatedJob` rejects a changed runtime start mode, and no G-code streams on mismatch.
+- Focused regressions: `npx tsx tests\validate-job-ticket.test.ts`, `npx tsx tests\ticket-determinism-entitlement-and-presets.test.ts`, `npx tsx tests\machine-service-start-validated-job.test.ts`, `npx tsx tests\machine-service-job-lifecycle-safety.test.ts`, `npx tsx tests\wake-lock.test.ts`, `npx tsx tests\safety-write-failure-surfaces.test.ts`, `npx tsx tests\failed-start-persists-log.test.ts`, `npx tsx tests\job-replay-capture-not-gated.test.ts`.
+- `npx tsc --noEmit --pretty false`
+- `npm run build`
+- `npx eslint . --max-warnings 0`
+- `npm run project-map:check`
+- `git diff --check`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required for the host-side stale-output gate; hardware verification remains recommended for the jobs whose start-mode/origin behavior is being protected.
 
 ---
 ## Tier 2 鈥?This month
@@ -21078,6 +21099,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
 - [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
 - [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `1ff912a3`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
+- [x] T1-246 HIGH enforce runtime JobFingerprint at Start (shipped in `<TBD>`) - closes the stale-output audit cap by embedding `JobFingerprint` in every validated ticket and having `MachineService.startValidatedJob` rebuild/compare the current runtime fingerprint before streaming any G-code.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

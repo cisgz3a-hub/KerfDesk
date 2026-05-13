@@ -47,6 +47,7 @@ import { resetJobLogsForTest } from '../src/core/job/JobLog';
 import { loadReplays } from '../src/core/replay/JobReplay';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 import { setStorageForTest } from '../src/core/storage/storage';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -98,6 +99,12 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString('G0 X1\nM5'),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: ['G0 X1', 'M5'],
     gcodeText: 'G0 X1\nM5',
     machinePlanBounds: { ...plan.bounds },
@@ -189,6 +196,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: ctxFor(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
   } catch (e: unknown) {
     propagated = e instanceof Error ? e.message : String(e);

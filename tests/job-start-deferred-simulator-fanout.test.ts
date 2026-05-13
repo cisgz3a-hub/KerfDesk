@@ -31,6 +31,7 @@ import {
   hashReferencedMaterialPresets,
 } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -114,6 +115,15 @@ function makeBigTicket(lineCount: number): ValidatedJobTicket {
     entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
     materialPresetsHash: hashReferencedMaterialPresets(scene),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+      controllerMaxSpindle: 1000,
+    }),
+    emittedBurnBounds: null,
+    burnEnvelopeDivergence: null,
     gcodeLines: lines,
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -158,6 +168,8 @@ async function run(): Promise<void> {
       events.push(`notify-${notifyCount}`);
     },
     canvasContext: ctxForTicket(ticket),
+    currentStartMode: ticket.startMode,
+    currentSavedOrigin: ticket.savedOrigin,
   });
 
   // The controller's executeJob mock pushes 'executeJob-called' synchronously when
@@ -197,6 +209,8 @@ async function run(): Promise<void> {
         throw new Error('listener boom');
       },
       canvasContext: ctxForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
   } catch (e) {
     startError = e;

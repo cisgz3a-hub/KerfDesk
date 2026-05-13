@@ -223,6 +223,8 @@ void (async () => {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext,
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch (err) {
       rejection = err instanceof Error ? err : new Error(String(err));
@@ -265,6 +267,8 @@ void (async () => {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext,
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch (err) {
       rejection = err instanceof Error ? err : new Error(String(err));

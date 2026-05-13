@@ -203,6 +203,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: {} as never,
+      currentStartMode: 'absolute',
+      currentSavedOrigin: null,
     });
   } catch (e) {
     threw = true;

@@ -24,6 +24,10 @@
 import type { Scene } from '../core/scene/Scene';
 import type { DeviceProfile } from '../core/devices/DeviceProfile';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
+import {
+  fingerprintMismatchReason,
+  type JobFingerprint,
+} from '../core/job/JobFingerprint';
 import { hashObject, hashSceneForTicket, hashString } from '../core/job/ticketHashing';
 // T1-181 (external audit High #1 + #3): live-state hashes for the
 // determinism gate. The validator recomputes these at start time and
@@ -48,6 +52,12 @@ export interface ValidateJobTicketInput {
   currentProfile: DeviceProfile | null;
   /** Identifier of the currently connected controller type. */
   currentControllerType: ControllerId;
+  /**
+   * T1-246: current runtime fingerprint rebuilt immediately before
+   * start. Required on the production MachineService path; optional
+   * here so older pure unit tests can still isolate pre-existing gates.
+   */
+  currentFingerprint?: JobFingerprint;
 }
 
 /**
@@ -152,6 +162,34 @@ export function validateJobTicket(input: ValidateJobTicketInput): TicketValidati
         'A material preset used by this design changed after the G-code was created. '
         + 'Recompile so the toolpath reflects the current preset settings, then start.',
     };
+  }
+
+  // T1-246: service-level stale-output gate. Earlier checks keep the
+  // historical copy for scene/profile/material/gcode mismatches; this
+  // full fingerprint catches the audit's missing runtime assumptions:
+  // start mode, saved origin, resolved machine capabilities, and
+  // compile options. A production start with a missing ticket
+  // fingerprint is fail-closed.
+  if (input.currentFingerprint) {
+    const ticketFingerprint = (ticket as ValidatedJobTicket & {
+      fingerprint?: JobFingerprint;
+    }).fingerprint;
+    if (!ticketFingerprint) {
+      return {
+        ok: false,
+        reason:
+          'Ticket is missing a job fingerprint. Recompile before starting.',
+      };
+    }
+    const mismatch = fingerprintMismatchReason(ticketFingerprint, input.currentFingerprint);
+    if (mismatch) {
+      console.warn('[ticket] job fingerprint mismatch', {
+        field: mismatch.field,
+        ticketFingerprint,
+        currentFingerprint: input.currentFingerprint,
+      });
+      return { ok: false, reason: mismatch.message };
+    }
   }
 
   const recomputedGcodeHash = hashString(ticket.gcodeText);

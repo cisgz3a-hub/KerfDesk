@@ -20,6 +20,7 @@ import { getJobLogs } from '../src/core/job/JobLog';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -94,6 +95,12 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: [...gcodeLines],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -179,6 +186,8 @@ async function run(): Promise<void> {
         simLines.push(line);
       },
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     assert(sentBatches.length === 1, 'executeJob streams once');
@@ -233,6 +242,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     assert(executeCalls.length === 1, 'startValidatedJob calls executeJob once');
@@ -260,6 +271,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     const progress = {
@@ -321,6 +334,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: canvasContextForTicket(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch (err) {
       message = err instanceof Error ? err.message : String(err);
@@ -348,10 +363,31 @@ async function run(): Promise<void> {
     const portRef = { current: port as SerialPortLike };
     const svc = new MachineService(controllerRef, portRef);
 
-    const t = makeTestTicket(scene, {
+    const baseTicket = makeTestTicket(scene, {
       gcodeLines: ['G0 X1 Y1', 'M5'],
       gcodeText: 'G0 X1 Y1\nM5',
     });
+    const machineInfo = ctrl.getMachineInfo();
+    const reportedBed =
+      machineInfo.bedWidth > 0 && machineInfo.bedHeight > 0
+        ? { width: machineInfo.bedWidth, height: machineInfo.bedHeight }
+        : null;
+    const reportedAccel =
+      machineInfo.maxAccelX > 0 && machineInfo.maxAccelY > 0
+        ? Math.min(machineInfo.maxAccelX, machineInfo.maxAccelY)
+        : (machineInfo.maxAccelX > 0 ? machineInfo.maxAccelX : (machineInfo.maxAccelY > 0 ? machineInfo.maxAccelY : null));
+    const t: ValidatedJobTicket = {
+      ...baseTicket,
+      fingerprint: makeTestJobFingerprint({
+        scene,
+        profile: getActiveProfile(),
+        startMode: baseTicket.startMode,
+        savedOrigin: baseTicket.savedOrigin,
+        controllerMaxSpindle: ctrl.maxSpindle,
+        machineBedFromController: reportedBed,
+        controllerAccelMmPerS2: reportedAccel,
+      }),
+    };
 
     await svc.startValidatedJob({
       ticket: t,
@@ -359,6 +395,8 @@ async function run(): Promise<void> {
       machineState: ctrl.state,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(t),
+      currentStartMode: t.startMode,
+      currentSavedOrigin: t.savedOrigin,
     });
 
     await waitUntil(() => !ctrl.isJobRunning, 8000);

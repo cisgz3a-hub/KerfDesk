@@ -8,6 +8,7 @@ import type { AABB } from '../types';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { ControllerId } from '../../controllers/ControllerRegistry';
 import type { BurnEnvelopeDivergenceReport } from '../output/burnEnvelopeDivergence';
+import type { JobFingerprint } from './JobFingerprint';
 
 /**
  * Collision-resistant fingerprint of inputs that produced a compiled G-code
@@ -19,6 +20,14 @@ export interface ValidatedJobTicket {
   readonly sceneHash: string;
   readonly profileHash: string;
   readonly gcodeHash: string;
+  /**
+   * T1-246: full compile/runtime fingerprint embedded in the ticket
+   * and revalidated by `MachineService.startValidatedJob`. This is the
+   * service-level stale-output gate: changes to start mode, saved
+   * origin, controller capability inputs ($30 / bed / origin), or
+   * compile options refuse Start before any G-code streams.
+   */
+  readonly fingerprint: JobFingerprint;
   /**
    * T1-181 (external audit High #1 + #3): determinism gate.
    * Hash of the entitlement-policy snapshot read at compile time

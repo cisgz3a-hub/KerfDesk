@@ -8,11 +8,11 @@
  * start, the job result is silently wrong but the partial-
  * fingerprint validation passes.
  *
- * T2-85 is the type definition + builder + comparison + reason
- * detection. The audit's full proposal threads `JobFingerprint`
- * through ValidatedJobTicket and the start path's mismatch detector;
- * that migration is filed as T2-85-followup since it touches the
- * existing `validateTicket` flow.
+ * T2-85 shipped the type definition + builder + comparison + reason
+ * detection first. T1-246 wires the fingerprint into
+ * `ValidatedJobTicket` and `MachineService.startValidatedJob` so the
+ * final runtime path refuses stale output instead of merely describing
+ * the missing guarantee.
  */
 
 import type { Scene } from '../scene/Scene';

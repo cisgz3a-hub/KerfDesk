@@ -36,6 +36,7 @@ import {
   hashEntitlementPolicy,
   hashReferencedMaterialPresets,
 } from '../core/job/compileInputHashes';
+import { buildJobFingerprint, type JobFingerprint } from '../core/job/JobFingerprint';
 // T1-182 (external audit High #2 + #8): canonical burn envelope
 // derived from the EMITTED gcode (not the upstream `Plan`). Attaches
 // to the ticket so future preview / validation code can consume the
@@ -221,6 +222,63 @@ export function resolvePipelineControllerCapabilities(
   base: ControllerCapabilities = grblCapabilities,
 ): ControllerCapabilities {
   return applyProfileOverrides(base, profileToControllerCapabilityOverrides(profile));
+}
+
+export interface PipelineJobFingerprintInputs {
+  scene: Scene;
+  startMode: GcodeStartMode;
+  savedOrigin: { x: number; y: number } | null;
+  profile: DeviceProfile | null;
+  controllerMaxSpindle: number | null;
+  outputFormat: OutputFormat;
+  machineBedFromController: { width: number; height: number } | null;
+  controllerAccelMmPerS2: number | null;
+  controllerCapabilities?: ControllerCapabilities;
+}
+
+/**
+ * T1-246: canonical fingerprint builder for the production compile and
+ * start paths. Keeping the shape here prevents the audit failure where
+ * a helper exists but compile/start rebuild different notions of "same
+ * job."
+ */
+export function buildPipelineJobFingerprint(args: PipelineJobFingerprintInputs): JobFingerprint {
+  const controllerCapabilities = resolvePipelineControllerCapabilities(
+    args.profile,
+    args.controllerCapabilities ?? grblCapabilities,
+  );
+  const outputTarget = resolveOutputTarget(args.profile, controllerCapabilities, args.outputFormat);
+  const originCorner = resolveOriginCorner(args.profile);
+  const bedWidthMm = resolveBedWidthMm(args.profile, args.machineBedFromController);
+  const bedHeightMm = resolveBedHeightMm(args.profile, args.machineBedFromController);
+  const maxSpindle =
+    (args.controllerMaxSpindle != null && args.controllerMaxSpindle > 0)
+      ? args.controllerMaxSpindle
+      : (controllerCapabilities.laser.maxPowerValue > 0
+          ? controllerCapabilities.laser.maxPowerValue
+          : 1000);
+
+  return buildJobFingerprint({
+    scene: args.scene,
+    profile: args.profile,
+    materialSnapshot: hashReferencedMaterialPresets(args.scene),
+    startMode: args.startMode,
+    savedOrigin: args.savedOrigin,
+    capabilities: {
+      controllerCapabilities,
+      outputTarget,
+      maxSpindle,
+      bedWidthMm,
+      bedHeightMm,
+      originCorner,
+      controllerAccelMmPerS2: args.controllerAccelMmPerS2,
+      returnToOrigin: args.profile?.returnToOrigin ?? true,
+    },
+    compileOptions: {
+      outputFormat: args.outputFormat,
+      sceneCompileOptions: args.scene.compileOptions ?? null,
+    },
+  });
 }
 
 // ─── RESULT TYPES ──────────────────────────────────────────────
@@ -476,11 +534,23 @@ export async function compileGcode(
 
   const gcode = output.text;
   const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const fingerprint = buildPipelineJobFingerprint({
+    scene,
+    startMode,
+    savedOrigin,
+    profile,
+    controllerMaxSpindle,
+    outputFormat,
+    machineBedFromController,
+    controllerAccelMmPerS2,
+    controllerCapabilities: opts.controllerCapabilities,
+  });
   const ticket: ValidatedJobTicket = {
     ticketId: generateTicketId(),
     sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcode),
+    fingerprint,
     // T1-181 (audit High #1 + #3): capture compile-time entitlement
     // policy AND referenced-material-presets so the start-time
     // validator can detect divergence. See compileInputHashes.ts for

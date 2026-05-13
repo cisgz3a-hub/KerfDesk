@@ -141,6 +141,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: activeJobContextFromCompile(compiledA),
+        currentStartMode: compiledA.ticket.startMode,
+        currentSavedOrigin: compiledA.ticket.savedOrigin,
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);
@@ -177,6 +179,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: activeJobContextFromCompile(compiled),
+        currentStartMode: compiled.ticket.startMode,
+        currentSavedOrigin: compiled.ticket.savedOrigin,
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);
@@ -210,6 +214,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: activeJobContextFromCompile(compiled),
+      currentStartMode: compiled.ticket.startMode,
+      currentSavedOrigin: compiled.ticket.savedOrigin,
     });
 
     assert(sendCalls.length === 1, 'clean path: executeJob called once');
@@ -243,6 +249,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: activeJobContextFromCompile(compiled),
+        currentStartMode: tamperedTicket.startMode,
+        currentSavedOrigin: tamperedTicket.savedOrigin,
       });
     } catch (err: unknown) {
       errMsg = err instanceof Error ? err.message : String(err);

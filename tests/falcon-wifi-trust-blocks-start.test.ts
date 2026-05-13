@@ -249,6 +249,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: {} as never,
+      currentStartMode: 'absolute',
+      currentSavedOrigin: null,
     });
   } catch (e) {
     threw = true;
@@ -275,6 +277,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: {} as never,
+      currentStartMode: 'absolute',
+      currentSavedOrigin: null,
     });
   } catch (e) {
     if (/untrusted connection/i.test((e as Error).message ?? '')) {

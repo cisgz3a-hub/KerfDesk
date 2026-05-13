@@ -605,6 +605,9 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
             machineState,
             notifySimulatorTx,
             canvasContext,
+            currentStartMode: startMode,
+            currentSavedOrigin: props.savedOrigin,
+            outputFormat: 'grbl',
           })
           .catch((err: unknown) => {
             console.warn(

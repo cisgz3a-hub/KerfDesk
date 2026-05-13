@@ -9,9 +9,9 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-244\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-244\*\*/);
-  assert.match(handoff, /Next active audit-fix ticket: none from `docs\/AUDIT-2026-05-12\.md`/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-246\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-246\*\*/);
+  assert.match(handoff, /Next active audit-fix ticket: continue the release-readiness audit sequence/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {
@@ -20,10 +20,12 @@ test('handoff no longer presents the stale T1-202 state as current', () => {
 });
 
 test('handoff preserves known verification caveats', () => {
-  assert.match(handoff, /Full `npm test` passed during T1-243/);
+  assert.match(handoff, /Full `npm test` passed during T1-246/);
   assert.match(handoff, /T1-242 closed F-020/);
   assert.match(handoff, /T1-243 closed F-021/);
   assert.match(handoff, /T1-244 closed F-022/);
+  assert.match(handoff, /T1-245 fixed the user-reported long-job stop\/disconnect path/);
+  assert.match(handoff, /T1-246 closed the largest stale-output audit cap/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

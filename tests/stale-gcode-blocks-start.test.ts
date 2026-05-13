@@ -150,6 +150,8 @@ async function run(): Promise<void> {
       machineState: makeIdleState(),
       notifySimulatorTx: () => {},
       canvasContext: canvasContextFromCompile(compiled),
+      currentStartMode: compiled.ticket.startMode,
+      currentSavedOrigin: compiled.ticket.savedOrigin,
     });
   } catch (err: unknown) {
     errorMessage = err instanceof Error ? err.message : String(err);

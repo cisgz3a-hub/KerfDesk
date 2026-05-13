@@ -17,6 +17,7 @@ import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { type SerialPortLike } from '../src/communication/SerialPort';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -100,6 +101,12 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: [...gcodeLines],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -182,6 +189,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     assert(acquireCallCount === 1, 'acquireJobWakeLock invoked exactly once for successful start');
@@ -204,6 +213,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     const progress = {
@@ -248,6 +259,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     svc.clearJobSession();
@@ -269,6 +282,8 @@ async function run(): Promise<void> {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
 
     await svc.disconnect();
@@ -293,6 +308,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: canvasContextForTicket(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch {
       threw = true;
@@ -321,6 +338,8 @@ async function run(): Promise<void> {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: canvasContextForTicket(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch {
       threw = true;

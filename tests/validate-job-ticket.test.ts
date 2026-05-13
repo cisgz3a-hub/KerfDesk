@@ -35,6 +35,7 @@ import {
   hashReferencedMaterialPresets,
 } from '../src/core/job/compileInputHashes';
 import { validateJobTicket } from '../src/app/validateJobTicket';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -96,6 +97,12 @@ function makeTicket(args: {
     materialPresetsHash: hashReferencedMaterialPresets(args.scene),
     emittedBurnBounds: null,
     burnEnvelopeDivergence: null,
+    fingerprint: makeTestJobFingerprint({
+      scene: args.scene,
+      profile: args.profile,
+      startMode: 'absolute',
+      savedOrigin: null,
+    }),
     gcodeLines: args.gcodeText.split('\n'),
     gcodeText: args.gcodeText,
     machinePlanBounds: { minX: 0, minY: 0, maxX: 1, maxY: 1 },

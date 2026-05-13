@@ -133,6 +133,8 @@ void (async () => {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: cctx,
+        currentStartMode: compiled.ticket.startMode,
+        currentSavedOrigin: compiled.ticket.savedOrigin,
       });
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
@@ -173,6 +175,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: cctx,
+      currentStartMode: compiled.ticket.startMode,
+      currentSavedOrigin: compiled.ticket.savedOrigin,
     });
     assert(svc.getActiveJobCanvasContext() != null, 'context set');
 
@@ -238,6 +242,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: cctx,
+      currentStartMode: compiled.ticket.startMode,
+      currentSavedOrigin: compiled.ticket.savedOrigin,
     });
     assert(svc.getActiveJobCanvasContext() != null, 'context set again');
     svc.clearJobSession();

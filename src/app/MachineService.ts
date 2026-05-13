@@ -5,6 +5,8 @@ import { WebSerialPort } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
+import { type GcodeStartMode } from '../core/output/GcodeOrigin';
+import { type OutputFormat } from '../core/output/Output';
 // T1-88: requireFeature import removed — the only consumer was the
 // job_replay capture gate, which is now always-on.
 import {
@@ -75,6 +77,7 @@ import { getMachineEventLedger } from './MachineEventLedger';
 // (scene/profile/controller/gcode hash) can be tested in isolation.
 // Hashing imports + the ControllerId type moved with the logic.
 import { validateJobTicket } from './validateJobTicket';
+import { buildPipelineJobFingerprint } from './PipelineService';
 // T1-136: approval-nonce eviction extracted so the TTL + FIFO rules
 // can be unit-tested without mounting the service.
 import {
@@ -711,15 +714,72 @@ export class MachineService {
   // T1-135: delegates to pure validateJobTicket. The wrapper resolves
   // the runtime context (active profile + the GRBL controller-id
   // constant) so the helper can stay free of singleton access.
+  private static finitePositive(value: unknown): number | null {
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
+  }
+
+  private readControllerMachineInfo(): {
+    maxSpindle: number | null;
+    bed: { width: number; height: number } | null;
+    accelMmPerS2: number | null;
+  } {
+    const controller = this.controllerRef.current as LaserController & {
+      getMachineInfo?: () => {
+        bedWidth?: unknown;
+        bedHeight?: unknown;
+        maxSpindle?: unknown;
+        maxAccelX?: unknown;
+        maxAccelY?: unknown;
+      };
+    };
+    const info = controller.getMachineInfo?.();
+    const maxSpindle =
+      MachineService.finitePositive(controller.maxSpindle)
+      ?? MachineService.finitePositive(info?.maxSpindle);
+    const bedWidth = MachineService.finitePositive(info?.bedWidth);
+    const bedHeight = MachineService.finitePositive(info?.bedHeight);
+    const maxAccelX = MachineService.finitePositive(info?.maxAccelX);
+    const maxAccelY = MachineService.finitePositive(info?.maxAccelY);
+    const accelMmPerS2 =
+      maxAccelX !== null && maxAccelY !== null
+        ? Math.min(maxAccelX, maxAccelY)
+        : (maxAccelX ?? maxAccelY);
+    return {
+      maxSpindle,
+      bed: bedWidth !== null && bedHeight !== null
+        ? { width: bedWidth, height: bedHeight }
+        : null,
+      accelMmPerS2,
+    };
+  }
+
   private validateTicket(
     ticket: ValidatedJobTicket,
     scene: Scene,
+    runtime: {
+      currentStartMode: GcodeStartMode;
+      currentSavedOrigin: { x: number; y: number } | null;
+      outputFormat: OutputFormat;
+    },
   ): { ok: true } | { ok: false; reason: string } {
+    const currentProfile = getActiveProfile();
+    const machineInfo = this.readControllerMachineInfo();
+    const currentFingerprint = buildPipelineJobFingerprint({
+      scene,
+      startMode: runtime.currentStartMode,
+      savedOrigin: runtime.currentSavedOrigin,
+      profile: currentProfile,
+      controllerMaxSpindle: machineInfo.maxSpindle,
+      outputFormat: runtime.outputFormat,
+      machineBedFromController: machineInfo.bed,
+      controllerAccelMmPerS2: machineInfo.accelMmPerS2,
+    });
     return validateJobTicket({
       ticket,
       scene,
-      currentProfile: getActiveProfile(),
+      currentProfile,
       currentControllerType: 'grbl',
+      currentFingerprint,
     });
   }
 
@@ -729,8 +789,20 @@ export class MachineService {
     machineState: MachineState | null;
     notifySimulatorTx: (line: string) => void;
     canvasContext: ActiveJobCanvasContext;
+    currentStartMode: GcodeStartMode;
+    currentSavedOrigin: { x: number; y: number } | null;
+    outputFormat?: OutputFormat;
   }): Promise<void> {
-    const { ticket, scene, machineState, notifySimulatorTx, canvasContext } = args;
+    const {
+      ticket,
+      scene,
+      machineState,
+      notifySimulatorTx,
+      canvasContext,
+      currentStartMode,
+      currentSavedOrigin,
+      outputFormat = 'grbl',
+    } = args;
 
     if (
       this.activeTicket
@@ -801,7 +873,11 @@ export class MachineService {
       );
     }
 
-    const validation = this.validateTicket(ticket, scene);
+    const validation = this.validateTicket(ticket, scene, {
+      currentStartMode,
+      currentSavedOrigin,
+      outputFormat,
+    });
     if (!validation.ok) {
       throw new Error(validation.reason);
     }

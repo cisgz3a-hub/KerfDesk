@@ -19,6 +19,7 @@ import { createScene } from '../src/core/scene/Scene';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -64,6 +65,12 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: [...gcodeLines],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -123,6 +130,8 @@ void (async () => {
     machineState: idle,
     notifySimulatorTx: () => {},
     canvasContext: cctx,
+    currentStartMode: ticket.startMode,
+    currentSavedOrigin: ticket.savedOrigin,
   });
   for (let i = 0; i < 30; i++) {
     await Promise.resolve();

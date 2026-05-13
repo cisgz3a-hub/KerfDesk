@@ -2,6 +2,8 @@ import { type MutableRefObject } from 'react';
 import { type MachineService, type ActiveOperationKind, type OperationLease } from './MachineService';
 import { type LaserController } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
+import { type GcodeStartMode } from '../core/output/GcodeOrigin';
+import { type OutputFormat } from '../core/output/Output';
 import { type MachineState } from '../controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
@@ -167,6 +169,9 @@ export class ExecutionCoordinator {
     machineState: MachineState | null;
     notifySimulatorTx: (line: string) => void;
     canvasContext: ActiveJobCanvasContext;
+    currentStartMode: GcodeStartMode;
+    currentSavedOrigin: { x: number; y: number } | null;
+    outputFormat?: OutputFormat;
   }): Promise<void> {
     return this.deps.machineService.startValidatedJob(args);
   }

@@ -18,6 +18,7 @@ import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/tick
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { createScene } from '../src/core/scene/Scene';
 import { createEmptyPlan } from '../src/core/plan/Plan';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -90,6 +91,12 @@ function makeTicket(
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: [...gcodeLines],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -181,17 +188,22 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: firstCtx,
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
     await waitForContext(svc);
 
     let err = '';
+    const secondTicket = makeTicket(scene, { ticketId: 'tkt_second' });
     try {
       await svc.startValidatedJob({
-        ticket: makeTicket(scene, { ticketId: 'tkt_second' }),
+        ticket: secondTicket,
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
-        canvasContext: ctxFor(ticket),
+        canvasContext: ctxFor(secondTicket),
+        currentStartMode: secondTicket.startMode,
+        currentSavedOrigin: secondTicket.savedOrigin,
       });
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
@@ -218,6 +230,8 @@ void (async () => {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: ctxFor(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
       });
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
@@ -233,6 +247,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: ctxFor(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
     assert(svc.getActiveTicket()?.ticketId === ticket.ticketId, 'service can start again after failure');
   }
@@ -249,17 +265,22 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: ctxFor(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
     await svc.tryFinalizeJobLog(idle, doneProgress, true, () => {});
     const finalizing = svc.tryFinalizeJobLog(idle, doneProgress, false, () => {});
     let err = '';
+    const duringFinalizeTicket = makeTicket(scene, { ticketId: 'tkt_during_finalize' });
     try {
       await svc.startValidatedJob({
-        ticket: makeTicket(scene, { ticketId: 'tkt_during_finalize' }),
+        ticket: duringFinalizeTicket,
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
-        canvasContext: ctxFor(ticket),
+        canvasContext: ctxFor(duringFinalizeTicket),
+        currentStartMode: duringFinalizeTicket.startMode,
+        currentSavedOrigin: duringFinalizeTicket.savedOrigin,
       });
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);
@@ -285,6 +306,8 @@ void (async () => {
       machineState: idle,
       notifySimulatorTx: () => {},
       canvasContext: ctxFor(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
     });
     await svc.disconnect();
     assert(disconnectCalled, 'disconnect delegates to controller');
@@ -314,6 +337,8 @@ void (async () => {
         machineState: idle,
         notifySimulatorTx: () => {},
         canvasContext: ctxFor(emptyTicket),
+        currentStartMode: emptyTicket.startMode,
+        currentSavedOrigin: emptyTicket.savedOrigin,
       });
     } catch (e: unknown) {
       err = e instanceof Error ? e.message : String(e);

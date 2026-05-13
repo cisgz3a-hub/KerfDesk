@@ -12,6 +12,7 @@ import { createScene } from '../src/core/scene/Scene';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 
 let passed = 0;
 let failed = 0;
@@ -59,6 +60,12 @@ void (async () => {
     burnEnvelopeDivergence: null,
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
     gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
     gcodeLines: ['G0 X1', 'M5'],
     gcodeText,
     machinePlanBounds: { ...plan.bounds },
@@ -106,6 +113,8 @@ void (async () => {
     machineState: idle,
     notifySimulatorTx: () => {},
     canvasContext,
+    currentStartMode: ticket.startMode,
+    currentSavedOrigin: ticket.savedOrigin,
   });
 
   assert(

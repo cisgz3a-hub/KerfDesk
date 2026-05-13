@@ -7,9 +7,9 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-244** (recovery reconnect/recompile acknowledgements wait for successful work, shipped in `8c34dd58`).
-- Current audit-fix run completed: **T1-223 through T1-244**, with T1-237 still deferred as multi-week firmware-adapter wiring.
-- Next active audit-fix ticket: none from `docs/AUDIT-2026-05-12.md`; T1-237 remains the deferred multi-week firmware-adapter wiring decision.
+- Last shipped roadmap item: **T1-246** (runtime JobFingerprint enforcement at Start, shipped in `<TBD>`).
+- Current audit-fix run completed: **T1-223 through T1-246**, with T1-237 still deferred as multi-week firmware-adapter wiring.
+- Next active audit-fix ticket: continue the release-readiness audit sequence with the next runtime-enforcement cap after stale-output: service-level `FrameTicket`, autosave/manual-save truth split, structured pause/stop laser-off confirmation, support-bundle export, or signed entitlement authority.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
 
 ## What Just Shipped In This Run
@@ -39,6 +39,8 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T1-242 | F-020 | Recovery-card buttons now acknowledge the runtime recovery checklist so Start can re-enable after real recovery. |
 | T1-243 | F-021 | T3-81 end-to-end workflow suite now exits when spawned by the test runner. |
 | T1-244 | F-022 | Recovery reconnect/recompile acknowledgements now wait for successful reconnect/recompile work. |
+| T1-245 | user report | Long GRBL jobs keep streaming by treating `ok` acknowledgements as heartbeat-alive traffic and pausing autosave work while jobs run. |
+| T1-246 | release-readiness audit | Runtime `JobFingerprint` is embedded in `ValidatedJobTicket` and revalidated inside `MachineService.startValidatedJob` before G-code streams. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -54,9 +56,9 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 ## Verification Baseline
 
-- `npx tsc --noEmit --pretty false` passed during the T1-244 close-out.
-- Focused tests for T1-223 through T1-244 passed at their commits.
-- Full `npm test` passed during T1-243 after the T3-81 suite natural-exit fix.
+- `npx tsc --noEmit --pretty false` passed during the T1-246 close-out.
+- Focused tests for T1-223 through T1-246 passed at their commits.
+- Full `npm test` passed during T1-246 after updating stale synthetic-ticket fixtures for the required runtime fingerprint.
 - `scripts/run-tests.mjs` now names and kills timed-out per-file children instead of wedging silently.
 - `npm run project-map:check` passed during T1-240 after regenerating `PROJECT_MAP.md`.
 - Dependabot PRs must not be merged blindly; previous local test-merge attempts could not be safely verified.
@@ -65,8 +67,11 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 Continue in this order unless a newer owner instruction says otherwise:
 
-1. **T1-237** - firmware adapter wiring remains deferred/multi-week.
-2. Resume the normal roadmap queue after deciding whether to take T1-237 now or keep it deferred.
+1. **FrameTicket service gate** - require a frame ticket matching the compiled job fingerprint before Start, unless an explicit advanced override is logged.
+2. **Autosave/manual-save truth split** - autosave must never mark the chosen manual project file clean.
+3. **Pause/stop/alarm laser-off confirmation** - no fire-and-forget laser-off safety paths may leave the app ready.
+4. **Support bundle export** - wire the existing bundle assembler to a user-exportable ZIP.
+5. **Signed entitlement authority** - replace local/cache-authoritative licensing with signed entitlement tokens.
 
 ## Known Caveats
 
@@ -77,4 +82,4 @@ Continue in this order unless a newer owner instruction says otherwise:
 
 ## Current Ticket Note
 
-T1-242 closed F-020 by wiring recovery-card actions to `MachineService.applyRecoveryAck(...)`, adding an explicit inspection action, and making recovery actions acknowledge only after success or operator confirmation. T1-243 closed F-021 by making the T3-81 end-to-end workflow suite exit naturally under the runner. T1-244 closed F-022 by moving reconnect acknowledgement to successful USB/simulator connect and making recompile recovery wait for an awaited success/failure result. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work.
+T1-242 closed F-020 by wiring recovery-card actions to `MachineService.applyRecoveryAck(...)`, adding an explicit inspection action, and making recovery actions acknowledge only after success or operator confirmation. T1-243 closed F-021 by making the T3-81 end-to-end workflow suite exit naturally under the runner. T1-244 closed F-022 by moving reconnect acknowledgement to successful USB/simulator connect and making recompile recovery wait for an awaited success/failure result. T1-245 fixed the user-reported long-job stop/disconnect path by keeping heartbeat alive on `ok` acknowledgements and pausing autosave work during jobs. T1-246 closed the largest stale-output audit cap by making `JobFingerprint` part of `ValidatedJobTicket` and the service-level Start validator. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work.

@@ -1120,6 +1120,9 @@ export function ConnectionPanelMain({
         machineState,
         notifySimulatorTx,
         canvasContext,
+        currentStartMode: startMode,
+        currentSavedOrigin: savedOrigin,
+        outputFormat: 'grbl',
       });
       if (jobStartPosition) {
         setLastJobStartPosition(jobStartPosition);

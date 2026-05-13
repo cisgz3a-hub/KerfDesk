@@ -312,6 +312,8 @@ async function run(): Promise<void> {
       machineState: makeIdleState(),
       notifySimulatorTx: () => {},
       canvasContext: activeJobContext(compiled),
+      currentStartMode: compiled.ticket.startMode,
+      currentSavedOrigin: compiled.ticket.savedOrigin,
     });
 
     assert(reloaded.objects.length > 0, 'import/edit/save/reload workflow keeps imported SVG objects');
