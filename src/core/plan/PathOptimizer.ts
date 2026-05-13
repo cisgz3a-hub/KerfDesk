@@ -2,14 +2,11 @@
  * 2-opt path optimization — reorders cut paths to minimize total travel distance.
  * Nearest-neighbor for initial ordering, then capped 2-opt refinement.
  *
- * Scaling (path count): ≤50 → 50 iterations; 51–100 → 15; 101–300 → 3; >300 → NN only.
- * A 2s wall-clock cap inside 2-opt is a safety net on pathological inputs.
+ * Scaling (path count): <=50 -> 50 iterations; 51-100 -> 15; 101-300 -> 3; >300 -> NN only.
+ * T1-226: the budget is deterministic so equal inputs emit equal path order and G-code.
  *
  * This reduces idle laser travel by 30-60% on typical jobs with many small shapes.
  */
-
-/** Hard stop for 2-opt inner loop (ms) — tiered iteration limits should make this rare. */
-const TWO_OPT_WALL_MS = 2000;
 
 import { type FlatPath } from '../job/Job';
 
@@ -91,17 +88,12 @@ function twoOpt(
 ): FlatPath[] {
   if (paths.length <= 2) return paths;
 
-  const now = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
-  const wallStart = now();
-
   let best = [...paths];
   let bestTravel = totalTravel(best, startPos);
   let improved = true;
   let iterations = 0;
 
   while (improved && iterations < maxIterations) {
-    if (now() - wallStart > TWO_OPT_WALL_MS) break;
-
     improved = false;
     iterations++;
 
