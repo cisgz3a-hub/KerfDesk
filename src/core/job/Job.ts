@@ -17,7 +17,7 @@
 
 import { type AABB, type Point, emptyAABB, generateId } from '../types';
 import { type FillMode, type ImageRasterMode } from '../scene/Layer';
-import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { type ScanningOffsetTable } from './ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
 import { type CompoundPath, type ContourRole } from '../geometry/CompoundPath';
 

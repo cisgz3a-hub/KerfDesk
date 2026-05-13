@@ -10,7 +10,7 @@
  */
 
 import { generateId } from '../types';
-import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { type ScanningOffsetTable } from '../job/ScanningOffset';
 
 // ─── LAYER COLORS ────────────────────────────────────────────────
 

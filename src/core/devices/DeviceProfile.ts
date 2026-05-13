@@ -4,7 +4,7 @@
  */
 
 import { type Scene } from '../scene/Scene';
-import { type ScanningOffsetTable } from '../plan/ScanningOffset';
+import { type ScanningOffsetTable } from '../job/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
 import { type OutputFormat } from '../output/Output';
 import {

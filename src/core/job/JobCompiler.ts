@@ -44,10 +44,10 @@ import {
   type CompoundPath,
   type ContourRole,
 } from '../geometry/CompoundPath';
-import { orderOperationsWithMetrics, type OrderableShape } from '../plan/OperationOrderer';
+import { orderOperationsWithMetrics, type OrderableShape } from './OperationOrderer';
 import { getActiveProfile } from '../devices/DeviceProfile';
-import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from '../plan/ScanningOffset';
-import { computeSmartOverscan } from '../plan/SmartOverscan';
+import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from './ScanningOffset';
+import { computeSmartOverscan } from './SmartOverscan';
 import { getPresetById } from '../materials/MaterialLibrary';
 import { canUseFeature } from '../../entitlements';
 // T1-147: pure compound-role inference + point-in-polygon test
