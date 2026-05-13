@@ -264,6 +264,8 @@ The Gate 1 cluster 鈥?required for Private Technical Alpha 鈥?is fully closed.
   - User runs trace-to-engrave once with `window.__LF_TRACE_PROBE = true` in the console first; pastes the resulting `[trace-storm-probe]` summary back. Probe ships 2026-05-10.
   - Both are separate fix slices; the dither-half fix in `4532163` stands on its own. Until the probe data lands, the master checklist line stays `[ ]`. | Hardware diagnosis 2026-05-12; dither half FIXED (`4532163`); import half DIAGNOSED; trace-storm probe SHIPPED `6572ea1` 2026-05-10 (await probe data before fix). |
 
+| T1-223 | Service-side placement-uncertain gate for Start | `MachineService.startValidatedJob` now refuses when `controllerRef.current?.getPlacementUncertain?.() === true`, before ticket validation and before any `executeJob` stream. The error includes `getPlacementUncertainReason()` for diagnostics only; safety comes from the boolean getter. Pinned by `tests/machine-service-start-validated-job.test.ts` asserting the uncertain controller throws and never calls `executeJob`. **Hardware verification not required** for the code path itself because this is a fail-closed refusal before g-code emission; release hardware regression remains useful. | `<TBD>` |
+
 ### 鉁?Confirmed open
 
 | Ticket | What | Estimate |

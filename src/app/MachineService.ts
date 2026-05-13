@@ -788,6 +788,19 @@ export class MachineService {
       );
     }
 
+    // F-010/T1-223: the UI already refuses Start while WCS placement is
+    // uncertain, but the service is the final production gate before bytes
+    // can stream. Use the controller boolean as the source of truth; the
+    // optional reason is only diagnostic text.
+    if (this.controllerRef.current?.getPlacementUncertain?.() === true) {
+      const placementReason =
+        this.controllerRef.current.getPlacementUncertainReason?.() ?? 'unknown';
+      throw new Error(
+        `Work-coordinate state could not be confirmed (reason: ${placementReason}). `
+        + 'Reconnect or address the underlying WCS issue before starting a job.',
+      );
+    }
+
     const validation = this.validateTicket(ticket, scene);
     if (!validation.ok) {
       throw new Error(validation.reason);

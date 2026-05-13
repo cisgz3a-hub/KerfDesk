@@ -301,6 +301,43 @@ async function run(): Promise<void> {
   }
 
   {
+    let executeCount = 0;
+    const mock = {
+      ...makeMockController(async () => {
+        executeCount++;
+      }),
+      getPlacementUncertain: () => true,
+      getPlacementUncertainReason: () => 'wcs_query_error',
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    let message = '';
+    try {
+      await svc.startValidatedJob({
+        ticket,
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: canvasContextForTicket(ticket),
+      });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    assert(
+      /work-coordinate state/i.test(message),
+      'startValidatedJob blocks when controller placement is uncertain',
+    );
+    assert(
+      /wcs_query_error/.test(message),
+      'placement-uncertain error includes controller reason',
+    );
+    assert(executeCount === 0, 'placement-uncertain block prevents executeJob');
+  }
+
+  {
     const port = new MockSerialPort();
     const ctrl = new GrblController();
     port.open();
