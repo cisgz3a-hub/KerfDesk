@@ -6952,7 +6952,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\agent-handoff-current-state.test.ts`
 - `npx tsc --noEmit --pretty false`
 
-**Status:** Shipped in <TBD>. Hardware verification not required; this is a docs and handoff-integrity update.
+**Status:** Shipped in d3e84255. Hardware verification not required; this is a docs and handoff-integrity update.
 
 ---
 ## Tier 2 鈥?This month
@@ -20807,7 +20807,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-225 HIGH move scene dirty hash into core scene layer (shipped in `48f3597`) - closes audit F-007 by removing the runtime `core/job` to `app/sceneDirtyHash` import inversion.
 - [x] T1-226 MEDIUM deterministic PathOptimizer iteration budget (shipped in `f46532c`) - closes audit F-012 by removing wall-clock early exit from 2-opt path ordering so emitted G-code ordering is not runtime-speed dependent.
 - [x] T1-227 MEDIUM extract PreflightContext to break rule cycles (shipped in `4ef0903`) - closes audit F-009 by moving shared preflight rule contracts out of the `Preflight.ts` orchestrator so rules no longer import their caller.
-- [x] T1-231 LOW refresh AGENT_HANDOFF.md after audit-fix run (shipped in <TBD>) - closes audit F-015 by replacing the stale T1-202 handoff with the current T1-223..T1-231 continuation state and next ticket.
+- [x] T1-231 LOW refresh AGENT_HANDOFF.md after audit-fix run (shipped in d3e84255) - closes audit F-015 by replacing the stale T1-202 handoff with the current T1-223..T1-231 continuation state and next ticket.
 - [x] T1-230 MEDIUM move SafetyActionResult and ControllerStatus to neutral controller-owned modules (shipped in 05efdb38) - closes audit F-006 by removing the remaining controller-to-app shared-type imports while preserving app-level compatibility wrappers.
 - [x] T1-229 MEDIUM backfill ROADMAP + shipped ledger for T1-209..T1-222 (shipped in 834b70f8) - closes audit F-014 by recording the missing coupled-triple docs for the WorkflowPanel and v30 audit-response tickets.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
