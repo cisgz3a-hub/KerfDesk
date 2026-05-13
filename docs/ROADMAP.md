@@ -7092,6 +7092,23 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `8f5c8ca1`. Hardware verification not required; this is React dependency/lint hygiene only.
 
 ---
+### T1-240 | Regenerate PROJECT_MAP and pin check
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-018.
+
+**Problem:** `npm run project-map:check` reported `PROJECT_MAP.md is stale`, so the repo's generated orientation layer no longer matched the actual `src/` and `tests/` file tree. That is low-risk at runtime but high-friction for audits and agent handoffs because stale navigation data leads to missed files.
+
+**Fix:** Regenerated `PROJECT_MAP.md` with the existing deterministic `scripts/generate-project-map.mjs` generator. The current map records 475 `src/` files and 679 `tests/` files, including the recent audit inventory and hook-triage test additions. The existing `tests/project-map-generated.test.ts` already pins the generated-map contract and runs the same `--check` path, so no new test harness was needed.
+
+**Verification:**
+- `npm run project-map:check` failed before regeneration with the stale-map message.
+- `npm run project-map:generate`
+- `npm run project-map:check`
+- `npx tsx tests\project-map-generated.test.ts`
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is generated documentation only.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20954,6 +20971,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-236 INFO route inline core ID generators through `generateId()` (shipped in fe7b4bc4) - closes audit F-013 by centralizing core factory ID randomness behind deterministic-aware helpers while preserving existing prefixes.
 - [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `bdf928ac`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
 - [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
+- [x] T1-240 LOW regenerate `PROJECT_MAP.md` (shipped in `<TBD>`) - closes audit F-018 by refreshing the generated orientation map and re-running the existing project-map check/test.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

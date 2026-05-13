@@ -7,9 +7,9 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-239** (React hook dependency warning triage, shipped in 8f5c8ca1).
-- Current audit-fix run completed: **T1-223 through T1-239**, with T1-237 still deferred as multi-week firmware-adapter wiring.
-- Next active audit-fix ticket: **T1-240** - F-018 regenerate/check `PROJECT_MAP.md`.
+- Last shipped roadmap item: **T1-240** (regenerate `PROJECT_MAP.md`, shipped in `<TBD>`).
+- Current audit-fix run completed: **T1-223 through T1-240**, with T1-237 still deferred as multi-week firmware-adapter wiring.
+- Next active audit-fix ticket: **T1-241** - F-019 diagnose/fix the full-suite test runner hang.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
 
 ## What Just Shipped In This Run
@@ -34,6 +34,7 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T1-236 | F-013 | Inline core ID generators routed through deterministic-aware `generateId()`. |
 | T1-238 | F-016 | No-skip exported-symbol inventory generated and pinned against drift. |
 | T1-239 | F-017 | React hook dependency warnings reduced from 45 to 0 and pinned. |
+| T1-240 | F-018 | `PROJECT_MAP.md` regenerated and project-map check restored. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -45,7 +46,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 4. `docs/ROADMAP.md`
 5. `docs/ROADMAP-shipped-audit.md`
 6. `docs/AUDIT-2026-05-12.md`
-7. `PROJECT_MAP.md` (currently stale per F-018; do not rely on it without regenerating/checking)
+7. `PROJECT_MAP.md` (generated; verify with `npm run project-map:check` after file additions)
 
 ## Verification Baseline
 
@@ -53,7 +54,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 - Focused tests for T1-223 through T1-239 passed at their commits.
 - Full `npm test` currently times out under F-019. Do not report full-suite green until F-019 is fixed.
 - `tests/end-to-end-workflows/end-to-end-workflows.test.ts` passes when run directly, but the full runner can hang waiting on it.
-- `npm run project-map:check` was stale under F-018 before this run; regenerate/check when reaching T1-240.
+- `npm run project-map:check` passed during T1-240 after regenerating `PROJECT_MAP.md`.
 - Dependabot PRs must not be merged blindly; previous local test-merge attempts could not be safely verified.
 
 ## Next Audit-Fix Queue
@@ -61,8 +62,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 Continue in this order unless a newer owner instruction says otherwise:
 
 1. **T1-237** - firmware adapter wiring remains deferred/multi-week.
-2. **T1-240** - F-018: regenerate/check `PROJECT_MAP.md`.
-3. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
+2. **T1-241** - F-019: diagnose/fix the full-suite test runner hang.
 
 ## Known Caveats
 
@@ -73,4 +73,4 @@ Continue in this order unless a newer owner instruction says otherwise:
 
 ## Current Ticket Note
 
-T1-239 closed F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0. `tests/react-hooks-clean.test.ts` runs the local ESLint binary and fails if hook dependency warnings return. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work; the next active ticket is T1-240.
+T1-240 closed F-018 by regenerating `PROJECT_MAP.md`; `npm run project-map:check` and `tests/project-map-generated.test.ts` pass. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work; the next active ticket is T1-241.
