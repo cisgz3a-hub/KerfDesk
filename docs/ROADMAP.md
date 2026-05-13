@@ -7089,7 +7089,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\react-hooks-clean.test.ts`
 - `npx tsc --noEmit --pretty false`
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is React dependency/lint hygiene only.
+**Status:** Shipped in `8f5c8ca1`. Hardware verification not required; this is React dependency/lint hygiene only.
 
 ---
 ## Tier 2 鈥?This month
@@ -20953,7 +20953,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in 49ed6bb2) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
 - [x] T1-236 INFO route inline core ID generators through `generateId()` (shipped in fe7b4bc4) - closes audit F-013 by centralizing core factory ID randomness behind deterministic-aware helpers while preserving existing prefixes.
 - [x] T1-238 MEDIUM no-skip exported-symbol audit inventory (shipped in `bdf928ac`) - closes audit F-016's completeness gap by generating a one-row-per-export inventory for every live `src/` and `electron/` export, with a check that fails on drift.
-- [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `<TBD>`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
+- [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

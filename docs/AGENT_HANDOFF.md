@@ -7,7 +7,7 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-239** (React hook dependency warning triage, shipped in `<TBD>`).
+- Last shipped roadmap item: **T1-239** (React hook dependency warning triage, shipped in 8f5c8ca1).
 - Current audit-fix run completed: **T1-223 through T1-239**, with T1-237 still deferred as multi-week firmware-adapter wiring.
 - Next active audit-fix ticket: **T1-240** - F-018 regenerate/check `PROJECT_MAP.md`.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
