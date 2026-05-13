@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 475 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 683 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 476 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 684 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -32,7 +32,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
-| `src/import` | 17 | dxf, image, svg, trace |
+| `src/import` | 18 | dxf, image, svg, trace |
 | `src/integrity` | 1 | - |
 | `src/io` | 14 | migrations, validation |
 | `src/onboarding` | 1 | - |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 609 | - |
+| `tests/` | 610 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -346,6 +346,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/import/dxf/DxfToScene.ts`
 - `src/import/dxf/index.ts`
 - `src/import/image/ImageImportLimits.ts`
+- `src/import/image/ImageImportStorageStrategy.ts`
 - `src/import/svg/PathParser.ts`
 - `src/import/svg/SvgComplexityLimits.ts`
 - `src/import/svg/SvgParser.ts`
@@ -882,6 +883,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/history.test.ts`
 - `tests/home-corner-wizard-profile.test.ts`
 - `tests/image-decompression-bomb.test.ts`
+- `tests/image-import-large-file-blob-store.test.ts`
 - `tests/image-import-max-dim-cap.test.ts`
 - `tests/image-prep-grayscale-equivalence.test.ts`
 - `tests/image-processing-worker-equivalence.test.ts`

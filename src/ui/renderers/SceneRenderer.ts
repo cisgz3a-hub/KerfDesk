@@ -24,7 +24,7 @@ import { type Transform } from '../viewport';
 import { type AABB, type Matrix3x2, aabbIntersects } from '../../core/types';
 import { computeObjectBounds } from '../../geometry/bounds';
 import { fillTextGeometry } from '../../geometry/textCanvasDraw';
-import { getImage } from '../../io/ImageStore';
+import { getImageRenderSrc } from '../../io/ImageStore';
 import { type BurnState } from '../../app/MachineService';
 // T1-132: overlay-bounds helpers + types extracted to sibling module so
 // they can be unit-tested without loading the renderer surface.
@@ -1092,7 +1092,7 @@ function drawGeometry(
             idbPendingSrc.add(geom.src);
             const rawId = geom.src.slice('indexeddb://'.length);
             const srcKey = geom.src;
-            void getImage(rawId).then(uri => {
+            void getImageRenderSrc(rawId).then(uri => {
               idbPendingSrc.delete(srcKey);
               if (uri) {
                 setIdbResolved(srcKey, uri);

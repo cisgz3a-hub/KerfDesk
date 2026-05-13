@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2622
-- Files with exports: 481
+- Export rows: 2629
+- Files with exports: 482
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -17,9 +17,9 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | compile-output | 402 |
 | core-domain | 354 |
 | entitlement-security | 99 |
-| file-ipc-boundary | 183 |
+| file-ipc-boundary | 186 |
 | machine-control | 228 |
-| supporting-runtime | 796 |
+| supporting-runtime | 800 |
 | ui-operator-surface | 560 |
 
 ## Checklist
@@ -4031,6 +4031,19 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
+### File: `src/import/image/ImageImportStorageStrategy.ts`
+
+**Exports inventoried:** 4
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 1 | `IMAGE_INDEXEDDB_THRESHOLD` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 3 | `ImageImportStorageStrategy` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 8 | `ImageImportStorageInput` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 12 | `chooseImageImportStorageStrategy` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
 ### File: `src/import/svg/index.ts`
 
 **Exports inventoried:** 31
@@ -4273,19 +4286,22 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/io/ImageStore.ts`
 
-**Exports inventoried:** 9
+**Exports inventoried:** 12
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 43 | `hashDataUri` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 52 | `storeImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 82 | `getImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 94 | `hasImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 100 | `deleteImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 112 | `listImages` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 126 | `getStorageUsed` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 132 | `clearImageStore` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
-| 152 | `pruneUnusedImages` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 47 | `hashDataUri` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 55 | `hashBlob` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 72 | `storeImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 102 | `storeImageBlob` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 133 | `getImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 160 | `getImageRenderSrc` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 198 | `hasImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 210 | `deleteImage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 228 | `listImages` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 242 | `getStorageUsed` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 248 | `clearImageStore` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 273 | `pruneUnusedImages` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -6441,8 +6457,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 52 | `UseImportDeps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 66 | `useImport` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 63 | `UseImportDeps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 77 | `useImport` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

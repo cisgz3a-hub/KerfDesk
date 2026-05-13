@@ -17,20 +17,22 @@ import {
   ProjectChecksumLoadCancelledError,
   confirmProjectChecksumMismatch,
 } from '../../io/ProjectIntegrity';
-import { storeImage } from '../../io/ImageStore';
+import { storeImage, storeImageBlob } from '../../io/ImageStore';
 import { generateId } from '../../core/types';
 import { createLayer, defaultLaserSettings, type Layer } from '../../core/scene/Layer';
 import { type SceneCommitAction } from '../scene/SceneCommitActions';
 import { prepareImageGrayscale } from '../../workers/imagePrepClient';
 import { captureSceneRevision, isSceneStale } from './asyncSceneGuard';
 import {
+  chooseImageImportStorageStrategy,
+  type ImageImportStorageStrategy,
+} from '../../import/image/ImageImportStorageStrategy';
+import {
   ImageImportLimitError,
   checkImageDimensions,
   checkImageFileSize,
   imageLimitErrorMessage,
 } from '../../import/image/ImageImportLimits';
-
-const IMAGE_INDEXEDDB_THRESHOLD = 100 * 1024; // 100KB - inline below, IndexedDB above
 
 type ImageImportResult =
   | { kind: 'ok'; scene: Scene }
@@ -47,6 +49,15 @@ async function probeImageDimensionsBeforeDecode(source: File): Promise<boolean> 
   } finally {
     bitmap.close();
   }
+}
+
+function readFileAsDataUri(source: File): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(source);
+  });
 }
 
 export interface UseImportDeps {
@@ -92,6 +103,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
     source: File | string,
     fileName?: string,
   ): Promise<ImageImportResult> => {
+    let objectUrlToRevoke: string | null = null;
     try {
       // T1-17 Pass 3: read the live scene from the ref. This shadows the
       // outer `scene` parameter for the body of this callback, so every
@@ -99,23 +111,44 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       // call time instead of the value closed over at definition time.
       const scene = sceneRef.current;
       const revisionAtStart = captureSceneRevision(scene);
-      let dataUri: string;
+      let dataUri: string | null = null;
+      let decodeSrc: string;
       let displayName: string;
       let dimensionsCheckedBeforeDecode = false;
+      let fileSource: File | null = null;
+      let storageStrategy: ImageImportStorageStrategy;
 
       if (typeof source === 'string') {
         dataUri = source;
+        decodeSrc = source;
         displayName = (fileName || 'image').replace(/\.[^.]+$/, '');
+        storageStrategy = chooseImageImportStorageStrategy({
+          kind: 'data-uri',
+          dataUriLength: dataUri.length,
+        });
       } else {
         // T2-124: stage 1 runs before FileReader reads the bytes.
         checkImageFileSize(source.size);
         dimensionsCheckedBeforeDecode = await probeImageDimensionsBeforeDecode(source);
-        dataUri = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = () => reject(new Error('Failed to read file'));
-          reader.readAsDataURL(source);
+        fileSource = source;
+        storageStrategy = chooseImageImportStorageStrategy({
+          kind: 'file',
+          sizeBytes: source.size,
         });
+        if (typeof URL.createObjectURL === 'function') {
+          objectUrlToRevoke = URL.createObjectURL(source);
+          decodeSrc = objectUrlToRevoke;
+        } else {
+          dataUri = await readFileAsDataUri(source);
+          decodeSrc = dataUri;
+          storageStrategy = chooseImageImportStorageStrategy({
+            kind: 'data-uri',
+            dataUriLength: dataUri.length,
+          });
+        }
+        if (storageStrategy === 'inline-data-uri' && dataUri == null) {
+          dataUri = await readFileAsDataUri(source);
+        }
         displayName = source.name.replace(/\.[^.]+$/, '');
       }
 
@@ -123,14 +156,23 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       await new Promise<void>((resolve, reject) => {
         img.onload = () => resolve();
         img.onerror = () => reject(new Error('Failed to decode image'));
-        img.src = dataUri;
+        img.src = decodeSrc;
       });
       if (!dimensionsCheckedBeforeDecode) {
         checkImageDimensions(img.naturalWidth || img.width, img.naturalHeight || img.height);
       }
 
-      let imageSrc = dataUri;
-      if (dataUri.length > IMAGE_INDEXEDDB_THRESHOLD) {
+      let imageSrc = dataUri ?? decodeSrc;
+      if (storageStrategy === 'indexeddb-blob' && fileSource) {
+        try {
+          const imageId = await storeImageBlob(fileSource, img.naturalWidth, img.naturalHeight);
+          imageSrc = `indexeddb://${imageId}`;
+        } catch {
+          const fallbackDataUri = dataUri ?? await readFileAsDataUri(fileSource);
+          dataUri = fallbackDataUri;
+          imageSrc = fallbackDataUri;
+        }
+      } else if (storageStrategy === 'indexeddb-data-uri' && dataUri) {
         try {
           const imageId = await storeImage(dataUri, img.naturalWidth, img.naturalHeight);
           imageSrc = `indexeddb://${imageId}`;
@@ -292,6 +334,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       }
       console.error('[useImport] Image import failed:', err);
       return { kind: 'failed' };
+    } finally {
+      if (objectUrlToRevoke && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(objectUrlToRevoke);
+      }
     }
   }, []);
 
