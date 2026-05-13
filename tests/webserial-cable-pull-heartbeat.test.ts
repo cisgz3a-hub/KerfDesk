@@ -37,6 +37,41 @@ async function connectController(controller: GrblController, port: MockSerialPor
 async function run(): Promise<void> {
   console.log('\n=== T3-16 cable-pull heartbeat recovery ===\n');
 
+  // A long-running controller can acknowledge normal streamed G-code while
+  // missing realtime status replies. `ok` traffic proves the transport is
+  // alive; the heartbeat must not disconnect a healthy burn just because the
+  // `<Run|...>` report was delayed or suppressed.
+  {
+    const controller = new GrblController();
+    const port = new MockSerialPort();
+    const errors: string[] = [];
+    controller.onError((_code, message) => errors.push(message));
+
+    await connectController(controller, port);
+
+    const moves = Array.from({ length: 40 }, (_v, i) => `G1 X${i + 1} F60`);
+    await controller.sendJob([
+      'G21',
+      'G90',
+      'M4 S100',
+      ...moves,
+      'M5',
+    ]);
+    assert(controller.isJobRunning, 'long job is running before status-only silence');
+
+    port.blockStatusQueryResponse = true;
+    await flush(1100);
+
+    assert(controller.isJobRunning, 'ok acknowledgements keep the running-job heartbeat alive');
+    assert(controller.state.status !== 'disconnected',
+      `ok acknowledgements prevent false disconnect (got ${controller.state.status})`);
+    assert(errors.every(message => !/status heartbeat/i.test(message)),
+      'no status-heartbeat error is emitted while ok acknowledgements are flowing');
+
+    port.blockStatusQueryResponse = false;
+    await controller.disconnect();
+  }
+
   const controller = new GrblController();
   const port = new MockSerialPort((line) => {
     if (line === '$$') return ['$30=1000', '$32=1', 'ok'];
@@ -81,6 +116,8 @@ async function run(): Promise<void> {
     'heartbeat disconnect requires two consecutive missed status replies');
   assert(/_handleJobStatusHeartbeatTimeout/.test(body),
     'controller has a dedicated job heartbeat timeout handler');
+  assert(/_recordJobStatusHeartbeatResponse\(\);\s*this\._handleOk\(\);/s.test(source),
+    'job heartbeat treats normal ok acknowledgements as controller-alive traffic');
   assert(/this\._handleTransportDisconnect\(true\)/.test(body),
     'heartbeat failure uses the same failed-transport disconnect path');
 

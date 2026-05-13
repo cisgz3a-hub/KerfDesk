@@ -92,6 +92,12 @@ Current checklist snapshot from `docs/ROADMAP.md` on 2026-05-10:
 
 The Gate 1 cluster éˆ¥?required for Private Technical Alpha éˆ¥?is fully closed. Per the roadmap's own definition this means LaserForge can be distributed to a small group of technically competent testers running supervised jobs on scrap material.
 
+#### Recent safety/user-reported fixes
+
+| Ticket | What | Evidence |
+|---|---|---|
+| T1-245 | Long jobs must not false-disconnect or starve streaming | User-reported 2026-05-13: long burns could stop halfway, lose connection, or physically stop. Two root causes fixed: `GrblController` now treats normal `ok` acknowledgements as running-job heartbeat-alive traffic before `_handleOk()`, so blocked/delayed realtime status reports do not false-disconnect an otherwise responsive controller; `App.tsx` autosave interval now returns before dirty hashing / `serializeForAutosave(scene)` while `grbl.isJobRunning` or the live controller ref says a job is running, avoiding planner-buffer starvation from large-scene autosave work. Pinned by `tests/webserial-cable-pull-heartbeat.test.ts` (new ok-traffic case failed before the fix) and `tests/autosave-pauses-during-active-job.test.ts` (new autosave guard test failed before the fix). **Ship hash:** `<TBD>`. **Hardware verification recommended:** long Falcon burn over USB/WiFi; confirm no false disconnect while ok traffic flows and autosave resumes after completion. |
+
 #### Dirty-state cluster (5/5 shipped)
 
 | Ticket | What | Evidence |

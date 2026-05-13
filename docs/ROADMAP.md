@@ -7188,6 +7188,27 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `8c34dd58`. Hardware verification recommended before release tagging: after disconnect/emergency-stop/failed-compile recovery, confirm Reconnect and Recompile steps clear only after the actual reconnect/recompile path succeeds.
 
 ---
+### T1-245 | Long jobs must not false-disconnect or starve streaming
+
+**Audit source:** User-reported Falcon long-burn failure, 2026-05-13: long jobs sometimes stopped halfway, lost connection, or physically stopped without an obvious operator action.
+
+**Problem:** Two active-job paths could interrupt host-streamed GRBL jobs. First, the running-job heartbeat treated only `<...>` status reports as proof that the controller was alive. During long burns a controller can continue sending normal `ok` acknowledgements while realtime status reports are delayed or suppressed; after two missed status replies LaserForge disconnected a healthy job anyway. Second, the App autosave interval still ran dirty hashing and `serializeForAutosave(scene)` every 30 seconds during active jobs. Compile/toolpath work was already suppressed while jobs run because main-thread stalls can drain the GRBL planner buffer; autosave had the same risk on large raster scenes.
+
+**Fix:** The GRBL controller now records normal `ok` acknowledgements as running-job heartbeat responses before handling the ack, so cable-pull detection still fires on true silence but not while the controller is actively acknowledging the stream. The App autosave interval now returns before dirty hashing or serialization whenever either `grbl.isJobRunning` or the live controller ref reports a running job, deferring persistence until streaming has stopped.
+
+**Verification:**
+- `npx tsx tests\webserial-cable-pull-heartbeat.test.ts` failed before the fix on the new "ok acknowledgements keep heartbeat alive" case and passes after.
+- `npx tsx tests\autosave-pauses-during-active-job.test.ts` failed before the fix because autosave lacked an active-job guard and passes after.
+- `npx tsc --noEmit --pretty false`
+- `npm test`
+- `npm run build`
+- `npx eslint . --max-warnings 0`
+- `npm run project-map:check`
+- `git diff --check`
+
+**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: run a long Falcon burn from USB and Falcon WiFi paths, confirm no false disconnect while `ok` traffic is flowing, and confirm autosave resumes after the job completes.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21056,6 +21077,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `3c163ce0`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
 - [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
 - [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
+- [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `<TBD>`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

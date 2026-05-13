@@ -1156,6 +1156,8 @@ export function App(): React.ReactElement {
 
   useEffect(() => {
     const interval = setInterval(() => {
+      // Skip heavy autosave work during host-streamed jobs; it can drain GRBL's planner.
+      if (grbl.isJobRunning || grbl.controllerRef.current?.isJobRunning) return;
       if (!isDirty(scene, lastSavedSceneHashRef.current)) return;
 
       let json: string;
@@ -1181,7 +1183,7 @@ export function App(): React.ReactElement {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [scene]);
+  }, [scene, grbl.isJobRunning, grbl.controllerRef]);
 
   const activeLayerModeForSuggestion = scene.layers.find(l => l.id === scene.activeLayerId)?.settings.mode;
   useEffect(() => {

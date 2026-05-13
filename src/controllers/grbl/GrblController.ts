@@ -1949,6 +1949,7 @@ export class GrblController implements GrblControllerApi {
     }
 
     if (line === 'ok') {
+      this._recordJobStatusHeartbeatResponse();
       this._handleOk();
     } else if (line.startsWith('error:')) {
       this._handleError(line);
