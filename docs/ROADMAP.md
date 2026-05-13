@@ -7149,7 +7149,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\machine-event-ledger-recovery-cleared-wiring.test.ts`
 - `npx tsc --noEmit --pretty false`
 
-**Status:** Shipped in `<TBD>`. Hardware verification recommended before release tagging: trigger an alarm during/around a test job, complete Inspect -> Unlock -> Re-home/manual-position -> Frame, and confirm Start re-enables only after the checklist clears.
+**Status:** Shipped in `3c163ce0`. Hardware verification recommended before release tagging: trigger an alarm during/around a test job, complete Inspect -> Unlock -> Re-home/manual-position -> Frame, and confirm Start re-enables only after the checklist clears.
 
 ---
 ### T1-243 | T3-81 end-to-end workflow suite must exit under the runner
@@ -7166,7 +7166,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - runner-style spawn reproduction exits with code 0 in under one second
 - `npm test`
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is test-runner/test-hygiene only.
+**Status:** Shipped in `3c163ce0`. Hardware verification not required; this is test-runner/test-hygiene only.
 
 ---
 ## Tier 2 鈥?This month
@@ -21033,8 +21033,8 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-239 MEDIUM triage React hook dependency warnings (shipped in `8f5c8ca1`) - closes audit F-017 by reducing `react-hooks/exhaustive-deps` warnings from 45 to 0 and pinning the zero-warning state with `tests/react-hooks-clean.test.ts`.
 - [x] T1-240 LOW regenerate `PROJECT_MAP.md` (shipped in `a63a8430`) - closes audit F-018 by refreshing the generated orientation map and re-running the existing project-map check/test.
 - [x] T1-241 MEDIUM fix full-suite test runner hang/diagnostics (shipped in `e66b7baf`) - closes audit F-019 by adding per-file runner timeouts/child cleanup, unrefing the WiFi override timer, and restoring full `npm test` to green.
-- [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `<TBD>`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
-- [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `<TBD>`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
+- [x] T1-242 HIGH wire recovery-card actions into runtime recovery checklist (shipped in `3c163ce0`) - closes audit F-020 by making recovery buttons acknowledge the matching `MachineService.applyRecoveryAck(...)` step so Start can re-enable only after visible recovery is actually complete.
+- [x] T1-243 MEDIUM make T3-81 end-to-end workflow suite exit under the runner (shipped in `3c163ce0`) - closes audit F-021 by replacing immediate `process.exit()` in the success/error paths with natural `process.exitCode` termination and pinning runner-spawned exit behavior.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

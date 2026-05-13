@@ -7,7 +7,7 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-243** (T3-81 end-to-end workflow suite exits when runner-spawned, shipped in `<TBD>`).
+- Last shipped roadmap item: **T1-243** (T3-81 end-to-end workflow suite exits when runner-spawned, shipped in `3c163ce0`).
 - Current audit-fix run completed: **T1-223 through T1-243**, with T1-237 still deferred as multi-week firmware-adapter wiring.
 - Next active audit-fix ticket: none from `docs/AUDIT-2026-05-12.md`; T1-237 remains the deferred multi-week firmware-adapter wiring decision.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
