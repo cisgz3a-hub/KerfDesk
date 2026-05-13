@@ -6580,6 +6580,209 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 
 ---
 
+### T1-209 | WorkflowPanel Start Job wiring (Phase 5a)
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This ticket shipped before the audit, but the coupled roadmap and shipped-ledger entries were missing. T1-229 restores the paper trail from git history.
+
+**Fix:** `ConnectionPanel` wired the WorkflowPanel ready-mode Start action into the existing legacy start-job flow instead of leaving the Phase 4 callback null. The follow-up commit tightened pause responsiveness by updating WorkflowPanel mode derivation and paused-state routing.
+
+**Verification:**
+- `tests/workflow-panel-phase4-live-job.test.ts`
+- `tests/workflow-panel-derive-mode.test.ts`
+- `tests/workflow-panel-scaffold.test.ts`
+
+**Status:** Shipped in `ce8078a6`; T1-209-followup shipped in `ab8785d9`. Hardware verification remains recommended before release for live job-start UI, but this T1-229 backfill changes docs/tests only.
+
+---
+
+### T1-210 | WorkflowPanel live elapsed-time and job-time estimate
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This ticket shipped before the audit and was missing from the canonical roadmap/ledger pair.
+
+**Fix:** `ConnectionPanel` feeds live elapsed-time and job estimate data into WorkflowPanel running/ready surfaces so the panel can show useful timing instead of static placeholders.
+
+**Verification:** git evidence points at `src/ui/components/ConnectionPanel.tsx`; covered by the WorkflowPanel phase tests around T1-209/T1-208 wiring.
+
+**Status:** Shipped in `3e980ce9`. Hardware verification not performed by this backfill; no production code changes in T1-229.
+
+---
+
+### T1-211 | Frame buttons in WorkflowPanel Move tab
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This shipped UI follow-up was absent from both roadmap documents.
+
+**Fix:** `MoveTab` and `SetupMode` expose frame controls in the WorkflowPanel Move tab and route the callbacks from `ConnectionPanel`, bringing framing closer to jog/origin controls.
+
+**Verification:**
+- `tests/workflow-panel-phase3-setup.test.ts`
+
+**Status:** Shipped in `d756907a`. Hardware verification recommended for live Frame behavior; T1-229 itself is docs/test backfill only.
+
+---
+
+### T1-212 | Frame button beside Start Job in WorkflowPanel footer
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This shipped WorkflowPanel footer change was missing from the official ledger.
+
+**Fix:** `WorkflowPanel` gained a footer Frame affordance beside Start Job, wired through `ConnectionPanel`, so operators can frame immediately before running from the same control strip.
+
+**Verification:**
+- `tests/workflow-panel-scaffold.test.ts`
+
+**Status:** Shipped in `c3827ed3`. Hardware verification recommended for live Frame behavior; T1-229 itself is docs/test backfill only.
+
+---
+
+### T1-213 | Disable WorkflowPanel routing and fall back to legacy panel
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This rollback/safety stabilization commit was absent from the roadmap and shipped-audit ledger.
+
+**Fix:** `ConnectionPanel` disables the new WorkflowPanel routing path and falls back to the legacy panel while the redesigned workflow surface remains incomplete, keeping the proven start/framing flow active.
+
+**Verification:** git evidence points at `src/ui/components/ConnectionPanel.tsx`; this is a UI routing rollback.
+
+**Status:** Shipped in `622b4372`. Hardware verification not required for the docs backfill.
+
+---
+
+### T1-214 | Keep E-Stop visible and reduce machine-panel clutter
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Backfill note:** This shipped UI safety fix was missing from the canonical roadmap and ledger.
+
+**Fix:** `ConnectionPanelMain` was adjusted so Emergency Stop is not pushed off-screen by dense drawer content, and the jog-visible-without-scroll pin was updated to preserve the operator-critical controls.
+
+**Verification:**
+- `tests/connection-panel-jog-visible-without-scroll.test.ts`
+
+**Status:** Shipped in `23c433f8`. Hardware verification not required for the docs backfill; browser verification remains useful for panel layout.
+
+---
+
+### T1-216 | Resume awaits modal-spindle reassert before cycle-start
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #3.
+
+**Backfill note:** This safety fix shipped before the audit but had no roadmap or ledger row.
+
+**Fix:** `GrblController.resume()` now waits for the modal spindle/laser mode reassertion result before issuing cycle-start, so resume cannot outrun the safety reassertion path.
+
+**Verification:**
+- `tests/resume-awaits-modal-restore.test.ts`
+- `tests/controller-safety-action-result-methods.test.ts`
+- `tests/safety-action-result.test.ts`
+- `tests/safety-controls-bypass-entitlement.test.ts`
+
+**Status:** Shipped in `1def34cd`. Hardware verification recommended before release for live Pause/Resume; T1-229 is documentation/test backfill only.
+
+---
+
+### T1-217 | acknowledgeFault awaits safety-off
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #2.
+
+**Backfill note:** This safety fix shipped before the audit but was missing from the canonical docs.
+
+**Fix:** `GrblController.acknowledgeFault()` now awaits the safety-off path before completing, preventing a fault acknowledgement from racing ahead of laser-off enforcement.
+
+**Verification:**
+- `tests/acknowledge-fault-awaits-safety-off.test.ts`
+
+**Status:** Shipped in `2c5f9196`. Hardware verification recommended before release for live fault acknowledgement; T1-229 changes docs/tests only.
+
+---
+
+### T1-218 | Bed-dimension fallback no longer authorizes motion
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #1.
+
+**Backfill note:** This fail-closed safety fix shipped before the audit but was absent from ROADMAP and the ledger.
+
+**Fix:** Unknown or fallback bed dimensions no longer authorize start/motion paths. `PipelineService`, preflight, `App`, `ConnectionPanelMain`, and profile hooks were updated so uncertain bed dimensions block instead of pretending the profile fallback is a live controller guarantee.
+
+**Verification:**
+- `tests/bed-dimensions-known-blocks-start.test.ts`
+
+**Status:** Shipped in `29b67f53`. Hardware verification recommended for machine-profile regressions; T1-229 is a docs/test backfill.
+
+---
+
+### T1-219 | Recovery bypass requires explicit token
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #4.
+
+**Backfill note:** This recovery-state safety fix shipped before the audit and was missing from the official shipped ledger.
+
+**Fix:** `MachineService` recovery clearing now requires an explicit `RecoveryBypassToken`; legitimate acknowledgements still clear through the intended path, while direct bypass attempts are blocked and tested.
+
+**Verification:**
+- `tests/recovery-bypass-requires-token.test.ts`
+- `tests/recovery-state-blocks-start.test.ts`
+- `tests/machine-event-ledger-recovery-cleared-wiring.test.ts`
+
+**Status:** Shipped in `e1335ba8`. Hardware verification not required for the docs backfill; recovery-flow regression testing remains useful before release.
+
+---
+
+### T1-220 | Failed-start uses bytes-written counter
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #8.
+
+**Backfill note:** This failed-start safety fix shipped before the audit but had no roadmap or ledger row.
+
+**Fix:** `MachineService` and `GrblController` distinguish a failed start that wrote bytes to the controller from one that failed before streaming. If bytes were written, unsafe/recovery state is preserved instead of treating the failure as harmless.
+
+**Verification:**
+- `tests/failed-start-preserves-unsafe-state-when-streamed.test.ts`
+- `tests/failed-start-uses-bytes-written-counter.test.ts`
+
+**Status:** Shipped in `993aaab3`. Hardware verification recommended before release for live failed-start recovery; T1-229 is docs/test backfill only.
+
+---
+
+### T1-221 | MachineService.jog acquires the operation mutex
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #9 bypass plug.
+
+**Backfill note:** This single-writer safety fix shipped before the audit and was absent from the roadmap/ledger pair.
+
+**Fix:** `MachineService.jog` now participates in the operation mutex, so jog commands cannot bypass active operation ownership while other machine-control actions are running.
+
+**Verification:**
+- `tests/machine-service-jog-respects-mutex.test.ts`
+
+**Status:** Shipped in `ac473616`. Hardware verification recommended for live jog controls; T1-229 itself changes docs/tests only.
+
+---
+
+### T1-222 | Operation mutex release validates session lease
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014, v30 audit response #9 lease tokens.
+
+**Backfill note:** This operation-ownership safety fix shipped before the audit but was missing from the official roadmap and shipped ledger.
+
+**Fix:** The operation mutex now issues lease/session tokens and validates them on release. Stale releases become no-ops instead of accidentally clearing a newer active operation, and `ExecutionCoordinator` call sites pass the lease through their `finally` blocks.
+
+**Verification:**
+- `tests/operation-mutex-lease-tokens.test.ts`
+- `tests/operation-mutex-prevents-overlap.test.ts`
+- `tests/machine-service-jog-respects-mutex.test.ts`
+- `tests/frame-dot-finally-emits-m5.test.ts`
+
+**Status:** Shipped in `cc17f1b9`. Hardware verification recommended for live overlapping-control regressions; T1-229 is docs/test backfill only.
+
+---
 ### T1-223 | Service-side placement-uncertain gate for Start
 
 **Audit source:** `docs/AUDIT-2026-05-12.md` F-010.
@@ -6702,6 +6905,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 
 ---
 
+### T1-229 | Backfill ROADMAP and shipped ledger for T1-209..T1-222
+
+**Audit source:** `docs/AUDIT-2026-05-12.md` F-014.
+
+**Problem:** Thirteen recently shipped tickets existed in git history and tests, but the canonical roadmap and shipped-audit ledger did not mention them. That broke the repo's coupled-triple contract and made future agents believe the safety audit response was still missing.
+
+**Fix:** Backfilled ROADMAP detail blocks, master-checklist entries, and shipped-audit rows for T1-209..T1-214 and T1-216..T1-222 using exact git evidence. T1-209's follow-up hash is recorded with the T1-209 entry so it is not orphaned.
+
+**Verification:**
+- `npx tsx tests\roadmap-backfill-t1-209-222.test.ts`
+- `Select-String -Path docs\ROADMAP.md,docs\ROADMAP-shipped-audit.md -Pattern 'T1-209|T1-222|T1-229|<TBD>'`
+- `npx tsc --noEmit --pretty false`
+
+**Status:** Shipped in <TBD>. Hardware verification not required; this is a documentation and docs-integrity-test backfill.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -20554,6 +20773,20 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-225 HIGH move scene dirty hash into core scene layer (shipped in `48f3597`) - closes audit F-007 by removing the runtime `core/job` to `app/sceneDirtyHash` import inversion.
 - [x] T1-226 MEDIUM deterministic PathOptimizer iteration budget (shipped in `f46532c`) - closes audit F-012 by removing wall-clock early exit from 2-opt path ordering so emitted G-code ordering is not runtime-speed dependent.
 - [x] T1-227 MEDIUM extract PreflightContext to break rule cycles (shipped in `4ef0903`) - closes audit F-009 by moving shared preflight rule contracts out of the `Preflight.ts` orchestrator so rules no longer import their caller.
+- [x] T1-229 MEDIUM backfill ROADMAP + shipped ledger for T1-209..T1-222 (shipped in <TBD>) - closes audit F-014 by recording the missing coupled-triple docs for the WorkflowPanel and v30 audit-response tickets.
+- [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
+- [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
+- [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
+- [x] T1-219 HIGH recovery bypass requires explicit token (shipped in `e1335ba8`) - v30 audit response #4; recovery clearing now requires the intended bypass token.
+- [x] T1-218 HIGH bed-dimension fallback no longer authorizes motion (shipped in `29b67f53`) - v30 audit response #1; unknown/fallback bed dimensions fail closed.
+- [x] T1-217 HIGH acknowledgeFault awaits safety-off (shipped in `2c5f9196`) - v30 audit response #2; fault acknowledgement waits for laser-off enforcement.
+- [x] T1-216 HIGH resume awaits modal-spindle reassert before cycle-start (shipped in `1def34cd`) - v30 audit response #3; resume cannot outrun modal laser-mode restoration.
+- [x] T1-214 MEDIUM keep E-Stop visible and reduce machine-panel clutter (shipped in `23c433f8`) - keeps Emergency Stop accessible in the connected drawer.
+- [x] T1-213 MEDIUM disable WorkflowPanel routing and fall back to legacy panel (shipped in `622b4372`) - keeps the proven legacy machine panel active while WorkflowPanel matures.
+- [x] T1-212 MEDIUM Frame button beside Start Job in WorkflowPanel footer (shipped in `c3827ed3`) - brings frame-before-start closer to the primary run action.
+- [x] T1-211 MEDIUM Frame buttons in WorkflowPanel Move tab (shipped in `d756907a`) - exposes framing in the setup/move workflow surface.
+- [x] T1-210 LOW WorkflowPanel live elapsed-time and job-time estimate (shipped in `3e980ce9`) - replaces static timing placeholders with live job timing data.
+- [x] T1-209 MEDIUM WorkflowPanel Start Job wiring Phase 5a (shipped in `ce8078a6`; T1-209-followup in `ab8785d9`) - wires the ready-mode Start action into the legacy start flow and fixes pause responsiveness.
 - [x] T1-228 MEDIUM move JobCompiler runtime helpers out of plan layer (shipped in c8ca7f60) - closes the JobCompiler runtime portion of audit F-005 by moving OperationOrderer, ScanningOffset, and SmartOverscan implementations into `core/job` with compatibility wrappers in `core/plan`.
 - [x] T1-208 MEDIUM WorkflowPanel Phase 4: real ready / running / paused modes (shipped 2026-05-12 in `ff1b9080`) — extends T1-207. Phase 4 ships the three "live job" modes — the panel content shown while the user is about to run a job (ready), while a job is running, and while a job is paused. The footer (T1-204) already routes Pause / Resume / Stop based on the active mode; Phase 4 wires those callbacks to real `MachineService` methods, surfaces job progress in the running / paused modes via the existing `Progress` component, and ships a compact summary card for the ready mode. The Start callback intentionally stays null — the legacy panel still owns the full ticket-validation flow (compile + sceneHash + profileHash + gcodeHash verification + entitlement + material-preset hashes); lifting that flow into a shared helper is Phase 5 work. New files: (a) `ReadyMode.tsx` (custom-built summary card — "Ready to run" status banner, job name / line count / estimated time / plan summary rows, "Press Start Job below to begin." hint); (b) `RunningMode.tsx` (embeds existing `Progress` with displayPaused=false); (c) `PausedMode.tsx` (embeds existing `Progress` with displayPaused=true). `WorkflowPanel.tsx` adds `liveJobProps: { ready: ReadyModeProps; running: RunningModeProps; paused: PausedModeProps } | null` to its props (bundled to keep the prop surface compact); mode-content router calls the real mode when wired, falls back to `ModeStub` when null. Adapter wiring in `ConnectionPanel.tsx`: `jobName` from `scene.metadata?.name ?? 'Untitled'`; `lineCount` from `jobProgress?.totalLines`; pause/resume/stop callbacks call `machineService.pause()` / `.resume()` / `.stopAndEnsureLaserOff()` (idempotent commands the user invokes on an already-running job, safe to wire ahead of Phase 5). `elapsedSeconds`, `estimatedRemaining`, `estimatedTime`, `planSummary` are computed-but-static in Phase 4 (the live tracking timer + the time estimator wiring will land in a Phase 4 follow-up; the modes render without these without crashing). Pinned by new `tests/workflow-panel-phase4-live-job.test.ts` (30 contracts: each mode file source structure + T1-208 markers + import of the right reused component + ReadyMode has no Start onClick in its body — footer owns the primary, WorkflowPanel imports + liveJobProps bundled shape + router calls each real mode when wired + fallback to ModeStub when null, adapter builds liveJobProps + jobName resolution + pause/resume/stop wirings + onStartJob stays null + liveJobProps threaded into the WorkflowPanel call). Phases 1–3 tests verified post-fix (`workflow-panel-derive-mode` 27/27, `workflow-panel-feature-flag` 13/13, `workflow-panel-scaffold` 66/66, `workflow-panel-phase2-modes` 42/42, `workflow-panel-phase3-setup` 51/51). 1 adjacent test verified (`build-start-readiness` 85/85). Phase 4 deliberate deferrals: live elapsed-seconds tracking + time-estimator wiring (Phase 4 follow-up); Start-Job callback (Phase 5 lifts the ticket-validation flow). Hardware verification: needed — flip the flag, start a job from the legacy panel (Start callback isn't wired in the new panel yet), confirm the workflow panel transitions to `running` mode with a live progress bar, Pause flips to `paused` mode, Resume returns to `running`, Stop returns the panel to setup with the laser-off contract honored.
 - [x] T1-207 MEDIUM WorkflowPanel Phase 3: real setup mode with Move / Job / Console tabs (shipped 2026-05-12 in `80de6c04`) — extends T1-206. Setup mode is the largest of the four mode bodies — the user's "preparation space" where they jog, set the origin, check the job, and run diagnostic commands. Phase 3 ships the tab-shell with three real tabs, reusing existing legacy-panel components 1:1 so the safety surface is shared during the rollout. Tab persistence via localStorage (`laserforge.ui.setup-tab`, default `'move'`) so the user isn't bounced to Move every reload. New files: (a) `setupTabPersistence.ts` (typed localStorage helpers + `ALL_SETUP_TABS` constant + `SetupTab` union); (b) `TabBar.tsx` (pure presentational component, role='tablist', aria-selected on the active tab, mode-pip-style indicator for the active selection); (c) `MoveTab.tsx` (embeds existing `Jog` from `connection/Jog.tsx` — jog buttons / step selector / home / last position / auto-focus — with frame + test-fire deferred to a Phase-3 follow-up since they need active-operation gating that lives deeper); (d) `JobTab.tsx` (read-only summary rows: device profile name, resolved bed size, gcode status — fresh/stale/not compiled — with a recompile button when stale; layer overview + start mode + saved origin deferred to a Phase-3 follow-up); (e) `ConsoleTab.tsx` (embeds existing `ConsolePanel.tsx` — manual command input + structured message log + safe-GRBL-diagnostics shortcut); (f) `SetupMode.tsx` (top-level for the setup mode: TabBar + a switch routing to one of the three tab bodies + `useState` initialized from `readSetupTab()` + `useEffect` that writes on every change). `WorkflowPanel.tsx` adds a `setupModeProps: SetupModeProps | null` field to its props; the mode-content router calls `SetupMode` when wired, falls back to `ModeStub` when not (for early/partial callers). Adapter wiring in `ConnectionPanel.tsx`: local `jogStep` useState (matches the legacy panel pattern); `onJog` calls `executionCoordinator.jog(axis, distance, 1000)` with a literal 1000 mm/min feed default — Phase 4 will lift the profile-aware feed resolution up; `onHome` calls `executionCoordinator.home()`; `canHome` gated on `isConnected && machineStatus === 'idle'`; `sendUserCommand` classifies via `machineService.classifyUserCommand(cmd)` and blocks `warn`/`dangerous` severities with a console.warn pointing at the legacy panel's approval-token flow (safe commands flow through unchanged via `machineService.sendCommand(cmd, 'user', undefined)`); `messageEvents` threaded from `machineUi`. Pinned by new `tests/workflow-panel-phase3-setup.test.ts` (51 contracts: persistence key + default + round-trip for every tab + invalid-storage fallback, every tab component source structure + import + render of the existing component it reuses, SetupMode imports + initial-state-from-persistence + persist-in-useEffect + switch routing to each body, TabBar a11y roles + aria-selected, WorkflowPanel routes setup→SetupMode when wired + falls back to ModeStub when null, adapter builds setupModeProps with JOG_DEFAULT_FEED_MM_PER_MIN literal + executionCoordinator wiring + classifyUserCommand safety carve-out + idle gating on canHome). Phase 1+2 tests verified post-fix (`workflow-panel-derive-mode` 27/27, `workflow-panel-feature-flag` 13/13, `workflow-panel-scaffold` 66/66, `workflow-panel-phase2-modes` 42/42). 2 adjacent tests verified (`build-start-readiness` 85/85, `connection-panel-equality` 28/28). Hardware verification: needed — flip the flag, confirm jog buttons drive real motion at the default 1000 mm/min, Console tab accepts safe commands like `$$` / `$#` / `?` but blocks `$X` / `$H` (warn/dangerous via the classifier), tab selection persists across reload, Job tab gcode status flips correctly when the design changes.
@@ -20601,7 +20834,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-164 route disconnect-time laserOff through notifyLaserSafetyOutcome (shipped 2026-05-11 in `17c8132e`) — audit F-011 fix. Pre-T1-164 `MachineService.disconnect()` called `await ctrl.operations.laserOff()` inside an empty `try { } catch { /* not connected, buffer full, or port already gone */ }` block — both success and failure outcomes were silently discarded. A transport-failure M5 during disconnect could not escalate `_laserOutputState` to `'unknown'` (so the next job-start was un-gated even though the laser-off contract was indeterminate); a successful M5 could not downgrade an existing `'on'` / `'unknown'` to `'off'` (so the safety-state machine missed the positive confirmation). The audit (docs/AUDIT-2026-05-11.md F-011) flagged this as a Medium safety/robustness finding, comparing against the wired `ExecutionCoordinator.emergencyLaserOff` path which captures the result, computes a stage (`'m5' | 'soft-reset' | 'failed'`), and routes through `notifyLaserSafetyOutcome`. The audit also called out that the comment ("not connected, buffer full, or port already gone") was misleading: only "Not connected" is safe to swallow — the controller never had a live port we could have left in a laser-on state. The other failures are real safety events. Fix: capture the `OperationResult`, compute the stage (`ok` → `'m5'`; `reason === 'soft-reset'` → `'soft-reset'`; else `'failed'`), and call `this.notifyLaserSafetyOutcome(stage)` unless the failure message matches `/Not connected/i`. The "Not connected" carve-out is explicit and documented inline. Also handles the case where the underlying `operations.laserOff()` throws synchronously — converted to `'failed'` with the same "Not connected" carve-out. Pinned by new `tests/disconnect-laser-off-routes-through-notify.test.ts` (16 contracts: success → `'off'` (downgrades a pre-existing `'unknown'`), transport-failure → `'unknown'`, soft-reset → `'unknown'`, "Not connected" failure swallowed (state stays `'off'`), thrown non-"Not connected" error → `'unknown'`, thrown "Not connected" swallowed, source-pins on T1-164 marker, audit cross-reference, `notifyLaserSafetyOutcome(stage)` call site, removed swallow-everything comment, "Not connected" carve-out documented). 4 nearby tests verified post-fix (`machine-service-disconnect-safety-result` 16/16, `disconnect-stops-job-gating` 18/18, `execution-coordinator-disconnect` 17/17, `safety-off-two-stage` 14/14, `error-handler-sends-safety-off` 14/14, `autofocus-timeout-issues-safety-off` 14/14). Hardware verification: not required for the routing change (no new G-code emitted; the audit-trail flow is purely host-side state). The behavioral change is that a disconnect-time soft-reset / transport-failure laserOff now triggers the T1-122 emergency-stop recovery checklist on next connect — which is the intended audit improvement (the previous behavior silently lost track of an indeterminate laser-off state).
 - [x] T1-163 surface UnsafeStopOnErrorOverrideToken in ControllerInterface.setStopOnError signature (shipped 2026-05-11 in `530dce96`) — audit F-001 fix. Pre-T1-163 the `UnsafeStopOnErrorOverrideToken` interface + `createStopOnErrorOverrideToken` factory + `isUnsafeStopOnErrorOverrideToken` type-guard lived inside `src/controllers/grbl/GrblController.ts`, and `ControllerInterface.GrblControllerApi.setStopOnError` was typed `setStopOnError?(value: boolean): void`. A caller wired against the interface alone (e.g. a future controller adapter, an integration harness holding `GrblControllerApi` rather than the concrete `GrblController`) had no compile-time signal that `setStopOnError(false, ...)` requires a token — the call would compile and only throw at runtime inside the controller's gate. The full-code audit (docs/AUDIT-2026-05-11.md F-001) flagged this as a documented-but-not-typed safety contract. Fix: new `src/controllers/grbl/StopOnErrorOverrideToken.ts` hoists the token type + factory + type-guard (byte-identical implementation; the kind brand `'unsafe-stop-on-error-override-token'`, the empty-reason throw, the warn-on-mint, and the Object.freeze are all preserved). `ControllerInterface.ts` imports the type and the signature is now `setStopOnError?(value: boolean, token?: UnsafeStopOnErrorOverrideToken): void`. `GrblController.ts` imports from the new module + re-exports both the type and the factory for backwards-compat with the historical import path used by T1-116 tests and the audit doc. Pinned by `tests/stop-on-error-token-in-interface.test.ts` (24 contracts: token module exports, ControllerInterface imports + signature, GrblController re-export path, factory rejects empty / whitespace reason, mint shape, mint frozen, type-guard accepts real / rejects null / undefined / empty / missing-reason / empty-reason / mismatched-kind, backwards-compat path). The runtime gate inside `GrblController.setStopOnError` is unchanged and remains the load-bearing defense; `tests/stop-on-error-override.test.ts` (13/13) and `tests/machine-settings-stop-on-error-toggle.test.ts` (2/2) both stay green. `tests/stop-on-error-no-bypass-source-guard.test.ts` allowlists the new sibling module (its JSDoc mentions the gated call site as documentation, not as a call site) — the scanner strips `//` line comments but not `/* ... */` block comments, so the allowlist is the cleanest fix. Hardware verification: not required (type-only signature change + extraction; no runtime behavior change).
 
-### Tier 2 (This month)
+## Tier 2 (This month)
 - [x] T2-1 Validated Job Ticket (all 5 phases shipped; checklist catch-up)
 - [x] T2-2 `Storage` interface refactor (StorageAdapter + runtime adapters + getStorage migration; direct localStorage restricted to migration helpers)
 - [x] T2-3 Service-layer paywall gates (shipped; token signing deferred to Tier 3)
