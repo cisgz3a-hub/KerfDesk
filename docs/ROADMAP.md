@@ -7032,7 +7032,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\determinism-gate.test.ts`
 - `npx tsc --noEmit --pretty false`
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is source-level determinism review coverage only and does not alter G-code, controller commands, or machine state.
+**Status:** Shipped in `49ed6bb2`. Hardware verification not required; this is source-level determinism review coverage only and does not alter G-code, controller commands, or machine state.
 
 ---
 ## Tier 2 鈥?This month
@@ -20893,7 +20893,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-232 LOW route production diagnostics through structured logging (shipped in 4b1310f) - closes audit F-003 by replacing the remaining `src/` `console.log` breadcrumbs with a bounded structured diagnostic log sink.
 - [x] T1-233 LOW type WebSerialPort catch paths as unknown (shipped in 3c82189) - closes audit F-002 by normalizing non-Error WebSerial read/write failures without `any` catch typing.
 - [x] T1-234 LOW eslint cleanup sweep (shipped in 10cd1bab) - closes audit F-001/F-004 by renaming the hook-shaped SVG helper and removing stale `no-explicit-any` disable directives while keeping intentional `any` boundaries documented.
-- [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in `<TBD>`) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
+- [x] T1-235 LOW review `core/` Date.now / Math.random callsites (shipped in 49ed6bb2) - closes audit F-008 by pinning the per-site review, proving compile/output paths stay deterministic, and leaving the remaining inline random ID cleanup to T1-236/F-013.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

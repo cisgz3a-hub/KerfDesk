@@ -7,7 +7,7 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-235** (core time/random per-site review, shipped in `<TBD>`).
+- Last shipped roadmap item: **T1-235** (core time/random per-site review, shipped in 49ed6bb2).
 - Current audit-fix run completed: **T1-223 through T1-235**.
 - Next audit-fix ticket: **T1-236** - route inline ID generators through `generateId()` where appropriate.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
