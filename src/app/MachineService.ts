@@ -1,7 +1,7 @@
 import { type MutableRefObject } from 'react';
 import { type LaserController } from '../controllers/ControllerInterface';
 import { type SerialPortLike } from '../communication/SerialPort';
-import { WebSerialPort } from '../communication/WebSerialPort';
+import { WebSerialPort, type DeviceFingerprint } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
 import { type MachineState, type JobProgress } from '../controllers/ControllerInterface';
 import { type Scene } from '../core/scene/Scene';
@@ -66,7 +66,7 @@ import {
   type FalconWiFiAction,
   type TrustClassification,
 } from '../security/FalconWiFiTrust';
-import { getActiveProfile } from '../core/devices/DeviceProfile';
+import { getActiveProfile, saveDeviceProfile } from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
@@ -238,6 +238,13 @@ const MAX_CONSUMED_APPROVAL_NONCES = DEFAULT_MAX_CONSUMED_APPROVAL_NONCES;
 
 // T1-145: mutatesWorkCoordinateSystem / safetyResultForStateMachine /
 // safetyStatesEqual / createApprovalNonce moved to ./machineServiceHelpers.
+
+function hasUsefulSerialFingerprint(
+  fingerprint: DeviceFingerprint | null | undefined,
+): fingerprint is DeviceFingerprint {
+  return typeof fingerprint?.usbVendorId === 'number'
+    || typeof fingerprint?.usbProductId === 'number';
+}
 
 export class MachineService {
   private state: MachineServiceState = {
@@ -1933,10 +1940,11 @@ export class MachineService {
 
   async connectRealLaser(baudRate: number, signal?: AbortSignal): Promise<void> {
     // T1-50: accept an optional AbortSignal. T2-33 made
-    // WebSerialPort.requestAndOpen signal-aware; this service passes
-    // the same signal down so user-cancel during port selection/open
-    // uses the T1-49 cleanup path. GrblController.connect still checks
-    // at the service await boundary until its handshake is signal-aware.
+    // WebSerialPort's open flow signal-aware; this service passes the
+    // same signal down so user-cancel during port selection/open uses
+    // the T1-49 cleanup path. T3-48 follow-up routes through
+    // connectKnownPortOrPrompt so previously-authorized Web Serial
+    // grants can reconnect without a picker prompt when unambiguous.
     signal?.throwIfAborted();
     if (this._activeConnectAbortController !== null) {
       throw new Error('Connection already in progress');
@@ -1979,12 +1987,18 @@ export class MachineService {
     let ws: WebSerialPort | null = null;
     try {
       ws = createSerialPort('web') as WebSerialPort;
-      await ws.requestAndOpen(baudRate, connectSignal);
+      const activeProfile = getActiveProfile();
+      const profileFingerprint =
+        activeProfile?.connection?.kind === 'serial'
+          ? activeProfile.connection.fingerprint
+          : undefined;
+      const connectResult = await ws.connectKnownPortOrPrompt(baudRate, profileFingerprint, connectSignal);
       connectSignal.throwIfAborted();
       await this.controllerRef.current.connect(ws, connectSignal);
       connectSignal.throwIfAborted();
       this.portRef.current = ws;
       this.state.isSimulator = false;
+      this._persistConnectedSerialFingerprint(connectResult.fingerprint, baudRate);
       // T1-22: fresh connection clears any stale unknown laser-safety state
       // from a previous session.
       this._setLaserOutputState('off');
@@ -2032,6 +2046,38 @@ export class MachineService {
         this._activeConnectPromise = null;
       }
     }
+  }
+
+  private _persistConnectedSerialFingerprint(
+    fingerprint: DeviceFingerprint | undefined,
+    baudRate: number,
+  ): void {
+    if (!hasUsefulSerialFingerprint(fingerprint)) return;
+
+    const activeProfile = getActiveProfile();
+    if (!activeProfile || activeProfile.connection?.kind === 'falcon-wifi') return;
+
+    const serialConnection = activeProfile.connection?.kind === 'serial'
+      ? activeProfile.connection
+      : { kind: 'serial' as const };
+    const existing = serialConnection.fingerprint;
+    const fingerprintUnchanged =
+      existing?.usbVendorId === fingerprint.usbVendorId
+      && existing?.usbProductId === fingerprint.usbProductId
+      && serialConnection.baudRate === baudRate;
+    if (fingerprintUnchanged) return;
+
+    saveDeviceProfile({
+      ...activeProfile,
+      connection: {
+        ...serialConnection,
+        baudRate,
+        fingerprint: {
+          usbVendorId: fingerprint.usbVendorId,
+          usbProductId: fingerprint.usbProductId,
+        },
+      },
+    });
   }
 
   async disconnect(): Promise<SafetyActionResult> {

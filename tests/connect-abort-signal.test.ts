@@ -5,9 +5,10 @@
  * route through the T1-49 cleanup path (port closed, portRef nulled,
  * controller.disconnect best-effort called).
  *
- * Follow-up slices now pass the same UI-owned signal through
- * `WebSerialPort.requestAndOpen` and `GrblController.connect`, so
- * cancel covers port selection/open and the GRBL welcome handshake.
+ * T3-48 routes the same UI-owned signal through
+ * `WebSerialPort.connectKnownPortOrPrompt` and `GrblController.connect`,
+ * so cancel covers known-port reuse, port selection/open, and the GRBL
+ * welcome handshake.
  *
  * Hardware verification: not required (UI plumbing for previously-
  * swallowed async failures, no g-code or machine-state change).
@@ -267,7 +268,7 @@ void (async () => {
       assert(portRef.current !== null,
         'unaborted signal: portRef points at the WebSerialPort (no behavior change)');
       assert(lastRequestAndOpenSignal instanceof AbortSignal && !lastRequestAndOpenSignal.aborted,
-        'unaborted signal: MachineService passes a service-owned signal to WebSerialPort.requestAndOpen');
+        'unaborted signal: MachineService passes a service-owned signal through the WebSerial open flow');
       assert(ctrl.lastConnectSignal === lastRequestAndOpenSignal,
         'unaborted signal: MachineService passes the same service-owned signal to controller.connect');
       assert(portSpy.closeCalls === 0, 'unaborted signal: port.close NOT called');
@@ -307,8 +308,8 @@ void (async () => {
       assert(ctrl.connectCalls === 0, 'service cancel: controller.connect NOT called when open is aborted');
     }
 
-    assert(/requestAndOpen\(baudRate,\s*connectSignal\)/.test(machineServiceSource),
-      'source pin: MachineService passes service-owned AbortSignal into WebSerialPort.requestAndOpen');
+    assert(/connectKnownPortOrPrompt\(baudRate,\s*profileFingerprint,\s*connectSignal\)/.test(machineServiceSource),
+      'source pin: MachineService passes service-owned AbortSignal into WebSerialPort.connectKnownPortOrPrompt');
     assert(/controllerRef\.current\.connect\(ws,\s*connectSignal\)/.test(machineServiceSource),
       'source pin: MachineService passes service-owned AbortSignal into controller.connect');
   } finally {

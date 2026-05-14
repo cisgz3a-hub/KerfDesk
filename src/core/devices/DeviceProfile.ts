@@ -23,6 +23,16 @@ import { validateProfile, type ProfileValidationIssue } from './validateProfile'
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
 
 /**
+ * USB descriptor fingerprint for a remembered Web Serial device. Stored on
+ * serial profiles so reconnect can prefer the same previously-authorized port
+ * without prompting when `navigator.serial.getPorts()` can see it.
+ */
+export interface SerialDeviceFingerprint {
+  usbVendorId?: number;
+  usbProductId?: number;
+}
+
+/**
  * Connection metadata for a DeviceProfile. When absent, profiles are treated as
  * the historical `serial` flavour (GRBL over USB). Falcon A1 Pro
  * WiFi profiles use the `falcon-wifi` variant and talk to the device directly
@@ -34,6 +44,8 @@ export type DeviceConnection =
       /** Kept here for future parity; currently DeviceProfile.baudRate is the source of truth. */
       baudRate?: number;
       preferredPort?: string;
+      /** Captured from Web Serial `SerialPort.getInfo()` after a successful connect. */
+      fingerprint?: SerialDeviceFingerprint;
     }
   | {
       kind: 'falcon-wifi';
