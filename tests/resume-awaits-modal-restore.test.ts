@@ -87,7 +87,7 @@ async function setUpPausedController(): Promise<{
   await ctrl.sendJob(['G21', 'G90', 'M3 S100', 'G1 X1 Y1 F600']);
   await flush();
   // Pause: emits realtime feed-hold + queues M5 S0 critical write.
-  ctrl.pause();
+  await ctrl.pause();
   await flush();
   // Drop the realtime byte history so we can assert on the cycle-
   // start byte specifically.

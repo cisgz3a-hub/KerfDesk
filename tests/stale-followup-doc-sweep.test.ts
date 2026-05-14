@@ -133,9 +133,9 @@ console.log('\n=== T1-162 stale T*-followup doc-string sweep ===\n');
     'utf-8',
   );
   // Each safety method's signature should declare SafetyActionResult. T1-216 made
-  // resume async so it declares Promise<SafetyActionResult>.
+  // resume async; T1-252 made pause async so M5 S0 is awaited before returning.
   const expected = new Map([
-    ['pause', /^\s*pause\(\)\s*:\s*SafetyActionResult/m],
+    ['pause', /^\s*async\s+pause\(\)\s*:\s*Promise<SafetyActionResult>/m],
     ['resume', /^\s*async\s+resume\(\)\s*:\s*Promise<SafetyActionResult>/m],
     ['stop', /^\s*stop\(\)\s*:\s*SafetyActionResult/m],
     ['emergencyStop', /^\s*emergencyStop\(\)\s*:\s*SafetyActionResult/m],

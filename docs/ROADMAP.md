@@ -7308,6 +7308,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `66e559f0`. Hardware verification recommended before release tagging: run Frame -> Start on Falcon and verify Start without framing remains a deliberate, visible operator choice.
 
 ---
+### T1-252 | Pause laser-off confirmation is structured and load-bearing
+
+**Audit source:** User-provided v33 release-readiness correction, 2026-05-14. The audit found that pause could return a clean accepted result before the explicit `M5 S0` laser-off command had completed.
+
+**Problem:** `GrblController.pause()` emitted feed-hold, launched `_writeCriticalSystemLine('M5 S0')` in a detached promise, and immediately returned `makePauseResult()`. If the M5 critical write failed, the failure reached only `console.warn`; `MachineService.pause()` saw a clean pause, appended `paused-verified`, and left `_laserOutputState` at `off`.
+
+**Fix:** `GrblController.pause()` is now async and awaits the critical `M5 S0` write. A confirmed M5 returns `laserState: 'off'`; a failed M5 returns `accepted: false`, `laserState: 'unknown'`, and `requiresInspection: true`. `operations.pauseJob()` carries the controller `SafetyActionResult` through `OperationResult.safetyResult`, and `MachineService.pause()` records that exact result. Failed pause laser-off now latches both `SafetyState.unsafeUnknown` and `_laserOutputState: 'unknown'`, so Start cannot proceed until the operator resolves the safety state.
+
+**Verification:**
+- `npx tsx tests\pause-laser-off-confirmation.test.ts` failed before the fix and passes after.
+- `npx tsx tests\controller-safety-action-result-methods.test.ts` pins the async controller pause contract and confirmed-off result.
+- `npx tsx tests\machine-service-pause-resume.test.ts`, `npx tsx tests\machine-service-safety-state-machine.test.ts`, and `npx tsx tests\acknowledge-fault-awaits-safety-off.test.ts` pass after the wiring change.
+
+**Status:** Shipped in `<TBD-T1-252>`. Hardware verification recommended before release tagging: pause a low-power Falcon job and confirm Pause reports safe only after the laser visibly turns off; simulate/force M5 failure only on a test bench.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21181,6 +21197,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-249 HIGH avoid trace-generated straight closure burns (shipped in `3844f2af`) - stops forced closure of far-apart traced contour endpoints and raises noisy-trace filtering defaults.
 - [x] T1-250 HIGH separate autosave and manual-save truth (shipped in `3844f2af`) - keeps autosave as recovery data without marking the user's manually chosen project file clean.
 - [x] T1-251 HIGH enforce service-level FrameTicket proof at Start (shipped in `66e559f0`) - requires `MachineService.startValidatedJob` to receive either a fresh frame proof matching the compiled job fingerprint or an explicit logged Start-without-framing override before streaming any G-code.
+- [x] T1-252 HIGH make pause laser-off confirmation load-bearing (shipped in `<TBD-T1-252>`) - awaits pause-time `M5 S0`, carries the structured result through controller operations, and latches failed laser-off as unknown/unsafe instead of reporting a clean pause.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

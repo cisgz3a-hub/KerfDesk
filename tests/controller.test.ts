@@ -353,11 +353,11 @@ async function testPauseResume() {
   assert(ctrl.state.status === 'run', 'Job started → run state');
 
   // Pause while job is still running (no oks sent yet)
-  ctrl.pause();
+  await ctrl.pause();
   assert(ctrl.state.status === 'hold', 'Pause → hold state');
 
   // Resume
-  ctrl.resume();
+  await ctrl.resume();
   assert(ctrl.state.status === 'run', 'Resume → run state');
 
   // Now drain all oks to complete the job

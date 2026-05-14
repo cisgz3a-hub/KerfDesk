@@ -163,8 +163,8 @@ export interface JobHandle {
 }
 
 export type OperationResult =
-  | { ok: true; message?: string }
-  | { ok: false; reason: string; message?: string };
+  | { ok: true; message?: string; safetyResult?: SafetyActionResult }
+  | { ok: false; reason: string; message?: string; safetyResult?: SafetyActionResult };
 
 export type FrameOperationResult =
   | { ok: true; message?: string }
@@ -280,7 +280,7 @@ export interface GrblControllerApi extends GcodeLineController {
    */
   executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle>;
   sendJob(lines: string[]): Promise<void>;
-  pause(): SafetyActionResult;
+  pause(): Promise<SafetyActionResult>;
   /**
    * T1-216 (v30 audit #3): resume awaits the modal-spindle reassert
    * (`M3 S0` / `M4 S0`) before issuing the cycle-start byte. Pre-
@@ -316,8 +316,8 @@ export interface GrblControllerApi extends GcodeLineController {
    *
    * Implementations should:
    *  - Confirm motion has stopped.
-   *  - Call {@link safetyOff} as defense-in-depth (fire-and-forget;
-   *    the original fault path already invoked it once).
+   *  - Await {@link safetyOff} as defense-in-depth; do not clear the
+   *    fault until laser-off is confirmed by M5 or forced by reset.
    *  - Transition status to 'idle' if the controller is currently in
    *    'faulted_requires_inspection'; otherwise no-op.
    *

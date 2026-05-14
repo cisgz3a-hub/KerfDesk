@@ -1749,6 +1749,18 @@ export class MachineService {
       safetyResultForStateMachine(result),
       Date.now(),
     ));
+    if (result.laserState === 'off') {
+      this._setLaserOutputState('off');
+    } else if (
+      result.laserState === 'unknown'
+      && (result.action === 'pause'
+        || result.action === 'abortJob'
+        || result.action === 'emergencyStop'
+        || result.action === 'laserOff'
+        || result.action === 'disconnectSafe')
+    ) {
+      this._setLaserOutputState('unknown');
+    }
     return result;
   }
 
@@ -2445,13 +2457,20 @@ export class MachineService {
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('pause'));
     try {
       const result = await ctrl.operations.pauseJob();
-      if (!result.ok) throw new Error(result.reason);
+      if (!result.ok) {
+        return this._recordSafetyResult(result.safetyResult ?? {
+          ...makeNotConnectedResult('pause'),
+          requiresReconnect: false,
+          message: result.message ?? result.reason,
+        });
+      }
+      const safetyResult = result.safetyResult ?? makePauseResult();
       // T1-200: paused-verified fires only after the controller
       // confirms the operation succeeded. A throw between this and
       // the catch leaves a pause-requested without a paused-verified
       // — that asymmetry is the diagnostic signal.
       getMachineEventLedger().append({ kind: 'paused-verified', t: Date.now() });
-      return this._recordSafetyResult(makePauseResult());
+      return this._recordSafetyResult(safetyResult);
     } catch (err: unknown) {
       return this._recordSafetyResult({
         ...makeNotConnectedResult('pause'),
@@ -2502,6 +2521,6 @@ export class MachineService {
     // M5 via sendCommand would race the reset and usually throw
     // 'Not connected' anyway. Intentionally no follow-up writes here.
     void sendTx;
-    return this._recordSafetyResult(makeSoftResetStopResult());
+    return this._recordSafetyResult(result.safetyResult ?? makeSoftResetStopResult());
   }
 }

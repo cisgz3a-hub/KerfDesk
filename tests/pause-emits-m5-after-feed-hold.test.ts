@@ -88,7 +88,7 @@ console.log('\n=== T1-23 pause emits M5 + resume reasserts spindle mode ===\n');
 async function main(): Promise<void> {
   {
     const { ctrl, events, flush } = makeController();
-    ctrl.pause();
+    await ctrl.pause();
     await flush();
     const feedHoldIdx = events.findIndex(e => e.kind === 'byte' && e.data === 0x21);
     const m5Idx = events.findIndex(e => e.kind === 'critical' && typeof e.data === 'string' && e.data.includes('M5'));
@@ -105,11 +105,11 @@ async function main(): Promise<void> {
       _state: { status: string };
     };
     internals._lastSpindleMode = 'M3';
-    ctrl.pause();
+    await ctrl.pause();
     await flush();
     internals._state = { ...internals._state, status: 'hold' };
     events.length = 0;
-    ctrl.resume();
+    await ctrl.resume();
     await flush();
     const reassertIdx = events.findIndex(e => e.kind === 'critical' && typeof e.data === 'string' && e.data.includes('M3 S0'));
     const cycleStartIdx = events.findIndex(e => e.kind === 'byte' && e.data === 0x7E);
@@ -126,11 +126,11 @@ async function main(): Promise<void> {
       _state: { status: string };
     };
     internals._lastSpindleMode = 'M4';
-    ctrl.pause();
+    await ctrl.pause();
     await flush();
     internals._state = { ...internals._state, status: 'hold' };
     events.length = 0;
-    ctrl.resume();
+    await ctrl.resume();
     await flush();
     const m4Reassert = events.findIndex(e => e.kind === 'critical' && typeof e.data === 'string' && e.data.includes('M4 S0'));
     const m3Reassert = events.findIndex(e => e.kind === 'critical' && typeof e.data === 'string' && e.data.includes('M3 S0'));
@@ -143,11 +143,11 @@ async function main(): Promise<void> {
   {
     const { ctrl, events, flush } = makeController();
     const internals = ctrl as unknown as { _state: { status: string } };
-    ctrl.pause();
+    await ctrl.pause();
     await flush();
     internals._state = { ...internals._state, status: 'hold' };
     events.length = 0;
-    ctrl.resume();
+    await ctrl.resume();
     await flush();
     const anyReassert = events.findIndex(e =>
       e.kind === 'critical'

@@ -64,7 +64,7 @@ function makeController(opts: {
     async connect() { /* no-op */ },
     async disconnect() { /* no-op */ },
     async sendJob() { /* no-op */ },
-    pause() { return acceptedSafety('pause'); },
+    async pause() { return acceptedSafety('pause'); },
     // T1-216: resume is async (awaits modal reassert).
     async resume() { return acceptedSafety('resume'); },
     stop() { return acceptedSafety('abortJob'); },

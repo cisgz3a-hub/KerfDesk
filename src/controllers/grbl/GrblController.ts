@@ -296,7 +296,7 @@ export class GrblController implements GrblControllerApi {
     },
     pauseJob: async (): Promise<OperationResult> => {
       try {
-        return this._operationFromSafetyResult(this.pause());
+        return this._operationFromSafetyResult(await this.pause());
       } catch (err: unknown) {
         return this._operationError(err);
       }
@@ -1109,7 +1109,7 @@ export class GrblController implements GrblControllerApi {
    * Feed-hold pause. Machine decelerates cleanly, preserves position, laser turns off.
    * Recoverable via resume(). Send this for user-initiated pause during a job.
    */
-  pause(): SafetyActionResult {
+  async pause(): Promise<SafetyActionResult> {
     if (!this._port?.isOpen) return makeNotConnectedResult('pause');
     console.info('[GrblController] pause() — feed hold (recoverable)');
     if (this._isJobRunning) {
@@ -1121,15 +1121,33 @@ export class GrblController implements GrblControllerApi {
     // state as belt-and-suspenders for $32=0 or non-spec GRBL forks.
     this._sendRealtime(REALTIME_FEED_HOLD);
     if (this._port?.isOpen) {
-      void this._writeCriticalSystemLine('M5 S0', { trackSpindleMode: false }).catch(
-        (err: unknown) =>
-          console.warn(
-            '[GrblController] T1-23 pause: M5 writeCritical failed; relying on feed-hold firmware contract:',
-            err instanceof Error ? err.message : String(err),
-          ),
-      );
+      try {
+        await this._writeCriticalSystemLine('M5 S0', { trackSpindleMode: false });
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        console.warn(
+          '[GrblController] T1-252 pause: M5 writeCritical failed after feed-hold; '
+          + 'reporting laser-off as unknown instead of returning a clean pause:',
+          message,
+        );
+        return makePauseResult({
+          accepted: false,
+          motionState: 'unknown',
+          laserState: 'unknown',
+          positionTrusted: 'unknown',
+          requiresRehome: 'unknown',
+          requiresReconnect: false,
+          requiresInspection: true,
+          message:
+            'Pause feed-hold was sent, but the M5 S0 laser-off confirmation failed. '
+            + `Inspect the machine before continuing. Underlying error: ${message}`,
+        });
+      }
     }
-    return makePauseResult();
+    return makePauseResult({
+      laserState: 'off',
+      message: 'Pause command accepted. Feed-hold sent and M5 S0 laser-off confirmed on the wire.',
+    });
   }
 
   /**
@@ -1425,12 +1443,13 @@ export class GrblController implements GrblControllerApi {
 
   private _operationFromSafetyResult(result: SafetyActionResult): OperationResult {
     if (result.accepted) {
-      return { ok: true, message: result.message };
+      return { ok: true, message: result.message, safetyResult: result };
     }
     return {
       ok: false,
       reason: result.message ?? `${result.action} not accepted`,
       message: result.message,
+      safetyResult: result,
     };
   }
 

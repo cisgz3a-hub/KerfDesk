@@ -117,18 +117,29 @@ export function makeNotConnectedResult(action: SafetyAction): SafetyActionResult
   };
 }
 
-export function makePauseResult(message?: string): SafetyActionResult {
+export function makePauseResult(args?: string | {
+  accepted?: boolean;
+  motionState?: MotionState;
+  laserState?: LaserOffState;
+  positionTrusted?: Tristate;
+  requiresRehome?: Tristate;
+  requiresReconnect?: boolean;
+  requiresInspection?: boolean;
+  message?: string;
+  timestamp?: number;
+}): SafetyActionResult {
+  const opts = typeof args === 'string' ? { message: args } : (args ?? {});
   return {
     action: 'pause',
-    accepted: true,
-    motionState: 'paused',
-    laserState: 'commandedOff',
-    positionTrusted: true,
-    requiresRehome: false,
-    requiresReconnect: false,
-    requiresInspection: false,
-    message: message ?? 'Pause command sent. Motion is feed-held; laser-off command sent.',
-    timestamp: Date.now(),
+    accepted: opts.accepted ?? true,
+    motionState: opts.motionState ?? 'paused',
+    laserState: opts.laserState ?? 'commandedOff',
+    positionTrusted: opts.positionTrusted ?? true,
+    requiresRehome: opts.requiresRehome ?? false,
+    requiresReconnect: opts.requiresReconnect ?? false,
+    requiresInspection: opts.requiresInspection ?? false,
+    message: opts.message ?? 'Pause command sent. Motion is feed-held; laser-off command sent.',
+    timestamp: opts.timestamp ?? Date.now(),
   };
 }
 
