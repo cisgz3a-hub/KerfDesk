@@ -52,11 +52,11 @@ const jobGuardIndex = Math.min(
     autosaveBody.indexOf('controllerRef.current?.isJobRunning'),
   ].filter(i => i >= 0),
 );
-const dirtyIndex = autosaveBody.indexOf('isDirty(scene');
+const dirtyIndex = autosaveBody.indexOf('hashSceneForPersistence(scene)');
 const serializeIndex = autosaveBody.indexOf('serializeForAutosave(scene)');
 
 assert(jobGuardIndex >= 0 && dirtyIndex >= 0 && jobGuardIndex < dirtyIndex,
-  'active-job guard runs before dirty hashing');
+  'active-job guard runs before autosave hashing');
 assert(jobGuardIndex >= 0 && serializeIndex >= 0 && jobGuardIndex < serializeIndex,
   'active-job guard runs before serializeForAutosave');
 

@@ -1,20 +1,14 @@
 /**
- * T1-68 regression test.
+ * T1-68/T1-248 regression test.
  *
- * Bug: the autosave timer in App.tsx called the fire-and-forget
- * `writeAutosave(json)` and then synchronously cleared `sceneIsDirtyRef` and
- * advanced `lastSavedSceneRef`. If the underlying storage write rejected
- * (quota exceeded, fs error, IPC failure), the project was marked clean
- * even though the data never landed — silent data loss.
+ * Original bug: the autosave timer called a fire-and-forget write, then
+ * immediately marked the scene clean. If storage rejected, the project looked
+ * saved even though the recovery copy was never persisted.
  *
- * Fix: App.tsx now awaits `writeAutosaveAsync(json)` and only clears the
- * dirty flag / advances `lastSavedSceneRef` on the resolved branch. The
- * rejected branch logs and leaves both refs untouched so the next tick
- * retries.
- *
- * This test mirrors the post-fix timer body and a reasonable approximation
- * of `MutableRefObject<T>` so we can verify ref state after the awaited
- * write resolves or rejects, without standing up React.
+ * Current contract: autosave is only a recovery copy. A successful autosave
+ * advances the autosave hash so the next tick does not rewrite the same scene,
+ * but it must never advance the manual-save hash or clear the user's unsaved
+ * project-file state.
  *
  * Run: npx tsx tests/autosave-dirty-flag-on-failure.test.ts
  */
@@ -32,10 +26,10 @@ let failed = 0;
 function assert(cond: boolean, message: string): void {
   if (cond) {
     passed++;
-    console.log(`  ✓ ${message}`);
+    console.log(`  PASS ${message}`);
   } else {
     failed++;
-    console.error(`  ✗ ${message}`);
+    console.error(`  FAIL ${message}`);
   }
 }
 
@@ -54,28 +48,23 @@ class FailingStorageAdapter implements StorageAdapter {
 interface RefObj<T> { current: T }
 
 /**
- * Mirrors the post-fix App.tsx autosave timer body. Kept structurally close
- * to the source so a future divergence shows up here.
+ * Mirrors the App.tsx autosave timer state updates without standing up React.
  */
 async function runAutosaveTickOnce(
   json: string,
-  sceneIsDirtyRef: RefObj<boolean>,
-  lastSavedSceneRef: RefObj<string>,
+  manualDirtyRef: RefObj<boolean>,
+  lastManualSaveRef: RefObj<string>,
+  lastAutosaveRef: RefObj<string>,
 ): Promise<void> {
-  if (!sceneIsDirtyRef.current) return;
-
-  if (json === lastSavedSceneRef.current) {
-    sceneIsDirtyRef.current = false;
-    return;
-  }
+  void manualDirtyRef;
+  void lastManualSaveRef;
+  if (json === lastAutosaveRef.current) return;
 
   await writeAutosaveAsync(json).then(
     () => {
-      lastSavedSceneRef.current = json;
-      sceneIsDirtyRef.current = false;
+      lastAutosaveRef.current = json;
     },
     (err: unknown) => {
-      // Match production behavior: log, leave both refs untouched.
       console.warn('[test] simulated autosave failure (expected):',
         err instanceof Error ? err.message : err);
     },
@@ -83,9 +72,8 @@ async function runAutosaveTickOnce(
 }
 
 async function run(): Promise<void> {
-  console.log('\n=== autosave dirty flag on failure (T1-68) ===\n');
+  console.log('\n=== autosave dirty flag on failure (T1-68/T1-248) ===\n');
 
-  // ── Contract: writeAutosaveAsync rejects on adapter set failure ────────
   {
     setStorageForTest(new FailingStorageAdapter());
     resetAutosaveForTest();
@@ -104,47 +92,36 @@ async function run(): Promise<void> {
     );
   }
 
-  // ── Failed write: dirty stays dirty, lastSaved is NOT advanced ─────────
   {
     setStorageForTest(new FailingStorageAdapter());
     resetAutosaveForTest();
-    const sceneIsDirtyRef: RefObj<boolean> = { current: true };
-    const lastSavedSceneRef: RefObj<string> = { current: '{"prev":true}' };
+    const manualDirtyRef: RefObj<boolean> = { current: true };
+    const lastManualSaveRef: RefObj<string> = { current: '{"manual":true}' };
+    const lastAutosaveRef: RefObj<string> = { current: '{"autosave":true}' };
     const newJson = '{"new":true}';
 
-    await runAutosaveTickOnce(newJson, sceneIsDirtyRef, lastSavedSceneRef);
+    await runAutosaveTickOnce(newJson, manualDirtyRef, lastManualSaveRef, lastAutosaveRef);
 
-    assert(
-      sceneIsDirtyRef.current === true,
-      'failed autosave leaves sceneIsDirtyRef === true (project stays dirty)',
-    );
-    assert(
-      lastSavedSceneRef.current === '{"prev":true}',
-      'failed autosave does NOT advance lastSavedSceneRef to un-persisted JSON',
-    );
+    assert(manualDirtyRef.current === true, 'failed autosave leaves manual dirty state true');
+    assert(lastManualSaveRef.current === '{"manual":true}', 'failed autosave does not advance manual save hash');
+    assert(lastAutosaveRef.current === '{"autosave":true}', 'failed autosave does not advance autosave hash');
   }
 
-  // ── Successful write: dirty cleared, lastSaved advanced ────────────────
   {
     const adapter = new InMemoryStorageAdapter();
     setStorageForTest(adapter);
     resetAutosaveForTest();
-    const sceneIsDirtyRef: RefObj<boolean> = { current: true };
-    const lastSavedSceneRef: RefObj<string> = { current: '{"prev":true}' };
+    const manualDirtyRef: RefObj<boolean> = { current: true };
+    const lastManualSaveRef: RefObj<string> = { current: '{"manual":true}' };
+    const lastAutosaveRef: RefObj<string> = { current: '{"autosave":true}' };
     const newJson = '{"new":true}';
 
-    await runAutosaveTickOnce(newJson, sceneIsDirtyRef, lastSavedSceneRef);
+    await runAutosaveTickOnce(newJson, manualDirtyRef, lastManualSaveRef, lastAutosaveRef);
 
-    assert(
-      sceneIsDirtyRef.current === false,
-      'successful autosave clears sceneIsDirtyRef',
-    );
-    assert(
-      lastSavedSceneRef.current === newJson,
-      'successful autosave advances lastSavedSceneRef to the persisted JSON',
-    );
-    // T2-69: JSON now lives inside the atomic record at
-    // 'laserforge_autosave_record'; legacy key is no longer written.
+    assert(manualDirtyRef.current === true, 'successful autosave keeps manual dirty state true');
+    assert(lastManualSaveRef.current === '{"manual":true}', 'successful autosave does not advance manual save hash');
+    assert(lastAutosaveRef.current === newJson, 'successful autosave advances only the autosave hash');
+
     const persistedRecord = await adapter.get('laserforge_autosave_record');
     const parsedRecord = persistedRecord ? JSON.parse(persistedRecord) : null;
     assert(
@@ -153,32 +130,27 @@ async function run(): Promise<void> {
     );
   }
 
-  // ── Retry-after-failure: a follow-up tick with a working adapter saves ─
   {
     const failing = new FailingStorageAdapter();
     setStorageForTest(failing);
     resetAutosaveForTest();
-    const sceneIsDirtyRef: RefObj<boolean> = { current: true };
-    const lastSavedSceneRef: RefObj<string> = { current: '' };
+    const manualDirtyRef: RefObj<boolean> = { current: true };
+    const lastManualSaveRef: RefObj<string> = { current: '' };
+    const lastAutosaveRef: RefObj<string> = { current: '' };
     const json = '{"retryable":true}';
 
-    await runAutosaveTickOnce(json, sceneIsDirtyRef, lastSavedSceneRef);
-    assert(sceneIsDirtyRef.current === true, 'still dirty after first (failed) tick');
+    await runAutosaveTickOnce(json, manualDirtyRef, lastManualSaveRef, lastAutosaveRef);
+    assert(manualDirtyRef.current === true, 'still manually dirty after first failed tick');
 
     const working = new InMemoryStorageAdapter();
     setStorageForTest(working);
     resetAutosaveForTest();
-    await runAutosaveTickOnce(json, sceneIsDirtyRef, lastSavedSceneRef);
+    await runAutosaveTickOnce(json, manualDirtyRef, lastManualSaveRef, lastAutosaveRef);
 
-    assert(
-      sceneIsDirtyRef.current === false,
-      'second tick (working adapter) clears dirty flag',
-    );
-    assert(
-      lastSavedSceneRef.current === json,
-      'second tick advances lastSavedSceneRef',
-    );
-    // T2-69: JSON now lives inside the atomic record.
+    assert(manualDirtyRef.current === true, 'second tick keeps manual dirty state true');
+    assert(lastManualSaveRef.current === '', 'second tick does not advance manual save hash');
+    assert(lastAutosaveRef.current === json, 'second tick advances autosave hash');
+
     const persistedRecord2 = await working.get('laserforge_autosave_record');
     const parsedRecord2 = persistedRecord2 ? JSON.parse(persistedRecord2) : null;
     assert(

@@ -54,8 +54,8 @@ import { appendStructuredDiagnosticLogEvent } from '../../core/logging/Structure
 
 const GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
-const JOB_STATUS_HEARTBEAT_TIMEOUT_MS = 250;
-const JOB_STATUS_HEARTBEAT_MAX_MISSES = 2;
+const JOB_STATUS_REPLY_WARN_MS = 1500;
+const JOB_NO_RX_ABORT_MS = 8000;
 const REALTIME_STATUS = 0x3F;
 const REALTIME_FEED_HOLD = 0x21; // '!'
 const REALTIME_CYCLE_START = 0x7E; // '~'
@@ -474,7 +474,8 @@ export class GrblController implements GrblControllerApi {
   private _pollTimer: ReturnType<typeof setInterval> | null = null;
   private _jobStatusHeartbeatTimer: ReturnType<typeof setTimeout> | null = null;
   private _jobStatusHeartbeatAwaitingResponse = false;
-  private _jobStatusHeartbeatMisses = 0;
+  private _jobStatusHeartbeatWarned = false;
+  private _lastControllerRxAt = 0;
 
   private _stateListeners: Set<StateChangeCallback> = new Set();
   private _progressListeners: Set<ProgressCallback> = new Set();
@@ -711,6 +712,7 @@ export class GrblController implements GrblControllerApi {
       port.onData((line) => {
         if (connectSettled && !welcomeReceived) return;
         this._emitRawLine(line, 'rx');
+        this._recordControllerRx();
 
         // USB: stay quiet until polled; `?` yields `<State|...>`. Only treat lines
         // with a known GRBL state token as welcome — random `<` noise must not connect.
@@ -996,6 +998,8 @@ export class GrblController implements GrblControllerApi {
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._linesAcknowledged = 0;
     this._jobStartTime = Date.now();
+    this._lastControllerRxAt = this._jobStartTime;
+    this._jobStatusHeartbeatWarned = false;
     this._pausePending = false;
     this._resumeRequested = false;
     this._ackTimestamps = [];
@@ -2466,11 +2470,11 @@ export class GrblController implements GrblControllerApi {
   }
 
   /**
-   * T3-16: while a job is running, a physically yanked USB cable can take
-   * longer to surface through WebSerial close/error callbacks than through
-   * missed realtime status replies. Send one `?` heartbeat at a time and
-   * require two consecutive missing replies before treating the transport as
-   * failed, so one delayed status packet does not abort a good burn.
+   * T3-16/T1-248: while a job is running, a physically yanked USB cable can
+   * take longer to surface through WebSerial close/error callbacks than
+   * through missed realtime status replies. A late status report is only a
+   * warning; the stream is aborted only after sustained silence from every
+   * controller RX path (`ok`, `error:`, `ALARM:`, status, identity, etc.).
    */
   private _pollJobStatusHeartbeat(): void {
     if (this._jobStatusHeartbeatAwaitingResponse) return;
@@ -2478,18 +2482,23 @@ export class GrblController implements GrblControllerApi {
     this._jobStatusHeartbeatAwaitingResponse = true;
     this._jobStatusHeartbeatTimer = setTimeout(
       () => this._handleJobStatusHeartbeatTimeout(),
-      JOB_STATUS_HEARTBEAT_TIMEOUT_MS,
+      JOB_STATUS_REPLY_WARN_MS,
     );
   }
 
+  private _recordControllerRx(): void {
+    this._lastControllerRxAt = Date.now();
+    this._jobStatusHeartbeatWarned = false;
+  }
+
   private _recordJobStatusHeartbeatResponse(): void {
-    if (!this._jobStatusHeartbeatAwaitingResponse && this._jobStatusHeartbeatMisses === 0) return;
+    if (!this._jobStatusHeartbeatAwaitingResponse && !this._jobStatusHeartbeatWarned) return;
     if (this._jobStatusHeartbeatTimer !== null) {
       clearTimeout(this._jobStatusHeartbeatTimer);
       this._jobStatusHeartbeatTimer = null;
     }
     this._jobStatusHeartbeatAwaitingResponse = false;
-    this._jobStatusHeartbeatMisses = 0;
+    this._jobStatusHeartbeatWarned = false;
   }
 
   private _handleJobStatusHeartbeatTimeout(): void {
@@ -2497,16 +2506,23 @@ export class GrblController implements GrblControllerApi {
     if (!this._jobStatusHeartbeatAwaitingResponse) return;
     this._jobStatusHeartbeatAwaitingResponse = false;
 
-    if (!this._isJobRunning) {
-      this._jobStatusHeartbeatMisses = 0;
+    if (!this._isJobRunning) return;
+
+    const lastRxAt = this._lastControllerRxAt > 0 ? this._lastControllerRxAt : this._jobStartTime;
+    const silentForMs = Date.now() - lastRxAt;
+    if (silentForMs < JOB_NO_RX_ABORT_MS) {
+      if (!this._jobStatusHeartbeatWarned) {
+        this._jobStatusHeartbeatWarned = true;
+        for (const cb of this._errorListeners) {
+          cb(-1,
+            `Status heartbeat delayed during running job; controller last replied ${Math.round(silentForMs)}ms ago. Keeping job alive unless all controller replies stop.`);
+        }
+      }
       return;
     }
 
-    this._jobStatusHeartbeatMisses += 1;
-    if (this._jobStatusHeartbeatMisses < JOB_STATUS_HEARTBEAT_MAX_MISSES) return;
-
     this._handleStatusPollFailure(new Error(
-      `status heartbeat missed ${JOB_STATUS_HEARTBEAT_MAX_MISSES} consecutive replies during running job`,
+      `controller silent for ${Math.round(silentForMs)}ms during running job (no ok/error/status replies)`,
     ));
   }
 
@@ -2533,7 +2549,7 @@ export class GrblController implements GrblControllerApi {
       this._jobStatusHeartbeatTimer = null;
     }
     this._jobStatusHeartbeatAwaitingResponse = false;
-    this._jobStatusHeartbeatMisses = 0;
+    this._jobStatusHeartbeatWarned = false;
   }
 
   // ─── POST-CONNECT MACHINE SETTINGS ($$) ─────────────────────

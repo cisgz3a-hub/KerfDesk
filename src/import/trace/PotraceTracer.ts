@@ -23,13 +23,13 @@ export interface TraceOptions {
 
 export const DEFAULT_TRACE_OPTIONS: TraceOptions = {
   threshold: 128,
-  turdsize: 2,
+  turdsize: 8,
   alphamax: 1.0,
   opttolerance: 0.2,
   invert: false,
 };
 
-interface PotraceItem {
+export interface PotraceItem {
   type: string;
   x?: number;
   y?: number;
@@ -39,13 +39,21 @@ interface PotraceItem {
   y2?: number;
 }
 
-function contourToSubPath(items: PotraceItem[]): SubPath | null {
+const TRACE_CLOSE_TOLERANCE_PX = 1.5;
+
+function distance(a: { x: number; y: number }, b: { x: number; y: number }): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+export function contourToSubPath(items: PotraceItem[]): SubPath | null {
   if (items.length < 2) return null;
   const segments: PathSegment[] = [];
   const first = items[0];
   if (first.type !== 'POINT' || first.x === undefined || first.y === undefined) return null;
 
-  segments.push({ type: 'move', to: { x: first.x, y: first.y } });
+  const firstPoint = { x: first.x, y: first.y };
+  let lastPoint = firstPoint;
+  segments.push({ type: 'move', to: firstPoint });
 
   for (let i = 1; i < items.length; i++) {
     const it = items[i];
@@ -60,13 +68,18 @@ function contourToSubPath(items: PotraceItem[]): SubPath | null {
         cp2: { x: it.x2, y: it.y2 },
         to: { x: it.x, y: it.y },
       });
+      lastPoint = { x: it.x, y: it.y };
     } else if (it.type === 'POINT' && it.x != null && it.y != null) {
       segments.push({ type: 'line', to: { x: it.x, y: it.y } });
+      lastPoint = { x: it.x, y: it.y };
     }
   }
 
-  segments.push({ type: 'close' });
-  return { segments, closed: true };
+  const closed = distance(lastPoint, firstPoint) <= TRACE_CLOSE_TOLERANCE_PX;
+  if (closed) {
+    segments.push({ type: 'close' });
+  }
+  return { segments, closed };
 }
 
 /**

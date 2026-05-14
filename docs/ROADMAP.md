@@ -7230,6 +7230,65 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `f8c7c1ee`. Hardware verification not required for the host-side stale-output gate; hardware verification remains recommended for the jobs whose start-mode/origin behavior is being protected.
 
 ---
+### T1-247 | Start must require service-level safe idle gates
+
+**Audit source:** User-provided v33 release-readiness correction, 2026-05-14. The audit found that UI gates had improved, but the final `MachineService.startValidatedJob(...)` path still did not require laser output to be confirmed off, did not reject while temporary operations were active, and did not require the canonical safety state to be `safeIdle`.
+
+**Problem:** A laser app cannot rely on UI button state as the final safety authority. Before this fix, `startValidatedJob(...)` rejected unknown laser state but did not reject a known `on` state, did not check `_activeOperation`, and did not call `safetyStateAllowsStartJob(...)`. That meant tests or future callers could bypass the UI and reach the streaming path while Test Fire, frame, autofocus, set-origin, jog, or a non-idle safety state was active.
+
+**Fix:** `MachineService.startValidatedJob(...)` now fails closed before streaming if an active operation lease exists, if `_laserOutputState !== 'off'`, or if the safety state machine does not allow job start. The error messages name the blocking state so recovery UI and logs can point at the right operator action.
+
+**Verification:**
+- `npx tsx tests\machine-service-job-lifecycle-safety.test.ts` failed before the fix on new service-level start blockers and passes after.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required for the host-side refusal gate; hardware verification remains recommended for live job-start safety paths before release tagging.
+
+---
+### T1-248 | Running-job heartbeat must warn before hard disconnect
+
+**Audit source:** User-provided long-job stop/disconnect diagnosis, 2026-05-14. The audit found that the previous two-miss, 250 ms status-heartbeat abort was too hair-trigger for production GRBL streaming, especially when `ok` acknowledgements continue while realtime status reports are delayed.
+
+**Problem:** T1-245 taught the heartbeat that `ok` traffic means the controller is alive, but the status heartbeat could still disconnect a real job after a short status-report delay. A host/USB/browser stall should degrade the status indicator first, not immediately abort a burn that is still receiving controller replies.
+
+**Fix:** The GRBL controller now tracks the timestamp of any controller RX line, warns once when running-job status replies are delayed beyond 1500 ms, keeps the job alive while any controller traffic is still flowing, and only hard-aborts after 8000 ms of total controller silence. The disconnect path still fires for true cable-pull silence, explicit Web Serial failure, GRBL alarms, and normalized polling failures.
+
+**Verification:**
+- `npx tsx tests\webserial-cable-pull-heartbeat.test.ts` failed before the fix on delayed-status/no-disconnect coverage and passes after.
+- `npx tsx tests\poll-status-failure-normalized.test.ts` passes after the heartbeat change.
+
+**Status:** Shipped in `<TBD>`. Hardware verification recommended: run a long Falcon burn and confirm delayed status reports produce a warning instead of a false disconnect while `ok` traffic or other controller replies continue.
+
+---
+### T1-249 | Trace contours must not invent long closing burn lines
+
+**Audit source:** User-provided trace/burn diagnosis, 2026-05-14. The audit found that the trace converter forced every traced contour closed, so noisy or malformed image traces could create straight closing segments that were not visually part of the source image.
+
+**Problem:** `PotraceTracer` appended a `close` segment for every contour and returned `closed: true` unconditionally. Downstream plan optimization correctly burns closed paths, so a traced contour whose last point was far from its first point could become a real straight laser line across the workpiece.
+
+**Fix:** The trace converter now closes a contour only when its last point is within a small endpoint tolerance of the first point. Open contours remain open. The default speckle filter is more conservative, and ImageTracer worker/adapter options now enable line filtering and disable right-angle enhancement for general image tracing so noisy input is less likely to produce artificial straight geometry.
+
+**Verification:**
+- `npx tsx tests\trace-contour-safety.test.ts` failed before the fix and passes after. It proves far-apart endpoints no longer append a close segment, near endpoints still close, and trace defaults/options stay pinned.
+
+**Status:** Shipped in `<TBD>`. Hardware verification recommended before cutting customer artwork: compare vector preview/toolpath output against a noisy traced bitmap and confirm no unexpected straight closure lines are present.
+
+---
+### T1-250 | Autosave must not mark manual project saves clean
+
+**Audit source:** User-provided v33 release-readiness correction, 2026-05-14. The audit found that autosave and manual save shared one clean-state hash, so a successful autosave could make the app treat the user's chosen project file as saved.
+
+**Problem:** `lastSavedSceneHashRef` represented both manual file save truth and autosave recovery truth. After an edit, autosave success advanced that same hash, so new-project/exit dirty checks could skip the unsaved-changes prompt even though the manual project file had not been saved.
+
+**Fix:** App dirty tracking now separates `lastManualSaveHashRef` from `lastAutosaveHashRef`. Manual save acknowledgement updates both, new project resets both, and autosave updates only the autosave hash. Autosave remains a recovery copy; it is no longer proof that the user's chosen file is clean.
+
+**Verification:**
+- `npx tsx tests\autosave-manual-save-separation.test.ts` failed before the fix and passes after.
+- `npx tsx tests\autosave-dirty-flag-on-failure.test.ts` now pins successful autosave preserving manual dirty state and failed autosave preserving both hashes.
+- `npx tsx tests\autosave-pauses-during-active-job.test.ts` still pins that active jobs skip autosave hashing/serialization.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required; this is a host-side persistence correctness fix.
+
+---
 ## Tier 2 鈥?This month
 
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21100,6 +21159,10 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
 - [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `1ff912a3`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
 - [x] T1-246 HIGH enforce runtime JobFingerprint at Start (shipped in `f8c7c1ee`) - closes the stale-output audit cap by embedding `JobFingerprint` in every validated ticket and having `MachineService.startValidatedJob` rebuild/compare the current runtime fingerprint before streaming any G-code.
+- [x] T1-247 HIGH enforce service-level start safety gates (shipped in `<TBD>`) - makes `MachineService.startValidatedJob` require no active temporary operation, laser output confirmed off, and `SafetyState === safeIdle` before streaming any G-code.
+- [x] T1-248 HIGH harden running-job heartbeat (shipped in `<TBD>`) - turns short delayed status replies into a warning and only aborts after sustained no-controller-RX silence during running GRBL jobs.
+- [x] T1-249 HIGH avoid trace-generated straight closure burns (shipped in `<TBD>`) - stops forced closure of far-apart traced contour endpoints and raises noisy-trace filtering defaults.
+- [x] T1-250 HIGH separate autosave and manual-save truth (shipped in `<TBD>`) - keeps autosave as recovery data without marking the user's manually chosen project file clean.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

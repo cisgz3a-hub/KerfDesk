@@ -493,7 +493,8 @@ export function App(): React.ReactElement {
       );
     }
   }, [grbl.machineState, machineUi.executionCoordinator, machineUi.service, setSavedOrigin, showAlert]);
-  const lastSavedSceneHashRef = useRef<string>(hashSceneForPersistence(scene));
+  const lastManualSaveHashRef = useRef<string>(hashSceneForPersistence(scene));
+  const lastAutosaveHashRef = useRef<string>(lastManualSaveHashRef.current);
   // T1-75 (origin) + T2-76 step 3 (extended on edits) + step 5
   // (extended via unified function): bridge counter for
   // ConnectionPanelMain so it can reset hasFramed (which is
@@ -1001,7 +1002,7 @@ export function App(): React.ReactElement {
       await machineUi.executionCoordinator.safeDisconnect();
     }
 
-    if (isDirty(scene, lastSavedSceneHashRef.current)) {
+    if (isDirty(scene, lastManualSaveHashRef.current)) {
       const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
       if (!confirmed) return;
     }
@@ -1084,7 +1085,7 @@ export function App(): React.ReactElement {
    */
   const handleNewProject = useCallback(
     (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
-      lastSavedSceneHashRef.current = hashSceneForPersistence(newScene);
+      lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(newScene);
       commitSceneTransaction(newScene, { kind: 'load', source }, {
         selectionAfter: new Set(),
       });
@@ -1158,23 +1159,22 @@ export function App(): React.ReactElement {
     const interval = setInterval(() => {
       // Skip heavy autosave work during host-streamed jobs; it can drain GRBL's planner.
       if (grbl.isJobRunning || grbl.controllerRef.current?.isJobRunning) return;
-      if (!isDirty(scene, lastSavedSceneHashRef.current)) return;
 
       let json: string;
       let currentHash: string;
       try {
-        json = serializeForAutosave(scene);
         currentHash = hashSceneForPersistence(scene);
+        if (currentHash === lastAutosaveHashRef.current) return;
+        json = serializeForAutosave(scene);
       } catch (e) {
         console.warn('[LaserForge] Autosave failed (serialize):', e);
         return;
       }
 
-      // Advance the saved hash only after the write resolves. Failed writes
-      // leave the old hash intact, so the next tick retries.
+      // Autosave is recovery data; manual dirty prompts keep using lastManualSaveHashRef.
       void writeAutosaveAsync(json).then(
         () => {
-          lastSavedSceneHashRef.current = currentHash;
+          lastAutosaveHashRef.current = currentHash;
         },
         (err: unknown) => {
           console.warn('[LaserForge] Autosave failed:', err);
@@ -1352,9 +1352,9 @@ export function App(): React.ReactElement {
     scene,
     setSelectedIds,
     handleNewProject,
-    isSceneDirty: () => isDirty(scene, lastSavedSceneHashRef.current),
+    isSceneDirty: () => isDirty(scene, lastManualSaveHashRef.current),
     markSceneSaved: (savedScene) => {
-      lastSavedSceneHashRef.current = hashSceneForPersistence(savedScene);
+      lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(savedScene);
     },
     showAlert,
     showConfirm,

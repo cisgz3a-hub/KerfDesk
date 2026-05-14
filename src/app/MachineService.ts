@@ -36,6 +36,7 @@ import {
 } from './SafetyActionResult';
 import {
   safetyStateInitial,
+  safetyStateAllowsStartJob,
   transitionFromSafetyResult,
   type SafetyResultLike,
   type SafetyState,
@@ -813,14 +814,33 @@ export class MachineService {
       throw new Error('A job is already active. Wait for it to finish or clear the job session.');
     }
 
-    // T1-22: refuse to start a job while laser output state is uncertain.
-    // This typically means the previous emergency-laser-off path took the
-    // soft-reset fallback (M5 transport failed) or both stages failed. The
-    // user must reconnect or run an explicit safety-clear before continuing.
-    if (this._laserOutputState === 'unknown') {
+    // T1-247: service-level operation/safety gates are the final authority
+    // before bytes can stream. UI gating is helpful but not sufficient:
+    // direct service callers, stale React closures, or test harnesses must
+    // not be able to start while another temporary laser/motion operation
+    // is active, while the laser is on, or while the canonical safety
+    // machine is not in safeIdle.
+    if (this._activeOperation !== null) {
       throw new Error(
-        'Machine is in an unknown laser-safety state after a previous laser-off failure. '
-        + 'Reconnect or clear the safety state before starting a job.',
+        `Cannot start job while ${this._activeOperation.kind} is active. `
+        + 'Wait for that operation to finish before starting a job.',
+      );
+    }
+
+    if (this._laserOutputState !== 'off') {
+      const state = this._laserOutputState;
+      throw new Error(
+        state === 'unknown'
+          ? 'Machine is in an unknown laser-safety state after a previous laser-off failure. '
+            + 'Reconnect or clear the safety state before starting a job.'
+          : 'Machine laser output is still marked on. Release Test Fire or confirm laser off before starting a job.',
+      );
+    }
+
+    if (!safetyStateAllowsStartJob(this._safetyState)) {
+      throw new Error(
+        `Machine is not in a safe idle state (safety state: ${this._safetyState.kind}). `
+        + 'Complete or acknowledge the pending safety action before starting a job.',
       );
     }
 

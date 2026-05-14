@@ -72,54 +72,69 @@ async function run(): Promise<void> {
     await controller.disconnect();
   }
 
-  const controller = new GrblController();
-  const port = new MockSerialPort((line) => {
-    if (line === '$$') return ['$30=1000', '$32=1', 'ok'];
-    return [];
-  });
-  const errors: string[] = [];
-  const states: string[] = [];
-  controller.onError((_code, message) => errors.push(message));
-  controller.onStateChange(state => states.push(state.status));
+  {
+    const controller = new GrblController();
+    const port = new MockSerialPort((line) => {
+      if (line === '$$') return ['$30=1000', '$32=1', 'ok'];
+      return [];
+    });
+    const errors: string[] = [];
+    const states: string[] = [];
+    controller.onError((_code, message) => errors.push(message));
+    controller.onStateChange(state => states.push(state.status));
 
-  await connectController(controller, port);
+    await connectController(controller, port);
 
-  await controller.sendJob([
-    'G21',
-    'G90',
-    'M4 S100',
-    'G1 X10 F500',
-    'G1 X20 F500',
-    'M5',
-  ]);
-  assert(controller.isJobRunning, 'job is running before heartbeat silence');
+    await controller.sendJob([
+      'G21',
+      'G90',
+      'M4 S100',
+      'G1 X10 F500',
+      'G1 X20 F500',
+      'M5',
+    ]);
+    assert(controller.isJobRunning, 'job is running before heartbeat silence');
 
-  port.blockStatusQueryResponse = true;
-  await flush(1100);
+    port.blockStatusQueryResponse = true;
+    await flush(1800);
 
-  assert(!controller.isJobRunning, 'heartbeat timeout aborts the active job');
-  assert(controller.state.status === 'disconnected',
-    `heartbeat timeout disconnects controller (got ${controller.state.status})`);
-  assert(!port.isOpen, 'heartbeat timeout closes the failed port');
-  assert(states.includes('disconnected'), 'state listeners see the disconnected transition');
-  assert(errors.some(message => /status heartbeat/i.test(message) && /running job/i.test(message)),
-    'error message names the running-job status heartbeat failure');
+    assert(controller.isJobRunning, 'delayed status heartbeat warns but keeps the active job alive');
+    assert(controller.state.status !== 'disconnected',
+      `delayed status heartbeat does not disconnect immediately (got ${controller.state.status})`);
+    assert(port.isOpen, 'delayed status heartbeat keeps the port open');
+    assert(errors.some(message => /status heartbeat delayed/i.test(message) && /running job/i.test(message)),
+      'warning message names delayed heartbeat without declaring transport failure');
+    assert(errors.every(message => !/Status polling failed/i.test(message)),
+      'delayed status heartbeat does not emit a failed-polling transport error');
+
+    await flush(7000);
+
+    assert(!controller.isJobRunning, 'hard controller silence aborts the active job');
+    assert(controller.state.status === 'disconnected',
+      `hard controller silence disconnects controller (got ${controller.state.status})`);
+    assert(!port.isOpen, 'hard controller silence closes the failed port');
+    assert(states.includes('disconnected'), 'state listeners see the disconnected transition after hard silence');
+    assert(errors.some(message => /controller silent/i.test(message) && /running job/i.test(message)),
+      'hard-abort message names controller silence during running job');
+  }
 
   const here = dirname(fileURLToPath(import.meta.url));
   const source = readFileSync(resolve(here, '../src/controllers/grbl/GrblController.ts'), 'utf-8');
   const start = source.indexOf('T3-16');
   const body = start >= 0 ? source.slice(start, source.indexOf('// ─── POST-CONNECT MACHINE SETTINGS', start)) : '';
   assert(body.length > 0, 'GrblController carries a T3-16 cable-pull heartbeat marker');
-  assert(/JOB_STATUS_HEARTBEAT_TIMEOUT_MS\s*=\s*250/.test(source),
-    'heartbeat timeout is pinned near the requested 200ms response window');
-  assert(/JOB_STATUS_HEARTBEAT_MAX_MISSES\s*=\s*2/.test(source),
-    'heartbeat disconnect requires two consecutive missed status replies');
+  assert(/JOB_STATUS_REPLY_WARN_MS\s*=\s*1500/.test(source),
+    'delayed status heartbeat warns after a human-visible grace period');
+  assert(/JOB_NO_RX_ABORT_MS\s*=\s*8000/.test(source),
+    'hard disconnect requires sustained controller RX silence, not two late status replies');
   assert(/_handleJobStatusHeartbeatTimeout/.test(body),
     'controller has a dedicated job heartbeat timeout handler');
   assert(/_recordJobStatusHeartbeatResponse\(\);\s*this\._handleOk\(\);/s.test(source),
     'job heartbeat treats normal ok acknowledgements as controller-alive traffic');
+  assert(/_recordControllerRx\(\);/.test(source),
+    'controller tracks last RX time for any GRBL response line');
   assert(/this\._handleTransportDisconnect\(true\)/.test(body),
-    'heartbeat failure uses the same failed-transport disconnect path');
+    'hard controller silence uses the same failed-transport disconnect path');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   if (failed > 0) process.exit(1);

@@ -348,6 +348,97 @@ void (async () => {
     assert(svc.getActiveTicket() === null, 'empty/comment-only job leaves no active ticket');
   }
 
+  {
+    let sendCalls = 0;
+    const controller = makeController(async () => {
+      sendCalls++;
+    });
+    const svc = new MachineService(
+      { current: controller } as { current: LaserController },
+      { current: null } as { current: SerialPortLike | null },
+    );
+    svc.notifyTestFire('begin');
+
+    let err = '';
+    try {
+      await svc.startValidatedJob({
+        ticket,
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: ctxFor(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
+      });
+    } catch (e: unknown) {
+      err = e instanceof Error ? e.message : String(e);
+    }
+    assert(/laser.*on|laser-safety/i.test(err), 'start is blocked while laser output state is on');
+    assert(sendCalls === 0, 'laser-on block prevents executeJob');
+  }
+
+  {
+    let sendCalls = 0;
+    const controller = makeController(async () => {
+      sendCalls++;
+    });
+    const svc = new MachineService(
+      { current: controller } as { current: LaserController },
+      { current: null } as { current: SerialPortLike | null },
+    );
+    const lease = svc.tryAcquireOperation('testFire');
+    assert(lease !== null, 'precondition: acquired active operation lease');
+
+    let err = '';
+    try {
+      await svc.startValidatedJob({
+        ticket,
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: ctxFor(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
+      });
+    } catch (e: unknown) {
+      err = e instanceof Error ? e.message : String(e);
+    } finally {
+      if (lease) svc.releaseOperation(lease);
+    }
+    assert(/testFire.*active|active operation|operation.*finish|busy/i.test(err), 'start is blocked while a temporary operation is active');
+    assert(sendCalls === 0, 'active-operation block prevents executeJob');
+  }
+
+  {
+    let sendCalls = 0;
+    const controller = makeController(async () => {
+      sendCalls++;
+    });
+    const svc = new MachineService(
+      { current: controller } as { current: LaserController },
+      { current: null } as { current: SerialPortLike | null },
+    );
+    (svc as unknown as { _setSafetyState: (state: { kind: 'pausedVerified' }) => void })
+      ._setSafetyState({ kind: 'pausedVerified' });
+
+    let err = '';
+    try {
+      await svc.startValidatedJob({
+        ticket,
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: ctxFor(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
+      });
+    } catch (e: unknown) {
+      err = e instanceof Error ? e.message : String(e);
+    }
+    assert(/safe idle|safety state|pausedVerified/i.test(err), 'start is blocked while safety state is not safeIdle');
+    assert(sendCalls === 0, 'non-safeIdle block prevents executeJob');
+  }
+
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 })().catch((e: unknown) => {

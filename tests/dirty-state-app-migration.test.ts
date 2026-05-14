@@ -21,20 +21,20 @@ assert(
   'App.tsx no longer compares serialized scene JSON for dirty state',
 );
 assert(
-  appSource.includes('lastSavedSceneHashRef'),
-  'App.tsx tracks last saved scene hash',
+  appSource.includes('lastManualSaveHashRef'),
+  'App.tsx tracks the manual-save clean hash',
 );
 assert(
   appSource.includes('useRef<string>(hashSceneForPersistence(scene))'),
-  'App.tsx initializes the clean baseline from the initial scene hash',
+  'App.tsx initializes the manual clean baseline from the initial scene hash',
 );
 assert(
-  appSource.includes('isDirty(scene, lastSavedSceneHashRef.current)'),
-  'App.tsx derives dirty state from the current scene hash',
+  appSource.includes('isDirty(scene, lastManualSaveHashRef.current)'),
+  'App.tsx derives manual dirty state from the current scene hash',
 );
 assert(
-  appSource.includes('lastSavedSceneHashRef.current = hashSceneForPersistence(newScene)'),
-  'loaded/new projects become the clean hash baseline',
+  appSource.includes('lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(newScene)'),
+  'loaded/new projects become the manual and autosave clean hash baselines',
 );
 
 assert(
