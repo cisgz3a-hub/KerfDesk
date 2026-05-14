@@ -55,15 +55,16 @@ This section is the release plan: where we are, what gates separate us from each
 
 ### Current checklist snapshot
 
-**Snapshot date:** 2026-05-09, branch `master`.
+**Snapshot date:** 2026-05-14, branch `master`.
 
 The master checklist at the bottom of this file is the current source of truth:
 
 | Tier | Shipped/Closed | Open | Notes |
 |---|---:|---:|---|
-| Tier 1 | 84 | 11 | Most open items are hardware-verification gates or partial follow-ups. |
-| Tier 2 | 127 | 3 | Counts reconciled to the master checklist; T2-7 Marlin intentionally skipped for MVP; T2-99/T2-100 signed release workflows, T2-101 auto-update infrastructure, and T2-102 failed-launch detection layer shipped; T2-120/T2-128 storage namespace boundary shipped; PRT4040 router-laser profile and home-corner setup shipped; T2-6 App split and T2-95 trial decision remain open. |
-| Tier 3 | 67 | 25 | Active quarter-scope backlog; T3-16 running-job cable-pull heartbeat, T3-18 output semantic validator, T3-41 semantic E2E assertions, T3-42 dialect-specific template validators, T3-49 serial disconnect handling, T3-52 renderer lifecycle safety, T3-53 status-poll failure normalization, T3-56 conservative unknown `$32` handling, T3-58 capability-confidence indicators, T3-60 disconnect-stops-job gating, T3-61 per-controller-family safety regressions, T3-62 Ruida safety design, T3-63 fake WebSerial byte-stream harness, T3-64 obsolete Electron serial harness close-out, T3-65 fake Falcon WiFi server, T3-66 CI suite lane separation, T3-67 canonical bounds selectors, T3-68 debug state graph/transition log, T3-69 guided first-run test, T3-70 job layout mini-map, T3-71 browser compatibility guidance, T3-72 job complexity summary, T3-73 frame failure reasons, T3-74 structured log events, T3-75 image-reference validation, T3-76 large-project save/load guard, T3-77 project integrity checksum, T3-78 persistence stress suite, T3-79 group/ungroup parent graph integrity, T3-80 undo/redo correctness suite, T3-81 end-to-end workflow integration suite, and T3-85 installer QA matrix shipped/closed; million-line streaming remains deferred to T3-15. |
+| T1 | 234 | 5 | Open: T1-17 trace/import-freeze follow-up plus T1-28, T1-31, T1-34, and T1-36 hardware-verification gates. |
+| T2 | 127 | 3 | Open: T2-6 App split (parked for now), T2-30 Falcon WiFi real controller, and T2-95 real trial model/business decision. |
+| T3 | 87 | 5 | Open: T3-4 code-signing provisioning, T3-12 hardware-in-the-loop suite, T3-17 WiFi safety model, T3-34 stripe-based raster emission, and T3-84 Linux packaging/business decision. |
+| T4 | 0 | 1 broad line | Master checklist keeps Tier 4 as one broad backlog line (`T4-1 through T4-9`); the audit ledger still lists 2 shipped / 7 open concrete later items. |
 
 ### Historical audit classification
 

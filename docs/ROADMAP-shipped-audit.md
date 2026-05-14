@@ -10,8 +10,8 @@
 > produced during the 2026-04-30 audit and are no longer current planning
 > counts. For strict roadmap execution, use the master checklist at the bottom
 > of `docs/ROADMAP.md`. Direct checklist count on `master` before this note:
-> T0 open 0, T1 open 10, T2 open 3, T3 open 25, and T4 represented by one
-> broad backlog line (`T4-1 through T4-9`). Active open checklist lines: 39.
+> T0 open 0, T1 open 5, T2 open 3, T3 open 5, and T4 represented by one
+> broad backlog line (`T4-1 through T4-9`). Active open checklist lines: 14.
 
 ---
 
@@ -51,16 +51,16 @@ must not be used as the current open-ticket count.
 | 4 | 9 | **2** | 0 | **7** | ~22% |
 | **Total** | **323** | ~49 | 6 | ~210 confirmed-or-likely | éˆ¥?|
 
-Current checklist snapshot from `docs/ROADMAP.md` on 2026-05-10:
+Current checklist snapshot from `docs/ROADMAP.md` on 2026-05-14:
 
 | Tier | Shipped/closed | Open | Planning note |
 |---|---:|---:|---|
 | T0 | 4 | 0 | Fully closed. |
-| T1 | 85 | 10 | Remaining lines are mostly hardware-verification gates. |
+| T1 | 234 | 5 | Remaining lines are T1-17 trace/import-freeze work plus hardware-verification gates. |
 | T2 | 127 | 3 | Open: T2-6, T2-30, T2-95. |
-| T3 | 67 | 25 | T3-85 installer QA matrix shipped after the original checklist note. |
+| T3 | 87 | 5 | Open: T3-4, T3-12, T3-17, T3-34, T3-84. |
 | T4 | 0 | 1 broad line | `T4-1 through T4-9`; this audit still lists 7 concrete later items. |
-| **Checklist total** | **283** | **39** | Counted from checked/unchecked master checklist lines. |
+| **Checklist total** | **452** | **14** | Counted from checked/unchecked master checklist lines, including appended audit-fix and follow-up tickets. |
 
 **Gate status (per `docs/ROADMAP.md` æ‚ Release Readiness):**
 
@@ -654,9 +654,9 @@ T2-119 (assertTrustedSender on every IPC handler), T2-121 (main-process command 
 | T3-92 | Go to last machine position control | Added session-local last job start position capture in `ConnectionPanelMain`, a pure `LastMachinePosition` helper that plans relative X/Y jogs from the current controller position back to that stored point, and a fixed Move Laser `Go to last position` button in `Jog`. The move uses `ExecutionCoordinator.jog` so the existing idle gate, operation mutex, simulator notification, and controller jog path remain in force; stored position clears on disconnect / emergency stop. Pinned by `tests/last-machine-position.test.ts` and `tests/connection-panel-go-to-last-position.test.ts`. **Hardware verification needed** on Falcon A1 Pro before release tagging. | `e4a9f54` |
 | T3-82 | Production bundle smoke tests | `scripts/verify-production-build.mjs` with broader pattern library (auto-Pro unlock literal, legacy tester HMAC, debug API leakage `__forceProUnlock`/`__entitlementService`, mock entitlement leakage, vitest leakage, source map references); 22 markers in code | `de3fbc7` |
 
-### Open (25)
+### Open (5)
 
-T3-4 (Win/macOS code signing), **T3-12** (hardware-in-the-loop safety verification suite), T3-15 (spool-based G-code AsyncIterable streaming), T3-17 (Wi-Fi safety model), T3-24, T3-34, T3-43, T3-44, T3-46, T3-47, T3-48, T3-50 (device identity verification on connect), T3-51, T3-54, T3-55, T3-57, T3-59, T3-83, T3-84 (Linux packaging éˆ¥?only if business decides), T3-86 (native module packaging smoke test éˆ¥?referenced from T1-86 as future work), T3-87, T3-88 (IPC fuzz suite), T3-89 (production security build CI checks), T3-90, T3-91.
+T3-4 (Win/macOS code signing provisioning), **T3-12** (hardware-in-the-loop safety verification suite), T3-17 (Wi-Fi safety model), T3-34 (stripe-based raster G-code emission), T3-84 (Linux packaging éˆ¥?only if business decides).
 
 ---
 

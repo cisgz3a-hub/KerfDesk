@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 479 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 704 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 705 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 628 | - |
+| `tests/` | 629 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1092,6 +1092,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/retention-policy.test.ts`
 - `tests/right-origin-x-flip.test.ts`
 - `tests/roadmap-backfill-t1-209-222.test.ts`
+- `tests/roadmap-current-counts.test.ts`
 - `tests/rollback-crash-loop-detection.test.ts`
 - `tests/rotated-raster-fails-closed.test.ts`
 - `tests/ruida-safety-design-doc.test.ts`
