@@ -7372,7 +7372,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\entitlement-signed-cache-authority.test.ts`, `npx tsx tests\signed-entitlement-token.test.ts`, and `npx tsx tests\license-status-states.test.ts` pass after the verifier wiring.
 - `npx tsc --noEmit --pretty false` passes after browser/Node WebCrypto compatibility shims.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required (commercial entitlement crypto only). Release note: real server deployment, signing key custody, and production `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK` configuration are still required before paid distribution.
+**Status:** Shipped in `041e0698`. Hardware verification not required (commercial entitlement crypto only). Release note: real server deployment, signing key custody, and production `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK` configuration are still required before paid distribution.
 
 ---
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21251,7 +21251,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-252 HIGH make pause laser-off confirmation load-bearing (shipped in `379e623e`) - awaits pause-time `M5 S0`, carries the structured result through controller operations, and latches failed laser-off as unknown/unsafe instead of reporting a clean pause.
 - [x] T1-253 HIGH make support bundle export user-exportable (shipped in `1191cba0`) - adds runtime bundle collection, real ZIP creation, Electron binary save/browser download fallback, and an About-tab Export Diagnostic Bundle action.
 - [x] T1-254 HIGH make signed entitlement cache the only local Pro authority (shipped in `a5192187`) - stops raw `laserforge_license_cache` JSON from granting verified/offline Pro and accepts local cache only after signed-token verification.
-- [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `<TBD>`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
+- [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `041e0698`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
