@@ -7,7 +7,7 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-254** (signed entitlement cache authority, shipped in `<TBD>`).
+- Last shipped roadmap item: **T1-254** (signed entitlement cache authority, shipped in `a5192187`).
 - Current audit-fix run completed: **T1-223 through T1-254**, with T1-237 still deferred as multi-week firmware-adapter wiring.
 - Next active audit-fix ticket: continue the release-readiness audit sequence with production entitlement-server/public-key rollout or the next release-pipeline blocker.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
