@@ -114,15 +114,28 @@ export function generateRasterScanlines(
   bitmap: ProcessedBitmap,
   settings: RasterSettings
 ): RasterScanline[] {
+  return Array.from(iterateRasterScanlines(bitmap, settings));
+}
+
+/**
+ * T3-34 first slice: lazily produce raster scanlines row-by-row.
+ *
+ * This does not yet stream final G-code chunks (that still depends on
+ * the broader T3-15 spool migration), but it removes the eager
+ * `RasterScanline[]` materialization from the planner path so large
+ * rasters can release each source row as soon as its moves are appended.
+ */
+export function* iterateRasterScanlines(
+  bitmap: ProcessedBitmap,
+  settings: RasterSettings
+): Generator<RasterScanline, void, void> {
   const { width, height, data, mode, position, physicalWidth, physicalHeight } = bitmap;
-  if (width === 0 || height === 0 || data.length === 0) return [];
+  if (width === 0 || height === 0 || data.length === 0) return;
 
   /** Pixel pitch from actual physical size (matches resampled bitmap; avoids dpi-only mismatch). */
   const pixelSizeX = physicalWidth / width;
   const pixelSizeY = physicalHeight / height;
-  if (!(pixelSizeX > 0) || !(pixelSizeY > 0)) return [];
-
-  const scanlines: RasterScanline[] = [];
+  if (!(pixelSizeX > 0) || !(pixelSizeY > 0)) return;
 
   for (let row = 0; row < height; row++) {
     const y = position.y + row * pixelSizeY;
@@ -170,10 +183,8 @@ export function generateRasterScanlines(
       ? lastSeg.endX + overscan
       : lastSeg.endX - overscan;
 
-    scanlines.push({ y, segments, direction, overscanFromX, overscanToX });
+    yield { y, segments, direction, overscanFromX, overscanToX };
   }
-
-  return scanlines;
 }
 
 // ─── 1-BIT SEGMENT EXTRACTION ────────────────────────────────────

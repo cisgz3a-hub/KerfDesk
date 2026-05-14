@@ -53,9 +53,8 @@ import {
   type FillScanlineRow,
 } from './FillGenerator';
 import {
-  generateRasterScanlines,
+  iterateRasterScanlines,
   type RasterSettings,
-  type RasterScanline,
 } from './RasterGenerator';
 import { optimizePathOrder } from './PathOptimizer';
 import {
@@ -794,9 +793,6 @@ function planRasterOperation(
     responseCurve: settings.responseCurve,
   };
 
-  const scanlines = generateRasterScanlines(bitmap, rasterSettings);
-  if (scanlines.length === 0) return [];
-
   const moves: Move[] = [];
   const speed = settings.speed;
   const useAccel = settings.accelAwarePower !== false;
@@ -810,8 +806,10 @@ function planRasterOperation(
   // and follows S inline during G1.
   moves.push({ type: 'laserOn', power: 0 });
 
-  for (const scanline of scanlines) {
+  let sawScanline = false;
+  for (const scanline of iterateRasterScanlines(bitmap, rasterSettings)) {
     if (scanline.segments.length === 0) continue;
+    sawScanline = true;
     // T1-165 (audit F-029): cancel-aware per-scanline check. A 12MP
     // photo produces ~4000 scanlines × 100–1000 segments — the inner
     // segment loop here is ~0.1–1ms per scanline, so checking once
@@ -902,6 +900,8 @@ function planRasterOperation(
       });
     }
   }
+
+  if (!sawScanline) return [];
 
   moves.push({ type: 'laserOff' });
 

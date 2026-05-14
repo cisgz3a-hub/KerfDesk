@@ -4,13 +4,14 @@
  */
 
 import type { ProcessedBitmap } from '../src/core/job/Job';
+import { readFileSync } from 'node:fs';
 import {
   adjustBrightness,
   adjustContrast,
   invertImage,
   thresholdToOneBit,
 } from '../src/core/image/ImageProcessing';
-import { generateRasterScanlines, luminanceToLaserPower, type RasterSettings } from '../src/core/plan/RasterGenerator';
+import { generateRasterScanlines, iterateRasterScanlines, luminanceToLaserPower, type RasterSettings } from '../src/core/plan/RasterGenerator';
 
 let passed = 0;
 let failed = 0;
@@ -129,6 +130,37 @@ console.log('\n=== threshold 1-bit raster ===');
   const powers = lines.flatMap(l => l.segments.map(s => s.power));
   assert(powers.length > 0, 'threshold mode produces burn segments');
   assert(powers.every(p => p === 0 || p === 100), '1-bit threshold raster uses only off or powerMax');
+}
+
+console.log('\n=== T3-34 raster scanline iterator ===');
+{
+  const bitmap: ProcessedBitmap = {
+    width: 4,
+    height: 3,
+    dpi: 254,
+    sourceObjectId: 'iter-1',
+    mode: '1bit',
+    data: new Uint8Array([
+      255, 0, 255, 0,
+      0, 0, 0, 0,
+      255, 255, 0, 0,
+    ]),
+    physicalWidth: 4,
+    physicalHeight: 3,
+    position: { x: 0, y: 0 },
+    pipeline: { brightness: 0, contrast: 0, gamma: 1, ditheringMode: 'threshold', inverted: false, imageMode: 'threshold' },
+  };
+  const eager = generateRasterScanlines(bitmap, rasterSettings);
+  const streamed = Array.from(iterateRasterScanlines(bitmap, rasterSettings));
+  assert(JSON.stringify(streamed) === JSON.stringify(eager), 'iterateRasterScanlines matches eager generateRasterScanlines output');
+  assert(streamed.length === 2, 'iterator skips empty rows without materializing them');
+
+  const generatorSrc = readFileSync('src/core/plan/RasterGenerator.ts', 'utf8');
+  const optimizerSrc = readFileSync('src/core/plan/PlanOptimizer.ts', 'utf8');
+  assert(/export function\* iterateRasterScanlines/.test(generatorSrc), 'RasterGenerator exports a lazy scanline iterator');
+  assert(/Array\.from\(iterateRasterScanlines\(bitmap,\s*settings\)\)/.test(generatorSrc), 'generateRasterScanlines is the compatibility wrapper');
+  assert(/iterateRasterScanlines/.test(optimizerSrc), 'PlanOptimizer consumes the raster iterator');
+  assert(!/const scanlines = generateRasterScanlines/.test(optimizerSrc), 'PlanOptimizer no longer materializes all raster scanlines before planning');
 }
 
 console.log('\n=== Summary ===');

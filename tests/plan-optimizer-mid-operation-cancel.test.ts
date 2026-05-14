@@ -258,8 +258,8 @@ console.log('\n=== T1-165 PlanOptimizer mid-operation abort cancellation ===\n')
 
   // The new per-scanline check inside planRasterOperation.
   assert(
-    /for \(const scanline of scanlines\) \{[\s\S]{0,400}throwIfOptimizeAborted\(signal\)/.test(src),
-    'planRasterOperation has a per-scanline throwIfOptimizeAborted check inside the scanlines loop',
+    /for \(const scanline of iterateRasterScanlines\(bitmap,\s*rasterSettings\)\) \{[\s\S]{0,500}throwIfOptimizeAborted\(signal\)/.test(src),
+    'planRasterOperation has a per-scanline throwIfOptimizeAborted check inside the raster iterator loop',
   );
 
   // planPath now takes signal.
