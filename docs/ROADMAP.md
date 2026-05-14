@@ -7420,7 +7420,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - The wrapper was smoke-tested locally against the current npm: it wrote a CycloneDX 1.5 SBOM with dependency components to a temp file.
 - `npx tsx tests\ci-installer-builds.test.ts`, `npx tsx tests\windows-signing-release-workflow.test.ts`, and `npx tsx tests\macos-signing-notarization-workflow.test.ts` pass after the upload path updates.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum/SBOM publishing to GitHub Releases remains separate work because it requires signing keys and release policy.
+**Status:** Shipped in `a2cfa7db`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum/SBOM publishing to GitHub Releases remains separate work because it requires signing keys and release policy.
 
 ---
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21302,7 +21302,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `041e0698`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
 - [x] T1-256 HIGH add WebCrypto private-key signer for server entitlements (shipped in `d12d46ea`) - signs server-issued ES256 entitlement tokens from server-only `ENTITLEMENT_SIGNING_PRIVATE_JWK` config and rejects public-only JWKs.
 - [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `ed56b5a4`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
-- [x] T1-258 HIGH upload CycloneDX SBOM with installer workflows (shipped in `<TBD>`) - generates `release/sbom.cdx.json` via `npm sbom` and uploads it beside installer artifacts and checksums.
+- [x] T1-258 HIGH upload CycloneDX SBOM with installer workflows (shipped in `a2cfa7db`) - generates `release/sbom.cdx.json` via `npm sbom` and uploads it beside installer artifacts and checksums.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
