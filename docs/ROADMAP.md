@@ -7404,7 +7404,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\windows-signing-release-workflow.test.ts` failed before the signed Windows workflow generated/uploaded checksums and passes after.
 - `npx tsx tests\macos-signing-notarization-workflow.test.ts` failed before the signed macOS workflow generated/uploaded checksums and passes after.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum files, SBOM upload, and GitHub Release publishing remain separate release-pipeline work because they require signing keys and release policy.
+**Status:** Shipped in `ed56b5a4`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum files, SBOM upload, and GitHub Release publishing remain separate release-pipeline work because they require signing keys and release policy.
 
 ---
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21285,7 +21285,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-254 HIGH make signed entitlement cache the only local Pro authority (shipped in `a5192187`) - stops raw `laserforge_license_cache` JSON from granting verified/offline Pro and accepts local cache only after signed-token verification.
 - [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `041e0698`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
 - [x] T1-256 HIGH add WebCrypto private-key signer for server entitlements (shipped in `d12d46ea`) - signs server-issued ES256 entitlement tokens from server-only `ENTITLEMENT_SIGNING_PRIVATE_JWK` config and rejects public-only JWKs.
-- [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `<TBD>`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
+- [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `ed56b5a4`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
