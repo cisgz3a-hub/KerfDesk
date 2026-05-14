@@ -8,6 +8,9 @@
  * Run: npx tsx tests/falcon-autofocus-firmware-gate.test.ts
  */
 
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import {
   FALCON_AUTOFOCUS_MIN_FIRMWARE,
   backfillFalconAutofocus,
@@ -179,6 +182,22 @@ void (async () => {
   // 11. The minimum-firmware constant is exported and uses 1.0.38.
   {
     assert(FALCON_AUTOFOCUS_MIN_FIRMWARE === '1.0.38', 'FALCON_AUTOFOCUS_MIN_FIRMWARE === "1.0.38"');
+  }
+
+  // 12. Live profile wiring: useAppDeviceProfiles must thread the
+  //     connected controller's firmware identity into the heal helper.
+  {
+    const hookSrc = readFileSync(resolve(process.cwd(), 'src/ui/hooks/useAppDeviceProfiles.ts'), 'utf8');
+    assert(/backfillFalconAutofocus/.test(hookSrc),
+      'useAppDeviceProfiles imports/calls backfillFalconAutofocus');
+    assert(/getDeviceIdentity\?:/.test(hookSrc),
+      'ProfileAwareController exposes optional getDeviceIdentity');
+    assert(/controller\?\.getDeviceIdentity\?\.\(\)\?\.firmwareVersion/.test(hookSrc),
+      'useAppDeviceProfiles reads live firmwareVersion from controller identity');
+    assert(/backfillFalconAutofocus\(current,\s*firmwareVersion\)/.test(hookSrc),
+      'useAppDeviceProfiles passes live firmwareVersion into backfillFalconAutofocus');
+    assert(/autoFocusSupported/.test(hookSrc) && /autoFocusCommand/.test(hookSrc) && /autoFocusTimeoutMs/.test(hookSrc),
+      'useAppDeviceProfiles compares/persists the three autofocus fields');
   }
 
   console.log(`\nT3-55 Falcon autofocus firmware gate: ${passed} passed, ${failed} failed`);

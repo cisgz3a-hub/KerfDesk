@@ -225,6 +225,28 @@ function freshValid(): DeviceProfile {
   assert(!r.ok, 'autoFocusTimeoutMs=-1 rejected');
 }
 
+// T3-55 follow-up: old/unknown Falcon firmware disables autofocus by
+// clearing the command and setting timeout to 0. That disabled state
+// must remain persistable; the positive-timeout rule applies only
+// while autofocus is enabled.
+{
+  const p = freshValid();
+  p.autoFocusSupported = false;
+  p.autoFocusCommand = '';
+  p.autoFocusTimeoutMs = 0;
+  const r = validateProfile(p);
+  assert(r.ok, 'disabled autofocus with autoFocusTimeoutMs=0 accepted');
+}
+
+{
+  const p = freshValid();
+  p.autoFocusSupported = false;
+  p.autoFocusCommand = '';
+  p.autoFocusTimeoutMs = -1;
+  const r = validateProfile(p);
+  assert(!r.ok, 'disabled autofocus with invalid autoFocusTimeoutMs rejected');
+}
+
 // ── 18. maxFeedRate negative → rejected ──
 {
   const p = freshValid();

@@ -279,7 +279,11 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
   }
 
   // ── autoFocusTimeoutMs (warn on absurd values) ──
-  if (profile.autoFocusTimeoutMs != null) {
+  const disabledAutofocusTimeout =
+    profile.autoFocusSupported === false &&
+    (profile.autoFocusCommand ?? '') === '' &&
+    profile.autoFocusTimeoutMs === 0;
+  if (profile.autoFocusTimeoutMs != null && !disabledAutofocusTimeout) {
     if (!isPositiveFinite(profile.autoFocusTimeoutMs) || profile.autoFocusTimeoutMs > 5 * 60 * 1000) {
       issues.push({
         field: 'autoFocusTimeoutMs',

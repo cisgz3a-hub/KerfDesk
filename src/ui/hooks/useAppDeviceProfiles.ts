@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo } from 'react';
 import { bedDimensionsKnown, resolveBedHeightMm, resolveBedWidthMm } from '../../app/PipelineService';
 import {
   applyProfileToScene,
+  backfillFalconAutofocus,
   deleteDeviceProfile,
   getActiveProfile,
   getActiveProfileId,
@@ -49,6 +50,7 @@ interface ProfileAwareController {
   applyWcsNormalization?: () => void;
   skipWcsNormalization?: () => void;
   setStopOnError?: (enabled: boolean) => void;
+  getDeviceIdentity?: () => { firmwareVersion?: string | null };
 }
 
 interface ConfirmWithCheckboxResult {
@@ -205,6 +207,28 @@ export function useAppDeviceProfiles({
     // a persisted profile value.
     controller.setStopOnError(true);
   }, [controller, profileRevision]);
+
+  useEffect(() => {
+    const firmwareVersion = controller?.getDeviceIdentity?.()?.firmwareVersion;
+    if (!firmwareVersion) return;
+    const current = getActiveProfile();
+    if (!current) return;
+
+    const healed = backfillFalconAutofocus(current, firmwareVersion);
+    if (
+      healed === current
+      || (
+        healed.autoFocusSupported === current.autoFocusSupported
+        && healed.autoFocusCommand === current.autoFocusCommand
+        && healed.autoFocusTimeoutMs === current.autoFocusTimeoutMs
+      )
+    ) {
+      return;
+    }
+
+    saveDeviceProfile(healed);
+    refreshProfiles();
+  }, [controller, profileRevision, refreshProfiles]);
 
   const mergeProfilePreservedFields = useCallback((target: DeviceProfile, previous: DeviceProfile): void => {
     target.scanningOffsets = previous.scanningOffsets;

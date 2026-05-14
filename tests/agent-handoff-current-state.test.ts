@@ -9,7 +9,7 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T3-48 follow-up\*\*/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T3-55 follow-up\*\*/);
   assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-260\*\*/);
   assert.match(handoff, /Next active audit-fix ticket: finish actual entitlement server deployment\/secret-store configuration/);
 });
@@ -45,6 +45,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T3-85 added the manual installer QA release gate/);
   assert.match(handoff, /T3-91 follow-up wires the unsafe-at-connect banner into the live connection panel/);
   assert.match(handoff, /T3-48 follow-up wires the previously-shipped Web Serial known-port helper/);
+  assert.match(handoff, /T3-55 follow-up wires live controller firmware identity into Falcon autofocus profile healing/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);
