@@ -41,10 +41,14 @@ jobs:
       - run: npm run electron:compile
       - run: npm run build
       - run: npm run electron:build
+      - name: Generate SHA256 checksums
+        run: node scripts/generate-checksums.mjs release
       - uses: actions/upload-artifact@v4
         with:
           name: windows-installer
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/SHA256SUMS
           if-no-files-found: error
           retention-days: 7
 
@@ -65,9 +69,13 @@ jobs:
       - run: npm run electron:compile
       - run: npm run build
       - run: npm run electron:build:mac
+      - name: Generate SHA256 checksums
+        run: node scripts/generate-checksums.mjs release
       - uses: actions/upload-artifact@v4
         with:
           name: macos-installer
-          path: release/*.dmg
+          path: |
+            release/*.dmg
+            release/SHA256SUMS
           if-no-files-found: error
           retention-days: 7

@@ -36,7 +36,10 @@ assert(/CSC_LINK:\s*\$\{\{\s*secrets\.WIN_CERT_PFX_BASE64\s*\}\}/.test(workflow)
 assert(/CSC_KEY_PASSWORD:\s*\$\{\{\s*secrets\.WIN_CERT_PASSWORD\s*\}\}/.test(workflow), 'workflow reads certificate password from WIN_CERT_PASSWORD secret');
 assert(/Verify signing secrets/.test(workflow), 'workflow fails early when signing secrets are missing');
 assert(/electron-builder --win --config scripts\/signing\/electron-builder\.windows-signed\.cjs --publish never/.test(workflow), 'workflow uses the signed electron-builder config');
+assert(/node scripts\/generate-checksums\.mjs release/.test(workflow), 'workflow generates SHA256SUMS for signed Windows artifact');
 assert(/windows-signed-installer/.test(workflow), 'workflow uploads a signed installer artifact');
+assert(/path:\s*\|\s*[\s\S]*release\/\*\.exe[\s\S]*release\/SHA256SUMS/.test(workflow),
+  'workflow uploads signed exe together with SHA256SUMS');
 
 assert(/require\('\.\.\/\.\.\/package\.json'\)\.build/.test(signedConfig), 'signed config extends package build config');
 assert(/signAndEditExecutable:\s*true/.test(signedConfig), 'signed config enables executable signing');

@@ -39,8 +39,11 @@ assert(/build-windows:[\s\S]*npm ci/.test(ci), 'Windows job installs dependencie
 assert(/build-windows:[\s\S]*npm run electron:compile/.test(ci), 'Windows job compiles Electron main');
 assert(/build-windows:[\s\S]*npm run build/.test(ci), 'Windows job builds renderer');
 assert(/build-windows:[\s\S]*npm run electron:build/.test(ci), 'Windows job builds installer');
+assert(/build-windows:[\s\S]*node scripts\/generate-checksums\.mjs release/.test(ci),
+  'Windows job generates SHA256SUMS for installer');
 assert(/build-windows:[\s\S]*actions\/upload-artifact@v4/.test(ci), 'Windows job uploads artifact');
-assert(/build-windows:[\s\S]*path:\s+release\/\*\.exe/.test(ci), 'Windows artifact uploads exe');
+assert(/build-windows:[\s\S]*path:\s*\|[\s\S]*release\/\*\.exe[\s\S]*release\/SHA256SUMS/.test(ci),
+  'Windows artifact uploads exe and SHA256SUMS');
 assert(/--publish\s+never/.test(pkg.scripts?.['electron:build'] ?? ''),
   'Windows installer script disables electron-builder implicit CI publish');
 
@@ -50,8 +53,11 @@ assert(/build-macos:[\s\S]*npm ci/.test(ci), 'macOS job installs dependencies');
 assert(/build-macos:[\s\S]*npm run electron:compile/.test(ci), 'macOS job compiles Electron main');
 assert(/build-macos:[\s\S]*npm run build/.test(ci), 'macOS job builds renderer');
 assert(/build-macos:[\s\S]*npm run electron:build:mac/.test(ci), 'macOS job builds dmg');
+assert(/build-macos:[\s\S]*node scripts\/generate-checksums\.mjs release/.test(ci),
+  'macOS job generates SHA256SUMS for dmg');
 assert(/build-macos:[\s\S]*actions\/upload-artifact@v4/.test(ci), 'macOS job uploads artifact');
-assert(/build-macos:[\s\S]*path:\s+release\/\*\.dmg/.test(ci), 'macOS artifact uploads dmg');
+assert(/build-macos:[\s\S]*path:\s*\|[\s\S]*release\/\*\.dmg[\s\S]*release\/SHA256SUMS/.test(ci),
+  'macOS artifact uploads dmg and SHA256SUMS');
 assert(/--publish\s+never/.test(pkg.scripts?.['electron:build:mac'] ?? ''),
   'macOS installer script disables electron-builder implicit CI publish');
 

@@ -40,7 +40,10 @@ assert(/APPLE_APP_SPECIFIC_PASSWORD:\s*\$\{\{\s*secrets\.APPLE_APP_SPECIFIC_PASS
 assert(/APPLE_TEAM_ID:\s*\$\{\{\s*secrets\.APPLE_TEAM_ID\s*\}\}/.test(workflow), 'workflow reads APPLE_TEAM_ID secret');
 assert(/Verify signing and notarization secrets/.test(workflow), 'workflow fails early when release secrets are missing');
 assert(/electron-builder --mac --config scripts\/signing\/electron-builder\.macos-signed\.cjs --publish never/.test(workflow), 'workflow uses the signed macOS electron-builder config');
+assert(/node scripts\/generate-checksums\.mjs release/.test(workflow), 'workflow generates SHA256SUMS for signed macOS artifact');
 assert(/macos-signed-notarized-dmg/.test(workflow), 'workflow uploads notarized dmg artifact');
+assert(/path:\s*\|\s*[\s\S]*release\/\*\.dmg[\s\S]*release\/SHA256SUMS/.test(workflow),
+  'workflow uploads notarized dmg together with SHA256SUMS');
 
 assert(/require\('\.\.\/\.\.\/package\.json'\)\.build/.test(signedConfig), 'signed config extends package build config');
 assert(/hardenedRuntime:\s*true/.test(signedConfig), 'signed config enables hardened runtime');

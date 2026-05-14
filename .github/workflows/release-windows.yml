@@ -30,9 +30,13 @@ jobs:
       - run: npm run icons:ico
       - name: Build signed Windows installer
         run: npx electron-builder --win --config scripts/signing/electron-builder.windows-signed.cjs --publish never
+      - name: Generate SHA256 checksums
+        run: node scripts/generate-checksums.mjs release
       - uses: actions/upload-artifact@v4
         with:
           name: windows-signed-installer
-          path: release/*.exe
+          path: |
+            release/*.exe
+            release/SHA256SUMS
           if-no-files-found: error
           retention-days: 30
