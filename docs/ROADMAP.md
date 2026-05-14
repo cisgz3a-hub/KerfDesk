@@ -7429,13 +7429,28 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 
 **Problem:** A downloaded signed installer can have OS code-signing proof, checksums, and an uploaded SBOM, but without an attestation the release review cannot independently verify that the artifact came from the expected GitHub workflow/ref. GPG release signing still requires a key custody policy; GitHub artifact attestations are the no-extra-secret provenance layer available inside the existing manual signed workflows.
 
-**Fix:** Added explicit `contents: read`, `id-token: write`, and `attestations: write` permissions to `.github/workflows/release-windows.yml` and `.github/workflows/release-macos.yml`. Each signed release workflow now runs `actions/attest@v4` twice after generating checksums/SBOMs: once for installer provenance and once to bind `release/sbom.cdx.json` to the installer. `docs/CODE-SIGNING.md` now includes `gh attestation verify` commands beside the OS-signing checks.
+**Fix:** Added explicit GitHub permission declarations for attestation signing (`id-token: write`, `attestations: write`) and repository access to `.github/workflows/release-windows.yml` and `.github/workflows/release-macos.yml`; T1-260 later expanded repository access to `contents: write` for explicit GitHub Release publishing. Each signed release workflow now runs `actions/attest@v4` twice after generating checksums/SBOMs: once for installer provenance and once to bind `release/sbom.cdx.json` to the installer. `docs/CODE-SIGNING.md` now includes `gh attestation verify` commands beside the OS-signing checks.
 
 **Verification:**
 - `npx tsx tests\release-artifact-attestations.test.ts` failed before the workflow permissions/attestation steps and docs existed, then passed after.
 - The test pins both signed workflows to provenance and SBOM attestation steps for their platform artifacts.
 
 **Status:** Shipped in `85ecae9c`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum files remain a possible policy choice, but signed GitHub provenance/SBOM attestations now cover the no-extra-secret in-repo release-integrity path.
+
+---
+### T1-260 | Manual signed GitHub Release publishing
+
+**Audit source:** Follow-up to T2-101/T2-103/T3-4 release pipeline hardening after checksums, SBOMs, and artifact attestations shipped. Signed release workflows still only produced Actions artifacts; a release owner had no pinned, intentional path for attaching the signed installers to a GitHub Release.
+
+**Problem:** Auto-update and public-download flows consume GitHub Releases, not transient Actions artifacts. Without a controlled publish step, the release process remained manual and easy to do inconsistently: upload the installer but forget checksums, overwrite Windows/macOS metadata with shared filenames, or publish from a local machine without the workflow provenance attached.
+
+**Fix:** Added explicit manual inputs to `.github/workflows/release-windows.yml` and `.github/workflows/release-macos.yml`: `publish_release` (default `false`) and `release_tag`. Publishing is gated behind `publish_release`, validates `release_tag`, uses the workflow `github.token`, creates a draft release only if the tag does not already have one, and uploads the installer plus platform-specific metadata (`SHA256SUMS.windows` / `SHA256SUMS.macos`, `sbom.windows.cdx.json` / `sbom.macos.cdx.json`). The platform suffixes prevent the Windows and macOS signed workflows from clobbering each other's checksum/SBOM assets.
+
+**Verification:**
+- `npx tsx tests\release-github-publish-workflows.test.ts` failed before the manual inputs/publish steps/docs existed, then passed after.
+- Existing signed workflow guards still pass: `npx tsx tests\release-artifact-attestations.test.ts`, `npx tsx tests\windows-signing-release-workflow.test.ts`, and `npx tsx tests\macos-signing-notarization-workflow.test.ts`.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required (release workflow metadata only). Release note: actual public release still requires real Windows/macOS signing secrets and an operator intentionally setting `publish_release: true`.
 
 ---
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21319,6 +21334,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `ed56b5a4`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
 - [x] T1-258 HIGH upload CycloneDX SBOM with installer workflows (shipped in `a2cfa7db`) - generates `release/sbom.cdx.json` via `npm sbom` and uploads it beside installer artifacts and checksums.
 - [x] T1-259 HIGH generate signed provenance/SBOM attestations for release installers (shipped in `85ecae9c`) - uses GitHub artifact attestations in the signed Windows/macOS release workflows and documents `gh attestation verify`.
+- [x] T1-260 HIGH add opt-in signed GitHub Release publishing (shipped in `<TBD>`) - manual signed workflows can attach installers plus platform-specific checksum/SBOM assets to a draft GitHub Release.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

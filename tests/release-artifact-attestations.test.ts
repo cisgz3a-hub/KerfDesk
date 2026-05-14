@@ -32,8 +32,8 @@ for (const [label, workflow, artifactPattern] of [
   ['Windows', win, 'release/\\*\\.exe'],
   ['macOS', mac, 'release/\\*\\.dmg'],
 ] as const) {
-  assert(/permissions:\s*[\s\S]*contents:\s+read/.test(workflow),
-    `${label} workflow declares contents: read permission`);
+  assert(/permissions:\s*[\s\S]*contents:\s+(read|write)/.test(workflow),
+    `${label} workflow declares contents permission`);
   assert(/permissions:\s*[\s\S]*id-token:\s+write/.test(workflow),
     `${label} workflow declares id-token: write permission for Sigstore signing`);
   assert(/permissions:\s*[\s\S]*attestations:\s+write/.test(workflow),

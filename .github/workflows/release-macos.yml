@@ -2,9 +2,19 @@ name: macOS Signed Notarized Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Attach signed artifacts to a draft GitHub Release
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: Existing release tag to attach artifacts to, for example v1.0.0
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
   attestations: write
 
@@ -36,6 +46,13 @@ jobs:
           test -n "$APPLE_ID" || { echo "APPLE_ID secret is required for notarized macOS releases."; exit 1; }
           test -n "$APPLE_APP_SPECIFIC_PASSWORD" || { echo "APPLE_APP_SPECIFIC_PASSWORD secret is required for notarized macOS releases."; exit 1; }
           test -n "$APPLE_TEAM_ID" || { echo "APPLE_TEAM_ID secret is required for notarized macOS releases."; exit 1; }
+      - name: Validate GitHub Release publish input
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          test -n "$RELEASE_TAG" || { echo "release_tag is required when publish_release is true."; exit 1; }
       - run: npm ci
       - run: npm run build
       - run: npm run electron:compile
@@ -64,3 +81,19 @@ jobs:
             release/sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
+      - name: Prepare macOS release assets
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        run: |
+          cp release/SHA256SUMS release/SHA256SUMS.macos
+          cp release/sbom.cdx.json release/sbom.macos.cdx.json
+      - name: Publish macOS artifacts to GitHub Release
+        if: ${{ inputs.publish_release }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft --title "$RELEASE_TAG" --notes "Draft LaserForge release created by the signed macOS workflow."
+          gh release upload "$RELEASE_TAG" release/*.dmg release/SHA256SUMS.macos release/sbom.macos.cdx.json --repo "$GITHUB_REPOSITORY" --clobber

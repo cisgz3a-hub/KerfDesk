@@ -108,6 +108,24 @@ The cert itself stays in the runner's Keychain — for hosted runners
 that means an `apple-actions/import-codesign-certs` step before this
 one decoding a base64 `.p12` blob into a temporary keychain.
 
+## GitHub Release publishing
+
+The signed Windows and macOS workflows stay manual-only. By default
+they build, sign, attest, and upload Actions artifacts without touching
+GitHub Releases.
+
+For an intentional release publish (T1-260), run the signed workflow
+with `publish_release: true` and `release_tag` set to the target tag,
+for example `v1.0.0`. The workflow creates a draft release when the tag
+does not already have one, then uploads:
+
+- the platform installer (`.exe` or `.dmg`),
+- `SHA256SUMS.windows` or `SHA256SUMS.macos`,
+- `sbom.windows.cdx.json` or `sbom.macos.cdx.json`.
+
+The platform-specific checksum and SBOM filenames avoid Windows and
+macOS workflows overwriting each other's release assets.
+
 ## Linux
 
 Out of scope for T3-4. AppImage/Snap/Flatpak each have their own

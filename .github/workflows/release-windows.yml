@@ -2,9 +2,19 @@ name: Windows Signed Release
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Attach signed artifacts to a draft GitHub Release
+        required: true
+        default: false
+        type: boolean
+      release_tag:
+        description: Existing release tag to attach artifacts to, for example v1.0.0
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
   id-token: write
   attestations: write
 
@@ -29,6 +39,13 @@ jobs:
         run: |
           if (-not $env:CSC_LINK) { throw "WIN_CERT_PFX_BASE64 secret is required for signed Windows releases." }
           if (-not $env:CSC_KEY_PASSWORD) { throw "WIN_CERT_PASSWORD secret is required for signed Windows releases." }
+      - name: Validate GitHub Release publish input
+        if: ${{ inputs.publish_release }}
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          if (-not $env:RELEASE_TAG) { throw "release_tag is required when publish_release is true." }
       - run: npm ci
       - run: npm run build
       - run: npm run electron:compile
@@ -57,3 +74,21 @@ jobs:
             release/sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
+      - name: Prepare Windows release assets
+        if: ${{ inputs.publish_release }}
+        shell: pwsh
+        run: |
+          Copy-Item -LiteralPath release/SHA256SUMS -Destination release/SHA256SUMS.windows -Force
+          Copy-Item -LiteralPath release/sbom.cdx.json -Destination release/sbom.windows.cdx.json -Force
+      - name: Publish Windows artifacts to GitHub Release
+        if: ${{ inputs.publish_release }}
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view "$env:RELEASE_TAG" --repo "$env:GITHUB_REPOSITORY" *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create "$env:RELEASE_TAG" --repo "$env:GITHUB_REPOSITORY" --draft --title "$env:RELEASE_TAG" --notes "Draft LaserForge release created by the signed Windows workflow."
+          }
+          gh release upload "$env:RELEASE_TAG" release/*.exe release/SHA256SUMS.windows release/sbom.windows.cdx.json --repo "$env:GITHUB_REPOSITORY" --clobber
