@@ -7450,7 +7450,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\release-github-publish-workflows.test.ts` failed before the manual inputs/publish steps/docs existed, then passed after.
 - Existing signed workflow guards still pass: `npx tsx tests\release-artifact-attestations.test.ts`, `npx tsx tests\windows-signing-release-workflow.test.ts`, and `npx tsx tests\macos-signing-notarization-workflow.test.ts`.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required (release workflow metadata only). Release note: actual public release still requires real Windows/macOS signing secrets and an operator intentionally setting `publish_release: true`.
+**Status:** Shipped in `9092f469`. Hardware verification not required (release workflow metadata only). Release note: actual public release still requires real Windows/macOS signing secrets and an operator intentionally setting `publish_release: true`.
 
 ---
 ### T2-1 | Validated Job Ticket (execution contract)
@@ -21334,7 +21334,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `ed56b5a4`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
 - [x] T1-258 HIGH upload CycloneDX SBOM with installer workflows (shipped in `a2cfa7db`) - generates `release/sbom.cdx.json` via `npm sbom` and uploads it beside installer artifacts and checksums.
 - [x] T1-259 HIGH generate signed provenance/SBOM attestations for release installers (shipped in `85ecae9c`) - uses GitHub artifact attestations in the signed Windows/macOS release workflows and documents `gh attestation verify`.
-- [x] T1-260 HIGH add opt-in signed GitHub Release publishing (shipped in `<TBD>`) - manual signed workflows can attach installers plus platform-specific checksum/SBOM assets to a draft GitHub Release.
+- [x] T1-260 HIGH add opt-in signed GitHub Release publishing (shipped in `9092f469`) - manual signed workflows can attach installers plus platform-specific checksum/SBOM assets to a draft GitHub Release.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
