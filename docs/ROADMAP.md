@@ -7375,6 +7375,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `041e0698`. Hardware verification not required (commercial entitlement crypto only). Release note: real server deployment, signing key custody, and production `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK` configuration are still required before paid distribution.
 
 ---
+### T1-256 | WebCrypto private-key signer for server entitlements
+
+**Audit source:** Follow-up to T1-255 and the remaining entitlement server deployment/signing-key custody release-readiness item. The repo had a server-side signing interface from T2-89 and a production public-key verifier from T1-255, but no concrete server-side signer that an adapter could use without test stubs.
+
+**Problem:** A production entitlement server must mint the same signed token shape the client verifies, while keeping private signing material out of client/Vite configuration. Without a real signer factory, deployment work would still depend on ad hoc adapter code or tests-only signers.
+
+**Fix:** Added `src/entitlements/ServerWebCryptoEntitlementSigner.ts` with `createWebCryptoServerEntitlementSigner(...)`, `parseEntitlementSigningPrivateKeyConfig(...)`, and `createConfiguredServerEntitlementSignerFromEnv(...)`. The signer imports an ES256/P-256 private JWK, signs the canonical token payload string with WebCrypto, returns the existing `SignedEntitlementToken` envelope, rejects public-only JWK config, and reads only the server-side `ENTITLEMENT_SIGNING_PRIVATE_JWK` env key. It is exported from `src/entitlements/index.ts`.
+
+**Verification:**
+- `npx tsx tests\server-webcrypto-entitlement-signer.test.ts` failed before the signer module existed and passes after. It generates a real P-256 key pair, signs an entitlement payload through the server signer, verifies it through the T1-255 verifier, rejects public-only private-key config, and source-pins the server-only env boundary.
+- `npx tsx tests\webcrypto-entitlement-verifier.test.ts` now flips an actual signature byte for deterministic bad-signature coverage and passes.
+- `npx tsx tests\server-entitlement-service.test.ts`, `npx tsx tests\signed-entitlement-token.test.ts`, and `npx tsc --noEmit --pretty false` pass after the signer export.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required (commercial entitlement crypto only). Release note: actual server deployment and secret-store configuration are still required before paid distribution; this ticket supplies the in-repo signer the server adapter should use.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21252,6 +21268,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-253 HIGH make support bundle export user-exportable (shipped in `1191cba0`) - adds runtime bundle collection, real ZIP creation, Electron binary save/browser download fallback, and an About-tab Export Diagnostic Bundle action.
 - [x] T1-254 HIGH make signed entitlement cache the only local Pro authority (shipped in `a5192187`) - stops raw `laserforge_license_cache` JSON from granting verified/offline Pro and accepts local cache only after signed-token verification.
 - [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `041e0698`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
+- [x] T1-256 HIGH add WebCrypto private-key signer for server entitlements (shipped in `<TBD>`) - signs server-issued ES256 entitlement tokens from server-only `ENTITLEMENT_SIGNING_PRIVATE_JWK` config and rejects public-only JWKs.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

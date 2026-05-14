@@ -8,15 +8,15 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2652
-- Files with exports: 484
+- Export rows: 2657
+- Files with exports: 485
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
 |---|---:|
 | compile-output | 402 |
 | core-domain | 354 |
-| entitlement-security | 105 |
+| entitlement-security | 110 |
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
@@ -3703,7 +3703,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/entitlements/index.ts`
 
-**Exports inventoried:** 17
+**Exports inventoried:** 18
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
@@ -3717,13 +3717,14 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 6 | `tierDisplayName from ./EntitlementService` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 | 7 | `ActivateResult from ./EntitlementService` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 | 9 | `* from ./ServerEntitlementService` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 10 | `* from ./EntitlementLifecycle` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 11 | `* from ./WebCryptoEntitlementVerifier` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 16 | `hasPro` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 20 | `canUse` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 31 | `canUseFeature` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 35 | `EntitlementError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 42 | `assertFeature` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 10 | `* from ./ServerWebCryptoEntitlementSigner` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 11 | `* from ./EntitlementLifecycle` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 12 | `* from ./WebCryptoEntitlementVerifier` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 17 | `hasPro` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 21 | `canUse` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 32 | `canUseFeature` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 36 | `EntitlementError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 43 | `assertFeature` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -3768,6 +3769,19 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 128 | `normalizeLicenseCode` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 | 132 | `activateServerEntitlement` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 | 193 | `refreshServerEntitlement` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/entitlements/ServerWebCryptoEntitlementSigner.ts`
+
+**Exports inventoried:** 4
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 17 | `EntitlementPrivateKeyConfig` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 46 | `parseEntitlementSigningPrivateKeyConfig` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 58 | `createConfiguredServerEntitlementSignerFromEnv` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 67 | `createWebCryptoServerEntitlementSigner` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

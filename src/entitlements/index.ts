@@ -7,6 +7,7 @@ export {
   type ActivateResult,
 } from './EntitlementService';
 export * from './ServerEntitlementService';
+export * from './ServerWebCryptoEntitlementSigner';
 export * from './EntitlementLifecycle';
 export * from './WebCryptoEntitlementVerifier';
 

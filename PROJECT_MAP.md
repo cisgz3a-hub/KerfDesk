@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 478 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 697 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 479 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 698 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -29,7 +29,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/core` | 115 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/debug` | 4 | - |
 | `src/diagnostics` | 13 | - |
-| `src/entitlements` | 11 | - |
+| `src/entitlements` | 12 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
 | `src/import` | 18 | dxf, image, svg, trace |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 621 | - |
+| `tests/` | 622 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -314,6 +314,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/entitlements/FeatureMatrix.ts`
 - `src/entitlements/LicenseStatus.ts`
 - `src/entitlements/ServerEntitlementService.ts`
+- `src/entitlements/ServerWebCryptoEntitlementSigner.ts`
 - `src/entitlements/SignedEntitlementToken.ts`
 - `src/entitlements/WebCryptoEntitlementVerifier.ts`
 - `src/entitlements/index.ts`
@@ -1124,6 +1125,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/serial-navigator-disconnect.test.ts`
 - `tests/serial-port-close-async.test.ts`
 - `tests/server-entitlement-service.test.ts`
+- `tests/server-webcrypto-entitlement-signer.test.ts`
 - `tests/service-layer-pro-gate-coverage.test.ts`
 - `tests/signed-entitlement-token.test.ts`
 - `tests/simulation.test.ts`

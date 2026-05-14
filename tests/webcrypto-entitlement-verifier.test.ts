@@ -6,6 +6,7 @@
  */
 import { webcrypto } from 'node:crypto';
 import {
+  base64UrlDecode,
   base64UrlEncode,
   verifyEntitlementToken,
   type EntitlementTokenPayload,
@@ -99,8 +100,10 @@ void (async () => {
     const verifier = createWebCryptoEntitlementVerifier([
       { kid: token.kid, alg: 'ES256', jwk: publicJwk },
     ], webcrypto);
+    const signatureBytes = base64UrlDecode(token.signature);
+    signatureBytes[0] ^= 0xff;
     const result = await verifyEntitlementToken({
-      token: { ...token, signature: token.signature.replace(/.$/, token.signature.endsWith('A') ? 'B' : 'A') },
+      token: { ...token, signature: base64UrlEncode(signatureBytes) },
       verifier,
       now: Date.now(),
       replayMode: 'ignore',
