@@ -15,6 +15,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke('dialog:save', defaultName, content),
   saveGcode: (defaultName: string, content: string) =>
     ipcRenderer.invoke('dialog:saveGcode', defaultName, content),
+  saveBinaryFile: (defaultName: string, base64Content: string) =>
+    ipcRenderer.invoke('dialog:saveBinary', defaultName, base64Content),
   openFile: () =>
     ipcRenderer.invoke('dialog:open'),
   isElectron: true,

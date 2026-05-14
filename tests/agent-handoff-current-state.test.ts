@@ -9,9 +9,9 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-252\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-252\*\*/);
-  assert.match(handoff, /Next active audit-fix ticket: continue the release-readiness audit sequence/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-253\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-253\*\*/);
+  assert.match(handoff, /Next active audit-fix ticket: continue the release-readiness audit sequence with signed entitlement authority/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {
@@ -20,7 +20,8 @@ test('handoff no longer presents the stale T1-202 state as current', () => {
 });
 
 test('handoff preserves known verification caveats', () => {
-  assert.match(handoff, /Full `npm test` passed during T1-252/);
+  assert.match(handoff, /Full `npm test` passed during T1-253/);
+  assert.match(handoff, /git diff --check` passed during the T1-253 close-out/);
   assert.match(handoff, /T1-242 closed F-020/);
   assert.match(handoff, /T1-243 closed F-021/);
   assert.match(handoff, /T1-244 closed F-022/);
@@ -32,6 +33,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T1-250 separated autosave recovery truth from manual project-file dirty state/);
   assert.match(handoff, /T1-251 moved frame freshness into the final start path/);
   assert.match(handoff, /T1-252 made pause-time laser-off confirmation load-bearing/);
+  assert.match(handoff, /T1-253 made support bundles user-exportable/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

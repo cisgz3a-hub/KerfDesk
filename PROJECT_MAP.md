@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 476 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 693 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 477 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 695 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -28,7 +28,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/controllers` | 29 | grbl |
 | `src/core` | 115 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/debug` | 4 | - |
-| `src/diagnostics` | 12 | - |
+| `src/diagnostics` | 13 | - |
 | `src/entitlements` | 10 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 617 | - |
+| `tests/` | 619 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -302,6 +302,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/diagnostics/RetentionPolicy.ts`
 - `src/diagnostics/StorageHealth.ts`
 - `src/diagnostics/SupportBundle.ts`
+- `src/diagnostics/SupportBundleExport.ts`
 - `src/diagnostics/TroubleshootingPanelContent.ts`
 - `src/diagnostics/installGlobalErrorHandlers.ts`
 
@@ -1152,6 +1153,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/streaming-health.test.ts`
 - `tests/structured-log-events.test.ts`
 - `tests/structured-rx-tx-entries.test.ts`
+- `tests/support-bundle-ui-export.test.ts`
+- `tests/support-bundle-zip-export.test.ts`
 - `tests/support-bundle.test.ts`
 - `tests/svg-complexity-limits.test.ts`
 - `tests/svg-import-placement.test.ts`

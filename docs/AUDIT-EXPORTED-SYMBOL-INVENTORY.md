@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2638
-- Files with exports: 482
+- Export rows: 2646
+- Files with exports: 483
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -19,7 +19,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | entitlement-security | 99 |
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
-| supporting-runtime | 809 |
+| supporting-runtime | 817 |
 | ui-operator-surface | 560 |
 
 ## Checklist
@@ -3582,14 +3582,31 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 31 | `SupportBundleManifest` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 45 | `SupportBundleInclusions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 66 | `defaultBundleInclusions` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 86 | `SupportBundleInputs` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 122 | `SupportBundle` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 139 | `BuildSupportBundleArgs` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 154 | `buildSupportBundle` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 273 | `findLicenseKeyLeaks` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 30 | `SupportBundleManifest` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 44 | `SupportBundleInclusions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 65 | `defaultBundleInclusions` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 85 | `SupportBundleInputs` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 123 | `SupportBundle` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 140 | `BuildSupportBundleArgs` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 155 | `buildSupportBundle` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 280 | `findLicenseKeyLeaks` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/diagnostics/SupportBundleExport.ts`
+
+**Exports inventoried:** 8
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 14 | `SupportBundleSaveMethod` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 16 | `SupportBundleSaveResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 30 | `BuildRuntimeSupportBundleOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 54 | `buildRuntimeSupportBundle` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 85 | `exportRuntimeSupportBundle` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 92 | `supportBundleZipFileName` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 98 | `buildSupportBundleZip` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 120 | `saveSupportBundleZip` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4869,8 +4886,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 14 | `AppSettingsModalProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 35 | `AppSettingsModal` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 15 | `AppSettingsModalProps` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 36 | `AppSettingsModal` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

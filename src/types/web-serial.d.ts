@@ -6,6 +6,7 @@ declare global {
   interface ElectronAPI {
     saveFile?: (defaultName: string, content: string) => Promise<boolean>;
     saveGcode?: (defaultName: string, content: string) => Promise<boolean>;
+    saveBinaryFile?: (defaultName: string, base64Content: string) => Promise<boolean>;
     openFile?: () => Promise<{ fileName: string; content: string; ext: string } | null>;
     isElectron?: boolean;
     // T2-35: native Electron serial bridge declarations removed.

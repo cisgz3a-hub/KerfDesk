@@ -10,6 +10,7 @@ import { GcodeSettingsTab } from './settings/GcodeSettingsTab';
 import { CalibrationSettingsTab } from './settings/CalibrationSettingsTab';
 import { ProfilesSettingsTab } from './settings/ProfilesSettingsTab';
 import { type UserMode } from '../../app/UserModeGates';
+import { exportRuntimeSupportBundle } from '../../diagnostics/SupportBundleExport';
 
 export interface AppSettingsModalProps {
   open: boolean;
@@ -33,6 +34,36 @@ export interface AppSettingsModalProps {
 }
 
 export function AppSettingsModal(props: AppSettingsModalProps): React.ReactElement {
+  const [supportBundleState, setSupportBundleState] =
+    React.useState<'idle' | 'exporting' | 'saved' | 'failed'>('idle');
+  const [supportBundleMessage, setSupportBundleMessage] = React.useState<string | null>(null);
+
+  const handleExportSupportBundle = (): void => {
+    setSupportBundleState('exporting');
+    setSupportBundleMessage(null);
+    void exportRuntimeSupportBundle({ machineProfile: props.activeProfile }).then(
+      (result) => {
+        if (result.ok) {
+          setSupportBundleState('saved');
+          setSupportBundleMessage(`Support bundle saved: ${result.filename}`);
+          return;
+        }
+        setSupportBundleState('failed');
+        setSupportBundleMessage(
+          result.reason === 'cancelled'
+            ? 'Support bundle export cancelled.'
+            : `Support bundle export failed: ${result.message}`,
+        );
+      },
+      (err: unknown) => {
+        setSupportBundleState('failed');
+        setSupportBundleMessage(
+          `Support bundle export failed: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      },
+    );
+  };
+
   const modeButton = (mode: UserMode, label: string) => React.createElement('button', {
     type: 'button',
     onClick: () => props.onSetUserMode(mode),
@@ -92,6 +123,48 @@ export function AppSettingsModal(props: AppSettingsModalProps): React.ReactEleme
       React.createElement('p', { style: { fontSize: 12, color: '#c0c0d0', lineHeight: 1.6 } },
         'Version: v0.1.0', React.createElement('br'),
         `License: ${tierDisplayName(entitlementService.getState().tier)}`,
+      ),
+      React.createElement('div', {
+        style: {
+          marginTop: 18,
+          padding: 14,
+          border: '1px solid rgba(0,212,255,0.18)',
+          borderRadius: 6,
+          background: 'rgba(0,212,255,0.05)',
+        },
+      },
+        React.createElement('h4', { style: { margin: '0 0 8px', fontSize: 13 } }, 'Diagnostics'),
+        React.createElement('p', {
+          style: { margin: '0 0 12px', color: '#aeb7d8', fontSize: 12, lineHeight: 1.5 },
+        },
+        'Export recent job logs, machine events, storage health, and app details for support.'),
+        React.createElement('button', {
+          type: 'button',
+          onClick: handleExportSupportBundle,
+          disabled: supportBundleState === 'exporting',
+          style: {
+            background: supportBundleState === 'exporting'
+              ? 'rgba(80,80,110,0.35)'
+              : 'rgba(0,212,255,0.12)',
+            border: '1px solid rgba(0,212,255,0.35)',
+            borderRadius: 6,
+            padding: '8px 14px',
+            fontSize: 12,
+            color: supportBundleState === 'exporting' ? '#8888aa' : '#00d4ff',
+            cursor: supportBundleState === 'exporting' ? 'default' : 'pointer',
+            fontFamily: "'DM Sans', system-ui, sans-serif",
+            fontWeight: 700,
+          },
+        }, supportBundleState === 'exporting' ? 'Exporting...' : 'Export Diagnostic Bundle'),
+        supportBundleMessage && React.createElement('div', {
+          role: 'status',
+          style: {
+            marginTop: 10,
+            fontSize: 11,
+            color: supportBundleState === 'failed' ? '#ff6b88' : '#2dd4a0',
+            lineHeight: 1.4,
+          },
+        }, supportBundleMessage),
       ),
       React.createElement('p', { style: { fontSize: 11, color: '#888', marginTop: 20 } },
         'Third-party licenses: see LICENSES-THIRD-PARTY.md'),

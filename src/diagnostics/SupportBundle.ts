@@ -9,15 +9,14 @@
  * the various subsystem snapshots (job logs, errors, crash reports,
  * etc); output is a structured `SupportBundle` whose `files` map
  * (filename → JSON-serialised content) is ready for a downstream
- * ZIP step. Privacy is enforced through T2-115's redaction layer:
+ * ZIP step. T1-253 adds the real user-exportable ZIP path.
+ * Privacy is enforced through T2-115's redaction layer:
  * license keys are ALWAYS redacted regardless of caller options;
  * project-name redaction is on by default; G-code / project files /
  * raw images are opt-in.
  *
- * Threading the assembled `SupportBundle` into the actual ZIP +
- * `Help → ...` UI is filed as T2-108-followup-Phase-2 (UI dialog +
- * file dialog + opening the containing folder); the ZIP packaging
- * itself is T2-108-followup-Phase-3.
+ * Runtime collection, ZIP creation, and save/download UI live in
+ * `SupportBundleExport.ts`.
  */
 import { redactObject, defaultRedactionOptions, type RedactionOptions } from './Redaction';
 import type { CorrelationIds } from './CorrelationIds';
@@ -107,6 +106,8 @@ export interface SupportBundleInputs {
   compileMetadata?: unknown[];
   /** Last N preflight reports. */
   preflightReports?: unknown[];
+  /** Append-only machine event ledger snapshot (T1-193/T1-253). */
+  machineEventLedger?: unknown;
   /** When the user opts in: raw G-code text by job ID. */
   gcodeByJobId?: Record<string, string>;
   /** When the user opts in: project file JSON. */
@@ -220,6 +221,12 @@ export function buildSupportBundle(args: BuildSupportBundleArgs): SupportBundle 
   if (args.inputs.preflightReports) {
     files['preflight-reports.json'] = stringify(
       redactObject(args.inputs.preflightReports.slice(-MAX_PREFLIGHT), redaction),
+    );
+  }
+
+  if (args.inputs.machineEventLedger !== undefined) {
+    files['machine-event-ledger.json'] = stringify(
+      redactObject(args.inputs.machineEventLedger, redaction),
     );
   }
 

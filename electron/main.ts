@@ -399,6 +399,23 @@ ipcMain.handle('dialog:saveGcode', async (event, defaultName: unknown, content: 
   return true;
 });
 
+ipcMain.handle('dialog:saveBinary', async (event, defaultName: unknown, base64Content: unknown) => {
+  assertTrustedSender(event);
+  if (typeof defaultName !== 'string') throw new Error('Invalid default file name');
+  if (typeof base64Content !== 'string') throw new Error('Invalid binary file content');
+  if (!mainWindow) return false;
+  const result = await dialog.showSaveDialog(mainWindow, {
+    defaultPath: defaultName,
+    filters: [
+      { name: 'ZIP archive', extensions: ['zip'] },
+      { name: 'All Files', extensions: ['*'] },
+    ],
+  });
+  if (result.canceled || !result.filePath) return false;
+  fs.writeFileSync(result.filePath, Buffer.from(base64Content, 'base64'));
+  return true;
+});
+
 ipcMain.handle('dialog:open', async (event) => {
   assertTrustedSender(event);
   if (!mainWindow) return null;
