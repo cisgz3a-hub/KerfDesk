@@ -157,3 +157,12 @@ After a signed build:
 Both checks are pre-release blockers; an installer that ships unsigned
 defeats the entire purpose of T3-4 and must not be uploaded to a
 public release channel.
+
+## Installer QA
+
+Before publishing a release, run the manual installer matrix in
+[docs/INSTALLER-QA.md](INSTALLER-QA.md). That T3-85 checklist records
+the exact release candidate artifacts, checksum/SBOM/attestation proof,
+and the required Windows/macOS install scenarios: fresh install,
+upgrade, uninstall/reinstall, restricted user, unicode path,
+Gatekeeper, offline install, and offline launch.
