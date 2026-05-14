@@ -12,6 +12,8 @@ interface ConnectWizardProps {
   onConnectUsb: () => void;
   onConnectSimulator: () => void;
   onCancelConnect?: () => void;
+  onForgetUsbDevice?: () => void;
+  hasRememberedUsbDevice?: boolean;
   browserCompatibility?: BrowserCompatibility;
   /**
    * T1-50 Part A: while true, machine-choice buttons are disabled so a rapid
@@ -39,6 +41,8 @@ export function ConnectWizard({
   onConnectUsb,
   onConnectSimulator,
   onCancelConnect,
+  onForgetUsbDevice,
+  hasRememberedUsbDevice = false,
   browserCompatibility,
   connecting = false,
 }: ConnectWizardProps) {
@@ -156,6 +160,23 @@ export function ConnectWizard({
         style: { fontSize: 10, color: '#88e9ff', lineHeight: 1.35 },
       }, 'Use the real machine through Web Serial.'),
     ),
+    webSerialSupported && !connecting && hasRememberedUsbDevice && onForgetUsbDevice && React.createElement('button', {
+      type: 'button',
+      onClick: onForgetUsbDevice,
+      title: 'Clear the remembered USB permission for this machine profile',
+      style: {
+        width: '100%',
+        padding: '8px 10px',
+        borderRadius: 8,
+        border: '1px solid rgba(136,233,255,0.26)',
+        background: 'rgba(0,212,255,0.045)',
+        color: '#88e9ff',
+        cursor: 'pointer',
+        fontFamily: font,
+        fontSize: 11,
+        textAlign: 'left' as const,
+      },
+    }, 'Forget saved USB laser'),
     connecting && onCancelConnect && React.createElement('button', {
       type: 'button',
       onClick: onCancelConnect,

@@ -18,6 +18,7 @@ import type { ValidatedJobTicket } from '../../core/job/ValidatedJobTicket';
 import {
   resolveFrameDotFeedRate,
   resolveFrameLineDelayMs,
+  saveDeviceProfile,
   type DeviceProfile,
   type MachineOriginCorner,
 } from '../../core/devices/DeviceProfile';
@@ -116,6 +117,7 @@ type StartMode = GcodeStartMode;
 /** Keep streaming-health banner visible briefly after status recovers (reduces flicker). */
 const STREAMING_WARNING_HOLD_MS = 3000;
 const CURRENT_MODE_LONG_JOB_TIP_KEY = 'laserforge_current_mode_long_job_tip_acknowledged';
+const ACTIVE_PROFILE_CHANGED_EVENT = 'laserforge:active-profile-changed';
 
 // T1-143: formatJobTime / readyStartModeLabel / layerModeToOperationKind
 // / buildReadyOperationRows / frameFailureLogLine all moved to
@@ -821,6 +823,39 @@ export function ConnectionPanelMain({
       appendMessage('Recovery step acknowledged: reconnect complete.');
     }
   }, [appendMessage, machineService]);
+
+  const hasRememberedUsbDevice = activeProfile?.connection?.kind === 'serial'
+    && activeProfile.connection.fingerprint != null
+    && (
+      typeof activeProfile.connection.fingerprint.usbVendorId === 'number'
+      || typeof activeProfile.connection.fingerprint.usbProductId === 'number'
+    );
+
+  const forgetUsbDevice = useCallback(async () => {
+    if (!hasRememberedUsbDevice || activeProfile?.connection?.kind !== 'serial') return;
+    const serialConnection = activeProfile.connection;
+    const fingerprint = serialConnection.fingerprint;
+    try {
+      const forgotten = await WebSerialPort.forgetKnownPorts(fingerprint);
+      saveDeviceProfile({
+        ...activeProfile,
+        connection: {
+          ...serialConnection,
+          fingerprint: undefined,
+        },
+      });
+      if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+        window.dispatchEvent(new Event(ACTIVE_PROFILE_CHANGED_EVENT));
+      }
+      appendMessage(
+        forgotten > 0
+          ? `Forgot ${forgotten} saved USB laser grant${forgotten === 1 ? '' : 's'}.`
+          : 'Cleared saved USB laser for this profile.',
+      );
+    } catch (e: any) {
+      appendMessage(`Forget saved USB laser failed: ${e?.message ?? String(e)}`);
+    }
+  }, [activeProfile, appendMessage, hasRememberedUsbDevice]);
 
   // ─── Connection handlers ─────────────────────────────────
 
@@ -2034,6 +2069,8 @@ export function ConnectionPanelMain({
     onConnectUsb: () => { void connectRealLaser(); },
     onConnectSimulator: () => { void connectSimulator(); },
     onCancelConnect: connectAbortRef.current ? cancelConnect : undefined,
+    hasRememberedUsbDevice: hasRememberedUsbDevice,
+    onForgetUsbDevice: hasRememberedUsbDevice ? () => { void forgetUsbDevice(); } : undefined,
     connecting,
   });
 

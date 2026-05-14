@@ -46,15 +46,19 @@ interface Counters {
   usb: number;
   sim: number;
   cancel: number;
+  forget: number;
 }
 
-async function renderWizard(connecting: boolean): Promise<{ counters: Counters; container: HTMLDivElement }> {
+async function renderWizard(
+  connecting: boolean,
+  options: { hasRememberedUsbDevice?: boolean } = {},
+): Promise<{ counters: Counters; container: HTMLDivElement }> {
   const container = win.document.getElementById('root') as HTMLDivElement;
   if (root) {
     await act(async () => { root!.unmount(); });
   }
   root = createRoot(container);
-  const counters: Counters = { usb: 0, sim: 0, cancel: 0 };
+  const counters: Counters = { usb: 0, sim: 0, cancel: 0, forget: 0 };
   await act(async () => {
     root!.render(
       React.createElement(ConnectWizard as React.ComponentType<any>, {
@@ -62,6 +66,8 @@ async function renderWizard(connecting: boolean): Promise<{ counters: Counters; 
         onConnectUsb: () => { counters.usb += 1; },
         onConnectSimulator: () => { counters.sim += 1; },
         onCancelConnect: () => { counters.cancel += 1; },
+        onForgetUsbDevice: () => { counters.forget += 1; },
+        hasRememberedUsbDevice: options.hasRememberedUsbDevice ?? false,
         connecting,
       }),
     );
@@ -83,6 +89,11 @@ function findSimButton(container: HTMLElement): HTMLButtonElement | null {
 function findCancelButton(container: HTMLElement): HTMLButtonElement | null {
   return Array.from(container.querySelectorAll('button')).find(b =>
     /Cancel connect/i.test(b.textContent ?? ''),
+  ) as HTMLButtonElement | undefined ?? null;
+}
+function findForgetButton(container: HTMLElement): HTMLButtonElement | null {
+  return Array.from(container.querySelectorAll('button')).find(b =>
+    /Forget saved USB laser/i.test(b.textContent ?? ''),
   ) as HTMLButtonElement | undefined ?? null;
 }
 
@@ -113,9 +124,26 @@ async function run(): Promise<void> {
       assert(counters.sim === 1, 'idle: clicking Simulator fires onConnectSimulator once');
     }
 
+    // --- remembered USB grant: operator can clear the saved device explicitly ---
+    {
+      const { counters, container } = await renderWizard(false, { hasRememberedUsbDevice: true });
+      const forget = findForgetButton(container);
+      assert(forget !== null, 'remembered USB: Forget saved USB laser button is rendered');
+      assert(forget?.disabled === false, 'remembered USB: Forget saved USB laser button is enabled');
+      if (forget) await act(async () => { forget.click(); });
+      assert(counters.forget === 1, 'remembered USB: clicking Forget saved USB laser fires onForgetUsbDevice once');
+    }
+
+    // --- no remembered USB grant: no extra clutter ---
+    {
+      const { container } = await renderWizard(false, { hasRememberedUsbDevice: false });
+      assert(findForgetButton(container) === null,
+        'no remembered USB: Forget saved USB laser button is hidden');
+    }
+
     // --- connecting=true: buttons disabled, label changed, clicks no-op ---
     {
-      const { counters, container } = await renderWizard(true);
+      const { counters, container } = await renderWizard(true, { hasRememberedUsbDevice: true });
       const usb = findUsbButton(container);
       const sim = findSimButton(container);
       assert(usb !== null, 'connecting: USB button still rendered');
@@ -130,6 +158,8 @@ async function run(): Promise<void> {
       const cancel = findCancelButton(container);
       assert(cancel !== null, 'connecting: Cancel connect button is rendered');
       assert(cancel?.disabled === false, 'connecting: Cancel connect button stays enabled');
+      assert(findForgetButton(container) === null,
+        'connecting: Forget saved USB laser is hidden while a connect is in flight');
 
       // The mutex is enforced two ways:
       //   1. `disabled: true` — the browser ignores the click event.
@@ -179,6 +209,14 @@ async function run(): Promise<void> {
         'source pin: real USB connect passes AbortSignal to MachineService.connectRealLaser');
       assert(/abort\(new Error\('Connection cancelled by user'\)\)/.test(panelSource),
         'source pin: cancel UI aborts the in-flight USB connect with a user-cancel reason');
+      assert(/WebSerialPort\.forgetKnownPorts\(/.test(panelSource),
+        'source pin: ConnectionPanelMain calls WebSerialPort.forgetKnownPorts for explicit saved-device cleanup');
+      assert(/saveDeviceProfile\(\{[\s\S]*?fingerprint:\s*undefined[\s\S]*?\}\)/.test(panelSource),
+        'source pin: ConnectionPanelMain clears the active serial profile fingerprint after forgetting the saved USB device');
+      assert(/hasRememberedUsbDevice:\s*hasRememberedUsbDevice/.test(panelSource),
+        'source pin: ConnectionPanelMain passes hasRememberedUsbDevice into ConnectWizard');
+      assert(/onForgetUsbDevice:\s*hasRememberedUsbDevice\s*\?/.test(panelSource),
+        'source pin: ConnectionPanelMain passes an explicit forget callback only when a remembered USB device exists');
     }
   } finally {
     if (root) {
