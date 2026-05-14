@@ -7,9 +7,9 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T1-253** (support bundle export, shipped in `1191cba0`).
-- Current audit-fix run completed: **T1-223 through T1-253**, with T1-237 still deferred as multi-week firmware-adapter wiring.
-- Next active audit-fix ticket: continue the release-readiness audit sequence with signed entitlement authority.
+- Last shipped roadmap item: **T1-254** (signed entitlement cache authority, shipped in `<TBD>`).
+- Current audit-fix run completed: **T1-223 through T1-254**, with T1-237 still deferred as multi-week firmware-adapter wiring.
+- Next active audit-fix ticket: continue the release-readiness audit sequence with production entitlement-server/public-key rollout or the next release-pipeline blocker.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
 
 ## What Just Shipped In This Run
@@ -48,6 +48,7 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T1-251 | release-readiness audit | Start now requires service-level FrameTicket proof or an explicit logged Start-without-framing override. |
 | T1-252 | release-readiness audit | Pause now awaits M5 S0 laser-off confirmation and failed pause laser-off latches unsafe/unknown state. |
 | T1-253 | release-readiness audit | Support bundle export now creates a real ZIP through Settings -> About with Electron save and browser download fallback. |
+| T1-254 | release-readiness audit | Local entitlement cache now grants Pro only when it verifies as a signed entitlement token; raw cache JSON is no longer authority. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -63,10 +64,10 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 ## Verification Baseline
 
-- `npx tsc --noEmit --pretty false` passed during the T1-253 close-out.
+- `npx tsc --noEmit --pretty false` passed during the T1-254 close-out.
 - Focused tests for T1-223 through T1-252 passed at their commits.
-- Full `npm test` passed during T1-253.
-- `npm run build`, `npx eslint . --max-warnings 0`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, and `git diff --check` passed during the T1-253 close-out.
+- Full `npm test` passed during T1-254.
+- `npm run build`, `npx eslint . --max-warnings 0`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, and `git diff --check` passed during the T1-254 close-out.
 - `scripts/run-tests.mjs` now names and kills timed-out per-file children instead of wedging silently.
 - `npm run project-map:check` passed during T1-240 after regenerating `PROJECT_MAP.md`.
 - Dependabot PRs must not be merged blindly; previous local test-merge attempts could not be safely verified.
@@ -75,7 +76,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 
 Continue in this order unless a newer owner instruction says otherwise:
 
-1. **Signed entitlement authority** - replace local/cache-authoritative licensing with signed entitlement tokens.
+1. **Production entitlement rollout** - configure the production public-key verifier and server/token issuance path for paid distribution, or continue with the next release-pipeline blocker if server rollout is handled elsewhere.
 
 ## Known Caveats
 
@@ -86,4 +87,4 @@ Continue in this order unless a newer owner instruction says otherwise:
 
 ## Current Ticket Note
 
-T1-242 closed F-020 by wiring recovery-card actions to `MachineService.applyRecoveryAck(...)`, adding an explicit inspection action, and making recovery actions acknowledge only after success or operator confirmation. T1-243 closed F-021 by making the T3-81 end-to-end workflow suite exit naturally under the runner. T1-244 closed F-022 by moving reconnect acknowledgement to successful USB/simulator connect and making recompile recovery wait for an awaited success/failure result. T1-245 fixed the user-reported long-job stop/disconnect path by keeping heartbeat alive on `ok` acknowledgements and pausing autosave work during jobs. T1-246 closed the largest stale-output audit cap by making `JobFingerprint` part of `ValidatedJobTicket` and the service-level Start validator. T1-247 made Start require service-level safe-idle gates. T1-248 made running-job heartbeat tolerant of short status delays while still aborting true silence. T1-249 hardened trace conversion against accidental straight closure burns. T1-250 separated autosave recovery truth from manual project-file dirty state. T1-251 moved frame freshness into the final start path by requiring `FrameTicket` proof or a logged unframed-start override. T1-252 made pause-time laser-off confirmation load-bearing: `GrblController.pause()` awaits M5 S0, `operations.pauseJob()` carries the structured `SafetyActionResult`, and `MachineService.pause()` latches failed laser-off as unsafe/unknown. T1-253 made support bundles user-exportable: `SupportBundleExport.ts` collects runtime diagnostics, writes a real ZIP, and Settings -> About exposes `Export Diagnostic Bundle`. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work.
+T1-242 closed F-020 by wiring recovery-card actions to `MachineService.applyRecoveryAck(...)`, adding an explicit inspection action, and making recovery actions acknowledge only after success or operator confirmation. T1-243 closed F-021 by making the T3-81 end-to-end workflow suite exit naturally under the runner. T1-244 closed F-022 by moving reconnect acknowledgement to successful USB/simulator connect and making recompile recovery wait for an awaited success/failure result. T1-245 fixed the user-reported long-job stop/disconnect path by keeping heartbeat alive on `ok` acknowledgements and pausing autosave work during jobs. T1-246 closed the largest stale-output audit cap by making `JobFingerprint` part of `ValidatedJobTicket` and the service-level Start validator. T1-247 made Start require service-level safe-idle gates. T1-248 made running-job heartbeat tolerant of short status delays while still aborting true silence. T1-249 hardened trace conversion against accidental straight closure burns. T1-250 separated autosave recovery truth from manual project-file dirty state. T1-251 moved frame freshness into the final start path by requiring `FrameTicket` proof or a logged unframed-start override. T1-252 made pause-time laser-off confirmation load-bearing: `GrblController.pause()` awaits M5 S0, `operations.pauseJob()` carries the structured `SafetyActionResult`, and `MachineService.pause()` latches failed laser-off as unsafe/unknown. T1-253 made support bundles user-exportable: `SupportBundleExport.ts` collects runtime diagnostics, writes a real ZIP, and Settings -> About exposes `Export Diagnostic Bundle`. T1-254 removed raw local cache authority from commercial entitlements: `EntitlementService` now accepts verified signed cache tokens, feature-scopes `canUse(...)`, and rejects forged `{ valid: true }` cache JSON. T1-237 remains deferred because firmware adapter wiring is multi-week architecture work.

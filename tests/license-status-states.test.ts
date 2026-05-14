@@ -167,12 +167,12 @@ void (async () => {
   const svc = new EntitlementService();
   await svc.initialize();
   const s = svc.getState();
-  assert(s.status === 'offline_grace' && s.tier === 'paid' && s.hasPro,
-    `offline_grace: status=offline_grace, tier=paid, hasPro=true (got ${s.status}/${s.tier}/${s.hasPro})`);
-  assert(typeof s.graceUntil === 'number' && (s.graceUntil ?? 0) > Date.now(),
-    `offline_grace: graceUntil > now (got ${s.graceUntil})`);
-  assert(s.label === 'cached@example.com',
-    `offline_grace: cached name surfaced (got ${s.label})`);
+  assert(s.status === 'verification_failed' && s.tier === 'free' && !s.hasPro,
+    `raw cache ignored: status=verification_failed, tier=free, hasPro=false (got ${s.status}/${s.tier}/${s.hasPro})`);
+  assert(s.code === SAVED_CODE,
+    `raw cache ignored: code preserved for retry (got ${s.code})`);
+  assert(typeof s.lastError === 'string' && /network unreachable/.test(s.lastError),
+    `raw cache ignored: network error surfaced (got ${s.lastError})`);
 }
 
 // 6. Offline grace expired — cache is older than 30 days → verification_failed
@@ -208,16 +208,15 @@ void (async () => {
     valid: true,
   };
   await getStorage().set(LICENSE_CACHE_KEY, JSON.stringify(cached));
-  // Throwing fetch confirms we never reach the network.
-  installFetchMock({ throws: new Error('SHOULD NOT BE CALLED') });
+  installFetchMock({ throws: new Error('network unreachable') });
 
   const svc = new EntitlementService();
   await svc.initialize();
   const s = svc.getState();
-  assert(s.status === 'verified' && s.tier === 'paid' && s.hasPro,
-    `fresh cache: verified without network call (got ${s.status}/${s.tier}/${s.hasPro})`);
-  assert(s.label === 'cache-fresh@example.com',
-    `fresh cache: cached name (got ${s.label})`);
+  assert(s.status === 'verification_failed' && s.tier === 'free' && !s.hasPro,
+    `fresh raw cache ignored: verification_failed/free/no Pro (got ${s.status}/${s.tier}/${s.hasPro})`);
+  assert(s.label == null,
+    `fresh raw cache ignored: cached name not trusted (got ${s.label})`);
 }
 
 // 8. No saved license → free (status='free')

@@ -8,7 +8,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2646
+- Export rows: 2647
 - Files with exports: 483
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
@@ -16,7 +16,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 |---|---:|
 | compile-output | 402 |
 | core-domain | 354 |
-| entitlement-security | 99 |
+| entitlement-security | 100 |
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
@@ -3674,14 +3674,15 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/entitlements/EntitlementService.ts`
 
-**Exports inventoried:** 4
+**Exports inventoried:** 5
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 38 | `ActivateResult` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 55 | `EntitlementService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 539 | `entitlementService` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
-| 541 | `tierDisplayName` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 43 | `ActivateResult` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 72 | `EntitlementServiceOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 82 | `EntitlementService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 608 | `entitlementService` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
+| 610 | `tierDisplayName` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | entitlement-security; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

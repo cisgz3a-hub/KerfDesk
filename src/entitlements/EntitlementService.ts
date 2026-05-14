@@ -1,6 +1,12 @@
-import type { EntitlementState, EntitlementTier, LicenseStatus, ProFeature, StoredLicenseCacheEntry } from './types';
+import type { EntitlementState, EntitlementTier, LicenseStatus, ProFeature } from './types';
 import { PRO_FEATURES } from './types';
 import { buildStatusDetail } from './LicenseStatus';
+import {
+  type EntitlementTokenPayload,
+  type EntitlementVerifier,
+  verifyEntitlementToken,
+  verifyFailureMessage,
+} from './SignedEntitlementToken';
 import { parseTesterCode, verifyTesterCode } from './testerKey';
 import { getStorage } from '../core/storage/storage';
 
@@ -8,7 +14,6 @@ const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 const LICENSE_CACHE_KEY = 'laserforge_license_cache';
 const LICENSE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
-const LICENSE_OFFLINE_GRACE = 30 * 24 * 60 * 60 * 1000;
 
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
@@ -47,15 +52,44 @@ export interface ActivateResult {
  * message instead of "you're free, no idea why".
  */
 type StoredCodeValidation =
-  | { kind: 'verified'; tier: 'paid' | 'tester_permanent'; label: string }
-  | { kind: 'offline_grace'; label: string; graceUntil: number }
+  | {
+      kind: 'verified';
+      tier: 'paid' | 'tester_permanent';
+      label: string;
+      features?: ReadonlyArray<ProFeature>;
+      lastVerifiedAt?: number;
+    }
+  | {
+      kind: 'offline_grace';
+      label: string;
+      graceUntil: number;
+      features?: ReadonlyArray<ProFeature>;
+      lastVerifiedAt?: number;
+    }
   | { kind: 'verification_failed'; error: string }
   | { kind: 'revoked' };
+
+export interface EntitlementServiceOptions {
+  /**
+   * T1-254: local cache authority must be a signed entitlement token.
+   * Without a verifier, cache reads fail closed and the service falls
+   * back to live verification instead of trusting raw JSON.
+   */
+  readonly signedTokenVerifier?: EntitlementVerifier | null;
+  readonly now?: () => number;
+}
 
 export class EntitlementService {
   private state: EntitlementState = { tier: 'free', hasPro: false, status: 'free' };
   private listeners = new Set<() => void>();
   private initPromise: Promise<void> | null = null;
+  private readonly signedTokenVerifier: EntitlementVerifier | null;
+  private readonly now: () => number;
+
+  constructor(options: EntitlementServiceOptions = {}) {
+    this.signedTokenVerifier = options.signedTokenVerifier ?? null;
+    this.now = options.now ?? (() => Date.now());
+  }
 
   getState(): EntitlementState {
     return { ...this.state };
@@ -165,7 +199,8 @@ export class EntitlementService {
           status: result.tier === 'paid' ? 'verified' : 'tester',
           label: result.label,
           code: upper,
-          lastVerifiedAt: Date.now(),
+          lastVerifiedAt: result.lastVerifiedAt ?? this.now(),
+          features: result.features,
         });
         return;
       case 'offline_grace':
@@ -175,7 +210,9 @@ export class EntitlementService {
           status: 'offline_grace',
           label: result.label,
           code: upper,
+          lastVerifiedAt: result.lastVerifiedAt,
           graceUntil: result.graceUntil,
+          features: result.features,
         });
         return;
       case 'revoked':
@@ -302,7 +339,7 @@ export class EntitlementService {
       status: 'verified',
       label: gum.name,
       code: upper,
-      lastVerifiedAt: Date.now(),
+      lastVerifiedAt: this.now(),
     };
     this.setState(next);
     return { ok: true, state: next };
@@ -333,37 +370,50 @@ export class EntitlementService {
     return await this.verifyGumroadStructured(upper);
   }
 
-  private async getCachedLicense(code: string): Promise<StoredLicenseCacheEntry | null> {
+  private async getCachedEntitlementToken(): Promise<unknown | null> {
     try {
       const raw = await getStorage().get(LICENSE_CACHE_KEY);
       if (!raw) return null;
-      const entry = JSON.parse(raw) as StoredLicenseCacheEntry;
-      if (entry.code !== code.toUpperCase().trim()) return null;
-      return entry;
+      return JSON.parse(raw) as unknown;
     } catch {
       return null;
     }
   }
 
-  private async setCachedLicense(code: string, name: string, valid: boolean): Promise<void> {
-    const entry: StoredLicenseCacheEntry = {
-      code: code.toUpperCase().trim(),
-      name,
-      validatedAt: Date.now(),
-      valid,
-    };
+  private async clearCachedEntitlement(): Promise<void> {
     try {
-      await getStorage().set(LICENSE_CACHE_KEY, JSON.stringify(entry));
+      await getStorage().remove(LICENSE_CACHE_KEY);
     } catch {
       /* ignore */
     }
+  }
+
+  private async validateSignedCache(): Promise<StoredCodeValidation | null> {
+    if (this.signedTokenVerifier == null) return null;
+    const token = await this.getCachedEntitlementToken();
+    if (token == null) return null;
+
+    const result = await verifyEntitlementToken({
+      token,
+      verifier: this.signedTokenVerifier,
+      now: this.now(),
+      replayMode: 'ignore',
+    });
+    if (!result.ok) {
+      return {
+        kind: 'verification_failed',
+        error: verifyFailureMessage(result.reason),
+      };
+    }
+    return signedPayloadToStoredValidation(result.payload, this.now());
   }
 
   /**
    * T1-80: structured variant of `verifyGumroad`. Distinguishes the four
    * outcomes the audit calls out:
    *  - `verified`: server confirmed valid + not refunded/chargebacked
-   *  - `offline_grace`: network error, but cache is valid + within grace
+   *  - `offline_grace`: signed cache token is older than fresh window
+   *     but still within its signed expiry
    *  - `revoked`: server confirmed refunded / chargebacked / disputed
    *  - `verification_failed`: anything else (server says invalid OR
    *     network error with no usable cache)
@@ -372,12 +422,9 @@ export class EntitlementService {
    * which has its own UX and doesn't need the four-outcome distinction.
    */
   private async verifyGumroadStructured(upper: string): Promise<StoredCodeValidation> {
-    const cached = await this.getCachedLicense(upper);
-    if (cached && cached.valid) {
-      const age = Date.now() - cached.validatedAt;
-      if (age < LICENSE_CACHE_MAX_AGE) {
-        return { kind: 'verified', tier: 'paid', label: cached.name };
-      }
+    const signedCache = await this.validateSignedCache();
+    if (signedCache?.kind === 'verified' || signedCache?.kind === 'offline_grace') {
+      return signedCache;
     }
 
     try {
@@ -392,7 +439,7 @@ export class EntitlementService {
       });
 
       if (!response.ok) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         // HTTP error from server side — Gumroad says "we don't know this
         // key" or there was an upstream issue. Treat as verification
         // failed (could be transient or genuinely invalid; user can
@@ -414,7 +461,7 @@ export class EntitlementService {
       };
 
       if (!data.success || !data.purchase) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         return {
           kind: 'verification_failed',
           error: 'Gumroad reported the license could not be verified.',
@@ -422,40 +469,29 @@ export class EntitlementService {
       }
 
       if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         return { kind: 'revoked' };
       }
 
       const name = data.purchase.email || 'PRO User';
-      await this.setCachedLicense(upper, name, true);
+      await this.clearCachedEntitlement();
       return { kind: 'verified', tier: 'paid', label: name };
     } catch (err) {
       console.warn('[EntitlementService] Network error during license check:', err);
 
-      if (cached && cached.valid) {
-        const age = Date.now() - cached.validatedAt;
-        if (age < LICENSE_OFFLINE_GRACE) {
-          return {
-            kind: 'offline_grace',
-            label: cached.name,
-            graceUntil: cached.validatedAt + LICENSE_OFFLINE_GRACE,
-          };
-        }
-      }
       return {
         kind: 'verification_failed',
-        error: err instanceof Error ? err.message : 'Network error during license check.',
+        error: signedCache?.kind === 'verification_failed'
+          ? signedCache.error
+          : err instanceof Error ? err.message : 'Network error during license check.',
       };
     }
   }
 
   private async verifyGumroad(upper: string): Promise<{ name: string } | null> {
-    const cached = await this.getCachedLicense(upper);
-    if (cached && cached.valid) {
-      const age = Date.now() - cached.validatedAt;
-      if (age < LICENSE_CACHE_MAX_AGE) {
-        return { name: cached.name };
-      }
+    const signedCache = await this.validateSignedCache();
+    if (signedCache?.kind === 'verified' || signedCache?.kind === 'offline_grace') {
+      return { name: signedCache.label };
     }
 
     try {
@@ -470,7 +506,7 @@ export class EntitlementService {
       });
 
       if (!response.ok) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         return null;
       }
 
@@ -485,31 +521,64 @@ export class EntitlementService {
       };
 
       if (!data.success || !data.purchase) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         return null;
       }
 
       if (data.purchase.refunded || data.purchase.chargebacked || data.purchase.disputed) {
-        await this.setCachedLicense(upper, '', false);
+        await this.clearCachedEntitlement();
         return null;
       }
 
       const name = data.purchase.email || 'PRO User';
-      await this.setCachedLicense(upper, name, true);
+      await this.clearCachedEntitlement();
       return { name };
     } catch (err) {
       console.warn('[EntitlementService] Network error during license check:', err);
 
-      if (cached && cached.valid) {
-        const age = Date.now() - cached.validatedAt;
-        if (age < LICENSE_OFFLINE_GRACE) {
-          return { name: cached.name };
-        }
-      }
-
       return null;
     }
   }
+}
+
+function signedPayloadToStoredValidation(
+  payload: EntitlementTokenPayload,
+  now: number,
+): StoredCodeValidation {
+  if (payload.tier === 'free') {
+    return {
+      kind: 'verification_failed',
+      error: 'Signed entitlement is free-tier.',
+    };
+  }
+
+  const tier: 'paid' | 'tester_permanent' =
+    payload.tier === 'tester' ? 'tester_permanent' : 'paid';
+  const features = filterTokenFeatures(payload.features);
+
+  if (now - payload.iat < LICENSE_CACHE_MAX_AGE) {
+    return {
+      kind: 'verified',
+      tier,
+      label: payload.sub,
+      features,
+      lastVerifiedAt: payload.iat,
+    };
+  }
+
+  return {
+    kind: 'offline_grace',
+    label: payload.sub,
+    graceUntil: payload.exp,
+    features,
+    lastVerifiedAt: payload.iat,
+  };
+}
+
+function filterTokenFeatures(features: readonly string[]): ReadonlyArray<ProFeature> {
+  return features.filter((feature): feature is ProFeature =>
+    (PRO_FEATURES as readonly string[]).includes(feature),
+  );
 }
 
 /**

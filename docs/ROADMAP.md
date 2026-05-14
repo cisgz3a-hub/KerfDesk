@@ -7341,6 +7341,24 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `1191cba0`. Hardware verification not required (diagnostic export plumbing). Manual smoke recommended before release tagging: open Settings -> About, click Export Diagnostic Bundle, and confirm a `.zip` is saved and opens.
 
 ---
+### T1-254 | Signed entitlement cache is the only local Pro authority
+
+**Audit source:** User-provided v33 release-readiness correction, 2026-05-14. The audit found that commercial entitlement still trusted locally editable cache JSON, so a user could forge or preserve Pro by editing `laserforge_license_cache`.
+
+**Problem:** T2-90 and T2-89 introduced signed entitlement-token primitives, but `EntitlementService` still consumed `StoredLicenseCacheEntry` raw JSON with `{ valid: true, validatedAt: ... }`. That meant local cache remained an authority for fresh verified status and offline grace, even though the signed-token verifier existed.
+
+**Fix:** `EntitlementService` now accepts an injected signed-token verifier and routes cache reads through `verifyEntitlementToken(..., replayMode: 'ignore')`. Raw JSON cache is no longer parsed as authority; it can migrate as stored data but cannot grant `verified` or `offline_grace`. Signed tokens populate paid/tester state, feature-scoped `canUse(...)`, `lastVerifiedAt`, and offline grace until the signed `exp`. Live Gumroad verification remains available for online activation/retry, but it clears stale local cache instead of writing new raw-valid cache authority.
+
+**Verification:**
+- `npx tsx tests\entitlement-signed-cache-authority.test.ts` failed before the service wiring and passes after. It proves forged raw cache is rejected, signed cache grants verified state, older signed cache grants offline grace until signed expiry, bad signatures fail closed, and the old `StoredLicenseCacheEntry` authority branch is gone.
+- `npx tsx tests\license-status-states.test.ts` now pins that raw fresh/offline cache is ignored and the saved code is preserved for retry.
+- `npx tsx tests\license-status-machine.test.ts`, `npx tsx tests\entitlement-storage-migration.test.ts`, and `npx tsx tests\signed-entitlement-token.test.ts` pass after the migration.
+- `npx tsc --noEmit --pretty false` passes after the service constructor and signed-token wiring.
+- Full close-out passed: `npm test`, `npm run build`, `npx eslint . --max-warnings 0`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, and `git diff --check`.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required (commercial entitlement state only). Release note: production signed-token issuance/public-key configuration is still required before paid distribution; this ticket removes raw local cache authority.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21216,6 +21234,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-251 HIGH enforce service-level FrameTicket proof at Start (shipped in `66e559f0`) - requires `MachineService.startValidatedJob` to receive either a fresh frame proof matching the compiled job fingerprint or an explicit logged Start-without-framing override before streaming any G-code.
 - [x] T1-252 HIGH make pause laser-off confirmation load-bearing (shipped in `379e623e`) - awaits pause-time `M5 S0`, carries the structured result through controller operations, and latches failed laser-off as unknown/unsafe instead of reporting a clean pause.
 - [x] T1-253 HIGH make support bundle export user-exportable (shipped in `1191cba0`) - adds runtime bundle collection, real ZIP creation, Electron binary save/browser download fallback, and an About-tab Export Diagnostic Bundle action.
+- [x] T1-254 HIGH make signed entitlement cache the only local Pro authority (shipped in `<TBD>`) - stops raw `laserforge_license_cache` JSON from granting verified/offline Pro and accepts local cache only after signed-token verification.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

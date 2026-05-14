@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 477 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 695 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 696 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 619 | - |
+| `tests/` | 620 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -790,6 +790,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/entitlement-api-migration-phase2b.test.ts`
 - `tests/entitlement-api-no-deprecated-export.test.ts`
 - `tests/entitlement-api-split.test.ts`
+- `tests/entitlement-signed-cache-authority.test.ts`
 - `tests/entitlement-storage-migration.test.ts`
 - `tests/error-boundary.test.ts`
 - `tests/error-handler-faults-active-job.test.ts`
