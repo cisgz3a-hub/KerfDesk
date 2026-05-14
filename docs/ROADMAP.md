@@ -7423,6 +7423,21 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `a2cfa7db`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum/SBOM publishing to GitHub Releases remains separate work because it requires signing keys and release policy.
 
 ---
+### T1-259 | Signed release artifact attestations
+
+**Audit source:** Follow-up to T2-103/T3-4 release integrity after T1-257 and T1-258. Checksums and SBOMs now ship with installer artifacts, but the signed release workflow still lacked a cryptographic provenance record tying each installer to the GitHub Actions run that produced it.
+
+**Problem:** A downloaded signed installer can have OS code-signing proof, checksums, and an uploaded SBOM, but without an attestation the release review cannot independently verify that the artifact came from the expected GitHub workflow/ref. GPG release signing still requires a key custody policy; GitHub artifact attestations are the no-extra-secret provenance layer available inside the existing manual signed workflows.
+
+**Fix:** Added explicit `contents: read`, `id-token: write`, and `attestations: write` permissions to `.github/workflows/release-windows.yml` and `.github/workflows/release-macos.yml`. Each signed release workflow now runs `actions/attest@v4` twice after generating checksums/SBOMs: once for installer provenance and once to bind `release/sbom.cdx.json` to the installer. `docs/CODE-SIGNING.md` now includes `gh attestation verify` commands beside the OS-signing checks.
+
+**Verification:**
+- `npx tsx tests\release-artifact-attestations.test.ts` failed before the workflow permissions/attestation steps and docs existed, then passed after.
+- The test pins both signed workflows to provenance and SBOM attestation steps for their platform artifacts.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required (release workflow metadata only). Release note: GPG-signed checksum files remain a possible policy choice, but signed GitHub provenance/SBOM attestations now cover the no-extra-secret in-repo release-integrity path.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21303,6 +21318,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-256 HIGH add WebCrypto private-key signer for server entitlements (shipped in `d12d46ea`) - signs server-issued ES256 entitlement tokens from server-only `ENTITLEMENT_SIGNING_PRIVATE_JWK` config and rejects public-only JWKs.
 - [x] T1-257 HIGH upload SHA256SUMS with installer workflows (shipped in `ed56b5a4`) - runs the release checksum generator after unsigned and signed installer builds and uploads checksums beside `.exe` / `.dmg` artifacts.
 - [x] T1-258 HIGH upload CycloneDX SBOM with installer workflows (shipped in `a2cfa7db`) - generates `release/sbom.cdx.json` via `npm sbom` and uploads it beside installer artifacts and checksums.
+- [x] T1-259 HIGH generate signed provenance/SBOM attestations for release installers (shipped in `<TBD>`) - uses GitHub artifact attestations in the signed Windows/macOS release workflows and documents `gh attestation verify`.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

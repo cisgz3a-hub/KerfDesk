@@ -126,6 +126,15 @@ After a signed build:
   `Authority=Developer ID Application: …` and a non-empty Team ID.
   Then `spctl --assess --verbose=4 LaserForge.app` to confirm
   Gatekeeper acceptance.
+- **Release provenance (T1-259)**: the signed Windows/macOS release
+  workflows generate GitHub artifact attestations for the installer and
+  an SBOM attestation tying `release/sbom.cdx.json` to the installer.
+  Verify a downloaded installer with:
+
+  ```bash
+  gh attestation verify ./LaserForge-Setup.exe -R stolkjohannjohann-sudo/LaserForge
+  gh attestation verify ./LaserForge.dmg -R stolkjohannjohann-sudo/LaserForge
+  ```
 
 Both checks are pre-release blockers; an installer that ships unsigned
 defeats the entire purpose of T3-4 and must not be uploaded to a

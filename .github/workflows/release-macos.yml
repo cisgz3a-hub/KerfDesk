@@ -3,6 +3,11 @@ name: macOS Signed Notarized Release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -41,6 +46,15 @@ jobs:
         run: node scripts/generate-checksums.mjs release
       - name: Generate SBOM
         run: node scripts/generate-sbom.mjs release/sbom.cdx.json
+      - name: Generate macOS installer provenance attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'release/*.dmg'
+      - name: Generate macOS installer SBOM attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'release/*.dmg'
+          sbom-path: 'release/sbom.cdx.json'
       - uses: actions/upload-artifact@v4
         with:
           name: macos-signed-notarized-dmg

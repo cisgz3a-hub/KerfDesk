@@ -3,6 +3,11 @@ name: Windows Signed Release
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -34,6 +39,15 @@ jobs:
         run: node scripts/generate-checksums.mjs release
       - name: Generate SBOM
         run: node scripts/generate-sbom.mjs release/sbom.cdx.json
+      - name: Generate Windows installer provenance attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'release/*.exe'
+      - name: Generate Windows installer SBOM attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'release/*.exe'
+          sbom-path: 'release/sbom.cdx.json'
       - uses: actions/upload-artifact@v4
         with:
           name: windows-signed-installer
