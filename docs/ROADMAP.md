@@ -7241,7 +7241,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Verification:**
 - `npx tsx tests\machine-service-job-lifecycle-safety.test.ts` failed before the fix on new service-level start blockers and passes after.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required for the host-side refusal gate; hardware verification remains recommended for live job-start safety paths before release tagging.
+**Status:** Shipped in `3844f2af`. Hardware verification not required for the host-side refusal gate; hardware verification remains recommended for live job-start safety paths before release tagging.
 
 ---
 ### T1-248 | Running-job heartbeat must warn before hard disconnect
@@ -7256,7 +7256,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\webserial-cable-pull-heartbeat.test.ts` failed before the fix on delayed-status/no-disconnect coverage and passes after.
 - `npx tsx tests\poll-status-failure-normalized.test.ts` passes after the heartbeat change.
 
-**Status:** Shipped in `<TBD>`. Hardware verification recommended: run a long Falcon burn and confirm delayed status reports produce a warning instead of a false disconnect while `ok` traffic or other controller replies continue.
+**Status:** Shipped in `3844f2af`. Hardware verification recommended: run a long Falcon burn and confirm delayed status reports produce a warning instead of a false disconnect while `ok` traffic or other controller replies continue.
 
 ---
 ### T1-249 | Trace contours must not invent long closing burn lines
@@ -7270,7 +7270,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Verification:**
 - `npx tsx tests\trace-contour-safety.test.ts` failed before the fix and passes after. It proves far-apart endpoints no longer append a close segment, near endpoints still close, and trace defaults/options stay pinned.
 
-**Status:** Shipped in `<TBD>`. Hardware verification recommended before cutting customer artwork: compare vector preview/toolpath output against a noisy traced bitmap and confirm no unexpected straight closure lines are present.
+**Status:** Shipped in `3844f2af`. Hardware verification recommended before cutting customer artwork: compare vector preview/toolpath output against a noisy traced bitmap and confirm no unexpected straight closure lines are present.
 
 ---
 ### T1-250 | Autosave must not mark manual project saves clean
@@ -7286,7 +7286,7 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 - `npx tsx tests\autosave-dirty-flag-on-failure.test.ts` now pins successful autosave preserving manual dirty state and failed autosave preserving both hashes.
 - `npx tsx tests\autosave-pauses-during-active-job.test.ts` still pins that active jobs skip autosave hashing/serialization.
 
-**Status:** Shipped in `<TBD>`. Hardware verification not required; this is a host-side persistence correctness fix.
+**Status:** Shipped in `3844f2af`. Hardware verification not required; this is a host-side persistence correctness fix.
 
 ---
 ## Tier 2 鈥?This month
@@ -21159,10 +21159,10 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-244 HIGH make recovery reconnect/recompile acknowledgements wait for successful work (shipped in `8c34dd58`) - closes audit F-022 by acknowledging reconnect only after successful USB/simulator connect and acknowledging recompile only after the callback reports no failure.
 - [x] T1-245 HIGH keep long GRBL jobs streaming (shipped in `1ff912a3`) - fixes a user-reported long-burn stop/disconnect by counting `ok` acknowledgements as heartbeat-alive traffic and skipping autosave hashing/serialization while a job is active.
 - [x] T1-246 HIGH enforce runtime JobFingerprint at Start (shipped in `f8c7c1ee`) - closes the stale-output audit cap by embedding `JobFingerprint` in every validated ticket and having `MachineService.startValidatedJob` rebuild/compare the current runtime fingerprint before streaming any G-code.
-- [x] T1-247 HIGH enforce service-level start safety gates (shipped in `<TBD>`) - makes `MachineService.startValidatedJob` require no active temporary operation, laser output confirmed off, and `SafetyState === safeIdle` before streaming any G-code.
-- [x] T1-248 HIGH harden running-job heartbeat (shipped in `<TBD>`) - turns short delayed status replies into a warning and only aborts after sustained no-controller-RX silence during running GRBL jobs.
-- [x] T1-249 HIGH avoid trace-generated straight closure burns (shipped in `<TBD>`) - stops forced closure of far-apart traced contour endpoints and raises noisy-trace filtering defaults.
-- [x] T1-250 HIGH separate autosave and manual-save truth (shipped in `<TBD>`) - keeps autosave as recovery data without marking the user's manually chosen project file clean.
+- [x] T1-247 HIGH enforce service-level start safety gates (shipped in `3844f2af`) - makes `MachineService.startValidatedJob` require no active temporary operation, laser output confirmed off, and `SafetyState === safeIdle` before streaming any G-code.
+- [x] T1-248 HIGH harden running-job heartbeat (shipped in `3844f2af`) - turns short delayed status replies into a warning and only aborts after sustained no-controller-RX silence during running GRBL jobs.
+- [x] T1-249 HIGH avoid trace-generated straight closure burns (shipped in `3844f2af`) - stops forced closure of far-apart traced contour endpoints and raises noisy-trace filtering defaults.
+- [x] T1-250 HIGH separate autosave and manual-save truth (shipped in `3844f2af`) - keeps autosave as recovery data without marking the user's manually chosen project file clean.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.
