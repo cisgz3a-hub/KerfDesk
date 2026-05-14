@@ -171,9 +171,11 @@ function portWith(statusResponse: string | null, blockStatus = false): MockSeria
     '_unsafeAtConnect verdict field declared');
   // 5s watchdog (5000ms literal somewhere near setTimeout for the watchdog)
   const watchdogIdx = src.indexOf('_safeStateWatchdog = setTimeout');
-  const watchdogSlice = watchdogIdx >= 0 ? src.slice(watchdogIdx, watchdogIdx + 500) : '';
+  const watchdogSlice = watchdogIdx >= 0 ? src.slice(watchdogIdx, watchdogIdx + 700) : '';
   assert(/, 5000\)/.test(watchdogSlice),
     'watchdog uses 5000ms timeout');
+  assert(/reason:\s*'no-status-response'[\s\S]{0,260}for\s*\(const cb of this\._stateListeners\)/.test(watchdogSlice),
+    'watchdog notifies state listeners after recording no-status-response');
   // _armSafeStateCheck called from welcome
   assert(/this\._armSafeStateCheck\(\);/.test(src),
     'welcome handler calls _armSafeStateCheck()');
@@ -291,7 +293,9 @@ function ctxFor(unsafeReason:
   );
   assert(/controllerRef\.current\?\.getUnsafeAtConnect\?\.\(\)/.test(panelSrc),
     'ConnectionPanelMain reads getUnsafeAtConnect from the controller');
-  assert(/unsafeAtConnect != null \? unsafeAtConnect\.reason : null/.test(panelSrc),
+  assert(/const\s+unsafeAtConnectReason\s*=\s*unsafeAtConnectVerdict\?\.reason\s*\?\?\s*null/.test(panelSrc),
+    'ConnectionPanelMain derives a stable unsafe-at-connect reason');
+  assert(/runPreflightSummary[\s\S]*unsafeAtConnectReason/.test(panelSrc),
     'ConnectionPanelMain forwards verdict reason (or null) to runPreflightSummary');
 }
 

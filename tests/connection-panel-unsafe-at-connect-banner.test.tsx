@@ -87,6 +87,7 @@ void (async () => {
       'alarm',
       'run',
       'hold',
+      'door',
       'check',
       'no-status-response',
       'unsafe-residual-spindle',

@@ -2684,6 +2684,9 @@ export class GrblController implements GrblControllerApi {
         feedRate: this._state.feedRate,
         spindleSpeed: this._state.spindleSpeed,
       };
+      for (const cb of this._stateListeners) {
+        cb({ ...this._state });
+      }
     }, 5000);
   }
 

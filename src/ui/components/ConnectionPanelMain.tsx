@@ -100,6 +100,8 @@ import {
   type ConnectionDetailsPanelKey,
 } from './connection/ConnectionDetailsPanel';
 import { MachineControls } from './connection/MachineControls';
+import { UnsafeAtConnectBanner } from './connection/UnsafeAtConnectBanner';
+import { type UnsafeAtConnectActionKind } from './connection/unsafeAtConnectMessages';
 import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
 import { analyzeOperationOrder } from '../../app/OperationOrder';
@@ -403,10 +405,11 @@ export function ConnectionPanelMain({
   const preflightPlanMaxX = machinePlanBounds?.maxX ?? null;
   const preflightPlanMaxY = machinePlanBounds?.maxY ?? null;
   const preflightGcodeHeaderTemplate = activeProfile?.gcodeHeaderTemplate ?? null;
+  const unsafeAtConnectVerdict = controllerRef.current?.getUnsafeAtConnect?.() ?? null;
+  const unsafeAtConnectReason = unsafeAtConnectVerdict?.reason ?? null;
 
   useEffect(() => {
     const ctrlMaxSpindle = controllerRef.current?.maxSpindle;
-    const unsafeAtConnect = controllerRef.current?.getUnsafeAtConnect?.();
     const result = runPreflightSummary(
       scene,
       gcode,
@@ -417,7 +420,7 @@ export function ConnectionPanelMain({
       controllerRef.current?.getFirmwareHomingCycleEnabled?.(),
       controllerRef.current?.getFirmwareLaserModeEnabled?.(),
       typeof ctrlMaxSpindle === 'number' && ctrlMaxSpindle > 0 ? ctrlMaxSpindle : undefined,
-      unsafeAtConnect != null ? unsafeAtConnect.reason : null,
+      unsafeAtConnectReason,
       startMode,
       savedOrigin,
       // T1-218 (v30 audit #1): tell preflight whether the bed
@@ -446,6 +449,7 @@ export function ConnectionPanelMain({
     preflightPlanMaxX,
     preflightPlanMaxY,
     preflightGcodeHeaderTemplate,
+    unsafeAtConnectReason,
     compiledJobTicket,
     startMode,
     savedOrigin,
@@ -1647,6 +1651,42 @@ export function ConnectionPanelMain({
     showConfirm,
   ]);
 
+  const handleUnsafeAtConnectAction = useCallback((kind: UnsafeAtConnectActionKind) => {
+    void (async () => {
+      try {
+        switch (kind) {
+          case 'reset':
+            // T3-91 follow-up: use the same confirmed Unlock path as the
+            // alarm recovery card; do not introduce a second raw-$X route.
+            if (await handleUnlock()) {
+              appendMessage('Unsafe-at-connect recovery: unlock sent. Wait for the controller to report Idle.');
+            }
+            break;
+          case 'reconnect':
+            await machineService.disconnect();
+            setConnectionRecoveryVisible(false);
+            appendMessage('Unsafe-at-connect recovery: disconnected. Reconnect to rerun the safe-state handshake.');
+            break;
+          case 'm5':
+            // Use the structured laser-off path so M5 success/failure feeds
+            // MachineService laser-output and safety-state tracking.
+            await executionCoordinator.emergencyLaserOff();
+            controllerRef.current?.requestStatusReport();
+            appendMessage('Unsafe-at-connect recovery: laser-off command sent. Wait for the controller to report laser-off idle.');
+            break;
+        }
+      } catch (err: unknown) {
+        appendMessage(`Unsafe-at-connect recovery failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    })();
+  }, [
+    appendMessage,
+    controllerRef,
+    executionCoordinator,
+    handleUnlock,
+    machineService,
+  ]);
+
   /** Deadman: laser is on only while primary pointer is held on the button. */
   const beginTestFire = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {
@@ -1922,6 +1962,10 @@ export function ConnectionPanelMain({
   const alarmBanner = alarmRecoveryContent && React.createElement(RecoveryCard, {
     content: alarmRecoveryContent,
     onAction: handleRecoveryAction,
+  });
+  const unsafeAtConnectBanner = isConnected && React.createElement(UnsafeAtConnectBanner, {
+    unsafeVerdict: unsafeAtConnectVerdict,
+    onRecoveryAction: handleUnsafeAtConnectAction,
   });
   const faultedBanner = isConnected && machineState?.status === 'faulted_requires_inspection' && React.createElement('div', {
     // T2-12 part 2: distinct from alarmBanner because the recovery
@@ -2679,6 +2723,7 @@ export function ConnectionPanelMain({
         statusSection,
         alarmBanner: detailsPanel == null ? alarmBanner : null,
         faultedBanner: detailsPanel == null ? faultedBanner : null,
+        unsafeAtConnectBanner: detailsPanel == null ? unsafeAtConnectBanner : null,
         laserModeBanner: detailsPanel == null ? laserModeBanner : null,
         connectSection,
       }),

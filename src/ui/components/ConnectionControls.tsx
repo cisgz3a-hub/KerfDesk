@@ -10,6 +10,11 @@ interface ConnectionControlsProps {
    */
   faultedBanner?: React.ReactNode;
   /**
+   * T3-91 follow-up: connect-time unsafe-state verdict shown inline
+   * before less urgent machine-mode notices.
+   */
+  unsafeAtConnectBanner?: React.ReactNode;
+  /**
    * Laser-mode ($32=0) detection banner. Independent of alarm/
    * faulted state — orthogonality of underlying conditions.
    * LaserModeBanner returns null when not applicable.
@@ -23,6 +28,7 @@ export function ConnectionControls({
   statusSection,
   alarmBanner,
   faultedBanner,
+  unsafeAtConnectBanner,
   laserModeBanner,
   connectSection,
   isConnected,
@@ -33,6 +39,7 @@ export function ConnectionControls({
     statusSection,
     alarmBanner,
     faultedBanner,
+    unsafeAtConnectBanner,
     laserModeBanner,
     !isConnected && connectSection,
   );
