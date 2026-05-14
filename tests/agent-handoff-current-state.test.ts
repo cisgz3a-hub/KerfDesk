@@ -9,8 +9,8 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-257\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-257\*\*/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-258\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-258\*\*/);
   assert.match(handoff, /Next active audit-fix ticket: finish actual entitlement server deployment\/secret-store configuration/);
 });
 
@@ -20,9 +20,9 @@ test('handoff no longer presents the stale T1-202 state as current', () => {
 });
 
 test('handoff preserves known verification caveats', () => {
-  assert.match(handoff, /Full `npm test` passed during T1-257/);
-  assert.match(handoff, /git diff --check` passed during the T1-257 close-out/);
-  assert.match(handoff, /npx tsc --noEmit --pretty false` passed during the T1-257 close-out/);
+  assert.match(handoff, /Full `npm test` passed during T1-258/);
+  assert.match(handoff, /git diff --check` passed during the T1-258 close-out/);
+  assert.match(handoff, /npx tsc --noEmit --pretty false` passed during the T1-258 close-out/);
   assert.match(handoff, /T1-242 closed F-020/);
   assert.match(handoff, /T1-243 closed F-021/);
   assert.match(handoff, /T1-244 closed F-022/);
@@ -39,6 +39,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T1-255 added the real WebCrypto ES256 verifier/);
   assert.match(handoff, /T1-256 added the matching WebCrypto ES256 server signer/);
   assert.match(handoff, /T1-257 wired release checksum generation/);
+  assert.match(handoff, /T1-258 wired CycloneDX SBOM generation/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

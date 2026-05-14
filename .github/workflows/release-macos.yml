@@ -39,11 +39,14 @@ jobs:
         run: npx electron-builder --mac --config scripts/signing/electron-builder.macos-signed.cjs --publish never
       - name: Generate SHA256 checksums
         run: node scripts/generate-checksums.mjs release
+      - name: Generate SBOM
+        run: node scripts/generate-sbom.mjs release/sbom.cdx.json
       - uses: actions/upload-artifact@v4
         with:
           name: macos-signed-notarized-dmg
           path: |
             release/*.dmg
             release/SHA256SUMS
+            release/sbom.cdx.json
           if-no-files-found: error
           retention-days: 30
