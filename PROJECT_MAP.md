@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 477 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 696 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 478 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 697 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -29,7 +29,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/core` | 115 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/debug` | 4 | - |
 | `src/diagnostics` | 13 | - |
-| `src/entitlements` | 10 | - |
+| `src/entitlements` | 11 | - |
 | `src/fonts` | 6 | data |
 | `src/geometry` | 9 | - |
 | `src/import` | 18 | dxf, image, svg, trace |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 620 | - |
+| `tests/` | 621 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -315,6 +315,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/entitlements/LicenseStatus.ts`
 - `src/entitlements/ServerEntitlementService.ts`
 - `src/entitlements/SignedEntitlementToken.ts`
+- `src/entitlements/WebCryptoEntitlementVerifier.ts`
 - `src/entitlements/index.ts`
 - `src/entitlements/testerKey.ts`
 - `src/entitlements/types.ts`
@@ -1227,6 +1228,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/wcs-query-error-fails-closed.test.ts`
 - `tests/web-serial-byte-stream-harness.test.ts`
 - `tests/web-serial-partial-open-cleanup.test.ts`
+- `tests/webcrypto-entitlement-verifier.test.ts`
 - `tests/webserial-cable-pull-heartbeat.test.ts`
 - `tests/webserial-unknown-catch.test.ts`
 - `tests/windows-signing-release-workflow.test.ts`

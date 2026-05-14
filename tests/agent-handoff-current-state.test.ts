@@ -9,9 +9,9 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T1-254\*\*/);
-  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-254\*\*/);
-  assert.match(handoff, /Next active audit-fix ticket: continue the release-readiness audit sequence with production entitlement-server\/public-key rollout/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-255\*\*/);
+  assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-255\*\*/);
+  assert.match(handoff, /Next active audit-fix ticket: continue the release-readiness audit sequence with entitlement server deployment\/signing-key custody/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {
@@ -20,9 +20,9 @@ test('handoff no longer presents the stale T1-202 state as current', () => {
 });
 
 test('handoff preserves known verification caveats', () => {
-  assert.match(handoff, /Full `npm test` passed during T1-254/);
-  assert.match(handoff, /git diff --check` passed during the T1-254 close-out/);
-  assert.match(handoff, /npx tsc --noEmit --pretty false` passed during the T1-254 close-out/);
+  assert.match(handoff, /Full `npm test` passed during T1-255/);
+  assert.match(handoff, /git diff --check` passed during the T1-255 close-out/);
+  assert.match(handoff, /npx tsc --noEmit --pretty false` passed during the T1-255 close-out/);
   assert.match(handoff, /T1-242 closed F-020/);
   assert.match(handoff, /T1-243 closed F-021/);
   assert.match(handoff, /T1-244 closed F-022/);
@@ -36,6 +36,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T1-252 made pause-time laser-off confirmation load-bearing/);
   assert.match(handoff, /T1-253 made support bundles user-exportable/);
   assert.match(handoff, /T1-254 removed raw local cache authority from commercial entitlements/);
+  assert.match(handoff, /T1-255 added the real WebCrypto ES256 verifier/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

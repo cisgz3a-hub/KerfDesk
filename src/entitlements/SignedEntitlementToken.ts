@@ -11,11 +11,10 @@
  *
  * T2-90 ships the typed signed-token shape + format validators +
  * base64url codec + replay/expiry/clock-skew checks + a verifier
- * stub that takes an `EntitlementVerifier` interface (so the real
- * Ed25519 / ECDSA WebCrypto wiring lands in T2-90-followup once
- * T2-89's server is up and a real public key is embedded). This
- * MVP gives `EntitlementService` typed cache I/O + replay defence
- * even before the public-key crypto is wired.
+ * stub that takes an `EntitlementVerifier` interface. T1-255 adds the
+ * real WebCrypto `ES256` verifier and env-configured production
+ * public-key hook; EdDSA support remains best-effort depending on the
+ * host WebCrypto implementation.
  */
 
 export type SigningAlg = 'EdDSA' | 'ES256';

@@ -7359,6 +7359,22 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 **Status:** Shipped in `a5192187`. Hardware verification not required (commercial entitlement state only). Release note: production signed-token issuance/public-key configuration is still required before paid distribution; this ticket removes raw local cache authority.
 
 ---
+### T1-255 | WebCrypto public-key verifier for signed entitlements
+
+**Audit source:** Follow-up to T1-254 and the T2-90/T2-89 commercial entitlement chain. T1-254 made local cache authority depend on an injected signed-token verifier; the remaining production gap was that the repo still only had a verifier interface/test stubs, not a real public-key verifier that the app singleton could configure.
+
+**Problem:** A service that requires signed tokens is only release-useful if production can verify those tokens without shipping private keys. Before this slice, the `EntitlementVerifier` interface existed and tests could stub it, but the app had no WebCrypto verifier and no Vite-env public-key configuration hook.
+
+**Fix:** Added `src/entitlements/WebCryptoEntitlementVerifier.ts` with `createWebCryptoEntitlementVerifier(...)`, `parseEntitlementPublicKeyConfig(...)`, and `createConfiguredEntitlementVerifierFromEnv(...)`. The verifier imports public JWK keys, exposes configured `kid`s, verifies ES256/P-256 signatures over the canonical token payload string using WebCrypto, fails closed on unknown kids/bad signatures, and supports a JSON key-list env variable `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`. The `entitlementService` singleton now passes the configured verifier into `EntitlementService`, so signed cache authority works in production once the public key is supplied.
+
+**Verification:**
+- `npx tsx tests\webcrypto-entitlement-verifier.test.ts` failed before the verifier module existed and passes after. It generates a real P-256 key pair, signs an entitlement token with WebCrypto, verifies it through `verifyEntitlementToken`, rejects tampered signatures, rejects unknown kids, and pins env parsing/singleton wiring.
+- `npx tsx tests\entitlement-signed-cache-authority.test.ts`, `npx tsx tests\signed-entitlement-token.test.ts`, and `npx tsx tests\license-status-states.test.ts` pass after the verifier wiring.
+- `npx tsc --noEmit --pretty false` passes after browser/Node WebCrypto compatibility shims.
+
+**Status:** Shipped in `<TBD>`. Hardware verification not required (commercial entitlement crypto only). Release note: real server deployment, signing key custody, and production `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK` configuration are still required before paid distribution.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21235,6 +21251,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-252 HIGH make pause laser-off confirmation load-bearing (shipped in `379e623e`) - awaits pause-time `M5 S0`, carries the structured result through controller operations, and latches failed laser-off as unknown/unsafe instead of reporting a clean pause.
 - [x] T1-253 HIGH make support bundle export user-exportable (shipped in `1191cba0`) - adds runtime bundle collection, real ZIP creation, Electron binary save/browser download fallback, and an About-tab Export Diagnostic Bundle action.
 - [x] T1-254 HIGH make signed entitlement cache the only local Pro authority (shipped in `a5192187`) - stops raw `laserforge_license_cache` JSON from granting verified/offline Pro and accepts local cache only after signed-token verification.
+- [x] T1-255 HIGH add WebCrypto public-key verifier for signed entitlements (shipped in `<TBD>`) - verifies ES256 signed entitlement tokens with configured public JWK keys and wires the production singleton to `VITE_ENTITLEMENT_PUBLIC_KEYS_JWK`.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

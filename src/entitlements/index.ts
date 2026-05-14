@@ -8,6 +8,7 @@ export {
 } from './EntitlementService';
 export * from './ServerEntitlementService';
 export * from './EntitlementLifecycle';
+export * from './WebCryptoEntitlementVerifier';
 
 import type { ProFeature } from './types';
 import { entitlementService } from './EntitlementService';

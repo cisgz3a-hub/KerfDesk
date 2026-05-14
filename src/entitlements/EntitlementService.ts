@@ -7,6 +7,7 @@ import {
   verifyEntitlementToken,
   verifyFailureMessage,
 } from './SignedEntitlementToken';
+import { createConfiguredEntitlementVerifierFromEnv } from './WebCryptoEntitlementVerifier';
 import { parseTesterCode, verifyTesterCode } from './testerKey';
 import { getStorage } from '../core/storage/storage';
 
@@ -605,7 +606,13 @@ function deriveStatusDetail(state: EntitlementState): import('./LicenseStatus').
   });
 }
 
-export const entitlementService = new EntitlementService();
+const entitlementEnv = (import.meta as ImportMeta & {
+  env?: Partial<Record<string, string | undefined>>;
+}).env;
+
+export const entitlementService = new EntitlementService({
+  signedTokenVerifier: createConfiguredEntitlementVerifierFromEnv(entitlementEnv),
+});
 
 export function tierDisplayName(tier: EntitlementTier): string {
   switch (tier) {
