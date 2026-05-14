@@ -28,6 +28,7 @@ import { estimateJobTime } from '../../core/output/TimeEstimator';
 // helpers here.
 import { buildFrameCorners } from '../../app/frameGcode';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
+import { createUnframedStartOverrideTicket } from '../../app/FrameState';
 import {
   resolveFrameDotFeedRate,
   resolveFrameLineDelayMs,
@@ -601,6 +602,11 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
         void executionCoordinator
           .startValidatedJob({
             ticket: compiledTicket,
+            frameTicket: createUnframedStartOverrideTicket({
+              jobTicketId: compiledTicket.ticketId,
+              fingerprint: compiledTicket.fingerprint,
+              reason: 'Workflow panel Start Job selected without frame proof',
+            }),
             scene: props.scene,
             machineState,
             notifySimulatorTx,

@@ -7,6 +7,7 @@ import { type OutputFormat } from '../core/output/Output';
 import { type MachineState } from '../controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
+import { type FrameTicket } from './FrameState';
 import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners } from './frameGcode';
@@ -171,6 +172,7 @@ export class ExecutionCoordinator {
     canvasContext: ActiveJobCanvasContext;
     currentStartMode: GcodeStartMode;
     currentSavedOrigin: { x: number; y: number } | null;
+    frameTicket: FrameTicket | null;
     outputFormat?: OutputFormat;
   }): Promise<void> {
     return this.deps.machineService.startValidatedJob(args);

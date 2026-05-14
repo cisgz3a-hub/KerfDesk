@@ -51,6 +51,7 @@
  */
 export type MachineEvent =
   | { readonly kind: 'job-start'; readonly t: number; readonly ticketId: string; readonly sceneHash: string }
+  | { readonly kind: 'unframed-start-override'; readonly t: number; readonly ticketId: string; readonly reason: string }
   | { readonly kind: 'job-completed'; readonly t: number; readonly ticketId: string; readonly linesAcknowledged: number }
   | { readonly kind: 'job-stopped'; readonly t: number; readonly ticketId: string; readonly reason: string }
   | { readonly kind: 'job-failed'; readonly t: number; readonly ticketId: string; readonly error: string }

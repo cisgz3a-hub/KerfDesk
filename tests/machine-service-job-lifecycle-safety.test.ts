@@ -19,6 +19,7 @@ import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferenced
 import { createScene } from '../src/core/scene/Scene';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -184,6 +185,7 @@ void (async () => {
     const firstCtx = ctxFor(ticket);
     void svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -198,6 +200,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket: secondTicket,
+        frameTicket: makeTestFrameTicket(secondTicket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -226,6 +229,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -243,6 +247,7 @@ void (async () => {
     shouldFail = false;
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -261,6 +266,7 @@ void (async () => {
     );
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -275,6 +281,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket: duringFinalizeTicket,
+        frameTicket: makeTestFrameTicket(duringFinalizeTicket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -302,6 +309,7 @@ void (async () => {
     );
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -333,6 +341,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket: emptyTicket,
+        frameTicket: makeTestFrameTicket(emptyTicket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -363,6 +372,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -393,6 +403,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -425,6 +436,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},

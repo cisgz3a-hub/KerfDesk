@@ -48,6 +48,7 @@ import { loadReplays } from '../src/core/replay/JobReplay';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 import { setStorageForTest } from '../src/core/storage/storage';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -192,6 +193,7 @@ void (async () => {
   try {
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},

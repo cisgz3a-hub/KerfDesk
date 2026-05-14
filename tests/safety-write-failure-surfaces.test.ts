@@ -29,6 +29,7 @@ import type { ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createScene } from '../src/core/scene/Scene';
 import type { ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import type { Scene } from '../src/core/scene/Scene';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -219,6 +220,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -263,6 +265,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},

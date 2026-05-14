@@ -21,6 +21,7 @@ import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/tick
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -164,6 +165,7 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
 
 async function run(): Promise<void> {
   console.log('\n=== machine-service startValidatedJob ===\n');
+  installMockLocalStorage();
 
   const scene = createScene(120, 100, 'ticket svc test');
   const ticket = makeTestTicket(scene);
@@ -180,6 +182,7 @@ async function run(): Promise<void> {
     const simLines: string[] = [];
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: line => {
@@ -238,6 +241,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -267,6 +271,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -330,6 +335,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -391,6 +397,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket: t,
+      frameTicket: makeTestFrameTicket(t),
       scene,
       machineState: ctrl.state,
       notifySimulatorTx: () => {},

@@ -3,6 +3,7 @@
  * Run: npx tsx tests/stale-gcode-blocks-start.test.ts
  */
 import './e2e/helpers/e2eDeterministicIds';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 import { MachineService } from '../src/app/MachineService';
 import { compileGcode, type CompileGcodeResult } from '../src/app/PipelineService';
@@ -146,6 +147,7 @@ async function run(): Promise<void> {
   try {
     await service.startValidatedJob({
       ticket: compiled.ticket,
+      frameTicket: makeTestFrameTicket(compiled.ticket),
       scene: sceneAfterEdit,
       machineState: makeIdleState(),
       notifySimulatorTx: () => {},

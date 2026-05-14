@@ -20,6 +20,7 @@ import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/tick
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 const memoryStore: Record<string, string> = {};
 function installMockLocalStorage(): void {
@@ -150,6 +151,7 @@ void (async () => {
 
   await svc.startValidatedJob({
     ticket,
+    frameTicket: makeTestFrameTicket(ticket),
     scene,
     machineState: idle,
     notifySimulatorTx: () => {},

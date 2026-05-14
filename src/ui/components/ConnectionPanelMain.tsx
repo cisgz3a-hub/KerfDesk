@@ -35,6 +35,12 @@ import { ExecutionCoordinator, type FrameResult } from '../../app/ExecutionCoord
 import { type CompileGcodeResult, type CompileProgress } from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
 import {
+  createFramedStartTicket,
+  createUnframedStartOverrideTicket,
+  validateFrameTicketForStart,
+  type FrameTicket,
+} from '../../app/FrameState';
+import {
   verifySavedOriginG54,
   describeSavedOriginDrift,
 } from '../../app/savedOriginVerify';
@@ -317,6 +323,7 @@ export function ConnectionPanelMain({
   const intentionalDisconnectRef = useRef(false);
   const hasFramed = useRef(false);
   const currentFrameAnchorRef = useRef<CurrentFrameAnchor | null>(null);
+  const lastFrameTicketRef = useRef<FrameTicket | null>(null);
 
   // T1-97 retire (2026-05-02): frame-before-start bypass override removed.
   // The underlying defect that made it necessary was structurally fixed by
@@ -537,6 +544,7 @@ export function ConnectionPanelMain({
     if (isConnected) {
       hasFramed.current = false;
       currentFrameAnchorRef.current = null;
+      lastFrameTicketRef.current = null;
       hasJogged.current = false;
       hasSetOrigin.current = false;
       setWorkflowVersion(v => v + 1);
@@ -556,6 +564,7 @@ export function ConnectionPanelMain({
   useEffect(() => {
     hasFramed.current = false;
     currentFrameAnchorRef.current = null;
+    lastFrameTicketRef.current = null;
     setWorkflowVersion(v => v + 1);
   }, [historyVersion]);
 
@@ -594,6 +603,7 @@ export function ConnectionPanelMain({
     if (lastFrameKeyRef.current !== null && lastFrameKeyRef.current !== frameFreshnessKey) {
       hasFramed.current = false;
       currentFrameAnchorRef.current = null;
+      lastFrameTicketRef.current = null;
       setWorkflowVersion(v => v + 1);
     }
     lastFrameKeyRef.current = frameFreshnessKey;
@@ -1114,6 +1124,23 @@ export function ConnectionPanelMain({
         canvasPlanBounds: lastGcodeCompileResult.canvasPlanBounds,
         machineTransform: lastGcodeCompileResult.machineTransform,
       };
+      const frameTicketValidation = validateFrameTicketForStart({
+        frameTicket: lastFrameTicketRef.current,
+        jobTicketId: ticket.ticketId,
+        fingerprint: ticket.fingerprint,
+      });
+      const freshFrameTicket =
+        frameTicketValidation.ok && !frameTicketValidation.override
+          ? lastFrameTicketRef.current
+          : null;
+      const frameTicket = freshFrameTicket
+        ?? ((!requireFrame && userModeGatePolicy.allowStartWithoutFraming)
+          ? createUnframedStartOverrideTicket({
+              jobTicketId: ticket.ticketId,
+              fingerprint: ticket.fingerprint,
+              reason: userModeGatePolicy.startWithoutFramingLabel ?? 'Start without framing selected',
+            })
+          : null);
       await executionCoordinator.startValidatedJob({
         ticket,
         scene,
@@ -1122,6 +1149,7 @@ export function ConnectionPanelMain({
         canvasContext,
         currentStartMode: startMode,
         currentSavedOrigin: savedOrigin,
+        frameTicket,
         outputFormat: 'grbl',
       });
       if (jobStartPosition) {
@@ -1293,11 +1321,19 @@ export function ConnectionPanelMain({
 
     hasFramed.current = true;
     currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
+    lastFrameTicketRef.current = compiledJobTicket
+      ? createFramedStartTicket({
+          jobTicketId: compiledJobTicket.ticketId,
+          fingerprint: compiledJobTicket.fingerprint,
+          machineBounds: framePhysicalBounds,
+          mode: 'safe',
+        })
+      : null;
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Safe) complete']);
     return true;
-  }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [activeProfile, bedWidth, canFrame, compiledJobTicket, confirmFrameBounds, framePhysicalBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleFrameDot = useCallback(async () => {
     if (!canFrame) return;
@@ -1368,10 +1404,18 @@ export function ConnectionPanelMain({
 
     hasFramed.current = true;
     currentFrameAnchorRef.current = captureCurrentFrameAnchor(startMode, frameStartPosition);
+    lastFrameTicketRef.current = compiledJobTicket
+      ? createFramedStartTicket({
+          jobTicketId: compiledJobTicket.ticketId,
+          fingerprint: compiledJobTicket.fingerprint,
+          machineBounds: framePhysicalBounds,
+          mode: 'dot',
+        })
+      : null;
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
     setMessages(prev => [...prev, '✓ Frame (Laser Dot) complete']);
-  }, [activeProfile, bedWidth, canFrame, confirmFrameBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
+  }, [activeProfile, bedWidth, canFrame, compiledJobTicket, confirmFrameBounds, framePhysicalBounds, machineState?.position, sceneBounds, frameTransformBounds, startMode, savedOrigin, originCorner, bedHeight, executionCoordinator, setMessages, verifySavedOriginForFrame]);
 
   const handleHome = useCallback(async (): Promise<boolean> => {
     if (!canHome) {

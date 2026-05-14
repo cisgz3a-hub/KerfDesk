@@ -8,6 +8,7 @@
  * Run: npx tsx tests/end-to-end-workflows/end-to-end-workflows.test.ts
  */
 import '../e2e/helpers/e2eDeterministicIds';
+import { makeTestFrameTicket } from '../helpers/testFrameTicket';
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -308,6 +309,7 @@ async function run(): Promise<void> {
     const service = new MachineService({ current: controller }, { current: null } as { current: SerialPortLike | null });
     await service.startValidatedJob({
       ticket: compiled.ticket,
+      frameTicket: makeTestFrameTicket(compiled.ticket),
       scene: reloaded,
       machineState: makeIdleState(),
       notifySimulatorTx: () => {},

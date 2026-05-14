@@ -245,6 +245,7 @@ void (async () => {
   try {
     await svc.startValidatedJob({
       ticket: { ticketId: 't', gcodeLines: ['G0 X0'], gcodeText: 'G0 X0' } as never,
+      frameTicket: null,
       scene: {} as never,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -273,6 +274,7 @@ void (async () => {
   try {
     await svc.startValidatedJob({
       ticket: { ticketId: 't', gcodeLines: ['G0 X0'], gcodeText: 'G0 X0' } as never,
+      frameTicket: null,
       scene: {} as never,
       machineState: idle,
       notifySimulatorTx: () => {},

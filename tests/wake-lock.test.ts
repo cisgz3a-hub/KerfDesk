@@ -18,6 +18,7 @@ import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/tick
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { type SerialPortLike } from '../src/communication/SerialPort';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -185,6 +186,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -209,6 +211,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -255,6 +258,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -278,6 +282,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -304,6 +309,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene: otherScene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -334,6 +340,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket,
+        frameTicket: makeTestFrameTicket(ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},

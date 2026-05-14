@@ -7,6 +7,7 @@
  * Run: npx tsx tests/job-fingerprint-start-validation.test.ts
  */
 import './e2e/helpers/e2eDeterministicIds';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 import { MachineService } from '../src/app/MachineService';
 import {
@@ -278,6 +279,7 @@ async function run(): Promise<void> {
   try {
     await svc.startValidatedJob({
       ticket: ticketWithFingerprint,
+      frameTicket: makeTestFrameTicket(ticketWithFingerprint),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},

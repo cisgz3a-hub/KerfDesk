@@ -32,6 +32,7 @@ import {
 } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -161,6 +162,7 @@ async function run(): Promise<void> {
   let notifyCount = 0;
   await svc.startValidatedJob({
     ticket,
+    frameTicket: makeTestFrameTicket(ticket),
     scene,
     machineState: idle,
     notifySimulatorTx: () => {
@@ -202,6 +204,7 @@ async function run(): Promise<void> {
   try {
     await svc.startValidatedJob({
       ticket,
+      frameTicket: makeTestFrameTicket(ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {

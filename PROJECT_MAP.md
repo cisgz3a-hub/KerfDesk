@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 476 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 689 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 692 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 614 | - |
+| `tests/` | 616 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -58,7 +58,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `tests/entitlement-tamper-resistance` | 1 | - |
 | `tests/fixtures` | 3 | projects |
 | `tests/harness` | 2 | - |
-| `tests/helpers` | 8 | - |
+| `tests/helpers` | 9 | - |
 | `tests/ipc-fuzz` | 1 | - |
 | `tests/malformed` | 5 | - |
 | `tests/packaged-app-smoke` | 1 | - |
@@ -845,6 +845,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/frame-result-reasons.test.ts`
 - `tests/frame-saved-origin-verify.test.ts`
 - `tests/frame-state-transitions.test.ts`
+- `tests/frame-ticket-start-gate.test.ts`
 - `tests/frame-vs-burn-equivalence.test.ts`
 - `tests/gated-feature-per-feature.test.ts`
 - `tests/gcode-emitter-purity-and-zero-distance.test.ts`
@@ -1190,6 +1191,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/typed-error-domains.test.ts`
 - `tests/typed-storage-ipc.test.ts`
 - `tests/ui-integration.test.ts`
+- `tests/ui-start-frame-ticket-proof.test.ts`
 - `tests/ui-start-job-end-to-end.test.ts`
 - `tests/ui-start-job-preserves-markers.test.ts`
 - `tests/ui-start-job-uses-ticket.test.tsx`
@@ -1314,6 +1316,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/helpers/imageFixtures.ts`
 - `tests/helpers/parseGcode.ts`
 - `tests/helpers/propertyTesting.ts`
+- `tests/helpers/testFrameTicket.ts`
 - `tests/helpers/testJobFingerprint.ts`
 
 ### `tests/ipc-fuzz`

@@ -7291,6 +7291,23 @@ The deploy URL will be `https://stolkjohannjohann-sudo.github.io/LaserForge/`. V
 ---
 ## Tier 2 鈥?This month
 
+### T1-251 | Service-level FrameTicket gate for Start
+
+**Audit source:** User-provided v33 release-readiness correction, 2026-05-14. The audit found that frame freshness was still UI-owned: `ConnectionPanelMain` tracked a frame boolean, but `MachineService.startValidatedJob` did not require a frame proof matching the compiled job fingerprint.
+
+**Problem:** The UI could recommend or require framing, yet a direct service caller could start a job with no proof that the current compiled ticket had been framed. That left frame freshness as a React/UI convention instead of a final machine-control contract. LightBurn-style "start without framing" should remain possible, but only as an explicit operator choice that is logged.
+
+**Fix:** `FrameState.ts` now defines a service-level `FrameTicket` with two valid proofs: a `framed` ticket carrying the compiled job fingerprint and machine bounds, or an `unframed-start-override` carrying the same fingerprint plus a reason. `MachineService.startValidatedJob` validates the frame ticket after stale-output validation and before streaming. Missing, wrong-ticket, or stale-fingerprint frame proofs reject Start. Explicit unframed starts remain allowed only when the UI creates an override ticket, and that override is recorded in `MachineEventLedger`.
+
+**Verification:**
+- `npx tsx tests\frame-ticket-start-gate.test.ts` failed before the fix and passes after. It proves missing frame proof rejects, stale frame fingerprints reject, and explicit unframed overrides stream only after logging a ledger event.
+- `npx tsx tests\ui-start-job-uses-ticket.test.tsx` still verifies the framed UI path threads the compile ticket into `MachineService.startValidatedJob`.
+- `npx tsx tests\ui-start-frame-ticket-proof.test.ts` pins that the UI stores framed proof at Frame success and does not forge framed proof in the Start handler.
+- `npm test` passed after updating all direct start call sites to supply explicit frame proof or a deliberate null for pre-frame rejection tests.
+
+**Status:** Shipped in `b4769f0`. Hardware verification recommended before release tagging: run Frame -> Start on Falcon and verify Start without framing remains a deliberate, visible operator choice.
+
+---
 ### T2-1 | Validated Job Ticket (execution contract)
 
 **Code reference:** `src/app/PipelineService.ts:61-69`, `src/ui/components/ConnectionPanelMain.tsx:568-602` (`handleStartJob`), `src/core/preflight/confirmPreflightForJobStart.ts:6-37`
@@ -21163,6 +21180,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T1-248 HIGH harden running-job heartbeat (shipped in `3844f2af`) - turns short delayed status replies into a warning and only aborts after sustained no-controller-RX silence during running GRBL jobs.
 - [x] T1-249 HIGH avoid trace-generated straight closure burns (shipped in `3844f2af`) - stops forced closure of far-apart traced contour endpoints and raises noisy-trace filtering defaults.
 - [x] T1-250 HIGH separate autosave and manual-save truth (shipped in `3844f2af`) - keeps autosave as recovery data without marking the user's manually chosen project file clean.
+- [x] T1-251 HIGH enforce service-level FrameTicket proof at Start (shipped in `b4769f0`) - requires `MachineService.startValidatedJob` to receive either a fresh frame proof matching the compiled job fingerprint or an explicit logged Start-without-framing override before streaming any G-code.
 - [x] T1-222 HIGH operation mutex release validates session lease (shipped in `cc17f1b9`) - v30 audit response #9 lease-token fix; stale releases no longer clear newer active operations.
 - [x] T1-221 HIGH MachineService.jog acquires operation mutex (shipped in `ac473616`) - v30 audit response #9 bypass plug; jog commands now respect active operation ownership.
 - [x] T1-220 HIGH failed-start uses bytes-written counter (shipped in `993aaab3`) - v30 audit response #8; unsafe state is preserved when a failed start already wrote bytes.

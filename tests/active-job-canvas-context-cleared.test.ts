@@ -16,6 +16,7 @@ import {
 import { createScene } from '../src/core/scene/Scene';
 import { addObject } from '../src/ui/history/SceneCommands';
 import { createRect } from '../src/core/scene/SceneObject';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -129,6 +130,7 @@ void (async () => {
     try {
       await svc.startValidatedJob({
         ticket: compiled.ticket,
+        frameTicket: makeTestFrameTicket(compiled.ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -171,6 +173,7 @@ void (async () => {
 
     await svc.startValidatedJob({
       ticket: compiled.ticket,
+      frameTicket: makeTestFrameTicket(compiled.ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -238,6 +241,7 @@ void (async () => {
     const svc = new MachineService(controllerRef, portRef);
     await svc.startValidatedJob({
       ticket: compiled.ticket,
+      frameTicket: makeTestFrameTicket(compiled.ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},

@@ -18,6 +18,7 @@ import {
 import { createScene } from '../src/core/scene/Scene';
 import { addObject } from '../src/ui/history/SceneCommands';
 import { createRect } from '../src/core/scene/SceneObject';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -129,6 +130,7 @@ void (async () => {
 
   await svc.startValidatedJob({
     ticket: first.ticket,
+    frameTicket: makeTestFrameTicket(first.ticket),
     scene,
     machineState: idle,
     notifySimulatorTx: () => {},

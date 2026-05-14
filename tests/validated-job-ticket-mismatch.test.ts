@@ -3,6 +3,7 @@
  * Run: npx tsx tests/validated-job-ticket-mismatch.test.ts
  */
 import './e2e/helpers/e2eDeterministicIds';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 import { type ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
 import { type CompileGcodeResult } from '../src/app/PipelineService';
@@ -137,6 +138,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket: compiledA.ticket,
+        frameTicket: makeTestFrameTicket(compiledA.ticket),
         scene: sceneB,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -175,6 +177,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket: compiled.ticket,
+        frameTicket: makeTestFrameTicket(compiled.ticket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},
@@ -210,6 +213,7 @@ async function run(): Promise<void> {
 
     await svc.startValidatedJob({
       ticket: compiled.ticket,
+      frameTicket: makeTestFrameTicket(compiled.ticket),
       scene,
       machineState: idle,
       notifySimulatorTx: () => {},
@@ -245,6 +249,7 @@ async function run(): Promise<void> {
     try {
       await svc.startValidatedJob({
         ticket: tamperedTicket,
+        frameTicket: makeTestFrameTicket(tamperedTicket),
         scene,
         machineState: idle,
         notifySimulatorTx: () => {},

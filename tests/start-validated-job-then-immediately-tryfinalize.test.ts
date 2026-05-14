@@ -20,6 +20,7 @@ import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/tick
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -124,6 +125,7 @@ void (async () => {
 
   void svc.startValidatedJob({
     ticket,
+    frameTicket: makeTestFrameTicket(ticket),
     scene,
     machineState: idle,
     notifySimulatorTx: () => {},

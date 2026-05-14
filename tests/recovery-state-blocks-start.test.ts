@@ -199,6 +199,7 @@ void (async () => {
   try {
     await svc.startValidatedJob({
       ticket: { ticketId: 't', gcodeLines: ['G0 X0'], gcodeText: 'G0 X0' } as unknown as ValidatedJobTicket,
+      frameTicket: null,
       scene: {} as Scene,
       machineState: idle,
       notifySimulatorTx: () => {},

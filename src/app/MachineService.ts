@@ -79,6 +79,10 @@ import { getMachineEventLedger } from './MachineEventLedger';
 // Hashing imports + the ControllerId type moved with the logic.
 import { validateJobTicket } from './validateJobTicket';
 import { buildPipelineJobFingerprint } from './PipelineService';
+import {
+  type FrameTicket,
+  validateFrameTicketForStart,
+} from './FrameState';
 // T1-136: approval-nonce eviction extracted so the TTL + FIFO rules
 // can be unit-tested without mounting the service.
 import {
@@ -792,6 +796,7 @@ export class MachineService {
     canvasContext: ActiveJobCanvasContext;
     currentStartMode: GcodeStartMode;
     currentSavedOrigin: { x: number; y: number } | null;
+    frameTicket: FrameTicket | null;
     outputFormat?: OutputFormat;
   }): Promise<void> {
     const {
@@ -802,6 +807,7 @@ export class MachineService {
       canvasContext,
       currentStartMode,
       currentSavedOrigin,
+      frameTicket,
       outputFormat = 'grbl',
     } = args;
 
@@ -900,6 +906,27 @@ export class MachineService {
     });
     if (!validation.ok) {
       throw new Error(validation.reason);
+    }
+
+    // T1-251: frame freshness is now service-owned. The UI can still
+    // choose LightBurn-style "start without framing", but it must pass
+    // an explicit override ticket so the final machine path can reject
+    // accidental missing/stale frame state and log deliberate bypasses.
+    const frameValidation = validateFrameTicketForStart({
+      frameTicket,
+      jobTicketId: ticket.ticketId,
+      fingerprint: ticket.fingerprint,
+    });
+    if (!frameValidation.ok) {
+      throw new Error(frameValidation.reason);
+    }
+    if (frameValidation.override) {
+      getMachineEventLedger().append({
+        kind: 'unframed-start-override',
+        t: Date.now(),
+        ticketId: ticket.ticketId,
+        reason: frameValidation.reason ?? 'Start without framing selected',
+      });
     }
 
     const lines = [...ticket.gcodeLines];
