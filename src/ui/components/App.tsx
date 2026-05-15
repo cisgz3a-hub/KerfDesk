@@ -132,6 +132,7 @@ import {
 import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
 import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
+import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -882,7 +883,8 @@ export function App(): React.ReactElement {
 
   const handleActivateLayer = useCallback((layerId: string) => {
     const prev = sceneRef.current;
-    if (prev.activeLayerId === layerId) return;
+    const result = buildActivateLayerCommit(prev, layerId);
+    if (!result) return;
     // T1-76: route through handleSceneCommit so canvas-click-to-activate
     // and LayerPanel click both produce a history entry. Previously this
     // was handleSceneChange (no history) while LayerPanel.tsx:157 used
@@ -890,7 +892,7 @@ export function App(): React.ReactElement {
     // Critical 9. Active layer is now consistently project state; undo
     // restores it. (Schema-level "active layer is UI state" is the
     // future T2-71/T2-73 path; T1-76 ships the consistency fix today.)
-    handleSceneCommit({ ...prev, activeLayerId: layerId }, 'activate-layer');
+    handleSceneCommit(result.scene, result.action);
   }, [handleSceneCommit]);
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {

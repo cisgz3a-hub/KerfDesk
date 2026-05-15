@@ -21,6 +21,8 @@ const sceneCommitActionsPath = resolve(here, '../src/ui/scene/SceneCommitActions
 const sceneCommitActions = readFileSync(sceneCommitActionsPath, 'utf-8');
 const layerPanelPath = resolve(here, '../src/ui/components/LayerPanel.tsx');
 const layerPanel = readFileSync(layerPanelPath, 'utf-8');
+const activateLayerHelperPath = resolve(here, '../src/ui/components/app/appActivateLayerHelpers.ts');
+const activateLayerHelper = readFileSync(activateLayerHelperPath, 'utf-8');
 
 let passed = 0;
 let failed = 0;
@@ -56,8 +58,8 @@ assert(
   'handleActivateLayer does NOT call handleSceneChange (no-history path closed)',
 );
 assert(
-  handlerBody.includes("'activate-layer'"),
-  "handleActivateLayer passes 'activate-layer' as the SceneCommitAction label",
+  handlerBody.includes('buildActivateLayerCommit') && activateLayerHelper.includes("action: 'activate-layer'"),
+  "handleActivateLayer delegates the 'activate-layer' SceneCommitAction label",
 );
 assert(
   handlerBody.includes('T1-76'),

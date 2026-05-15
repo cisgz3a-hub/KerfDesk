@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2669
-- Files with exports: 488
+- Export rows: 2671
+- Files with exports: 489
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -20,7 +20,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
-| ui-operator-surface | 568 |
+| ui-operator-surface | 570 |
 
 ## Checklist
 
@@ -3125,17 +3125,17 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 17 | `LAYER_COLORS` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 30 | `LayerMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 33 | `ImageRasterMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 35 | `FillMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 37 | `DitherMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 52 | `CutOrder` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 56 | `LaserSettings` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 160 | `Layer` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 174 | `defaultLaserSettings` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 215 | `createLayer` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
-| 242 | `sortLayersByProcessingOrder` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-layer-mode-helpers.test.ts<br>tests/controller-shared-types-neutral-layer.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 17 | `LAYER_COLORS` | const | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 30 | `LayerMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 33 | `ImageRasterMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 35 | `FillMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 37 | `DitherMode` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 52 | `CutOrder` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 56 | `LaserSettings` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 160 | `Layer` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 174 | `defaultLaserSettings` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 215 | `createLayer` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
+| 242 | `sortLayersByProcessingOrder` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | tests/active-layer-history-consistent.test.ts<br>tests/app-activate-layer-helpers.test.ts<br>tests/app-layer-mode-helpers.test.ts | not required by inventory | core-domain; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4791,7 +4791,18 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 143 | `App` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/app-canvas-viewport-props-extracted.test.ts<br>tests/app-connection-panel-props-extracted.test.ts<br>tests/app-delete-selection-helpers.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 144 | `App` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/app-activate-layer-helpers.test.ts<br>tests/app-canvas-viewport-props-extracted.test.ts<br>tests/app-connection-panel-props-extracted.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/ui/components/app/appActivateLayerHelpers.ts`
+
+**Exports inventoried:** 2
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 4 | `ActivateLayerCommit` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 14 | `buildActivateLayerCommit` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

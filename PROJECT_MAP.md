@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 482 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 710 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 483 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 711 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 192 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 193 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 634 | - |
+| `tests/` | 635 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -474,6 +474,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/UpdateNotice.tsx`
 - `src/ui/components/VariableTextDialog.tsx`
 - `src/ui/components/WelcomeWizard.tsx`
+- `src/ui/components/app/appActivateLayerHelpers.ts`
 - `src/ui/components/app/appDeleteSelectionHelpers.ts`
 - `src/ui/components/app/appLayerModeHelpers.ts`
 - `src/ui/components/app/appLayoutHelpers.ts`
@@ -631,6 +632,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/agent-handoff-current-state.test.ts`
 - `tests/analyze-burn-bounds.test.ts`
 - `tests/any-cast-cleanup.test.ts`
+- `tests/app-activate-layer-helpers.test.ts`
 - `tests/app-canvas-viewport-props-extracted.test.ts`
 - `tests/app-connection-panel-props-extracted.test.ts`
 - `tests/app-delete-selection-helpers.test.ts`
