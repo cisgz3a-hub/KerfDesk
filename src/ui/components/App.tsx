@@ -33,6 +33,7 @@ import {
 } from './app/appLayerModeHelpers';
 // T2-6 Phase 3w: layout-width math + connection-status predicate.
 import {
+  computeCanvasSize,
   computeLayoutWidths,
   isLaserConnected,
 } from './app/appLayoutHelpers';
@@ -702,7 +703,7 @@ export function App(): React.ReactElement {
   }, [openTextEdit, scene, setSelectedIds, setTextPlacementPt]);
 
   useEffect(() => {
-    const onResize = () => setCanvasSize({ width: window.innerWidth, height: window.innerHeight - 34 });
+    const onResize = () => setCanvasSize(computeCanvasSize(window.innerWidth, window.innerHeight));
     onResize();
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);

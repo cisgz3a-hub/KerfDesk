@@ -9,6 +9,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { MachineState } from '../src/controllers/ControllerInterface';
 import {
+  computeCanvasSize,
   computeLayoutWidths,
   isLaserConnected,
 } from '../src/ui/components/app/appLayoutHelpers';
@@ -97,6 +98,13 @@ console.log('\n=== T2-6 Phase 3w app layout helpers ===\n');
     'narrow canvas: viewport goes negative (no clamp — CSS handles overflow)');
 }
 
+// -------- computeCanvasSize --------
+{
+  const r = computeCanvasSize(1200, 900);
+  assert(r.width === 1200, 'canvas size preserves viewport width');
+  assert(r.height === 866, 'canvas size subtracts the app chrome height');
+}
+
 // -------- Source-level pin: App.tsx delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -112,12 +120,16 @@ console.log('\n=== T2-6 Phase 3w app layout helpers ===\n');
     'App calls computeLayoutWidths(canvasWidth, sidebarOpen)');
   assert(/isLaserConnected\(grbl\.machineState\)/.test(appSrc),
     'App calls isLaserConnected(machineState)');
+  assert(/computeCanvasSize\(window\.innerWidth, window\.innerHeight\)/.test(appSrc),
+    'App calls computeCanvasSize(window width, height)');
   // Inline `Math.min(500, Math.floor(canvasSize.width * 0.45))` is gone
   assert(!/Math\.min\(500, Math\.floor\(canvasSize\.width \* 0\.45\)\)/.test(appSrc),
     'inline 500/45% sidebar math is gone from App.tsx');
   // Inline status-disconnected/connecting check is gone
   assert(!/s\.status !== 'disconnected' && s\.status !== 'connecting'/.test(appSrc),
     'inline disconnect/connecting check is gone from App.tsx');
+  assert(!/innerHeight - 34/.test(appSrc),
+    'inline resize chrome subtraction is gone from App.tsx');
 
   const helperSrc = readFileSync(
     resolve(here, '../src/ui/components/app/appLayoutHelpers.ts'),
@@ -129,6 +141,10 @@ console.log('\n=== T2-6 Phase 3w app layout helpers ===\n');
     'computeLayoutWidths is exported');
   assert(/export function isLaserConnected/.test(helperSrc),
     'isLaserConnected is exported');
+  assert(/export function computeCanvasSize/.test(helperSrc),
+    'computeCanvasSize is exported');
+  assert(/T2-6 Phase 3an|Phase 3an/.test(helperSrc),
+    'appLayoutHelpers carries Phase 3an marker');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

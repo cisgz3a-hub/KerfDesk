@@ -44,10 +44,16 @@ export interface AppLayoutWidths {
   canvasViewportWidth: number;
 }
 
+export interface AppCanvasSize {
+  width: number;
+  height: number;
+}
+
 const TOOLBAR_WIDTH_PX = 36;
 const LAYERS_PANEL_WIDTH_PX = 240;
 const CONNECTION_SIDEBAR_MAX_PX = 500;
 const CONNECTION_SIDEBAR_PCT_OF_CANVAS = 0.45;
+const APP_VERTICAL_CHROME_PX = 34;
 
 /**
  * Lay out the App's primary horizontal regions.
@@ -80,4 +86,15 @@ export function computeLayoutWidths(
   const canvasViewportWidth =
     canvasWidth - toolbarWidth - connectionSidebarWidth - layersPanelWidth;
   return { connectionSidebarWidth, layersPanelWidth, toolbarWidth, canvasViewportWidth };
+}
+
+/**
+ * T2-6 Phase 3an: pure window-to-canvas sizing helper.
+ * App.tsx still owns the resize listener and viewport-store write.
+ */
+export function computeCanvasSize(windowWidth: number, windowHeight: number): AppCanvasSize {
+  return {
+    width: windowWidth,
+    height: windowHeight - APP_VERTICAL_CHROME_PX,
+  };
 }
