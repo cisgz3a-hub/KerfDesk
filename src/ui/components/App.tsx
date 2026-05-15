@@ -135,6 +135,10 @@ import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
 import { buildStartModeSelectionCommit } from './app/appStartModeSelectionHelpers';
 import { buildCameraPositionCommit } from './app/appCameraPositionHelpers';
+import {
+  resolveProductionModeToggle,
+  resolveUserModeSelection,
+} from './app/appModePreferenceHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -513,9 +517,10 @@ export function App(): React.ReactElement {
   const userMode = useAppSettingsStore(s => s.userMode);
   const setUserMode = useAppSettingsStore(s => s.setUserMode);
   const handleSetUserMode = useCallback((mode: UserMode) => {
-    if (mode === userMode) return;
-    if (mode === 'beginner') {
-      setUserMode('beginner');
+    const decision = resolveUserModeSelection(userMode, mode);
+    if (decision.kind === 'noop') return;
+    if (decision.kind === 'set') {
+      setUserMode(decision.mode);
       return;
     }
     const confirmed = confirm(
@@ -523,20 +528,20 @@ export function App(): React.ReactElement {
       + 'Advanced mode allows explicit overrides for some beginner safety gates, including starting without framing.\n\n'
       + 'Use this only if you understand your machine behavior.',
     );
-    if (confirmed) setUserMode('advanced');
+    if (confirmed) setUserMode(decision.mode);
   }, [setUserMode, userMode]);
   const handleToggleProductionMode = useCallback(() => {
-    if (productionMode) {
-      setProductionMode(false);
+    const decision = resolveProductionModeToggle({
+      productionMode,
+      proUnlocked: isProUnlocked(),
+    });
+    if (decision.kind === 'set') {
+      setProductionMode(decision.enabled);
       return;
     }
-    if (!isProUnlocked()) {
-      if (confirm('PRO mode is a paid feature ($30 one-time).\n\nClick OK to learn more.')) {
-        window.open('https://laserforge.pages.dev/landing.html', '_blank');
-      }
-      return;
+    if (confirm('PRO mode is a paid feature ($30 one-time).\n\nClick OK to learn more.')) {
+      window.open('https://laserforge.pages.dev/landing.html', '_blank');
     }
-    setProductionMode(true);
   }, [productionMode, setProductionMode]);
 
   useEffect(() => {
