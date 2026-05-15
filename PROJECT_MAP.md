@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 490 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 718 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 491 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 719 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 200 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 201 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 642 | - |
+| `tests/` | 643 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -475,6 +475,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/VariableTextDialog.tsx`
 - `src/ui/components/WelcomeWizard.tsx`
 - `src/ui/components/app/appActivateLayerHelpers.ts`
+- `src/ui/components/app/appAutosaveHelpers.ts`
 - `src/ui/components/app/appCameraPositionHelpers.ts`
 - `src/ui/components/app/appDeleteSelectionHelpers.ts`
 - `src/ui/components/app/appHistoryNavigationHelpers.ts`
@@ -640,6 +641,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/analyze-burn-bounds.test.ts`
 - `tests/any-cast-cleanup.test.ts`
 - `tests/app-activate-layer-helpers.test.ts`
+- `tests/app-autosave-helpers.test.ts`
 - `tests/app-camera-position-helpers.test.ts`
 - `tests/app-canvas-viewport-props-extracted.test.ts`
 - `tests/app-connection-panel-props-extracted.test.ts`

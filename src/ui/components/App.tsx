@@ -145,6 +145,10 @@ import {
   shouldCompileToolpathPreview,
 } from './app/appToolpathPreviewHelpers';
 import { buildTextPreviewFontLoadRequest } from './app/appTextPreviewFontHelpers';
+import {
+  shouldPersistAutosaveForHash,
+  shouldSkipAutosaveForRunningJob,
+} from './app/appAutosaveHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1057,13 +1061,19 @@ export function App(): React.ReactElement {
   useEffect(() => {
     const interval = setInterval(() => {
       // Skip heavy autosave work during host-streamed jobs; it can drain GRBL's planner.
-      if (grbl.isJobRunning || grbl.controllerRef.current?.isJobRunning) return;
+      if (shouldSkipAutosaveForRunningJob({
+        appJobRunning: grbl.isJobRunning,
+        controllerJobRunning: Boolean(grbl.controllerRef.current?.isJobRunning),
+      })) return;
 
       let json: string;
       let currentHash: string;
       try {
         currentHash = hashSceneForPersistence(scene);
-        if (currentHash === lastAutosaveHashRef.current) return;
+        if (!shouldPersistAutosaveForHash({
+          currentHash,
+          lastAutosaveHash: lastAutosaveHashRef.current,
+        })) return;
         json = serializeForAutosave(scene);
       } catch (e) {
         console.warn('[LaserForge] Autosave failed (serialize):', e);
