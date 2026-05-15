@@ -94,9 +94,9 @@ import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
 import { hashSceneForPersistence, isDirty } from '../../core/scene/sceneDirtyHash';
-import { generateId, IDENTITY_MATRIX } from '../../core/types';
+import { generateId } from '../../core/types';
 import { createLayer, type LayerMode } from '../../core/scene/Layer';
-import { type SceneObject, type TextGeometry } from '../../core/scene/SceneObject';
+import { type SceneObject } from '../../core/scene/SceneObject';
 import { selectSceneBounds } from '../../core/scene/bounds';
 import { resolveFrameSceneBounds, resolveFrameTransformBounds } from '../../app/frameGcode';
 import { theme } from '../styles/theme';
@@ -129,9 +129,9 @@ import {
 } from './app/appStartModeDecisions';
 import { type UserMode } from '../../app/UserModeGates';
 import {
-  resolveTextOperationLayer,
   textOperationModeForObject,
 } from '../scene/TextOperationLayer';
+import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -786,70 +786,27 @@ export function App(): React.ReactElement {
   );
 
   const handleAddTextDialogSubmit = useCallback(() => {
-    if (!dialogs.textInput.trim()) return;
+    const result = buildTextDialogSceneCommit({
+      scene,
+      newTextId: generateId(),
+      draft: {
+        textInput: dialogs.textInput,
+        textFont: dialogs.textFont,
+        textSize: dialogs.textSize,
+        textBold: dialogs.textBold,
+        textItalic: dialogs.textItalic,
+        textOperationMode: dialogs.textOperationMode,
+        editingTextId: dialogs.editingTextId,
+        textPlacementPt,
+      },
+    });
+    if (!result) return;
 
-    if (dialogs.editingTextId) {
-      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
-      const newScene = {
-        ...resolved.scene,
-        objects: resolved.scene.objects.map(o =>
-          o.id === dialogs.editingTextId
-            ? {
-                ...o,
-                name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-                layerId: resolved.layerId,
-                geometry: {
-                  ...(o.geometry as TextGeometry),
-                  type: 'text' as const,
-                  text: dialogs.textInput,
-                  fontSize: dialogs.textSize,
-                  fontFamily: dialogs.textFont,
-                  bold: dialogs.textBold,
-                  italic: dialogs.textItalic,
-                },
-                _bounds: null,
-                _worldTransform: null,
-              }
-            : o
-        ),
-      };
-      handleSceneCommit(newScene, 'text-edit', new Set([dialogs.editingTextId]));
-    } else {
-      const resolved = resolveTextOperationLayer(scene, dialogs.textOperationMode);
-
-      const tx = textPlacementPt?.x ?? scene.canvas.width / 2 - 30;
-      const ty = textPlacementPt?.y ?? scene.canvas.height / 2 - 10;
-
-      const textObj: SceneObject = {
-        id: generateId(),
-        type: 'text',
-        name: dialogs.textInput.length > 20 ? dialogs.textInput.slice(0, 20) + '...' : dialogs.textInput,
-        layerId: resolved.layerId,
-        parentId: null,
-        transform: { ...IDENTITY_MATRIX, tx, ty },
-        geometry: {
-          type: 'text',
-          text: dialogs.textInput,
-          fontSize: dialogs.textSize,
-          fontFamily: dialogs.textFont,
-          bold: dialogs.textBold,
-          italic: dialogs.textItalic,
-        },
-        visible: true,
-        locked: false,
-        powerScale: 1,
-        _bounds: null,
-        _worldTransform: null,
-      };
-
-      const newScene = {
-        ...resolved.scene,
-        objects: [...resolved.scene.objects, textObj],
-      };
-      // T2-79+: atomic — selection of the new text object rides into
-      // the history entry's selectionAfter. Undo restores pre-add
-      // selection; redo restores the new text selected.
-      handleSceneCommit(newScene, 'text-add', new Set([textObj.id]));
+    // T2-79+: atomic - selection of the new/edited text object rides
+    // into the history entry's selectionAfter. Undo restores pre-add
+    // selection; redo restores the target text selected.
+    handleSceneCommit(result.scene, result.action, result.selectionAfter);
+    if (result.placedNewText) {
       handleTextPlaced();
     }
 

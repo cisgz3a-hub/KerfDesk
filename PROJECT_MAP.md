@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 479 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 707 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 480 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 708 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 189 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 190 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 631 | - |
+| `tests/` | 632 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -478,6 +478,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appLayoutHelpers.ts`
 - `src/ui/components/app/appSelectionHelpers.ts`
 - `src/ui/components/app/appStartModeDecisions.ts`
+- `src/ui/components/app/appTextCommitHelpers.ts`
 - `src/ui/components/appCanvasViewportProps.ts`
 - `src/ui/components/appConnectionPanelProps.ts`
 - `src/ui/components/appFileToolbarProps.ts`
@@ -648,6 +649,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-settings-store.test.ts`
 - `tests/app-size-audit.test.ts`
 - `tests/app-start-mode-decisions.test.ts`
+- `tests/app-text-commit-helpers.test.ts`
 - `tests/app-text-dialogs-extracted.test.ts`
 - `tests/app-version-from-package.test.ts`
 - `tests/approval-nonce-store.test.ts`

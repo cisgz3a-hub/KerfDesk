@@ -31,6 +31,8 @@ const SCENE_CANVAS_ALLOWLIST: string[] = [
   'src/ui/components/FileToolbar.tsx',
   // Root: text placement default in canvas; profile dialog initial dims fallback.
   'src/ui/components/App.tsx',
+  // Text dialog helper: default placement is in document/design space.
+  'src/ui/components/app/appTextCommitHelpers.ts',
   // File → import: scale / center within the document.
   'src/ui/hooks/useImport.ts',
   // Fit-to-view fallback when the scene is empty: uses document (canvas) bounds.
