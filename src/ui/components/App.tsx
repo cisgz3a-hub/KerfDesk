@@ -144,6 +144,7 @@ import {
   shouldClearToolpathPreview,
   shouldCompileToolpathPreview,
 } from './app/appToolpathPreviewHelpers';
+import { buildTextPreviewFontLoadRequest } from './app/appTextPreviewFontHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -638,22 +639,23 @@ export function App(): React.ReactElement {
   }, [setTextPlacementHint, textPlacementHint]);
 
   useEffect(() => {
-    if (!dialogs.showTextDialog) return;
+    const request = buildTextPreviewFontLoadRequest({
+      showTextDialog: dialogs.showTextDialog,
+      textBold: dialogs.textBold,
+      textFont: dialogs.textFont,
+      textInput: dialogs.textInput,
+      textItalic: dialogs.textItalic,
+      textSize: dialogs.textSize,
+    });
+    if (!request) return;
     if (typeof document === 'undefined' || !document.fonts?.load) {
       setTextPreviewFontReady(true);
       return;
     }
 
     let cancelled = false;
-    const previewFontSizePx = Math.min(dialogs.textSize * 2, 48);
-    const fontSpec =
-      `${dialogs.textItalic ? 'italic ' : ''}` +
-      `${dialogs.textBold ? 'bold ' : ''}` +
-      `${previewFontSizePx}px "${dialogs.textFont}"`;
-    const sample = dialogs.textInput || 'Preview';
-
     setTextPreviewFontReady(false);
-    void document.fonts.load(fontSpec, sample)
+    void document.fonts.load(request.fontSpec, request.sample)
       .then(() => {
         if (!cancelled) setTextPreviewFontReady(true);
       })
