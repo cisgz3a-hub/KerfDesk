@@ -149,6 +149,7 @@ import {
   shouldPersistAutosaveForHash,
   shouldSkipAutosaveForRunningJob,
 } from './app/appAutosaveHelpers';
+import { buildExitFlowPlan } from './app/appExitHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -929,11 +930,16 @@ export function App(): React.ReactElement {
 
   const handleExit = useCallback(async () => {
     const ctrl = grbl.controllerRef.current;
-    const status = grbl.machineState?.status;
-    const isConnected = !!status && status !== 'disconnected' && status !== 'connecting';
+    const plan = buildExitFlowPlan({
+      machineStatus: grbl.machineState?.status,
+      hasController: Boolean(ctrl),
+      controllerJobRunning: Boolean(ctrl?.isJobRunning),
+      sceneDirty: isDirty(scene, lastManualSaveHashRef.current),
+      electronQuitAvailable: Boolean(window.electronAPI?.quit),
+    });
 
-    if (isConnected && ctrl) {
-      if (ctrl.isJobRunning) {
+    if (plan.shouldDisconnect && ctrl) {
+      if (plan.promptRunningJob) {
         const ok = confirm(
           'A laser job is running!\n\nThe laser will be stopped. Are you sure you want to exit?',
         );
@@ -942,13 +948,13 @@ export function App(): React.ReactElement {
       await machineUi.executionCoordinator.safeDisconnect();
     }
 
-    if (isDirty(scene, lastManualSaveHashRef.current)) {
+    if (plan.promptUnsavedChanges) {
       const confirmed = confirm('You have unsaved changes. Are you sure you want to exit?');
       if (!confirmed) return;
     }
 
-    if (window.electronAPI?.quit) {
-      void window.electronAPI.quit();
+    if (plan.destination === 'electron-quit') {
+      void window.electronAPI?.quit?.();
       return;
     }
 

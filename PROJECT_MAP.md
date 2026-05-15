@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 491 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 719 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 492 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 720 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 201 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 202 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 643 | - |
+| `tests/` | 644 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -478,6 +478,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appAutosaveHelpers.ts`
 - `src/ui/components/app/appCameraPositionHelpers.ts`
 - `src/ui/components/app/appDeleteSelectionHelpers.ts`
+- `src/ui/components/app/appExitHelpers.ts`
 - `src/ui/components/app/appHistoryNavigationHelpers.ts`
 - `src/ui/components/app/appLayerModeHelpers.ts`
 - `src/ui/components/app/appLayoutHelpers.ts`
@@ -648,6 +649,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-delete-selection-helpers.test.ts`
 - `tests/app-device-profiles-extracted.test.ts`
 - `tests/app-drag-drop-overlay-extracted.test.ts`
+- `tests/app-exit-helpers.test.ts`
 - `tests/app-file-toolbar-props-extracted.test.ts`
 - `tests/app-generator-workflows-extracted.test.ts`
 - `tests/app-history-manager-owned-by-store.test.ts`
