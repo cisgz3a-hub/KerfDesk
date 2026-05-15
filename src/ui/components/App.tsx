@@ -140,6 +140,10 @@ import {
 } from './app/appModePreferenceHelpers';
 import { buildHistoryNavigationCommit } from './app/appHistoryNavigationHelpers';
 import { resolveMaterialSuggestionRequest } from './app/appMaterialSuggestionHelpers';
+import {
+  shouldClearToolpathPreview,
+  shouldCompileToolpathPreview,
+} from './app/appToolpathPreviewHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -992,7 +996,7 @@ export function App(): React.ReactElement {
 
   // Clear preview state only when preview mode is actually off or suppressed by a job.
   useEffect(() => {
-    if (!showToolpathPreview || grbl.isJobRunning) {
+    if (shouldClearToolpathPreview({ showToolpathPreview, isJobRunning: grbl.isJobRunning })) {
       setToolpathPreviewMoves(null);
     }
   }, [showToolpathPreview, grbl.isJobRunning, setToolpathPreviewMoves]);
@@ -1002,7 +1006,7 @@ export function App(): React.ReactElement {
     // Never recompile during a running job — main-thread stalls starve the
     // WiFi bridge and cause GRBL's planner buffer to drain, silently stopping
     // the machine mid-job. The auto-recompile effect has this same guard.
-    if (grbl.isJobRunning || !showToolpathPreview) return;
+    if (!shouldCompileToolpathPreview({ showToolpathPreview, isJobRunning: grbl.isJobRunning })) return;
 
     let cancelled = false;
     void compileToolpath(scene).then(m => {

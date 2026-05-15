@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 488 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 716 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 489 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 717 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 198 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 199 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 640 | - |
+| `tests/` | 641 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -487,6 +487,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appStartModeDecisions.ts`
 - `src/ui/components/app/appStartModeSelectionHelpers.ts`
 - `src/ui/components/app/appTextCommitHelpers.ts`
+- `src/ui/components/app/appToolpathPreviewHelpers.ts`
 - `src/ui/components/appCanvasViewportProps.ts`
 - `src/ui/components/appConnectionPanelProps.ts`
 - `src/ui/components/appFileToolbarProps.ts`
@@ -667,6 +668,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-start-mode-selection-helpers.test.ts`
 - `tests/app-text-commit-helpers.test.ts`
 - `tests/app-text-dialogs-extracted.test.ts`
+- `tests/app-toolpath-preview-helpers.test.ts`
 - `tests/app-version-from-package.test.ts`
 - `tests/approval-nonce-store.test.ts`
 - `tests/async-scene-producer-guards.test.ts`
