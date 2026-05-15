@@ -9,7 +9,7 @@ import { test } from 'node:test';
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
 test('handoff names the current audit-fix state and next roadmap queue', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T2-6 Phase 3al\*\*/);
+  assert.match(handoff, /Last shipped roadmap item: \*\*T2-6 Phase 3am\*\*/);
   assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-260\*\*/);
   assert.match(handoff, /## Next Roadmap Queue/);
   assert.match(handoff, /T1-17 verification/);
@@ -64,6 +64,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T2-6 Phase 3aj extracts text-preview font-load request formatting/);
   assert.match(handoff, /T2-6 Phase 3ak extracts autosave skip\/persist decisions/);
   assert.match(handoff, /T2-6 Phase 3al extracts exit-flow decisions/);
+  assert.match(handoff, /T2-6 Phase 3am extracts start-mode status-label formatting/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

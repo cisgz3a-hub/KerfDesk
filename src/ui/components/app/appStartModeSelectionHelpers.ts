@@ -8,6 +8,11 @@ export interface StartModeSelectionCommit {
   shouldResetWcs: boolean;
 }
 
+export interface StartModeStatusLabelInput {
+  mode: GcodeStartMode;
+  savedOrigin: { readonly x: number; readonly y: number } | null | undefined;
+}
+
 /**
  * T2-6 Phase 3ad: pure start-mode selection transaction builder.
  * App.tsx still owns persisted start-mode state and the controller WCS
@@ -27,4 +32,17 @@ export function buildStartModeSelectionCommit(
     action: 'start-position',
     shouldResetWcs: mode !== 'savedOrigin',
   };
+}
+
+/**
+ * T2-6 Phase 3am: pure start-mode status-label formatting.
+ * App.tsx still owns rendering and saved-origin state.
+ */
+export function resolveStartModeStatusLabel(input: StartModeStatusLabelInput): string {
+  if (input.mode === 'absolute') return 'Canvas = Bed position';
+  if (input.mode === 'current') return 'Design starts at laser head';
+  if (input.savedOrigin) {
+    return `Design starts at saved origin X:${input.savedOrigin.x.toFixed(0)} Y:${input.savedOrigin.y.toFixed(0)}`;
+  }
+  return 'No saved origin - set one below';
 }

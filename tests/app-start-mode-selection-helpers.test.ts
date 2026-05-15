@@ -1,7 +1,10 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createScene } from '../src/core/scene/Scene';
-import { buildStartModeSelectionCommit } from '../src/ui/components/app/appStartModeSelectionHelpers';
+import {
+  buildStartModeSelectionCommit,
+  resolveStartModeStatusLabel,
+} from '../src/ui/components/app/appStartModeSelectionHelpers';
 
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
@@ -39,12 +42,34 @@ console.log('\n=== T2-6 Phase 3ad app start-mode selection helpers ===\n');
   assert(result.shouldResetWcs === false, 'saved-origin mode preserves WCS');
 }
 
+assert(
+  resolveStartModeStatusLabel({ mode: 'absolute', savedOrigin: null }) === 'Canvas = Bed position',
+  'absolute mode status label is preserved',
+);
+assert(
+  resolveStartModeStatusLabel({ mode: 'current', savedOrigin: null }) === 'Design starts at laser head',
+  'current/head mode status label is preserved',
+);
+assert(
+  resolveStartModeStatusLabel({ mode: 'savedOrigin', savedOrigin: { x: 12.4, y: 98.6 } })
+    === 'Design starts at saved origin X:12 Y:99',
+  'saved-origin status label rounds saved coordinates',
+);
+assert(
+  resolveStartModeStatusLabel({ mode: 'savedOrigin', savedOrigin: null }) === 'No saved origin - set one below',
+  'saved-origin status label preserves the missing-origin message',
+);
+
 const appSource = readFileSync(resolve(root, 'src/ui/components/App.tsx'), 'utf8');
 const helperSource = readFileSync(resolve(root, 'src/ui/components/app/appStartModeSelectionHelpers.ts'), 'utf8');
 
 assert(
   appSource.includes('buildStartModeSelectionCommit'),
   'App imports and uses buildStartModeSelectionCommit',
+);
+assert(
+  appSource.includes('resolveStartModeStatusLabel'),
+  'App imports and uses resolveStartModeStatusLabel',
 );
 assert(
   !appSource.includes('startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) }'),
@@ -55,8 +80,16 @@ assert(
   'App no longer carries the saved-origin WCS reset branch inline',
 );
 assert(
+  !appSource.includes("startMode === 'absolute'"),
+  'App no longer carries start-mode status-label branching inline',
+);
+assert(
   helperSource.includes('T2-6 Phase 3ad'),
   'appStartModeSelectionHelpers carries the T2-6 Phase 3ad marker',
 );
+assert(
+  helperSource.includes('T2-6 Phase 3am'),
+  'appStartModeSelectionHelpers carries the T2-6 Phase 3am marker',
+);
 
-console.log('Start-mode scene update and WCS-reset decision are extracted from App.');
+console.log('Start-mode scene update, WCS-reset decision, and status label are extracted from App.');

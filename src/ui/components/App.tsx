@@ -132,7 +132,10 @@ import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
 import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
-import { buildStartModeSelectionCommit } from './app/appStartModeSelectionHelpers';
+import {
+  buildStartModeSelectionCommit,
+  resolveStartModeStatusLabel,
+} from './app/appStartModeSelectionHelpers';
 import { buildCameraPositionCommit } from './app/appCameraPositionHelpers';
 import {
   resolveProductionModeToggle,
@@ -1549,13 +1552,7 @@ export function App(): React.ReactElement {
               zIndex: 5,
             },
           },
-          startMode === 'absolute'
-            ? 'Canvas = Bed position'
-            : startMode === 'current'
-              ? 'Design starts at laser head'
-              : savedOrigin
-                ? `Design starts at saved origin X:${savedOrigin.x.toFixed(0)} Y:${savedOrigin.y.toFixed(0)}`
-                : 'No saved origin - set one below',
+          resolveStartModeStatusLabel({ mode: startMode, savedOrigin }),
           ),
           React.createElement(CanvasViewport, buildAppCanvasViewportProps({
           scene,
