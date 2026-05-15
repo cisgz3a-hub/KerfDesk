@@ -134,6 +134,7 @@ import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
 import { buildStartModeSelectionCommit } from './app/appStartModeSelectionHelpers';
+import { buildCameraPositionCommit } from './app/appCameraPositionHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -939,46 +940,9 @@ export function App(): React.ReactElement {
   }, [grbl.controllerRef, grbl.machineState?.status, machineUi.executionCoordinator, scene]);
 
   const handleCameraPositionDesign = useCallback((worldX: number, worldY: number) => {
-    if (selectedIds.size === 0) {
-      let minX = Infinity;
-      let minY = Infinity;
-      for (const obj of scene.objects) {
-        if (!obj.visible) continue;
-        minX = Math.min(minX, obj.transform.tx);
-        minY = Math.min(minY, obj.transform.ty);
-      }
-      if (!Number.isFinite(minX)) return;
-      const dx = worldX - minX;
-      const dy = worldY - minY;
-      const newScene: Scene = {
-        ...scene,
-        objects: scene.objects.map(o => ({
-          ...o,
-          transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
-        })),
-      };
-      handleSceneCommit(newScene, 'camera-position');
-      return;
-    }
-
-    const selected = scene.objects.filter(o => selectedIds.has(o.id));
-    let minX = Infinity;
-    let minY = Infinity;
-    for (const o of selected) {
-      minX = Math.min(minX, o.transform.tx);
-      minY = Math.min(minY, o.transform.ty);
-    }
-    const dx = worldX - minX;
-    const dy = worldY - minY;
-    const newScene: Scene = {
-      ...scene,
-      objects: scene.objects.map(o =>
-        selectedIds.has(o.id)
-          ? { ...o, transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy } }
-          : o
-      ),
-    };
-    handleSceneCommit(newScene, 'camera-position');
+    const result = buildCameraPositionCommit(scene, selectedIds, worldX, worldY);
+    if (!result) return;
+    handleSceneCommit(result.scene, result.action);
   }, [scene, selectedIds, handleSceneCommit]);
 
   const sceneOps = useSceneOperations({

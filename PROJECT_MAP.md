@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 484 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 712 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 485 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 713 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 194 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 195 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 636 | - |
+| `tests/` | 637 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -475,6 +475,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/VariableTextDialog.tsx`
 - `src/ui/components/WelcomeWizard.tsx`
 - `src/ui/components/app/appActivateLayerHelpers.ts`
+- `src/ui/components/app/appCameraPositionHelpers.ts`
 - `src/ui/components/app/appDeleteSelectionHelpers.ts`
 - `src/ui/components/app/appLayerModeHelpers.ts`
 - `src/ui/components/app/appLayoutHelpers.ts`
@@ -634,6 +635,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/analyze-burn-bounds.test.ts`
 - `tests/any-cast-cleanup.test.ts`
 - `tests/app-activate-layer-helpers.test.ts`
+- `tests/app-camera-position-helpers.test.ts`
 - `tests/app-canvas-viewport-props-extracted.test.ts`
 - `tests/app-connection-panel-props-extracted.test.ts`
 - `tests/app-delete-selection-helpers.test.ts`
