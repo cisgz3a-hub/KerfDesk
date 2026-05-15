@@ -24,7 +24,6 @@ import { type Scene } from '../../core/scene/Scene';
 // T2-6 Phase 3u: selection helpers extracted so the filter +
 // select-all rules can be tested without mounting App.
 import {
-  filterValidIds,
   selectAllSelectableIds,
 } from './app/appSelectionHelpers';
 // T2-6 Phase 3v: active-layer-mode derivations extracted.
@@ -139,6 +138,7 @@ import {
   resolveProductionModeToggle,
   resolveUserModeSelection,
 } from './app/appModePreferenceHelpers';
+import { buildHistoryNavigationCommit } from './app/appHistoryNavigationHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1148,8 +1148,8 @@ export function App(): React.ReactElement {
     }
     const entry = undoHistoryEntry();
     if (!entry) return;
-    const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
-    applyHistoryScene(entry.scene, 'undo', validSelection);
+    const result = buildHistoryNavigationCommit(entry, 'undo');
+    applyHistoryScene(result.scene, result.direction, result.selectionAfter);
   }, [applyHistoryScene, grbl.isJobRunning, showAlert, undoHistoryEntry]);
 
   const handleRedo = useCallback(() => {
@@ -1162,8 +1162,8 @@ export function App(): React.ReactElement {
     }
     const entry = redoHistoryEntry();
     if (!entry) return;
-    const validSelection = filterValidIds(entry.selectionAfter, entry.scene);
-    applyHistoryScene(entry.scene, 'redo', validSelection);
+    const result = buildHistoryNavigationCommit(entry, 'redo');
+    applyHistoryScene(result.scene, result.direction, result.selectionAfter);
   }, [applyHistoryScene, grbl.isJobRunning, showAlert, redoHistoryEntry]);
 
   const handleSelectAll = useCallback(() => {
