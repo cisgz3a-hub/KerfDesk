@@ -21,7 +21,6 @@
 
 import React, { useRef, useEffect, useCallback, useMemo } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { deleteObjects } from '../../core/scene/SceneOps';
 // T2-6 Phase 3u: selection helpers extracted so the filter +
 // select-all rules can be tested without mounting App.
 import {
@@ -132,6 +131,7 @@ import {
 } from '../scene/TextOperationLayer';
 import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
 import { buildModeTabSelectResult } from './app/appModeTabHelpers';
+import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1201,8 +1201,8 @@ export function App(): React.ReactElement {
   }, [scene, setSelectedIds]);
 
   const handleDelete = useCallback(() => {
-    if (selectedIds.size === 0) return;
-    const newScene = deleteObjects(scene, selectedIds);
+    const result = buildDeleteSelectionCommit(scene, selectedIds);
+    if (!result) return;
     // T1-73 (origin) + T2-76 step 4 (extension): route through the
     // unified mutation function with the 'delete' action label and an
     // explicit empty selection. selectionAfter is applied inside
@@ -1212,8 +1212,8 @@ export function App(): React.ReactElement {
     // of dispatch). T1-73's original concern (autosave skipping the
     // deletion if the project stayed clean) is still satisfied:
     // commitSceneTransaction calls notifyDirty(true) for kind='edit'.
-    commitSceneTransaction(newScene, { kind: 'edit', action: 'delete' }, {
-      selectionAfter: new Set(),
+    commitSceneTransaction(result.scene, { kind: 'edit', action: result.action }, {
+      selectionAfter: result.selectionAfter,
     });
   }, [scene, selectedIds, commitSceneTransaction]);
 
