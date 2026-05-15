@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2671
-- Files with exports: 489
+- Export rows: 2673
+- Files with exports: 490
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -20,7 +20,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
-| ui-operator-surface | 570 |
+| ui-operator-surface | 572 |
 
 ## Checklist
 
@@ -4791,7 +4791,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 144 | `App` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/app-activate-layer-helpers.test.ts<br>tests/app-canvas-viewport-props-extracted.test.ts<br>tests/app-connection-panel-props-extracted.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 145 | `App` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/app-activate-layer-helpers.test.ts<br>tests/app-canvas-viewport-props-extracted.test.ts<br>tests/app-connection-panel-props-extracted.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4870,6 +4870,17 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 |---:|---|---|---|---|---|---|---|---|---|---|---|
 | 41 | `shouldResetStartModeAfterDisconnect` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 70 | `shouldNudgeStartModeToCurrent` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/ui/components/app/appStartModeSelectionHelpers.ts`
+
+**Exports inventoried:** 2
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 5 | `StartModeSelectionCommit` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 17 | `buildStartModeSelectionCommit` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

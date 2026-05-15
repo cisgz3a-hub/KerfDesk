@@ -133,6 +133,7 @@ import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
 import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
+import { buildStartModeSelectionCommit } from './app/appStartModeSelectionHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -897,16 +898,14 @@ export function App(): React.ReactElement {
 
   const handleSelectStartMode = useCallback((mode: StartMode, origin: { x: number; y: number }) => {
     setStartMode(mode);
-    handleSceneCommit({
-      ...scene,
-      startPosition: { x: Math.round(origin.x), y: Math.round(origin.y) },
-    }, 'start-position');
+    const result = buildStartModeSelectionCommit(scene, mode, origin);
+    handleSceneCommit(result.scene, result.action);
     // When leaving Origin mode, clear any WCS offset that Set Origin
     // applied. Bed mode assumes WCS == machine coords; Head mode is
     // G91-relative and doesn't depend on WCS but users expect the X:Y
     // readout to reflect machine coords after switching. Only 'savedOrigin'
     // mode wants the WCS offset to persist (user will Set Origin manually).
-    if (mode !== 'savedOrigin') {
+    if (result.shouldResetWcs) {
       void sendResetWcsCommand(grbl.controller);
     }
   }, [scene, handleSceneCommit, grbl.controller, setStartMode]);
