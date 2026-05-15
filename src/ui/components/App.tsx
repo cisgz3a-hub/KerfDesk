@@ -95,7 +95,6 @@ import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
 import { hashSceneForPersistence, isDirty } from '../../core/scene/sceneDirtyHash';
 import { generateId } from '../../core/types';
-import { createLayer, type LayerMode } from '../../core/scene/Layer';
 import { type SceneObject } from '../../core/scene/SceneObject';
 import { selectSceneBounds } from '../../core/scene/bounds';
 import { resolveFrameSceneBounds, resolveFrameTransformBounds } from '../../app/frameGcode';
@@ -132,6 +131,7 @@ import {
   textOperationModeForObject,
 } from '../scene/TextOperationLayer';
 import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
+import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -861,56 +861,21 @@ export function App(): React.ReactElement {
   const handleModeTabSelect = useCallback(
     (mode: string) => {
       const prev = sceneRef.current;
-      const targetLayer = prev.layers.find(l => l.settings.mode === mode);
+      const result = buildModeTabSelectResult(prev, mode);
 
-      if (targetLayer) {
-        const next =
-          prev.activeLayerId === targetLayer.id
-            ? prev
-            : { ...prev, activeLayerId: targetLayer.id };
-        const modeLayerIds = new Set(
-          next.layers.filter(l => l.settings.mode === mode).map(l => l.id),
-        );
-        const objectsOnMode = next.objects.filter(
-          o => o.visible && modeLayerIds.has(o.layerId),
-        );
-        setSelectedIds(new Set(objectsOnMode.map(o => o.id)));
-        if (prev.activeLayerId !== targetLayer.id) {
-          setScene(next);
-        }
+      setSelectedIds(new Set(result.selectionAfter));
+      if (result.action) {
+        // T2-79+: atomic - selecting all objects on the new mode-layer
+        // rides into the history entry's selectionAfter. Undo restores
+        // the pre-mode-select selection; redo re-selects the matched
+        // objects.
+        handleSceneCommit(result.scene, result.action, result.selectionAfter);
         return;
       }
 
-      const maxOrder =
-        prev.layers.length > 0 ? Math.max(...prev.layers.map(l => l.order)) : -1;
-      const modeNames: Record<string, string> = {
-        cut: 'Cut',
-        engrave: 'Engrave',
-        score: 'Score',
-        image: 'Image',
-      };
-      const newLayer = createLayer(
-        maxOrder + 1,
-        mode as LayerMode,
-        modeNames[mode] ?? mode,
-      );
-      const next: Scene = {
-        ...prev,
-        layers: [...prev.layers, newLayer],
-        activeLayerId: newLayer.id,
-      };
-      const modeLayerIds = new Set(
-        next.layers.filter(l => l.settings.mode === mode).map(l => l.id),
-      );
-      const objectsOnMode = next.objects.filter(
-        o => o.visible && modeLayerIds.has(o.layerId),
-      );
-      const modeSelection = new Set(objectsOnMode.map(o => o.id));
-      // T2-79+: atomic — selecting all objects on the new mode-layer
-      // rides into the history entry's selectionAfter. Undo restores
-      // the pre-mode-select selection; redo re-selects the matched
-      // objects.
-      handleSceneCommit(next, 'mode-select', modeSelection);
+      if (result.scene !== prev) {
+        setScene(result.scene);
+      }
     },
     [handleSceneCommit, setScene, setSelectedIds],
   );

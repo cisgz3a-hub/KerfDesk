@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 480 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 708 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 481 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 709 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 190 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 191 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 632 | - |
+| `tests/` | 633 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -476,6 +476,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/WelcomeWizard.tsx`
 - `src/ui/components/app/appLayerModeHelpers.ts`
 - `src/ui/components/app/appLayoutHelpers.ts`
+- `src/ui/components/app/appModeTabHelpers.ts`
 - `src/ui/components/app/appSelectionHelpers.ts`
 - `src/ui/components/app/appStartModeDecisions.ts`
 - `src/ui/components/app/appTextCommitHelpers.ts`
@@ -640,6 +641,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-layer-mode-helpers.test.ts`
 - `tests/app-layout-helpers.test.ts`
 - `tests/app-material-workflows-extracted.test.ts`
+- `tests/app-mode-tab-helpers.test.ts`
 - `tests/app-no-local-usestate.test.ts`
 - `tests/app-nudge-workflow-extracted.test.ts`
 - `tests/app-profile-apply-import.test.ts`

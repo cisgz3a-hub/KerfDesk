@@ -8,8 +8,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2665
-- Files with exports: 486
+- Export rows: 2667
+- Files with exports: 487
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
@@ -20,7 +20,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | file-ipc-boundary | 186 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
-| ui-operator-surface | 564 |
+| ui-operator-surface | 566 |
 
 ## Checklist
 
@@ -4815,6 +4815,17 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 29 | `isLaserConnected` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 36 | `AppLayoutWidths` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 68 | `computeLayoutWidths` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+
+**Findings count for this file:** inventory-only; see dated audit ledgers for findings.
+
+### File: `src/ui/components/app/appModeTabHelpers.ts`
+
+**Exports inventoried:** 2
+
+| Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
+|---:|---|---|---|---|---|---|---|---|---|---|---|
+| 12 | `ModeTabSelectResult` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 35 | `buildModeTabSelectResult` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
