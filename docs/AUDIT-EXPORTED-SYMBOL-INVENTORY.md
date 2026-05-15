@@ -8,13 +8,13 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2659
+- Export rows: 2661
 - Files with exports: 485
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
 | Domain | Export rows |
 |---|---:|
-| compile-output | 403 |
+| compile-output | 405 |
 | core-domain | 355 |
 | entitlement-security | 110 |
 | file-ipc-boundary | 186 |
@@ -2584,11 +2584,12 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/core/plan/index.ts`
 
-**Exports inventoried:** 57
+**Exports inventoried:** 58
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
 | 9 | `* from ./Plan` | export-star | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 10 | `iterateRasterOperationMoves from ./PlanOptimizer` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
 | 10 | `optimizePlan from ./PlanOptimizer` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
 | 10 | `OptimizePlanConfig from ./PlanOptimizer` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
 | 12 | `applyMachineTransform from ./MachineTransform` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
@@ -2736,16 +2737,17 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/core/plan/PlanOptimizer.ts`
 
-**Exports inventoried:** 6
+**Exports inventoried:** 7
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 106 | `FillProducedNoRowsDiagnostics` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
-| 118 | `FillProducedNoRowsError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
-| 137 | `OptimizePlanConfig` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
-| 156 | `OptimizePlanProgress` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
-| 171 | `optimizePlan` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
-| 917 | `appendBurnMoves2D` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 107 | `FillProducedNoRowsDiagnostics` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 119 | `FillProducedNoRowsError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 138 | `OptimizePlanConfig` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 157 | `OptimizePlanProgress` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 172 | `optimizePlan` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 781 | `iterateRasterOperationMoves` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
+| 920 | `appendBurnMoves2D` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | determinism-sensitive | not auto-matched by filename | requires production-path evidence | compile-output; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

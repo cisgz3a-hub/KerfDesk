@@ -24,7 +24,7 @@
  *  1. `RasterSegment.startX/endX` contain PURE artwork pixel bounds.
  *  2. `RasterScanline` gains `overscanFromX` / `overscanToX` — the
  *     row's travel envelope.
- *  3. `planRasterOperation` mirrors the fill pattern exactly:
+ *  3. `iterateRasterOperationMoves` mirrors the fill pattern exactly:
  *     - rapid to `overscanFromX`
  *     - G1 S0 approach from `overscanFromX` to first burn-start
  *     - burn each segment at its power
@@ -182,7 +182,7 @@ console.log('\n=== T1-173 raster overscan is S0 travel (Critical #1 audit fix) =
   }
 }
 
-// -------- 4. planRasterOperation emits the rapid + G1 S0 + burn + G1 S0 sequence --------
+// -------- 4. iterateRasterOperationMoves emits the rapid + G1 S0 + burn + G1 S0 sequence --------
 {
   // Use optimizePlan with a job containing one raster operation.
   const bitmap: ProcessedBitmap = {
@@ -338,17 +338,17 @@ console.log('\n=== T1-173 raster overscan is S0 travel (Critical #1 audit fix) =
   // PlanOptimizer rapid goes to scanline.overscanFromX, not adjusted[0].startX.
   assert(
     /rapid['"\s,:]+to:\s*\{\s*x:\s*scanline\.overscanFromX/.test(poSrc),
-    'planRasterOperation rapid lands at scanline.overscanFromX',
+    'iterateRasterOperationMoves rapid lands at scanline.overscanFromX',
   );
   // The old rapid pattern (`adjusted[0].startX`) must be gone.
   assert(
     !/rapid['"\s,:]+to:\s*\{\s*x:\s*adjusted\[0\]\.startX/.test(poSrc),
-    'planRasterOperation no longer rapids to adjusted[0].startX (which had -overscan baked in)',
+    'iterateRasterOperationMoves no longer rapids to adjusted[0].startX (which had -overscan baked in)',
   );
   // The exit-linear path lands at overscanToX.
   assert(
     /to:\s*\{\s*x:\s*scanline\.overscanToX/.test(poSrc),
-    'planRasterOperation exit linear lands at scanline.overscanToX',
+    'iterateRasterOperationMoves exit linear lands at scanline.overscanToX',
   );
 }
 

@@ -1,7 +1,7 @@
 /**
  * T1-165 (audit F-029): `optimizePlan` checks the abort signal only at
  * top-level operation boundaries pre-T1-165. Inside a single operation
- * (`planRasterOperation`, `planFillOperation`, `planPath`) the inner
+ * (`iterateRasterOperationMoves`, `planFillOperation`, `planPath`) the inner
  * scanline / row / segment loops ran to completion before the next
  * `throwIfOptimizeAborted` between operations fired.
  *
@@ -11,7 +11,7 @@
  * to finish before the abort took effect.
  *
  * Post-T1-165 the signal is threaded into the inner functions:
- *  - `planRasterOperation` checks once per scanline (~4000 checks for
+ *  - `iterateRasterOperationMoves` checks once per scanline (~4000 checks for
  *    a 12MP photo)
  *  - `planFillOperation` checks once per row (~10k checks for a large
  *    fill)
@@ -256,10 +256,10 @@ console.log('\n=== T1-165 PlanOptimizer mid-operation abort cancellation ===\n')
     'planFillOperation has a per-row throwIfOptimizeAborted check inside the allRows loop',
   );
 
-  // The new per-scanline check inside planRasterOperation.
+  // The new per-scanline check inside iterateRasterOperationMoves.
   assert(
     /for \(const scanline of iterateRasterScanlines\(bitmap,\s*rasterSettings\)\) \{[\s\S]{0,500}throwIfOptimizeAborted\(signal\)/.test(src),
-    'planRasterOperation has a per-scanline throwIfOptimizeAborted check inside the raster iterator loop',
+    'iterateRasterOperationMoves has a per-scanline throwIfOptimizeAborted check inside the raster iterator loop',
   );
 
   // planPath now takes signal.
@@ -280,10 +280,10 @@ console.log('\n=== T1-165 PlanOptimizer mid-operation abort cancellation ===\n')
     'planOperation signature accepts a signal parameter',
   );
 
-  // planRasterOperation accepts signal.
+  // iterateRasterOperationMoves accepts signal.
   assert(
-    /function planRasterOperation\([\s\S]*?signal\?: AbortSignal/.test(src),
-    'planRasterOperation signature accepts a signal parameter',
+    /export function\* iterateRasterOperationMoves\([\s\S]*?signal\?: AbortSignal/.test(src),
+    'iterateRasterOperationMoves signature accepts a signal parameter',
   );
 
   // planFillOperation accepts signal.

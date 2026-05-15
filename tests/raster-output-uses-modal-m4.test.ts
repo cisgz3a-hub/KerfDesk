@@ -217,16 +217,15 @@ void (async () => {
     assert(/single M4 covers the whole raster operation/.test(src),
       'PlanOptimizer comment documents single-M4 modal scope');
     // Pre-T1-31 emitted laserOff + laserOn pairs inside the per-segment
-    // loop. The new code emits each only once, outside the scanline loop.
-    // Pin the structural shape: the single push of laserOn before the
-    // outer `for (const scanline ...)` loop, single laserOff after it.
-    const planRasterFn = src.match(/function planRasterOperation[\s\S]*?\n\}/)?.[0] ?? '';
-    const laserOnPushes = (planRasterFn.match(/moves\.push\(\{ type: 'laserOn'/g) || []).length;
-    const laserOffPushes = (planRasterFn.match(/moves\.push\(\{ type: 'laserOff'/g) || []).length;
-    assert(laserOnPushes === 1,
-      `planRasterOperation pushes exactly 1 laserOn (got ${laserOnPushes})`);
-    assert(laserOffPushes === 1,
-      `planRasterOperation pushes exactly 1 laserOff (got ${laserOffPushes})`);
+    // loop. The new move iterator emits each only once, outside the
+    // scanline segment loop.
+    const rasterIteratorFn = src.match(/export function\* iterateRasterOperationMoves[\s\S]*?\n\}/)?.[0] ?? '';
+    const laserOnYields = (rasterIteratorFn.match(/yield \{ type: 'laserOn'/g) || []).length;
+    const laserOffYields = (rasterIteratorFn.match(/yield \{ type: 'laserOff'/g) || []).length;
+    assert(laserOnYields === 1,
+      `iterateRasterOperationMoves yields exactly 1 laserOn (got ${laserOnYields})`);
+    assert(laserOffYields === 1,
+      `iterateRasterOperationMoves yields exactly 1 laserOff (got ${laserOffYields})`);
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

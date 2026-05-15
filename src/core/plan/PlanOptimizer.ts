@@ -29,6 +29,7 @@
 import { type Point } from '../types';
 import {
   type Job, type Operation, type FlatPath,
+  type ProcessedBitmap,
   type ResolvedLaserSettings,
 } from '../job/Job';
 import { type CompoundPath } from '../geometry/CompoundPath';
@@ -268,14 +269,8 @@ function planOperation(
         sourceObjectIds: [operation.geometry.bitmap.sourceObjectId],
       });
       // RASTER: Convert bitmap pixels to scanline moves
-      const rasterMoves = planRasterOperation(
-        operation.geometry.bitmap,
-        settings,
-        pos,
-        signal,
-      );
-      for (let i = 0; i < rasterMoves.length; i++) {
-        moves.push(rasterMoves[i]);
+      for (const rasterMove of iterateRasterOperationMoves(operation.geometry.bitmap, settings, signal)) {
+        moves.push(rasterMove);
       }
     } else if (operation.type === 'engrave' && operation.geometry.type === 'fill') {
       const fillIds = Array.from(new Set(operation.geometry.paths.map(p => p.id)));
@@ -776,13 +771,18 @@ function planFillOperation(
  * planner stutter, fat/weak segment boundaries, and saturated buffer
  * bandwidth. The fill strategy (`planFillOperation`) already used
  * the modal pattern; this brings raster to parity.
+ *
+ * T3-34 second slice: expose the raster move stream as a generator
+ * so callers can consume row-generated moves without first building
+ * a private raster move array. The Plan object still materializes
+ * moves; this is a future streaming seam, not an output semantics
+ * change.
  */
-function planRasterOperation(
-  bitmap: import('../job/Job').ProcessedBitmap,
+export function* iterateRasterOperationMoves(
+  bitmap: ProcessedBitmap,
   settings: ResolvedLaserSettings,
-  startPos: Point,
   signal?: AbortSignal,
-): Move[] {
+): Generator<Move, void, void> {
   const rasterSettings: RasterSettings = {
     powerMin: settings.powerMin,
     powerMax: settings.powerMax,
@@ -793,7 +793,6 @@ function planRasterOperation(
     responseCurve: settings.responseCurve,
   };
 
-  const moves: Move[] = [];
   const speed = settings.speed;
   const useAccel = settings.accelAwarePower !== false;
   const maxAccel = Math.max(1, settings.maxAccelMmPerS2);
@@ -801,21 +800,23 @@ function planRasterOperation(
 
   const scanTable = settings.scanningOffsets;
 
-  // T1-31: single M4 covers the whole raster operation. M4 dynamic
-  // power mode means the laser auto-cuts during G0 between scanlines
-  // and follows S inline during G1.
-  moves.push({ type: 'laserOn', power: 0 });
-
   let sawScanline = false;
   for (const scanline of iterateRasterScanlines(bitmap, rasterSettings)) {
     if (scanline.segments.length === 0) continue;
-    sawScanline = true;
     // T1-165 (audit F-029): cancel-aware per-scanline check. A 12MP
     // photo produces ~4000 scanlines × 100–1000 segments — the inner
     // segment loop here is ~0.1–1ms per scanline, so checking once
     // per scanline lands a cancel within ~ms instead of waiting
     // 5–30s for the whole raster operation to finish.
     throwIfOptimizeAborted(signal);
+
+    if (!sawScanline) {
+      sawScanline = true;
+      // T1-31: single M4 covers the whole raster operation. M4 dynamic
+      // power mode means the laser auto-cuts during G0 between scanlines
+      // and follows S inline during G1.
+      yield { type: 'laserOn', power: 0 };
+    }
 
     // Apply per-speed scanning offset to every segment in this row up
     // front so the gap-bridge logic below uses the adjusted endpoints
@@ -840,7 +841,7 @@ function planRasterOperation(
     // had `-overscan` baked in, but `appendRasterBurnMoves` then
     // burned from that point at full power — engraving outside the
     // artwork.
-    moves.push({ type: 'rapid', to: { x: scanline.overscanFromX, y: adjusted[0].y } });
+    yield { type: 'rapid', to: { x: scanline.overscanFromX, y: adjusted[0].y } };
 
     // T1-173: G1 S0 approach from overscan-from to the first burn
     // pixel. The machine accelerates to scan speed during this
@@ -848,12 +849,12 @@ function planRasterOperation(
     // at the correct velocity. Skip if overscan === 0 (no headroom).
     const firstBurnStart = adjusted[0].startX;
     if (Math.abs(firstBurnStart - scanline.overscanFromX) > 1e-4) {
-      moves.push({
+      yield {
         type: 'linear',
         to: { x: firstBurnStart, y: adjusted[0].y },
         power: 0,
         speed,
-      });
+      };
     }
 
     let prevEndX = firstBurnStart;
@@ -865,16 +866,17 @@ function planRasterOperation(
       // direction. Skipped on the first iteration (prevEndX ===
       // first segment's startX) and skipped when two segments abut.
       if (i > 0 && Math.abs(seg.startX - prevEndX) > 1e-4) {
-        moves.push({
+        yield {
           type: 'linear',
           to: { x: seg.startX, y: seg.y },
           power: 0,
           speed,
-        });
+        };
       }
 
+      const burnMoves: Move[] = [];
       appendRasterBurnMoves(
-        moves,
+        burnMoves,
         seg.startX,
         seg.endX,
         seg.y,
@@ -884,6 +886,9 @@ function planRasterOperation(
         maxAccel,
         minRatio,
       );
+      for (const move of burnMoves) {
+        yield move;
+      }
       prevEndX = seg.endX;
     }
 
@@ -892,20 +897,18 @@ function planRasterOperation(
     // doesn't degrade the trailing burn pixels. Skip when overscan
     // === 0.
     if (Math.abs(scanline.overscanToX - prevEndX) > 1e-4) {
-      moves.push({
+      yield {
         type: 'linear',
         to: { x: scanline.overscanToX, y: adjusted[adjusted.length - 1].y },
         power: 0,
         speed,
-      });
+      };
     }
   }
 
-  if (!sawScanline) return [];
-
-  moves.push({ type: 'laserOff' });
-
-  return moves;
+  if (sawScanline) {
+    yield { type: 'laserOff' };
+  }
 }
 
 /**
