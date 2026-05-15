@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 487 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 715 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 488 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 716 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 197 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 198 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 639 | - |
+| `tests/` | 640 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -480,6 +480,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appHistoryNavigationHelpers.ts`
 - `src/ui/components/app/appLayerModeHelpers.ts`
 - `src/ui/components/app/appLayoutHelpers.ts`
+- `src/ui/components/app/appMaterialSuggestionHelpers.ts`
 - `src/ui/components/app/appModePreferenceHelpers.ts`
 - `src/ui/components/app/appModeTabHelpers.ts`
 - `src/ui/components/app/appSelectionHelpers.ts`
@@ -650,6 +651,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-keyboard-workflow-extracted.test.ts`
 - `tests/app-layer-mode-helpers.test.ts`
 - `tests/app-layout-helpers.test.ts`
+- `tests/app-material-suggestion-helpers.test.ts`
 - `tests/app-material-workflows-extracted.test.ts`
 - `tests/app-mode-preference-helpers.test.ts`
 - `tests/app-mode-tab-helpers.test.ts`

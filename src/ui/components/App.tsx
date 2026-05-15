@@ -139,6 +139,7 @@ import {
   resolveUserModeSelection,
 } from './app/appModePreferenceHelpers';
 import { buildHistoryNavigationCommit } from './app/appHistoryNavigationHelpers';
+import { resolveMaterialSuggestionRequest } from './app/appMaterialSuggestionHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1077,22 +1078,25 @@ export function App(): React.ReactElement {
     return () => clearInterval(interval);
   }, [scene, grbl.isJobRunning, grbl.controllerRef]);
 
-  const activeLayerModeForSuggestion = scene.layers.find(l => l.id === scene.activeLayerId)?.settings.mode;
+  const materialSuggestionRequest = useMemo(
+    () => resolveMaterialSuggestionRequest(scene),
+    [scene],
+  );
   useEffect(() => {
-    const materialName = scene.material?.name;
-    const machineType = scene.machine?.type || 'diode';
-    const activeLayer = scene.layers.find(l => l.id === scene.activeLayerId);
-
-    if (!materialName || !activeLayer) {
+    if (!materialSuggestionRequest) {
       setToastSuggestion(null);
       return;
     }
 
     let cancelled = false;
-    void getSuggestion(materialName, machineType, activeLayer.settings.mode).then(suggestion => {
+    void getSuggestion(
+      materialSuggestionRequest.materialName,
+      materialSuggestionRequest.machineType,
+      materialSuggestionRequest.layerMode,
+    ).then(suggestion => {
       if (cancelled) return;
       if (suggestion && suggestion.sampleCount > 0) {
-        setToastSuggestion({ suggestion, materialName });
+        setToastSuggestion({ suggestion, materialName: materialSuggestionRequest.materialName });
       } else {
         setToastSuggestion(null);
       }
@@ -1100,7 +1104,7 @@ export function App(): React.ReactElement {
     return () => {
       cancelled = true;
     };
-  }, [scene.material?.name, scene.machine?.type, scene.activeLayerId, scene.layers, activeLayerModeForSuggestion, setToastSuggestion]);
+  }, [materialSuggestionRequest, setToastSuggestion]);
 
   // ─── UNDO / REDO ─────────────────────────────────────────────
 
