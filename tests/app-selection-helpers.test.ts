@@ -14,6 +14,7 @@ import type { Scene } from '../src/core/scene/Scene';
 import type { SceneObject } from '../src/core/scene/SceneObject';
 import {
   filterValidIds,
+  hasSelectedTextObject,
   selectAllSelectableIds,
 } from '../src/ui/components/app/appSelectionHelpers';
 
@@ -32,6 +33,17 @@ function assert(condition: unknown, message: string): void {
 
 function obj(id: string, visible: boolean, locked: boolean): SceneObject {
   return { id, visible, locked, layerId: 'l1', name: id } as unknown as SceneObject;
+}
+
+function typedObj(id: string, type: string, visible = true, locked = false): SceneObject {
+  return {
+    id,
+    visible,
+    locked,
+    layerId: 'l1',
+    name: id,
+    geometry: { type },
+  } as unknown as SceneObject;
 }
 
 function scene(objects: SceneObject[]): Scene {
@@ -134,6 +146,20 @@ console.log('\n=== T2-6 Phase 3u app selection helpers ===\n');
     'only objects visible AND unlocked qualify');
 }
 
+// -------- hasSelectedTextObject --------
+{
+  const s = scene([
+    typedObj('name', 'text'),
+    typedObj('rect', 'rect'),
+  ]);
+  assert(hasSelectedTextObject(s, new Set(['name'])),
+    'selected text object is detected');
+  assert(!hasSelectedTextObject(s, new Set(['rect'])),
+    'selected non-text object is not treated as text');
+  assert(!hasSelectedTextObject(s, new Set(['missing'])),
+    'unselected text object is not detected');
+}
+
 // -------- Source-level pin: App.tsx delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
@@ -147,6 +173,8 @@ console.log('\n=== T2-6 Phase 3u app selection helpers ===\n');
     'App.tsx carries Phase 3u marker');
   assert(/selectAllSelectableIds\(scene\)/.test(appSrc),
     'App calls selectAllSelectableIds(scene)');
+  assert(/hasSelectedTextObject\(scene, selectedIds\)/.test(appSrc),
+    'App calls hasSelectedTextObject(scene, selectedIds)');
   // Inline filterValidIds is gone (no `function filterValidIds(` declaration)
   assert(!/^function filterValidIds/m.test(appSrc),
     'inline filterValidIds is gone from App.tsx');
@@ -154,6 +182,8 @@ console.log('\n=== T2-6 Phase 3u app selection helpers ===\n');
   // pattern is gone (now lives in selectAllSelectableIds)
   assert(!/scene\.objects\.filter\(o => o\.visible && !o\.locked\)\.map\(o => o\.id\)/.test(appSrc),
     'inline visible-and-unlocked filter is gone from App.tsx');
+  assert(!/scene\.objects\.some\(o\s*=>\s*selectedIds\.has\(o\.id\)\s*&&\s*o\.geometry\.type === 'text'\s*\)/s.test(appSrc),
+    'inline selected-text scan is gone from App.tsx');
 
   const helperSrc = readFileSync(
     resolve(here, '../src/ui/components/app/appSelectionHelpers.ts'),
@@ -161,10 +191,14 @@ console.log('\n=== T2-6 Phase 3u app selection helpers ===\n');
   );
   assert(/T2-6 Phase 3u|Phase 3u/.test(helperSrc),
     'appSelectionHelpers carries Phase 3u marker');
+  assert(/T2-6 Phase 3ao|Phase 3ao/.test(helperSrc),
+    'appSelectionHelpers carries Phase 3ao marker');
   assert(/export function filterValidIds/.test(helperSrc),
     'filterValidIds is exported');
   assert(/export function selectAllSelectableIds/.test(helperSrc),
     'selectAllSelectableIds is exported');
+  assert(/export function hasSelectedTextObject/.test(helperSrc),
+    'hasSelectedTextObject is exported');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

@@ -49,3 +49,11 @@ export function selectAllSelectableIds(scene: Scene): Set<string> {
     scene.objects.filter((o) => o.visible && !o.locked).map((o) => o.id),
   );
 }
+
+/**
+ * T2-6 Phase 3ao: quick-action selected-text predicate. App.tsx still owns
+ * rendering; this helper owns the pure selected-object scan.
+ */
+export function hasSelectedTextObject(scene: Scene, selectedIds: ReadonlySet<string>): boolean {
+  return scene.objects.some((o) => selectedIds.has(o.id) && o.geometry.type === 'text');
+}

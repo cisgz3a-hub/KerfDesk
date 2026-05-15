@@ -24,6 +24,7 @@ import { type Scene } from '../../core/scene/Scene';
 // T2-6 Phase 3u: selection helpers extracted so the filter +
 // select-all rules can be tested without mounting App.
 import {
+  hasSelectedTextObject,
   selectAllSelectableIds,
 } from './app/appSelectionHelpers';
 // T2-6 Phase 3v: active-layer-mode derivations extracted.
@@ -1390,9 +1391,7 @@ export function App(): React.ReactElement {
     sceneOps,
   });
 
-  const hasSelectedText = scene.objects.some(o =>
-    selectedIds.has(o.id) && o.geometry.type === 'text'
-  );
+  const hasSelectedText = hasSelectedTextObject(scene, selectedIds);
 
   // ─── RENDER ──────────────────────────────────────────────────
 
