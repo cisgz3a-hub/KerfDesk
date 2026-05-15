@@ -54,11 +54,12 @@ import {
   startProbeSession,
   useTraceStormProbe,
 } from '../../debug/traceStormProbe';
+import type { SceneCommitAction } from '../scene/SceneCommitActions';
 
 export interface ObjectPropertiesTabProps {
   scene: Scene;
   selectedIds: ReadonlySet<string>;
-  onSceneCommit: (scene: Scene) => void;
+  onSceneCommit: (scene: Scene, action?: SceneCommitAction, selectionAfter?: ReadonlySet<string>) => void;
   /** Live preview without history (optional). */
   onSceneChange?: (scene: Scene) => void;
   onSelectionChange?: (ids: ReadonlySet<string>) => void;
@@ -273,8 +274,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         deleteImageAfterTrace,
       });
       try {
-        onSceneCommit(newScene);
-        onSelectionChange?.(new Set([addedObjectId]));
+        onSceneCommit(newScene, 'trace-to-vector', new Set([addedObjectId]));
       } catch (err) {
         console.error('[Trace] scene commit failed:', err);
         await showAlert(
@@ -295,7 +295,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
         setTraceStormProbeEnabled(false);
       }
     }
-  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, deleteImageAfterTrace, onSceneCommit, onSelectionChange, showAlert]);
+  }, [scene, selectedObjects, traceThreshold, traceTurdsize, traceAlphamax, traceInvert, deleteImageAfterTrace, onSceneCommit, showAlert]);
 
   // T1-131: 9 style constants moved to module scope in
   // `properties/propertiesPanelStyles.ts`. The values reference only

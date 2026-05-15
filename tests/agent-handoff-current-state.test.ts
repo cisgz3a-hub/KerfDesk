@@ -8,10 +8,12 @@ import { test } from 'node:test';
 
 const handoff = readFileSync('docs/AGENT_HANDOFF.md', 'utf8');
 
-test('handoff names the current audit-fix state and next ticket', () => {
-  assert.match(handoff, /Last shipped roadmap item: \*\*T3-34 second slice\*\*/);
+test('handoff names the current audit-fix state and next roadmap queue', () => {
+  assert.match(handoff, /Last shipped roadmap item: \*\*T1-17 trace atomic-commit follow-up\*\*/);
   assert.match(handoff, /Current audit-fix run completed: \*\*T1-223 through T1-260\*\*/);
-  assert.match(handoff, /Next active audit-fix ticket: finish actual entitlement server deployment\/secret-store configuration/);
+  assert.match(handoff, /## Next Roadmap Queue/);
+  assert.match(handoff, /T1-17 verification/);
+  assert.match(handoff, /Next in-repo candidate if hardware is unavailable/);
 });
 
 test('handoff no longer presents the stale T1-202 state as current', () => {
@@ -48,6 +50,7 @@ test('handoff preserves known verification caveats', () => {
   assert.match(handoff, /T3-55 follow-up wires live controller firmware identity into Falcon autofocus profile healing/);
   assert.match(handoff, /T3-34 first slice removes eager raster scanline-array materialization/);
   assert.match(handoff, /T3-34 second slice removes the private raster move array/);
+  assert.match(handoff, /T1-17 trace atomic-commit follow-up removes the extra standalone selection update/);
   assert.doesNotMatch(handoff, /Full `npm test` currently times out under F-019/);
   assert.match(handoff, /Do not stage `.claude\/`/);
   assert.match(handoff, /Dependabot PRs must not be merged blindly/);

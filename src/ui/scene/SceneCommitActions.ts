@@ -36,6 +36,7 @@ export type SceneCommitAction =
   | 'template-import'
   | 'array-clone'
   | 'image-import'
+  | 'trace-to-vector'
   | 'svg-import'
   | 'dxf-import'
   // App.tsx internal callers (added in the App.tsx-label-cleanup commit
