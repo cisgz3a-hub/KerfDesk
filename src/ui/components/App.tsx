@@ -160,6 +160,7 @@ import {
   shouldSkipAutosaveForRunningJob,
 } from './app/appAutosaveHelpers';
 import { buildExitFlowPlan } from './app/appExitHelpers';
+import { buildProjectLoadCommitPlan } from './app/appProjectLoadHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1016,10 +1017,9 @@ export function App(): React.ReactElement {
    */
   const handleNewProject = useCallback(
     (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
-      lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(newScene);
-      commitSceneTransaction(newScene, { kind: 'load', source }, {
-        selectionAfter: new Set(),
-      });
+      const plan = buildProjectLoadCommitPlan(newScene, source);
+      lastManualSaveHashRef.current = lastAutosaveHashRef.current = plan.cleanHash;
+      commitSceneTransaction(newScene, plan.reason, plan.meta);
     },
     [commitSceneTransaction],
   );

@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 493 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 724 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 494 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 725 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 203 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 204 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 648 | - |
+| `tests/` | 649 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -485,6 +485,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appMaterialSuggestionHelpers.ts`
 - `src/ui/components/app/appModePreferenceHelpers.ts`
 - `src/ui/components/app/appModeTabHelpers.ts`
+- `src/ui/components/app/appProjectLoadHelpers.ts`
 - `src/ui/components/app/appSelectionHelpers.ts`
 - `src/ui/components/app/appStartModeDecisions.ts`
 - `src/ui/components/app/appStartModeSelectionHelpers.ts`
@@ -665,6 +666,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-no-local-usestate.test.ts`
 - `tests/app-nudge-workflow-extracted.test.ts`
 - `tests/app-profile-apply-import.test.ts`
+- `tests/app-project-load-helpers.test.ts`
 - `tests/app-recovery-setup-extracted.test.ts`
 - `tests/app-selection-helpers.test.ts`
 - `tests/app-settings-modal-extracted.test.ts`

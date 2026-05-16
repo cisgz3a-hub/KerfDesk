@@ -33,8 +33,16 @@ assert(
   'App.tsx derives manual dirty state from the current scene hash',
 );
 assert(
-  appSource.includes('lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(newScene)'),
+  appSource.includes('buildProjectLoadCommitPlan(newScene, source)'),
+  'loaded/new projects delegate clean-hash baseline planning',
+);
+assert(
+  appSource.includes('lastManualSaveHashRef.current = lastAutosaveHashRef.current = plan.cleanHash'),
   'loaded/new projects become the manual and autosave clean hash baselines',
+);
+assert(
+  !appSource.includes('hashSceneForPersistence(newScene)'),
+  'loaded/new project hash calculation is no longer inline in App.tsx',
 );
 
 assert(
