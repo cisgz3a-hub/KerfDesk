@@ -1,5 +1,5 @@
 import { type MutableRefObject } from 'react';
-import { type LaserController } from '../controllers/ControllerInterface';
+import { type LaserController, type SafetyOffOutcomeStage } from '../controllers/ControllerInterface';
 import { type SerialPortLike } from '../communication/SerialPort';
 import { WebSerialPort, type DeviceFingerprint } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
@@ -246,6 +246,12 @@ function hasUsefulSerialFingerprint(
     || typeof fingerprint?.usbProductId === 'number';
 }
 
+function safetyOffStageFromError(err: unknown): SafetyOffOutcomeStage | null {
+  if (err == null || typeof err !== 'object') return null;
+  const stage = (err as { safetyOffStage?: unknown }).safetyOffStage;
+  return stage === 'm5' || stage === 'soft-reset' || stage === 'failed' ? stage : null;
+}
+
 export class MachineService {
   private state: MachineServiceState = {
     isSimulator: false,
@@ -357,8 +363,13 @@ export class MachineService {
    * listener leaks — accumulating one closure per failed connect
    * cycle. T1-171 holds the unsubscribe here so `disconnect()` and
    * `emergencyStop()` can clear it on every disconnect path.
-   */
+  */
   private _autoM5Unsubscribe: (() => void) | null = null;
+  private _controllerSafetyOffOutcomeForwarder: {
+    ctrl: LaserController;
+    unsubscribe: () => void;
+    refs: number;
+  } | null = null;
 
   /** T2-12 part 1: subscribers to laser-output-state transitions. */
   private _laserOutputStateListeners: Set<(state: LaserOutputState) => void> = new Set();
@@ -615,9 +626,44 @@ export class MachineService {
       lastProgress = progress;
       void this.tryFinalizeJobLog(ctrl.state, progress, ctrl.isJobRunning, sink);
     });
+    const unsubSafetyOffOutcome = this._attachSafetyOffOutcomeForwarder(ctrl);
     return () => {
       unsubState();
       unsubProgress();
+      unsubSafetyOffOutcome();
+    };
+  }
+
+  private _attachSafetyOffOutcomeForwarder(ctrl: LaserController): () => void {
+    if (typeof ctrl.onSafetyOffOutcome !== 'function') return () => {};
+
+    if (this._controllerSafetyOffOutcomeForwarder?.ctrl !== ctrl) {
+      this._controllerSafetyOffOutcomeForwarder?.unsubscribe();
+      this._controllerSafetyOffOutcomeForwarder = null;
+    }
+
+    if (this._controllerSafetyOffOutcomeForwarder == null) {
+      const unsubscribe = ctrl.onSafetyOffOutcome((outcome) => {
+        this.notifyLaserSafetyOutcome(outcome.stage);
+      });
+      this._controllerSafetyOffOutcomeForwarder = { ctrl, unsubscribe, refs: 0 };
+    }
+
+    const forwarder = this._controllerSafetyOffOutcomeForwarder;
+    forwarder.refs += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const current = this._controllerSafetyOffOutcomeForwarder;
+      if (current == null || current.ctrl !== ctrl) return;
+      current.refs -= 1;
+      if (current.refs <= 0) {
+        current.unsubscribe();
+        if (this._controllerSafetyOffOutcomeForwarder === current) {
+          this._controllerSafetyOffOutcomeForwarder = null;
+        }
+      }
     };
   }
 
@@ -2447,6 +2493,10 @@ export class MachineService {
       await this.controllerRef.current.runAutoFocus(profile.autoFocusCommand, timeoutMs);
       return { ok: true };
     } catch (err: unknown) {
+      const stage = safetyOffStageFromError(err);
+      if (stage != null) {
+        this.notifyLaserSafetyOutcome(stage);
+      }
       return {
         ok: false,
         error: err instanceof Error ? err.message : 'Autofocus failed',

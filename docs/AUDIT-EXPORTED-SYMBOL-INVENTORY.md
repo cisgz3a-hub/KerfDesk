@@ -8,7 +8,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2719
+- Export rows: 2724
 - Files with exports: 500
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
@@ -18,7 +18,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | core-domain | 355 |
 | entitlement-security | 110 |
 | file-ipc-boundary | 189 |
-| machine-control | 228 |
+| machine-control | 233 |
 | supporting-runtime | 817 |
 | ui-operator-surface | 615 |
 
@@ -725,7 +725,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 215 | `OperationLease` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 | 222 | `MachineServiceState` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 | 228 | `JobRecordingSink` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 249 | `MachineService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 255 | `MachineService` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -1153,7 +1153,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/controllers/ControllerInterface.ts`
 
-**Exports inventoried:** 33
+**Exports inventoried:** 37
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
@@ -1168,28 +1168,32 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 83 | `ErrorCallback` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 | 95 | `RawLineCallback` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 | 108 | `ObjectLifecycleCallback` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 111 | `Unsubscribe` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 114 | `WcsConsentSnapshot` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 119 | `ControllerFamily` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 126 | `SerialConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 131 | `WebSocketConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 137 | `FileUploadConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 142 | `ConnectionDescriptor` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 147 | `ControllerOutput` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 153 | `ControllerJobTicket` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 160 | `JobHandle` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 165 | `OperationResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 169 | `FrameOperationResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 189 | `DeviceIdentity` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 208 | `DisconnectOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 213 | `MachineOperationApi` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 237 | `ControllerEventBus` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 243 | `ProtocolNeutralLaserController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 256 | `CommandSource` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 258 | `GcodeLineController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 266 | `GrblControllerApi` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 458 | `LaserController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 460 | `isGrblControllerApi` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 111 | `SafetyOffOutcomeStage` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 112 | `SafetyOffOutcomeSource` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 118 | `SafetyOffOutcome` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 125 | `SafetyOffOutcomeCallback` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 126 | `Unsubscribe` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 129 | `WcsConsentSnapshot` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 134 | `ControllerFamily` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 141 | `SerialConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 146 | `WebSocketConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 152 | `FileUploadConnectionDescriptor` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 157 | `ConnectionDescriptor` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 162 | `ControllerOutput` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 168 | `ControllerJobTicket` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 175 | `JobHandle` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 180 | `OperationResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 184 | `FrameOperationResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 204 | `DeviceIdentity` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 223 | `DisconnectOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 228 | `MachineOperationApi` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 252 | `ControllerEventBus` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 258 | `ProtocolNeutralLaserController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 271 | `CommandSource` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 273 | `GcodeLineController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 281 | `GrblControllerApi` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 478 | `LaserController` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 480 | `isGrblControllerApi` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -1312,26 +1316,27 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `src/controllers/grbl/GrblController.ts`
 
-**Exports inventoried:** 16
+**Exports inventoried:** 17
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 92 | `GrblControllerOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 109 | `ControllerSafetyEvent` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 113 | `ControllerSafetyEventSink` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 163 | `UnsafeStopOnErrorOverrideToken` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 164 | `createStopOnErrorOverrideToken` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 176 | `InvalidOperationArgumentError from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 177 | `validateJogArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 178 | `validateTestFireArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 179 | `validateFrameArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 191 | `WcsConsentVerdict` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 191 | `WcsUncertainReason` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 192 | `classifyWcsConsentInputs` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 201 | `UnsafeAtConnectReason` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 201 | `UnsafeAtConnectState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 204 | `GrblMachineInfo` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
-| 218 | `GrblController` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 88 | `AutoFocusSafetyOffError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 115 | `GrblControllerOptions` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 132 | `ControllerSafetyEvent` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 136 | `ControllerSafetyEventSink` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 186 | `UnsafeStopOnErrorOverrideToken` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 187 | `createStopOnErrorOverrideToken` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 199 | `InvalidOperationArgumentError from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 200 | `validateJogArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 201 | `validateTestFireArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 202 | `validateFrameArgs from ./grblOperationValidators` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 214 | `WcsConsentVerdict` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 214 | `WcsUncertainReason` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 215 | `classifyWcsConsentInputs` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 224 | `UnsafeAtConnectReason` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 224 | `UnsafeAtConnectState` | re-export | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 227 | `GrblMachineInfo` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
+| 241 | `GrblController` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | needs concurrency review | not compile-output unless noted | not auto-matched by filename | requires production-path evidence | machine-control; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

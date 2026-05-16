@@ -108,6 +108,21 @@ export type RawLineCallback = (
 export type ObjectLifecycleCallback = (
   activeObjectIds: readonly string[],
 ) => void;
+export type SafetyOffOutcomeStage = 'm5' | 'soft-reset' | 'failed';
+export type SafetyOffOutcomeSource =
+  | 'autofocus-timeout'
+  | 'autofocus-alarm'
+  | 'job-error'
+  | 'alarm';
+
+export interface SafetyOffOutcome {
+  source: SafetyOffOutcomeSource;
+  stage: SafetyOffOutcomeStage;
+  error?: Error;
+  code?: number;
+}
+
+export type SafetyOffOutcomeCallback = (outcome: SafetyOffOutcome) => void;
 export type Unsubscribe = () => void;
 
 /** Snapshot of work coordinate system and status report mask before LaserForge WCS baseline is applied. */
@@ -448,6 +463,11 @@ export interface GrblControllerApi extends GcodeLineController {
   onProgress(callback: ProgressCallback): Unsubscribe;
   onError(callback: ErrorCallback): Unsubscribe;
   onRawLine(callback: RawLineCallback): Unsubscribe;
+  /**
+   * Optional notification for controller-owned safetyOff calls where no
+   * service/coordinator caller is awaiting the outcome directly.
+   */
+  onSafetyOffOutcome?(callback: SafetyOffOutcomeCallback): Unsubscribe;
   /**
    * Subscribe to source-object activation changes during a job.
    * See ObjectLifecycleCallback. Optional for non-GRBL controllers / tests.

@@ -111,8 +111,8 @@ async function run(): Promise<void> {
     assert(alarmBlock.length > 0, 'alarm-pin: alarm branch found in runAutoFocus');
     assert(/cleanup\(\)/.test(alarmBlock.slice(0, 200)),
       'alarm-pin: alarm branch calls cleanup() first (clears timer, unsubscribes)');
-    assert(/safetyOff\(\)\.catch/.test(alarmBlock.slice(0, 400)),
-      'alarm-pin: alarm branch invokes safetyOff().catch(...) before reject');
+    assert(/_buildAutoFocusSafetyOffError/.test(alarmBlock.slice(0, 400)),
+      'alarm-pin: alarm branch awaits safety-off helper before reject');
     assert(/safety-off attempted/.test(alarmBlock.slice(0, 600)),
       'alarm-pin: alarm reject message includes "safety-off attempted" marker');
     assert(/T1-28/.test(body),

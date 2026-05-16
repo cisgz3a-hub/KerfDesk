@@ -15,6 +15,10 @@ import {
   type ErrorCallback,
   type RawLineCallback,
   type ObjectLifecycleCallback,
+  type SafetyOffOutcome,
+  type SafetyOffOutcomeCallback,
+  type SafetyOffOutcomeSource,
+  type SafetyOffOutcomeStage,
   type Unsubscribe,
   type WcsConsentSnapshot,
   type ControllerJobTicket,
@@ -74,6 +78,25 @@ interface PendingLine {
   byteCount: number;
   marker?: readonly string[] | null;
   system?: boolean;
+}
+
+interface SafetyOffResult {
+  stage: SafetyOffOutcomeStage;
+  error?: Error;
+}
+
+export class AutoFocusSafetyOffError extends Error {
+  readonly safetyOffStage: SafetyOffOutcomeStage;
+  readonly safetyOffError?: Error;
+
+  constructor(message: string, result: SafetyOffResult) {
+    super(message);
+    this.name = 'AutoFocusSafetyOffError';
+    this.safetyOffStage = result.stage;
+    if (result.error != null) {
+      this.safetyOffError = result.error;
+    }
+  }
 }
 
 /**
@@ -366,6 +389,7 @@ export class GrblController implements GrblControllerApi {
   /** Dedupe key for the last onObjectLifecycle emission (sorted ids joined). */
   private _lastLifecycleKey: string | null = null;
   private _objectLifecycleListeners = new Set<ObjectLifecycleCallback>();
+  private _safetyOffOutcomeListeners = new Set<SafetyOffOutcomeCallback>();
   private _queueIndex = 0;
   private _pending: PendingLine[] = [];
   private _bufferAvailable = GRBL_BUFFER_SIZE;
@@ -1313,10 +1337,7 @@ export class GrblController implements GrblControllerApi {
    * Never throws — the caller (`ExecutionCoordinator.emergencyLaserOff`) is on
    * the safety hot path and must always get a structured outcome it can act on.
    */
-  async safetyOff(): Promise<{
-    stage: 'm5' | 'soft-reset' | 'failed';
-    error?: Error;
-  }> {
+  async safetyOff(): Promise<SafetyOffResult> {
     if (!this._port?.isOpen) {
       return { stage: 'failed', error: new Error('Not connected') };
     }
@@ -1347,6 +1368,52 @@ export class GrblController implements GrblControllerApi {
       );
       return { stage: 'failed', error: combined };
     }
+  }
+
+  private _emitSafetyOffOutcome(outcome: SafetyOffOutcome): void {
+    for (const cb of this._safetyOffOutcomeListeners) {
+      try {
+        cb(outcome);
+      } catch (err) {
+        console.warn('[GrblController] safety-off outcome listener failed:', err);
+      }
+    }
+  }
+
+  private async _runControllerOwnedSafetyOff(
+    source: SafetyOffOutcomeSource,
+    code?: number,
+  ): Promise<SafetyOffResult> {
+    let result: SafetyOffResult;
+    try {
+      result = await this.safetyOff();
+    } catch (err: unknown) {
+      result = {
+        stage: 'failed',
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
+    }
+    const outcome: SafetyOffOutcome = {
+      source,
+      stage: result.stage,
+    };
+    if (result.error != null) outcome.error = result.error;
+    if (code != null) outcome.code = code;
+    this._emitSafetyOffOutcome(outcome);
+    return result;
+  }
+
+  private async _buildAutoFocusSafetyOffError(message: string): Promise<AutoFocusSafetyOffError> {
+    let result: SafetyOffResult;
+    try {
+      result = await this.safetyOff();
+    } catch (err: unknown) {
+      result = {
+        stage: 'failed',
+        error: err instanceof Error ? err : new Error(String(err)),
+      };
+    }
+    return new AutoFocusSafetyOffError(message, result);
   }
 
   /**
@@ -1537,8 +1604,9 @@ export class GrblController implements GrblControllerApi {
       // primary cause is worse than the secondary failure.
       const timer = setTimeout(() => {
         cleanup();
-        void this.safetyOff().catch(() => { /* logged inside safetyOff */ });
-        reject(new Error('Auto-focus timed out — safety-off attempted'));
+        void this._buildAutoFocusSafetyOffError(
+          'Auto-focus timed out - safety-off attempted',
+        ).then(reject);
       }, timeoutMs);
 
       const cleanup = (): void => {
@@ -1558,8 +1626,9 @@ export class GrblController implements GrblControllerApi {
         if (next.status === 'alarm') {
           cleanup();
           // T1-28: alarm during autofocus → safety-off before reject.
-          void this.safetyOff().catch(() => { /* logged inside safetyOff */ });
-          reject(new Error(`Auto-focus alarm: ALARM:${next.alarmCode ?? 'unknown'} — safety-off attempted`));
+          void this._buildAutoFocusSafetyOffError(
+            `Auto-focus alarm: ALARM:${next.alarmCode ?? 'unknown'} - safety-off attempted`,
+          ).then(reject);
           return;
         }
         if (next.status === 'homing' || next.status === 'run') {
@@ -1634,6 +1703,11 @@ export class GrblController implements GrblControllerApi {
   onRawLine(callback: RawLineCallback): Unsubscribe {
     this._rawLineListeners.add(callback);
     return () => this._rawLineListeners.delete(callback);
+  }
+
+  onSafetyOffOutcome(callback: SafetyOffOutcomeCallback): Unsubscribe {
+    this._safetyOffOutcomeListeners.add(callback);
+    return () => this._safetyOffOutcomeListeners.delete(callback);
   }
 
   onObjectLifecycle(cb: ObjectLifecycleCallback): Unsubscribe {
@@ -2112,7 +2186,7 @@ export class GrblController implements GrblControllerApi {
     // {stage: 'failed'} instead. Inspect the resolved value so a
     // failed safety-off gets logged for support.
     if (wasJobRunning) {
-      void this.safetyOff().then(result => {
+      void this._runControllerOwnedSafetyOff('job-error', code).then(result => {
         if (result.stage === 'failed') {
           console.warn(
             '[GrblController] T1-24: safetyOff after error:%d returned failed:',
@@ -2169,7 +2243,7 @@ export class GrblController implements GrblControllerApi {
     // partial reset, the laser can be in an undefined state. safetyOff
     // is a defense-in-depth confirmation. Fire-and-forget for the same
     // reason as _handleError above.
-    void this.safetyOff().then(result => {
+    void this._runControllerOwnedSafetyOff('alarm', code).then(result => {
       if (result.stage === 'failed') {
         console.warn(
           '[GrblController] T1-24: safetyOff after ALARM:%d returned failed:',
