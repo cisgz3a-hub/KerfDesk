@@ -31,6 +31,37 @@ export interface ParsedJobLines {
 
 const OBJ_IDS_COMMENT_RE = /^;\s*OBJ\s+ids=(.+)$/i;
 
+export interface GrblJobLineParserState {
+  pendingMarker: readonly string[] | null;
+}
+
+export function createGrblJobLineParserState(): GrblJobLineParserState {
+  return { pendingMarker: null };
+}
+
+export function parseGrblJobLineChunk(
+  lines: ReadonlyArray<string>,
+  state: GrblJobLineParserState = createGrblJobLineParserState(),
+): ParsedJobLines {
+  const jobLines: string[] = [];
+  const lineMarkers: (readonly string[] | null)[] = [];
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (line.length === 0) continue;
+    if (line.startsWith(';')) {
+      const m = line.match(OBJ_IDS_COMMENT_RE);
+      if (m) {
+        state.pendingMarker = m[1].split(',').map((s) => s.trim()).filter((s) => s.length > 0);
+      }
+      continue;
+    }
+    jobLines.push(line);
+    lineMarkers.push(state.pendingMarker);
+    state.pendingMarker = null;
+  }
+  return { jobLines, lineMarkers };
+}
+
 /**
  * Split `lines` into a parallel `jobLines` / `lineMarkers` pair.
  *
@@ -44,22 +75,5 @@ const OBJ_IDS_COMMENT_RE = /^;\s*OBJ\s+ids=(.+)$/i;
  *     overwrite — only the most recent one attaches.
  */
 export function parseGrblJobLines(lines: ReadonlyArray<string>): ParsedJobLines {
-  const jobLines: string[] = [];
-  const lineMarkers: (readonly string[] | null)[] = [];
-  let pending: readonly string[] | null = null;
-  for (const raw of lines) {
-    const line = raw.trim();
-    if (line.length === 0) continue;
-    if (line.startsWith(';')) {
-      const m = line.match(OBJ_IDS_COMMENT_RE);
-      if (m) {
-        pending = m[1].split(',').map((s) => s.trim()).filter((s) => s.length > 0);
-      }
-      continue;
-    }
-    jobLines.push(line);
-    lineMarkers.push(pending);
-    pending = null;
-  }
-  return { jobLines, lineMarkers };
+  return parseGrblJobLineChunk(lines);
 }

@@ -8,6 +8,7 @@ import type { AABB } from '../types';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { ControllerId } from '../../controllers/ControllerRegistry';
 import type { BurnEnvelopeDivergenceReport } from '../output/burnEnvelopeDivergence';
+import type { SpoolHandle } from '../output/GcodeStreaming';
 import type { JobFingerprint } from './JobFingerprint';
 
 /**
@@ -57,8 +58,8 @@ export interface ValidatedJobTicket {
    * footer return motion / template g-code / modal quirks could
    * make the emitted bytes' burn region differ from the plan's.
    * This field is the canonical post-emission burn AABB, derived
-   * by `analyzeEmittedBurnEnvelope(gcodeText)`. `null` when the
-   * emission contained no burn moves (a degenerate / empty job).
+   * from the emitted G-code stream/spool. `null` when the emission
+   * contained no burn moves (a degenerate / empty job).
    * Wiring the preview UI to consume this is deferred — this field
    * makes the data available for future consumers (validators,
    * support diagnostics, preview rebuild).
@@ -73,6 +74,17 @@ export interface ValidatedJobTicket {
    * tooling can diagnose encoder regressions.
    */
   readonly burnEnvelopeDivergence: BurnEnvelopeDivergenceReport | null;
+  /**
+   * T3-15 first production boundary: replayable G-code stream handle.
+   *
+   * During the transition this coexists with legacy `gcodeText` /
+   * `gcodeLines`; consumers can start moving to `open()` without
+   * forcing the controller migration in the same patch. Once the GRBL
+   * sender, simulator fan-out, validators, and replay capture consume
+   * the spool directly, the legacy full-text/full-array fields can be
+   * retired.
+   */
+  readonly gcodeSpool?: SpoolHandle;
   readonly gcodeLines: readonly string[];
   readonly gcodeText: string;
   readonly machinePlanBounds: AABB;

@@ -25,10 +25,25 @@
  * After T3-34's chunked GRBL output slice, `BaseGCodeStrategy`
  * implements `generateGcode(...)`; `PipelineService.compileGcode` drains
  * that iterable through `collectStreamingOutput` when a strategy
- * supports it. The remaining T3-15 work is still real:
- * `ValidatedJobTicket.gcodeText` / `gcodeLines` and
- * `GrblController.sendJob(string[])` continue to materialize full
- * jobs until the future spool/sendJob migration lands.
+ * supports it. The first T3-15 spool slices added replayable
+ * `ValidatedJobTicket.gcodeSpool` metadata and a `ControllerOutput`
+ * `gcode-stream` handoff, so MachineService can pass a spool to the
+ * controller boundary without inventing a second ticket model. The GRBL
+ * path now parses and bounds-checks spool chunks with stateful helpers,
+ * feeds the serial sender from a bounded queue window, and replays the
+ * simulator fan-out from the spool without reading legacy
+ * `ticket.gcodeLines` on the spooled start path. Streaming strategies
+ * now also build ticket spools directly from `generateGcode(...)`
+ * instead of from the already-split legacy line array, and compile
+ * materializes its temporary legacy text by reopening that spool instead
+ * of running the strategy a second time. Ticket validation now prefers
+ * the spool content hash over legacy `gcodeText`; compile-time burn
+ * envelope/divergence analysis and MachineService job-time estimation
+ * consume the spool stream, and the GRBL firmware adapter emits a
+ * replayable `gcode-stream` artifact. The remaining T3-15 work is still
+ * real: `gcodeText` / `gcodeLines`, compile-time text collection,
+ * preview parsing, and legacy `sendJob(string[])` still materialize full
+ * jobs until those callers move fully onto spool handles.
  *
  * Pairs with T3-44 (multi-domain progress already shipped — the
  * progress shape supports byte-domain upload progress that a
@@ -115,6 +130,81 @@ export interface SpoolHandle {
    * a temp file, an in-memory cache, or by re-running the producer.
    */
   open(options?: GcodeGenerateOptions): AsyncIterable<GcodeChunk>;
+}
+
+export type ReplayableGcodeChunkFactory = (options?: GcodeGenerateOptions) => AsyncIterable<GcodeChunk>;
+
+function hashCharsFnv1a(hash: number, text: string): number {
+  let h = hash >>> 0;
+  for (let i = 0; i < text.length; i++) {
+    h ^= text.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+function utf8ByteLength(text: string): number {
+  return typeof TextEncoder !== 'undefined'
+    ? new TextEncoder().encode(text).byteLength
+    : text.length;
+}
+
+/**
+ * Build a replayable spool handle from a deterministic chunk factory without
+ * collecting the job into a flat `string[]`.
+ *
+ * The first pass streams through the factory to compute line count, byte count,
+ * and a stable content fingerprint. Later `open()` calls invoke the factory
+ * again, giving consumers a fresh single-use stream. This is the first T3-15
+ * migration primitive: it proves ticket/controller boundaries can depend on a
+ * replayable stream handle before the GRBL sender itself stops using arrays.
+ */
+export async function buildReplayableGcodeSpool(
+  id: string,
+  factory: ReplayableGcodeChunkFactory,
+  options: GcodeGenerateOptions = {},
+): Promise<SpoolHandle> {
+  let lineCount = 0;
+  let byteCount = 0;
+  let hash = 0x811c9dc5 >>> 0;
+  let wroteLine = false;
+  let sawLast = false;
+
+  for await (const chunk of factory(options)) {
+    if (options.signal?.aborted) break;
+    for (const line of chunk.lines) {
+      if (wroteLine) {
+        hash = hashCharsFnv1a(hash, '\n');
+        byteCount += 1;
+      }
+      hash = hashCharsFnv1a(hash, line);
+      byteCount += utf8ByteLength(line);
+      lineCount++;
+      wroteLine = true;
+    }
+    if (chunk.cumulativeLineCount !== lineCount) {
+      throw new Error(
+        `Spool ${id} reported cumulativeLineCount=${chunk.cumulativeLineCount} `
+        + `after ${lineCount} streamed line(s).`,
+      );
+    }
+    if (chunk.isLast) {
+      sawLast = true;
+      break;
+    }
+  }
+
+  if (!options.signal?.aborted && !sawLast) {
+    throw new Error(`Spool ${id} ended before the terminal chunk.`);
+  }
+
+  return {
+    id,
+    contentHash: (hash >>> 0).toString(16).padStart(8, '0'),
+    lineCount,
+    byteCount,
+    open: (openOptions?: GcodeGenerateOptions) => factory(openOptions),
+  };
 }
 
 /**

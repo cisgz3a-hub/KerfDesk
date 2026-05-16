@@ -190,6 +190,10 @@ console.log('\n=== T1-182 emitted-burn-envelope parser (audit High #2 + #8) ===\
     /export function analyzeEmittedBurnEnvelope/.test(parserSrc),
     'analyzeEmittedBurnEnvelope is exported',
   );
+  assert(
+    /export async function analyzeEmittedBurnEnvelopeFromChunks/.test(parserSrc),
+    'analyzeEmittedBurnEnvelopeFromChunks is exported',
+  );
 
   assert(/T1-182/.test(ticketSrc), 'ValidatedJobTicket carries T1-182 marker');
   assert(
@@ -199,8 +203,8 @@ console.log('\n=== T1-182 emitted-burn-envelope parser (audit High #2 + #8) ===\
 
   assert(/T1-182/.test(pipelineSrc), 'PipelineService carries T1-182 marker');
   assert(
-    /emittedBurnBounds:\s*analyzeEmittedBurnEnvelope\(gcode\)\.burnBounds/.test(pipelineSrc),
-    'PipelineService populates emittedBurnBounds from analyzeEmittedBurnEnvelope(gcode)',
+    /emittedBurnBounds:\s*emittedBurnEnvelope\.burnBounds/.test(pipelineSrc),
+    'PipelineService populates emittedBurnBounds from the stream-derived emitted envelope',
   );
 }
 

@@ -114,9 +114,19 @@ export function checkBurnEnvelopeDivergence(
   gcode: string,
   toleranceMm: number = BURN_ENVELOPE_DIVERGENCE_TOLERANCE_MM,
 ): BurnEnvelopeDivergenceReport | null {
-  const planEnv = computePlanBurnEnvelope(plan);
-  const emitted: EmittedBurnEnvelope = analyzeEmittedBurnEnvelope(gcode);
+  return checkBurnEnvelopeDivergenceFromEnvelope(
+    plan,
+    analyzeEmittedBurnEnvelope(gcode),
+    toleranceMm,
+  );
+}
 
+export function checkBurnEnvelopeDivergenceFromEnvelope(
+  plan: Plan,
+  emitted: EmittedBurnEnvelope,
+  toleranceMm: number = BURN_ENVELOPE_DIVERGENCE_TOLERANCE_MM,
+): BurnEnvelopeDivergenceReport | null {
+  const planEnv = computePlanBurnEnvelope(plan);
   // Case 1: plan emits burns, gcode parser finds none.
   if (planEnv.burnBounds !== null && emitted.burnBounds === null) {
     return {

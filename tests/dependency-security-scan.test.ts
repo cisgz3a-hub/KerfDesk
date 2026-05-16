@@ -44,6 +44,9 @@ const repoRoot = path.resolve(here, '..');
 // 2. CI workflow includes the `npm audit` step with --omit=dev + audit-level
 {
   const ci = fs.readFileSync(path.resolve(repoRoot, '.github/workflows/ci.yml'), 'utf-8');
+  assert(/pull_request:/.test(ci), `ci.yml runs on pull_request`);
+  assert(/push:\s*[\s\S]*branches:\s*\[\s*master,\s*main\s*\]/.test(ci),
+    `ci.yml runs on master/main push`);
   assert(/npm audit/.test(ci), `ci.yml runs 'npm audit'`);
   assert(/--omit=dev/.test(ci),
     `ci.yml: 'npm audit' uses --omit=dev (dev CVEs don't ship)`);
@@ -118,6 +121,10 @@ const repoRoot = path.resolve(here, '..');
   const lcPath = path.resolve(repoRoot, '.github/workflows/license-check.yml');
   assert(fs.existsSync(lcPath),
     `license-check.yml still exists (license + audit are complementary)`);
+  const licenseWorkflow = fs.readFileSync(lcPath, 'utf-8');
+  assert(/pull_request:/.test(licenseWorkflow), `license-check.yml runs on pull_request`);
+  assert(/push:\s*[\s\S]*branches:\s*\[\s*master,\s*main\s*\]/.test(licenseWorkflow),
+    `license-check.yml runs on master/main push`);
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

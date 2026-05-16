@@ -26,6 +26,7 @@ import { resolveFalconTarget } from './FalconNetworkTarget';
 
 const HTTP_PORT = 8080;
 const HTTP_TIMEOUT_MS = 10_000;
+const MAX_RESPONSE_BODY_BYTES = 2 * 1024 * 1024;
 
 interface RawResponse {
   status: number;
@@ -63,8 +64,19 @@ function httpRequest(
       },
       (res) => {
         const chunks: Buffer[] = [];
-        res.on('data', (c: Buffer) => chunks.push(c));
+        let received = 0;
+        let tooLarge = false;
+        res.on('data', (c: Buffer) => {
+          received += c.length;
+          if (received > MAX_RESPONSE_BODY_BYTES) {
+            tooLarge = true;
+            req.destroy(new Error(`Falcon ${path} response too large (${received} bytes > ${MAX_RESPONSE_BODY_BYTES} bytes)`));
+            return;
+          }
+          chunks.push(c);
+        });
         res.on('end', () => {
+          if (tooLarge) return;
           const text = Buffer.concat(chunks).toString('utf8');
           let parsed: FalconEnvelope | null = null;
           try {

@@ -4,14 +4,69 @@
  *
  * Run: npx tsx tests/perf/streaming-expected-blockers.test.ts
  */
+import assert from 'node:assert/strict';
 import { test } from 'node:test';
+import {
+  assertMaterializedGcodeWithinLimit,
+  MAX_MATERIALIZED_GCODE_BYTES,
+  MAX_MATERIALIZED_GCODE_LINES,
+} from '../../src/app/PipelineService';
+import {
+  buildReplayableGcodeSpool,
+  type GcodeChunk,
+} from '../../src/core/output/GcodeStreaming';
 
-test.skip('T3-40/T3-15: million-line fake GRBL streaming keeps buffers and logs bounded', () => {
-  // Requires the future spool/streaming job architecture from T3-15.
+async function* millionLineChunks(totalLines: number, chunkLines: number): AsyncGenerator<GcodeChunk> {
+  let emitted = 0;
+  while (emitted < totalLines) {
+    const take = Math.min(chunkLines, totalLines - emitted);
+    const lines: string[] = [];
+    for (let i = 0; i < take; i++) {
+      lines.push(`G1 X${emitted + i} Y0 F600`);
+    }
+    emitted += take;
+    yield {
+      lines,
+      cumulativeLineCount: emitted,
+      isLast: emitted === totalLines,
+    };
+  }
+}
+
+test('T3-40/T3-15: million-line G-code spool is replayable without a flat line array', async () => {
+  const totalLines = 1_000_000;
+  const chunkLines = 2_000;
+  let factoryCalls = 0;
+  const spool = await buildReplayableGcodeSpool('million-line-test', () => {
+    factoryCalls++;
+    return millionLineChunks(totalLines, chunkLines);
+  });
+
+  assert.equal(spool.lineCount, totalLines);
+  assert.match(spool.contentHash, /^[0-9a-f]{8}$/);
+  assert(spool.byteCount > totalLines * 8);
+  assert.equal(factoryCalls, 1, 'spool metadata is computed by one streaming pass');
+
+  let observed = 0;
+  let maxChunk = 0;
+  for await (const chunk of spool.open()) {
+    observed += chunk.lines.length;
+    maxChunk = Math.max(maxChunk, chunk.lines.length);
+    if (observed >= 10_000) break;
+  }
+  assert.equal(observed, 10_000);
+  assert.equal(maxChunk, chunkLines);
+  assert.equal(factoryCalls, 2, 'open replays through the chunk factory instead of a stored string[]');
 });
 
-test.skip('T3-40/T3-15: million-line G-code export is streaming or explicitly memory-bounded', () => {
-  // Current output generation returns one giant string; T3-15 is the honest fix.
+test('T3-40: materialized G-code export is explicitly memory-bounded', () => {
+  assert.equal(MAX_MATERIALIZED_GCODE_LINES, 1_000_000);
+  assert.equal(MAX_MATERIALIZED_GCODE_BYTES, 50 * 1024 * 1024);
+  assert.doesNotThrow(() => assertMaterializedGcodeWithinLimit('G0 X0\nM5'));
+  assert.throws(
+    () => assertMaterializedGcodeWithinLimit('X'.repeat(MAX_MATERIALIZED_GCODE_BYTES + 1)),
+    /too large for the current materialized pipeline/i,
+  );
 });
 
 test.skip('T3-40/T2-17/T3-15: cancellation latency is measured inside million-line streaming', () => {

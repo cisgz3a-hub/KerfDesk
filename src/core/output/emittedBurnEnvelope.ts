@@ -38,6 +38,7 @@
  * Pure function. No singletons. No global reads.
  */
 import type { AABB } from '../types';
+import type { GcodeChunk } from './GcodeStreaming';
 
 export interface EmittedBurnEnvelope {
   /**
@@ -66,6 +67,32 @@ export interface EmittedBurnEnvelope {
 const ENV_EMPTY: AABB = {
   minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity,
 };
+
+interface EmittedBurnEnvelopeState {
+  motionMode: 'G0' | 'G1' | 'G2' | 'G3' | null;
+  distanceMode: 'absolute' | 'relative';
+  laserMode: 'M3' | 'M4' | 'off';
+  spindle: number;
+  posX: number;
+  posY: number;
+  burnBounds: { minX: number; minY: number; maxX: number; maxY: number };
+  burnMoveCount: number;
+  zeroDistanceLinearCount: number;
+}
+
+function createEmittedBurnEnvelopeState(): EmittedBurnEnvelopeState {
+  return {
+    motionMode: null,
+    distanceMode: 'absolute',
+    laserMode: 'off',
+    spindle: 0,
+    posX: 0,
+    posY: 0,
+    burnBounds: { ...ENV_EMPTY },
+    burnMoveCount: 0,
+    zeroDistanceLinearCount: 0,
+  };
+}
 
 /**
  * T1-189 (extends T1-186): compute arc center from `R` word mode.
@@ -238,137 +265,107 @@ function parseWords(line: string): Record<string, number> {
 }
 
 export function analyzeEmittedBurnEnvelope(gcode: string): EmittedBurnEnvelope {
-  const lines = gcode.split(/\r?\n/);
+  const state = createEmittedBurnEnvelopeState();
+  for (const raw of gcode.split(/\r?\n/)) {
+    analyzeEmittedBurnEnvelopeLine(state, raw);
+  }
+  return finishEmittedBurnEnvelope(state);
+}
 
-  // Modal state.
-  // T1-186 (arc support): G2/G3 added to motionMode. Arcs are
-  // expanded into the burn AABB via expandWithArc, which evaluates
-  // the cardinal-extremum points (±r along X / Y) and includes any
-  // that lie on the swept range.
-  let motionMode: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
-  let distanceMode: 'absolute' | 'relative' = 'absolute';
-  let laserMode: 'M3' | 'M4' | 'off' = 'off';
-  let spindle = 0;
-  let posX = 0;
-  let posY = 0;
+function analyzeEmittedBurnEnvelopeLine(state: EmittedBurnEnvelopeState, raw: string): void {
+  const stripped = stripComments(raw).trim();
+  if (stripped.length === 0) return;
+  const words = parseWords(stripped);
 
-  const burnBounds = { ...ENV_EMPTY };
-  let burnMoveCount = 0;
-  let zeroDistanceLinearCount = 0;
-  // We accumulate the "from" point into the AABB as well as the
-  // "to" point because a burn segment is the LINE between two
-  // points; both endpoints contribute to the envelope.
+  if (words.G === 90) state.distanceMode = 'absolute';
+  if (words.G === 91) state.distanceMode = 'relative';
 
-  for (const raw of lines) {
-    const stripped = stripComments(raw).trim();
-    if (stripped.length === 0) continue;
-    const words = parseWords(stripped);
+  if (words.M === 3) state.laserMode = 'M3';
+  if (words.M === 4) state.laserMode = 'M4';
+  if (words.M === 5) { state.laserMode = 'off'; state.spindle = 0; }
 
-    // Distance mode transitions (G90 / G91).
-    if (words.G === 90) distanceMode = 'absolute';
-    if (words.G === 91) distanceMode = 'relative';
-
-    // Laser modal transitions (M3 / M4 / M5).
-    if (words.M === 3) laserMode = 'M3';
-    if (words.M === 4) laserMode = 'M4';
-    if (words.M === 5) { laserMode = 'off'; spindle = 0; }
-
-    // Spindle / power. Tracked regardless of motion presence so a
-    // bare `S0` (modal power change without motion) updates the
-    // state for subsequent G1.
-    if (words.S !== undefined) {
-      spindle = words.S;
-    }
-
-    // Motion mode transitions. T1-186 added G2/G3 arc support.
-    let motion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
-    if (words.G === 0) motion = 'G0';
-    else if (words.G === 1) motion = 'G1';
-    else if (words.G === 2) motion = 'G2';
-    else if (words.G === 3) motion = 'G3';
-    if (motion !== null) motionMode = motion;
-
-    const hasMotionWord = words.X !== undefined || words.Y !== undefined;
-    if (!hasMotionWord || motionMode === null) continue;
-
-    // Resolve target position with respect to distance mode.
-    let nextX = posX;
-    let nextY = posY;
-    if (distanceMode === 'absolute') {
-      if (words.X !== undefined) nextX = words.X;
-      if (words.Y !== undefined) nextY = words.Y;
-    } else {
-      // Relative mode: increments.
-      if (words.X !== undefined) nextX = posX + words.X;
-      if (words.Y !== undefined) nextY = posY + words.Y;
-    }
-
-    const dx = nextX - posX;
-    const dy = nextY - posY;
-    const zeroDistance = dx === 0 && dy === 0;
-
-    if (motionMode === 'G1') {
-      if (zeroDistance) {
-        zeroDistanceLinearCount++;
-      } else if (laserMode !== 'off' && spindle > 0) {
-        // Burn move: laser on at non-zero power. Both endpoints
-        // contribute to the AABB.
-        expand(burnBounds, posX, posY);
-        expand(burnBounds, nextX, nextY);
-        burnMoveCount++;
-      }
-    } else if (motionMode === 'G2' || motionMode === 'G3') {
-      // T1-186: arc burn. The arc's bounding box extends beyond the
-      // endpoints to the cardinal-compass extrema (±r along X / Y)
-      // if those points lie on the swept range. I / J are CENTER
-      // offsets relative to the START position regardless of
-      // distance mode (GRBL spec; G91 affects X/Y but I/J are
-      // ALWAYS center-relative). The parser reads them as such.
-      //
-      // T1-189: also accept R-mode (`G2/G3 X.. Y.. R..`). When R is
-      // present (and I/J are not), compute the center via
-      // `centerFromRMode`. The GRBL sign convention: +R = short arc,
-      // -R = long arc; combined with direction this selects which
-      // side of the chord the center lies on.
-      if (laserMode !== 'off' && spindle > 0) {
-        let cx: number;
-        let cy: number;
-        let arcValid = true;
-        if (words.R !== undefined && words.I === undefined && words.J === undefined) {
-          const c = centerFromRMode(motionMode, posX, posY, nextX, nextY, words.R);
-          if (c === null) {
-            // Bad R-arc: chord longer than diameter, or zero chord.
-            // Expand by endpoints only (no compass-extrema enrichment).
-            expand(burnBounds, posX, posY);
-            expand(burnBounds, nextX, nextY);
-            burnMoveCount++;
-            arcValid = false;
-            cx = 0; cy = 0; // unused
-          } else {
-            cx = c.cx;
-            cy = c.cy;
-          }
-        } else {
-          const iOffset = words.I ?? 0;
-          const jOffset = words.J ?? 0;
-          cx = posX + iOffset;
-          cy = posY + jOffset;
-        }
-        if (arcValid) {
-          expandWithArc(burnBounds, motionMode, posX, posY, nextX, nextY, cx, cy);
-          burnMoveCount++;
-        }
-      }
-    }
-
-    posX = nextX;
-    posY = nextY;
+  if (words.S !== undefined) {
+    state.spindle = words.S;
   }
 
-  const haveBurn = burnMoveCount > 0 && Number.isFinite(burnBounds.minX);
+  let motion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
+  if (words.G === 0) motion = 'G0';
+  else if (words.G === 1) motion = 'G1';
+  else if (words.G === 2) motion = 'G2';
+  else if (words.G === 3) motion = 'G3';
+  if (motion !== null) state.motionMode = motion;
+
+  const hasMotionWord = words.X !== undefined || words.Y !== undefined;
+  if (!hasMotionWord || state.motionMode === null) return;
+
+  let nextX = state.posX;
+  let nextY = state.posY;
+  if (state.distanceMode === 'absolute') {
+    if (words.X !== undefined) nextX = words.X;
+    if (words.Y !== undefined) nextY = words.Y;
+  } else {
+    if (words.X !== undefined) nextX = state.posX + words.X;
+    if (words.Y !== undefined) nextY = state.posY + words.Y;
+  }
+
+  const zeroDistance = nextX === state.posX && nextY === state.posY;
+  if (state.motionMode === 'G1') {
+    if (zeroDistance) {
+      state.zeroDistanceLinearCount++;
+    } else if (state.laserMode !== 'off' && state.spindle > 0) {
+      expand(state.burnBounds, state.posX, state.posY);
+      expand(state.burnBounds, nextX, nextY);
+      state.burnMoveCount++;
+    }
+  } else if ((state.motionMode === 'G2' || state.motionMode === 'G3') && state.laserMode !== 'off' && state.spindle > 0) {
+    let cx: number;
+    let cy: number;
+    let arcValid = true;
+    if (words.R !== undefined && words.I === undefined && words.J === undefined) {
+      const c = centerFromRMode(state.motionMode, state.posX, state.posY, nextX, nextY, words.R);
+      if (c === null) {
+        expand(state.burnBounds, state.posX, state.posY);
+        expand(state.burnBounds, nextX, nextY);
+        state.burnMoveCount++;
+        arcValid = false;
+        cx = 0;
+        cy = 0;
+      } else {
+        cx = c.cx;
+        cy = c.cy;
+      }
+    } else {
+      cx = state.posX + (words.I ?? 0);
+      cy = state.posY + (words.J ?? 0);
+    }
+    if (arcValid) {
+      expandWithArc(state.burnBounds, state.motionMode, state.posX, state.posY, nextX, nextY, cx, cy);
+      state.burnMoveCount++;
+    }
+  }
+
+  state.posX = nextX;
+  state.posY = nextY;
+}
+
+function finishEmittedBurnEnvelope(state: EmittedBurnEnvelopeState): EmittedBurnEnvelope {
+  const haveBurn = state.burnMoveCount > 0 && Number.isFinite(state.burnBounds.minX);
   return {
-    burnBounds: haveBurn ? { ...burnBounds } : null,
-    burnMoveCount,
-    zeroDistanceLinearCount,
+    burnBounds: haveBurn ? { ...state.burnBounds } : null,
+    burnMoveCount: state.burnMoveCount,
+    zeroDistanceLinearCount: state.zeroDistanceLinearCount,
   };
+}
+
+export async function analyzeEmittedBurnEnvelopeFromChunks(
+  source: AsyncIterable<GcodeChunk>,
+): Promise<EmittedBurnEnvelope> {
+  const state = createEmittedBurnEnvelopeState();
+  for await (const chunk of source) {
+    for (const line of chunk.lines) {
+      analyzeEmittedBurnEnvelopeLine(state, line);
+    }
+    if (chunk.isLast) break;
+  }
+  return finishEmittedBurnEnvelope(state);
 }

@@ -5,6 +5,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { fileURLToPath } from 'url';
 import { createStorageFsBackend } from '../electron/storage';
 
 let passed = 0;
@@ -99,6 +100,13 @@ async function run(): Promise<void> {
 
     backend.storageClear();
     assert(backend.namespacedList('autosave').length === 0, 'clear removes all entries');
+
+    const storageSource = fs.readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../electron/storage.ts'),
+      'utf8',
+    );
+    assert(/fs\.fsyncSync/.test(storageSource),
+      'storage writes fsync the temp file before rename and parent directory after rename');
   } finally {
     rmrf(tempRoot);
   }

@@ -56,8 +56,26 @@ function writeState(userDataPath: string, state: StartupCrashLoopState): void {
   fs.mkdirSync(userDataPath, { recursive: true });
   const file = startupCrashLoopStatePath(userDataPath);
   const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+  const fileFd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeFileSync(fileFd, `${JSON.stringify(state, null, 2)}\n`, 'utf8');
+    fs.fsyncSync(fileFd);
+  } finally {
+    fs.closeSync(fileFd);
+  }
   fs.renameSync(tmp, file);
+  try {
+    const dirFd = fs.openSync(userDataPath, 'r');
+    try {
+      fs.fsyncSync(dirFd);
+    } finally {
+      fs.closeSync(dirFd);
+    }
+  } catch {
+    // Best-effort: some Windows/filesystem combinations do not support
+    // opening directories for fsync. The temp-file fsync above is still
+    // mandatory before the atomic rename.
+  }
 }
 
 export function beginStartupCrashLoopTracking(

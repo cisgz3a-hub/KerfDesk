@@ -28,6 +28,35 @@ function ensureStorageDir(baseUserDataPath: string): string {
   return dir;
 }
 
+function fsyncDirectoryBestEffort(dir: string): void {
+  try {
+    const fd = fs.openSync(dir, 'r');
+    try {
+      fs.fsyncSync(fd);
+    } finally {
+      fs.closeSync(fd);
+    }
+  } catch {
+    // Directory fsync is not supported on every platform/filesystem. The
+    // file fsync above is still required; this best-effort directory flush
+    // covers platforms that expose durable rename metadata syncing.
+  }
+}
+
+function durableWriteUtf8(file: string, value: string): void {
+  const dir = path.dirname(file);
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  const fd = fs.openSync(tmp, 'w');
+  try {
+    fs.writeFileSync(fd, value, 'utf8');
+    fs.fsyncSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
+  fs.renameSync(tmp, file);
+  fsyncDirectoryBestEffort(dir);
+}
+
 export function createStorageFsBackend(baseUserDataPath: string): StorageFsBackend {
   const getDir = (): string => ensureStorageDir(baseUserDataPath);
 
@@ -50,9 +79,7 @@ export function createStorageFsBackend(baseUserDataPath: string): StorageFsBacke
   function writeKey(key: string, value: string): void {
     const dir = getDir();
     const file = path.join(dir, keyToFilename(key));
-    const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
-    fs.writeFileSync(tmp, value, 'utf8');
-    fs.renameSync(tmp, file);
+    durableWriteUtf8(file, value);
   }
 
   function removeKey(key: string): void {

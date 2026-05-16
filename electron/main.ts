@@ -14,6 +14,7 @@ import {
   beginStartupCrashLoopTracking,
   markStartupSuccessful,
   recordStartupCrash,
+  type StartupCrashLoopStatus,
 } from './startupCrashLoop';
 import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
 import { assertTrustedSender, isTrustedElectronUrl } from './security';
@@ -75,6 +76,15 @@ const DEFAULT_MAX_FILE_BYTES = 50 * 1024 * 1024;
 
 // Enable Web Serial API in Electron
 app.commandLine.appendSwitch('enable-features', 'ElectronSerialChooser,WebSerial');
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
 
 function isTrustedSerialPermissionRequest(
   webContents: { getURL: () => string } | null,
@@ -265,6 +275,59 @@ function createWindow() {
   });
 }
 
+function createSafeModeWindow(startupStatus: StartupCrashLoopStatus): void {
+  mainWindow = new BrowserWindow({
+    width: 820,
+    height: 560,
+    minWidth: 640,
+    minHeight: 420,
+    title: 'LaserForge Safe Mode',
+    backgroundColor: '#0a0a12',
+    autoHideMenuBar: true,
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      sandbox: true,
+      webviewTag: false,
+    },
+  });
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.removeMenu();
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      void shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+  const reason = startupStatus.lastFailureReason ?? 'The previous launch did not finish startup.';
+  const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>LaserForge Safe Mode</title>
+    <style>
+      body { margin: 0; font-family: system-ui, sans-serif; background: #0a0a12; color: #f4f6fb; }
+      main { max-width: 680px; margin: 72px auto; padding: 0 32px; }
+      h1 { font-size: 28px; margin: 0 0 16px; }
+      p { color: #c7ccda; line-height: 1.55; }
+      code { color: #ffffff; background: #171827; padding: 2px 6px; border-radius: 4px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>LaserForge opened in safe mode</h1>
+      <p>The app detected ${startupStatus.consecutiveFailures} failed startup attempts and paused the normal boot path, including automatic update checks.</p>
+      <p>Last recorded reason: <code>${escapeHtml(reason)}</code></p>
+      <p>Export diagnostics or reset recent settings from the normal app after support reviews this state.</p>
+    </main>
+  </body>
+</html>`;
+  void mainWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+}
+
 registerFalconWiFiIpc(() => mainWindow);
 
 function recordMainProcessCrash(reason: string): void {
@@ -333,8 +396,10 @@ app.whenReady().then(() => {
   if (startupStatus.shouldEnterSafeMode) {
     console.warn(
       `[startup] T2-102: ${startupStatus.consecutiveFailures} failed launches; `
-      + 'safe-mode / rollback UI should be offered.',
+      + 'opening safe-mode recovery window.',
     );
+    createSafeModeWindow(startupStatus);
+    return;
   }
   createWindow();
   scheduleAutoUpdateCheck();

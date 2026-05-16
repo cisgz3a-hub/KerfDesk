@@ -32,6 +32,19 @@ export default defineConfig({
     // are generated in dist/ for post-build tooling, then excluded from
     // packaged installers by package.json:build.files negation globs.
     sourcemap: 'hidden',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (id.includes('react') || id.includes('scheduler')) return 'vendor-react';
+          if (id.includes('opentype.js') || id.includes('imagetracerjs') || id.includes('floyd-steinberg')) {
+            return 'vendor-importers';
+          }
+          if (id.includes('polygon-clipping') || id.includes('polygon-offset')) return 'vendor-geometry';
+          return 'vendor';
+        },
+      },
+    },
   },
   define: {
     __APP_VERSION__: JSON.stringify(packageJson.version),

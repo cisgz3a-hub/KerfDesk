@@ -16,7 +16,11 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { parseGrblJobLines } from '../src/controllers/grbl/GrblJobLineParser';
+import {
+  createGrblJobLineParserState,
+  parseGrblJobLineChunk,
+  parseGrblJobLines,
+} from '../src/controllers/grbl/GrblJobLineParser';
 
 let passed = 0;
 let failed = 0;
@@ -176,6 +180,18 @@ console.log('\n=== T1-134 GRBL job-line + OBJ-id parser ===\n');
 }
 
 // -------- 12. Source-level pin: GrblController delegates --------
+{
+  const state = createGrblJobLineParserState();
+  const first = parseGrblJobLineChunk(['; OBJ ids=cross'], state);
+  const second = parseGrblJobLineChunk(['G0 X7'], state);
+  assert(first.jobLines.length === 0, 'chunk parser can hold marker-only chunks');
+  assert(JSON.stringify(second.lineMarkers[0]) === '["cross"]',
+    'chunk parser carries pending marker across chunk boundary');
+  assert(state.pendingMarker === null,
+    'chunk parser consumes cross-boundary marker after first gcode line');
+}
+
+// -------- 13. Source-level pin: GrblController delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const ctrlSrc = readFileSync(

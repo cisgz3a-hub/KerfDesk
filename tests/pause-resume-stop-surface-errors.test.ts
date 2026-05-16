@@ -107,5 +107,24 @@ console.log('\n=== T1-64 pause/resume/stop surface errors ===\n');
     'handleStop catch does NOT clear isPaused (still-running state stays as last known)');
 }
 
+// Locate beginTestFire body: rejected promise must surface visibly and
+// release pointer capture instead of becoming an unhandled async failure.
+{
+  const startIdx = src.indexOf('const beginTestFire = useCallback');
+  assert(startIdx >= 0, 'beginTestFire is defined');
+  const nextHandler = src.indexOf('const endTestFire = useCallback', startIdx);
+  assert(nextHandler > startIdx, 'beginTestFire body precedes endTestFire');
+  const body = src.slice(startIdx, nextHandler);
+
+  assert(/\.catch\(\(err: unknown\)/.test(body),
+    'beginTestFire catches rejected coordinator promises');
+  assert(/releasePointerCapture/.test(body.slice(body.indexOf('.catch'))),
+    'beginTestFire catch releases pointer capture');
+  assert(/appendMessage\(/.test(body.slice(body.indexOf('.catch'))),
+    'beginTestFire catch surfaces a visible message');
+  assert(/Test fire failed/.test(body),
+    'beginTestFire catch message names test fire failure');
+}
+
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

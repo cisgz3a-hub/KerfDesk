@@ -409,17 +409,36 @@ export class ExecutionCoordinator {
     if (lease == null) {
       return false;
     }
-    const result = await ctrl.operations.testFire({
-      powerPercent: TEST_FIRE_POWER_PERCENT,
-      maxSpindle: args.maxSpindle,
-      onCommand: line => this.notifySimulator(line),
-    });
-    if (!result.ok) {
-      console.warn('[TestFire] start blocked:', result.message ?? result.reason);
-      // T2-11: release on failed start. The mutex is only useful if it's
-      // actually freed when the operation didn't begin.
-      this.deps.machineService.releaseOperation(lease);
+    let commandObserved = false;
+    let started = false;
+    try {
+      const result = await ctrl.operations.testFire({
+        powerPercent: TEST_FIRE_POWER_PERCENT,
+        maxSpindle: args.maxSpindle,
+        onCommand: line => {
+          commandObserved = true;
+          this.notifySimulator(line);
+        },
+      });
+      if (!result.ok) {
+        console.warn('[TestFire] start blocked:', result.message ?? result.reason);
+        return false;
+      }
+      started = true;
+    } catch (err: unknown) {
+      console.warn('[TestFire] start failed:', errorMessage(err));
+      if (commandObserved) {
+        try {
+          await this.emergencyLaserOff();
+        } catch (offErr: unknown) {
+          console.warn('[TestFire] emergencyLaserOff after failed start failed:', errorMessage(offErr));
+        }
+      }
       return false;
+    } finally {
+      if (!started) {
+        this.deps.machineService.releaseOperation(lease);
+      }
     }
     // T1-22: notify the service that the laser is intentionally on so
     // job-start gates and the laser-output-state surface stay accurate.

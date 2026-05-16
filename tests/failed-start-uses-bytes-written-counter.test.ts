@@ -175,14 +175,15 @@ void (async () => {
     /this\._writeLine\(line\);[\s\S]{0,800}this\._jobLinesWrittenSinceJobStart\+\+/.test(drainBlock),
     'increment happens AFTER _writeLine inside _drainQueue (failed writes do not count)',
   );
-  // Reset must be in sendJob's setup block.
-  const sendJobBlock = ctrlSrc.slice(
-    ctrlSrc.indexOf('async sendJob('),
-    ctrlSrc.indexOf('async sendJob(') + 2500,
+  // Reset must be in the shared job-start setup block used by both
+  // sendJob(string[]) and the T3-15 gcode-stream path.
+  const resetBlock = ctrlSrc.slice(
+    ctrlSrc.indexOf('private _resetJobRuntime('),
+    ctrlSrc.indexOf('private _resetJobRuntime(') + 1500,
   );
   assert(
-    /this\._jobLinesWrittenSinceJobStart = 0;/.test(sendJobBlock),
-    'counter reset at sendJob start',
+    /this\._jobLinesWrittenSinceJobStart = 0;/.test(resetBlock),
+    'counter reset in shared job-start runtime setup',
   );
 
   const ifaceSrc = readFileSync(

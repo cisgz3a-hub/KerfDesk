@@ -261,6 +261,35 @@ console.log('\n=== T1-135 validateJobTicket ===\n');
 // -------- 8. gate order: scene mismatch wins over profile mismatch --------
 {
   resetWarns();
+  const scene = makeScene();
+  const profile = makeProfile();
+  const canonicalGcode = 'G0\nM5';
+  const ticket = makeTicket({ scene, profile, gcodeText: canonicalGcode });
+  const spooled = {
+    ...ticket,
+    gcodeText: 'STALE_LEGACY_TEXT',
+    gcodeSpool: {
+      id: 'spool_validate_1',
+      contentHash: hashString(canonicalGcode),
+      lineCount: 2,
+      byteCount: canonicalGcode.length,
+      open: async function* () {
+        yield { lines: ['G0', 'M5'], cumulativeLineCount: 2, isLast: true };
+      },
+    },
+  } as ValidatedJobTicket;
+  const r = validateJobTicket({
+    ticket: spooled,
+    scene,
+    currentProfile: profile,
+    currentControllerType: 'grbl',
+  });
+  assert(r.ok === true, 'spooled ticket validates gcode hash from gcodeSpool.contentHash');
+}
+
+// -------- 9. gate order: scene mismatch wins over profile mismatch --------
+{
+  resetWarns();
   const ticketScene = makeScene(1);
   const ticketProfile = makeProfile(1);
   const ticket = makeTicket({ scene: ticketScene, profile: ticketProfile, gcodeText: 'G0' });
@@ -280,7 +309,7 @@ console.log('\n=== T1-135 validateJobTicket ===\n');
     'gate order: only the first failing gate logs (no double-warn)');
 }
 
-// -------- 9. Source-level pin: MachineService delegates --------
+// -------- 10. Source-level pin: MachineService delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const svcSrc = readFileSync(

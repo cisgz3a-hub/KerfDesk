@@ -10,6 +10,7 @@
 import { type SerialPortLike } from '../communication/SerialPort';
 import type { SafetyActionResult } from './SafetyActionResult';
 import type { GcodeStartMode } from '../core/output/GcodeOrigin';
+import type { SpoolHandle } from '../core/output/GcodeStreaming';
 // T1-163 (audit F-001): surface the T1-116 token type so the
 // setStopOnError signature declares its safety contract.
 import type { UnsafeStopOnErrorOverrideToken } from './grbl/StopOnErrorOverrideToken';
@@ -161,6 +162,7 @@ export type ConnectionDescriptor =
 
 export type ControllerOutput =
   | { kind: 'gcode-lines'; lines: readonly string[]; dialect: 'grbl' | 'marlin' | 'smoothie' | string }
+  | { kind: 'gcode-stream'; spool: SpoolHandle; dialect: 'grbl' | 'marlin' | 'smoothie' | string }
   | { kind: 'gcode-text'; text: string; dialect: string }
   | { kind: 'binary-job'; bytes: Uint8Array; format: 'ruida' | 'trocen' | string }
   | { kind: 'device-job'; payload: unknown; format: string };

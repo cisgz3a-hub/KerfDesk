@@ -11,8 +11,8 @@
  *   - `compileConstraints()`: GRBL planner constraints (no arc
  *     flattening, runtime accel/feed limits from live identity).
  *   - `emit(plan, job)`: thin wrapper over `GrblOutputStrategy.
- *     generate()` + `analyzeEmittedBurnEnvelope` so the
- *     `OutputArtifact` carries the real burn AABB.
+ *     generateGcode()` + spool burn-envelope analysis so the
+ *     `OutputArtifact` carries a replayable stream and real burn AABB.
  *   - `validate(output, live)`: minimal sanity checks — `$30`
  *     missing → warning, laser-mode mismatch → error. The full
  *     MachinePreflight battery still runs through the preflight
@@ -54,7 +54,9 @@ import type {
 import type { Plan } from '../core/plan/Plan';
 import type { Job } from '../core/job/Job';
 import { GrblOutputStrategy } from '../core/output/GrblStrategy';
-import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
+import { analyzeEmittedBurnEnvelopeFromChunks } from '../core/output/emittedBurnEnvelope';
+import { buildReplayableGcodeSpool } from '../core/output/GcodeStreaming';
+import { generateTicketId } from '../core/job/ticketHashing';
 
 const GRBL_CAPABILITIES: FirmwareCapabilities = Object.freeze({
   id: 'grbl',
@@ -88,19 +90,21 @@ class GrblFirmwareAdapter implements FirmwareAdapter {
     return GRBL_PLANNER_CONSTRAINTS;
   }
 
-  emit(plan: Plan, job: Job): OutputArtifact {
-    // Reuse the existing GRBL emitter so the output bytes are
-    // byte-identical to today's PipelineService path. The adapter
-    // adds the burn envelope (T1-182) so downstream consumers can
-    // run the T1-188 divergence check.
+  async emit(plan: Plan, job: Job): Promise<OutputArtifact> {
+    // Reuse the existing GRBL streaming emitter so the adapter
+    // artifact can be consumed without splitting a fully materialized
+    // text blob. The adapter adds the burn envelope (T1-182) so
+    // downstream consumers can run the T1-188 divergence check.
     const strategy = new GrblOutputStrategy();
-    const out = strategy.generate(plan, job);
-    const envelope = analyzeEmittedBurnEnvelope(out.text ?? '');
-    const lines = (out.text ?? '').split(/\r?\n/);
+    const spool = await buildReplayableGcodeSpool(
+      generateTicketId(),
+      options => strategy.generateGcode(plan, job, options),
+    );
+    const envelope = await analyzeEmittedBurnEnvelopeFromChunks(spool.open());
     return {
-      kind: 'gcode-lines',
+      kind: 'gcode-stream',
       firmware: 'grbl',
-      lines,
+      spool,
       burnBounds: envelope.burnBounds,
     };
   }

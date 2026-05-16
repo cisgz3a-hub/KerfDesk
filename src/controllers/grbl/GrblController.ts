@@ -27,6 +27,8 @@ import {
   type JobHandle,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
+import type { SpoolHandle } from '../../core/output/GcodeStreaming';
+import type { GcodeChunk } from '../../core/output/GcodeStreaming';
 import {
   ConnectionGenerationAllocator,
   contextFromToken,
@@ -45,14 +47,24 @@ import { parseGrblG54WcsLine } from './GrblWcsParser';
 import { classifyGrblSafeState } from './GrblSafeStateClassifier';
 // T1-134: pure job-line + OBJ-id marker parser extracted so the
 // gcode-line → object-id mapping contract is unit-testable in isolation.
-import { parseGrblJobLines } from './GrblJobLineParser';
+import {
+  createGrblJobLineParserState,
+  type GrblJobLineParserState,
+  parseGrblJobLineChunk,
+  parseGrblJobLines,
+} from './GrblJobLineParser';
 // T1-137: pure $I identity-line parser extracted so the
 // [VER:...] / [OPT:...] grammar is testable without mounting the controller.
 import { parseGrblIdentityLine } from './GrblIdentityParser';
 // T1-139: pure job-bounds checker (the controller-layer
 // defense-in-depth that scans G0/G1 X/Y moves against bed extents,
 // including the T1-44 relative-mode simulated-cursor path).
-import { checkGrblJobBounds } from './GrblJobBoundsChecker';
+import {
+  checkGrblJobBounds,
+  checkGrblJobBoundsChunk,
+  createGrblJobBoundsState,
+  type GrblJobBoundsContext,
+} from './GrblJobBoundsChecker';
 import {
   type SafetyActionResult,
   makeEmergencyStopResult,
@@ -71,6 +83,7 @@ const REALTIME_STATUS = 0x3F;
 const REALTIME_FEED_HOLD = 0x21; // '!'
 const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
+const STREAM_JOB_WINDOW_LINES = 2048;
 
 
 interface PendingLine {
@@ -391,6 +404,11 @@ export class GrblController implements GrblControllerApi {
   private _objectLifecycleListeners = new Set<ObjectLifecycleCallback>();
   private _safetyOffOutcomeListeners = new Set<SafetyOffOutcomeCallback>();
   private _queueIndex = 0;
+  private _jobTotalLines = 0;
+  private _streamIterator: AsyncIterator<GcodeChunk> | null = null;
+  private _streamParserState: GrblJobLineParserState | null = null;
+  private _streamDone = false;
+  private _streamFillInFlight = false;
   private _pending: PendingLine[] = [];
   private _bufferAvailable = GRBL_BUFFER_SIZE;
   private _linesAcknowledged = 0;
@@ -1003,13 +1021,17 @@ export class GrblController implements GrblControllerApi {
   }
 
   async executeJob(output: ControllerOutput, ticket: ControllerJobTicket): Promise<JobHandle> {
-    if (output.kind !== 'gcode-lines') {
-      throw new Error(`GRBL controller only supports gcode-lines output, got ${output.kind}`);
+    if (output.kind !== 'gcode-lines' && output.kind !== 'gcode-stream') {
+      throw new Error(`GRBL controller only supports gcode-lines or gcode-stream output, got ${output.kind}`);
     }
     if (output.dialect !== 'grbl') {
       throw new Error(`GRBL controller cannot execute ${output.dialect} dialect; expected grbl`);
     }
-    await this.sendJob([...output.lines]);
+    if (output.kind === 'gcode-stream') {
+      await this.sendJobSpool(output.spool);
+    } else {
+      await this.sendJob([...output.lines]);
+    }
     return {
       id: ticket.ticketId,
       startedAt: Date.now(),
@@ -1034,13 +1056,134 @@ export class GrblController implements GrblControllerApi {
       throw new Error(boundsError);
     }
 
+    this._startPreparedJob(jobLines, lineMarkers);
+  }
+
+  private async sendJobSpool(spool: SpoolHandle): Promise<void> {
+    if (!this._port?.isOpen) throw new Error('Not connected');
+    if (this._isJobRunning) throw new Error('Job already running');
+
+    const freshStatus = await this._queryFreshStatus();
+    if (freshStatus !== 'idle') {
+      throw new Error(
+        `Cannot start job — machine is "${freshStatus}" (wait for idle, then try again)`,
+      );
+    }
+
+    const totalJobLines = await this._validateSpoolBeforeStreaming(spool);
+
+    this._streamIterator = spool.open()[Symbol.asyncIterator]();
+    this._streamParserState = createGrblJobLineParserState();
+    this._streamDone = false;
+    this._streamFillInFlight = false;
+    this._jobLines = [];
+    this._lineMarkers = [];
+    this._resetJobRuntime(totalJobLines);
+
+    await this._fillStreamWindow();
+    if (this._jobLines.length === 0 && this._streamDone) {
+      this._clearStreamState();
+      this._emitProgress();
+      return;
+    }
+
+    this._isJobRunning = true;
+    this._updateStatus('run');
+    this._emitProgress();
+    this._drainQueue();
+  }
+
+  private async _validateSpoolBeforeStreaming(spool: SpoolHandle): Promise<number> {
+    const parserState = createGrblJobLineParserState();
+    const boundsContext = this._jobBoundsContext();
+    const boundsState = createGrblJobBoundsState(boundsContext);
+    let sawLast = false;
+    let totalJobLines = 0;
+    for await (const chunk of spool.open()) {
+      const parsed = parseGrblJobLineChunk(chunk.lines, parserState);
+      const boundsError = checkGrblJobBoundsChunk(parsed.jobLines, boundsContext, boundsState);
+      if (boundsError) {
+        throw new Error(boundsError);
+      }
+      totalJobLines += parsed.jobLines.length;
+      if (chunk.isLast) {
+        sawLast = true;
+        break;
+      }
+    }
+
+    if (!sawLast) {
+      throw new Error('Streaming G-code ended before terminal chunk.');
+    }
+
+    return totalJobLines;
+  }
+
+  private async _fillStreamWindow(): Promise<void> {
+    if (this._streamIterator === null || this._streamParserState === null || this._streamDone) {
+      return;
+    }
+    if (this._streamFillInFlight) return;
+
+    this._streamFillInFlight = true;
+    try {
+      while (this._jobLines.length < STREAM_JOB_WINDOW_LINES && !this._streamDone) {
+        const next = await this._streamIterator.next();
+        if (next.done) {
+          this._streamDone = true;
+          break;
+        }
+        const chunk = next.value;
+        const parsed = parseGrblJobLineChunk(chunk.lines, this._streamParserState);
+        this._jobLines.push(...parsed.jobLines);
+        this._lineMarkers.push(...parsed.lineMarkers);
+        if (chunk.isLast) {
+          this._streamDone = true;
+          break;
+        }
+      }
+    } finally {
+      this._streamFillInFlight = false;
+    }
+  }
+
+  private _handleStreamFillError(err: unknown): void {
+    const message = err instanceof Error ? err.message : String(err);
+    for (const cb of this._errorListeners) {
+      cb(0, `GRBL stream fill failed: ${message}`);
+    }
+    this._abortJob();
+    this._emitProgress();
+  }
+
+  private _startPreparedJob(
+    jobLines: string[],
+    lineMarkers: (readonly string[] | null)[],
+  ): void {
     this._jobLines = jobLines;
     this._lineMarkers = lineMarkers;
+    this._clearStreamState();
+    this._resetJobRuntime(jobLines.length);
 
+    // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
+    if (this._jobLines.length === 0) {
+      this._lineMarkers = [];
+      this._emitProgress();
+      return;
+    }
+
+    this._isJobRunning = true;
+    this._updateStatus('run');
+    this._emitProgress();
+    this._drainQueue();
+  }
+
+  private _resetJobRuntime(totalLines: number): void {
     this._queueIndex = 0;
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._linesAcknowledged = 0;
+    this._jobTotalLines = totalLines;
     this._jobStartTime = Date.now();
     this._lastControllerRxAt = this._jobStartTime;
     this._jobStatusHeartbeatWarned = false;
@@ -1055,18 +1198,13 @@ export class GrblController implements GrblControllerApi {
 
     this._lastLifecycleKey = null;
     this._emitObjectLifecycle([]);
+  }
 
-    // No lines to stream — never set _isJobRunning or we never get 'ok' and manual sendCommand stays blocked forever
-    if (this._jobLines.length === 0) {
-      this._lineMarkers = [];
-      this._emitProgress();
-      return;
-    }
-
-    this._isJobRunning = true;
-    this._updateStatus('run');
-    this._emitProgress();
-    this._drainQueue();
+  private _clearStreamState(): void {
+    this._streamIterator = null;
+    this._streamParserState = null;
+    this._streamDone = false;
+    this._streamFillInFlight = false;
   }
 
   // T1-134: delegates to the pure parseGrblJobLines helper. The parser
@@ -1106,12 +1244,16 @@ export class GrblController implements GrblControllerApi {
   // wires the controller's runtime state (bed extents, head position,
   // confirmation flag) into the helper's input shape.
   private _checkJobBounds(lines: string[]): string | null {
-    return checkGrblJobBounds(lines, {
+    return checkGrblJobBounds(lines, this._jobBoundsContext());
+  }
+
+  private _jobBoundsContext(): GrblJobBoundsContext {
+    return {
       bedWidthMm: this._bedWidth,
       bedHeightMm: this._bedHeight,
       headPosition: { x: this._state.position.x, y: this._state.position.y },
       positionConfirmed: this._positionConfirmed,
-    });
+    };
   }
 
   /**
@@ -2129,7 +2271,7 @@ export class GrblController implements GrblControllerApi {
     }
 
     if (this._isJobRunning &&
-        this._queueIndex >= this._jobLines.length &&
+        this._isQueueDrainedForCompletion() &&
         this._pending.length === 0) {
       this._completeJob();
       return;
@@ -2306,7 +2448,7 @@ export class GrblController implements GrblControllerApi {
       if (
         st === 'alarm' ||
         (st === 'idle' &&
-          this._queueIndex >= this._jobLines.length &&
+          this._isQueueDrainedForCompletion() &&
           this._pending.length === 0)
       ) {
         this._abortJob();
@@ -2385,6 +2527,11 @@ export class GrblController implements GrblControllerApi {
     if (!this._port?.isOpen || !this._isJobRunning) return;
     if (this._state.status === 'hold') return;
 
+    if (this._streamIterator !== null) {
+      this._drainStreamWindow();
+      return;
+    }
+
     while (this._queueIndex < this._jobLines.length) {
       const line = this._jobLines[this._queueIndex];
       const byteCount = line.length + 1;
@@ -2406,11 +2553,44 @@ export class GrblController implements GrblControllerApi {
     }
   }
 
+  private _drainStreamWindow(): void {
+    while (this._jobLines.length > 0) {
+      const line = this._jobLines[0];
+      const byteCount = line.length + 1;
+
+      if (byteCount > this._bufferAvailable) break;
+
+      const marker = this._lineMarkers[0];
+      this._writeLine(line);
+      this._jobLinesWrittenSinceJobStart++;
+      this._pending.push({ text: line, byteCount, marker });
+      this._bufferAvailable -= byteCount;
+      this._jobLines.shift();
+      this._lineMarkers.shift();
+      this._queueIndex++;
+      this._recordSendTimestamp();
+    }
+
+    if (this._jobLines.length === 0 && !this._streamDone && !this._streamFillInFlight) {
+      void this._fillStreamWindow()
+        .then(() => this._drainQueue())
+        .catch(err => this._handleStreamFillError(err));
+    }
+  }
+
+  private _isQueueDrainedForCompletion(): boolean {
+    if (this._streamIterator !== null) {
+      return this._streamDone && this._jobLines.length === 0;
+    }
+    return this._queueIndex >= this._jobLines.length;
+  }
+
   // ─── JOB LIFECYCLE ──────────────────────────────────────────
 
   private _completeJob(): void {
     this._resetJobStatusHeartbeat();
     this._isJobRunning = false;
+    this._clearStreamState();
     this._updateStatus('idle');
     this._emitProgress();
     this._lastLifecycleKey = null;
@@ -2420,9 +2600,11 @@ export class GrblController implements GrblControllerApi {
   private _abortJob(): void {
     this._resetJobStatusHeartbeat();
     this._isJobRunning = false;
+    this._clearStreamState();
     this._jobLines = [];
     this._lineMarkers = [];
     this._queueIndex = 0;
+    this._jobTotalLines = 0;
     this._pending = [];
     this._bufferAvailable = GRBL_BUFFER_SIZE;
     this._pausePending = false;
@@ -2534,7 +2716,7 @@ export class GrblController implements GrblControllerApi {
   }
 
   private _emitProgress(): void {
-    const total = this._jobLines.length;
+    const total = this._jobTotalLines || this._jobLines.length;
     const bufferFill = GRBL_BUFFER_SIZE - this._bufferAvailable;
     const { healthStatus, ackRateHz, expectedAckRateHz } = computeStreamingHealth({
       now: Date.now(),

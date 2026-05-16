@@ -78,9 +78,15 @@ void (async () => {
 
   {
     const mainSource = readFileSync(join(REPO_ROOT, 'electron', 'main.ts'), 'utf8');
+    const crashLoopSource = readFileSync(join(REPO_ROOT, 'electron', 'startupCrashLoop.ts'), 'utf8');
     assert(/beginStartupCrashLoopTracking/.test(mainSource), 'main.ts records startup attempt on boot');
     assert(/markStartupSuccessful/.test(mainSource), 'main.ts marks startup successful after stable renderer load');
     assert(/recordStartupCrash/.test(mainSource), 'main.ts records startup/render crashes');
+    assert(/createSafeModeWindow/.test(mainSource), 'main.ts opens a dedicated safe-mode window on crash loops');
+    assert(/if \(startupStatus\.shouldEnterSafeMode\)[\s\S]{0,200}return;/.test(mainSource),
+      'safe-mode boot returns before normal window and update check');
+    assert(/fs\.fsyncSync/.test(crashLoopSource),
+      'startup crash-loop state fsyncs writes for crash durability');
   }
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

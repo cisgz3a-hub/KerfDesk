@@ -1,8 +1,7 @@
 name: Deploy Web App to GitHub Pages
 
-# T1-113: deploy the web build to GitHub Pages when explicitly requested.
-# Keeping this manual avoids consuming Actions minutes on every master push
-# while preserving the tester deployment path at
+# T1-113: deploy the web build to GitHub Pages from protected branches and
+# when explicitly requested, preserving the tester deployment path at
 # https://stolkjohannjohann-sudo.github.io/LaserForge/.
 #
 # One-time manual prerequisite: repo Settings → Pages → Source must
@@ -13,6 +12,8 @@ name: Deploy Web App to GitHub Pages
 #
 on:
   workflow_dispatch:
+  push:
+    branches: [master, main]
 
 permissions:
   contents: read

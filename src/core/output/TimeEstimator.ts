@@ -1,63 +1,106 @@
 /**
- * Estimate job time from G-code
- * Parses movement commands and calculates time based on feed rates and distances
+ * Estimate job time from G-code.
+ * Parses movement commands and calculates time based on feed rates and distances.
  */
-export function estimateJobTime(gcode: string): {
+import type { GcodeChunk } from './GcodeStreaming';
+
+export interface JobTimeEstimate {
   totalSeconds: number;
   cutTime: number;
   travelTime: number;
   totalDistance: number;
   cutDistance: number;
   formatted: string;
-} {
-  const lines = gcode.split('\n');
-  let x = 0, y = 0;
-  let feedRate = 1000; // mm/min default
-  let cutTime = 0;
-  let travelTime = 0;
-  let cutDistance = 0;
-  let travelDistance = 0;
+}
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith(';')) continue;
+interface TimeEstimatorState {
+  x: number;
+  y: number;
+  feedRate: number;
+  cutTime: number;
+  travelTime: number;
+  cutDistance: number;
+  travelDistance: number;
+}
 
-    const fMatch = trimmed.match(/F([\d.]+)/);
-    if (fMatch) feedRate = parseFloat(fMatch[1]);
+function createTimeEstimatorState(): TimeEstimatorState {
+  return {
+    x: 0,
+    y: 0,
+    feedRate: 1000,
+    cutTime: 0,
+    travelTime: 0,
+    cutDistance: 0,
+    travelDistance: 0,
+  };
+}
 
-    const xMatch = trimmed.match(/X([-\d.]+)/);
-    const yMatch = trimmed.match(/Y([-\d.]+)/);
+function estimateLine(state: TimeEstimatorState, line: string): void {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith(';')) return;
 
-    if (xMatch || yMatch) {
-      const nx = xMatch ? parseFloat(xMatch[1]) : x;
-      const ny = yMatch ? parseFloat(yMatch[1]) : y;
-      const dx = nx - x;
-      const dy = ny - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+  const fMatch = trimmed.match(/F([\d.]+)/);
+  if (fMatch) state.feedRate = parseFloat(fMatch[1]);
 
-      if (trimmed.startsWith('G0')) {
-        // Rapid move — assume 5000 mm/min
-        const rapidRate = 5000;
-        travelTime += (dist / rapidRate) * 60;
-        travelDistance += dist;
-      } else if (trimmed.startsWith('G1')) {
-        const rate = feedRate || 1000;
-        cutTime += (dist / rate) * 60;
-        cutDistance += dist;
-      }
+  const xMatch = trimmed.match(/X([-\d.]+)/);
+  const yMatch = trimmed.match(/Y([-\d.]+)/);
 
-      x = nx;
-      y = ny;
+  if (xMatch || yMatch) {
+    const nx = xMatch ? parseFloat(xMatch[1]) : state.x;
+    const ny = yMatch ? parseFloat(yMatch[1]) : state.y;
+    const dx = nx - state.x;
+    const dy = ny - state.y;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (trimmed.startsWith('G0')) {
+      const rapidRate = 5000;
+      state.travelTime += (dist / rapidRate) * 60;
+      state.travelDistance += dist;
+    } else if (trimmed.startsWith('G1')) {
+      const rate = state.feedRate || 1000;
+      state.cutTime += (dist / rate) * 60;
+      state.cutDistance += dist;
     }
+
+    state.x = nx;
+    state.y = ny;
   }
+}
 
-  const totalSeconds = cutTime + travelTime;
-  const totalDistance = cutDistance + travelDistance;
-
-  // Format time
+function finishEstimate(state: TimeEstimatorState): JobTimeEstimate {
+  const totalSeconds = state.cutTime + state.travelTime;
+  const totalDistance = state.cutDistance + state.travelDistance;
   const mins = Math.floor(totalSeconds / 60);
   const secs = Math.round(totalSeconds % 60);
   const formatted = mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
 
-  return { totalSeconds, cutTime, travelTime, totalDistance, cutDistance, formatted };
+  return {
+    totalSeconds,
+    cutTime: state.cutTime,
+    travelTime: state.travelTime,
+    totalDistance,
+    cutDistance: state.cutDistance,
+    formatted,
+  };
+}
+
+export function estimateJobTime(gcode: string): JobTimeEstimate {
+  const state = createTimeEstimatorState();
+  for (const line of gcode.split('\n')) {
+    estimateLine(state, line);
+  }
+  return finishEstimate(state);
+}
+
+export async function estimateJobTimeFromChunks(
+  source: AsyncIterable<GcodeChunk>,
+): Promise<JobTimeEstimate> {
+  const state = createTimeEstimatorState();
+  for await (const chunk of source) {
+    for (const line of chunk.lines) {
+      estimateLine(state, line);
+    }
+    if (chunk.isLast) break;
+  }
+  return finishEstimate(state);
 }

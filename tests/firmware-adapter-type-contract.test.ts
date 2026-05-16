@@ -75,7 +75,7 @@ const mockAdapter: FirmwareAdapter = {
       maxFeedMmPerMin: 6000,
     };
   },
-  emit(_plan, _job): OutputArtifact {
+  async emit(_plan, _job): Promise<OutputArtifact> {
     return {
       kind: 'gcode-lines',
       firmware: 'grbl',
@@ -133,8 +133,8 @@ const mockAdapter: FirmwareAdapter = {
 
 // -------- 3. OutputArtifact discriminated union covers all 4 kinds --------
 {
-  const kinds: Array<OutputArtifact['kind']> = ['gcode-lines', 'gcode-text', 'binary-job', 'device-job'];
-  assert(kinds.length === 4, '4 OutputArtifact kinds declared');
+  const kinds: Array<OutputArtifact['kind']> = ['gcode-lines', 'gcode-stream', 'gcode-text', 'binary-job', 'device-job'];
+  assert(kinds.length === 5, '5 OutputArtifact kinds declared');
 }
 
 // -------- 4. MachineFaultKind / RecoveryStepKind cover the audit's enumeration --------

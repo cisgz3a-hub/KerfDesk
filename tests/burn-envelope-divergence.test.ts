@@ -18,6 +18,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   checkBurnEnvelopeDivergence,
+  checkBurnEnvelopeDivergenceFromEnvelope,
   computePlanBurnEnvelope,
   BURN_ENVELOPE_DIVERGENCE_TOLERANCE_MM,
 } from '../src/core/output/burnEnvelopeDivergence';
@@ -196,6 +197,24 @@ console.log('\n=== T1-188 burn-envelope divergence check ===\n');
 
 // -------- 9. Source pins on the implementation --------
 {
+  const plan = makePlan([
+    { type: 'rapid', to: { x: 10, y: 10 } },
+    { type: 'linear', to: { x: 50, y: 10 }, power: 50, speed: 1200 },
+  ]);
+  const report = checkBurnEnvelopeDivergenceFromEnvelope(plan, {
+    burnBounds: { minX: 7, minY: 10, maxX: 53, maxY: 10 },
+    burnMoveCount: 1,
+    zeroDistanceLinearCount: 0,
+  });
+  assert(report !== null, 'precomputed emitted envelope can be checked for divergence');
+  if (report) {
+    assert(report.kind === 'envelope-edge-mismatch', 'precomputed envelope mismatch reports edge divergence');
+    assert(report.maxEdgeDeltaMm === 3, `precomputed maxEdgeDeltaMm === 3 (got ${report.maxEdgeDeltaMm})`);
+  }
+}
+
+// -------- 10. Source pins on the implementation --------
+{
   const src = readFileSync(resolve(here, '../src/core/output/burnEnvelopeDivergence.ts'), 'utf-8');
   assert(/T1-188/.test(src), 'burnEnvelopeDivergence.ts carries T1-188 marker');
   assert(/audit High #2 \+ #8/.test(src), 'cross-references audit High #2 + #8');
@@ -208,6 +227,10 @@ console.log('\n=== T1-188 burn-envelope divergence check ===\n');
     'computePlanBurnEnvelope exported',
   );
   assert(
+    /export function checkBurnEnvelopeDivergenceFromEnvelope/.test(src),
+    'checkBurnEnvelopeDivergenceFromEnvelope exported',
+  );
+  assert(
     /BURN_ENVELOPE_DIVERGENCE_TOLERANCE_MM = 0\.5/.test(src),
     'tolerance constant is 0.5 mm',
   );
@@ -215,12 +238,12 @@ console.log('\n=== T1-188 burn-envelope divergence check ===\n');
   const pipelineSrc = readFileSync(resolve(here, '../src/app/PipelineService.ts'), 'utf-8');
   assert(/T1-188/.test(pipelineSrc), 'PipelineService.ts carries T1-188 marker');
   assert(
-    /burnEnvelopeDivergence:/.test(pipelineSrc),
-    'PipelineService.ts populates burnEnvelopeDivergence field',
+    /const burnEnvelopeDivergence =/.test(pipelineSrc) && /burnEnvelopeDivergence,/.test(pipelineSrc),
+    'PipelineService.ts computes and populates burnEnvelopeDivergence field',
   );
   assert(
-    /checkBurnEnvelopeDivergence\(machineTransform\.plan, gcode\)/.test(pipelineSrc),
-    'PipelineService.ts calls checkBurnEnvelopeDivergence with the post-transform plan + emitted gcode',
+    /checkBurnEnvelopeDivergenceFromEnvelope\(machineTransform\.plan, emittedBurnEnvelope\)/.test(pipelineSrc),
+    'PipelineService.ts checks divergence from the stream-derived emitted envelope',
   );
 
   const ticketSrc = readFileSync(resolve(here, '../src/core/job/ValidatedJobTicket.ts'), 'utf-8');

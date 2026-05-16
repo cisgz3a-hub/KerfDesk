@@ -20,6 +20,7 @@ import { getJobLogs } from '../src/core/job/JobLog';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import { buildReplayableGcodeSpool, fromArray } from '../src/core/output/GcodeStreaming';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
@@ -258,6 +259,106 @@ async function run(): Promise<void> {
       'executeJob receives ticket gcodeLines',
     );
     assert(executeCalls[0]?.ticketId === ticket.ticketId, 'executeJob receives the running ticket id');
+  }
+
+  {
+    installMockLocalStorage();
+    for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+
+    let spoolOpenCount = 0;
+    const spoolLines = ['G0 X9', 'M5'] as const;
+    const spooledTicket = {
+      ...ticket,
+      gcodeSpool: await buildReplayableGcodeSpool(
+        'tkt_phase2_spooled',
+        options => {
+          spoolOpenCount++;
+          return fromArray(spoolLines, options);
+        },
+      ),
+      ticketId: 'tkt_phase2_spooled',
+      gcodeText: [...spoolLines].join('\n'),
+      gcodeHash: hashString([...spoolLines].join('\n')),
+    };
+    Object.defineProperty(spooledTicket, 'gcodeLines', {
+      enumerable: true,
+      get() {
+        throw new Error('spooled start path must not read legacy gcodeLines');
+      },
+    });
+    const executeCalls: Array<{ outputKind: string; streamLines: string[]; ticketId: string }> = [];
+    const simLines: string[] = [];
+    const mock = {
+      ...makeMockController(async () => {
+        throw new Error('legacy sendJob should not be called for a spooled ticket');
+      }),
+      executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
+        const streamLines: string[] = [];
+        if ((output as { kind: string }).kind === 'gcode-stream') {
+          for await (const chunk of (output as { spool: { open: () => AsyncIterable<{ lines: readonly string[] }> } }).spool.open()) {
+            streamLines.push(...chunk.lines);
+          }
+        }
+        executeCalls.push({
+          outputKind: output.kind,
+          streamLines,
+          ticketId: jobTicket.ticketId,
+        });
+        return { id: jobTicket.ticketId, startedAt: 123 };
+      },
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    await svc.startValidatedJob({
+      ticket: spooledTicket,
+      frameTicket: makeTestFrameTicket(spooledTicket),
+      scene,
+      machineState: idle,
+      notifySimulatorTx: line => simLines.push(line),
+      canvasContext: canvasContextForTicket(spooledTicket),
+      currentStartMode: spooledTicket.startMode,
+      currentSavedOrigin: spooledTicket.savedOrigin,
+    });
+    await waitUntil(() => simLines.length === spoolLines.length, 1000);
+
+    assert(executeCalls.length === 1, 'spooled ticket calls executeJob once');
+    assert(executeCalls[0]?.outputKind === 'gcode-stream', 'spooled ticket passes gcode-stream output');
+    assert(
+      executeCalls[0]?.streamLines.join('\n') === [...spoolLines].join('\n'),
+      'gcode-stream output reopens the ticket spool',
+    );
+    assert(simLines.join('\n') === [...spoolLines].join('\n'),
+      'spooled ticket simulator fan-out reads from the spool stream');
+    assert(spoolOpenCount >= 3,
+      'spooled ticket opens the spool for metadata, controller handoff, and simulator fan-out');
+    assert(spoolOpenCount < 6,
+      'spooled ticket avoids legacy gcodeLines fallback opens');
+    assert(executeCalls[0]?.ticketId === spooledTicket.ticketId, 'gcode-stream keeps the running ticket id');
+
+    const activeTicket = svc.getActiveTicket();
+    assert(activeTicket?.gcodeSpool?.lineCount === spoolLines.length,
+      'spooled ticket active ticket exposes spool line count');
+
+    const spoolProgress = {
+      linesSent: spoolLines.length,
+      linesAcknowledged: spoolLines.length,
+      totalLines: spoolLines.length,
+      percentComplete: 100,
+      elapsedMs: 0,
+      bufferFill: 0,
+      healthStatus: 'healthy',
+      ackRateHz: null,
+      expectedAckRateHz: null,
+    } as JobProgress;
+    await svc.tryFinalizeJobLog(idle, spoolProgress, true, () => {});
+    await svc.tryFinalizeJobLog(idle, spoolProgress, false, () => {});
+    const logs = await getJobLogs();
+    const milestones = logs[0]?.entries.filter(e => e.type === 'milestone') ?? [];
+    const startMilestone = milestones.find(m => m.message.includes('Job started:'));
+    assert(Boolean(startMilestone?.message.includes(`${spoolLines.length} commands`)),
+      'spooled ticket job log uses spool line count');
   }
 
   {

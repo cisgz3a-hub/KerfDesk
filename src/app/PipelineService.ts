@@ -18,7 +18,13 @@ import {
   type OutputFormat,
   type StreamingGcodeGenerateOptions,
 } from '../core/output/Output';
-import { collectStreamingOutput } from '../core/output/GcodeStreaming';
+import {
+  buildReplayableGcodeSpool,
+  collectStreamingOutput,
+  fromArray,
+  type GcodeChunk,
+  type SpoolHandle,
+} from '../core/output/GcodeStreaming';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import '../core/output/GrblStrategy';
@@ -46,13 +52,13 @@ import { buildJobFingerprint, type JobFingerprint } from '../core/job/JobFingerp
 // to the ticket so future preview / validation code can consume the
 // real post-emission geometry, addressing the audit's "preview may
 // not match the actual program" framing.
-import { analyzeEmittedBurnEnvelope } from '../core/output/emittedBurnEnvelope';
+import { analyzeEmittedBurnEnvelopeFromChunks } from '../core/output/emittedBurnEnvelope';
 // T1-188 (external audit High #2 + #8 wiring): consistency gate
 // between plan-derived burn envelope and emitted-gcode burn envelope.
 // Catches encoder bugs (pre-T1-173 raster overscan, pre-T1-180
 // zero-distance dwell-burn) at compile time, before the ticket is
 // presented for approval.
-import { checkBurnEnvelopeDivergence, computePlanBurnEnvelope } from '../core/output/burnEnvelopeDivergence';
+import { checkBurnEnvelopeDivergenceFromEnvelope, computePlanBurnEnvelope } from '../core/output/burnEnvelopeDivergence';
 // T1-195 (extends T1-193): persist burn-envelope divergence events
 // to the shared ledger so support bundles can correlate compile-time
 // encoder regressions with the runtime stream they affected.
@@ -66,6 +72,8 @@ import {
 
 const DEFAULT_MACHINE_BED_MM = 300;
 const OUTPUT_FORMATS: readonly OutputFormat[] = ['grbl', 'marlin', 'smoothie', 'ruida', 'custom'];
+export const MAX_MATERIALIZED_GCODE_BYTES = 50 * 1024 * 1024;
+export const MAX_MATERIALIZED_GCODE_LINES = 1_000_000;
 
 type OutputTargetSource = 'profile-preference' | 'controller-default' | 'legacy-fallback';
 
@@ -83,6 +91,24 @@ const OUTPUT_FORMAT_TO_CONTROLLER_FORMAT: Record<OutputFormat, ControllerCapabil
   ruida: 'gcode-binary',
   custom: 'native-binary',
 };
+
+function gcodeByteLength(gcode: string): number {
+  return typeof TextEncoder !== 'undefined'
+    ? new TextEncoder().encode(gcode).byteLength
+    : gcode.length;
+}
+
+export function assertMaterializedGcodeWithinLimit(gcode: string): void {
+  const bytes = gcodeByteLength(gcode);
+  if (bytes > MAX_MATERIALIZED_GCODE_BYTES) {
+    throw new Error(
+      `Generated G-code is too large for the current materialized pipeline: `
+      + `${(bytes / (1024 * 1024)).toFixed(1)} MB exceeds `
+      + `${(MAX_MATERIALIZED_GCODE_BYTES / (1024 * 1024)).toFixed(0)} MB. `
+      + `Reduce raster DPI, simplify paths, or split this into smaller jobs.`,
+    );
+  }
+}
 
 function isOutputFormat(value: unknown): value is OutputFormat {
   return typeof value === 'string' && (OUTPUT_FORMATS as readonly string[]).includes(value);
@@ -374,6 +400,20 @@ function reportPhase(
   opts.onProgress({ phase, fraction, overallFraction: overall, detail });
 }
 
+async function* canonicalGcodeStream(source: AsyncIterable<GcodeChunk>): AsyncGenerator<GcodeChunk> {
+  let cumulativeLineCount = 0;
+  for await (const chunk of source) {
+    const lines = chunk.lines.map(line => line.trim()).filter(line => line.length > 0);
+    cumulativeLineCount += lines.length;
+    yield {
+      lines,
+      cumulativeLineCount,
+      isLast: chunk.isLast,
+    };
+    if (chunk.isLast) break;
+  }
+}
+
 /**
  * Full pipeline: Scene → G-code string + all intermediate data.
  *
@@ -500,6 +540,7 @@ export async function compileGcode(
   // T2-17: phase 5 — Output (g-code emission).
   throwIfAborted(opts.signal);
   reportPhase(opts, 'output', 0, 'Emitting G-code');
+  const generatedAt = new Date().toISOString();
   const gcodeOptions: StreamingGcodeGenerateOptions = {
     startMode,
     savedOrigin,
@@ -528,15 +569,34 @@ export async function compileGcode(
       returnY: machineTransform.returnPosition.y,
     },
     maxSpindle,
+    clock: () => generatedAt,
     signal: opts.signal,
     onProgress: (event) => {
       reportPhase(opts, 'output', event.fraction, event.detail ?? 'Emitting G-code');
     },
   };
   let gcode: string | null = null;
+  let gcodeSpool: SpoolHandle | null = null;
   if (typeof strategy.generateGcode === 'function') {
+    const ticketId = generateTicketId();
+    gcodeSpool = await buildReplayableGcodeSpool(
+      ticketId,
+      options => canonicalGcodeStream(
+        strategy.generateGcode!(
+          machineTransform.plan,
+          job,
+          {
+            ...gcodeOptions,
+            ...options,
+            onProgress: undefined,
+          },
+        ),
+      ),
+      { signal: opts.signal },
+    );
+    throwIfAborted(opts.signal);
     const streamed = await collectStreamingOutput(
-      strategy.generateGcode(machineTransform.plan, job, gcodeOptions),
+      gcodeSpool.open({ signal: opts.signal }),
       opts.signal,
     );
     throwIfAborted(opts.signal);
@@ -549,9 +609,52 @@ export async function compileGcode(
     gcode = output.text;
   }
   if (!gcode) return null;
+  assertMaterializedGcodeWithinLimit(gcode);
   reportPhase(opts, 'output', 1);
 
   const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (gcodeLines.length > MAX_MATERIALIZED_GCODE_LINES) {
+    throw new Error(
+      `Generated G-code has ${gcodeLines.length.toLocaleString('en-US')} lines, exceeding `
+      + `the current materialized pipeline limit of ${MAX_MATERIALIZED_GCODE_LINES.toLocaleString('en-US')} lines. `
+      + `Reduce raster DPI, simplify paths, or split this into smaller jobs.`,
+    );
+  }
+  if (gcodeSpool === null) {
+    gcodeSpool = await buildReplayableGcodeSpool(
+      generateTicketId(),
+      options => fromArray(gcodeLines, options),
+    );
+  }
+  const emittedBurnEnvelope = await analyzeEmittedBurnEnvelopeFromChunks(
+    gcodeSpool.open({ signal: opts.signal }),
+  );
+  throwIfAborted(opts.signal);
+  const burnEnvelopeDivergence = (() => {
+    const report = checkBurnEnvelopeDivergenceFromEnvelope(machineTransform.plan, emittedBurnEnvelope);
+    if (report !== null) {
+      console.warn(
+        `[T1-188] Burn-envelope divergence detected (kind=${report.kind}, `
+        + `maxEdgeDeltaMm=${report.maxEdgeDeltaMm.toFixed(3)}, `
+        + `planMoves=${report.planBurnMoveCount}, emittedMoves=${report.emittedBurnMoveCount}). `
+        + 'The emitted gcode produces a different burn region than the planned preview. '
+        + 'Check the encoder for new bugs introduced by recent edits.',
+      );
+      // T1-195: persist the divergence event so support bundles
+      // can correlate the runtime stream with the compile-time
+      // detection. The maxEdgeDeltaMm field is finite for
+      // 'envelope-edge-mismatch'; the empty/non-empty cases set
+      // it to Infinity, which we replace with -1 here for JSON
+      // safety (Infinity isn't JSON-representable).
+      getMachineEventLedger().append({
+        kind: 'burn-envelope-divergence',
+        t: Date.now(),
+        divergenceKind: report.kind,
+        maxEdgeDeltaMm: Number.isFinite(report.maxEdgeDeltaMm) ? report.maxEdgeDeltaMm : -1,
+      });
+    }
+    return report;
+  })();
   const fingerprint = buildPipelineJobFingerprint({
     scene,
     startMode,
@@ -564,10 +667,10 @@ export async function compileGcode(
     controllerCapabilities: opts.controllerCapabilities,
   });
   const ticket: ValidatedJobTicket = {
-    ticketId: generateTicketId(),
+    ticketId: gcodeSpool.id,
     sceneHash: hashSceneForTicket(scene),
     profileHash: profile ? hashObject(profile) : hashString('no-profile'),
-    gcodeHash: hashString(gcode),
+    gcodeHash: gcodeSpool.contentHash,
     fingerprint,
     // T1-181 (audit High #1 + #3): capture compile-time entitlement
     // policy AND referenced-material-presets so the start-time
@@ -580,7 +683,7 @@ export async function compileGcode(
     // preview / validator code consumes this to ensure preview ↔
     // output cannot diverge silently. See emittedBurnEnvelope.ts
     // for the parser.
-    emittedBurnBounds: analyzeEmittedBurnEnvelope(gcode).burnBounds,
+    emittedBurnBounds: emittedBurnEnvelope.burnBounds,
     // T1-188 (audit High #2 + #8 wiring): compile-time consistency
     // check between the plan's burn envelope and the emitted gcode's
     // burn envelope. Null when they agree within tolerance (0.5 mm
@@ -588,31 +691,8 @@ export async function compileGcode(
     // mismatch kind + deltas for support-bundle diagnosis. Logged
     // via console.warn so support tooling captures the divergence
     // event even when no listener consumes the ticket field.
-    burnEnvelopeDivergence: (() => {
-      const report = checkBurnEnvelopeDivergence(machineTransform.plan, gcode);
-      if (report !== null) {
-        console.warn(
-          `[T1-188] Burn-envelope divergence detected (kind=${report.kind}, `
-          + `maxEdgeDeltaMm=${report.maxEdgeDeltaMm.toFixed(3)}, `
-          + `planMoves=${report.planBurnMoveCount}, emittedMoves=${report.emittedBurnMoveCount}). `
-          + 'The emitted gcode produces a different burn region than the planned preview. '
-          + 'Check the encoder for new bugs introduced by recent edits.',
-        );
-        // T1-195: persist the divergence event so support bundles
-        // can correlate the runtime stream with the compile-time
-        // detection. The maxEdgeDeltaMm field is finite for
-        // 'envelope-edge-mismatch'; the empty/non-empty cases set
-        // it to Infinity, which we replace with -1 here for JSON
-        // safety (Infinity isn't JSON-representable).
-        getMachineEventLedger().append({
-          kind: 'burn-envelope-divergence',
-          t: Date.now(),
-          divergenceKind: report.kind,
-          maxEdgeDeltaMm: Number.isFinite(report.maxEdgeDeltaMm) ? report.maxEdgeDeltaMm : -1,
-        });
-      }
-      return report;
-    })(),
+    burnEnvelopeDivergence,
+    gcodeSpool,
     gcodeLines,
     gcodeText: gcode,
     machinePlanBounds: { ...machineTransform.plan.bounds },

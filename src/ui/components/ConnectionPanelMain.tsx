@@ -1366,7 +1366,7 @@ export function ConnectionPanelMain({
           fingerprint: compiledJobTicket.fingerprint,
           machineBounds: framePhysicalBounds,
           mode: 'safe',
-        })
+          })
       : null;
     setFrameRecoveryTimeoutSec(null);
     setWorkflowVersion(v => v + 1);
@@ -1658,7 +1658,7 @@ export function ConnectionPanelMain({
             appendMessage('Recovery step not acknowledged: no recompile action is available.');
             break;
           }
-          try {
+            try {
             const recompileOk = await onRecompile?.();
             if (recompileOk !== false) {
               machineService.applyRecoveryAck('recompile');
@@ -1709,7 +1709,7 @@ export function ConnectionPanelMain({
             controllerRef.current?.requestStatusReport();
             appendMessage('Unsafe-at-connect recovery: laser-off command sent. Wait for the controller to report laser-off idle.');
             break;
-        }
+          }
       } catch (err: unknown) {
         appendMessage(`Unsafe-at-connect recovery failed: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -1754,8 +1754,9 @@ export function ConnectionPanelMain({
         /* ignore */
       }
 
-      void executionCoordinator.beginTestFire({ maxSpindle }).then(ok => {
-        if (!ok) {
+void executionCoordinator.beginTestFire({ maxSpindle })
+        .then(ok => {
+          if (!ok) {
           try {
             e.currentTarget.releasePointerCapture(e.pointerId);
           } catch {
@@ -1763,15 +1764,24 @@ export function ConnectionPanelMain({
           }
           return;
         }
-        testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
-        setIsTestFiring(true);
+          testFirePointerCaptureRef.current = { pointerId: e.pointerId, el: e.currentTarget };
+          setIsTestFiring(true);
         // T1-18: ExecutionCoordinator.beginTestFire arms its own deadman timer.
         // UI no longer schedules an auto-stop — pointer-up / pointer-cancel /
         // unmount paths still call stopTestFire for responsive UX, but they are
         // no longer the safety guarantee.
-      });
+        })
+        .catch((err: unknown) => {
+          try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+          } catch {
+            /* ignore */
+          }
+          const message = err instanceof Error ? err.message : String(err);
+          appendMessage(`Test fire failed: ${message}`);
+        });
     },
-    [activeProfile, machineState?.status, executionCoordinator],
+    [activeProfile, machineState?.status, executionCoordinator, appendMessage],
   );
 
   const endTestFire = useCallback(() => {

@@ -321,6 +321,55 @@ function makeCoord(svc: MachineService, ctrl: LaserController): ExecutionCoordin
     'mutex released after endTestFire');
 }
 
+// 15. coord.beginTestFire releases mutex when operations.testFire throws
+{
+  const ctrl = makeController({
+    operations: {
+      ...makeController().operations,
+      testFire: async () => {
+        throw new Error('validator throw');
+      },
+    },
+  } as Partial<LaserController>);
+  const svc = makeService(ctrl);
+  const coord = makeCoord(svc, ctrl);
+  let rejected = false;
+  const ok = await coord.beginTestFire({ maxSpindle: 1000 }).catch(() => {
+    rejected = true;
+    return false;
+  });
+  assert(!rejected, 'beginTestFire does not reject when operations.testFire throws');
+  assert(ok === false, 'beginTestFire returns false when operations.testFire throws');
+  assert(svc.getActiveOperation() === null,
+    'mutex released after thrown beginTestFire start (no leak)');
+}
+
+// 16. coord.beginTestFire attempts laser-off if a start throw followed a command
+{
+  let laserOffCalls = 0;
+  const ctrl = makeController({
+    operations: {
+      ...makeController().operations,
+      testFire: async (args: { onCommand?: (line: string) => void }) => {
+        args.onCommand?.('M3 S50');
+        throw new Error('transport died after M3');
+      },
+      laserOff: async () => {
+        laserOffCalls++;
+        return { ok: true };
+      },
+    },
+  } as Partial<LaserController>);
+  const svc = makeService(ctrl);
+  const coord = makeCoord(svc, ctrl);
+  const ok = await coord.beginTestFire({ maxSpindle: 1000 });
+  assert(ok === false, 'beginTestFire returns false after post-command throw');
+  assert(laserOffCalls === 1,
+    `post-command throw attempts emergency laser-off once (got ${laserOffCalls})`);
+  assert(svc.getActiveOperation() === null,
+    'mutex released after post-command throw');
+}
+
 // 15. coord.autoFocus refuses when another op holds the mutex
 {
   const ctrl = makeController();

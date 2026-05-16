@@ -1,5 +1,5 @@
 import { type MutableRefObject } from 'react';
-import { type LaserController, type SafetyOffOutcomeStage } from '../controllers/ControllerInterface';
+import { type LaserController, type ControllerOutput, type SafetyOffOutcomeStage } from '../controllers/ControllerInterface';
 import { type SerialPortLike } from '../communication/SerialPort';
 import { WebSerialPort, type DeviceFingerprint } from '../communication/WebSerialPort';
 import { createSerialPort } from '../communication/SerialPortFactory';
@@ -24,7 +24,7 @@ import {
   type JobLog,
 } from '../core/job/JobLog';
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
-import { estimateJobTime } from '../core/output/TimeEstimator';
+import { estimateJobTime, estimateJobTimeFromChunks } from '../core/output/TimeEstimator';
 import {
   type SafetyActionResult,
   makeNotConnectedResult,
@@ -992,12 +992,15 @@ export class MachineService {
       });
     }
 
-    const lines = [...ticket.gcodeLines];
-    const streamableLines = lines
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && !line.startsWith(';'));
-    if (streamableLines.length === 0) {
-      throw new Error('Job contains no streamable G-code lines.');
+    const legacyLines = ticket.gcodeSpool ? null : [...ticket.gcodeLines];
+    const jobLineCount = ticket.gcodeSpool?.lineCount ?? (legacyLines?.length ?? 0);
+    if (legacyLines) {
+      const streamableLines = legacyLines
+        .map(line => line.trim())
+        .filter(line => line.length > 0 && !line.startsWith(';'));
+      if (streamableLines.length === 0) {
+        throw new Error('Job contains no streamable G-code lines.');
+      }
     }
 
     await this.acquireWakeLock();
@@ -1042,13 +1045,13 @@ export class MachineService {
       this.burnState = emptyBurnState();
       this.emitBurnState();
 
-      const gcodeText = ticket.gcodeText;
-
-      const estimate = gcodeText ? estimateJobTime(gcodeText) : null;
+      const estimate = ticket.gcodeSpool
+        ? await estimateJobTimeFromChunks(ticket.gcodeSpool.open())
+        : (ticket.gcodeText ? estimateJobTime(ticket.gcodeText) : null);
 
       const jobLog = createJobLog(
         scene.metadata?.name || 'Untitled',
-        lines.length,
+        jobLineCount,
         estimate ? estimate.formatted : '?',
         scene.layers.filter(l => l.visible && l.output !== false).map(l => ({
           name: l.name,
@@ -1061,7 +1064,7 @@ export class MachineService {
         { x: machineState?.position.x ?? 0, y: machineState?.position.y ?? 0 },
       );
       addLogEntry(jobLog, 'milestone',
-        `Job started: ${lines.length} commands (ticket ${ticket.ticketId})`);
+        `Job started: ${jobLineCount} commands (ticket ${ticket.ticketId})`);
       this.currentJobLog = jobLog;
 
       // T1-88: replay capture is no longer Pro-gated. Capture is a
@@ -1079,7 +1082,7 @@ export class MachineService {
       }));
       this.activeReplay = createReplay(
         scene.metadata?.name || 'Untitled',
-        lines.length,
+        jobLineCount,
         {
           layers: layerSettings,
           material: scene.material?.name || null,
@@ -1101,16 +1104,20 @@ export class MachineService {
       // the existing per-callback try/catch in notifySimulatorTx) — a
       // broken listener mustn't take down job start. executeJob's own
       // promise carries the streaming/transport error contract.
-      const sendPromise = controller.executeJob(
-        { kind: 'gcode-lines', lines, dialect: 'grbl' },
-        {
-          ticketId: ticket.ticketId,
-          sceneHash: ticket.sceneHash,
-          profileHash: ticket.profileHash,
-          outputHash: ticket.gcodeHash,
-        },
-      );
-      this._notifySimulatorChunked(lines, notifySimulatorTx);
+      const controllerOutput: ControllerOutput = ticket.gcodeSpool
+        ? { kind: 'gcode-stream', spool: ticket.gcodeSpool, dialect: 'grbl' }
+        : { kind: 'gcode-lines', lines: legacyLines ?? [], dialect: 'grbl' };
+      const sendPromise = controller.executeJob(controllerOutput, {
+        ticketId: ticket.ticketId,
+        sceneHash: ticket.sceneHash,
+        profileHash: ticket.profileHash,
+        outputHash: ticket.gcodeHash,
+      });
+      if (ticket.gcodeSpool) {
+        this._notifySimulatorSpoolChunked(ticket.gcodeSpool, notifySimulatorTx);
+      } else {
+        this._notifySimulatorChunked(legacyLines ?? [], notifySimulatorTx);
+      }
       await sendPromise;
     } catch (err) {
       if (this.activeJobSessionId === sessionId) {
@@ -1893,6 +1900,69 @@ export class MachineService {
       }
     };
     setTimeout(tick, 0);
+  }
+
+  private _notifySimulatorSpoolChunked(
+    spool: NonNullable<ValidatedJobTicket['gcodeSpool']>,
+    notify: (line: string) => void,
+  ): void {
+    const NOTIFY_CHUNK = 1000;
+    let failureCount = 0;
+    let firstError: unknown;
+    let lineIndex = 0;
+
+    const run = async (): Promise<void> => {
+      try {
+        let sawLast = false;
+        for await (const chunk of spool.open({ chunkLines: NOTIFY_CHUNK })) {
+          for (const line of chunk.lines) {
+            try {
+              notify(line);
+            } catch (err: unknown) {
+              if (failureCount === 0) {
+                firstError = err;
+                console.warn(
+                  '[MachineService] _notifySimulatorSpoolChunked: simulator listener threw on line %d. Suppressing further per-line warnings; a summary will be logged when the chunked notification completes.',
+                  lineIndex,
+                  err,
+                );
+              }
+              failureCount++;
+            }
+            lineIndex++;
+          }
+          if (chunk.isLast) {
+            sawLast = true;
+            break;
+          }
+          await new Promise<void>(resolve => setTimeout(resolve, 0));
+        }
+        if (!sawLast) {
+          console.warn(
+            '[MachineService] _notifySimulatorSpoolChunked: spool %s ended before the terminal chunk.',
+            spool.id,
+          );
+        }
+        if (failureCount > 1) {
+          console.warn(
+            '[MachineService] _notifySimulatorSpoolChunked: simulator listener failed on %d of %d delivered lines (first error attached).',
+            failureCount,
+            lineIndex,
+            firstError,
+          );
+        }
+      } catch (err: unknown) {
+        console.warn(
+          '[MachineService] _notifySimulatorSpoolChunked: failed to replay spool %s for simulator fan-out.',
+          spool.id,
+          err,
+        );
+      }
+    };
+
+    setTimeout(() => {
+      void run();
+    }, 0);
   }
 
   /**

@@ -22,6 +22,7 @@ import { optimizePlan } from '../src/core/plan/PlanOptimizer';
 
 let passed = 0;
 let failed = 0;
+const asyncChecks: Promise<void>[] = [];
 
 function assert(cond: unknown, message: string): void {
   if (cond) {
@@ -85,21 +86,27 @@ const adapter = getGrblFirmwareAdapter();
   job.bounds = { ...path.bounds };
   const plan = optimizePlan(job);
 
-  const artifact = adapter.emit(plan, job);
-  assert(artifact.kind === 'gcode-lines', `artifact.kind === 'gcode-lines'`);
-  assert(artifact.firmware === 'grbl', `artifact.firmware === 'grbl'`);
-  if (artifact.kind === 'gcode-lines') {
-    assert(artifact.lines.length > 0, 'emit produced at least 1 line of gcode');
-    assert(artifact.lines.some(l => /M4|M5|G[01]/.test(l)), 'emit produced recognizable GRBL output');
-  }
-  // The burn AABB should be non-null (we have a real burn move).
-  assert(artifact.burnBounds !== null, 'artifact.burnBounds non-null for a real burn');
-  if (artifact.burnBounds) {
-    assert(
-      artifact.burnBounds.maxX > artifact.burnBounds.minX,
-      'burn AABB has positive width',
-    );
-  }
+  asyncChecks.push(adapter.emit(plan, job).then(async artifact => {
+    assert(artifact.kind === 'gcode-stream', `artifact.kind === 'gcode-stream'`);
+    assert(artifact.firmware === 'grbl', `artifact.firmware === 'grbl'`);
+    if (artifact.kind === 'gcode-stream') {
+      assert(artifact.spool.lineCount > 0, 'emit produced a non-empty replayable spool');
+      const streamed: string[] = [];
+      for await (const chunk of artifact.spool.open({ chunkLines: 4 })) {
+        streamed.push(...chunk.lines);
+        if (chunk.isLast) break;
+      }
+      assert(streamed.some(l => /M4|M5|G[01]/.test(l)), 'emit produced recognizable GRBL output');
+    }
+    // The burn AABB should be non-null (we have a real burn move).
+    assert(artifact.burnBounds !== null, 'artifact.burnBounds non-null for a real burn');
+    if (artifact.burnBounds) {
+      assert(
+        artifact.burnBounds.maxX > artifact.burnBounds.minX,
+        'burn AABB has positive width',
+      );
+    }
+  }));
 }
 
 // -------- 4. validate flags missing $30 --------
@@ -197,7 +204,16 @@ const adapter = getGrblFirmwareAdapter();
     /T1-197/.test(src),
     'doc names the deferred multi-week wiring (T1-197 or later)',
   );
+  assert(
+    /generateGcode/.test(src) && !/split\(\/\\r\?\\n\/\)/.test(src),
+    'emit uses streaming generateGcode without splitting emitted text',
+  );
 }
 
-console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+Promise.all(asyncChecks).then(() => {
+  console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
+  if (failed > 0) process.exit(1);
+}).catch(err => {
+  console.error(err);
+  process.exit(1);
+});

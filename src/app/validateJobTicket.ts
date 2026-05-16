@@ -192,7 +192,7 @@ export function validateJobTicket(input: ValidateJobTicketInput): TicketValidati
     }
   }
 
-  const recomputedGcodeHash = hashString(ticket.gcodeText);
+  const recomputedGcodeHash = ticket.gcodeSpool?.contentHash ?? hashString(ticket.gcodeText);
   if (recomputedGcodeHash !== ticket.gcodeHash) {
     return {
       ok: false,

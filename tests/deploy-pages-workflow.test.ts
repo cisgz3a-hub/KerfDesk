@@ -1,6 +1,6 @@
 /**
- * T1-113 follow-up: GitHub Pages deploy workflow exists and remains
- * available on demand without consuming Actions minutes on every push.
+ * T1-113 follow-up: GitHub Pages deploy workflow exists and runs from
+ * release branches while remaining available on demand.
  * Source-pin only; we don't run the workflow itself here.
  *
  * Run: npx tsx tests/deploy-pages-workflow.test.ts
@@ -33,19 +33,12 @@ assert(fs.existsSync(workflowPath), '.github/workflows/deploy-pages.yml exists')
 
 const src = fs.existsSync(workflowPath) ? fs.readFileSync(workflowPath, 'utf8') : '';
 
-// 2. Manual-only trigger. The May 2026 CI-minute cleanup intentionally
-//    stopped automatic Pages builds on every push while preserving an
-//    explicit deploy button in GitHub Actions.
+// 2. Trigger: automatic protected-branch deploy plus explicit manual run.
 {
   assert(/on:\s*[\s\S]*?workflow_dispatch:/.test(src), 'workflow has manual dispatch');
-
-  assert(
-    !/\n\s+push:/.test(src) &&
-      !/\n\s+pull_request:/.test(src) &&
-      !/\n\s+schedule:/.test(src) &&
-      !/\n\s+deployment:/.test(src),
-    'workflow has no automatic push / PR / schedule / deployment trigger',
-  );
+  assert(/\n\s+push:\s*[\s\S]*?branches:\s*\[\s*master,\s*main\s*\]/.test(src),
+    'workflow deploys automatically on master/main push');
+  assert(!/\n\s+pull_request:/.test(src), 'workflow does not deploy from pull requests');
 
   assert(
     /github\.ref\s*==\s*'refs\/heads\/master'/.test(src) &&

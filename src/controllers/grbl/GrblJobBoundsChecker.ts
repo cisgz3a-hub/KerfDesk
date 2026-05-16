@@ -46,6 +46,78 @@ export interface GrblJobBoundsContext {
 
 const EPS = 0.01;
 
+export interface GrblJobBoundsState {
+  relative: boolean;
+  curX: number;
+  curY: number;
+}
+
+export function createGrblJobBoundsState(ctx: GrblJobBoundsContext): GrblJobBoundsState {
+  return {
+    relative: false,
+    curX: ctx.headPosition.x,
+    curY: ctx.headPosition.y,
+  };
+}
+
+export function checkGrblJobBoundsChunk(
+  lines: ReadonlyArray<string>,
+  ctx: GrblJobBoundsContext,
+  state: GrblJobBoundsState = createGrblJobBoundsState(ctx),
+): string | null {
+  const { bedWidthMm: bedW, bedHeightMm: bedH } = ctx;
+  if (!(bedW > 0) || !(bedH > 0)) {
+    return null;
+  }
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^G91\b/i.test(line)) {
+      state.relative = true;
+      continue;
+    }
+    if (/^G90\b/i.test(line)) {
+      state.relative = false;
+      continue;
+    }
+
+    if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
+
+    const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
+    const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
+    if (!xMatch && !yMatch) continue;
+
+    if (state.relative) {
+      // T1-44: refuse the job if we don't actually know where the head is.
+      if (!ctx.positionConfirmed) {
+        return (
+          'Cannot accept relative-mode job: current head position is unknown. '
+          + 'Reconnect to refresh status, then try again.'
+        );
+      }
+      if (xMatch) state.curX += parseFloat(xMatch[1]);
+      if (yMatch) state.curY += parseFloat(yMatch[1]);
+    } else {
+      if (xMatch) state.curX = parseFloat(xMatch[1]);
+      if (yMatch) state.curY = parseFloat(yMatch[1]);
+    }
+
+    if (Number.isFinite(state.curX) && (state.curX < -EPS || state.curX > bedW + EPS)) {
+      return (
+        `Job out of bounds: position would reach X=${state.curX.toFixed(3)} but machine bed is `
+        + `${bedW.toFixed(0)}mm wide. Recompile against the current profile or move the head.`
+      );
+    }
+    if (Number.isFinite(state.curY) && (state.curY < -EPS || state.curY > bedH + EPS)) {
+      return (
+        `Job out of bounds: position would reach Y=${state.curY.toFixed(3)} but machine bed is `
+        + `${bedH.toFixed(0)}mm tall. Recompile against the current profile or move the head.`
+      );
+    }
+  }
+  return null;
+}
+
 /**
  * Scan `lines` for G0/G1 X/Y moves that exceed the bed extents. Returns
  * `null` when every move stays in-bounds (or when `bedWidthMm` /
@@ -62,63 +134,5 @@ export function checkGrblJobBounds(
   lines: ReadonlyArray<string>,
   ctx: GrblJobBoundsContext,
 ): string | null {
-  const { bedWidthMm: bedW, bedHeightMm: bedH } = ctx;
-  if (!(bedW > 0) || !(bedH > 0)) {
-    return null;
-  }
-
-  let relative = false;
-
-  // T1-44: simulated cursor for relative-mode tracking. Seeded from the
-  // last confirmed head position; only consulted when a relative move
-  // is reached.
-  let curX = ctx.headPosition.x;
-  let curY = ctx.headPosition.y;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^G91\b/i.test(line)) {
-      relative = true;
-      continue;
-    }
-    if (/^G90\b/i.test(line)) {
-      relative = false;
-      continue;
-    }
-
-    if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
-
-    const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
-    const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
-    if (!xMatch && !yMatch) continue;
-
-    if (relative) {
-      // T1-44: refuse the job if we don't actually know where the head is.
-      if (!ctx.positionConfirmed) {
-        return (
-          'Cannot accept relative-mode job: current head position is unknown. '
-          + 'Reconnect to refresh status, then try again.'
-        );
-      }
-      if (xMatch) curX += parseFloat(xMatch[1]);
-      if (yMatch) curY += parseFloat(yMatch[1]);
-    } else {
-      if (xMatch) curX = parseFloat(xMatch[1]);
-      if (yMatch) curY = parseFloat(yMatch[1]);
-    }
-
-    if (Number.isFinite(curX) && (curX < -EPS || curX > bedW + EPS)) {
-      return (
-        `Job out of bounds: position would reach X=${curX.toFixed(3)} but machine bed is `
-        + `${bedW.toFixed(0)}mm wide. Recompile against the current profile or move the head.`
-      );
-    }
-    if (Number.isFinite(curY) && (curY < -EPS || curY > bedH + EPS)) {
-      return (
-        `Job out of bounds: position would reach Y=${curY.toFixed(3)} but machine bed is `
-        + `${bedH.toFixed(0)}mm tall. Recompile against the current profile or move the head.`
-      );
-    }
-  }
-  return null;
+  return checkGrblJobBoundsChunk(lines, ctx);
 }

@@ -3,6 +3,7 @@
  * Run: npx tsx tests/validated-job-ticket-phase1.test.ts
  */
 import { compileGcode } from '../src/app/PipelineService';
+import { readFileSync } from 'node:fs';
 import {
   createBlankProfile,
   getActiveProfile,
@@ -107,9 +108,28 @@ void (async () => {
       result.ticket.sceneHash === hashSceneForTicket(scene),
       'ticket.sceneHash matches hashSceneForTicket(live scene)',
     );
-    assert(result.ticket.gcodeHash === hashString(result.gcode), 'gcodeHash matches hashString(gcode)');
     const lines = result.gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    assert(result.ticket.gcodeHash === hashString(lines.join('\n')),
+      'gcodeHash matches canonical non-empty G-code lines');
     assert(result.ticket.gcodeLines.length === lines.length, 'gcodeLines count matches trimmed gcode');
+    assert(result.ticket.gcodeSpool?.lineCount === lines.length, 'gcodeSpool lineCount matches trimmed gcode');
+    assert(result.ticket.gcodeSpool?.byteCount != null && result.ticket.gcodeSpool.byteCount > 0,
+      'gcodeSpool records a positive byte count');
+    let reopenedLines = 0;
+    for await (const chunk of result.ticket.gcodeSpool!.open({ chunkLines: 2 })) {
+      reopenedLines += chunk.lines.length;
+    }
+    assert(reopenedLines === lines.length, 'gcodeSpool reopens as chunked G-code stream');
+    const pipelineSrc = readFileSync('src/app/PipelineService.ts', 'utf8');
+    const streamingBranchStart = pipelineSrc.indexOf("if (typeof strategy.generateGcode === 'function')");
+    const streamingBranchEnd = pipelineSrc.indexOf('} else {', streamingBranchStart);
+    const streamingBranch = pipelineSrc.slice(streamingBranchStart, streamingBranchEnd);
+    assert(/buildReplayableGcodeSpool\([\s\S]*strategy\.generateGcode/.test(pipelineSrc),
+      'streaming compile path builds gcodeSpool from strategy.generateGcode');
+    assert(!/fromArray\(gcodeLines/.test(streamingBranch),
+      'streaming compile path does not build gcodeSpool from materialized gcodeLines');
+    assert(!/collectStreamingOutput\(\s*strategy\.generateGcode/.test(streamingBranch),
+      'streaming compile path materializes legacy text from gcodeSpool, not a second generateGcode pass');
     assert(result.ticket.startMode === 'absolute', 'ticket.startMode matches compile startMode');
   }
 

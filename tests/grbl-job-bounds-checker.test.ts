@@ -18,6 +18,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   checkGrblJobBounds,
+  checkGrblJobBoundsChunk,
+  createGrblJobBoundsState,
   type GrblJobBoundsContext,
 } from '../src/controllers/grbl/GrblJobBoundsChecker';
 
@@ -183,6 +185,17 @@ console.log('\n=== T1-139 GRBL job-bounds checker ===\n');
 }
 
 // -------- 18. Source-level pin: GrblController delegates --------
+{
+  const boundsCtx = ctx({ headPosition: { x: 0, y: 0 } });
+  const state = createGrblJobBoundsState(boundsCtx);
+  const first = checkGrblJobBoundsChunk(['G91', 'G0 X100'], boundsCtx, state);
+  const second = checkGrblJobBoundsChunk(['G0 X350'], boundsCtx, state);
+  assert(first === null, 'chunk bounds checker carries safe first relative chunk');
+  assert(second != null && /X=450\.000/.test(second),
+    'chunk bounds checker preserves relative cursor across chunks');
+}
+
+// -------- 19. Source-level pin: GrblController delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const ctrlSrc = readFileSync(

@@ -50,6 +50,7 @@ void (async () => {
         },
         resetWcsToMachineOrigin: async () => ({ ok: true as const }),
         testFire: async (args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }) => {
+          if (args.maxSpindle <= 0) throw new Error('maxSpindle must be positive');
           const line = `M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`;
           sent.push(line);
           args.onCommand?.(line);
@@ -102,8 +103,10 @@ void (async () => {
 
     sent.length = 0;
     sim.length = 0;
-    await coord.beginTestFire({ maxSpindle: 0 });
-    assert(sent.includes('M3 S0'), 'beginTestFire 0 → M3 S0');
+    const zeroOk = await coord.beginTestFire({ maxSpindle: 0 });
+    assert(zeroOk === false, 'beginTestFire 0 returns false');
+    assert(!sent.some(line => line.startsWith('M3 ')), 'beginTestFire 0 sends no M3 command');
+    assert(svc.getActiveOperation() === null, 'beginTestFire 0 releases the test-fire mutex');
   }
 
   {

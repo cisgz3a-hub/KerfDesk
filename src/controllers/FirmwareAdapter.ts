@@ -39,6 +39,7 @@ import type { AABB } from '../core/types';
 import type { Plan } from '../core/plan/Plan';
 import type { Job } from '../core/job/Job';
 import type { OutputFormat } from '../core/output/Output';
+import type { SpoolHandle } from '../core/output/GcodeStreaming';
 
 /**
  * Stable identifier for a firmware adapter. Used by the future
@@ -123,6 +124,7 @@ export interface PlannerConstraints {
  */
 export type OutputArtifact =
   | { readonly kind: 'gcode-lines'; readonly firmware: FirmwareAdapterId; readonly lines: readonly string[]; readonly burnBounds: AABB | null }
+  | { readonly kind: 'gcode-stream'; readonly firmware: FirmwareAdapterId; readonly spool: SpoolHandle; readonly burnBounds: AABB | null }
   | { readonly kind: 'gcode-text'; readonly firmware: FirmwareAdapterId; readonly text: string; readonly burnBounds: AABB | null }
   | { readonly kind: 'binary-job'; readonly firmware: FirmwareAdapterId; readonly bytes: Uint8Array; readonly burnBounds: AABB | null }
   | { readonly kind: 'device-job'; readonly firmware: FirmwareAdapterId; readonly payload: unknown; readonly burnBounds: AABB | null };
@@ -254,7 +256,7 @@ export interface FirmwareAdapter {
    * MUST attach `burnBounds` so downstream code can compare against
    * the plan's bounds (T1-188 invariant).
    */
-  emit(plan: Plan, job: Job): OutputArtifact;
+  emit(plan: Plan, job: Job): Promise<OutputArtifact>;
 
   /**
    * Validate an OutputArtifact against the live machine identity.

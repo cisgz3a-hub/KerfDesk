@@ -106,7 +106,7 @@ class MarlinFirmwareAdapter implements FirmwareAdapter {
     return MARLIN_PLANNER_CONSTRAINTS;
   }
 
-  emit(_plan: Plan, _job: Job): OutputArtifact {
+  async emit(_plan: Plan, _job: Job): Promise<OutputArtifact> {
     // Real Marlin adapter: translate plan → Marlin-dialect g-code.
     throw new MarlinNotYetSupportedError('emit');
   }

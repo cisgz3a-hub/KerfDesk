@@ -221,7 +221,7 @@ async function run(): Promise<void> {
   const end = src.indexOf('private _queryFreshStatus', start);
   const body = src.slice(start, end);
   assert(body.length > 200, 'located _checkJobBounds body');
-  assert(/checkGrblJobBounds\(lines,\s*\{/.test(body),
+  assert(/checkGrblJobBounds\(lines,\s*this\._jobBoundsContext\(\)\)/.test(body),
     '_checkJobBounds delegates to checkGrblJobBounds');
   assert(/headPosition:\s*\{\s*x:\s*this\._state\.position\.x,\s*y:\s*this\._state\.position\.y\s*\}/.test(body),
     '_checkJobBounds passes _state.position to the helper');
@@ -232,9 +232,9 @@ async function run(): Promise<void> {
     path.resolve(here, '../src/controllers/grbl/GrblJobBoundsChecker.ts'),
     'utf-8',
   );
-  assert(/let curX = ctx\.headPosition\.x/.test(helperSrc),
+  assert(/curX:\s*ctx\.headPosition\.x/.test(helperSrc),
     'helper seeds curX from headPosition.x');
-  assert(/let curY = ctx\.headPosition\.y/.test(helperSrc),
+  assert(/curY:\s*ctx\.headPosition\.y/.test(helperSrc),
     'helper seeds curY from headPosition.y');
   assert(/if \(!ctx\.positionConfirmed\)/.test(helperSrc),
     'helper refuses relative moves when positionConfirmed is false');
@@ -242,9 +242,9 @@ async function run(): Promise<void> {
     'position-unknown message phrasing matches contract');
   assert(/Reconnect to refresh status/.test(helperSrc),
     'position-unknown message names "Reconnect" remediation');
-  assert(/curX \+= parseFloat\(xMatch\[1\]\)/.test(helperSrc),
+  assert(/state\.curX \+= parseFloat\(xMatch\[1\]\)/.test(helperSrc),
     'helper relative branch accumulates X delta');
-  assert(/curY \+= parseFloat\(yMatch\[1\]\)/.test(helperSrc),
+  assert(/state\.curY \+= parseFloat\(yMatch\[1\]\)/.test(helperSrc),
     'helper relative branch accumulates Y delta');
   // The OLD `if (relative) continue` short-circuit must be gone.
   assert(!/if \(relative\) continue;/.test(helperSrc),

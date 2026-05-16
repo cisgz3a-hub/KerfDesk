@@ -103,8 +103,18 @@ async function run(): Promise<void> {
     connect: async () => {},
     disconnect: async () => {},
     executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
-      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
-      sendCalls.push([...output.lines]);
+      if (output.kind === 'gcode-lines') {
+        sendCalls.push([...output.lines]);
+      } else if (output.kind === 'gcode-stream') {
+        const lines: string[] = [];
+        for await (const chunk of output.spool.open()) {
+          lines.push(...chunk.lines);
+          if (chunk.isLast) break;
+        }
+        sendCalls.push(lines);
+      } else {
+        throw new Error(`mock only supports G-code output, got ${output.kind}`);
+      }
       return { id: jobTicket.ticketId, startedAt: 123 };
     },
     sendJob: async (lines: string[]) => {
@@ -242,7 +252,12 @@ async function run(): Promise<void> {
 
     const tamperedTicket = {
       ...compiled.ticket,
-      gcodeText: `${compiled.ticket.gcodeText}\nG4 P1`,
+      gcodeSpool: compiled.ticket.gcodeSpool
+        ? { ...compiled.ticket.gcodeSpool, contentHash: '00000000' }
+        : undefined,
+      gcodeText: compiled.ticket.gcodeSpool
+        ? compiled.ticket.gcodeText
+        : `${compiled.ticket.gcodeText}\nG4 P1`,
     };
 
     let errMsg = '';

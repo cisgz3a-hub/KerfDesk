@@ -129,6 +129,27 @@ void (async () => {
   {
     const server = new FakeFalconServer();
     await server.start();
+    try {
+      server.setHttpResponse('/system/getDeviceModel', {
+        status: 200,
+        body: 'X'.repeat(2 * 1024 * 1024 + 1),
+      });
+      let message = '';
+      try {
+        await getDeviceModel(server.httpTarget());
+      } catch (error) {
+        message = error instanceof Error ? error.message : String(error);
+      }
+      assert(/response too large/i.test(message),
+        `oversized Falcon HTTP body aborts with a size error (got "${message.slice(0, 120)}")`);
+    } finally {
+      await server.stop();
+    }
+  }
+
+  {
+    const server = new FakeFalconServer();
+    await server.start();
     const events: FalconWsEvent[] = [];
     const handle = connectFalconWebSocket(server.wsTarget(), event => events.push(event));
 

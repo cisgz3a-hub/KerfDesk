@@ -33,6 +33,7 @@ import { createEmptyPlan } from '../src/core/plan/Plan';
 
 let passed = 0;
 let failed = 0;
+const asyncChecks: Promise<void>[] = [];
 
 function assert(cond: unknown, message: string): void {
   if (cond) {
@@ -79,17 +80,16 @@ const grbl = getGrblFirmwareAdapter();
 {
   const plan = createEmptyPlan('p');
   const job = createEmptyJob('j', 'test');
-  let caught: unknown = null;
-  try {
-    marlin.emit(plan, job);
-  } catch (e) {
-    caught = e;
-  }
-  assert(caught instanceof MarlinNotYetSupportedError, 'emit() throws MarlinNotYetSupportedError');
-  if (caught instanceof MarlinNotYetSupportedError) {
-    assert(caught.code === 'MARLIN_NOT_IMPLEMENTED', 'error.code === MARLIN_NOT_IMPLEMENTED');
-    assert(/T1-196 stub/.test(caught.message), 'error message names T1-196');
-  }
+  asyncChecks.push(marlin.emit(plan, job).then(
+    () => assert(false, 'emit() throws MarlinNotYetSupportedError'),
+    (caught: unknown) => {
+      assert(caught instanceof MarlinNotYetSupportedError, 'emit() throws MarlinNotYetSupportedError');
+      if (caught instanceof MarlinNotYetSupportedError) {
+        assert(caught.code === 'MARLIN_NOT_IMPLEMENTED', 'error.code === MARLIN_NOT_IMPLEMENTED');
+        assert(/T1-196 stub/.test(caught.message), 'error message names T1-196');
+      }
+    },
+  ));
 }
 
 // -------- 3. validate() returns the MARLIN_NOT_IMPLEMENTED error finding --------
@@ -152,5 +152,10 @@ const grbl = getGrblFirmwareAdapter();
   );
 }
 
-console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
-if (failed > 0) process.exit(1);
+Promise.all(asyncChecks).then(() => {
+  console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
+  if (failed > 0) process.exit(1);
+}).catch(err => {
+  console.error(err);
+  process.exit(1);
+});
