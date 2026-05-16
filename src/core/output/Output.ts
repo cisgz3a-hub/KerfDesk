@@ -46,10 +46,16 @@ export interface Output {
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
 import { type GcodeGenerateOptions } from './GcodeOrigin';
+import {
+  type GcodeChunk,
+  type GcodeGenerateOptions as StreamingChunkOptions,
+} from './GcodeStreaming';
 import { emptyTemplateContext, renderTemplate } from '../plan/GcodeTemplates';
 import { validateGcodeTemplates, type TemplateFinding } from '../preflight/GcodeTemplateValidator';
 
 export type { GcodeGenerateOptions, GcodeStartMode } from './GcodeOrigin';
+
+export type StreamingGcodeGenerateOptions = GcodeGenerateOptions & StreamingChunkOptions;
 
 export interface OutputStrategy {
   readonly formatId: OutputFormat;
@@ -64,6 +70,7 @@ export interface OutputStrategy {
 
   // Generate full output from a plan
   generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output;
+  generateGcode?(plan: Plan, job: Job, options?: StreamingGcodeGenerateOptions): AsyncIterable<GcodeChunk>;
 
   // Individual move encoding (used by generate internally)
   encodeHeader(job: Job, options?: GcodeGenerateOptions): string;
@@ -190,7 +197,100 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   private static readonly _posEps = 0.0005;
 
+  get format(): string {
+    return this.formatId;
+  }
+
   generate(plan: Plan, job: Job, options?: GcodeGenerateOptions): Output {
+    const generatedAt = (options?.clock ?? (() => new Date().toISOString()))();
+    const lines = Array.from(this.iterateGcodeLines(plan, job, options, generatedAt));
+    const text = lines.filter(l => l !== undefined).join('\n');
+
+    return {
+      id: generateId(),
+      planId: plan.id,
+      format: this.formatId,
+      createdAt: generatedAt,
+      text,
+      lineCount: lines.length,
+      binary: null,
+      fileSizeBytes: new TextEncoder().encode(text).length,
+    };
+  }
+
+  async *generateGcode(
+    plan: Plan,
+    job: Job,
+    options: StreamingGcodeGenerateOptions = {},
+  ): AsyncGenerator<GcodeChunk, void, void> {
+    const chunkLines = options.chunkLines ?? 1000;
+    if (chunkLines <= 0) {
+      throw new Error('generateGcode: chunkLines must be > 0');
+    }
+
+    const generatedAt = (options.clock ?? (() => new Date().toISOString()))();
+    let cumulativeLineCount = 0;
+    let pending: string[] = [];
+    let ready: string[] | null = null;
+
+    for (const line of this.iterateGcodeLines(plan, job, options, generatedAt)) {
+      if (options.signal?.aborted) return;
+      pending.push(line);
+
+      if (pending.length >= chunkLines) {
+        if (ready !== null) {
+          cumulativeLineCount += ready.length;
+          yield {
+            lines: ready,
+            cumulativeLineCount,
+            isLast: false,
+          };
+        }
+        ready = pending;
+        pending = [];
+      }
+    }
+
+    if (options.signal?.aborted) return;
+    if (ready !== null) {
+      if (pending.length > 0) {
+        cumulativeLineCount += ready.length;
+        yield {
+          lines: ready,
+          cumulativeLineCount,
+          isLast: false,
+        };
+        cumulativeLineCount += pending.length;
+        yield {
+          lines: pending,
+          cumulativeLineCount,
+          isLast: true,
+        };
+      } else {
+        cumulativeLineCount += ready.length;
+        yield {
+          lines: ready,
+          cumulativeLineCount,
+          isLast: true,
+        };
+      }
+      return;
+    }
+
+    cumulativeLineCount += pending.length;
+    yield {
+      lines: pending,
+      cumulativeLineCount,
+      isLast: true,
+    };
+  }
+
+  private *iterateGcodeLines(
+    plan: Plan,
+    job: Job,
+    options: GcodeGenerateOptions | undefined,
+    generatedAt: string,
+  ): Generator<string, void, void> {
     throwIfOutputAborted(options?.signal);
     this.currentSpeed = 0;
     this._maxSpindle = options?.maxSpindle ?? 1000;
@@ -199,16 +299,25 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     this._prevZ = 0;
     const totalMoves = countPlanMoves(plan);
     let completedMoves = 0;
+    let emittedLines = 0;
+    const tailNonEmpty: string[] = [];
+
+    const rememberLine = (line: string): string => {
+      emittedLines++;
+      if (line.trim().length > 0) {
+        tailNonEmpty.push(line);
+        if (tailNonEmpty.length > 5) tailNonEmpty.shift();
+      }
+      return line;
+    };
 
     try {
       validateTemplatesBeforeEmission(job, options, this._maxSpindle);
       throwIfOutputAborted(options?.signal);
-      const lines: string[] = [];
-      const generatedAt = (options?.clock ?? (() => new Date().toISOString()))();
       const header = this.encodeHeader(job, options, generatedAt);
       const headerLines = header.split(/\r?\n/);
       for (let i = 0; i < headerLines.length; i++) {
-        lines.push(headerLines[i]);
+        yield rememberLine(headerLines[i]);
       }
 
       for (let operationIndex = 0; operationIndex < plan.operations.length; operationIndex++) {
@@ -216,17 +325,17 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         const op = plan.operations[operationIndex];
         const srcOp = job.operations.find(o => o.id === op.operationId);
         const passes = Math.max(1, srcOp?.settings.passes ?? 1);
-        lines.push('');
+        yield rememberLine('');
         if (passes > 1) {
-          lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}/${passes}) ---`);
+          yield rememberLine(`; --- ${op.layerName} (pass ${op.passIndex + 1}/${passes}) ---`);
         } else {
-          lines.push(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
+          yield rememberLine(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
         }
 
         for (let moveIndex = 0; moveIndex < op.moves.length; moveIndex++) {
           throwIfOutputAborted(options?.signal);
           const move = op.moves[moveIndex];
-          lines.push(this.encodeMove(move));
+          yield rememberLine(this.encodeMove(move));
           completedMoves++;
           reportOutputProgress(options, {
             fraction: 0,
@@ -236,7 +345,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
             operationCount: plan.operations.length,
             moveIndex,
             moveCount: op.moves.length,
-            emittedLines: lines.length,
+            emittedLines,
             detail: `Emitted ${completedMoves}/${totalMoves} G-code moves`,
           });
           throwIfOutputAborted(options?.signal);
@@ -254,12 +363,12 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         const backY = -this._prevPos.y;
         const eps = BaseGCodeStrategy._posEps;
         if (Math.abs(backX) > eps || Math.abs(backY) > eps) {
-          lines.push(`G0 X${backX.toFixed(3)} Y${backY.toFixed(3)} ; return to start`);
+          yield rememberLine(`G0 X${backX.toFixed(3)} Y${backY.toFixed(3)} ; return to start`);
           this._prevPos = { x: 0, y: 0 };
         }
       }
 
-      lines.push('');
+      yield rememberLine('');
       throwIfOutputAborted(options?.signal);
       // T1-180 (external audit High #5): snapshot the encoder's
       // mutable modal state BEFORE the preview-pass encodeFooter
@@ -280,9 +389,9 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         prevZ: this._prevZ,
         currentSpeed: this.currentSpeed,
       };
-      const previewFooter = this.encodeFooter(job, options, lines.length + 1);
+      const previewFooter = this.encodeFooter(job, options, emittedLines + 1);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
-      const totalLines = lines.length + footerLineCount;
+      const totalLines = emittedLines + footerLineCount;
       // Restore the snapshot so the final encodeFooter sees the same
       // state the operations loop left behind, not the preview-pass
       // residue. Output stays deterministic.
@@ -293,7 +402,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       const footerLines = footer.split(/\r?\n/);
       for (let i = 0; i < footerLines.length; i++) {
         throwIfOutputAborted(options?.signal);
-        lines.push(footerLines[i]);
+        yield rememberLine(footerLines[i]);
       }
 
       // T1-26: defense-in-depth laser-off at the final gcode boundary.
@@ -309,30 +418,15 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       // was also bypassed. Strip line-comments (`;` to EOL) AND
       // parenthesized comments (`(...)`) so only executable g-code
       // tokens reach the regex.
-      const tailNonEmpty = lines
-        .filter(l => l.trim().length > 0)
-        .slice(-5);
       const tailCodeOnly = tailNonEmpty
         .map(l => l.replace(/\([^)]*\)/g, '').replace(/;.*$/, ''))
         .join('\n');
       if (!/\bM5\b/i.test(tailCodeOnly)) {
         throwIfOutputAborted(options?.signal);
-        lines.push('M5 S0 ; T1-26 defense-in-depth laser-off');
+        yield rememberLine('M5 S0 ; T1-26 defense-in-depth laser-off');
       }
 
       throwIfOutputAborted(options?.signal);
-      const text = lines.filter(l => l !== undefined).join('\n');
-
-      return {
-        id: generateId(),
-        planId: plan.id,
-        format: this.formatId,
-        createdAt: generatedAt,
-        text,
-        lineCount: lines.length,
-        binary: null,
-        fileSizeBytes: new TextEncoder().encode(text).length,
-      };
     } finally {
       this.currentSpeed = 0;
       this._relative = false;

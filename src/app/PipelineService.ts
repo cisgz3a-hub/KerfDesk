@@ -13,10 +13,14 @@ import { type AABB } from '../core/types';
 import { type Move } from '../core/plan/Plan';
 import { type MachineTransformResult, applyMachineTransform } from '../core/plan/MachineTransform';
 import { type GcodeStartMode } from '../core/output/GcodeOrigin';
-import { type OutputFormat } from '../core/output/Output';
+import {
+  getOutputStrategy,
+  type OutputFormat,
+  type StreamingGcodeGenerateOptions,
+} from '../core/output/Output';
+import { collectStreamingOutput } from '../core/output/GcodeStreaming';
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
-import { getOutputStrategy } from '../core/output/Output';
 import '../core/output/GrblStrategy';
 import { getActiveProfile, type DeviceProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
 import {
@@ -496,7 +500,7 @@ export async function compileGcode(
   // T2-17: phase 5 — Output (g-code emission).
   throwIfAborted(opts.signal);
   reportPhase(opts, 'output', 0, 'Emitting G-code');
-  const output = strategy.generate(machineTransform.plan, job, {
+  const gcodeOptions: StreamingGcodeGenerateOptions = {
     startMode,
     savedOrigin,
     returnPosition: (profile?.returnToOrigin ?? true)
@@ -528,11 +532,25 @@ export async function compileGcode(
     onProgress: (event) => {
       reportPhase(opts, 'output', event.fraction, event.detail ?? 'Emitting G-code');
     },
-  });
-  if (!output.text) return null;
+  };
+  let gcode: string | null = null;
+  if (typeof strategy.generateGcode === 'function') {
+    const streamed = await collectStreamingOutput(
+      strategy.generateGcode(machineTransform.plan, job, gcodeOptions),
+      opts.signal,
+    );
+    throwIfAborted(opts.signal);
+    if (!streamed.sawLast) {
+      throw new Error('Streaming G-code generation ended before the terminal chunk.');
+    }
+    gcode = streamed.lines.join('\n');
+  } else {
+    const output = strategy.generate(machineTransform.plan, job, gcodeOptions);
+    gcode = output.text;
+  }
+  if (!gcode) return null;
   reportPhase(opts, 'output', 1);
 
-  const gcode = output.text;
   const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
   const fingerprint = buildPipelineJobFingerprint({
     scene,

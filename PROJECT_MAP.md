@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 494 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 726 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 727 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 650 | - |
+| `tests/` | 651 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1092,6 +1092,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/prt4040-wizard-and-start-mode.test.ts`
 - `tests/raster-bidirectional-row-parity.test.ts`
 - `tests/raster-buffers-out-of-history.test.ts`
+- `tests/raster-gcode-streaming.test.ts`
 - `tests/raster-grayscale-merge-tolerance.test.ts`
 - `tests/raster-m4-no-software-splitting.test.ts`
 - `tests/raster-move-iterator.test.ts`
