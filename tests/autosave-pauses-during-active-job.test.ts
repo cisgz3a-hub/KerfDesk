@@ -52,13 +52,16 @@ const jobGuardIndex = Math.min(
     autosaveBody.indexOf('controllerRef.current?.isJobRunning'),
   ].filter(i => i >= 0),
 );
-const dirtyIndex = autosaveBody.indexOf('hashSceneForPersistence(scene)');
-const serializeIndex = autosaveBody.indexOf('serializeForAutosave(scene)');
+const payloadPlanIndex = autosaveBody.indexOf('buildAutosavePayloadPlan({');
 
-assert(jobGuardIndex >= 0 && dirtyIndex >= 0 && jobGuardIndex < dirtyIndex,
-  'active-job guard runs before autosave hashing');
-assert(jobGuardIndex >= 0 && serializeIndex >= 0 && jobGuardIndex < serializeIndex,
-  'active-job guard runs before serializeForAutosave');
+assert(jobGuardIndex >= 0 && payloadPlanIndex >= 0 && jobGuardIndex < payloadPlanIndex,
+  'active-job guard runs before autosave payload planning');
+
+const helperSource = readFileSync(resolve(here, '../src/ui/components/app/appAutosaveHelpers.ts'), 'utf-8');
+assert(helperSource.includes('hashSceneForPersistence(input.scene)'),
+  'autosave helper owns scene hashing after the active-job guard');
+assert(helperSource.includes('serializeForAutosave(input.scene)'),
+  'autosave helper owns serialization after the active-job guard');
 
 const depsStart = source.indexOf('}, [scene', autosaveEnd);
 const deps = depsStart >= 0 ? source.slice(depsStart, depsStart + 160) : '';

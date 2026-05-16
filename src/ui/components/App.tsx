@@ -89,7 +89,7 @@ import { MaterialTestDialog } from './MaterialTestDialog';
 import { GcodePreview } from './GcodePreview';
 import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
-import { serializeForAutosave, serializeScene } from '../../io/SceneSerializer';
+import { serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
 import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
@@ -156,7 +156,7 @@ import {
 } from './app/appToolpathPreviewHelpers';
 import { buildTextPreviewFontLoadRequest } from './app/appTextPreviewFontHelpers';
 import {
-  shouldPersistAutosaveForHash,
+  buildAutosavePayloadPlan,
   shouldSkipAutosaveForRunningJob,
 } from './app/appAutosaveHelpers';
 import { buildExitFlowPlan } from './app/appExitHelpers';
@@ -1094,24 +1094,20 @@ export function App(): React.ReactElement {
         controllerJobRunning: Boolean(grbl.controllerRef.current?.isJobRunning),
       })) return;
 
-      let json: string;
-      let currentHash: string;
-      try {
-        currentHash = hashSceneForPersistence(scene);
-        if (!shouldPersistAutosaveForHash({
-          currentHash,
-          lastAutosaveHash: lastAutosaveHashRef.current,
-        })) return;
-        json = serializeForAutosave(scene);
-      } catch (e) {
-        console.warn('[LaserForge] Autosave failed (serialize):', e);
+      const payload = buildAutosavePayloadPlan({
+        scene,
+        lastAutosaveHash: lastAutosaveHashRef.current,
+      });
+      if (payload.kind === 'skip-unchanged') return;
+      if (payload.kind === 'serialize-error') {
+        console.warn('[LaserForge] Autosave failed (serialize):', payload.error);
         return;
       }
 
       // Autosave is recovery data; manual dirty prompts keep using lastManualSaveHashRef.
-      void writeAutosaveAsync(json).then(
+      void writeAutosaveAsync(payload.json).then(
         () => {
-          lastAutosaveHashRef.current = currentHash;
+          lastAutosaveHashRef.current = payload.currentHash;
         },
         (err: unknown) => {
           console.warn('[LaserForge] Autosave failed:', err);
