@@ -104,6 +104,7 @@ import { ConnectionPanel } from './ConnectionPanel';
 import {
   buildAppConnectionPanelProps,
   resolveConnectionPanelBoundsProps,
+  resolveConnectionPanelMachinePlanBounds,
 } from './appConnectionPanelProps';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
@@ -407,6 +408,12 @@ export function App(): React.ReactElement {
     () => resolveConnectionPanelBoundsProps({ sceneBounds, frameTransformBounds }),
     [sceneBounds, frameTransformBounds],
   );
+  const connectionPanelMachinePlanBounds = resolveConnectionPanelMachinePlanBounds({
+    activeJobPlanBounds: activeJobTransform?.plan.bounds ?? null,
+    gcodeStale,
+    currentGcode,
+    compiledMachinePlanBounds: lastResult?.machinePlanBounds ?? null,
+  });
 
   useEffect(() => {
     if (grbl.isJobRunning && !wasJobRunningRef.current) {
@@ -1640,9 +1647,7 @@ export function App(): React.ReactElement {
         // T1-100: activeJobTransform is populated only after Start, so
         // pre-Start preflight should use the current fresh compile bounds
         // instead of falling back to fragile raw G-code text scanning.
-        machinePlanBounds:
-          activeJobTransform?.plan.bounds
-          ?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null),
+        machinePlanBounds: connectionPanelMachinePlanBounds,
         ...connectionPanelBoundsProps,
         showAlert,
         showConfirm,

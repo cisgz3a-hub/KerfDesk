@@ -41,3 +41,21 @@ export function resolveConnectionPanelBoundsProps(args: {
     frameTransformBoundsMaxY: finiteOrFallback(args.frameTransformBounds.maxY, 100),
   };
 }
+
+/**
+ * T2-6 Phase 3aq: keep the connection-panel machine-plan-bounds source
+ * selection out of App.tsx's render prop object. Active jobs keep their pinned
+ * machine transform bounds; idle preflight uses the current fresh compile only.
+ */
+export function resolveConnectionPanelMachinePlanBounds(args: {
+  activeJobPlanBounds: AABB | null | undefined;
+  gcodeStale: boolean;
+  currentGcode: string | null | undefined;
+  compiledMachinePlanBounds: AABB | null | undefined;
+}): AABB | null {
+  if (args.activeJobPlanBounds) return args.activeJobPlanBounds;
+  if (!args.gcodeStale && args.currentGcode && args.compiledMachinePlanBounds) {
+    return args.compiledMachinePlanBounds;
+  }
+  return null;
+}

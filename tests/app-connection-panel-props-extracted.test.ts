@@ -1,6 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { resolveConnectionPanelBoundsProps } from '../src/ui/components/appConnectionPanelProps';
+import {
+  resolveConnectionPanelBoundsProps,
+  resolveConnectionPanelMachinePlanBounds,
+} from '../src/ui/components/appConnectionPanelProps';
 
 function assert(condition: unknown, message: string): void {
   if (!condition) throw new Error(message);
@@ -44,6 +47,49 @@ assert(
   'resolveConnectionPanelBoundsProps applies stable fallbacks for non-finite bounds',
 );
 
+const activeJobBounds = { minX: 10, minY: 20, maxX: 30, maxY: 40 };
+const compiledBounds = { minX: 1, minY: 2, maxX: 3, maxY: 4 };
+
+assert(
+  resolveConnectionPanelMachinePlanBounds({
+    activeJobPlanBounds: activeJobBounds,
+    gcodeStale: false,
+    currentGcode: 'G0 X1',
+    compiledMachinePlanBounds: compiledBounds,
+  }) === activeJobBounds,
+  'resolveConnectionPanelMachinePlanBounds prefers active job bounds',
+);
+
+assert(
+  resolveConnectionPanelMachinePlanBounds({
+    activeJobPlanBounds: null,
+    gcodeStale: false,
+    currentGcode: 'G0 X1',
+    compiledMachinePlanBounds: compiledBounds,
+  }) === compiledBounds,
+  'resolveConnectionPanelMachinePlanBounds uses fresh compiled bounds',
+);
+
+assert(
+  resolveConnectionPanelMachinePlanBounds({
+    activeJobPlanBounds: null,
+    gcodeStale: true,
+    currentGcode: 'G0 X1',
+    compiledMachinePlanBounds: compiledBounds,
+  }) === null,
+  'resolveConnectionPanelMachinePlanBounds ignores compiled bounds when G-code is stale',
+);
+
+assert(
+  resolveConnectionPanelMachinePlanBounds({
+    activeJobPlanBounds: null,
+    gcodeStale: false,
+    currentGcode: '',
+    compiledMachinePlanBounds: compiledBounds,
+  }) === null,
+  'resolveConnectionPanelMachinePlanBounds requires current G-code before using compiled bounds',
+);
+
 assert(
   appSource.includes('buildAppConnectionPanelProps'),
   'App.tsx should use a ConnectionPanel prop builder instead of a large inline object',
@@ -65,8 +111,25 @@ assert(
   'appConnectionPanelProps should export resolveConnectionPanelBoundsProps',
 );
 assert(
+  builderSource.includes('T2-6 Phase 3aq'),
+  'appConnectionPanelProps should carry the Phase 3aq marker',
+);
+assert(
+  builderSource.includes('resolveConnectionPanelMachinePlanBounds'),
+  'appConnectionPanelProps should export resolveConnectionPanelMachinePlanBounds',
+);
+assert(
   appSource.includes('resolveConnectionPanelBoundsProps({'),
   'App.tsx should delegate connection-panel bounds prop fallback shaping',
+);
+assert(
+  appSource.includes('resolveConnectionPanelMachinePlanBounds({'),
+  'App.tsx should delegate connection-panel machine-plan bounds selection',
+);
+assert(
+  !appSource.includes('activeJobTransform?.plan.bounds')
+    || !appSource.includes('?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null)'),
+  'App.tsx should not inline machinePlanBounds fallback selection',
 );
 assert(
   !appSource.includes('Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0'),
