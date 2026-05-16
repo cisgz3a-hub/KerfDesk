@@ -101,7 +101,10 @@ import { resolveFrameSceneBounds, resolveFrameTransformBounds } from '../../app/
 import { theme } from '../styles/theme';
 import { ShortcutsPanel } from './ShortcutsPanel';
 import { ConnectionPanel } from './ConnectionPanel';
-import { buildAppConnectionPanelProps } from './appConnectionPanelProps';
+import {
+  buildAppConnectionPanelProps,
+  resolveConnectionPanelBoundsProps,
+} from './appConnectionPanelProps';
 import { TemplateBrowser } from './TemplateBrowser';
 import { BoxGenerator } from './BoxGenerator';
 import { BoxStudioPage } from '../pages/BoxStudioPage';
@@ -399,6 +402,10 @@ export function App(): React.ReactElement {
       hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
     }),
     [outputSceneBounds, gcodeStale, currentGcode, lastResult],
+  );
+  const connectionPanelBoundsProps = useMemo(
+    () => resolveConnectionPanelBoundsProps({ sceneBounds, frameTransformBounds }),
+    [sceneBounds, frameTransformBounds],
   );
 
   useEffect(() => {
@@ -1636,14 +1643,7 @@ export function App(): React.ReactElement {
         machinePlanBounds:
           activeJobTransform?.plan.bounds
           ?? (!gcodeStale && currentGcode && lastResult ? lastResult.machinePlanBounds : null),
-        boundsMinX: Number.isFinite(sceneBounds.minX) ? sceneBounds.minX : 0,
-        boundsMinY: Number.isFinite(sceneBounds.minY) ? sceneBounds.minY : 0,
-        boundsMaxX: Number.isFinite(sceneBounds.maxX) ? sceneBounds.maxX : 100,
-        boundsMaxY: Number.isFinite(sceneBounds.maxY) ? sceneBounds.maxY : 100,
-        frameTransformBoundsMinX: Number.isFinite(frameTransformBounds.minX) ? frameTransformBounds.minX : 0,
-        frameTransformBoundsMinY: Number.isFinite(frameTransformBounds.minY) ? frameTransformBounds.minY : 0,
-        frameTransformBoundsMaxX: Number.isFinite(frameTransformBounds.maxX) ? frameTransformBounds.maxX : 100,
-        frameTransformBoundsMaxY: Number.isFinite(frameTransformBounds.maxY) ? frameTransformBounds.maxY : 100,
+        ...connectionPanelBoundsProps,
         showAlert,
         showConfirm,
         showPrompt,
