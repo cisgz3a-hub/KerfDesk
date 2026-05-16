@@ -44,6 +44,14 @@ assert(
   !appSource.includes('hashSceneForPersistence(newScene)'),
   'loaded/new project hash calculation is no longer inline in App.tsx',
 );
+assert(
+  appSource.includes('buildSceneSavedBaselinePlan(savedScene)'),
+  'manual save baseline updates delegate hash calculation',
+);
+assert(
+  !appSource.includes('hashSceneForPersistence(savedScene)'),
+  'manual save hash calculation is no longer inline in App.tsx',
+);
 
 assert(
   !fileHandlersSource.includes('sceneIsDirtyRef'),

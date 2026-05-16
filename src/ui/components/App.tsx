@@ -160,7 +160,10 @@ import {
   shouldSkipAutosaveForRunningJob,
 } from './app/appAutosaveHelpers';
 import { buildExitFlowPlan } from './app/appExitHelpers';
-import { buildProjectLoadCommitPlan } from './app/appProjectLoadHelpers';
+import {
+  buildProjectLoadCommitPlan,
+  buildSceneSavedBaselinePlan,
+} from './app/appProjectLoadHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -1290,7 +1293,8 @@ export function App(): React.ReactElement {
     handleNewProject,
     isSceneDirty: () => isDirty(scene, lastManualSaveHashRef.current),
     markSceneSaved: (savedScene) => {
-      lastManualSaveHashRef.current = lastAutosaveHashRef.current = hashSceneForPersistence(savedScene);
+      const plan = buildSceneSavedBaselinePlan(savedScene);
+      lastManualSaveHashRef.current = lastAutosaveHashRef.current = plan.cleanHash;
     },
     showAlert,
     showConfirm,
