@@ -11,6 +11,7 @@ import {
   type TransportOpenOptions,
   type Unsubscribe,
 } from '../transports/Transport';
+import { SubscriptionSet } from './TransportSubscription';
 
 export interface SerialPortLike {
   write(data: string): void;
@@ -62,9 +63,9 @@ export class MockSerialPort implements SerialPortLike {
   readonly capabilities = LINE_TRANSPORT_CAPABILITIES;
 
   private _isOpen = false;
-  private _dataCallback: ((line: string) => void) | null = null;
-  private _errorCallback: ((error: Error) => void) | null = null;
-  private _closeCallback: (() => void) | null = null;
+  private readonly _dataCallbacks = new SubscriptionSet<[line: string]>();
+  private readonly _errorCallbacks = new SubscriptionSet<[error: Error]>();
+  private readonly _closeCallbacks = new SubscriptionSet<[]>();
   private _responseGenerator: ((line: string) => string[]) | null;
 
   /** Last F feed rate (mm/min) from G-code stream; used when a move line has no F */
@@ -200,24 +201,15 @@ export class MockSerialPort implements SerialPortLike {
   }
 
   onData(callback: (line: string) => void): Unsubscribe {
-    this._dataCallback = callback;
-    return () => {
-      if (this._dataCallback === callback) this._dataCallback = null;
-    };
+    return this._dataCallbacks.subscribe(callback);
   }
 
   onError(callback: (error: Error) => void): Unsubscribe {
-    this._errorCallback = callback;
-    return () => {
-      if (this._errorCallback === callback) this._errorCallback = null;
-    };
+    return this._errorCallbacks.subscribe(callback);
   }
 
   onClose(callback: () => void): Unsubscribe {
-    this._closeCallback = callback;
-    return () => {
-      if (this._closeCallback === callback) this._closeCallback = null;
-    };
+    return this._closeCallbacks.subscribe(callback);
   }
 
   // T2-31: async close. The mock has nothing to await — the in-memory
@@ -226,21 +218,21 @@ export class MockSerialPort implements SerialPortLike {
   // implementations see the same await-then-isOpen-false guarantee.
   async close(): Promise<void> {
     this._isOpen = false;
-    this._closeCallback?.();
+    this._closeCallbacks.dispatch();
   }
 
   injectResponse(line: string): void {
     this.sent.push(line);
-    Promise.resolve().then(() => { this._dataCallback?.(line); });
+    Promise.resolve().then(() => { this._dataCallbacks.dispatch(line); });
   }
 
   simulateDisconnect(): void {
     this._isOpen = false;
-    this._closeCallback?.();
+    this._closeCallbacks.dispatch();
   }
 
   simulateError(message: string): void {
-    this._errorCallback?.(new Error(message));
+    this._errorCallbacks.dispatch(new Error(message));
   }
 
   /** Delay `ok` until after simulated move time; keeps oks ordered like real GRBL */

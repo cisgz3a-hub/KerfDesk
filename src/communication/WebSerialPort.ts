@@ -10,6 +10,7 @@ import {
   type Unsubscribe,
 } from '../transports/Transport';
 import { type SerialPortLike } from './SerialPort';
+import { SubscriptionSet } from './TransportSubscription';
 
 /**
  * T3-48: USB descriptor fingerprint used to match a previously-
@@ -49,9 +50,9 @@ export class WebSerialPort implements SerialPortLike {
   private _readLoopActive = false;
   private _navigatorDisconnectHandler: ((event: Event & { port?: SerialPort }) => void) | null = null;
 
-  private _dataCallback: ((line: string) => void) | null = null;
-  private _errorCallback: ((error: Error) => void) | null = null;
-  private _closeCallback: (() => void) | null = null;
+  private readonly _dataCallbacks = new SubscriptionSet<[line: string]>();
+  private readonly _errorCallbacks = new SubscriptionSet<[error: Error]>();
+  private readonly _closeCallbacks = new SubscriptionSet<[]>();
 
   get isOpen(): boolean { return this._isOpen; }
 
@@ -311,14 +312,14 @@ export class WebSerialPort implements SerialPortLike {
     const encoder = new TextEncoder();
     // Don't await — fire and forget for streaming performance
     this._writer.write(encoder.encode(data)).catch((e: unknown) => {
-      this._errorCallback?.(errorFromUnknownError(e));
+      this._errorCallbacks.dispatch(errorFromUnknownError(e));
     });
   }
 
   writeByte(byte: number): void {
     if (!this._isOpen || !this._writer) throw new Error('Port is not open');
     this._writer.write(new Uint8Array([byte])).catch((e: unknown) => {
-      this._errorCallback?.(errorFromUnknownError(e));
+      this._errorCallbacks.dispatch(errorFromUnknownError(e));
     });
   }
 
@@ -363,24 +364,15 @@ export class WebSerialPort implements SerialPortLike {
   }
 
   onData(callback: (line: string) => void): Unsubscribe {
-    this._dataCallback = callback;
-    return () => {
-      if (this._dataCallback === callback) this._dataCallback = null;
-    };
+    return this._dataCallbacks.subscribe(callback);
   }
 
   onError(callback: (error: Error) => void): Unsubscribe {
-    this._errorCallback = callback;
-    return () => {
-      if (this._errorCallback === callback) this._errorCallback = null;
-    };
+    return this._errorCallbacks.subscribe(callback);
   }
 
   onClose(callback: () => void): Unsubscribe {
-    this._closeCallback = callback;
-    return () => {
-      if (this._closeCallback === callback) this._closeCallback = null;
-    };
+    return this._closeCallbacks.subscribe(callback);
   }
 
   // T2-31: async close. `isOpen` flips to false synchronously at entry
@@ -439,7 +431,7 @@ export class WebSerialPort implements SerialPortLike {
       this._port = null;
     }
 
-    this._closeCallback?.();
+    this._closeCallbacks.dispatch();
   }
 
   private _navigatorSerialEventTarget(): {
@@ -501,7 +493,7 @@ export class WebSerialPort implements SerialPortLike {
       this._writer = null;
     }
     this._port = null;
-    this._closeCallback?.();
+    this._closeCallbacks.dispatch();
   }
 
   private async _startReadLoop(): Promise<void> {
@@ -525,19 +517,19 @@ export class WebSerialPort implements SerialPortLike {
         for (const line of lines) {
           const trimmed = line.trim();
           if (trimmed) {
-            this._dataCallback?.(trimmed);
+            this._dataCallbacks.dispatch(trimmed);
           }
         }
       }
     } catch (e: unknown) {
       if (this._readLoopActive) {
-        this._errorCallback?.(new Error(`Read error: ${messageFromUnknownError(e)}`));
+        this._errorCallbacks.dispatch(new Error(`Read error: ${messageFromUnknownError(e)}`));
       }
     }
 
     if (this._readLoopActive) {
       this._isOpen = false;
-      this._closeCallback?.();
+      this._closeCallbacks.dispatch();
     }
   }
 }

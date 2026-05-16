@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 492 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 722 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 723 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 646 | - |
+| `tests/` | 647 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1160,6 +1160,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/serial-known-port-reuse.test.ts`
 - `tests/serial-navigator-disconnect.test.ts`
 - `tests/serial-port-close-async.test.ts`
+- `tests/serial-port-subscription-wiring.test.ts`
 - `tests/server-entitlement-service.test.ts`
 - `tests/server-webcrypto-entitlement-signer.test.ts`
 - `tests/service-layer-pro-gate-coverage.test.ts`

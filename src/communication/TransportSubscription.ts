@@ -14,11 +14,15 @@
  *
  * Audit 3B section 3.7.
  *
- * T2-36 ships a generic SubscriptionSet primitive + an Unsubscribe
- * type so transport implementations can swap the single-slot
- * fields for sets without rebuilding the publish loop on every
- * adopting site. Wiring `WebSerialPort` + `MockSerialPort` is filed
- * as T2-36-followup.
+ * T2-36 shipped a generic SubscriptionSet primitive + an
+ * Unsubscribe type so transport implementations can swap the
+ * single-slot fields for sets without rebuilding the publish loop on
+ * every adopting site.
+ *
+ * Audit F-003 follow-up: `WebSerialPort` and `MockSerialPort` now use
+ * SubscriptionSet for data/error/close listeners. The remaining
+ * transport follow-up is the broader context-tag propagation for
+ * per-event connection metadata.
  */
 
 export type Unsubscribe = () => void;

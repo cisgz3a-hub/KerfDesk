@@ -1055,8 +1055,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 15 | `SerialPortLike` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/helpers/FaultInjectingSerialPort.ts | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 60 | `MockSerialPort` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | tests/helpers/FaultInjectingSerialPort.ts | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 16 | `SerialPortLike` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | tests/helpers/FaultInjectingSerialPort.ts | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 61 | `MockSerialPort` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | tests/helpers/FaultInjectingSerialPort.ts | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -1078,14 +1078,14 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 24 | `Unsubscribe` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 26 | `Listener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 37 | `SubscriptionSet` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 118 | `combineUnsubscribes` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 137 | `TransportCtx` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 142 | `DataListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 143 | `ErrorListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 144 | `CloseListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 28 | `Unsubscribe` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 30 | `Listener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 41 | `SubscriptionSet` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 122 | `combineUnsubscribes` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 141 | `TransportCtx` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 146 | `DataListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 147 | `ErrorListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 148 | `CloseListener` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -1095,10 +1095,10 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 20 | `DeviceFingerprint` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 26 | `KnownPortConnectResult` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 38 | `WebSerialPort` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 563 | `messageFromUnknownError` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 21 | `DeviceFingerprint` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 27 | `KnownPortConnectResult` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 39 | `WebSerialPort` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 555 | `messageFromUnknownError` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
