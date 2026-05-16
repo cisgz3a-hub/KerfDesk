@@ -18,16 +18,17 @@
  * (samples from the same spool), the simulator (consumes from the
  * spool), and every validator that scans output lines.
  *
- * **This module is the type foundation only.** It defines the
- * `GcodeChunk`, `StreamingOutputStrategy`, and `SpoolHandle`
- * contracts plus pure utility helpers (`chunkArrayBy`,
- * `collectStreamingOutput`) so the eventual migration has a stable
- * target. No production code consumes the streaming surface yet —
- * the existing `OutputStrategy.generate(plan, job): Output` path
- * remains the only emitter, and the eight-stage memory profile is
- * unchanged. Migration to real streaming is filed as future T3-15
- * follow-up slices, scheduled when actual users hit memory walls
- * (per the audit row's "right time to promote" reasoning).
+ * This module began as the type foundation for the spool migration.
+ * It defines the `GcodeChunk`, `StreamingOutputStrategy`, and
+ * `SpoolHandle` contracts plus pure utility helpers (`chunkArrayBy`,
+ * `collectStreamingOutput`) so the migration has a stable target.
+ * After T3-34's chunked GRBL output slice, `BaseGCodeStrategy`
+ * implements `generateGcode(...)`; `PipelineService.compileGcode` drains
+ * that iterable through `collectStreamingOutput` when a strategy
+ * supports it. The remaining T3-15 work is still real:
+ * `ValidatedJobTicket.gcodeText` / `gcodeLines` and
+ * `GrblController.sendJob(string[])` continue to materialize full
+ * jobs until the future spool/sendJob migration lands.
  *
  * Pairs with T3-44 (multi-domain progress already shipped — the
  * progress shape supports byte-domain upload progress that a

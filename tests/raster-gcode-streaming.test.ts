@@ -150,16 +150,34 @@ void (async () => {
     const outputSrc = readFileSync(resolve(here, '../src/core/output/Output.ts'), 'utf-8');
     const streamingSrc = readFileSync(resolve(here, '../src/core/output/GcodeStreaming.ts'), 'utf-8');
     const pipelineSrc = readFileSync(resolve(here, '../src/app/PipelineService.ts'), 'utf-8');
+    const roadmapSrc = readFileSync(resolve(here, '../docs/ROADMAP.md'), 'utf-8');
+    const auditSrc = readFileSync(resolve(here, '../docs/ROADMAP-shipped-audit.md'), 'utf-8');
     const generateGcodeBody =
       outputSrc.match(/async \*generateGcode[\s\S]*?\n  private/)?.[0] ?? '';
+    const t315RoadmapBlock =
+      roadmapSrc.match(/### T3-15 \| Spool-based G-code output[\s\S]*?### T3-16 \|/)?.[0] ?? '';
+    const t315AuditRow =
+      auditSrc.match(/\| T3-15 \| Spool-based G-code output[\s\S]*?\n/)?.[0] ?? '';
 
     check(/async \*generateGcode/.test(outputSrc), 'BaseGCodeStrategy exposes generateGcode');
     check(/iterateGcodeLines/.test(generateGcodeBody), 'generateGcode reuses the shared G-code line iterator');
     check(!/this\.generate\(/.test(generateGcodeBody), 'generateGcode does not wrap legacy generate()');
     check(!/fromArray\(/.test(generateGcodeBody), 'generateGcode does not adapt a materialized legacy array');
     check(/GcodeChunk/.test(streamingSrc), 'GcodeStreaming chunk contract remains the output streaming surface');
+    check(!/No production code consumes the streaming surface yet/.test(streamingSrc),
+      'GcodeStreaming docs no longer claim the streaming surface is unused in production');
+    check(/PipelineService\.compileGcode` drains/.test(streamingSrc),
+      'GcodeStreaming docs name the current partial production consumer');
     check(/collectStreamingOutput/.test(pipelineSrc), 'PipelineService drains streaming output when available');
     check(/generateGcode/.test(pipelineSrc), 'PipelineService calls the streaming output surface');
+    check(!/No live consumer of the streaming surface yet|Production memory profile remains at the pre-T3-15 8-stage shape/.test(t315RoadmapBlock),
+      'T3-15 roadmap block no longer carries stale no-consumer wording');
+    check(/PipelineService\.compileGcode` now consumes/.test(t315RoadmapBlock),
+      'T3-15 roadmap block documents the partial streaming consumer');
+    check(!/Production memory profile unchanged - 8-stage shape remains/.test(t315AuditRow),
+      'T3-15 shipped-audit row no longer claims the original memory profile is fully unchanged');
+    check(/partially improved/.test(t315AuditRow) && /PipelineService\.compileGcode/.test(t315AuditRow),
+      'T3-15 shipped-audit row documents the partial production streaming improvement');
   }
 
   console.log(`\nT3-34 raster G-code streaming: ${passed} passed, ${failed} failed\n`);
