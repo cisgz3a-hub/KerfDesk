@@ -237,7 +237,7 @@ async function run(): Promise<void> {
 
   assert(/T1-46/.test(src), 'T1-46 marker present in MachineService.ts');
   assert(
-    /const sendPromise = this\.controllerRef\.current\.executeJob\([\s\S]{0,800}this\._notifySimulatorChunked/.test(src),
+    /const sendPromise = (?:this\.controllerRef\.current|controller)\.executeJob\([\s\S]{0,800}this\._notifySimulatorChunked/.test(src),
     'startValidatedJob: executeJob promise captured BEFORE _notifySimulatorChunked invocation',
   );
   assert(

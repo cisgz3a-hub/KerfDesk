@@ -11,9 +11,26 @@
 import { MachineService } from '../src/app/MachineService';
 import { GrblController } from '../src/controllers/grbl/GrblController';
 import { MockSerialPort, type SerialPortLike } from '../src/communication/SerialPort';
-import type { LaserController } from '../src/controllers/ControllerInterface';
+import type {
+  ControllerJobTicket,
+  ControllerOutput,
+  LaserController,
+  MachineState,
+  SafetyOffOutcomeCallback,
+} from '../src/controllers/ControllerInterface';
+import type { ActiveJobCanvasContext } from '../src/app/ActiveJobCanvasContext';
+import type { ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
+import { createEmptyPlan } from '../src/core/plan/Plan';
+import { createScene } from '../src/core/scene/Scene';
+import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
+import {
+  captureEntitlementPolicySnapshot,
+  hashEntitlementPolicy,
+  hashReferencedMaterialPresets,
+} from '../src/core/job/compileInputHashes';
 import {
   initializeDeviceProfiles,
+  getActiveProfile,
   resetDeviceProfilesForTest,
   saveDeviceProfile,
   setActiveProfileId,
@@ -21,6 +38,8 @@ import {
 } from '../src/core/devices/DeviceProfile';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 import { setStorageForTest } from '../src/core/storage/storage';
+import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
+import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
 let passed = 0;
 let failed = 0;
@@ -157,6 +176,112 @@ function fakeControllerWithAutofocusError(stage: 'm5' | 'soft-reset' | 'failed')
   } as unknown as LaserController;
 }
 
+const idleState: MachineState = {
+  status: 'idle',
+  position: { x: 0, y: 0, z: 0 },
+  feedRate: 0,
+  spindleSpeed: 0,
+  alarmCode: null,
+  errorCode: null,
+};
+
+function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
+  const plan = createEmptyPlan('safety-off-routing');
+  const profile = getActiveProfile();
+  const gcodeText = 'G0 X1\nM5';
+  const machineTransform = {
+    plan,
+    offsetX: 0,
+    offsetY: 0,
+    flipReferenceY: 300,
+    flipY: true,
+    returnPosition: { x: 0, y: 0 },
+  };
+  return {
+    ticketId: 'tkt_safety_off_routing',
+    sceneHash: hashSceneForTicket(scene),
+    entitlementPolicyHash: hashEntitlementPolicy(captureEntitlementPolicySnapshot()),
+    materialPresetsHash: hashReferencedMaterialPresets(scene),
+    emittedBurnBounds: null,
+    burnEnvelopeDivergence: null,
+    profileHash: profile ? hashObject(profile) : hashString('no-profile'),
+    gcodeHash: hashString(gcodeText),
+    fingerprint: makeTestJobFingerprint({
+      scene,
+      profile,
+      startMode: 'current',
+      savedOrigin: null,
+    }),
+    gcodeLines: ['G0 X1', 'M5'],
+    gcodeText,
+    machinePlanBounds: { ...plan.bounds },
+    machineTransform,
+    controllerType: 'grbl',
+    startMode: 'current',
+    savedOrigin: null,
+    createdAt: Date.now(),
+  };
+}
+
+function canvasContextFor(ticket: ValidatedJobTicket): ActiveJobCanvasContext {
+  return {
+    canvasMoves: [],
+    canvasPlanBounds: { minX: 0, minY: 0, maxX: 0, maxY: 0 },
+    machineTransform: ticket.machineTransform,
+  };
+}
+
+function controllerThatEmitsSafetyOutcomeDuringExecute(): LaserController {
+  const listeners = new Set<SafetyOffOutcomeCallback>();
+  return {
+    protocolName: 'mock',
+    state: idleState,
+    isJobRunning: false,
+    maxSpindle: null,
+    connect: async () => {},
+    disconnect: async () => {},
+    executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
+      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
+      setTimeout(() => {
+        for (const cb of listeners) {
+          cb({ source: 'job-error', stage: 'soft-reset', code: 9 });
+        }
+      }, 0);
+      return { id: jobTicket.ticketId, startedAt: Date.now() };
+    },
+    sendJob: async () => {},
+    pause: async () => ({ action: 'pause', accepted: true, timestamp: Date.now() }),
+    resume: async () => ({ action: 'resume', accepted: true, timestamp: Date.now() }),
+    stop: () => ({ action: 'abortJob', accepted: true, timestamp: Date.now() }),
+    emergencyStop: () => ({ action: 'emergencyStop', accepted: true, timestamp: Date.now() }),
+    sendCommand: () => {},
+    requestStatusReport: () => {},
+    onStateChange: () => () => {},
+    onProgress: () => () => {},
+    onError: () => () => {},
+    onRawLine: () => () => {},
+    onSafetyOffOutcome: (cb: SafetyOffOutcomeCallback) => {
+      listeners.add(cb);
+      return () => listeners.delete(cb);
+    },
+    safetyOff: async () => ({ stage: 'm5' as const }),
+    operations: {
+      jog: async () => ({ ok: true }),
+      home: async () => ({ ok: true }),
+      unlockAlarm: async () => ({ ok: true }),
+      setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
+      resetWcsToMachineOrigin: async () => ({ ok: true }),
+      testFire: async () => ({ ok: true }),
+      frame: async () => ({ ok: true }),
+      laserOff: async () => ({ ok: true }),
+      pauseJob: async () => ({ ok: true }),
+      resumeJob: async () => ({ ok: true }),
+      stopJob: async () => ({ ok: true }),
+      emergencyStop: async () => ({ ok: true }),
+    },
+  } as unknown as LaserController;
+}
+
 async function makeConnectedGrbl(): Promise<{ ctrl: GrblController; port: MockSerialPort }> {
   const ctrl = new GrblController({ allowHeadlessWcsAutoNormalize: true });
   const port = new MockSerialPort((line: string) => {
@@ -254,6 +379,38 @@ async function run(): Promise<void> {
     );
     unsub();
     await ctrl.disconnect();
+  }
+
+  {
+    await installProfile();
+    const scene = createScene(120, 100, 'safety-off service start');
+    const ticket = makeTicket(scene);
+    const controller = controllerThatEmitsSafetyOutcomeDuringExecute();
+    const svc = new MachineService(
+      { current: controller } as { current: LaserController },
+      { current: null } as { current: SerialPortLike | null },
+    );
+
+    await svc.startValidatedJob({
+      ticket,
+      frameTicket: makeTestFrameTicket(ticket),
+      scene,
+      machineState: idleState,
+      notifySimulatorTx: () => {},
+      canvasContext: canvasContextFor(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
+    });
+    await flush(30);
+
+    assert(
+      svc.getLaserOutputState() === 'unknown',
+      "startValidatedJob arms safety-off forwarding without attachAutoFinalize",
+    );
+    assert(
+      svc.getRecoveryState().status !== 'none',
+      'service-level safety-off forwarding triggers recovery after start',
+    );
   }
 
   setStorageForTest(null);

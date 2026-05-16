@@ -59,7 +59,7 @@ assert(/T1-199/.test(svcSrc), 'MachineService.ts carries T1-199 marker');
 {
   const startMethod = svcSrc.slice(
     svcSrc.indexOf('async startValidatedJob('),
-    svcSrc.indexOf('async startValidatedJob(') + 8000,
+    svcSrc.indexOf('async startValidatedJob(') + 14000,
   );
   assert(
     /getMachineEventLedger\(\)\.append\(\{\s*kind:\s*'job-start'/.test(startMethod),

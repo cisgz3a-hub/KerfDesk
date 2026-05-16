@@ -635,7 +635,24 @@ export class MachineService {
   }
 
   private _attachSafetyOffOutcomeForwarder(ctrl: LaserController): () => void {
-    if (typeof ctrl.onSafetyOffOutcome !== 'function') return () => {};
+    this._ensureSafetyOffOutcomeForwarder(ctrl);
+
+    const forwarder = this._controllerSafetyOffOutcomeForwarder;
+    if (forwarder == null || forwarder.ctrl !== ctrl) return () => {};
+
+    forwarder.refs += 1;
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      const current = this._controllerSafetyOffOutcomeForwarder;
+      if (current == null || current.ctrl !== ctrl) return;
+      current.refs -= 1;
+    };
+  }
+
+  private _ensureSafetyOffOutcomeForwarder(ctrl: LaserController): void {
+    if (typeof ctrl.onSafetyOffOutcome !== 'function') return;
 
     if (this._controllerSafetyOffOutcomeForwarder?.ctrl !== ctrl) {
       this._controllerSafetyOffOutcomeForwarder?.unsubscribe();
@@ -648,23 +665,11 @@ export class MachineService {
       });
       this._controllerSafetyOffOutcomeForwarder = { ctrl, unsubscribe, refs: 0 };
     }
+  }
 
-    const forwarder = this._controllerSafetyOffOutcomeForwarder;
-    forwarder.refs += 1;
-    let released = false;
-    return () => {
-      if (released) return;
-      released = true;
-      const current = this._controllerSafetyOffOutcomeForwarder;
-      if (current == null || current.ctrl !== ctrl) return;
-      current.refs -= 1;
-      if (current.refs <= 0) {
-        current.unsubscribe();
-        if (this._controllerSafetyOffOutcomeForwarder === current) {
-          this._controllerSafetyOffOutcomeForwarder = null;
-        }
-      }
-    };
+  private _clearSafetyOffOutcomeForwarder(): void {
+    this._controllerSafetyOffOutcomeForwarder?.unsubscribe();
+    this._controllerSafetyOffOutcomeForwarder = null;
   }
 
   /**
@@ -863,6 +868,11 @@ export class MachineService {
       frameTicket,
       outputFormat = 'grbl',
     } = args;
+    const controller = this.controllerRef.current;
+    if (controller == null) {
+      throw new Error('Cannot start job while disconnected.');
+    }
+    this._ensureSafetyOffOutcomeForwarder(controller);
 
     if (
       this.activeTicket
@@ -1091,7 +1101,7 @@ export class MachineService {
       // the existing per-callback try/catch in notifySimulatorTx) — a
       // broken listener mustn't take down job start. executeJob's own
       // promise carries the streaming/transport error contract.
-      const sendPromise = this.controllerRef.current.executeJob(
+      const sendPromise = controller.executeJob(
         { kind: 'gcode-lines', lines, dialect: 'grbl' },
         {
           ticketId: ticket.ticketId,
@@ -2222,6 +2232,7 @@ export class MachineService {
       // disconnect before the controller reaches 'idle' leaks one
       // onStateChange closure per cycle.
       this._clearAutoM5Listener();
+      this._clearSafetyOffOutcomeForwarder();
       this.clearJobSession();
       // T1-41: invalidate saved-origin G54 snapshot on disconnect.
       // Firmware can lose G54 across power cycles, and a reconnect may
@@ -2329,6 +2340,7 @@ export class MachineService {
       // controller into a non-idle terminal state without ever
       // reporting 'idle'.
       this._clearAutoM5Listener();
+      this._clearSafetyOffOutcomeForwarder();
       this.clearJobSession();
       this._savedOriginG54Snapshot = null;
       // T1-175 (external audit Critical #2): emergencyStop must NOT
