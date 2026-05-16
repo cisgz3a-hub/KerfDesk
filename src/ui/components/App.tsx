@@ -164,6 +164,7 @@ import {
   buildProjectLoadCommitPlan,
   buildSceneSavedBaselinePlan,
 } from './app/appProjectLoadHelpers';
+import { buildUnsafePriorStateAlert } from './app/appRecoveryHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -634,18 +635,10 @@ export function App(): React.ReactElement {
   useEffect(() => {
     const unsafe = getUnsafePriorState();
     if (unsafe == null) return;
-    const startedLabel = (() => {
-      try { return new Date(unsafe.startedAt).toLocaleString(); }
-      catch { return new Date(unsafe.startedAt).toString(); }
-    })();
+    const alert = buildUnsafePriorStateAlert(unsafe);
     void showAlert(
-      'Previous session ended unexpectedly',
-      'A job was running when the previous session ended. The machine ' +
-      'state may be unsafe — laser, head position, and workpiece may ' +
-      'all have unexpected values. Inspect the machine and the ' +
-      'workpiece BEFORE reconnecting.\n\n' +
-      `Job started: ${startedLabel}` +
-      (unsafe.ticketId ? `\nTicket: ${unsafe.ticketId}` : ''),
+      alert.title,
+      alert.body,
     ).finally(() => {
       clearUnsafePriorState();
     });

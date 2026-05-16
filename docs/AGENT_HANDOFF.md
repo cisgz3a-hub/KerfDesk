@@ -7,7 +7,7 @@ This file is the current continuation note for Claude Code, Codex, or any other 
 - Branch: `master`.
 - Always verify live state first with `git status --short --branch` and `git log --oneline -5`.
 - Local `master` may be ahead of `origin/master` until the current agent pushes. Do not assume local equals remote.
-- Last shipped roadmap item: **T2-6 Phase 3au** (manual-save clean-baseline planning extracted from App.tsx, shipped in `3b5549ab`).
+- Last shipped roadmap item: **T2-6 Phase 3av** (unsafe-prior-state recovery alert formatting extracted from App.tsx, shipped in `<TBD>`).
 - Current audit-fix run completed: **T1-223 through T1-260**, with T1-237 still deferred as multi-week firmware-adapter wiring.
 - Next active audit-fix ticket: finish actual entitlement server deployment/secret-store configuration outside this repo, or continue with the next release-pipeline blocker that can be completed in-repo.
 - Do not stage `.claude/`; it is local agent state and may be untracked.
@@ -85,6 +85,7 @@ The audit response queue from `docs/AUDIT-2026-05-12.md` has shipped these fixes
 | T2-6 Phase 3as | App split | Autosave payload planning moved into `src/ui/components/app/appAutosaveHelpers.ts`; App still owns timer lifecycle and storage writes. |
 | T2-6 Phase 3at | App split | Project-load clean-baseline planning moved into `src/ui/components/app/appProjectLoadHelpers.ts`; App still owns ref writes and transaction dispatch. |
 | T2-6 Phase 3au | App split | Manual-save clean-baseline planning moved into `src/ui/components/app/appProjectLoadHelpers.ts`; App still owns ref writes after file-save success. |
+| T2-6 Phase 3av | App split | Unsafe-prior-state recovery alert title/body/date formatting moved into `src/ui/components/app/appRecoveryHelpers.ts`; App still owns storage reads, modal display, and flag clearing. |
 
 Each ticket followed the coupled-triple flow: focused code/docs change, focused verification, `docs/ROADMAP.md`, `docs/ROADMAP-shipped-audit.md`, commit, then hash-fill commit where applicable.
 
@@ -128,6 +129,7 @@ Each ticket followed the coupled-triple flow: focused code/docs change, focused 
 - `npx tsx tests/app-autosave-helpers.test.ts`, `npx tsx tests/autosave-pauses-during-active-job.test.ts`, `npx tsx tests/autosave-manual-save-separation.test.ts`, `npx tsc --noEmit --pretty false`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, `npm run electron:compile`, `npm run build`, `npm test`, and `git diff --check` passed during the T2-6 Phase 3as close-out.
 - `npx tsx tests/app-project-load-helpers.test.ts`, `npx tsx tests/dirty-state-app-migration.test.ts`, `npx tsx tests/project-runtime-reset.test.ts`, `npx tsx tests/scene-transaction-unified.test.ts`, `npx tsc --noEmit --pretty false`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, `npm run electron:compile`, `npm run build`, and `git diff --check` passed during the T2-6 Phase 3at close-out.
 - `npx tsx tests/app-project-load-helpers.test.ts`, `npx tsx tests/dirty-state-app-migration.test.ts`, `npx tsx tests/autosave-manual-save-separation.test.ts`, `npx tsc --noEmit --pretty false`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, `npm run electron:compile`, `npm run build`, and `git diff --check` passed during the T2-6 Phase 3au close-out.
+- `npx tsx tests/app-recovery-helpers.test.ts`, `npx tsx tests/unsafe-prior-state-persistence.test.ts`, `npx tsx tests/agent-handoff-current-state.test.ts`, `npx tsc --noEmit --pretty false`, `npm run project-map:check`, `node scripts/exported-symbol-inventory.mjs --check`, `npm run electron:compile`, `npm run build`, `npm test`, and `git diff --check` passed during the T2-6 Phase 3av close-out.
 - `npx tsx tests/image-processing.test.ts` and `npx tsx tests/pipeline.test.ts` passed during the T3-34 lazy raster scanline first-slice close-out.
 - `npx tsx tests/connection-panel-unsafe-at-connect-wiring.test.ts` passed during the T3-91 follow-up close-out.
 - `npx tsx tests/installer-qa-matrix.test.ts` passed during the T3-85 close-out.

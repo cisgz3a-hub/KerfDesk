@@ -129,16 +129,22 @@ async function run(): Promise<void> {
     path.resolve(here, '../src/ui/components/App.tsx'),
     'utf-8',
   );
+  const appRecoveryHelpersSrc = fs.readFileSync(
+    path.resolve(here, '../src/ui/components/app/appRecoveryHelpers.ts'),
+    'utf-8',
+  );
   assert(/getUnsafePriorState/.test(appSrc),
     'App.tsx reads getUnsafePriorState at startup');
-  assert(/Previous session ended unexpectedly/.test(appSrc),
-    'App.tsx surfaces "Previous session ended unexpectedly" recovery alert');
+  assert(/buildUnsafePriorStateAlert\(unsafe\)/.test(appSrc),
+    'App.tsx delegates unsafe-prior-state recovery alert text to appRecoveryHelpers');
+  assert(/Previous session ended unexpectedly/.test(appRecoveryHelpersSrc),
+    'appRecoveryHelpers surfaces "Previous session ended unexpectedly" recovery alert');
   assert(
     /clearUnsafePriorState\(\)/.test(appSrc),
     'App.tsx clears the flag after the user dismisses the alert',
   );
   assert(
-    /Inspect the machine/i.test(appSrc),
+    /Inspect the machine/i.test(appRecoveryHelpersSrc),
     'recovery alert message names "Inspect the machine" remediation',
   );
 }
