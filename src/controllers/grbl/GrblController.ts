@@ -1468,6 +1468,13 @@ export class GrblController implements GrblControllerApi {
     this._sendRealtime(REALTIME_STATUS);
   }
 
+  private _controllerSetupInProgress(): boolean {
+    return this._awaitingIdentityOk ||
+      this._awaitingSettingsOk ||
+      this._awaitingWcsQueryOk ||
+      this._awaitingWorkOffsetRequestOk;
+  }
+
   /**
    * Trigger a machine autofocus macro/command and wait for a full motion cycle.
    * Resolves only after the machine leaves Idle (Home/Run) and then returns to Idle.
@@ -1475,6 +1482,9 @@ export class GrblController implements GrblControllerApi {
   async runAutoFocus(command: string, timeoutMs: number = 15000): Promise<void> {
     if (!this._port?.isOpen) throw new Error('Not connected');
     if (this._state.status !== 'idle') throw new Error('Machine not idle — cannot auto-focus');
+    if (this._controllerSetupInProgress()) {
+      throw new Error('Controller setup still in progress — wait a moment, then try autofocus again');
+    }
     if (typeof command !== 'string' || command.length === 0) {
       throw new Error('Invalid autofocus command: empty');
     }

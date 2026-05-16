@@ -37,6 +37,9 @@ console.log('\n=== T1-28 autofocus timeout issues safety-off ===\n');
 
 async function makeConnectedController(): Promise<{ ctrl: GrblController; port: MockSerialPort }> {
   const port = new MockSerialPort((line: string) => {
+    if (line === '$I') {
+      return ['[VER:1.1h.20221128:]', 'ok'];
+    }
     if (line === '$$') {
       return [
         '$30=1000', '$32=1', '$22=0', '$23=0',

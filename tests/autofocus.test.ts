@@ -277,6 +277,21 @@ async function testGrblRunAutoFocus(): Promise<void> {
 
   {
     const { ctrl, port } = await connectGrbl();
+    (ctrl as unknown as { _awaitingSettingsOk: boolean })._awaitingSettingsOk = true;
+    let blockedDuringSetup = false;
+    try {
+      await ctrl.runAutoFocus('$HZ1', 30);
+    } catch (e: unknown) {
+      blockedDuringSetup = e instanceof Error && /setup still in progress/i.test(e.message);
+    }
+    assert(blockedDuringSetup, 'refuses autofocus while controller setup handshake is still in progress');
+    assert(!port.received.includes('$HZ1'), 'setup-in-progress refusal does not send the autofocus command');
+    (ctrl as unknown as { _awaitingSettingsOk: boolean })._awaitingSettingsOk = false;
+    await ctrl.disconnect();
+  }
+
+  {
+    const { ctrl, port } = await connectGrbl();
     port.blockStatusQueryResponse = true;
     let timedOut = false;
     try {
