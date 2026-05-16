@@ -17174,14 +17174,14 @@ This is partially addressed by T1-29 (persisted unsafe-prior-state flag) 鈥?on 
 **Originally dismissed because:** Said "hardware/firmware concern, document but don't fix in software" 鈥?wrong. The detection latency is software's concern; better detection lets the safety-state machine react sooner.
 
 **Fix:** Detect cable-pull faster via two complementary signals:
-(1) **Status-poll heartbeat.** During a running job, app sends `?` realtime byte every ~500ms and expects a status response within ~200ms. Two consecutive timeouts 鈫?assume transport failure 鈫?mark `DISCONNECTED_UNSAFE`, set T1-29 unsafe-prior-state flag, alert user.
+(1) **Status-poll heartbeat.** During a running job, app sends `?` realtime status probes and treats sustained controller silence as unsafe transport loss. The original T3-16 two-missed-status-replies rule was intentionally superseded by T1-248: delayed status reports now warn first, any controller RX line keeps the job alive, and hard disconnect is reserved for sustained no-controller-RX silence.
 (2) **Write-failure escalation.** When a critical write (M5, soft reset) fails per T1-22, immediately mark transport state as failed and trigger the same unsafe-state path.
 
 **Estimate:** ~1 session.
 
 **Priority:** Tier 3. Defense-in-depth on top of T1-29 and T1-22; not urgent but real.
 
-**Status:** Shipped in `896c144` — `GrblController` now treats running-job status silence as a cable-pull signal: while streaming, the polling loop sends one realtime `?` heartbeat at a time, waits 250ms for a status report, and requires two consecutive missed replies before routing through the same failed-transport path used by status write failures. That path aborts the active stream, closes the failed port best-effort, transitions to `disconnected`, and emits a status-heartbeat error for the UI/recovery layer. Existing WebSerial navigator-disconnect and transport-error paths remain unchanged. Pinned by `tests/webserial-cable-pull-heartbeat.test.ts` plus polling/fresh-start/cable-yank regressions. **Hardware verification needed** before release tagging: pull USB during a low-power test job and verify the UI moves to disconnected/recovery promptly.
+**Status:** Shipped in `896c144` — `GrblController` added running-job status-heartbeat recovery for cable-pull detection. **Current invariant superseded by T1-248 (`3844f2af`):** delayed status reports warn first, `ok` / `error:` / `ALARM:` / status / other controller RX keeps the job alive, and hard disconnect occurs only after sustained no-controller-RX silence or explicit transport/controller failure. The failed-transport path aborts the active stream, closes the failed port best-effort, transitions to `disconnected`, and emits a status-heartbeat error for the UI/recovery layer. Existing WebSerial navigator-disconnect and transport-error paths remain unchanged. Pinned by `tests/webserial-cable-pull-heartbeat.test.ts` plus polling/fresh-start/cable-yank regressions. **Hardware verification needed** before release tagging: pull USB during a low-power test job and verify the UI moves to disconnected/recovery promptly.
 
 ---
 
@@ -21565,7 +21565,7 @@ Current learned feedback is localStorage-only. After T2-2 it's IndexedDB or fs. 
 - [x] T3-13 Active-edge-table fill scanline algorithm (Shipped — `generateFillRows` now uses scanline edge buckets + active row edge set; behavior pinned by fill/compound/pipeline tests)
 - [x] T3-14 Sampled / level-of-detail G-code preview (Shipped — sampled preview model + capped rendered moves; worker/zoom-region refinement deferred until needed)
 - [x] T3-15 Spool-based G-code output (AsyncIterable streaming) (Shipped — type-foundation slice in `3541292`; `src/core/output/GcodeStreaming.ts` ships GcodeChunk / StreamingOutputStrategy / SpoolHandle contracts plus chunkArrayBy / fromArray / collectStreamingOutput helpers; live emitter migration is multi-week and stays deferred until users report actual memory pressure)
-- [x] T3-16 WebSerial cable-pull recovery (Shipped in `896c144` — running-job status heartbeat detects two missed replies, aborts the stream, closes the failed port, and reports a cable-pull-style transport failure)
+- [x] T3-16 WebSerial cable-pull recovery (Shipped in `896c144` — running-job status heartbeat detects unsafe transport loss; current timing semantics are superseded by T1-248, which warns on delayed status and hard-disconnects only after sustained no-controller-RX silence)
 - [ ] T3-17 Wi-Fi safety model (gated on Falcon WiFi being revived)
 - [x] T3-18 Output validator semantic scan over emitted G-code (Shipped in `4f57f01` - final emitted G-code preflight validator with modal laser-state, spindle/feed, unsupported-command, and GRBL line-length checks)
 - [x] T3-19 Doc recommendation: prefer saved-origin absolute mode for production (Shipped in `8fa3e82` — production-run doc + one-time long-job tip)
