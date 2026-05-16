@@ -131,10 +131,11 @@ import {
   shouldNudgeStartModeToCurrent,
 } from './app/appStartModeDecisions';
 import { type UserMode } from '../../app/UserModeGates';
-import {
-  textOperationModeForObject,
-} from '../scene/TextOperationLayer';
 import { buildTextDialogSceneCommit } from './app/appTextCommitHelpers';
+import {
+  buildTextEditDialogRequest,
+  buildTextPlacementDialogRequest,
+} from './app/appTextDialogOpenHelpers';
 import { buildModeTabSelectResult } from './app/appModeTabHelpers';
 import { buildDeleteSelectionCommit } from './app/appDeleteSelectionHelpers';
 import { buildActivateLayerCommit } from './app/appActivateLayerHelpers';
@@ -705,16 +706,18 @@ export function App(): React.ReactElement {
   }, [setTextPlacementHint]);
 
   const handleRequestTextPlacement = useCallback((world: { x: number; y: number }) => {
-    setEditingTextId(null);
-    setTextOperationMode('engrave');
-    setTextPlacementPt({ x: world.x, y: world.y });
-    setShowTextDialog(true);
+    const request = buildTextPlacementDialogRequest(world);
+    setEditingTextId(request.editingTextId);
+    setTextOperationMode(request.textOperationMode);
+    setTextPlacementPt(request.textPlacementPt);
+    setShowTextDialog(request.showDialog);
   }, [setEditingTextId, setShowTextDialog, setTextOperationMode, setTextPlacementPt]);
 
   const handleEditText = useCallback((obj: SceneObject) => {
-    openTextEdit(obj, textOperationModeForObject(scene, obj));
-    setTextPlacementPt(null);
-    setSelectedIds(new Set([obj.id]));
+    const request = buildTextEditDialogRequest(scene, obj);
+    openTextEdit(obj, request.textOperationMode);
+    setTextPlacementPt(request.textPlacementPt);
+    setSelectedIds(new Set(request.selectionAfter));
   }, [openTextEdit, scene, setSelectedIds, setTextPlacementPt]);
 
   useEffect(() => {

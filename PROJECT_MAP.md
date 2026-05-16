@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 492 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 723 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 493 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 724 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -42,14 +42,14 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/templates` | 1 | - |
 | `src/transports` | 1 | - |
 | `src/types` | 3 | - |
-| `src/ui` | 202 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
+| `src/ui` | 203 | browser, components, features, history, hooks, pages, recovery, renderers, safety, scene, stores, styles, tools, utils |
 | `src/workers` | 2 | - |
 
 ## Test Boundaries
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 647 | - |
+| `tests/` | 648 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -489,6 +489,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/ui/components/app/appStartModeDecisions.ts`
 - `src/ui/components/app/appStartModeSelectionHelpers.ts`
 - `src/ui/components/app/appTextCommitHelpers.ts`
+- `src/ui/components/app/appTextDialogOpenHelpers.ts`
 - `src/ui/components/app/appTextPreviewFontHelpers.ts`
 - `src/ui/components/app/appToolpathPreviewHelpers.ts`
 - `src/ui/components/appCanvasViewportProps.ts`
@@ -672,6 +673,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/app-start-mode-decisions.test.ts`
 - `tests/app-start-mode-selection-helpers.test.ts`
 - `tests/app-text-commit-helpers.test.ts`
+- `tests/app-text-dialog-open-helpers.test.ts`
 - `tests/app-text-dialogs-extracted.test.ts`
 - `tests/app-text-preview-font-helpers.test.ts`
 - `tests/app-toolpath-preview-helpers.test.ts`
