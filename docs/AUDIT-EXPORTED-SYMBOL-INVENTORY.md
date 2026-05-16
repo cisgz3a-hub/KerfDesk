@@ -8,7 +8,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ## Summary
 
-- Export rows: 2705
+- Export rows: 2708
 - Files with exports: 498
 - Generated deterministically by `node scripts/exported-symbol-inventory.mjs --write`.
 
@@ -17,7 +17,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | compile-output | 405 |
 | core-domain | 355 |
 | entitlement-security | 110 |
-| file-ipc-boundary | 186 |
+| file-ipc-boundary | 189 |
 | machine-control | 228 |
 | supporting-runtime | 817 |
 | ui-operator-surface | 604 |
@@ -154,11 +154,14 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 ### File: `electron/security.ts`
 
-**Exports inventoried:** 1
+**Exports inventoried:** 4
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 31 | `assertTrustedSender` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | tests/dependency-security-scan.test.ts<br>tests/production-security-source-checks.test.ts<br>tests/security-deps-pinned.test.ts | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 26 | `isTrustedPackagedFileUrl` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | tests/dependency-security-scan.test.ts<br>tests/production-security-source-checks.test.ts<br>tests/security-deps-pinned.test.ts | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 37 | `isExpectedDevServerUrl` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | tests/dependency-security-scan.test.ts<br>tests/production-security-source-checks.test.ts<br>tests/security-deps-pinned.test.ts | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 45 | `isTrustedElectronUrl` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | tests/dependency-security-scan.test.ts<br>tests/production-security-source-checks.test.ts<br>tests/security-deps-pinned.test.ts | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
+| 57 | `assertTrustedSender` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | needs lifecycle review | review if stateful | not compile-output unless noted | tests/dependency-security-scan.test.ts<br>tests/production-security-source-checks.test.ts<br>tests/security-deps-pinned.test.ts | requires production-path evidence | file-ipc-boundary; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -4671,12 +4674,12 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 30 | `TrustReason` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 | 39 | `TrustResult` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 | 54 | `evaluateSenderTrust` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 98 | `UntrustedSenderError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 105 | `assertSenderTrustResult` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 110 | `assertTrustedSenderFrame` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 118 | `describeTrustResult` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 142 | `HandlerCoverageReport` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
-| 148 | `checkHandlerCoverage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 123 | `UntrustedSenderError` | class | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 130 | `assertSenderTrustResult` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 135 | `assertTrustedSenderFrame` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 143 | `describeTrustResult` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 167 | `HandlerCoverageReport` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
+| 173 | `checkHandlerCoverage` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | review if stateful | not compile-output unless noted | not auto-matched by filename | not required by inventory | supporting-runtime; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

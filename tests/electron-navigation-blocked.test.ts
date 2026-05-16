@@ -18,7 +18,7 @@
  * window we don't open today). setWindowOpenHandler routes http(s) URLs
  * to the OS browser via shell.openExternal and denies everything else.
  * will-navigate cancels any navigation that isn't to the dev server (in
- * dev mode) or to a file:// URL (in packaged mode).
+ * dev mode) or to the bundled renderer path (in packaged mode).
  *
  * This test mirrors the routing rules in pure logic AND grep-asserts
  * that the production handlers are wired in both code paths.
@@ -34,6 +34,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..');
 const PROD_FILE = join(REPO_ROOT, 'electron', 'main.ts');
+const SECURITY_FILE = join(REPO_ROOT, 'electron', 'security.ts');
 
 let passed = 0;
 let failed = 0;
@@ -104,9 +105,22 @@ function isExpectedDevServerUrl(url: string): boolean {
   }
 }
 
+const PACKAGED_RENDERER_ROOT = 'file:///C:/Program%20Files/LaserForge/resources/app.asar/dist/';
+
+function isBundledRendererUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.protocol === 'file:' && parsed.href.startsWith(PACKAGED_RENDERER_ROOT);
+  } catch {
+    return false;
+  }
+}
+
 function navAllowed(url: string, isDev: boolean): boolean {
   const isDevServer = isDev && isExpectedDevServerUrl(url);
-  const isAppFile = !isDev && url.startsWith('file://');
+  const isAppFile = !isDev && isBundledRendererUrl(url);
   return isDevServer || isAppFile;
 }
 
@@ -123,13 +137,20 @@ function navAllowed(url: string, isDev: boolean): boolean {
   assert(!navAllowed('javascript:alert(1)', true), 'dev: javascript: blocked');
 }
 
-// 4. Packaged mode: file:// allowed, everything else blocked.
+// 4. Packaged mode: bundled renderer path allowed, other file:// blocked.
 {
-  assert(navAllowed('file:///app/dist/index.html', false), 'packaged: file:// allowed');
   assert(
     navAllowed('file:///C:/Program%20Files/LaserForge/resources/app.asar/dist/index.html', false),
-    'packaged: long file:// URL allowed',
+    'packaged: bundled renderer index allowed',
   );
+  assert(
+    navAllowed('file:///C:/Program%20Files/LaserForge/resources/app.asar/dist/index.html#/settings', false),
+    'packaged: bundled renderer hash route allowed',
+  );
+  assert(!navAllowed('file:///app/dist/index.html', false), 'packaged: unrelated app-looking file blocked');
+  assert(!navAllowed('file:///C:/Program%20Files/LaserForge/resources/app.asar.evil/dist/index.html', false),
+    'packaged: file root prefix lookalike blocked');
+  assert(!navAllowed('file:///C:/Users/Alice/Desktop/malicious.html', false), 'packaged: arbitrary local file blocked');
   assert(!navAllowed('http://localhost:3000/', false), 'packaged: dev server blocked');
   assert(!navAllowed('https://attacker.com', false), 'packaged: external https blocked');
   assert(!navAllowed('javascript:alert(1)', false), 'packaged: javascript: blocked');
@@ -145,12 +166,16 @@ function navAllowed(url: string, isDev: boolean): boolean {
 // ── STRUCTURAL: production file wires everything correctly ──────────
 {
   const src = readFileSync(PROD_FILE, 'utf8');
+  const securitySrc = readFileSync(SECURITY_FILE, 'utf8');
 
   // Strip comments so doc-references to denylisted patterns don't false-positive.
   // The comment-stripper must NOT eat URL schemes (http://, file://, etc.).
   // Match `//` only when preceded by whitespace, line-start, or `;` — never
   // when preceded by a colon (which is what makes it a URL scheme separator).
   const codeOnly = src
+    .replace(/(^|[\s;])\/\/[^\n]*/g, '$1')
+    .replace(/\/\*[\s\S]*?\*\//g, '');
+  const securityCodeOnly = securitySrc
     .replace(/(^|[\s;])\/\/[^\n]*/g, '$1')
     .replace(/\/\*[\s\S]*?\*\//g, '');
 
@@ -214,20 +239,24 @@ function navAllowed(url: string, isDev: boolean): boolean {
   );
 
   // 7. Verify the will-navigate allowlist references the dev server origin
-  //    through parsed-origin comparison, plus the file:// scheme.
-  const localhostDevHits = (codeOnly.match(/localhost:3000/g) ?? []).length;
+  //    through parsed-origin comparison, plus the bundled-app trust helper.
+  const localhostDevHits = (securityCodeOnly.match(/localhost:3000/g) ?? []).length;
   assert(
-    localhostDevHits >= 2,
-    `dev server origin ('http://localhost:3000') referenced at least twice (got ${localhostDevHits})`,
+    localhostDevHits >= 1,
+    `dev server origin ('http://localhost:3000') defined in shared security helper (got ${localhostDevHits})`,
   );
   assert(
-    /new URL\(url\)\.origin === DEV_SERVER_ORIGIN/.test(codeOnly),
-    'dev navigation allowlist compares parsed URL origins',
+    /new URL\(url\)\.origin === new URL\(EXPECTED_DEV_ORIGIN\)\.origin/.test(securityCodeOnly),
+    'shared dev navigation allowlist compares parsed URL origins',
   );
   const fileSchemeHits = (codeOnly.match(/url\.startsWith\(['"]file:\/\/['"]\)/g) ?? []).length;
   assert(
-    fileSchemeHits >= 2,
-    `file:// scheme prefix-checked at least twice in nav guards (got ${fileSchemeHits})`,
+    fileSchemeHits === 0,
+    `will-navigate must not trust raw file:// prefixes (got ${fileSchemeHits})`,
+  );
+  assert(
+    (codeOnly.match(/isTrustedElectronUrl\(url\)/g) ?? []).length >= 2,
+    'will-navigate handlers use isTrustedElectronUrl(url)',
   );
 
   // 8. Verify the deny pattern: action: 'deny' appears in BOTH

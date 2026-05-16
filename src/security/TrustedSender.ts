@@ -21,7 +21,7 @@
  */
 
 export type AppEnvironment =
-  | { kind: 'packaged' }
+  | { kind: 'packaged'; trustedFileRoot: string }
   | { kind: 'dev'; expectedDevOrigin: string }
   | { kind: 'test' };
 
@@ -43,7 +43,7 @@ export type TrustResult =
 /**
  * Pure trust evaluation. Reusable from main + renderer + tests.
  * Audit-derived rules:
- *   - packaged build: only `file://` URLs trusted
+ *   - packaged build: only bundled app `file://` URLs trusted
  *   - dev build: only the configured dev-server origin trusted
  *   - test: always trusted (deterministic)
  *
@@ -66,7 +66,7 @@ export function evaluateSenderTrust(opts: {
     return { trusted: false, reason: 'frame-url-malformed', observedUrl: String(url) };
   }
   if (opts.env.kind === 'packaged') {
-    if (url.startsWith('file://')) {
+    if (isTrustedPackagedFileUrl(url, opts.env.trustedFileRoot)) {
       return { trusted: true, reason: 'packaged-file-url' };
     }
     return { trusted: false, reason: 'untrusted-origin', observedUrl: url };
@@ -88,6 +88,31 @@ export function evaluateSenderTrust(opts: {
     return { trusted: false, reason: 'unknown-scheme', observedUrl: url };
   }
   return { trusted: false, reason: 'untrusted-origin', observedUrl: url };
+}
+
+function normalizeFileUrlForPrefix(input: string): string | null {
+  try {
+    const parsed = new URL(input);
+    if (parsed.protocol !== 'file:') return null;
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.href;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeTrustedFileRoot(input: string): string | null {
+  const normalized = normalizeFileUrlForPrefix(input);
+  if (normalized == null) return null;
+  return normalized.endsWith('/') ? normalized : `${normalized}/`;
+}
+
+function isTrustedPackagedFileUrl(url: string, trustedFileRoot: string): boolean {
+  const normalizedRoot = normalizeTrustedFileRoot(trustedFileRoot);
+  const normalizedUrl = normalizeFileUrlForPrefix(url);
+  if (normalizedRoot == null || normalizedUrl == null) return false;
+  return normalizedUrl.startsWith(normalizedRoot);
 }
 
 /**

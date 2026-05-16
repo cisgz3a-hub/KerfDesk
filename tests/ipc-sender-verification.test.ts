@@ -26,15 +26,18 @@ function assert(c: boolean, m: string): void {
 
 console.log('\n=== T2-119 IPC sender verification ===\n');
 
-const PACKAGED: AppEnvironment = { kind: 'packaged' };
+const PACKAGED: AppEnvironment & { readonly trustedFileRoot: string } = {
+  kind: 'packaged',
+  trustedFileRoot: 'file:///app/dist/',
+};
 const DEV: AppEnvironment = { kind: 'dev', expectedDevOrigin: 'http://localhost:3000/' };
 const TEST: AppEnvironment = { kind: 'test' };
 
 void (async () => {
 
-// 1. packaged + file:// → trusted
+// 1. packaged + bundled app file:// → trusted
 {
-  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///app/index.html' } });
+  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///app/dist/index.html' } });
   assert(r.trusted, `trusted`);
   if (r.trusted) assert(r.reason === 'packaged-file-url', `reason=packaged-file-url`);
 }
@@ -85,7 +88,7 @@ void (async () => {
 
 // 8. dev + file:// → untrusted (dev expects http origin only)
 {
-  const r = evaluateSenderTrust({ env: DEV, frame: { url: 'file:///app/index.html' } });
+  const r = evaluateSenderTrust({ env: DEV, frame: { url: 'file:///app/dist/index.html' } });
   assert(!r.trusted, `dev + file:// untrusted`);
 }
 
@@ -160,7 +163,7 @@ void (async () => {
 {
   let threw = false;
   try {
-    assertTrustedSenderFrame({ env: PACKAGED, frame: { url: 'file:///app/index.html' } });
+    assertTrustedSenderFrame({ env: PACKAGED, frame: { url: 'file:///app/dist/index.html' } });
   } catch { threw = true; }
   assert(!threw, `integration trusted → no throw`);
 }
@@ -180,7 +183,7 @@ void (async () => {
 
 // 19. describeTrustResult: trusted
 {
-  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file://x' } });
+  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///app/dist/index.html' } });
   const msg = describeTrustResult(r);
   assert(msg.includes('Trusted'), `trusted message`);
 }
@@ -244,12 +247,25 @@ ipcMain.handle('b', (event) => {
 // 24. THE audit's headline: dev-localhost trusted, packaged-file trusted, attacker rejected
 {
   // Audit's three concrete cases:
-  assert(evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///x' } }).trusted, `case A: packaged file:// → trusted`);
+  assert(evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///app/dist/index.html' } }).trusted, `case A: packaged app file → trusted`);
   assert(evaluateSenderTrust({ env: DEV, frame: { url: 'http://localhost:3000/' } }).trusted, `case B: dev localhost → trusted`);
   assert(!evaluateSenderTrust({ env: PACKAGED, frame: { url: 'http://attacker.com/' } }).trusted, `case C: attacker → blocked`);
 }
 
-// 25. Regression: dev origin must match exactly, not by string prefix
+// 25. Regression: packaged file trust is rooted at the bundled app path,
+//     not every local file:// URL.
+{
+  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///Users/alice/Desktop/malicious.html' } });
+  assert(!r.trusted, `packaged arbitrary local file untrusted`);
+}
+
+// 26. Regression: packaged file root must not accept string-prefix lookalikes.
+{
+  const r = evaluateSenderTrust({ env: PACKAGED, frame: { url: 'file:///app/dist.evil/index.html' } });
+  assert(!r.trusted, `packaged file root lookalike untrusted`);
+}
+
+// 27. Regression: dev origin must match exactly, not by string prefix
 {
   const r = evaluateSenderTrust({
     env: { kind: 'dev', expectedDevOrigin: 'http://localhost:3000' },

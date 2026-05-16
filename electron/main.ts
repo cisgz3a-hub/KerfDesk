@@ -16,7 +16,7 @@ import {
   recordStartupCrash,
 } from './startupCrashLoop';
 import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
-import { assertTrustedSender } from './security';
+import { assertTrustedSender, isTrustedElectronUrl } from './security';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -29,16 +29,6 @@ let mainWindow: BrowserWindow | null = null;
  * end-user benefit.
  */
 const isDev = !app.isPackaged;
-const DEV_SERVER_ORIGIN = 'http://localhost:3000';
-
-function isExpectedDevServerUrl(url: string): boolean {
-  try {
-    return new URL(url).origin === DEV_SERVER_ORIGIN;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * DevTools control: open automatically for unpackaged dev runs, or when a
  * support engineer explicitly sets ELECTRON_ENABLE_DEVTOOLS=1 to diagnose a
@@ -86,9 +76,33 @@ const DEFAULT_MAX_FILE_BYTES = 50 * 1024 * 1024;
 // Enable Web Serial API in Electron
 app.commandLine.appendSwitch('enable-features', 'ElectronSerialChooser,WebSerial');
 
+function isTrustedSerialPermissionRequest(
+  webContents: { getURL: () => string } | null,
+  details: { readonly requestingUrl?: string; readonly isMainFrame: boolean },
+): boolean {
+  if (typeof details.requestingUrl === 'string' && details.requestingUrl.length > 0) {
+    return isTrustedElectronUrl(details.requestingUrl);
+  }
+  if (!details.isMainFrame || webContents == null) return false;
+  return isTrustedElectronUrl(webContents.getURL());
+}
+
+function isTrustedSerialDevicePermissionRequest(
+  webContents: { getURL: () => string },
+  details: { readonly deviceType: string; readonly origin: string },
+): boolean {
+  if (details.deviceType !== 'serial') return false;
+  if (isTrustedElectronUrl(details.origin)) return true;
+  return details.origin === 'file://' && isTrustedElectronUrl(webContents.getURL());
+}
+
 app.on('web-contents-created', (_, contents) => {
-  contents.session.on('select-serial-port', (event, portList, _webContents, callback) => {
+  contents.session.on('select-serial-port', (event, portList, webContents, callback) => {
     event.preventDefault();
+    if (!isTrustedElectronUrl(webContents.getURL())) {
+      callback('');
+      return;
+    }
     // Never auto-select the first port. Let the user choose explicitly.
     if (!portList || portList.length === 0) {
       callback('');
@@ -114,12 +128,12 @@ app.on('web-contents-created', (_, contents) => {
     })();
   });
 
-  contents.session.setPermissionCheckHandler((_webContents, permission) => {
-    return permission === 'serial';
+  contents.session.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => {
+    return permission === 'serial' && isTrustedSerialPermissionRequest(webContents, details);
   });
 
   contents.session.setDevicePermissionHandler((details) => {
-    return details.deviceType === 'serial';
+    return isTrustedSerialDevicePermissionRequest(contents, details);
   });
 
   // T1-90: belt-and-suspenders navigation hardening for ANY WebContents
@@ -139,9 +153,7 @@ app.on('web-contents-created', (_, contents) => {
   });
 
   contents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && isExpectedDevServerUrl(url);
-    const isAppFile = !isDev && url.startsWith('file://');
-    if (!isDevServer && !isAppFile) {
+    if (!isTrustedElectronUrl(url)) {
       event.preventDefault();
     }
   });
@@ -204,9 +216,7 @@ function createWindow() {
   });
 
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const isDevServer = isDev && isExpectedDevServerUrl(url);
-    const isAppFile = !isDev && url.startsWith('file://');
-    if (!isDevServer && !isAppFile) {
+    if (!isTrustedElectronUrl(url)) {
       event.preventDefault();
     }
   });

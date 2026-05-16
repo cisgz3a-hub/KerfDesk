@@ -1,4 +1,6 @@
 import { app, type IpcMainInvokeEvent } from 'electron';
+import * as path from 'path';
+import { fileURLToPath } from 'url';
 
 const EXPECTED_DEV_ORIGIN = 'http://localhost:3000/';
 
@@ -8,24 +10,48 @@ function senderFrameFromEvent(event: IpcMainInvokeEvent): SenderFrameLike {
   return event.senderFrame ? { url: event.senderFrame.url } : null;
 }
 
-function senderTrusted(frame: SenderFrameLike): boolean {
-  if (!frame || typeof frame.url !== 'string' || frame.url.length === 0) {
+function bundledRendererRootPath(): string {
+  return path.resolve(__dirname, '..', 'dist');
+}
+
+function isPathWithinOrEqual(rootPath: string, candidatePath: string): boolean {
+  const relative = path.relative(rootPath, candidatePath);
+  return relative === '' || (
+    relative.length > 0
+    && !relative.startsWith('..')
+    && !path.isAbsolute(relative)
+  );
+}
+
+export function isTrustedPackagedFileUrl(url: string, rootPath = bundledRendererRootPath()): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'file:') return false;
+    const requestedPath = path.resolve(fileURLToPath(parsed));
+    return isPathWithinOrEqual(rootPath, requestedPath);
+  } catch {
     return false;
   }
+}
 
+export function isExpectedDevServerUrl(url: string): boolean {
+  try {
+    return new URL(url).origin === new URL(EXPECTED_DEV_ORIGIN).origin;
+  } catch {
+    return false;
+  }
+}
+
+export function isTrustedElectronUrl(url: string): boolean {
+  if (typeof url !== 'string' || url.length === 0) return false;
   if (app.isPackaged) {
-    return frame.url.startsWith('file://');
+    return isTrustedPackagedFileUrl(url);
   }
+  return isExpectedDevServerUrl(url);
+}
 
-  if (frame.url.startsWith('http://') || frame.url.startsWith('https://')) {
-    try {
-      return new URL(frame.url).origin === new URL(EXPECTED_DEV_ORIGIN).origin;
-    } catch {
-      return false;
-    }
-  }
-
-  return false;
+function senderTrusted(frame: SenderFrameLike): boolean {
+  return !!frame && isTrustedElectronUrl(frame.url);
 }
 
 export function assertTrustedSender(event: IpcMainInvokeEvent): void {

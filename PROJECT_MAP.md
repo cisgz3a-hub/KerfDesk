@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 492 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 720 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 721 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 644 | - |
+| `tests/` | 645 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -811,6 +811,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/electron-csp-integration.test.ts`
 - `tests/electron-navigation-blocked.test.ts`
 - `tests/electron-renderer-sandbox.test.ts`
+- `tests/electron-serial-permission-trust.test.ts`
 - `tests/emitted-burn-envelope-arcs.test.ts`
 - `tests/emitted-burn-envelope-r-mode-arcs.test.ts`
 - `tests/emitted-burn-envelope.test.ts`
