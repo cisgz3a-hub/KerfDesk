@@ -14,12 +14,17 @@
  * transport callback with the `connectionId` it was registered
  * against; listeners drop events whose connectionId ≠ active.
  *
- * T2-34 ships the pure primitive (allocator + token + isStale check
- * + guard wrapper) so transport implementations and controllers can
- * adopt it without coordinating on a single connectionId source.
- * Wiring `WebSerialPort.onData/onError/onClose` + GrblController to
- * accept and forward `TransportCallbackContext` is filed as
- * T2-34-followup.
+ * T2-34 shipped the pure primitive (allocator + token + isStale
+ * check + guard wrapper) so transport implementations and
+ * controllers can adopt it without coordinating on a single
+ * connectionId source.
+ *
+ * Audit F-002 follow-up: GrblController now allocates a token per
+ * connect and wraps data/error/close callbacks with
+ * `withGenerationGuard(...)`, so stale old-port callbacks no-op after
+ * reconnect. Broader transport-level `TransportCallbackContext`
+ * propagation and multi-subscriber WebSerial wiring remain separate
+ * architecture work.
  */
 
 export interface ConnectionToken {

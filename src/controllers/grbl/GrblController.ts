@@ -23,6 +23,13 @@ import {
   type JobHandle,
 } from '../ControllerInterface';
 import { type SerialPortLike } from '../../communication/SerialPort';
+import {
+  ConnectionGenerationAllocator,
+  contextFromToken,
+  isStaleContext,
+  withGenerationGuard,
+  type ConnectionToken,
+} from '../../communication/ConnectionGenerationGuard';
 import { computeStreamingHealth } from './streamingHealth';
 import { buildGrblFrameGcode } from './GrblFrameGcode';
 import { parseGrblStatusReport } from './GrblStatusReportParser';
@@ -329,6 +336,8 @@ export class GrblController implements GrblControllerApi {
 
   private _state: MachineState;
   private _port: SerialPortLike | null = null;
+  private readonly _connectionGenerations = new ConnectionGenerationAllocator();
+  private _activeConnectionToken: ConnectionToken | null = null;
   private _isJobRunning = false;
   /**
    * T1-220 (v30 audit #8): monotonic counter of job lines written
@@ -658,6 +667,8 @@ export class GrblController implements GrblControllerApi {
     this._unsafeAtConnect = null;
 
     this._port = port;
+    const connectionToken = this._connectionGenerations.allocate();
+    this._activeConnectionToken = connectionToken;
     this._updateStatus('connecting');
 
     return new Promise<void>((resolve, reject) => {
@@ -699,6 +710,9 @@ export class GrblController implements GrblControllerApi {
         connectSettled = true;
         cleanupConnectTimers();
         this._stopStatusPolling();
+        if (!isStaleContext(contextFromToken(connectionToken), this._activeConnectionToken)) {
+          this._activeConnectionToken = null;
+        }
         if (this._port === port) {
           void port.close().catch(() => { /* ignore abort cleanup close failures */ });
           this._port = null;
@@ -709,7 +723,7 @@ export class GrblController implements GrblControllerApi {
 
       signal?.addEventListener('abort', onAbort, { once: true });
 
-      port.onData((line) => {
+      port.onData(withGenerationGuard(connectionToken, () => this._activeConnectionToken, (line) => {
         if (connectSettled && !welcomeReceived) return;
         this._emitRawLine(line, 'rx');
         this._recordControllerRx();
@@ -777,7 +791,7 @@ export class GrblController implements GrblControllerApi {
         if (welcomeReceived) {
           this._handleLine(line);
         }
-      });
+      }));
 
       probeWifi1 = setTimeout(() => {
         if (!welcomeReceived) {
@@ -807,7 +821,7 @@ export class GrblController implements GrblControllerApi {
         }
       }, 3000);
 
-      port.onError((err) => {
+      port.onError(withGenerationGuard(connectionToken, () => this._activeConnectionToken, (err) => {
         for (const cb of this._errorListeners) {
           cb(-1, `Serial error: ${err.message}`);
         }
@@ -816,11 +830,11 @@ export class GrblController implements GrblControllerApi {
         // handle best-effort, and force disconnected so the UI cannot start
         // another job on a dead port.
         this._handleTransportDisconnect(true);
-      });
+      }));
 
-      port.onClose(() => {
+      port.onClose(withGenerationGuard(connectionToken, () => this._activeConnectionToken, () => {
         this._handleTransportDisconnect(false);
-      });
+      }));
 
       port.write('\n');
       try {
@@ -848,6 +862,9 @@ export class GrblController implements GrblControllerApi {
           signal?.removeEventListener('abort', onAbort);
           cleanupConnectTimers();
           this._stopStatusPolling();
+          if (!isStaleContext(contextFromToken(connectionToken), this._activeConnectionToken)) {
+            this._activeConnectionToken = null;
+          }
           if (this._port) {
             // T2-31: close() is now async. setTimeout cannot await; chain
             // .catch to swallow the close-failure (best-effort cleanup,
@@ -881,6 +898,7 @@ export class GrblController implements GrblControllerApi {
         // Best effort — port may already be closing or in error state
       }
       await new Promise(r => setTimeout(r, 80));
+      this._activeConnectionToken = null;
       try {
         // T2-31: close() is now async. Await so disconnect resolves only
         // after the browser has released the port — eliminates the race
@@ -894,6 +912,7 @@ export class GrblController implements GrblControllerApi {
     } else if (this._port) {
       this._port = null;
     }
+    this._activeConnectionToken = null;
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
@@ -931,6 +950,7 @@ export class GrblController implements GrblControllerApi {
     this._stopStatusPolling();
     this._abortJob();
     this._port = null;
+    this._activeConnectionToken = null;
     this._maxSpindle = null;
     this._settingsQueried = false;
     this._awaitingSettingsOk = false;
