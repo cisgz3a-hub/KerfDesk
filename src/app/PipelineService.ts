@@ -579,6 +579,7 @@ export async function compileGcode(
   let gcodeSpool: SpoolHandle | null = null;
   if (typeof strategy.generateGcode === 'function') {
     const ticketId = generateTicketId();
+    let reportSpoolBuildProgress = true;
     gcodeSpool = await buildReplayableGcodeSpool(
       ticketId,
       options => canonicalGcodeStream(
@@ -588,12 +589,13 @@ export async function compileGcode(
           {
             ...gcodeOptions,
             ...options,
-            onProgress: undefined,
+            onProgress: reportSpoolBuildProgress ? gcodeOptions.onProgress : undefined,
           },
         ),
       ),
       { signal: opts.signal },
     );
+    reportSpoolBuildProgress = false;
     throwIfAborted(opts.signal);
     const streamed = await collectStreamingOutput(
       gcodeSpool.open({ signal: opts.signal }),

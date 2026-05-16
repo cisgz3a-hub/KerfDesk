@@ -59,8 +59,17 @@ function makeCtrl(sendJob: (lines: string[]) => Promise<void> = async () => {}):
     connect: async () => {},
     disconnect: async () => {},
     executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
-      if (output.kind !== 'gcode-lines') throw new Error('mock only supports gcode-lines');
-      await sendJob([...output.lines]);
+      if (output.kind === 'gcode-lines') {
+        await sendJob([...output.lines]);
+      } else if (output.kind === 'gcode-stream') {
+        const lines: string[] = [];
+        for await (const chunk of output.spool.open()) {
+          lines.push(...chunk.lines);
+        }
+        await sendJob(lines);
+      } else {
+        throw new Error(`mock only supports G-code output, got ${output.kind}`);
+      }
       return { id: jobTicket.ticketId, startedAt: 123 };
     },
     sendJob,
