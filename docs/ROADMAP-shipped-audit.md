@@ -516,6 +516,8 @@ T2-1 (ValidatedJobTicket éˆ¥?type exists, contract not enforced), **T2-3** (p
 
 T2-6 Phase 3av addendum (shipped in `4a47845d`): unsafe-prior-state recovery alert copy/date formatting moved into `src/ui/components/app/appRecoveryHelpers.ts`; `App.tsx` still owns storage reads, modal display, and clearing the persisted flag after acknowledgement. Pinned by `tests/app-recovery-helpers.test.ts`. **Hardware verification not required** (pure UI copy extraction; no machine state, G-code, serial, or safety-gate behavior changed). Full T2-6 remains open for further App.tsx file split work.
 
+T2-6 Phase 3aw addendum (shipped in `<TBD>`): startup autosave recovery prompt eligibility and timestamp-label planning moved into `src/ui/components/app/appRecoveryHelpers.ts`; `App.tsx` still owns `readAutosave()` and dialog-store writes. The helper delegates the eligibility contract to `evaluateRecoveryEligibility(...)` and returns the stable show/time-label decision for the startup prompt. Pinned by `tests/app-recovery-helpers.test.ts`. **Hardware verification not required** (pure startup prompt planning; no machine state, G-code, serial, or safety-gate behavior changed). Full T2-6 remains open for further App.tsx file split work.
+
 #### Connection lifecycle (6 tickets)
 
 T2-30 (Falcon WiFi as transport), T2-31 (close async), **T2-32** (no ConnectionManager), T2-33, T2-34 (no generation guard), T2-36 (subscription transport callbacks).

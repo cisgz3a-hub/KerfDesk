@@ -91,7 +91,6 @@ import { MaterialDialog } from './MaterialDialog';
 import { importDxfIntoScene } from '../../import/dxf';
 import { serializeScene } from '../../io/SceneSerializer';
 import { readAutosave, writeAutosave, writeAutosaveAsync, clearAutosave } from '../../app/autosavePersistence';
-import { evaluateRecoveryEligibility } from '../../app/recoveryEligibility';
 import { getUnsafePriorState, clearUnsafePriorState } from '../../app/unsafePriorState';
 import { hashSceneForPersistence, isDirty } from '../../core/scene/sceneDirtyHash';
 import { generateId } from '../../core/types';
@@ -164,7 +163,10 @@ import {
   buildProjectLoadCommitPlan,
   buildSceneSavedBaselinePlan,
 } from './app/appProjectLoadHelpers';
-import { buildUnsafePriorStateAlert } from './app/appRecoveryHelpers';
+import {
+  buildAutosaveRecoveryStartupPrompt,
+  buildUnsafePriorStateAlert,
+} from './app/appRecoveryHelpers';
 
 type StartMode = GcodeStartMode;
 import { gatedFeature, isProUnlocked } from '../utils/proGate';
@@ -594,22 +596,10 @@ export function App(): React.ReactElement {
     let cancelled = false;
     void readAutosave().then(payload => {
       if (cancelled || !payload) return;
-      // T1-71: recovery should fire on any meaningful change, not only
-      // scenes with placed objects. A user who configured machine,
-      // material, and custom layers but didn't place an object yet still
-      // had real work in autosave; the previous "objects > 0" gate threw
-      // it away.
-      const eligibility = evaluateRecoveryEligibility(payload.json);
-      if (!eligibility.shouldOffer) return;
+      const prompt = buildAutosaveRecoveryStartupPrompt(payload);
+      if (!prompt.shouldShow) return;
       setShowRecover(true);
-      try {
-        const d = new Date(payload.timestamp);
-        setRecoverAutosaveTimeLabel(
-          d.toLocaleDateString() + ' ' + d.toLocaleTimeString(),
-        );
-      } catch {
-        setRecoverAutosaveTimeLabel(null);
-      }
+      setRecoverAutosaveTimeLabel(prompt.timeLabel);
     });
     return () => {
       cancelled = true;
