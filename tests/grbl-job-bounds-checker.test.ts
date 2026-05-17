@@ -155,6 +155,50 @@ console.log('\n=== T1-139 GRBL job-bounds checker ===\n');
   assert(r === null, 'M-codes, comments, F-only lines ignored');
 }
 
+// -------- S25-07-001. semicolon comments cannot change modal state --------
+{
+  const r = checkGrblJobBounds(
+    ['G91', '; G90 comment only', 'G0 X350'],
+    ctx({ headPosition: { x: 100, y: 0 } }),
+  );
+  assert(r != null && /X=450\.000/.test(r),
+    'semicolon comment G90 does not reset relative mode before out-of-bounds X move');
+
+  const r2 = checkGrblJobBounds(
+    ['; G91 comment only', 'G0 X100'],
+    ctx({ positionConfirmed: false }),
+  );
+  assert(r2 === null,
+    'semicolon comment G91 does not force relative-mode position-confirmation failure');
+}
+
+// -------- S25-07-001. parenthesized comments cannot change modal state --------
+{
+  const r = checkGrblJobBounds(
+    ['G91', '(G90 comment only)', 'G0 X350'],
+    ctx({ headPosition: { x: 100, y: 0 } }),
+  );
+  assert(r != null && /X=450\.000/.test(r),
+    'parenthetical comment G90 does not reset relative mode before out-of-bounds X move');
+
+  const r2 = checkGrblJobBounds(
+    ['(G91 comment only)', 'G0 X100'],
+    ctx({ positionConfirmed: false }),
+  );
+  assert(r2 === null,
+    'parenthetical comment G91 does not force relative-mode position-confirmation failure');
+}
+
+// -------- S25-07-001. same-block real modal motion still checks --------
+{
+  const r = checkGrblJobBounds(
+    ['G91 G0 X350'],
+    ctx({ headPosition: { x: 100, y: 0 } }),
+  );
+  assert(r != null && /X=450\.000/.test(r),
+    'real same-block G91 G0 X350 still rejects relative out-of-bounds motion');
+}
+
 // -------- 14. line without X or Y is skipped --------
 {
   const r = checkGrblJobBounds(['G0 Z5'], ctx());

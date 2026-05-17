@@ -309,7 +309,90 @@ console.log('\n=== T1-173 raster overscan is S0 travel (Critical #1 audit fix) =
   }
 }
 
-// -------- 6. Source pins on the implementation --------
+// -------- 6. S25-03-001: scanning offset shifts the overscan envelope with the burn span --------
+{
+  const bitmap: ProcessedBitmap = {
+    width: 4,
+    height: 2,
+    data: new Uint8Array([
+      255, 255, 255, 255, // row 0: LTR
+      255, 255, 255, 255, // row 1: RTL
+    ]),
+    mode: '1bit',
+    position: { x: 10, y: 0 },
+    physicalWidth: 4,
+    physicalHeight: 2,
+    sourceObjectId: 'scan-offset-overscan-bitmap',
+  } as unknown as ProcessedBitmap;
+
+  const settings: ResolvedLaserSettings = {
+    powerMin: 0,
+    powerMax: 80,
+    speed: 1200,
+    passes: 1,
+    zStepPerPass: 0,
+    fillInterval: 0,
+    fillAngle: 0,
+    fillMode: 'line',
+    fillBiDirectional: true,
+    overscanning: 3,
+    overcut: 0,
+    leadIn: 0,
+    tabCount: 0,
+    tabWidth: 0,
+    insideFirst: false,
+    airAssist: false,
+    accelAwarePower: false,
+    maxAccelMmPerS2: 500,
+    minPowerRatioAccel: 0.2,
+    scanningOffsets: [{ speedMmPerMin: 1200, offsetMm: 1 }],
+  };
+
+  const operation: Operation = {
+    id: 'op-raster-offset-overscan',
+    layerId: 'L1',
+    layerName: 'Raster Offset Overscan',
+    layerColor: '#000000',
+    order: 0,
+    type: 'raster',
+    settings,
+    geometry: { type: 'raster', bitmap },
+    bounds: { minX: 10, minY: 0, maxX: 14, maxY: 2 },
+  } as unknown as Operation;
+
+  const job = createEmptyJob('S25-03-001-raster', 'test-project');
+  job.operations = [operation];
+
+  const plan = optimizePlan(job);
+  const moves = plan.operations[0].moves;
+  const rapidMoves = moves.filter((m): m is { type: 'rapid'; to: { x: number; y: number } } => m.type === 'rapid');
+  const linearMoves = moves.filter((m): m is { type: 'linear'; to: { x: number; y: number }; power: number; speed: number } => m.type === 'linear');
+  const s0Linears = linearMoves.filter(m => m.power === 0);
+  const burnLinears = linearMoves.filter(m => m.power > 0);
+
+  assert(rapidMoves.length === 2, `scan-offset fixture emits two row rapids (got ${rapidMoves.length})`);
+  assert(s0Linears.length === 4, `scan-offset fixture emits four S0 approach/exit moves (got ${s0Linears.length})`);
+  assert(burnLinears.length === 2, `scan-offset fixture emits two burn moves with accel splitting disabled (got ${burnLinears.length})`);
+
+  const ltrRapid = rapidMoves.find(m => Math.abs(m.to.y - 0) < 1e-6);
+  const rtlRapid = rapidMoves.find(m => Math.abs(m.to.y - 1) < 1e-6);
+  const ltrS0 = s0Linears.filter(m => Math.abs(m.to.y - 0) < 1e-6).map(m => m.to.x).sort((a, b) => a - b);
+  const rtlS0 = s0Linears.filter(m => Math.abs(m.to.y - 1) < 1e-6).map(m => m.to.x).sort((a, b) => a - b);
+  const ltrBurn = burnLinears.find(m => Math.abs(m.to.y - 0) < 1e-6);
+  const rtlBurn = burnLinears.find(m => Math.abs(m.to.y - 1) < 1e-6);
+
+  assert(ltrRapid?.to.x === 6, `LTR rapid uses shifted overscanFromX=6 (got ${ltrRapid?.to.x})`);
+  assert(ltrS0.includes(9), `LTR S0 approach lands at shifted burn start x=9 (got [${ltrS0.join(', ')}])`);
+  assert(ltrBurn?.to.x === 13, `LTR burn ends at shifted burn end x=13 (got ${ltrBurn?.to.x})`);
+  assert(ltrS0.includes(16), `LTR S0 exit lands at shifted overscanToX=16 (got [${ltrS0.join(', ')}])`);
+
+  assert(rtlRapid?.to.x === 18, `RTL rapid uses shifted overscanFromX=18 (got ${rtlRapid?.to.x})`);
+  assert(rtlS0.includes(15), `RTL S0 approach lands at shifted burn start x=15 (got [${rtlS0.join(', ')}])`);
+  assert(rtlBurn?.to.x === 11, `RTL burn ends at shifted burn end x=11 (got ${rtlBurn?.to.x})`);
+  assert(rtlS0.includes(8), `RTL S0 exit lands at shifted overscanToX=8 (got [${rtlS0.join(', ')}])`);
+}
+
+// -------- 7. Source pins on the implementation --------
 {
   const rgSrc = readFileSync(resolve(here, '../src/core/plan/RasterGenerator.ts'), 'utf-8');
   const poSrc = readFileSync(resolve(here, '../src/core/plan/PlanOptimizer.ts'), 'utf-8');
@@ -335,20 +418,27 @@ console.log('\n=== T1-173 raster overscan is S0 travel (Critical #1 audit fix) =
     'RasterScanline declares overscanFromX + overscanToX',
   );
 
-  // PlanOptimizer rapid goes to scanline.overscanFromX, not adjusted[0].startX.
+  assert(/S25-03-001/.test(poSrc), 'PlanOptimizer carries S25-03-001 marker');
+
+  // PlanOptimizer rapid goes to the adjusted overscan envelope, not the raw
+  // scanline envelope and not the adjusted burn-start.
   assert(
-    /rapid['"\s,:]+to:\s*\{\s*x:\s*scanline\.overscanFromX/.test(poSrc),
-    'iterateRasterOperationMoves rapid lands at scanline.overscanFromX',
+    /rapid['"\s,:]+to:\s*\{\s*x:\s*adjustedOverscanFromX/.test(poSrc),
+    'iterateRasterOperationMoves rapid lands at adjustedOverscanFromX',
   );
   // The old rapid pattern (`adjusted[0].startX`) must be gone.
   assert(
     !/rapid['"\s,:]+to:\s*\{\s*x:\s*adjusted\[0\]\.startX/.test(poSrc),
     'iterateRasterOperationMoves no longer rapids to adjusted[0].startX (which had -overscan baked in)',
   );
+  assert(
+    !/rapid['"\s,:]+to:\s*\{\s*x:\s*scanline\.overscanFromX/.test(poSrc),
+    'iterateRasterOperationMoves no longer rapids to raw scanline.overscanFromX after scan-offset adjustment',
+  );
   // The exit-linear path lands at overscanToX.
   assert(
-    /to:\s*\{\s*x:\s*scanline\.overscanToX/.test(poSrc),
-    'iterateRasterOperationMoves exit linear lands at scanline.overscanToX',
+    /to:\s*\{\s*x:\s*adjustedOverscanToX/.test(poSrc),
+    'iterateRasterOperationMoves exit linear lands at adjustedOverscanToX',
   );
 }
 

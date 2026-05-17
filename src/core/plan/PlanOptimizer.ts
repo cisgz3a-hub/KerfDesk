@@ -834,6 +834,17 @@ export function* iterateRasterOperationMoves(
       adjusted.push({ startX: s, endX: e, power: seg.power, y: seg.y });
     }
 
+    // S25-03-001: scan-offset correction shifts the burn span, so the
+    // S0 overscan envelope must shift with it. Otherwise the first
+    // burn pixel still lands at the calibrated offset, but the
+    // acceleration/deceleration headroom becomes asymmetric.
+    const adjustedOverscanFromX = scanline.direction === 'ltr'
+      ? adjusted[0].startX - settings.overscanning
+      : adjusted[0].startX + settings.overscanning;
+    const adjustedOverscanToX = scanline.direction === 'ltr'
+      ? adjusted[adjusted.length - 1].endX + settings.overscanning
+      : adjusted[adjusted.length - 1].endX - settings.overscanning;
+
     // T1-173 (audit Critical #1): rapid to the row's overscan-from,
     // NOT the first segment's burn-start. The overscan-from is the
     // entry point for the row's travel envelope; the laser is off
@@ -841,14 +852,14 @@ export function* iterateRasterOperationMoves(
     // had `-overscan` baked in, but `appendRasterBurnMoves` then
     // burned from that point at full power — engraving outside the
     // artwork.
-    yield { type: 'rapid', to: { x: scanline.overscanFromX, y: adjusted[0].y } };
+    yield { type: 'rapid', to: { x: adjustedOverscanFromX, y: adjusted[0].y } };
 
     // T1-173: G1 S0 approach from overscan-from to the first burn
     // pixel. The machine accelerates to scan speed during this
     // distance with the laser off, so the first burn pixel is hit
     // at the correct velocity. Skip if overscan === 0 (no headroom).
     const firstBurnStart = adjusted[0].startX;
-    if (Math.abs(firstBurnStart - scanline.overscanFromX) > 1e-4) {
+    if (Math.abs(firstBurnStart - adjustedOverscanFromX) > 1e-4) {
       yield {
         type: 'linear',
         to: { x: firstBurnStart, y: adjusted[0].y },
@@ -896,10 +907,10 @@ export function* iterateRasterOperationMoves(
     // The machine decelerates with the laser off so deceleration
     // doesn't degrade the trailing burn pixels. Skip when overscan
     // === 0.
-    if (Math.abs(scanline.overscanToX - prevEndX) > 1e-4) {
+    if (Math.abs(adjustedOverscanToX - prevEndX) > 1e-4) {
       yield {
         type: 'linear',
-        to: { x: scanline.overscanToX, y: adjusted[adjusted.length - 1].y },
+        to: { x: adjustedOverscanToX, y: adjusted[adjusted.length - 1].y },
         power: 0,
         speed,
       };

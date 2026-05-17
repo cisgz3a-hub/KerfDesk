@@ -60,6 +60,25 @@ export function createGrblJobBoundsState(ctx: GrblJobBoundsContext): GrblJobBoun
   };
 }
 
+function stripGrblComments(line: string): string {
+  let out = '';
+  let inParenComment = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inParenComment) {
+      if (ch === ')') inParenComment = false;
+      continue;
+    }
+    if (ch === ';') break;
+    if (ch === '(') {
+      inParenComment = true;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 export function checkGrblJobBoundsChunk(
   lines: ReadonlyArray<string>,
   ctx: GrblJobBoundsContext,
@@ -71,7 +90,7 @@ export function checkGrblJobBoundsChunk(
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const line = stripGrblComments(lines[i]);
     for (const modeMatch of line.matchAll(/\bG(90|91)\b/gi)) {
       state.relative = modeMatch[1] === '91';
     }

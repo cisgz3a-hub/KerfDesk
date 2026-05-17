@@ -29,6 +29,9 @@ import {
   emptyTemplateContext,
   renderTemplate,
 } from '../src/core/plan/GcodeTemplates';
+import { createEmptyJob } from '../src/core/job/Job';
+import { createEmptyPlan } from '../src/core/plan/Plan';
+import { GrblOutputStrategy } from '../src/core/output/GrblStrategy';
 
 let passed = 0;
 let failed = 0;
@@ -230,6 +233,48 @@ console.log('\n=== gcode template sanitization (T1-91) ===\n');
   assert(
     out === 'header: {JOB_NAME}',
     `no recursion: literal "{JOB_NAME}" in jobName remains as-is (got "${out}")`,
+  );
+}
+
+// ── 15. Default safety header sanitizes JOB_NAME before baseline ────
+{
+  const job = createEmptyJob('Innocent Job\nM3 S1000\nG4 P5\nM5', 's25-05');
+  job.metadata.objectCount = 0;
+  job.metadata.layerCount = 0;
+  const plan = createEmptyPlan(job.id);
+  const output = new GrblOutputStrategy().generate(plan, job, {
+    startMode: 'absolute',
+    clock: () => '2026-05-17T00:00:00.000Z',
+  });
+  const text = output.text ?? '';
+  const lines = text.split('\n');
+  const codeLines = lines
+    .map(line => line.replace(/;.*$/, '').trim())
+    .filter(line => line.length > 0);
+
+  assert(
+    !lines.some(line => /^M3 S1000\s*$/.test(line)),
+    'default header: malicious job name cannot emit bare "M3 S1000"',
+  );
+  assert(
+    !lines.some(line => /^G4 P5\s*$/.test(line)),
+    'default header: malicious job name cannot emit bare "G4 P5"',
+  );
+  assert(
+    !lines.some(line => /^M5\s*$/.test(line)),
+    'default header: malicious job name cannot emit bare "M5"',
+  );
+  assert(
+    /^;\s*Job: Innocent Job M3 S1000 G4 P5 M5$/.test(lines[1] ?? ''),
+    `default header: injected text remains a single comment line (got "${lines[1] ?? ''}")`,
+  );
+  assert(
+    /^G21\b/.test(codeLines[0] ?? ''),
+    `default header: first executable line is the safety baseline G21 (got "${codeLines[0] ?? ''}")`,
+  );
+  assert(
+    codeLines.slice(0, 5).some(line => /^M5 S0\b/.test(line)),
+    'default header: laser-off safety baseline remains in the first executable block',
   );
 }
 
