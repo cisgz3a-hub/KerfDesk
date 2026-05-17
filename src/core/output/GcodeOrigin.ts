@@ -17,6 +17,14 @@ export interface GcodeGenerateOptions {
   onProgress?: (event: GcodeOutputProgress) => void;
   /** GRBL $30 — max spindle/PWM (S range). Default 1000. */
   maxSpindle?: number;
+  /**
+   * When true, power=0 linear moves are emitted as hard laser-off travel
+   * (`M5 S0` -> motion without S -> modal laser restore at S0) instead of
+   * relying on inline `G1 ... S0`. This protects machines/controllers that
+   * visibly mark blank raster gaps even though the G-code requested S0.
+   * Defaults to true.
+   */
+  hardOffZeroPowerLinearMoves?: boolean;
   /** Machine-space XY to rapid to before M2; omit or null to skip the return move. */
   returnPosition?: { x: number; y: number } | null;
   /** From device profile: lines appended after the standard header (G21/G90/laser off). */

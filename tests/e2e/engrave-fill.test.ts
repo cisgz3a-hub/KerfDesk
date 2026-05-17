@@ -38,7 +38,11 @@ try {
 
   assert(gcode.includes('Engrave'), 'Comment references Engrave layer');
   assert(lines > 80, `Raster fill yields many lines (got ${lines})`);
-  assert(/^G1 .*F\d+.*S\d+/m.test(gcode), 'Has raster-style G1 F S lines');
+  assert(/^G1 .*S\d+/m.test(gcode), 'Has raster-style powered G1 S lines');
+  assert(
+    /M5 S0\nG1 [^\n]*\nM4 S0\nG1 [^\n]*S\d+/m.test(gcode),
+    'Zero-power raster travel is hard laser-off before burn resumes',
+  );
 
   expectMatchesSnapshot(gcode, 'engrave-fill.gcode');
   passed++;

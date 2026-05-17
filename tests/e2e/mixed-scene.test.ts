@@ -42,6 +42,10 @@ console.log('\n=== E2E: mixed-scene ===');
 
     assert(gcode.includes('Score'), 'Includes score section');
     assert(gcode.includes('M4'), 'Includes M4');
+    assert(
+      /M5 S0\nG1 [^\n]*\nM4 S0\nG1 [^\n]*S\d+/m.test(gcode),
+      'Raster gap travel uses hard laser-off before burn resumes',
+    );
 
     expectMatchesSnapshot(gcode, 'mixed-scene.gcode');
     passed++;

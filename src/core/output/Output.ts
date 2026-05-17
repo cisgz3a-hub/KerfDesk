@@ -337,7 +337,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         for (let moveIndex = 0; moveIndex < op.moves.length; moveIndex++) {
           throwIfOutputAborted(options?.signal);
           const move = op.moves[moveIndex];
-          yield rememberLine(this.encodeMoveWithState(move, state));
+          const encoded = this.encodeMoveWithState(move, state);
+          for (const line of encoded.split(/\r?\n/)) {
+            yield rememberLine(line);
+          }
           completedMoves++;
           reportOutputProgress(options, {
             fraction: 0,
@@ -437,6 +440,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   private createEncoderState(options?: GcodeGenerateOptions): GcodeEncoderState {
     return {
       currentSpeed: 0,
+      hardOffZeroPowerLinearMoves: options?.hardOffZeroPowerLinearMoves ?? true,
       maxSpindle: options?.maxSpindle ?? 1000,
       prevPos: { x: 0, y: 0 },
       relative: options?.startMode === 'current',
@@ -689,6 +693,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       } if emitted)`;
     }
 
+    if (state.hardOffZeroPowerLinearMoves && power <= 0) {
+      return this.encodeHardOffLinearTravelWithState(to, speed, state);
+    }
+
     if (!state.relative) {
       state.prevPos = { x: to.x, y: to.y };
       const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
@@ -712,6 +720,43 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     }
     parts.push(this.encodePowerValueForMaxSpindle(power, state.maxSpindle));
     return parts.join(' ');
+  }
+
+  private encodeHardOffLinearTravelWithState(
+    to: { x: number; y: number },
+    speed: number,
+    state: GcodeEncoderState,
+  ): string {
+    const eps = BaseGCodeStrategy._posEps;
+    let travelLine: string;
+
+    if (!state.relative) {
+      state.prevPos = { x: to.x, y: to.y };
+      const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
+      if (speed !== state.currentSpeed) {
+        parts.push(`F${speed.toFixed(0)}`);
+        state.currentSpeed = speed;
+      }
+      travelLine = parts.join(' ');
+    } else {
+      const dx = to.x - state.prevPos.x;
+      const dy = to.y - state.prevPos.y;
+      state.prevPos = { x: to.x, y: to.y };
+      const parts: string[] = ['G1'];
+      if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
+      if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
+      if (speed !== state.currentSpeed) {
+        parts.push(`F${speed.toFixed(0)}`);
+        state.currentSpeed = speed;
+      }
+      travelLine = parts.join(' ');
+    }
+
+    return [
+      this.encodeLaserOff(),
+      travelLine,
+      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle),
+    ].join('\n');
   }
 
   private encodeLaserOnWithState(power: number, state: GcodeEncoderState): string {
@@ -802,6 +847,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
 interface GcodeEncoderState {
   currentSpeed: number;
+  hardOffZeroPowerLinearMoves: boolean;
   maxSpindle: number;
   prevPos: { x: number; y: number };
   relative: boolean;
