@@ -163,6 +163,10 @@ console.log('\n=== T1-208 WorkflowPanel Phase 4 live-job modes ===\n');
     'adapter wires onStartJob to executionCoordinator.startValidatedJob',
   );
   assert(
+    /allowUnverifiedWcsStart:\s*activeProfile\?\.allowUnverifiedWcsStart === true/.test(src),
+    'adapter forwards profile WCS compatibility into startValidatedJob',
+  );
+  assert(
     /startMode !== 'savedOrigin'/.test(src),
     "adapter blocks savedOrigin in the new panel (Phase 5b lifts the G54 drift check)",
   );

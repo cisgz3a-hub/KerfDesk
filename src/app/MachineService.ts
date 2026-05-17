@@ -911,6 +911,7 @@ export class MachineService {
     currentSavedOrigin: { x: number; y: number } | null;
     frameTicket: FrameTicket | null;
     outputFormat?: OutputFormat;
+    allowUnverifiedWcsStart?: boolean;
   }): Promise<void> {
     const {
       ticket,
@@ -922,6 +923,7 @@ export class MachineService {
       currentSavedOrigin,
       frameTicket,
       outputFormat = 'grbl',
+      allowUnverifiedWcsStart = false,
     } = args;
     const controller = this.controllerRef.current;
     if (controller == null) {
@@ -1007,8 +1009,13 @@ export class MachineService {
     // F-010/T1-223: the UI already refuses Start while WCS placement is
     // uncertain, but the service is the final production gate before bytes
     // can stream. Use the controller boolean as the source of truth; the
-    // optional reason is only diagnostic text.
-    if (this.controllerRef.current?.getPlacementUncertain?.() === true) {
+    // optional reason is only diagnostic text. Compatibility profiles for
+    // manual-zero machines can opt into unverified-WCS start, but the default
+    // stays fail-closed.
+    if (
+      this.controllerRef.current?.getPlacementUncertain?.() === true
+      && !allowUnverifiedWcsStart
+    ) {
       const placementReason =
         this.controllerRef.current.getPlacementUncertainReason?.() ?? 'unknown';
       throw new Error(

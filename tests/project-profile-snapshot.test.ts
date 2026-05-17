@@ -65,6 +65,19 @@ void (async () => {
     `multi-field drift detected (got fields=${fields.join(',')})`);
 }
 
+// 3b. diffProfiles: profile WCS compatibility is tracked because it changes
+//     the final Start gate on machines that cannot report GRBL WCS state.
+{
+  const saved = setupProfile('Manual-zero', { allowUnverifiedWcsStart: false });
+  const current = setupProfile('Manual-zero', { allowUnverifiedWcsStart: true });
+  const changes = diffProfiles(saved, current);
+  const wcs = changes.find(c => c.field === 'allowUnverifiedWcsStart');
+  assert(
+    wcs != null && wcs.saved === false && wcs.current === true,
+    `allowUnverifiedWcsStart drift detected (got ${changes.length} changes; wcs=${JSON.stringify(wcs)})`,
+  );
+}
+
 // 4. diffProfiles: cosmetic-only fields (name, id) NOT tracked
 {
   const saved = setupProfile('Old name', { id: 'p1' });

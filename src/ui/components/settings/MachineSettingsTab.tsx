@@ -416,6 +416,8 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
         'Compute overscan from speed + acceleration. Per-layer override.'),
       checkboxField('Skip WCS normalization prompt on connect', 'suppressWcsConsent',
         'If checked, LaserForge will silently set G54 to (0,0,0) and $10=0 on each connect for this machine, without asking.'),
+      checkboxField('Allow manual-zero start when WCS cannot be verified', 'allowUnverifiedWcsStart',
+        'Compatibility mode for GRBL-like machines that cannot report G54/$10 reliably. Keep off unless you intentionally set zero manually before each job.'),
       checkboxField('Allow negative workspace coordinates', 'allowsNegativeWorkspace',
         'Most diode lasers have the origin at a front corner and treat negative coords as limit hits. Enable only if your machine is configured for work offsets that produce negative coordinates.'),
     ),

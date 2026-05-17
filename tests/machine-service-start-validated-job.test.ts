@@ -472,6 +472,37 @@ async function run(): Promise<void> {
   }
 
   {
+    let executeCount = 0;
+    const mock = {
+      ...makeMockController(async () => {
+        executeCount++;
+      }),
+      getPlacementUncertain: () => true,
+      getPlacementUncertainReason: () => 'missing_g54',
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    await svc.startValidatedJob({
+      ticket,
+      frameTicket: makeTestFrameTicket(ticket),
+      scene,
+      machineState: idle,
+      notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
+      allowUnverifiedWcsStart: true,
+    });
+
+    assert(
+      executeCount === 1,
+      'profile compatibility allows start when WCS proof is unavailable',
+    );
+  }
+
+  {
     const port = new MockSerialPort();
     const ctrl = new GrblController();
     port.open();

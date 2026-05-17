@@ -206,6 +206,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const executionCoordinator = machineUi.executionCoordinator;
   const controller = props.controller;
   const machineState = props.machineState;
+  const activeProfile = getActiveProfile();
   const machineStatus = machineState?.status ?? null;
   // Same isConnected derivation as ConnectionPanelMain.tsx:424.
   const isConnected =
@@ -669,6 +670,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
             currentStartMode: startMode,
             currentSavedOrigin: props.savedOrigin,
             outputFormat: 'grbl',
+            allowUnverifiedWcsStart: activeProfile?.allowUnverifiedWcsStart === true,
           })
           .catch((err: unknown) => {
             console.warn(

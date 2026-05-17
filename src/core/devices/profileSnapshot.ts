@@ -47,6 +47,7 @@ const TRACKED_FIELDS: Array<keyof DeviceProfile> = [
   'minPowerRatioAccel',
   'accelAwarePower',
   'allowsNegativeWorkspace',
+  'allowUnverifiedWcsStart',
   'returnToOrigin',
   'startGcode',
   'endGcode',

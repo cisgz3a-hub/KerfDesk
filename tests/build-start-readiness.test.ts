@@ -87,6 +87,7 @@ function happy(): BuildStartReadinessInput {
     currentModeFrameAnchorValid: true,
     placementUncertain: false,
     placementUncertainReason: null,
+    allowUnverifiedWcsStart: false,
     onResetWcsToBaseline: null,
     recoveryAllowsStart: true,
     wifiTrust: trustedTrust,
@@ -562,6 +563,31 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   }
 }
 
+// -------- 16. Profile compatibility can accept unverified WCS explicitly --------
+//
+// Some GRBL-compatible machines cannot report the same $# / G54 / $10
+// evidence as a Falcon-style diode gantry. The Start gate must remain
+// strict by default, but a machine profile can explicitly opt into a
+// manual-zero compatibility mode so those machines are not locked out
+// by a controller-specific WCS proof they cannot provide.
+{
+  const r = buildStartReadiness({
+    ...happy(),
+    placementUncertain: true,
+    placementUncertainReason: 'missing_g54',
+    allowUnverifiedWcsStart: true,
+    canStartJob: true,
+  });
+  const g = r.gates.find((g) => g.id === 'wcsState');
+  assert(r.ready === true, 'profile WCS compatibility: readiness stays true');
+  assert(r.blockingGate === null, 'profile WCS compatibility: no blocking gate');
+  assert(g?.status === 'ok', 'profile WCS compatibility: WCS gate does not fail');
+  assert(
+    /profile|manual/i.test(`${g?.label ?? ''} ${g?.failAction ?? ''}`),
+    'profile WCS compatibility: WCS gate copy names the profile/manual-zero basis',
+  );
+}
+
 // -------- 16. T1-205: data-failure reasons get a recovery button --------
 //
 // User-reported bug: hitting `missing_g54` had no recovery action
@@ -811,6 +837,14 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   assert(
     /placementUncertainReason:\s*WcsUncertainReason \| null/.test(helperSrc),
     'BuildStartReadinessInput declares placementUncertainReason field',
+  );
+  assert(
+    /allowUnverifiedWcsStart:\s*boolean/.test(helperSrc),
+    'BuildStartReadinessInput declares allowUnverifiedWcsStart field',
+  );
+  assert(
+    /allowUnverifiedWcsStart/.test(panelSrc),
+    'ConnectionPanelMain threads allowUnverifiedWcsStart into buildStartReadiness',
   );
 
   const ifaceSrc = readFileSync(

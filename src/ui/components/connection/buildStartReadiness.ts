@@ -62,6 +62,7 @@ export interface BuildStartReadinessInput {
    * only case the original message describes correctly).
    */
   readonly placementUncertainReason: WcsUncertainReason | null;
+  readonly allowUnverifiedWcsStart: boolean;
   /**
    * T1-205: callback for the "Reset WCS to baseline" recovery
    * button. When set AND the WCS gate is failing with a
@@ -104,6 +105,15 @@ function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
       status: 'ok',
       failHeadline: 'Work-coordinate state could not be confirmed',
       failAction: 'No WCS consent prompt was shown on connect — disconnect and reconnect to retry',
+    };
+  }
+  if (input.allowUnverifiedWcsStart) {
+    return {
+      id: 'wcsState',
+      label: 'Work-coordinate state accepted by profile',
+      status: 'ok',
+      failHeadline: 'Work-coordinate verification bypassed by machine profile',
+      failAction: 'This profile uses manual-zero compatibility because the controller cannot reliably report G54/$10 WCS state.',
     };
   }
   let failHeadline: string;

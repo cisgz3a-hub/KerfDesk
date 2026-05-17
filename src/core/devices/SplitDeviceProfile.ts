@@ -76,6 +76,7 @@ export interface ControllerSection {
   readonly homingEnabled: boolean;
   readonly softLimitsEnabled: boolean;
   readonly suppressWcsConsent?: boolean;
+  readonly allowUnverifiedWcsStart?: boolean;
   readonly stopOnError?: boolean;
   readonly allowsNegativeWorkspace?: boolean;
 }
@@ -197,6 +198,7 @@ export function splitFromMonolithic(profile: DeviceProfile): SplitDeviceProfile 
       homingEnabled: profile.homingEnabled,
       softLimitsEnabled: profile.softLimitsEnabled,
       suppressWcsConsent: profile.suppressWcsConsent,
+      allowUnverifiedWcsStart: profile.allowUnverifiedWcsStart,
       stopOnError: profile.stopOnError,
       allowsNegativeWorkspace: profile.allowsNegativeWorkspace,
     },

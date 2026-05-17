@@ -80,6 +80,10 @@ console.log('\n=== T3-58 Machine settings capability indicators ===\n');
     'laser mode is unknown when no live $32 value exists');
   assert(html.includes('Settings not read yet'),
     'unknown values explain that controller settings were not read');
+  assert(
+    html.includes('Allow manual-zero start when WCS cannot be verified'),
+    'settings expose profile WCS compatibility as an explicit machine setting',
+  );
 }
 
 {

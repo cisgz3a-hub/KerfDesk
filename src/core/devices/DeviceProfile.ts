@@ -212,6 +212,14 @@ export interface DeviceProfile {
   suppressWcsConsent?: boolean;
 
   /**
+   * Compatibility mode for GRBL-like machines that cannot reliably report the
+   * WCS evidence LaserForge expects (`$#` with G54 and `$$` with $10). Default
+   * is fail-closed. When true, Start may proceed from the active profile's
+   * manual-zero workflow even if the controller marks placement as uncertain.
+   */
+  allowUnverifiedWcsStart?: boolean;
+
+  /**
    * T3-90 (T1-25 follow-up): when true, send `M5 S0` after the connect-time
    * safe-state handshake (T1-25) reports a clean idle/FS:0,0 verdict.
    * Defense-in-depth on top of T1-22 (`safetyOff()`), T1-23 (pause/resume
@@ -752,6 +760,7 @@ export function createPrt4040RouterLaserProfile(
     autoFocusCommand: undefined,
     autoFocusTimeoutMs: undefined,
     allowsNegativeWorkspace: true,
+    allowUnverifiedWcsStart: true,
   };
 }
 

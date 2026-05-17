@@ -174,6 +174,7 @@ export class ExecutionCoordinator {
     currentSavedOrigin: { x: number; y: number } | null;
     frameTicket: FrameTicket | null;
     outputFormat?: OutputFormat;
+    allowUnverifiedWcsStart?: boolean;
   }): Promise<void> {
     return this.deps.machineService.startValidatedJob(args);
   }

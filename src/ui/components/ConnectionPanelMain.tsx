@@ -1199,6 +1199,7 @@ export function ConnectionPanelMain({
         currentSavedOrigin: savedOrigin,
         frameTicket,
         outputFormat: 'grbl',
+        allowUnverifiedWcsStart,
       });
       if (jobStartPosition) {
         setLastJobStartPosition(jobStartPosition);
@@ -1878,6 +1879,8 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     (controllerRef.current?.getPlacementUncertainReason?.() ?? null) as
       | WcsUncertainReason
       | null;
+  const allowUnverifiedWcsStart = activeProfile?.allowUnverifiedWcsStart === true;
+  const wcsBlocksJobStart = placementUncertain && !allowUnverifiedWcsStart;
   // T1-122: live RecoveryState. Pre-T1-122 the runtime RecoveryState
   // type was defined but no production owner held an instance and no
   // canonical canStartJob consulted `recoveryAllowsStart`. Now
@@ -1920,7 +1923,8 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     });
   // T1-30: canStartJob keeps its existing product-level conjuncts
   // (gcode exists / fresh / framed / preflight passed / not running /
-  // machine bounds OK / laser output confirmed off / WCS not uncertain)
+  // machine bounds OK / laser output confirmed off / WCS confirmed or
+  // explicitly accepted by the active machine profile)
   // and adds `gates.baseSafe` as a defense-in-depth conjunct. baseSafe
   // collapses status === 'idle', laserOutput === 'off', no active
   // operation, no error code, and no pending recovery into one check;
@@ -1937,7 +1941,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     (!requireFrame || hasFramed.current) &&
     currentModeFrameAnchorValid &&
     laserOutputState !== 'unknown' &&
-    !placementUncertain &&
+    !wcsBlocksJobStart &&
     // T1-122: recovery checklist must be complete. recoveryAllowsStart
     // returns true exactly when state.status === 'none' (every required
     // step for the active recovery has been acknowledged). Audit Phase
@@ -1998,6 +2002,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     currentModeFrameAnchorValid,
     placementUncertain,
     placementUncertainReason,
+    allowUnverifiedWcsStart,
     // T1-205: wire the "Reset WCS to baseline" recovery button.
     // applyWcsNormalization sends `G10 L2 P1 X0 Y0 Z0` + `$10=0`
     // and clears _placementUncertain locally — the gate flips to

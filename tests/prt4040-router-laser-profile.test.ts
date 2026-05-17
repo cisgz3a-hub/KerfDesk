@@ -52,6 +52,7 @@ async function run(): Promise<void> {
   assertEq(profile.maxFeedRate, 1500, 'maxFeedRate conservative for router mechanics');
   assertEq(profile.maxSpindle, 1000, 'maxSpindle defaults to GRBL 1000');
   assertEq(profile.allowsNegativeWorkspace, true, 'negative workspace allowed for CNC-router coordinates');
+  assertEq(profile.allowUnverifiedWcsStart, true, 'manual-zero profile can start when WCS verification is unavailable');
   assert(shouldDefaultStartModeToCurrentForProfile(profile), 'profile defaults/nudges start mode to current/head mode');
 
   const scene = createScene(400, 400, 'prt4040 stay-put compile');

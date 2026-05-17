@@ -64,6 +64,10 @@ void (async () => {
     assert(split.controller.maxSpindle === blank.maxSpindle, 'Migration: maxSpindle in controller section');
     assert(split.controller.homingEnabled === blank.homingEnabled, 'Migration: homingEnabled in controller section');
     assert(split.controller.softLimitsEnabled === blank.softLimitsEnabled, 'Migration: softLimitsEnabled in controller section');
+    assert(
+      split.controller.allowUnverifiedWcsStart === blank.allowUnverifiedWcsStart,
+      'Migration: allowUnverifiedWcsStart in controller section',
+    );
 
     assert(split.transport.kind === 'serial', 'Migration: blank profile -> transport.kind serial');
     assert(split.transport.serial?.baudRate === blank.baudRate, 'Migration: baudRate in transport.serial');
@@ -324,10 +328,13 @@ void (async () => {
   //     guaranteed not to drop fields silently.
   {
     const original: DeviceProfile = createBlankProfile('Round trip');
+    original.allowUnverifiedWcsStart = true;
     const split = splitFromMonolithic(original);
 
     assert(typeof split.device.machineType === 'string', 'Round-trip: device.machineType present');
     assert(typeof split.controller.maxSpindle === 'number', 'Round-trip: controller.maxSpindle present');
+    assert(split.controller.allowUnverifiedWcsStart === true,
+      'Round-trip: controller.allowUnverifiedWcsStart present');
     assert(typeof split.transport.kind === 'string', 'Round-trip: transport.kind present');
     assert(typeof split.output.format === 'string', 'Round-trip: output.format present');
   }
