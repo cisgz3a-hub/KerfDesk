@@ -66,7 +66,7 @@ The master checklist at the bottom of this file is the current source of truth:
 | T3 | 87 | 5 | Open: T3-4 code-signing provisioning, T3-12 hardware-in-the-loop suite, T3-17 WiFi safety model, T3-34 stripe-based raster emission, and T3-84 Linux packaging/business decision. |
 | T4 | 0 | 1 broad line | Master checklist keeps Tier 4 as one broad backlog line (`T4-1 through T4-9`); the audit ledger still lists 2 shipped / 7 open concrete later items. |
 
-> **Pending checkpoint (2026-05-16):** The external audit remediation batch is in the working tree but not yet hash-filled. It does not change checklist counts yet. It materially advances T3-15/T3-34 and closes several audit findings: test-fire exception safety, automatic CI triggers, Falcon HTTP body caps, fsync-durable local writes, crash-loop safe-mode wiring, renderer chunking, and production spool consumers. See `docs/ROADMAP-shipped-audit.md` "2026-05-16 external audit remediation checkpoint."
+> **2026-05-16 checkpoint:** The external audit remediation batch is recorded and hash-filled in `bacf6ba1`, with follow-up docs/CI verification in `a4d4f26d` and `a55c509d`. It does not change checklist counts yet. It materially advances T3-15/T3-34 and closes several audit findings: test-fire exception safety, automatic CI triggers, Falcon HTTP body caps, fsync-durable local writes, crash-loop safe-mode wiring, renderer chunking, and production spool consumers. See `docs/ROADMAP-shipped-audit.md` "2026-05-16 external audit remediation checkpoint."
 
 ### Historical audit classification
 

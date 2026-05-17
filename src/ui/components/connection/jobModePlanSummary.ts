@@ -1,7 +1,7 @@
 // T1-62: for multi-mode jobs, generic "Running" hides the planned
 // operation order from the user during a 12+ minute mixed engrave+cut
 // run. PlanOptimizer's `orderOperations` always emits engrave/score
-// first, then cuts (see `src/core/plan/OperationOrderer.ts:176-191`),
+// first, then cuts (see `src/core/job/OperationOrderer.ts:176-194`),
 // regardless of layer order. This helper surfaces that fixed sequence
 // as a "Plan: ..." subtitle under the active label so the user knows
 // what's coming. Image layers map to engrave (treated identically by
