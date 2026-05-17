@@ -5460,7 +5460,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 26 | `Controls` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/safety-controls-bypass-entitlement.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 28 | `Controls` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | tests/controls-reset-wcs-baseline.test.tsx<br>tests/safety-controls-bypass-entitlement.test.ts | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 
@@ -5565,7 +5565,7 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 | 14 | `GateStatus` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 16 | `StartReadinessGate` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 | 54 | `StartReadiness` | interface | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 106 | `StartReadinessPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 107 | `StartReadinessPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

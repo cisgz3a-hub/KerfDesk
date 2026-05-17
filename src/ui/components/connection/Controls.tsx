@@ -8,6 +8,7 @@ interface ControlsProps {
   isRunning: boolean;
   displayPaused: boolean;
   startButtonLabel?: string;
+  canResetWcsToBaseline?: boolean;
   /**
    * T1-96: structured readiness state replaces the single-string
    * `startDisabledReason`. The panel renders nothing when
@@ -17,6 +18,7 @@ interface ControlsProps {
   startReadiness: StartReadiness;
   onFrame: () => void;
   onStartJob: () => void;
+  onResetWcsToBaseline?: () => void;
   onPauseResume: () => void;
   onStop: () => void;
 }
@@ -30,9 +32,11 @@ export function Controls({
   isRunning,
   displayPaused,
   startButtonLabel,
+  canResetWcsToBaseline = false,
   startReadiness,
   onFrame,
   onStartJob,
+  onResetWcsToBaseline,
   onPauseResume,
   onStop,
 }: ControlsProps) {
@@ -93,6 +97,27 @@ export function Controls({
           },
         }, startButtonLabel ?? `▶ START${isSimulator ? ' (Sim)' : ''}`),
       ),
+      onResetWcsToBaseline && React.createElement('button', {
+        type: 'button',
+        'data-testid': 'connection-reset-wcs-baseline',
+        onClick: () => {
+          if (canResetWcsToBaseline) onResetWcsToBaseline();
+        },
+        disabled: !canResetWcsToBaseline,
+        title: 'Set G54 to X0 Y0 Z0 and $10=0 while the controller is idle and laser output is off.',
+        style: {
+          padding: '9px 12px',
+          fontSize: 11,
+          fontWeight: 700,
+          borderRadius: 7,
+          cursor: canResetWcsToBaseline ? 'pointer' : 'default',
+          fontFamily: font,
+          background: canResetWcsToBaseline ? 'rgba(144,200,255,0.10)' : '#121222',
+          border: canResetWcsToBaseline ? '1px solid #2a5a8a' : '1px solid #252540',
+          color: canResetWcsToBaseline ? '#90c8ff' : '#777798',
+          opacity: canResetWcsToBaseline ? 1 : 0.55,
+        },
+      }, 'Reset WCS to baseline'),
       React.createElement(StartReadinessPanel, { readiness: startReadiness }),
     ),
     (isRunning || displayPaused) && React.createElement('div', {

@@ -999,8 +999,8 @@ export class MachineService {
     // after every required step is done — see RecoveryState.checkRecoveryComplete.
     if (!recoveryAllowsStart(this._recoveryState)) {
       throw new Error(
-        `Machine recovery is incomplete (status: ${this._recoveryState.status}). `
-        + 'Acknowledge every required recovery step before starting a new job.',
+        `Machine recovery is still active (status: ${this._recoveryState.status}). `
+        + 'Use the recovery banner controls before starting a new job.',
       );
     }
 

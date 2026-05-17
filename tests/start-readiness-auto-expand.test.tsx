@@ -1,7 +1,8 @@
 /**
  * T1-110: StartReadinessPanel auto-expands when the blocking gate
- * is one the user just invalidated (currentModeAnchor / framing /
- * frameControls), so the explanation is immediately visible
+ * is one the user just invalidated or can directly fix
+ * (currentModeAnchor / framing / frameControls / wcsState), so the
+ * explanation is immediately visible
  * instead of one click away.
  *
  * Other gates (controllerConnected, gcodeCompiled, etc.) — which
@@ -232,6 +233,12 @@ async function run(): Promise<void> {
     assert(
       !src.includes("'#333355'"),
       'Controls.tsx no longer references the old low-contrast #333355',
+    );
+    const readinessPanelPath = path.resolve(__dirname, '..', 'src', 'ui', 'components', 'connection', 'StartReadinessPanel.tsx');
+    const readinessPanelSrc = fs.readFileSync(readinessPanelPath, 'utf8');
+    assert(
+      /AUTO_EXPAND_GATE_IDS[\s\S]*'wcsState'/.test(readinessPanelSrc),
+      'StartReadinessPanel auto-expands wcsState so the Reset WCS action is visible',
     );
   }
 

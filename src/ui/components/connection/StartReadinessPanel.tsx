@@ -101,6 +101,7 @@ const AUTO_EXPAND_GATE_IDS: ReadonlySet<StartReadinessGate['id']> = new Set([
   'currentModeAnchor',
   'framing',
   'frameControls',
+  'wcsState',
 ]);
 
 export function StartReadinessPanel({ readiness }: Props): React.ReactElement | null {

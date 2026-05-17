@@ -1953,6 +1953,17 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     // WiFi connection without the user's awareness.
     wifiStartAllowed &&
     (gates?.baseSafe ?? false);
+  const canResetWcsToBaseline = Boolean(
+    isConnected &&
+    !isRunning &&
+    !displayPaused &&
+    machineState &&
+    machineState.status === 'idle' &&
+    machineState.errorCode == null &&
+    laserOutputState === 'off' &&
+    activeOperation == null &&
+    controllerRef.current?.applyWcsNormalization,
+  );
   /**
    * T1-96: structured Start-button readiness for the diagnostics panel.
    *
@@ -2569,11 +2580,15 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     isRunning,
     displayPaused,
     startReadiness,
+    canResetWcsToBaseline,
     startButtonLabel: !requireFrame && !hasFramed.current && userModeGatePolicy.startWithoutFramingLabel
       ? userModeGatePolicy.startWithoutFramingLabel
       : undefined,
     onFrame: () => { void handleFrameSafe(); },
     onStartJob: () => { void handleStartJob(); },
+    onResetWcsToBaseline: () => {
+      controllerRef.current?.applyWcsNormalization?.();
+    },
     onPauseResume: () => { void handlePauseResume(); },
     onStop: () => { void handleStop(); },
   });

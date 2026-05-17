@@ -212,7 +212,7 @@ void (async () => {
     message = (e as Error).message ?? '';
   }
   assert(threw, 'startValidatedJob throws when recovery is non-none');
-  assert(/recovery is incomplete/i.test(message),
+  assert(/recovery is still active/i.test(message),
     `error message names recovery (got: '${message.slice(0, 80)}...')`);
   assert(/alarm/i.test(message),
     'error message includes the recovery status name');

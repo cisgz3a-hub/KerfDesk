@@ -122,8 +122,8 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     'laserState',
     'noActiveOperation',
     'noControllerError',
-    'recoveryComplete',
     'wcsState',
+    'recoveryComplete',
     'connectionTrust',
   ];
   const r = buildStartReadiness(happy());
@@ -708,6 +708,10 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     });
     const g = r.gates.find((g) => g.id === 'recoveryComplete');
     assert(g?.status === 'fail', 'recoveryAllowsStart=false: recoveryComplete fails');
+    assert(
+      !/Recovery checklist incomplete/i.test(`${g?.failHeadline ?? ''} ${g?.failAction ?? ''}`),
+      'recoveryAllowsStart=false: recovery gate no longer shows dead-end checklist wording',
+    );
   }
 
   {
@@ -742,6 +746,24 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     assert(r.gates.find((g) => g.id === 'recoveryComplete')?.status === 'ok',
       'happy: recoveryComplete ok');
   }
+}
+
+// -------- 19. WCS reset is surfaced before recovery copy when both block Start --------
+{
+  const noop = () => {};
+  const r = buildStartReadiness({
+    ...happy(),
+    placementUncertain: true,
+    placementUncertainReason: 'missing_g54',
+    recoveryAllowsStart: false,
+    canStartJob: false,
+    onResetWcsToBaseline: noop,
+  });
+  const wcs = r.gates.find((g) => g.id === 'wcsState');
+  assert(r.blockingGate?.id === 'wcsState',
+    `WCS reset should be first blocking action when WCS and recovery both fail (got ${r.blockingGate?.id})`);
+  assert(wcs?.failActionButton?.onClick === noop,
+    'WCS gate keeps the reset-to-baseline action while recovery state also blocks Start');
 }
 
 // -------- Source-level pin: ConnectionPanelMain delegates --------

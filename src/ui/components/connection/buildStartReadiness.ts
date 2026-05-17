@@ -317,18 +317,18 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
         : 'Controller reported an error',
       failAction: 'Read the controller log and clear the error before starting',
     },
+    wcsStateGate(input),
     {
       id: 'recoveryComplete',
-      label: 'Recovery checklist complete',
+      label: 'Machine recovery confirmed',
       status: input.recoveryPending || !input.recoveryAllowsStart ? 'fail' : 'ok',
       failHeadline: input.recoveryPending
         ? 'Previous-session unsafe state pending'
-        : 'Recovery checklist incomplete',
+        : 'Machine recovery still needs confirmation',
       failAction: input.recoveryPending
         ? 'Acknowledge the recovery dialog that appeared at startup, or open Settings > Recovery'
-        : 'Open the recovery banner above and complete each required step',
+        : 'Use the recovery banner controls before starting a job',
     },
-    wcsStateGate(input),
     {
       id: 'connectionTrust',
       label: `Connection trust (${input.wifiTrust.label})`,
