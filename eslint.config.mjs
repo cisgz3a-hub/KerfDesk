@@ -12,6 +12,7 @@ export default tseslint.config(
       'dist/**',
       'dist-electron/**',
       'release/**',
+      'audit/external/**',
       'node_modules/**',
     ],
   },
