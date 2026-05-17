@@ -197,7 +197,25 @@ async function run(): Promise<void> {
   await ctrl.disconnect();
 }
 
-// ── 7. Source-level pin: _positionConfirmed flag + simulation shape ──
+// ── 7. Same-block G91 + motion must still simulate and reject ──
+{
+  const port = port400x300();
+  port.open();
+  const ctrl = new GrblController();
+  await ctrl.connect(port);
+  await flush(30);
+  let err: string | null = null;
+  try {
+    await ctrl.sendJob(['G21', 'G91 G0 X9999', 'M2']);
+  } catch (e: unknown) {
+    err = e instanceof Error ? e.message : String(e);
+  }
+  assert(err != null, 'same-block G91 G0 X9999 → reject (mode word plus motion is not skipped)');
+  assert(/X=9999/.test(err ?? ''), 'same-block relative rejection reports accumulated X position');
+  await ctrl.disconnect();
+}
+
+// ── 8. Source-level pin: _positionConfirmed flag + simulation shape ──
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

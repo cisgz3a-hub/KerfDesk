@@ -72,16 +72,11 @@ export function checkGrblJobBoundsChunk(
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (/^G91\b/i.test(line)) {
-      state.relative = true;
-      continue;
-    }
-    if (/^G90\b/i.test(line)) {
-      state.relative = false;
-      continue;
+    for (const modeMatch of line.matchAll(/\bG(90|91)\b/gi)) {
+      state.relative = modeMatch[1] === '91';
     }
 
-    if (!/^\s*G0\d*\b/i.test(line) && !/^\s*G1\d*\b/i.test(line)) continue;
+    if (!/\bG0\d*\b/i.test(line) && !/\bG1\d*\b/i.test(line)) continue;
 
     const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
     const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
