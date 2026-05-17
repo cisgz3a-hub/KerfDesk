@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 497 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 734 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 737 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 658 | - |
+| `tests/` | 661 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -971,6 +971,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/laser-mode-banner.test.tsx`
 - `tests/last-machine-position.test.ts`
 - `tests/layer-panel-styles.test.ts`
+- `tests/layer-panel-tabs-entitlement.test.ts`
 - `tests/layer-transforms.test.ts`
 - `tests/lf004-spooled-compile-materialization.test.ts`
 - `tests/license-status-machine.test.ts`
@@ -992,6 +993,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/machine-service-emergency-stop-safety-result.test.ts`
 - `tests/machine-service-helpers.test.ts`
 - `tests/machine-service-job-lifecycle-safety.test.ts`
+- `tests/machine-service-job-log-checkpoint-wiring.test.ts`
 - `tests/machine-service-jog-respects-mutex.test.ts`
 - `tests/machine-service-known-port-reuse.test.ts`
 - `tests/machine-service-laser-state-subscription.test.ts`
@@ -1079,6 +1081,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/preflight-template-validation.test.ts`
 - `tests/preflight-validator-dialect-routing.test.ts`
 - `tests/preflight-warning-confirm-includes-detail.test.ts`
+- `tests/preflight-z-axis-bounds.test.ts`
 - `tests/preflight.test.ts`
 - `tests/preset-ops-helpers.test.ts`
 - `tests/production-bundle-smoke.test.ts`
