@@ -192,36 +192,73 @@ void (async () => {
     assert(log.sim.length === 0, 'no controller → no simulator notify from deadman');
   }
 
-  // ── 5. Re-entry resets the timer (only second beginTestFire's expiry fires) ─
+  // ── 5. Re-entry is refused while the first deadman protects active laser-on ─
   {
     const log: SentLog = { sent: [], sim: [] };
     const coord = makeCoord(makeMockController(log.sent), log, 80);
 
-    await coord.beginTestFire({ maxSpindle: 1000 });
+    const first = await coord.beginTestFire({ maxSpindle: 1000 });
+    assert(first === true, 'first beginTestFire succeeds');
 
     // After 50ms (before the first deadman expires), call begin again.
-    // The first timer must be cleared — only the second timer's expiry should fire.
+    // The active test-fire keeps its original lease + deadman; a second begin
+    // must not mint a fresh lease that can later be released while the first
+    // laser-on interval is still pending.
     await wait(50);
-    await coord.beginTestFire({ maxSpindle: 1000 });
-
-    // At t=70ms, the first timer would have fired (80ms from t=0). Verify M5 not
-    // yet sent — proves the first timer was cleared on re-entry.
-    await wait(20);
+    const second = await coord.beginTestFire({ maxSpindle: 1000 });
+    assert(second === false, 'second beginTestFire is refused while active');
     assert(
-      log.sent.filter(c => c === 'M5 S0').length === 0,
-      're-entry cleared the first deadman (no early M5)',
+      log.sent.filter(c => c === 'M3 S50').length === 1,
+      're-entry does not send a second M3',
     );
 
-    // The second timer was armed at t=50 with 80ms duration → expires at t=130.
-    // Wait until t≈150ms total to confirm exactly one M5 from the second timer.
+    // The original timer still owns the stop guarantee and fires once.
     await wait(80);
     assert(
       log.sent.filter(c => c === 'M5 S0').length === 1,
-      'second deadman fired exactly once',
+      'original deadman fired exactly once after refused re-entry',
     );
   }
 
-  // ── 6. endTestFire is idempotent: safe to call without an active fire ──
+  // ── 6. Failed re-entry cannot leave the operation mutex idle while laser is on ──
+  {
+    const sent: string[] = [];
+    let allowTestFire = true;
+    const controller = makeMockController(sent);
+    controller.operations.testFire = async (args: { powerPercent: number; maxSpindle: number }) => {
+      if (!allowTestFire) return { ok: false as const, reason: 'blocked', message: 'blocked' };
+      sent.push(`M3 S${Math.max(0, Math.round((args.powerPercent / 100) * args.maxSpindle))}`);
+      return { ok: true as const };
+    };
+    const controllerRef = { current: controller } as { current: LaserController | null };
+    const svc = new MachineService(
+      controllerRef as { current: LaserController },
+      { current: null } as { current: SerialPortLike | null },
+    );
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: () => {} },
+      testFireDeadmanMs: 80,
+    });
+
+    const first = await coord.beginTestFire({ maxSpindle: 1000 });
+    assert(first === true, 'first beginTestFire succeeds before failed re-entry');
+    assert(svc.getActiveOperation()?.kind === 'testFire', 'testFire mutex held after first begin');
+
+    allowTestFire = false;
+    const second = await coord.beginTestFire({ maxSpindle: 1000 });
+    assert(second === false, 'failed re-entry returns false');
+    assert(
+      svc.getActiveOperation()?.kind === 'testFire',
+      'failed re-entry leaves the original testFire mutex held',
+    );
+
+    await wait(120);
+    assert(svc.getActiveOperation() === null, 'deadman releases the mutex after laser-off');
+  }
+
+  // ── 7. endTestFire is idempotent: safe to call without an active fire ──
   {
     const log: SentLog = { sent: [], sim: [] };
     const coord = makeCoord(makeMockController(log.sent), log, 50);

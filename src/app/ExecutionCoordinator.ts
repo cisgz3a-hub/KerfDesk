@@ -400,11 +400,13 @@ export class ExecutionCoordinator {
   async beginTestFire(args: { maxSpindle: number }): Promise<boolean> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return false;
+    if (this._testFireLease !== null || this._testFireTimerHandle !== null) {
+      return false;
+    }
     // T2-11: acquire the mutex before issuing the M3 + arming the deadman.
-    // Re-entry: same-kind acquire returns a fresh lease (T1-222 — the
-    // sessionId is bumped on every successful acquire, so an old
-    // deadman's stale-release becomes a silent no-op). Different-kind
-    // acquire fails; beginTestFire returns false same as no-controller.
+    // Re-entry is refused above while a test-fire is already active. That
+    // keeps the original deadman + lease intact until endTestFire or the
+    // deadman path confirms laser-off.
     const lease = this.deps.machineService.tryAcquireOperation('testFire');
     if (lease == null) {
       return false;
@@ -444,15 +446,10 @@ export class ExecutionCoordinator {
     // job-start gates and the laser-output-state surface stay accurate.
     this.deps.machineService.notifyTestFire('begin');
     // T1-222: store the lease so endTestFire and the deadman timer
-    // closure below release the SAME lease. If beginTestFire is
-    // re-entered (a second click) the new lease overwrites this
-    // field — the old timer was clearTimeout'd, so its closure never
-    // runs to release the stale lease anyway, but the lease swap
-    // keeps endTestFire releasing the freshest round.
+    // closure below release the SAME lease.
     this._testFireLease = lease;
     // Arm the deadman synchronously after the laser-on command succeeds so there is no window
-    // in which the laser is on but the auto-stop is unscheduled. Re-entry: clear
-    // any prior handle first (a second beginTestFire resets the timer).
+    // in which the laser is on but the auto-stop is unscheduled.
     if (this._testFireTimerHandle !== null) {
       clearTimeout(this._testFireTimerHandle);
       this._testFireTimerHandle = null;
@@ -474,6 +471,9 @@ export class ExecutionCoordinator {
       // lease will silently no-op inside releaseOperation — the
       // fresh round's mutex is preserved.
       void this.emergencyLaserOff().finally(() => {
+        if (this._testFireLease === lease) {
+          this._testFireLease = null;
+        }
         this.deps.machineService.releaseOperation(lease);
       });
     }, deadmanMs);
