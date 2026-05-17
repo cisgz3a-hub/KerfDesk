@@ -325,6 +325,8 @@ export interface CompileGcodeResult {
   failedTextObjects: string[];
   /** Execution-contract ticket (phase 1: built here; consumed by later phases). */
   ticket: ValidatedJobTicket;
+  /** True when emitted output contains M4 dynamic-power laser mode. */
+  outputUsesM4: boolean;
 }
 
 export interface CompileToolpathResult {
@@ -347,6 +349,7 @@ export interface CompileOptions {
   signal?: AbortSignal;
   onProgress?: (event: CompileProgress) => void;
   controllerCapabilities?: ControllerCapabilities;
+  gcodeMaterialization?: 'full' | 'ticket-only';
 }
 
 export interface CompileProgress {
@@ -412,6 +415,36 @@ async function* canonicalGcodeStream(source: AsyncIterable<GcodeChunk>): AsyncGe
     };
     if (chunk.isLast) break;
   }
+}
+
+async function materializeGcodeSpool(
+  spool: SpoolHandle,
+  signal?: AbortSignal,
+): Promise<{ gcode: string; gcodeLines: readonly string[] }> {
+  const streamed = await collectStreamingOutput(spool.open({ signal }), signal);
+  if (!streamed.sawLast) {
+    throw new Error('Streaming G-code generation ended before the terminal chunk.');
+  }
+  const gcodeLines = streamed.lines.map(line => line.trim()).filter(line => line.length > 0);
+  const gcode = gcodeLines.join('\n');
+  assertMaterializedGcodeWithinLimit(gcode);
+  if (gcodeLines.length > MAX_MATERIALIZED_GCODE_LINES) {
+    throw new Error(
+      `Generated G-code has ${gcodeLines.length.toLocaleString('en-US')} lines, exceeding `
+      + `the current materialized pipeline limit of ${MAX_MATERIALIZED_GCODE_LINES.toLocaleString('en-US')} lines. `
+      + `Reduce raster DPI, simplify paths, or split this into smaller jobs.`,
+    );
+  }
+  return { gcode, gcodeLines };
+}
+
+async function streamUsesM4(spool: SpoolHandle, signal?: AbortSignal): Promise<boolean> {
+  for await (const chunk of spool.open({ signal })) {
+    if (signal?.aborted) break;
+    if (chunk.lines.some(line => /\bM4\b/i.test(line))) return true;
+    if (chunk.isLast) break;
+  }
+  return false;
 }
 
 /**
@@ -575,8 +608,11 @@ export async function compileGcode(
       reportPhase(opts, 'output', event.fraction, event.detail ?? 'Emitting G-code');
     },
   };
-  let gcode: string | null = null;
+  const gcodeMaterialization = opts.gcodeMaterialization ?? 'full';
+  let gcode = '';
+  let gcodeLines: readonly string[] = [];
   let gcodeSpool: SpoolHandle | null = null;
+  let outputUsesM4 = false;
   if (typeof strategy.generateGcode === 'function') {
     const ticketId = generateTicketId();
     let reportSpoolBuildProgress = true;
@@ -596,25 +632,27 @@ export async function compileGcode(
       { signal: opts.signal },
     );
     reportSpoolBuildProgress = false;
-    throwIfAborted(opts.signal);
-    const streamed = await collectStreamingOutput(
-      gcodeSpool.open({ signal: opts.signal }),
-      opts.signal,
-    );
-    throwIfAborted(opts.signal);
-    if (!streamed.sawLast) {
-      throw new Error('Streaming G-code generation ended before the terminal chunk.');
+    if (gcodeMaterialization === 'full') {
+      throwIfAborted(opts.signal);
+      const materialized = await materializeGcodeSpool(gcodeSpool, opts.signal);
+      throwIfAborted(opts.signal);
+      gcode = materialized.gcode;
+      gcodeLines = materialized.gcodeLines;
+      outputUsesM4 = /\bM4\b/i.test(gcode);
+    } else {
+      outputUsesM4 = await streamUsesM4(gcodeSpool, opts.signal);
     }
-    gcode = streamed.lines.join('\n');
   } else {
     const output = strategy.generate(machineTransform.plan, job, gcodeOptions);
-    gcode = output.text;
+    gcode = output.text ?? '';
+    gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    outputUsesM4 = /\bM4\b/i.test(gcode);
   }
-  if (!gcode) return null;
-  assertMaterializedGcodeWithinLimit(gcode);
+  if (gcodeMaterialization === 'full' && !gcode) return null;
+  if (gcodeMaterialization === 'ticket-only' && !gcodeSpool && !gcode) return null;
   reportPhase(opts, 'output', 1);
 
-  const gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  if (gcode) assertMaterializedGcodeWithinLimit(gcode);
   if (gcodeLines.length > MAX_MATERIALIZED_GCODE_LINES) {
     throw new Error(
       `Generated G-code has ${gcodeLines.length.toLocaleString('en-US')} lines, exceeding `
@@ -714,6 +752,7 @@ export async function compileGcode(
     canvasPlanBounds,
     failedTextObjects,
     ticket,
+    outputUsesM4,
   };
 }
 

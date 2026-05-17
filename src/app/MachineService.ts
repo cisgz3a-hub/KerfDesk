@@ -992,7 +992,7 @@ export class MachineService {
       });
     }
 
-    const legacyLines = ticket.gcodeSpool ? null : [...ticket.gcodeLines];
+    const legacyLines = ticket.gcodeSpool ? null : [...(ticket.gcodeLines ?? [])];
     const jobLineCount = ticket.gcodeSpool?.lineCount ?? (legacyLines?.length ?? 0);
     if (legacyLines) {
       const streamableLines = legacyLines

@@ -243,8 +243,12 @@ export function runPreflightSummary(
    * change behaviour. Production caller (ConnectionPanelMain)
    * computes the flag via `bedDimensionsKnown(profile,
    * controllerBed)` in PipelineService.
-   */
+  */
   bedDimensionsKnown: boolean = true,
+  compiledOutput?: {
+    readonly hasGcode?: boolean;
+    readonly outputUsesM4?: boolean;
+  },
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   // T1-218: when the caller signals the bed dimensions are
@@ -282,11 +286,11 @@ export function runPreflightSummary(
           ? savedOriginForPreflight ?? null
           : null,
     machineAlarmCode: machineState?.alarmCode ?? null,
-    hasGcode: gcode != null && gcode.length > 0,
+    hasGcode: compiledOutput?.hasGcode ?? (gcode != null && gcode.length > 0),
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
     emittedGcode: gcode,
-    outputUsesM4: gcode != null && /\bM4\b/i.test(gcode),
+    outputUsesM4: compiledOutput?.outputUsesM4 ?? (gcode != null && /\bM4\b/i.test(gcode)),
     gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {
       bedWidthMm: bedWidth > 0 ? bedWidth : undefined,

@@ -24,8 +24,9 @@
  * `collectStreamingOutput`) so the migration has a stable target.
  * After T3-34's chunked GRBL output slice, `BaseGCodeStrategy`
  * implements `generateGcode(...)`; `PipelineService.compileGcode` drains
- * that iterable through `collectStreamingOutput` when a strategy
- * supports it. The first T3-15 spool slices added replayable
+ * that iterable through `collectStreamingOutput` only for explicit
+ * materialized export/preview paths. The first T3-15 spool slices added
+ * replayable
  * `ValidatedJobTicket.gcodeSpool` metadata and a `ControllerOutput`
  * `gcode-stream` handoff, so MachineService can pass a spool to the
  * controller boundary without inventing a second ticket model. The GRBL
@@ -34,16 +35,17 @@
  * simulator fan-out from the spool without reading legacy
  * `ticket.gcodeLines` on the spooled start path. Streaming strategies
  * now also build ticket spools directly from `generateGcode(...)`
- * instead of from the already-split legacy line array, and compile
- * materializes its temporary legacy text by reopening that spool instead
- * of running the strategy a second time. Ticket validation now prefers
+ * instead of from the already-split legacy line array. Explicit
+ * materialized callers reopen that spool instead of running the
+ * strategy a second time. Ticket validation now prefers
  * the spool content hash over legacy `gcodeText`; compile-time burn
  * envelope/divergence analysis and MachineService job-time estimation
  * consume the spool stream, and the GRBL firmware adapter emits a
  * replayable `gcode-stream` artifact. The remaining T3-15 work is still
- * real: `gcodeText` / `gcodeLines`, compile-time text collection,
- * preview parsing, and legacy `sendJob(string[])` still materialize full
- * jobs until those callers move fully onto spool handles.
+ * real: export/preview text collection and legacy `sendJob(string[])`
+ * can still materialize full jobs until those callers move fully onto
+ * spool handles, but the device-start ticket path no longer drains a
+ * newly created spool back into `gcodeText` / `gcodeLines`.
  *
  * Pairs with T3-44 (multi-domain progress already shipped — the
  * progress shape supports byte-domain upload progress that a

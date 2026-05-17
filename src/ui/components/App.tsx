@@ -369,6 +369,7 @@ export function App(): React.ReactElement {
     currentGcode,
     setCurrentGcode,
     compileGcode,
+    compileMaterializedGcode,
     compileToolpath,
     gcodeStale,
     setGcodeStale,
@@ -396,21 +397,21 @@ export function App(): React.ReactElement {
     () => resolveFrameSceneBounds({
       outputBounds: outputSceneBounds,
       compiledCanvasBurnBounds:
-        !gcodeStale && currentGcode && lastResult ? lastResult.canvasBurnBounds ?? null : null,
+        !gcodeStale && lastResult ? lastResult.canvasBurnBounds ?? null : null,
       compiledCanvasPlanBounds:
-        !gcodeStale && currentGcode && lastResult ? lastResult.canvasPlanBounds : null,
-      hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
+        !gcodeStale && lastResult ? lastResult.canvasPlanBounds : null,
+      hasFreshCompile: !gcodeStale && lastResult != null,
     }),
-    [outputSceneBounds, gcodeStale, currentGcode, lastResult],
+    [outputSceneBounds, gcodeStale, lastResult],
   );
 
   const frameTransformBounds = useMemo(
     () => resolveFrameTransformBounds({
       outputBounds: outputSceneBounds,
       compiledCanvasPlanBounds: lastResult?.canvasPlanBounds ?? null,
-      hasFreshCompile: !gcodeStale && Boolean(currentGcode) && lastResult != null,
+      hasFreshCompile: !gcodeStale && lastResult != null,
     }),
-    [outputSceneBounds, gcodeStale, currentGcode, lastResult],
+    [outputSceneBounds, gcodeStale, lastResult],
   );
   const connectionPanelBoundsProps = useMemo(
     () => resolveConnectionPanelBoundsProps({ sceneBounds, frameTransformBounds }),
@@ -419,7 +420,7 @@ export function App(): React.ReactElement {
   const connectionPanelMachinePlanBounds = resolveConnectionPanelMachinePlanBounds({
     activeJobPlanBounds: activeJobTransform?.plan.bounds ?? null,
     gcodeStale,
-    currentGcode,
+    hasFreshCompile: lastResult != null,
     compiledMachinePlanBounds: lastResult?.machinePlanBounds ?? null,
   });
 
@@ -1421,7 +1422,7 @@ export function App(): React.ReactElement {
 
     React.createElement(FileToolbar, buildAppFileToolbarProps({
       scene,
-      compileGcode,
+      compileGcode: compileMaterializedGcode,
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,

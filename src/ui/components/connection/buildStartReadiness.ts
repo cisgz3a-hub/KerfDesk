@@ -43,6 +43,7 @@ export interface BuildStartReadinessInput {
   readonly activeOperation: ActiveOperationState | null;
   readonly recoveryPending: boolean;
   readonly gcode: string | null;
+  readonly hasCompiledGcode?: boolean;
   readonly gcodeStale: boolean;
   readonly isSimulator: boolean;
   readonly machineBlocksJobStart: boolean;
@@ -185,6 +186,7 @@ function frameControlBlockedHeadline(input: BuildStartReadinessInput): string {
 }
 
 export function buildStartReadiness(input: BuildStartReadinessInput): StartReadiness {
+  const hasCompiledGcode = input.hasCompiledGcode ?? Boolean(input.gcode);
   const blockerCount = input.preflight?.blockers ?? 0;
   const warningCount = input.preflight?.warnings ?? 0;
   const preflightDetails = (input.preflight?.issues ?? [])
@@ -206,14 +208,14 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
     {
       id: 'gcodeCompiled',
       label: 'G-code compiled',
-      status: input.gcode ? 'ok' : 'fail',
+      status: hasCompiledGcode ? 'ok' : 'fail',
       failHeadline: 'No G-code yet',
       failAction: 'Click G-code in the toolbar to compile this design',
     },
     {
       id: 'gcodeFresh',
       label: 'G-code matches current design',
-      status: !input.gcode ? 'pending' : (input.gcodeStale ? 'fail' : 'ok'),
+      status: !hasCompiledGcode ? 'pending' : (input.gcodeStale ? 'fail' : 'ok'),
       failHeadline: 'Design changed since last compile',
       failAction: 'Click ↻ Update above to recompile',
     },

@@ -54,7 +54,7 @@ assert(
   resolveConnectionPanelMachinePlanBounds({
     activeJobPlanBounds: activeJobBounds,
     gcodeStale: false,
-    currentGcode: 'G0 X1',
+    hasFreshCompile: true,
     compiledMachinePlanBounds: compiledBounds,
   }) === activeJobBounds,
   'resolveConnectionPanelMachinePlanBounds prefers active job bounds',
@@ -64,7 +64,7 @@ assert(
   resolveConnectionPanelMachinePlanBounds({
     activeJobPlanBounds: null,
     gcodeStale: false,
-    currentGcode: 'G0 X1',
+    hasFreshCompile: true,
     compiledMachinePlanBounds: compiledBounds,
   }) === compiledBounds,
   'resolveConnectionPanelMachinePlanBounds uses fresh compiled bounds',
@@ -74,7 +74,7 @@ assert(
   resolveConnectionPanelMachinePlanBounds({
     activeJobPlanBounds: null,
     gcodeStale: true,
-    currentGcode: 'G0 X1',
+    hasFreshCompile: true,
     compiledMachinePlanBounds: compiledBounds,
   }) === null,
   'resolveConnectionPanelMachinePlanBounds ignores compiled bounds when G-code is stale',
@@ -84,10 +84,10 @@ assert(
   resolveConnectionPanelMachinePlanBounds({
     activeJobPlanBounds: null,
     gcodeStale: false,
-    currentGcode: '',
+    hasFreshCompile: false,
     compiledMachinePlanBounds: compiledBounds,
   }) === null,
-  'resolveConnectionPanelMachinePlanBounds requires current G-code before using compiled bounds',
+  'resolveConnectionPanelMachinePlanBounds requires a fresh compile before using compiled bounds',
 );
 
 assert(

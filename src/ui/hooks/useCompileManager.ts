@@ -38,6 +38,7 @@ export interface UseCompileManagerResult {
   currentGcode: string | null;
   setCurrentGcode: React.Dispatch<React.SetStateAction<string | null>>;
   compileGcode: (targetScene: Scene) => Promise<string | null>;
+  compileMaterializedGcode: (targetScene: Scene) => Promise<string | null>;
   compileToolpath: (targetScene: Scene) => Promise<readonly Move[] | null>;
   /**
    * Full Scene → Job → Plan → machine transform → G-code pipeline, without mutating
@@ -219,6 +220,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
           profileSnapshot,
           {
             signal: abortController.signal,
+            gcodeMaterialization: 'ticket-only',
             onProgress: (event) => {
               if (requestId === compileRequestIdRef.current) {
                 setCompileProgress(event);
@@ -269,6 +271,40 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     ],
   );
 
+  const compileMaterializedGcode = useCallback(
+    async (targetScene: Scene): Promise<string | null> => {
+      if (isJobRunning) {
+        console.warn('[useCompileManager] compileMaterializedGcode suppressed: job is running');
+        return null;
+      }
+      const profileSnapshot = getActiveProfile();
+      try {
+        const result = await pipelineCompileGcode(
+          targetScene,
+          startMode,
+          savedOriginRef.current,
+          controllerMaxSpindle,
+          outputFormat,
+          machineBedFromControllerRef.current,
+          controllerAccelMmPerS2,
+          profileSnapshot,
+          { gcodeMaterialization: 'full' },
+        );
+        return result?.gcode ?? null;
+      } catch (err) {
+        console.error('G-code materialization failed:', err);
+        return null;
+      }
+    },
+    [
+      startMode,
+      controllerMaxSpindle,
+      outputFormat,
+      controllerAccelMmPerS2,
+      isJobRunning,
+    ],
+  );
+
   const compileToolpath = useCallback(async (targetScene: Scene): Promise<readonly Move[] | null> => {
     if (isJobRunning) {
       console.warn('[useCompileManager] compileToolpath suppressed: job is running');
@@ -290,6 +326,7 @@ export function useCompileManager(options: UseCompileManagerOptions): UseCompile
     currentGcode,
     setCurrentGcode,
     compileGcode,
+    compileMaterializedGcode,
     compileToolpath,
     compileToResult,
     gcodeStale,

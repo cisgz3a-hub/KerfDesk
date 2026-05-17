@@ -409,6 +409,7 @@ export function ConnectionPanelMain({
   const preflightGcodeHeaderTemplate = activeProfile?.gcodeHeaderTemplate ?? null;
   const unsafeAtConnectVerdict = controllerRef.current?.getUnsafeAtConnect?.() ?? null;
   const unsafeAtConnectReason = unsafeAtConnectVerdict?.reason ?? null;
+  const hasCompiledGcode = compiledJobTicket != null && lastGcodeCompileResult != null;
 
   useEffect(() => {
     const ctrlMaxSpindle = controllerRef.current?.maxSpindle;
@@ -428,6 +429,10 @@ export function ConnectionPanelMain({
       // T1-218 (v30 audit #1): tell preflight whether the bed
       // dimensions are real or a 300mm fallback.
       bedDimensionsKnown,
+      {
+        hasGcode: hasCompiledGcode,
+        outputUsesM4: lastGcodeCompileResult?.outputUsesM4,
+      },
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;
@@ -451,6 +456,8 @@ export function ConnectionPanelMain({
     preflightPlanMaxX,
     preflightPlanMaxY,
     preflightGcodeHeaderTemplate,
+    hasCompiledGcode,
+    lastGcodeCompileResult?.outputUsesM4,
     unsafeAtConnectReason,
     compiledJobTicket,
     startMode,
@@ -1114,7 +1121,6 @@ export function ConnectionPanelMain({
     stopTestFire();
 
     const ticket = preflightResult.ticket?.ticket ?? compiledJobTicket;
-    const lines = ticket.gcodeLines;
     if (!lastGcodeCompileResult) {
       setMessages(prev => [
         ...prev,
@@ -1131,7 +1137,9 @@ export function ConnectionPanelMain({
       await showAlert('Cannot start job', 'The compile output is out of date for this ticket. Recompile, then start.');
       return;
     }
-    if (startMode === 'current' && gcode && estimateJobTime(gcode).totalSeconds > 5 * 60) {
+    const estimatedSecondsForTip =
+      gcode ? estimateJobTime(gcode).totalSeconds : (lastGcodeCompileResult.machineTransform.plan.stats.estimatedTimeSeconds ?? null);
+    if (startMode === 'current' && (estimatedSecondsForTip ?? 0) > 5 * 60) {
       let shouldShowProductionTip = true;
       try {
         shouldShowProductionTip = localStorage.getItem(CURRENT_MODE_LONG_JOB_TIP_KEY) !== 'true';
@@ -1153,7 +1161,7 @@ export function ConnectionPanelMain({
     }
     setMessages(prev => [
       ...prev,
-      `Starting job: ${lines.length} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
+      `Starting job: ${ticket.gcodeSpool?.lineCount ?? ticket.gcodeLines?.length ?? 0} commands (readiness: ${preflight?.score ?? '?'}%, ticket ${ticket.ticketId})`,
     ]);
     setJobFailedRecoveryMessage(null);
     const jobStartPosition = captureLastJobStartPosition(machinePosition ?? machineState?.position ?? null);
@@ -1920,7 +1928,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
   // recovery state), so consolidating here makes the safety story
   // legible and prevents drift if any upstream gate weakens.
   const canStartJob =
-    !!gcode &&
+    hasCompiledGcode &&
     !isRunning &&
     !!preflight?.canStart &&
     !gcodeStale &&
@@ -1967,6 +1975,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     activeOperation,
     recoveryPending,
     gcode,
+    hasCompiledGcode,
     gcodeStale,
     isSimulator,
     machineBlocksJobStart,
@@ -2088,7 +2097,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     ? 'Ready to cut!'
     : isRunning
       ? 'Running'
-      : !gcode
+      : !hasCompiledGcode
         ? 'Compile G-code first'
         : gcodeStale
           ? 'Recompile G-code (design changed)'
@@ -2096,13 +2105,16 @@ void executionCoordinator.beginTestFire({ maxSpindle })
             ? 'Fix issues below first'
             : 'Prepare job';
   const jobTimeEstimate = useMemo(() => gcode ? estimateJobTime(gcode) : null, [gcode]);
-  const estimatedTimeFormatted = jobTimeEstimate?.formatted ?? null;
+  const planEstimatedTimeSeconds = lastGcodeCompileResult?.machineTransform.plan.stats.estimatedTimeSeconds ?? null;
+  const estimatedTimeFormatted = jobTimeEstimate?.formatted
+    ?? (planEstimatedTimeSeconds == null ? null : formatJobTime(planEstimatedTimeSeconds));
   const jobComplexitySummary = useMemo(() => buildJobComplexitySummary({
     gcodeText: gcode,
-    estimatedTimeSeconds: jobTimeEstimate?.totalSeconds ?? null,
+    commandCount: lastGcodeCompileResult?.ticket.gcodeSpool?.lineCount ?? null,
+    estimatedTimeSeconds: jobTimeEstimate?.totalSeconds ?? planEstimatedTimeSeconds,
     planStats: lastGcodeCompileResult?.machineTransform.plan.stats ?? null,
     scene,
-  }), [gcode, jobTimeEstimate?.totalSeconds, lastGcodeCompileResult?.machineTransform.plan.stats, scene]);
+  }), [gcode, jobTimeEstimate?.totalSeconds, lastGcodeCompileResult?.machineTransform.plan.stats, lastGcodeCompileResult?.ticket.gcodeSpool?.lineCount, planEstimatedTimeSeconds, scene]);
   const readyOperationRows = useMemo(() => buildReadyOperationRows(scene), [scene]);
   const readyOperationAnalysis = useMemo(
     () => analyzeOperationOrder(readyOperationRows),
@@ -2713,7 +2725,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     ),
   );
 
-  const readyToRunSection = isConnected && !isRunning && !displayPaused && gcode && !gcodeStale &&
+  const readyToRunSection = isConnected && !isRunning && !displayPaused && hasCompiledGcode && !gcodeStale &&
     React.createElement(ReadyToRunPanel, {
       data: readyToRunData,
       startLabel: `START${isSimulator ? ' (Sim)' : ''}`,

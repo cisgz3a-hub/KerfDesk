@@ -50,11 +50,11 @@ export function resolveConnectionPanelBoundsProps(args: {
 export function resolveConnectionPanelMachinePlanBounds(args: {
   activeJobPlanBounds: AABB | null | undefined;
   gcodeStale: boolean;
-  currentGcode: string | null | undefined;
+  hasFreshCompile: boolean;
   compiledMachinePlanBounds: AABB | null | undefined;
 }): AABB | null {
   if (args.activeJobPlanBounds) return args.activeJobPlanBounds;
-  if (!args.gcodeStale && args.currentGcode && args.compiledMachinePlanBounds) {
+  if (!args.gcodeStale && args.hasFreshCompile && args.compiledMachinePlanBounds) {
     return args.compiledMachinePlanBounds;
   }
   return null;

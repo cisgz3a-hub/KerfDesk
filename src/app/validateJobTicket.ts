@@ -192,7 +192,14 @@ export function validateJobTicket(input: ValidateJobTicketInput): TicketValidati
     }
   }
 
-  const recomputedGcodeHash = ticket.gcodeSpool?.contentHash ?? hashString(ticket.gcodeText);
+  const recomputedGcodeHash = ticket.gcodeSpool?.contentHash
+    ?? (ticket.gcodeText != null ? hashString(ticket.gcodeText) : null);
+  if (recomputedGcodeHash == null) {
+    return {
+      ok: false,
+      reason: 'Ticket is missing G-code output. Recompile to continue.',
+    };
+  }
   if (recomputedGcodeHash !== ticket.gcodeHash) {
     return {
       ok: false,

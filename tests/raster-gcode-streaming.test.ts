@@ -166,9 +166,9 @@ void (async () => {
     check(/GcodeChunk/.test(streamingSrc), 'GcodeStreaming chunk contract remains the output streaming surface');
     check(!/No production code consumes the streaming surface yet/.test(streamingSrc),
       'GcodeStreaming docs no longer claim the streaming surface is unused in production');
-    check(/PipelineService\.compileGcode` drains/.test(streamingSrc),
-      'GcodeStreaming docs name the current partial production consumer');
-    check(/collectStreamingOutput/.test(pipelineSrc), 'PipelineService drains streaming output when available');
+    check(/explicit[\s\S]*materialized export\/preview paths/.test(streamingSrc),
+      'GcodeStreaming docs name the explicit materialized consumer path');
+    check(/gcodeMaterialization/.test(pipelineSrc), 'PipelineService exposes explicit G-code materialization mode');
     check(/generateGcode/.test(pipelineSrc), 'PipelineService calls the streaming output surface');
     check(!/No live consumer of the streaming surface yet|Production memory profile remains at the pre-T3-15 8-stage shape/.test(t315RoadmapBlock),
       'T3-15 roadmap block no longer carries stale no-consumer wording');

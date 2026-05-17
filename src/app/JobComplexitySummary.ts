@@ -33,6 +33,7 @@ export interface JobComplexitySummary {
 
 export interface BuildJobComplexitySummaryInput {
   gcodeText: string | null | undefined;
+  commandCount?: number | null;
   estimatedTimeSeconds?: number | null;
   planStats?: Partial<PlanStats> | null;
   scene?: Scene | null;
@@ -49,7 +50,7 @@ const HIGH_FILL_SPACING_MM = 0.05;
 export function buildJobComplexitySummary(
   input: BuildJobComplexitySummaryInput,
 ): JobComplexitySummary {
-  const commandCount = countGcodeCommands(input.gcodeText);
+  const commandCount = finiteOrNull(input.commandCount) ?? countGcodeCommands(input.gcodeText);
   const estimatedTimeSeconds = resolveEstimatedTimeSeconds(input);
   const rasterProfile = summarizeRasterProfile(input.scene ?? null);
   const rasterDpiEquivalent = rasterProfile.rasterDpiEquivalent;
