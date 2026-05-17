@@ -1149,10 +1149,27 @@ export class GrblController implements GrblControllerApi {
 
   private _handleStreamFillError(err: unknown): void {
     const message = err instanceof Error ? err.message : String(err);
+    const wasJobRunning = this._isJobRunning;
     for (const cb of this._errorListeners) {
       cb(0, `GRBL stream fill failed: ${message}`);
     }
+    if (wasJobRunning) {
+      void this._runControllerOwnedSafetyOff('job-error').then(result => {
+        if (result.stage === 'failed') {
+          console.warn(
+            '[GrblController] stream fill failure: safetyOff returned failed:',
+            result.error,
+          );
+        }
+      }).catch((safetyErr: unknown) => {
+        console.warn('[GrblController] stream fill failure: safetyOff threw unexpectedly:', safetyErr);
+      });
+    }
     this._abortJob();
+    if (wasJobRunning) {
+      this._updateStatus('faulted_requires_inspection');
+      return;
+    }
     this._emitProgress();
   }
 
@@ -2416,7 +2433,12 @@ export class GrblController implements GrblControllerApi {
     if (parsed.stateWord === null) return;
 
     const newStatus = parsed.machineStatus;
-    if (newStatus && this._state.status !== 'disconnected' && this._state.status !== 'connecting') {
+    if (
+      newStatus
+      && this._state.status !== 'disconnected'
+      && this._state.status !== 'connecting'
+      && this._state.status !== 'faulted_requires_inspection'
+    ) {
       if (this._pausePending) {
         if (newStatus === 'hold' || newStatus === 'alarm' || newStatus === 'idle' || newStatus === 'homing' || newStatus === 'check') {
           this._state.status = newStatus;
