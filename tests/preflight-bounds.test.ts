@@ -195,5 +195,23 @@ console.log('\n=== Preflight bounds guardrails ===');
   assert(x != null && x.title.includes('G-code'), 'gcode fallback: negative X uses G-code wording');
 }
 
+{
+  const s = sceneWithRect();
+  const r = runPreflightSummary(s, 'G1 X+450 Y5', idle, 400, 300, null);
+  assert(
+    r.issues.some(i => i.id === 'output-exceed-x' && i.severity === 'blocker'),
+    'gcode fallback: signed positive X beyond bed blocks start',
+  );
+}
+
+{
+  const s = sceneWithRect();
+  const r = runPreflightSummary(s, 'G1 X10 Y10 ; parking note X999 Y999', idle, 400, 300, null);
+  assert(
+    !r.issues.some(i => i.id === 'output-exceed-x' || i.id === 'output-exceed-y'),
+    'gcode fallback: comment-only coordinates do not affect travel bounds',
+  );
+}
+
 console.log(`\nPreflight bounds: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

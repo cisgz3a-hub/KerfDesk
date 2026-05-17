@@ -28,6 +28,17 @@ function pushBedSizeMismatchIfNeeded(
   }
 }
 
+function stripGcodeComments(line: string): string {
+  return line.replace(/;.*$/, '').replace(/\([^)]*\)/g, '');
+}
+
+function readAxisValue(line: string, axis: 'X' | 'Y'): number | null {
+  const match = new RegExp(`${axis}\\s*([+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+))`, 'i').exec(line);
+  if (!match) return null;
+  const value = Number(match[1]);
+  return Number.isFinite(value) ? value : null;
+}
+
 export function runOutputBoundsChecks(ctx: PreflightContext, out: PreflightResult[]): void {
   const rawBounds = ctx.machinePlanBounds;
   if (!rawBounds) return;
@@ -88,15 +99,14 @@ export function runGcodeTravelBoundsChecks(ctx: PreflightContext, out: Preflight
   let minY = Infinity;
   let maxY = -Infinity;
   for (const line of gcode.split('\n')) {
-    const xm = line.match(/X([-\d.]+)/);
-    const ym = line.match(/Y([-\d.]+)/);
-    if (xm) {
-      const x = parseFloat(xm[1]);
+    const uncommentedLine = stripGcodeComments(line);
+    const x = readAxisValue(uncommentedLine, 'X');
+    const y = readAxisValue(uncommentedLine, 'Y');
+    if (x != null) {
       minX = Math.min(minX, x);
       maxX = Math.max(maxX, x);
     }
-    if (ym) {
-      const y = parseFloat(ym[1]);
+    if (y != null) {
       minY = Math.min(minY, y);
       maxY = Math.max(maxY, y);
     }
