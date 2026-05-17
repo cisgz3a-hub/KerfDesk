@@ -28,11 +28,11 @@ function sceneWithRectAt(x: number, y: number): Scene {
   return addObject(scene, createRect(scene.layers[0].id, x, y, 30, 20, 'Rect'));
 }
 
-test('beginner gantry flow recommends framing but does not hard require it', () => {
+test('beginner gantry flow requires framing before start', () => {
   const beginner = computeUserModeGatePolicy('beginner');
-  assert.equal(beginner.requireFrameBeforeStart, false);
-  assert.equal(beginner.allowStartWithoutFraming, true);
-  assert.equal(beginner.startWithoutFramingLabel, 'Start without framing');
+  assert.equal(beginner.requireFrameBeforeStart, true);
+  assert.equal(beginner.allowStartWithoutFraming, false);
+  assert.equal(beginner.startWithoutFramingLabel, null);
 });
 
 test('machine-space bounds suppress raw scene negative/outside-bed blockers', () => {

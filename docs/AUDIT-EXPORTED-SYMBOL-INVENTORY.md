@@ -5640,8 +5640,8 @@ This is the durable no-skip inventory layer for the Phase 4 function-level audit
 
 | Line | Export | Kind | Inputs validated | Failure modes | Side effects docced | Resource lifecycle | Re-entrant / concurrency | Determinism | Unit test evidence | Integration evidence | Notes |
 |---:|---|---|---|---|---|---|---|---|---|---|---|
-| 37 | `ConnectionPanelProps` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
-| 159 | `ConnectionPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 41 | `ConnectionPanelProps` | type | N/A - contract/export surface | N/A | N/A | N/A | N/A | N/A | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
+| 162 | `ConnectionPanel` | function | inventory row - verify at implementation review | inventory row - enumerate on deep review | inventory row - classify pure vs effectful on deep review | N/A unless implementation acquires resources | needs concurrency review | not compile-output unless noted | not auto-matched by filename | not required by inventory | ui-operator-surface; T1-238 inventory row generated 2026-05-13 |
 
 **Findings count for this file:** inventory-only; see dated audit ledgers for findings.
 

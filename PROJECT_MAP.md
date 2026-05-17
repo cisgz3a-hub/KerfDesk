@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 497 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 737 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 738 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 661 | - |
+| `tests/` | 662 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1294,6 +1294,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/wizard-complete-does-not-enable-material.test.tsx`
 - `tests/workflow-panel-derive-mode.test.ts`
 - `tests/workflow-panel-feature-flag.test.ts`
+- `tests/workflow-panel-frame-ticket-start-gate.test.ts`
 - `tests/workflow-panel-phase2-modes.test.ts`
 - `tests/workflow-panel-phase3-setup.test.ts`
 - `tests/workflow-panel-phase4-live-job.test.ts`

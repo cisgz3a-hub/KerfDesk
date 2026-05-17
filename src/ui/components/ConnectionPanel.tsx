@@ -28,7 +28,11 @@ import { estimateJobTime } from '../../core/output/TimeEstimator';
 // helpers here.
 import { buildFrameCorners } from '../../app/frameGcode';
 import { estimateFrameIdleTimeoutMs } from '../../app/grblIdlePoll';
-import { createUnframedStartOverrideTicket } from '../../app/FrameState';
+import {
+  createFramedStartTicket,
+  validateFrameTicketForStart,
+  type FrameTicket,
+} from '../../app/FrameState';
 import {
   resolveFrameDotFeedRate,
   resolveFrameLineDelayMs,
@@ -143,18 +147,17 @@ function useWorkflowPanelV2Flag(): boolean {
 }
 
 /**
- * T1-213: WorkflowPanel routing temporarily disabled at the user's
- * request — they preferred the legacy layout and asked to "go back
- * to that one and make some adjustments." The WorkflowPanel code,
- * feature-flag plumbing, and adapter all remain in the tree (the
- * flag still round-trips through localStorage; tests still pass)
- * but ConnectionPanel always renders the legacy panel here.
+ * T1-213 follow-up: WorkflowPanel routing is feature-flag controlled.
+ * Default storage stays false, so existing users remain on the legacy
+ * panel. The WorkflowPanel code, feature-flag plumbing, and adapter
+ * remain in the tree, and the flag still round-trips through
+ * localStorage. ConnectionPanel keeps the legacy panel as the default
+ * path.
  *
- * To re-enable the routing during a future revisit, change this
- * constant to `true` and the existing
- * `useWorkflowPanelV2Flag` subscription is reinstated.
+ * When explicitly enabled, Start still requires framed-ticket proof
+ * before the adapter can stream a job.
  */
-const WORKFLOW_PANEL_V2_ENABLED = false;
+const WORKFLOW_PANEL_V2_ENABLED = true;
 
 export function ConnectionPanel(props: ConnectionPanelProps) {
   const activeProfile = useActiveProfile();
@@ -339,6 +342,13 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const compileResult = props.lastGcodeCompileResult ?? null;
   const compiledTicket = props.compiledJobTicket ?? compileResult?.ticket ?? null;
   const startMode = props.startMode;
+  const [workflowFrameTicket, setWorkflowFrameTicket] = useState<FrameTicket | null>(null);
+  const workflowFrameFingerprintKey = compiledTicket
+    ? JSON.stringify({ ticketId: compiledTicket.ticketId, fingerprint: compiledTicket.fingerprint })
+    : 'none';
+  useEffect(() => {
+    setWorkflowFrameTicket(null);
+  }, [workflowFrameFingerprintKey]);
 
   // T1-211 (Phase 5b): frame wiring for the Move tab.
   // Two buttons: Frame (safe corner trace with laser-off motion) and
@@ -354,6 +364,30 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     isConnected
     && machineStatus === 'idle'
     && sceneBounds !== null;
+  const createWorkflowFrameTicket = (mode: 'safe' | 'dot') => {
+    if (!compiledTicket || !sceneBounds) return null;
+    const transformOpts = {
+      startMode,
+      savedOrigin: props.savedOrigin,
+      originCorner: props.originCorner,
+      bedHeightMm: props.bedHeight ?? 400,
+      bedWidthMm: props.bedWidth ?? 400,
+    };
+    const corners = buildFrameCorners(sceneBounds, transformOpts, frameTransformBounds ?? sceneBounds);
+    const xs = corners.map((c) => c.x);
+    const ys = corners.map((c) => c.y);
+    return createFramedStartTicket({
+      jobTicketId: compiledTicket.ticketId,
+      fingerprint: compiledTicket.fingerprint,
+      machineBounds: {
+        minX: Math.min(...xs),
+        minY: Math.min(...ys),
+        maxX: Math.max(...xs),
+        maxY: Math.max(...ys),
+      },
+      mode,
+    });
+  };
 
   const onFrameSafe = canFrame
     ? () => {
@@ -384,7 +418,15 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
             idleTimeoutMs,
             frameLineDelayMs,
           })
+          .then((result) => {
+            if (result.ok) {
+              setWorkflowFrameTicket(createWorkflowFrameTicket('safe'));
+            } else {
+              setWorkflowFrameTicket(null);
+            }
+          })
           .catch((err: unknown) => {
+            setWorkflowFrameTicket(null);
             console.warn(
               '[WorkflowPanel T1-211] Frame safe failed:',
               err instanceof Error ? err.message : err,
@@ -437,7 +479,15 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
             frameDotFeedRateMmPerMin,
             frameLineDelayMs,
           })
+          .then((result) => {
+            if (result.ok) {
+              setWorkflowFrameTicket(createWorkflowFrameTicket('dot'));
+            } else {
+              setWorkflowFrameTicket(null);
+            }
+          })
           .catch((err: unknown) => {
+            setWorkflowFrameTicket(null);
             console.warn(
               '[WorkflowPanel T1-211] Frame dot failed:',
               err instanceof Error ? err.message : err,
@@ -584,14 +634,23 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   //     enables this button already requires preflight to pass
   // canvasContext + notifySimulatorTx are read from the same sources
   // the legacy panel uses.
+  const workflowFrameTicketValidation = compiledTicket
+    ? validateFrameTicketForStart({
+        frameTicket: workflowFrameTicket,
+        jobTicketId: compiledTicket.ticketId,
+        fingerprint: compiledTicket.fingerprint,
+      })
+    : { ok: false as const, reason: 'No compiled job ticket.' };
+  const workflowFrameTicketValid =
+    workflowFrameTicketValidation.ok && !workflowFrameTicketValidation.override;
   const startReady =
     isConnected
     && machineStatus === 'idle'
     && compiledTicket !== null
     && compileResult !== null;
-  const onStartJob = (startReady && startMode !== 'savedOrigin')
+  const onStartJob = (startReady && workflowFrameTicketValid && startMode !== 'savedOrigin')
     ? () => {
-        if (!compiledTicket || !compileResult) return;
+        if (!compiledTicket || !compileResult || !workflowFrameTicket) return;
         const canvasContext = {
           canvasMoves: compileResult.canvasMoves,
           canvasPlanBounds: compileResult.canvasPlanBounds,
@@ -602,11 +661,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
         void executionCoordinator
           .startValidatedJob({
             ticket: compiledTicket,
-            frameTicket: createUnframedStartOverrideTicket({
-              jobTicketId: compiledTicket.ticketId,
-              fingerprint: compiledTicket.fingerprint,
-              reason: 'Workflow panel Start Job selected without frame proof',
-            }),
+            frameTicket: workflowFrameTicket,
             scene: props.scene,
             machineState,
             notifySimulatorTx,
@@ -672,7 +727,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
       // state, WiFi trust); a Phase 5b can replace this with the
       // full readiness object lifted up to App.tsx so both panels
       // share the SAME canStartJob.
-      canStartJob: startReady && startMode !== 'savedOrigin',
+      canStartJob: startReady && workflowFrameTicketValid && startMode !== 'savedOrigin',
       pauseRequested,
       onEmergencyStop,
       onConnectUsb,

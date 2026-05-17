@@ -51,6 +51,10 @@ expectSafe('M5');
 expectSafe('M3 S0');
 expectSafe('M4 S0');
 expectSafe('M3 s0');
+expectSafe('M30');
+expectSafe('G100 X0');
+expectSafe('G0 X0 ; M3 S500');
+expectSafe('G1 X1 (M4 S300)');
 expectSafe('G0 G91');
 expectSafe('G90');
 
@@ -67,6 +71,11 @@ expectWarn('M3');
 expectWarn('M4');
 expectWarn('G92 X0Y0');
 expectWarn('G10 P1 R10');
+expectWarn('G0 X0 M3 S500');
+expectWarn('G1 X10 M4 S300');
+expectWarn('G0 G92 X0 Y0');
+expectWarn('G90 G10 L20 P1 X0 Y0');
+expectWarn('G1 X0 M3');
 
 // DANGEROUS
 expectDangerous('$X');

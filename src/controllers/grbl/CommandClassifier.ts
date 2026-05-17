@@ -20,6 +20,8 @@ export function classifyUserCommand(raw: string): CommandClassification {
   if (command.length === 0) {
     return { severity: 'safe', reason: '', command: '' };
   }
+  const code = stripGcodeComments(command);
+  const words = parseGcodeWords(code);
 
   if (command === '$X') {
     return {
@@ -56,7 +58,7 @@ export function classifyUserCommand(raw: string): CommandClassification {
   }
 
   // G10 / G100: G10 is not G100 — require no digit after G10 / G92
-  if (/^G10(?![0-9])/i.test(command)) {
+  if (words.some(word => word.letter === 'G' && word.value === '10')) {
     return {
       severity: 'warn',
       command,
@@ -65,7 +67,7 @@ export function classifyUserCommand(raw: string): CommandClassification {
     };
   }
 
-  if (/^G92(?![0-9])/i.test(command)) {
+  if (words.some(word => word.letter === 'G' && word.value === '92')) {
     return {
       severity: 'warn',
       command,
@@ -74,13 +76,11 @@ export function classifyUserCommand(raw: string): CommandClassification {
     };
   }
 
-  // M30 etc. are not M3: require M3/M4 not followed by another digit
-  const mHead = command.match(/^[mM]([34])(?![0-9])/i);
-  if (mHead) {
-    const afterM = command.slice(mHead[0].length);
-    // m3S500, M3 S0, m3 s100, or S later on the line (G0 M3 S0)
-    const sMatch = afterM.match(/(?:^|\b)S\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)/i);
-    if (!sMatch) {
+  // M30 etc. are not M3: parse M3/M4 as command words anywhere in the block.
+  const laserOnWordIndex = words.findIndex(word => word.letter === 'M' && (word.value === '3' || word.value === '4'));
+  if (laserOnWordIndex >= 0) {
+    const sWord = words.slice(laserOnWordIndex + 1).find(word => word.letter === 'S');
+    if (!sWord) {
       return {
         severity: 'warn',
         command,
@@ -88,7 +88,7 @@ export function classifyUserCommand(raw: string): CommandClassification {
           'M3/M4 with no S word — the laser will follow the last S value, which can turn the beam on without a known power level.',
       };
     }
-    const sVal = parseFloat(sMatch[1] ?? 'NaN');
+    const sVal = parseFloat(sWord.value);
     if (!Number.isFinite(sVal)) {
       return {
         severity: 'warn',
@@ -107,4 +107,28 @@ export function classifyUserCommand(raw: string): CommandClassification {
   }
 
   return { severity: 'safe', reason: '', command };
+}
+
+interface GcodeWord {
+  readonly letter: string;
+  readonly value: string;
+}
+
+function stripGcodeComments(command: string): string {
+  return command
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/;.*$/, ' ');
+}
+
+function parseGcodeWords(command: string): GcodeWord[] {
+  const words: GcodeWord[] = [];
+  const wordRe = /([A-Za-z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  let match: RegExpExecArray | null;
+  while ((match = wordRe.exec(command)) !== null) {
+    words.push({
+      letter: (match[1] ?? '').toUpperCase(),
+      value: match[2] ?? '',
+    });
+  }
+  return words;
 }

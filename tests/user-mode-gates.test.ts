@@ -21,9 +21,9 @@ function assert(condition: unknown, message: string): void {
 
 {
   const beginner = computeUserModeGatePolicy('beginner');
-  assert(beginner.requireFrameBeforeStart === false, 'beginner mode recommends framing without blocking start');
-  assert(beginner.allowStartWithoutFraming === true, 'beginner mode can start without framing when other gates are safe');
-  assert(beginner.startWithoutFramingLabel === 'Start without framing', 'beginner mode exposes explicit unframed-start label');
+  assert(beginner.requireFrameBeforeStart === true, 'beginner mode requires a fresh frame before start');
+  assert(beginner.allowStartWithoutFraming === false, 'beginner mode cannot start without framing');
+  assert(beginner.startWithoutFramingLabel === null, 'beginner mode does not expose an unframed-start label');
   assert(beginner.requireProfileConfirmationOnConnect === true, 'beginner mode requires profile confirmation');
   assert(beginner.requireMaterialSafetyChecklist === true, 'beginner mode requires material safety checks');
   assert(beginner.showProductionConsole === false, 'beginner mode hides production console');

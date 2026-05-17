@@ -47,9 +47,9 @@ export function computeUserModeGatePolicy(mode: UserMode): UserModeGatePolicy {
 
   return {
     mode,
-    requireFrameBeforeStart: false,
-    allowStartWithoutFraming: true,
-    startWithoutFramingLabel: 'Start without framing',
+    requireFrameBeforeStart: true,
+    allowStartWithoutFraming: false,
+    startWithoutFramingLabel: null,
     requireProfileConfirmationOnConnect: true,
     requireMaterialSafetyChecklist: true,
     showProductionConsole: false,

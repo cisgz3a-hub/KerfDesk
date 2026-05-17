@@ -244,6 +244,18 @@ async function run(): Promise<void> {
       'warn',
       'no-token',
     );
+    await expectBlocked(
+      "sendCommand('G0 X0 M3 S500', 'user') without token → no-token",
+      () => svc.sendCommand('G0 X0 M3 S500', 'user'),
+      'warn',
+      'no-token',
+    );
+    await expectBlocked(
+      "sendCommand('G90 G10 L20 P1 X0 Y0', 'user') without token → no-token",
+      () => svc.sendCommand('G90 G10 L20 P1 X0 Y0', 'user'),
+      'warn',
+      'no-token',
+    );
     assert(sent.length === 0, 'controller never received any blocked warn line');
   }
 
