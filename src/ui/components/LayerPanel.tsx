@@ -154,15 +154,26 @@ export function LayerPanel({
     onSceneCommit(updateLayer(scene, activeLayer.id, () => next));
   }, [selectedMaterialPresetId, activeLayer?.settings.mode, activeLayer?.id]); // eslint-disable-line react-hooks/exhaustive-deps -- T1-239: preset application must run only when the user chooses a preset or the target layer/mode changes; adding scene/onSceneCommit would reapply the preset after the commit it just made.
 
-  const simpleTabsOn = activeLayer?.settings.tabs?.enabled === true;
+  // S25-04-001: the compiler strips tab settings when the tabs
+  // entitlement is unavailable, so the layer UI must not display or
+  // enable basic tabs as active in that state.
+  const tabsFeatureUnlocked = isProUnlocked();
+  const simpleTabsOn = tabsFeatureUnlocked && activeLayer?.settings.tabs?.enabled === true;
+  const visibleTabs = simpleTabsOn ? activeLayer?.settings.tabs : undefined;
   const detailTabCount =
-    activeLayer && simpleTabsOn && activeLayer.settings.tabs
-      ? activeLayer.settings.tabs.count
+    activeLayer && visibleTabs
+      ? visibleTabs.count
       : activeLayer?.settings.cut.tabCount ?? 0;
   const detailTabWidth =
-    activeLayer && simpleTabsOn && activeLayer.settings.tabs
-      ? activeLayer.settings.tabs.width
+    activeLayer && visibleTabs
+      ? visibleTabs.width
       : activeLayer?.settings.cut.tabWidth ?? 0;
+  const explainLockedTabs = () => {
+    void showAlert(
+      'Cut tabs require Pro',
+      'Cut tabs are disabled because this license cannot emit tabbed cut output. Upgrade or use a licensed build before relying on tabs to hold parts attached.',
+    );
+  };
 
   const setActiveLayer = (layerId: string) => {
     if (scene.activeLayerId === layerId) return;
@@ -790,6 +801,10 @@ export function LayerPanel({
           React.createElement('button', {
             type: 'button',
             onClick: () => {
+              if (!tabsFeatureUnlocked) {
+                explainLockedTabs();
+                return;
+              }
               const current = activeLayer.settings.tabs?.enabled ?? false;
               onSceneCommit(updateLayer(scene, activeLayer.id, l => {
                 if (current) {
@@ -816,20 +831,30 @@ export function LayerPanel({
                 };
               }));
             },
+            disabled: !tabsFeatureUnlocked,
+            title: tabsFeatureUnlocked ? 'Toggle cut tabs' : 'Cut tabs require Pro',
             style: {
-              width: 18, height: 18, borderRadius: 4, cursor: 'pointer',
-              background: activeLayer.settings.tabs?.enabled
+              width: 18, height: 18, borderRadius: 4, cursor: tabsFeatureUnlocked ? 'pointer' : 'not-allowed',
+              background: simpleTabsOn
                 ? 'rgba(45,212,160,0.2)' : '#0a0a14',
-              border: activeLayer.settings.tabs?.enabled
+              border: simpleTabsOn
                 ? '1px solid #2dd4a0' : '1px solid #252540',
-              color: activeLayer.settings.tabs?.enabled ? '#2dd4a0' : '#555570',
+              color: simpleTabsOn ? '#2dd4a0' : '#555570',
               fontSize: 11, lineHeight: '16px', textAlign: 'center' as const,
               padding: 0, fontFamily: theme.font.ui,
             },
-          }, activeLayer.settings.tabs?.enabled ? '✓' : ''),
+          }, simpleTabsOn ? '✓' : ''),
           React.createElement('span', {
-            style: { fontSize: 11, color: '#c0c0d0', cursor: 'pointer' },
+            style: {
+              fontSize: 11,
+              color: tabsFeatureUnlocked ? '#c0c0d0' : '#77778a',
+              cursor: tabsFeatureUnlocked ? 'pointer' : 'not-allowed',
+            },
             onClick: () => {
+              if (!tabsFeatureUnlocked) {
+                explainLockedTabs();
+                return;
+              }
               const current = activeLayer.settings.tabs?.enabled ?? false;
               onSceneCommit(updateLayer(scene, activeLayer.id, l => {
                 if (current) {
@@ -856,9 +881,9 @@ export function LayerPanel({
                 };
               }));
             },
-          }, 'Keep parts attached'),
+          }, tabsFeatureUnlocked ? 'Keep parts attached' : 'Keep parts attached (PRO)'),
         ),
-        activeLayer.settings.tabs?.enabled && React.createElement('div', {
+        simpleTabsOn && React.createElement('div', {
           style: { display: 'flex', gap: 4, marginBottom: 6 },
         },
           ...([
@@ -900,12 +925,12 @@ export function LayerPanel({
             }, preset.label);
           }),
         ),
-        activeLayer.settings.tabs?.enabled && React.createElement('div', {
+        visibleTabs && React.createElement('div', {
           style: { fontSize: 9, color: '#555570', lineHeight: 1.5 },
         },
-          `${activeLayer.settings.tabs.count} tabs, ${activeLayer.settings.tabs.width}mm wide, ${activeLayer.settings.tabs.height}mm tall`,
+          `${visibleTabs.count} tabs, ${visibleTabs.width}mm wide, ${visibleTabs.height}mm tall`,
         ),
-        activeLayer.settings.tabs?.enabled && productionMode && isProUnlocked() && React.createElement('button', {
+        simpleTabsOn && productionMode && tabsFeatureUnlocked && React.createElement('button', {
           type: 'button',
           onClick: () => setShowTabsCustomize(v => !v),
           style: {

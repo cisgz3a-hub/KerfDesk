@@ -4,7 +4,7 @@
  * T1-227: shared preflight rule contracts live here so rule modules do not
  * import the Preflight orchestrator that imports them.
  */
-import type { MachineStatus } from '../../controllers/ControllerInterface';
+import type { DeviceIdentity, MachineStatus } from '../../controllers/ControllerInterface';
 import type { DeviceProfile } from '../devices/DeviceProfile';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
 import type { Scene } from '../scene/Scene';
@@ -45,6 +45,12 @@ export const PREFLIGHT_CODES = {
   LAYER_SPEED_INVALID: 'LAYER_SPEED_INVALID',
   LAYER_SPEED_HIGH: 'LAYER_SPEED_HIGH',
   LAYER_SPEED_LOW: 'LAYER_SPEED_LOW',
+  /** S25-07-002: layer Z-step output is blocked unless profile Z support is explicit. */
+  Z_AXIS_UNSUPPORTED: 'Z_AXIS_UNSUPPORTED',
+  /** S25-07-002: profile enables Z travel but lacks safe min/max limits. */
+  Z_AXIS_LIMITS_MISSING: 'Z_AXIS_LIMITS_MISSING',
+  /** S25-07-002: planned pass-to-pass Z travel exceeds configured safe range. */
+  Z_AXIS_OUT_OF_RANGE: 'Z_AXIS_OUT_OF_RANGE',
   OVERSCAN_EXCEEDS_BED: 'OVERSCAN_EXCEEDS_BED',
   HOMING_ENABLED_NO_H: 'HOMING_ENABLED_NO_H',
   ACCEL_AWARE_NO_ACCEL_PARAM: 'ACCEL_AWARE_NO_ACCEL_PARAM',
@@ -129,6 +135,8 @@ export interface PreflightContext {
     maxRateY?: number;
     maxAccelX?: number;
     maxAccelY?: number;
+    /** T3-57/S25-01: full live firmware/settings identity for profile-vs-firmware mismatch checks. */
+    deviceIdentity?: DeviceIdentity | null;
     homingEnabled?: boolean;
     /** GRBL $32: laser mode. true = dynamic ($32=1), false = CNC ($32=0), undefined = not read. */
     laserMode?: boolean;

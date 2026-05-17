@@ -5,7 +5,7 @@ import { createBlankProfile, getActiveProfile } from '../devices/DeviceProfile';
 import type { Scene } from '../scene/Scene';
 import type { ValidatedJobTicket } from '../job/ValidatedJobTicket';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
-import type { MachineState } from '../../controllers/ControllerInterface';
+import type { DeviceIdentity, MachineState } from '../../controllers/ControllerInterface';
 import { runMachineStateChecks } from './rules/MachineStatePreflight';
 import { runSceneChecks, runDesignOutputLayerChecks } from './rules/ScenePreflight';
 import {
@@ -26,6 +26,7 @@ import { runSelfIntersectionChecks } from './rules/SelfIntersectionPreflight';
 import { runCompileComplexityChecks } from './rules/CompileComplexityPreflight';
 import { runGeometryValidityChecks } from './rules/GeometryValidityPreflight';
 import { runOutputGcodeSemanticChecks } from './rules/OutputValidator';
+import { checkCapabilityMismatches } from './rules/CapabilityMismatchRules';
 import { PREFLIGHT_CODES } from './PreflightContext';
 import type { PreflightContext, PreflightResult, PreflightSeverity } from './PreflightContext';
 
@@ -43,6 +44,7 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runBoundsChecks(ctx, results);
   runLayerChecks(ctx, results);
   runMachineChecks(ctx, results);
+  runCapabilityMismatchChecks(ctx, results);
   runTemplateChecks(ctx, results);
   runGcodeTemplateSemanticValidation(ctx, results);
   runOutputGcodeSemanticChecks(ctx, results);
@@ -53,6 +55,17 @@ export function runPreflight(ctx: PreflightContext): PreflightResult[] {
   runCompileComplexityChecks(ctx, results);
   ensureNoCompiledOutputIssue(ctx, results);
   return sortBySeverity(results);
+}
+
+function runCapabilityMismatchChecks(ctx: PreflightContext, out: PreflightResult[]): void {
+  if (!ctx.profile || !ctx.liveMachineInfo?.deviceIdentity) return;
+  for (const finding of checkCapabilityMismatches(ctx.profile, ctx.liveMachineInfo.deviceIdentity)) {
+    out.push({
+      severity: finding.severity,
+      code: finding.code,
+      message: `${finding.message} ${finding.fix}`,
+    });
+  }
 }
 
 export function hasBlockingErrors(results: PreflightResult[]): boolean {
@@ -107,7 +120,15 @@ function categorizeCode(code: string): 'machine' | 'design' | 'settings' | 'outp
   ) {
     return 'design';
   }
-  if (code.includes('LAYER') || code.includes('POWER') || code.includes('SPEED') || code.includes('SETTINGS_')) {
+  if (
+    code.includes('LAYER') ||
+    code.includes('POWER') ||
+    code.includes('SPEED') ||
+    code.includes('SETTINGS_') ||
+    code.startsWith('Z_AXIS_') ||
+    code.startsWith('PROFILE_') ||
+    code === 'HOMING_PROFILE_VS_FIRMWARE_MISMATCH'
+  ) {
     return 'settings';
   }
   if (code === PREFLIGHT_CODES.HOMING_REQUESTED_BUT_DISABLED) {
@@ -249,6 +270,7 @@ export function runPreflightSummary(
     readonly hasGcode?: boolean;
     readonly outputUsesM4?: boolean;
   },
+  firmwareDeviceIdentityFromMachine?: DeviceIdentity | null,
 ): PreflightSummary {
   const activeProfile = getActiveProfile();
   // T1-218: when the caller signals the bed dimensions are
@@ -301,6 +323,7 @@ export function runPreflightSummary(
         ? { maxSpindle: firmwareMaxSpindleFromMachine }
         : {}),
       ...(firmwareUnsafeAtConnect !== undefined ? { unsafeAtConnect: firmwareUnsafeAtConnect } : {}),
+      ...(firmwareDeviceIdentityFromMachine != null ? { deviceIdentity: firmwareDeviceIdentityFromMachine } : {}),
     },
   };
 

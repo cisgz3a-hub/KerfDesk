@@ -360,6 +360,11 @@ export interface GrblControllerApi extends GcodeLineController {
    */
   getFirmwareHomingCycleEnabled?(): boolean | undefined;
   /**
+   * GRBL: live firmware/settings identity captured from handshake and `$$`.
+   * Used by preflight to surface profile-vs-firmware capability mismatches.
+   */
+  getDeviceIdentity?(): DeviceIdentity;
+  /**
    * GRBL: $32 laser mode. `true` = $32=1 (laser dynamic mode), `false` = $32=0 (CNC/spindle mode),
    * `undefined` if not read yet. T1-32: jobs that emit M4 must verify $32=1; in CNC mode M4 keeps
    * the laser on at full power between motion commands which is dangerous for diode lasers.

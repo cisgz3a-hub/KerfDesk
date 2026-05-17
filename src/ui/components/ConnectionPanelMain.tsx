@@ -433,6 +433,7 @@ export function ConnectionPanelMain({
         hasGcode: hasCompiledGcode,
         outputUsesM4: lastGcodeCompileResult?.outputUsesM4,
       },
+      controllerRef.current?.getDeviceIdentity?.() ?? null,
     );
     const next: PreflightSummary =
       compiledJobTicket != null ? { ...result, validatedTicket: compiledJobTicket } : result;

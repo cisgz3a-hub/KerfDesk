@@ -10,6 +10,8 @@ import {
   type CapabilityMismatchCode,
   type CapabilityMismatchFinding,
 } from '../src/core/preflight/rules/CapabilityMismatchRules';
+import { runPreflight } from '../src/core/preflight/Preflight';
+import { createScene } from '../src/core/scene/Scene';
 import type { DeviceIdentity } from '../src/controllers/ControllerInterface';
 import type { DeviceProfile } from '../src/core/devices/DeviceProfile';
 
@@ -233,6 +235,31 @@ void (async () => {
   }
 
   // 15. Source pin: T3-57 marker + additive-only.
+  {
+    const results = runPreflight({
+      scene: createScene(400, 300, 'Capability mismatch preflight integration'),
+      profile: profile({ maxRateX: 9000, bedWidth: 500 }),
+      optimizeOrderEnabled: true,
+      liveMachineInfo: {
+        deviceIdentity: identity({
+          maxRateXMmPerMin: 6000,
+          bedWidthMm: 400,
+        }),
+      },
+      preflightBedWidthMm: 400,
+      preflightBedHeightMm: 300,
+    });
+    assert(
+      results.some((r) => r.code === 'PROFILE_FEED_X_EXCEEDS_FIRMWARE' && r.severity === 'warning'),
+      'Preflight integration surfaces profile X feed exceeding firmware $110',
+    );
+    assert(
+      results.some((r) => r.code === 'PROFILE_BED_WIDTH_EXCEEDS_FIRMWARE' && r.severity === 'warning'),
+      'Preflight integration surfaces profile bed width exceeding firmware $130',
+    );
+  }
+
+  // 16. Source pin: T3-57 marker + additive-only.
   {
     const fs = await import('node:fs');
     const path = await import('node:path');

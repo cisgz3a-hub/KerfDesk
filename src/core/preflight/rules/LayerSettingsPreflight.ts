@@ -1,5 +1,67 @@
 import type { PreflightContext, PreflightResult } from '../PreflightContext';
 import { PREFLIGHT_CODES } from '../PreflightContext';
+import type { Layer } from '../../scene/Layer';
+
+const Z_EPS = 0.001;
+
+function finiteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function plannedZRangeForLayer(layer: Layer): { minZ: number; maxZ: number; passCount: number } | null {
+  const zStep = Number(layer.settings.zStepPerPass);
+  if (!Number.isFinite(zStep) || Math.abs(zStep) <= Z_EPS) return null;
+
+  const rawPassCount = Number(layer.settings.passes);
+  const passCount = Number.isFinite(rawPassCount)
+    ? Math.max(1, Math.floor(rawPassCount))
+    : 1;
+  if (passCount <= 1) return null;
+
+  const finalZ = zStep * (passCount - 1);
+  return {
+    minZ: Math.min(0, finalZ),
+    maxZ: Math.max(0, finalZ),
+    passCount,
+  };
+}
+
+function runZAxisStepChecks(ctx: PreflightContext, layer: Layer, out: PreflightResult[]): void {
+  const zRange = plannedZRangeForLayer(layer);
+  if (!zRange) return;
+
+  const zAxis = ctx.profile?.zAxis;
+  if (zAxis?.supported !== true) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.Z_AXIS_UNSUPPORTED,
+      message: `Layer "${layer.name}" uses Z step per pass, but the active machine profile does not explicitly support bounded Z-axis job moves.`,
+      layerId: layer.id,
+    });
+    return;
+  }
+
+  const minLimit = zAxis.minMm;
+  const maxLimit = zAxis.maxMm;
+  if (!finiteNumber(minLimit) || !finiteNumber(maxLimit) || minLimit > maxLimit) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.Z_AXIS_LIMITS_MISSING,
+      message: `Layer "${layer.name}" uses Z step per pass, but the active machine profile has no safe Z min/max range.`,
+      layerId: layer.id,
+    });
+    return;
+  }
+
+  if (zRange.minZ < minLimit - Z_EPS || zRange.maxZ > maxLimit + Z_EPS) {
+    out.push({
+      severity: 'error',
+      code: PREFLIGHT_CODES.Z_AXIS_OUT_OF_RANGE,
+      message: `Layer "${layer.name}" would move Z from ${zRange.minZ.toFixed(3)}mm to ${zRange.maxZ.toFixed(3)}mm across ${zRange.passCount} passes, outside the configured safe Z range ${minLimit.toFixed(3)}mm to ${maxLimit.toFixed(3)}mm.`,
+      layerId: layer.id,
+    });
+  }
+}
 
 export function runLayerChecks(ctx: PreflightContext, out: PreflightResult[]): void {
   const { profile, scene } = ctx;
@@ -10,6 +72,11 @@ export function runLayerChecks(ctx: PreflightContext, out: PreflightResult[]): v
     if (layer.visible === false || layer.output === false) continue;
     const layerObjects = scene.objects.filter(obj => obj.layerId === layer.id && obj.visible);
     if (layerObjects.length === 0) continue;
+
+    // S25-07-002: planning emits `setZ` / `G0 Z...` for multi-pass
+    // zStepPerPass output, so preflight must fail closed unless the
+    // active profile explicitly declares bounded Z travel as safe.
+    runZAxisStepChecks(ctx, layer, out);
 
     const powerMin = layer.settings.power.min;
     const powerMax = layer.settings.power.max;

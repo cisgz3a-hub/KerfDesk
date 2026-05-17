@@ -23,7 +23,7 @@ function divergenceMessage(report: BurnEnvelopeDivergenceReport): string {
     `Plan burn moves: ${report.planBurnMoveCount}`,
     `Emitted burn moves: ${report.emittedBurnMoveCount}`,
     '',
-    'This may indicate a compile-time bug. The job MAY still run correctly, but the visual preview does not match the bytes that will be streamed to the machine. Inspect the support log before proceeding.',
+    'LaserForge blocked this start because the visual preview does not match the bytes that would be streamed to the machine. Recompile, inspect the support log, and fix the mismatch before running this job.',
   ];
   return lines.join('\n');
 }
@@ -49,19 +49,16 @@ export async function confirmPreflightForJobStart(
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>,
   validatedTicket?: ValidatedJobTicket,
 ): Promise<ConfirmedJobTicketResult> {
-  // T1-191 (external audit High #2 + #8 surfacing): if the compile
-  // detected a burn-envelope divergence (T1-188), present a dedicated
-  // confirm dialog BEFORE the blocker / warning flow. The user
-  // explicitly accepts the risk of running output that doesn't match
-  // the preview — the audit's "fail-soft" design choice.
+  // T1-191 / S25-06-001: if compile detects a burn-envelope divergence
+  // (T1-188), hard-block start before the normal blocker/warning flow.
+  // Preview/output mismatch means the operator cannot trust the preview
+  // to describe the bytes that would be streamed to the machine.
   if (validatedTicket?.burnEnvelopeDivergence) {
-    const accept = await showConfirm(
-      'Preview ↔ output mismatch',
-      divergenceMessage(validatedTicket.burnEnvelopeDivergence) + '\n\nProceed anyway?',
+    await showAlert(
+      'Cannot start job',
+      divergenceMessage(validatedTicket.burnEnvelopeDivergence),
     );
-    if (!accept) {
-      return { confirmed: false, ticket: null };
-    }
+    return { confirmed: false, ticket: null };
   }
 
   if (preflight && !preflight.canStart) {

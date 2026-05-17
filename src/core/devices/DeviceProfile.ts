@@ -117,6 +117,16 @@ export interface DeviceProfile {
   // Workspace
   bedWidth: number;
   bedHeight: number;
+  /**
+   * Optional Z-axis travel contract for profiles that intentionally support
+   * job-emitted Z motion. Absent means LaserForge must not assume Z travel is
+   * safe for layer `zStepPerPass` output.
+   */
+  zAxis?: {
+    supported: boolean;
+    minMm?: number;
+    maxMm?: number;
+  };
   /** Where (0,0) sits after homing — default front-left (e.g. Wainlux $23=3). */
   originCorner: MachineOriginCorner;
   /**
