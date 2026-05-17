@@ -183,6 +183,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract encodeLaserOn(power: number): string;
   abstract encodeLaserOff(): string;
   abstract encodePowerValue(power: number): string;
+  protected abstract encodePowerValueForMaxSpindle(power: number, maxSpindle: number): string;
+  protected encodeLaserOnForMaxSpindle(power: number, maxSpindle: number): string {
+    void maxSpindle;
+    return this.encodeLaserOn(power);
+  }
 
   private currentSpeed = 0;
   /** GRBL $30 / PWM ceiling; set each generate() from options.maxSpindle (default 1000). */
@@ -292,11 +297,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     generatedAt: string,
   ): Generator<string, void, void> {
     throwIfOutputAborted(options?.signal);
-    this.currentSpeed = 0;
-    this._maxSpindle = options?.maxSpindle ?? 1000;
-    this._relative = options?.startMode === 'current';
-    this._prevPos = { x: 0, y: 0 };
-    this._prevZ = 0;
+    const state = this.createEncoderState(options);
     const totalMoves = countPlanMoves(plan);
     let completedMoves = 0;
     let emittedLines = 0;
@@ -312,7 +313,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     };
 
     try {
-      validateTemplatesBeforeEmission(job, options, this._maxSpindle);
+      validateTemplatesBeforeEmission(job, options, state.maxSpindle);
       throwIfOutputAborted(options?.signal);
       const header = this.encodeHeader(job, options, generatedAt);
       const headerLines = header.split(/\r?\n/);
@@ -335,7 +336,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         for (let moveIndex = 0; moveIndex < op.moves.length; moveIndex++) {
           throwIfOutputAborted(options?.signal);
           const move = op.moves[moveIndex];
-          yield rememberLine(this.encodeMove(move));
+          yield rememberLine(this.encodeMoveWithState(move, state));
           completedMoves++;
           reportOutputProgress(options, {
             fraction: 0,
@@ -357,14 +358,14 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       // Inject the true relative return here so the head returns to the pre-Job
       // position before the template block runs. Non-template footers already
       // append this inside encodeFooter(); skip when no template to avoid duplicating.
-      if (this._relative && options?.gcodeFooterTemplate?.trim()) {
+      if (state.relative && options?.gcodeFooterTemplate?.trim()) {
         throwIfOutputAborted(options?.signal);
-        const backX = -this._prevPos.x;
-        const backY = -this._prevPos.y;
+        const backX = -state.prevPos.x;
+        const backY = -state.prevPos.y;
         const eps = BaseGCodeStrategy._posEps;
         if (Math.abs(backX) > eps || Math.abs(backY) > eps) {
           yield rememberLine(`G0 X${backX.toFixed(3)} Y${backY.toFixed(3)} ; return to start`);
-          this._prevPos = { x: 0, y: 0 };
+          state.prevPos = { x: 0, y: 0 };
         }
       }
 
@@ -385,20 +386,20 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       // inconsistent geometry. The audit flagged this as High
       // severity (output determinism).
       const stateSnapshot = {
-        prevPos: { x: this._prevPos.x, y: this._prevPos.y },
-        prevZ: this._prevZ,
-        currentSpeed: this.currentSpeed,
+        prevPos: { x: state.prevPos.x, y: state.prevPos.y },
+        prevZ: state.prevZ,
+        currentSpeed: state.currentSpeed,
       };
-      const previewFooter = this.encodeFooter(job, options, emittedLines + 1);
+      const previewFooter = this.encodeFooterWithState(job, options, emittedLines + 1, state);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
       const totalLines = emittedLines + footerLineCount;
       // Restore the snapshot so the final encodeFooter sees the same
       // state the operations loop left behind, not the preview-pass
       // residue. Output stays deterministic.
-      this._prevPos = { x: stateSnapshot.prevPos.x, y: stateSnapshot.prevPos.y };
-      this._prevZ = stateSnapshot.prevZ;
-      this.currentSpeed = stateSnapshot.currentSpeed;
-      const footer = this.encodeFooter(job, options, totalLines);
+      state.prevPos = { x: stateSnapshot.prevPos.x, y: stateSnapshot.prevPos.y };
+      state.prevZ = stateSnapshot.prevZ;
+      state.currentSpeed = stateSnapshot.currentSpeed;
+      const footer = this.encodeFooterWithState(job, options, totalLines, state);
       const footerLines = footer.split(/\r?\n/);
       for (let i = 0; i < footerLines.length; i++) {
         throwIfOutputAborted(options?.signal);
@@ -428,11 +429,18 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
       throwIfOutputAborted(options?.signal);
     } finally {
-      this.currentSpeed = 0;
-      this._relative = false;
-      this._prevPos = { x: 0, y: 0 };
-      this._prevZ = 0;
+      // Encoder state is per-run; no shared strategy fields are reset here.
     }
+  }
+
+  private createEncoderState(options?: GcodeGenerateOptions): GcodeEncoderState {
+    return {
+      currentSpeed: 0,
+      maxSpindle: options?.maxSpindle ?? 1000,
+      prevPos: { x: 0, y: 0 },
+      relative: options?.startMode === 'current',
+      prevZ: 0,
+    };
   }
 
   encodeHeader(job: Job, options?: GcodeGenerateOptions, generatedAt?: string): string {
@@ -643,19 +651,156 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return [...extras, ...safetyFooter].join('\n');
   }
 
-  private encodeMove(move: Move): string {
+  private encodeRapidWithState(to: { x: number; y: number }, state: GcodeEncoderState): string {
+    const eps = BaseGCodeStrategy._posEps;
+    if (!state.relative) {
+      state.prevPos = { x: to.x, y: to.y };
+      return `G0 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`;
+    }
+    const dx = to.x - state.prevPos.x;
+    const dy = to.y - state.prevPos.y;
+    state.prevPos = { x: to.x, y: to.y };
+    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
+      return '; G0 skipped (no motion)';
+    }
+    const parts: string[] = ['G0'];
+    if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
+    if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
+    return parts.join(' ');
+  }
+
+  private encodeLinearWithState(
+    to: { x: number; y: number },
+    power: number,
+    speed: number,
+    state: GcodeEncoderState,
+  ): string {
+    const eps = BaseGCodeStrategy._posEps;
+    const dx = to.x - state.prevPos.x;
+    const dy = to.y - state.prevPos.y;
+    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
+      return `; G1 skipped (zero distance — would dwell-burn at S${
+        Math.max(0, Math.round((power / 100) * state.maxSpindle))
+      } if emitted)`;
+    }
+
+    if (!state.relative) {
+      state.prevPos = { x: to.x, y: to.y };
+      const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
+      if (speed !== state.currentSpeed) {
+        parts.push(`F${speed.toFixed(0)}`);
+        state.currentSpeed = speed;
+      }
+      parts.push(this.encodePowerValueForMaxSpindle(power, state.maxSpindle));
+      return parts.join(' ');
+    }
+
+    state.prevPos = { x: to.x, y: to.y };
+
+    const parts: string[] = ['G1'];
+    if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
+    if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
+
+    if (speed !== state.currentSpeed) {
+      parts.push(`F${speed.toFixed(0)}`);
+      state.currentSpeed = speed;
+    }
+    parts.push(this.encodePowerValueForMaxSpindle(power, state.maxSpindle));
+    return parts.join(' ');
+  }
+
+  private encodeLaserOnWithState(power: number, state: GcodeEncoderState): string {
+    return this.encodeLaserOnForMaxSpindle(power, state.maxSpindle);
+  }
+
+  private encodeZMoveWithState(z: number, state: GcodeEncoderState): string {
+    const eps = BaseGCodeStrategy._posEps;
+    if (!state.relative) {
+      state.prevZ = z;
+      return `G0 Z${z.toFixed(3)}`;
+    }
+    const dz = z - state.prevZ;
+    state.prevZ = z;
+    if (Math.abs(dz) < eps) return '; Z skipped (no motion)';
+    return `G0 Z${dz.toFixed(3)}`;
+  }
+
+  private encodeFooterWithState(
+    job: Job,
+    options: GcodeGenerateOptions | undefined,
+    totalLines: number,
+    state: GcodeEncoderState,
+  ): string {
+    const extras: string[] = [];
+    const pre = options?.customEndGcode?.trim();
+    if (pre) {
+      for (const line of pre.split(/\r?\n/).map(l => l.trimEnd()).filter(l => l.length > 0)) {
+        extras.push(line);
+      }
+    }
+    if (options?.gcodeFooterTemplate) {
+      const templateContext = {
+        ...(options.gcodeTemplateContext ?? {
+          ...emptyTemplateContext(),
+          jobName: job.name || 'untitled',
+        }),
+        totalLines,
+      };
+      const renderedFooter = renderTemplate(options.gcodeFooterTemplate, templateContext);
+      if (renderedFooter.trim().length > 0) {
+        const footerParts = renderedFooter.split(/\r?\n/).map(l => l.trimEnd());
+        for (let i = 0; i < footerParts.length; i++) {
+          extras.push(footerParts[i]);
+        }
+      }
+    }
+
+    const safetyFooter: string[] = [];
+    safetyFooter.push(`${this.encodeLaserOff()} ; T2-14 safety baseline: laser off at end`);
+    if (state.relative) {
+      const backX = -state.prevPos.x;
+      const backY = -state.prevPos.y;
+      const eps = BaseGCodeStrategy._posEps;
+      if (Math.abs(backX) > eps || Math.abs(backY) > eps) {
+        safetyFooter.push(`G0 X${backX.toFixed(3)} Y${backY.toFixed(3)} ; return to start`);
+      }
+      safetyFooter.push('G90 ; restore absolute positioning');
+    } else {
+      const rp = options?.returnPosition;
+      if (
+        rp != null &&
+        Number.isFinite(rp.x) &&
+        Number.isFinite(rp.y)
+      ) {
+        safetyFooter.push(`${this.encodeRapidWithState(rp, state)} ; return to job origin`);
+      }
+    }
+    safetyFooter.push('M2 ; T2-14 safety baseline: program end');
+
+    return [...extras, ...safetyFooter].join('\n');
+  }
+
+  private encodeMoveWithState(move: Move, state: GcodeEncoderState): string {
     switch (move.type) {
-      case 'rapid':    return this.encodeRapid(move.to);
-      case 'linear':   return this.encodeLinear(move.to, move.power, move.speed);
-      case 'laserOn':  return this.encodeLaserOn(move.power);
+      case 'rapid':    return this.encodeRapidWithState(move.to, state);
+      case 'linear':   return this.encodeLinearWithState(move.to, move.power, move.speed, state);
+      case 'laserOn':  return this.encodeLaserOnWithState(move.power, state);
       case 'laserOff': return this.encodeLaserOff();
       case 'dwell':    return this.encodeDwell(move.ms);
       case 'setAir':   return this.encodeAirAssist(move.on);
-      case 'setZ':     return this.encodeZMove(move.z);
+      case 'setZ':     return this.encodeZMoveWithState(move.z, state);
       case 'marker':
         return `; OBJ ids=${move.sourceObjectIds.join(',')}`;
     }
   }
+}
+
+interface GcodeEncoderState {
+  currentSpeed: number;
+  maxSpindle: number;
+  prevPos: { x: number; y: number };
+  relative: boolean;
+  prevZ: number;
 }
 
 function validateTemplatesBeforeEmission(

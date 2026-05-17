@@ -26,13 +26,21 @@ export class GrblOutputStrategy extends BaseGCodeStrategy {
     return `M4 ${this.encodePowerValue(power)}`;
   }
 
+  protected encodeLaserOnForMaxSpindle(power: number, maxSpindle: number): string {
+    return `M4 ${this.encodePowerValueForMaxSpindle(power, maxSpindle)}`;
+  }
+
   encodeLaserOff(): string {
     return 'M5 S0';
   }
 
   encodePowerValue(power: number): string {
+    return this.encodePowerValueForMaxSpindle(power, this._maxSpindle);
+  }
+
+  protected encodePowerValueForMaxSpindle(power: number, maxSpindle: number): string {
     const pct = Math.max(0, Math.min(100, power));
-    const sValue = Math.round((pct / 100) * this._maxSpindle);
+    const sValue = Math.round((pct / 100) * maxSpindle);
     return `S${sValue}`;
   }
 }

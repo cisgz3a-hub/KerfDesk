@@ -186,20 +186,20 @@ console.log('\n=== T1-180 G-code emitter purity + zero-distance suppression (aud
 
   // The snapshot/restore pattern is present in generate().
   assert(
-    /stateSnapshot = \{/.test(src) && /prevZ:\s*this\._prevZ/.test(src),
-    'generate(): stateSnapshot literal declared with prevZ field',
+    /stateSnapshot = \{/.test(src) && /prevZ:\s*state\.prevZ/.test(src),
+    'generate(): per-run stateSnapshot literal declared with prevZ field',
   );
   assert(
-    /this\._prevPos = \{ x: stateSnapshot\.prevPos\.x, y: stateSnapshot\.prevPos\.y \}/.test(src),
-    'generate(): restores _prevPos from snapshot',
+    /state\.prevPos = \{ x: stateSnapshot\.prevPos\.x, y: stateSnapshot\.prevPos\.y \}/.test(src),
+    'generate(): restores per-run prevPos from snapshot',
   );
   assert(
-    /this\._prevZ = stateSnapshot\.prevZ/.test(src),
-    'generate(): restores _prevZ from snapshot',
+    /state\.prevZ = stateSnapshot\.prevZ/.test(src),
+    'generate(): restores per-run prevZ from snapshot',
   );
   assert(
-    /this\.currentSpeed = stateSnapshot\.currentSpeed/.test(src),
-    'generate(): restores currentSpeed from snapshot',
+    /state\.currentSpeed = stateSnapshot\.currentSpeed/.test(src),
+    'generate(): restores per-run currentSpeed from snapshot',
   );
 }
 
