@@ -12,7 +12,12 @@
  *
  * Run: npx tsx tests/preflight-rejects-m4-without-laser-mode.test.ts
  */
-import { runPreflight, PREFLIGHT_CODES, type PreflightContext } from '../src/core/preflight/Preflight';
+import {
+  runPreflight,
+  runPreflightSummary,
+  PREFLIGHT_CODES,
+  type PreflightContext,
+} from '../src/core/preflight/Preflight';
 import { createBlankProfile } from '../src/core/devices/DeviceProfile';
 import type { Scene } from '../src/core/scene/Scene';
 import { defaultLaserSettings } from '../src/core/scene/Layer';
@@ -130,6 +135,37 @@ function ctx(opts: {
 
 // ── 8. Source-level pin: PreflightContext exposes outputUsesM4 + liveMachineInfo.laserMode ──
 {
+  const summary = runPreflightSummary(
+    emptyScene(),
+    'G0 X10\nM3 S500\nM5\n',
+    {
+      status: 'idle',
+      position: { x: 0, y: 0, z: 0 },
+      feedRate: 0,
+      spindleSpeed: 0,
+      alarmCode: null,
+      errorCode: null,
+    },
+    300,
+    300,
+    { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    undefined,
+    false,
+    undefined,
+    null,
+    'absolute',
+    null,
+    true,
+    { hasGcode: true, outputUsesM4: true },
+  );
+  assert(
+    summary.issues.some(issue => issue.id === PREFLIGHT_CODES.MACHINE_LASER_MODE_DISABLED),
+    'spool metadata outputUsesM4=true still triggers MACHINE_LASER_MODE_DISABLED even without materialized M4 text',
+  );
+}
+
+// ── 9. Source-level pin: PreflightContext exposes outputUsesM4 + liveMachineInfo.laserMode ──
+{
   const fs = await import('node:fs');
   const url = await import('node:url');
   const path = await import('node:path');
@@ -150,8 +186,8 @@ function ctx(opts: {
     'MACHINE_LASER_MODE_DISABLED preflight code constant declared');
   assert(/firmwareLaserModeFromMachine\?:\s*boolean/.test(preflightSrc),
     'runPreflightSummary takes firmwareLaserModeFromMachine parameter');
-  assert(/outputUsesM4: gcode != null && \/\\bM4\\b\/i\.test\(gcode\)/.test(preflightSrc),
-    'runPreflightSummary computes outputUsesM4 once via M4 regex scan');
+  assert(/outputUsesM4: compiledOutput\?\.outputUsesM4 \?\? \(gcode != null && \/\\bM4\\b\/i\.test\(gcode\)\)/.test(preflightSrc),
+    'runPreflightSummary uses spool-aware outputUsesM4 metadata with materialized-gcode fallback');
 
   const ruleSrc = fs.readFileSync(
     path.resolve(here, '../src/core/preflight/rules/MachinePreflight.ts'),
