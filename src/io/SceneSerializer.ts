@@ -40,6 +40,17 @@ import {
   validateRequired,
   validateTransform,
 } from './sceneSerializerHelpers';
+import {
+  applyValidationMode,
+  validateEllipseGeometry,
+  validateImageGeometry,
+  validateLayerSettings,
+  validateLineGeometry,
+  validatePolygonGeometry,
+  validateRectGeometry,
+  validateTextGeometry,
+  type GeometryValidationIssue,
+} from './validation/geometryValidation';
 
 // ─── FILE FORMAT ─────────────────────────────────────────────────
 
@@ -238,7 +249,9 @@ export type ProjectRepairKind =
   | 'orphan-objects-relocated'    // object.layerId pointed to a missing layer
   | 'duplicate-objects-removed'   // ≥2 objects shared the same id
   | 'broken-parent-cleared'       // object.parentId pointed to a missing object
-  | 'invalid-active-layer';       // scene.activeLayerId pointed to a missing layer
+  | 'invalid-active-layer'        // scene.activeLayerId pointed to a missing layer
+  | 'invalid-object-geometry-repaired'
+  | 'invalid-layer-settings-repaired';
 
 export interface ProjectRepair {
   kind: ProjectRepairKind;
@@ -398,6 +411,9 @@ function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): S
     },
   };
 
+  repairLayerSettingsOnLoad(scene.layers, repairs);
+  repairObjectGeometryOnLoad(scene.objects, repairs);
+
   const layerIds = new Set(scene.layers.map(l => l.id));
 
   // T2-74: track each repair so deserializeSceneWithReport can
@@ -469,6 +485,73 @@ function buildSceneFromParsedEnvelope(parsed: any, repairs?: ProjectRepair[]): S
 }
 
 // ─── DEFAULT RESTORATION ─────────────────────────────────────────
+
+function describeValidationIssue(scope: string, issue: GeometryValidationIssue): string {
+  const repaired =
+    issue.repaired === undefined ? '' : ` -> ${JSON.stringify(issue.repaired)}`;
+  return `${scope}.${issue.field}: ${issue.kind} (${JSON.stringify(issue.observed)}${repaired})`;
+}
+
+function repairLayerSettingsOnLoad(layers: Layer[], repairs?: ProjectRepair[]): void {
+  for (const layer of layers) {
+    const result = validateLayerSettings(layer.settings);
+    if (result.issues.length === 0) {
+      continue;
+    }
+    layer.settings = applyValidationMode(result, 'auto-repair');
+    repairs?.push({
+      kind: 'invalid-layer-settings-repaired',
+      count: result.issues.length,
+      details: result.issues
+        .map(issue => describeValidationIssue(`layer ${layer.id}`, issue))
+        .join('; '),
+    });
+  }
+}
+
+function repairObjectGeometryOnLoad(objects: SceneObject[], repairs?: ProjectRepair[]): void {
+  for (const obj of objects) {
+    const geometry = obj.geometry;
+    let result: { value: Geometry; issues: GeometryValidationIssue[] } | null = null;
+
+    switch (geometry.type) {
+      case 'rect':
+        result = validateRectGeometry(geometry);
+        break;
+      case 'ellipse':
+        result = validateEllipseGeometry(geometry);
+        break;
+      case 'line':
+        result = validateLineGeometry(geometry);
+        break;
+      case 'polygon':
+        result = validatePolygonGeometry(geometry);
+        break;
+      case 'text':
+        result = validateTextGeometry(geometry);
+        break;
+      case 'image':
+        result = validateImageGeometry(geometry);
+        break;
+      default:
+        result = null;
+        break;
+    }
+
+    if (result === null || result.issues.length === 0) {
+      continue;
+    }
+
+    obj.geometry = applyValidationMode(result, 'auto-repair');
+    repairs?.push({
+      kind: 'invalid-object-geometry-repaired',
+      count: result.issues.length,
+      details: result.issues
+        .map(issue => describeValidationIssue(`object ${obj.id}`, issue))
+        .join('; '),
+    });
+  }
+}
 
 function normalizePowerForLayer(rawPower: unknown, defaults: LaserSettings['power']): LaserSettings['power'] {
   if (typeof rawPower === 'number' && Number.isFinite(rawPower)) {

@@ -17,6 +17,7 @@ import {
   applyValidationMode,
   GeometryValidationError,
 } from '../src/io/validation/geometryValidation';
+import { deserializeSceneWithReport } from '../src/io/SceneSerializer';
 
 let passed = 0;
 let failed = 0;
@@ -256,7 +257,61 @@ void (async () => {
   }
 }
 
-// 24. Source-level pin
+// 24. Project-load integration: finite invalid geometry/settings repaired and reported
+{
+  const project = {
+    format: 'laserforge',
+    version: '1.0',
+    scene: {
+      id: 'deep-validation-load',
+      canvas: { width: 200, height: 100 },
+      layers: [{
+        id: 'layer-1',
+        name: 'Bad layer',
+        settings: {
+          mode: 'cut',
+          power: { min: 75, max: 25 },
+          speed: 0,
+          passes: 1.5,
+          fill: { interval: -0.5 },
+        },
+      }],
+      objects: [{
+        id: 'bad-rect',
+        type: 'rect',
+        name: 'Bad rect',
+        layerId: 'layer-1',
+        geometry: { type: 'rect', x: 0, y: 0, width: -20, height: 0, cornerRadius: -1 },
+        transform: { a: 1, b: 0, c: 0, d: 1, tx: 0, ty: 0 },
+      }],
+      activeLayerId: 'layer-1',
+    },
+  };
+  const report = deserializeSceneWithReport(JSON.stringify(project));
+  const rect = report.scene.objects[0].geometry;
+  const settings = report.scene.layers[0].settings;
+  assert(rect.type === 'rect' && rect.width === 1 && rect.height === 1 && rect.cornerRadius === 0,
+    'project load repairs finite invalid rectangle geometry');
+  assert(settings.power.min === 0 && settings.power.max === 100,
+    'project load repairs invalid layer power range');
+  assert(settings.speed === 1000 && settings.passes === 1 && settings.fill.interval === 0.1,
+    'project load repairs invalid speed, passes, and fill interval');
+  assert(report.repairs.some(r => r.kind === 'invalid-object-geometry-repaired'
+    && /bad-rect/.test(r.details ?? '')
+    && /geometry\.width/.test(r.details ?? '')
+    && /geometry\.height/.test(r.details ?? '')
+    && /geometry\.cornerRadius/.test(r.details ?? '')),
+    'project load report identifies repaired geometry fields');
+  assert(report.repairs.some(r => r.kind === 'invalid-layer-settings-repaired'
+    && /layer-1/.test(r.details ?? '')
+    && /settings\.power/.test(r.details ?? '')
+    && /settings\.speed/.test(r.details ?? '')
+    && /settings\.passes/.test(r.details ?? '')
+    && /settings\.fill\.interval/.test(r.details ?? '')),
+    'project load report identifies repaired layer setting fields');
+}
+
+// 25. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

@@ -24,6 +24,16 @@ export const IMAGE_LIMITS = {
 
 export type ImageLimitKey = keyof typeof IMAGE_LIMITS;
 
+export type ImageHeaderFormat = 'png' | 'jpeg' | 'gif' | 'webp' | 'bmp';
+
+export interface ImageHeaderDimensions {
+  width: number;
+  height: number;
+  format: ImageHeaderFormat;
+}
+
+const IMAGE_HEADER_PROBE_BYTES = 64 * 1024;
+
 /**
  * Specific error thrown by the import path when a limit trips.
  * Carries the limit name + observed value + maximum so the UI can
@@ -89,6 +99,145 @@ export function checkImageDimensions(width: number, height: number): void {
   if (totalPixels > IMAGE_LIMITS.MAX_PIXELS) {
     throw new ImageImportLimitError('MAX_PIXELS', totalPixels, { width, height });
   }
+}
+
+function matchesBytes(view: DataView, start: number, bytes: readonly number[]): boolean {
+  if (view.byteLength < start + bytes.length) return false;
+  for (let i = 0; i < bytes.length; i++) {
+    if (view.getUint8(start + i) !== bytes[i]) return false;
+  }
+  return true;
+}
+
+function ascii(view: DataView, start: number, length: number): string {
+  if (view.byteLength < start + length) return '';
+  let out = '';
+  for (let i = 0; i < length; i++) out += String.fromCharCode(view.getUint8(start + i));
+  return out;
+}
+
+function u24le(view: DataView, offset: number): number {
+  return view.getUint8(offset) |
+    (view.getUint8(offset + 1) << 8) |
+    (view.getUint8(offset + 2) << 16);
+}
+
+function validDimensions(width: number, height: number, format: ImageHeaderFormat): ImageHeaderDimensions | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return null;
+  return { width, height, format };
+}
+
+function parsePngHeader(view: DataView): ImageHeaderDimensions | null {
+  const pngSig = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
+  if (!matchesBytes(view, 0, pngSig) || ascii(view, 12, 4) !== 'IHDR' || view.byteLength < 24) return null;
+  return validDimensions(view.getUint32(16, false), view.getUint32(20, false), 'png');
+}
+
+function parseGifHeader(view: DataView): ImageHeaderDimensions | null {
+  const sig = ascii(view, 0, 6);
+  if (sig !== 'GIF87a' && sig !== 'GIF89a') return null;
+  if (view.byteLength < 10) return null;
+  return validDimensions(view.getUint16(6, true), view.getUint16(8, true), 'gif');
+}
+
+function parseBmpHeader(view: DataView): ImageHeaderDimensions | null {
+  if (ascii(view, 0, 2) !== 'BM' || view.byteLength < 26) return null;
+  const dibSize = view.getUint32(14, true);
+  if (dibSize === 12 && view.byteLength >= 22) {
+    return validDimensions(view.getUint16(18, true), view.getUint16(20, true), 'bmp');
+  }
+  if (dibSize >= 40) {
+    return validDimensions(Math.abs(view.getInt32(18, true)), Math.abs(view.getInt32(22, true)), 'bmp');
+  }
+  return null;
+}
+
+function parseWebpHeader(view: DataView): ImageHeaderDimensions | null {
+  if (ascii(view, 0, 4) !== 'RIFF' || ascii(view, 8, 4) !== 'WEBP' || view.byteLength < 30) return null;
+  const chunk = ascii(view, 12, 4);
+  if (chunk === 'VP8X') {
+    return validDimensions(1 + u24le(view, 24), 1 + u24le(view, 27), 'webp');
+  }
+  if (chunk === 'VP8L' && view.getUint8(20) === 0x2f) {
+    const b0 = view.getUint8(21);
+    const b1 = view.getUint8(22);
+    const b2 = view.getUint8(23);
+    const b3 = view.getUint8(24);
+    const width = 1 + (((b1 & 0x3f) << 8) | b0);
+    const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
+    return validDimensions(width, height, 'webp');
+  }
+  if (chunk === 'VP8 ') {
+    const dataOffset = 20;
+    if (
+      view.getUint8(dataOffset + 3) === 0x9d &&
+      view.getUint8(dataOffset + 4) === 0x01 &&
+      view.getUint8(dataOffset + 5) === 0x2a
+    ) {
+      const width = view.getUint16(dataOffset + 6, true) & 0x3fff;
+      const height = view.getUint16(dataOffset + 8, true) & 0x3fff;
+      return validDimensions(width, height, 'webp');
+    }
+  }
+  return null;
+}
+
+function isJpegSofMarker(marker: number): boolean {
+  return (
+    (marker >= 0xc0 && marker <= 0xc3) ||
+    (marker >= 0xc5 && marker <= 0xc7) ||
+    (marker >= 0xc9 && marker <= 0xcb) ||
+    (marker >= 0xcd && marker <= 0xcf)
+  );
+}
+
+function parseJpegHeader(view: DataView): ImageHeaderDimensions | null {
+  if (!matchesBytes(view, 0, [0xff, 0xd8])) return null;
+  let offset = 2;
+  while (offset + 3 < view.byteLength) {
+    while (offset < view.byteLength && view.getUint8(offset) !== 0xff) offset++;
+    while (offset < view.byteLength && view.getUint8(offset) === 0xff) offset++;
+    if (offset >= view.byteLength) break;
+
+    const marker = view.getUint8(offset++);
+    if (marker === 0xd9 || marker === 0xda) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    if (offset + 2 > view.byteLength) break;
+
+    const segmentLength = view.getUint16(offset, false);
+    if (segmentLength < 2) break;
+    const segmentStart = offset + 2;
+    const segmentEnd = offset + segmentLength;
+    if (segmentEnd > view.byteLength) break;
+
+    if (isJpegSofMarker(marker) && segmentStart + 5 <= segmentEnd) {
+      const height = view.getUint16(segmentStart + 1, false);
+      const width = view.getUint16(segmentStart + 3, false);
+      return validDimensions(width, height, 'jpeg');
+    }
+    offset = segmentEnd;
+  }
+  return null;
+}
+
+/**
+ * S25-02-001: read dimensions from image headers before any bitmap or
+ * canvas decode path. Returns null for unknown/unsupported headers so callers
+ * can fall back to post-decode checks, but common raster formats are gated
+ * before memory-heavy decode.
+ */
+export async function probeImageHeaderDimensions(source: Blob): Promise<ImageHeaderDimensions | null> {
+  const headerBlob = typeof source.slice === 'function'
+    ? source.slice(0, IMAGE_HEADER_PROBE_BYTES)
+    : source;
+  const view = new DataView(await headerBlob.arrayBuffer());
+  return (
+    parsePngHeader(view) ??
+    parseJpegHeader(view) ??
+    parseGifHeader(view) ??
+    parseWebpHeader(view) ??
+    parseBmpHeader(view)
+  );
 }
 
 /**

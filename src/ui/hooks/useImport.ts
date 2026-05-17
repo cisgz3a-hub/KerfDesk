@@ -29,9 +29,11 @@ import {
 } from '../../import/image/ImageImportStorageStrategy';
 import {
   ImageImportLimitError,
+  checkImageBeforeDecode,
   checkImageDimensions,
   checkImageFileSize,
   imageLimitErrorMessage,
+  probeImageHeaderDimensions,
 } from '../../import/image/ImageImportLimits';
 
 type ImageImportResult =
@@ -41,6 +43,15 @@ type ImageImportResult =
   | { kind: 'failed' };
 
 async function probeImageDimensionsBeforeDecode(source: File): Promise<boolean> {
+  const headerDimensions = await probeImageHeaderDimensions(source);
+  if (headerDimensions) {
+    checkImageBeforeDecode({
+      fileBytes: source.size,
+      width: headerDimensions.width,
+      height: headerDimensions.height,
+    });
+    return true;
+  }
   if (typeof createImageBitmap !== 'function') return false;
   const bitmap = await createImageBitmap(source);
   try {

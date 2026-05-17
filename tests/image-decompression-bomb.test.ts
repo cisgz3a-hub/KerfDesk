@@ -12,6 +12,7 @@ import {
   checkImageFileSize,
   checkImageDimensions,
   checkImageBeforeDecode,
+  probeImageHeaderDimensions,
   imageLimitErrorMessage,
 } from '../src/import/image/ImageImportLimits';
 
@@ -30,6 +31,17 @@ function assert(c: boolean, m: string): void {
 console.log('\n=== T2-124 Image decompression-bomb protection ===\n');
 
 void (async () => {
+
+function fakePngWithDimensions(width: number, height: number): Blob {
+  const bytes = new Uint8Array(33);
+  bytes.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0);
+  bytes.set([0x00, 0x00, 0x00, 0x0d], 8);
+  bytes.set([0x49, 0x48, 0x44, 0x52], 12);
+  const view = new DataView(bytes.buffer);
+  view.setUint32(16, width, false);
+  view.setUint32(20, height, false);
+  return new Blob([bytes], { type: 'image/png' });
+}
 
 // 1. IMAGE_LIMITS: declared values match audit recommendations
 {
@@ -147,6 +159,29 @@ void (async () => {
     `valid input: returns dimensions + computed pixel count`);
 }
 
+// S25-02-001. Header probe reads dimensions from bytes before bitmap decode.
+{
+  const dims = await probeImageHeaderDimensions(fakePngWithDimensions(640, 480));
+  assert(dims?.width === 640 && dims.height === 480 && dims.format === 'png',
+    'PNG IHDR dimensions are parsed from file bytes');
+}
+
+// S25-02-001. Oversized tiny PNG is rejected from header metadata alone.
+{
+  const bomb = fakePngWithDimensions(50000, 50000);
+  const dims = await probeImageHeaderDimensions(bomb);
+  let caught: unknown = null;
+  try {
+    checkImageBeforeDecode({ fileBytes: bomb.size, width: dims?.width ?? 0, height: dims?.height ?? 0 });
+  } catch (e) { caught = e; }
+  assert(caught instanceof ImageImportLimitError,
+    'oversized small-byte PNG is rejected before any bitmap decode is needed');
+  if (caught instanceof ImageImportLimitError) {
+    assert(caught.limit === 'MAX_DIMENSION',
+      `header-only oversized PNG fails MAX_DIMENSION (got ${caught.limit})`);
+  }
+}
+
 // 12. checkImageBeforeDecode: file-size failure surfaces first
 {
   let caught: unknown = null;
@@ -218,14 +253,25 @@ void (async () => {
   assert(/T2-124/.test(src), 'T2-124 marker in ImageImportLimits.ts');
   for (const id of [
     'IMAGE_LIMITS', 'ImageImportLimitError', 'checkImageFileSize',
-    'checkImageDimensions', 'checkImageBeforeDecode', 'imageLimitErrorMessage',
+    'checkImageDimensions', 'checkImageBeforeDecode',
+    'probeImageHeaderDimensions', 'imageLimitErrorMessage',
   ]) {
     assert(src.includes(id), `export '${id}' declared`);
   }
   assert(/checkImageFileSize\(source\.size\)/.test(useImportSrc),
     'useImport checks File.size before reading image bytes');
-  assert(/createImageBitmap\(source\)/.test(useImportSrc),
-    'useImport probes File dimensions before FileReader/Image decode when createImageBitmap is available');
+  assert(/probeImageHeaderDimensions\(source\)/.test(useImportSrc),
+    'useImport probes File dimensions from image headers before bitmap decode');
+  const headerProbeIndex = useImportSrc.indexOf('probeImageHeaderDimensions(source)');
+  const bitmapProbeIndex = useImportSrc.indexOf('createImageBitmap(source)');
+  const fileReaderIndex = useImportSrc.indexOf('readFileAsDataUri(source)');
+  const grayscaleIndex = useImportSrc.indexOf('prepareImageGrayscale(');
+  assert(headerProbeIndex >= 0 && bitmapProbeIndex >= 0 && headerProbeIndex < bitmapProbeIndex,
+    'header probe runs before createImageBitmap fallback');
+  assert(headerProbeIndex >= 0 && fileReaderIndex >= 0 && headerProbeIndex < fileReaderIndex,
+    'header probe runs before FileReader data-URI conversion');
+  assert(headerProbeIndex >= 0 && grayscaleIndex >= 0 && headerProbeIndex < grayscaleIndex,
+    'header probe runs before grayscale preparation');
   assert(/checkImageDimensions\(.*img\.naturalWidth.*img\.naturalHeight/s.test(useImportSrc),
     'useImport checks decoded image dimensions before grayscale processing fallback');
   assert(/imageLimitErrorMessage/.test(useImportSrc),
