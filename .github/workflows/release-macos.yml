@@ -12,6 +12,11 @@ on:
         description: Existing release tag to attach artifacts to, for example v1.0.0
         required: false
         type: string
+      release_qa_confirmed:
+        description: Confirm installer QA/hardware verification was completed before publishing
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -51,8 +56,10 @@ jobs:
         shell: bash
         env:
           RELEASE_TAG: ${{ inputs.release_tag }}
+          RELEASE_QA_CONFIRMED: ${{ inputs.release_qa_confirmed }}
         run: |
           test -n "$RELEASE_TAG" || { echo "release_tag is required when publish_release is true."; exit 1; }
+          test "$RELEASE_QA_CONFIRMED" = "true" || { echo "release_qa_confirmed must be true after installer QA/hardware verification before publishing signed release assets."; exit 1; }
       - run: npm ci
       - run: npm run build
       - run: npm run electron:compile

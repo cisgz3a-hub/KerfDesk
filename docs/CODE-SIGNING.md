@@ -115,9 +115,12 @@ they build, sign, attest, and upload Actions artifacts without touching
 GitHub Releases.
 
 For an intentional release publish (T1-260), run the signed workflow
-with `publish_release: true` and `release_tag` set to the target tag,
-for example `v1.0.0`. The workflow creates a draft release when the tag
-does not already have one, then uploads:
+with `publish_release: true`, `release_tag` set to the target tag
+(for example `v1.0.0`), and `release_qa_confirmed: true` only after
+the installer QA/hardware verification checklist has been completed.
+The workflow refuses to publish signed release assets unless that QA
+gate is machine-confirmed. The workflow creates a draft release when
+the tag does not already have one, then uploads:
 
 - the platform installer (`.exe` or `.dmg`),
 - `SHA256SUMS.windows` or `SHA256SUMS.macos`,

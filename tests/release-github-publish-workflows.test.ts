@@ -36,10 +36,14 @@ for (const [label, workflow, platform, extension] of [
     `${label} workflow exposes a publish_release manual input`);
   assert(/workflow_dispatch:\s*[\s\S]*inputs:\s*[\s\S]*release_tag:/.test(workflow),
     `${label} workflow exposes a release_tag manual input`);
+  assert(/workflow_dispatch:\s*[\s\S]*inputs:\s*[\s\S]*release_qa_confirmed:/.test(workflow),
+    `${label} workflow exposes a release_qa_confirmed manual input`);
   assert(/contents:\s+write/.test(workflow),
     `${label} workflow grants contents: write only for explicit release publishing`);
   assert(/Validate GitHub Release publish input/.test(workflow),
     `${label} workflow validates release_tag before publishing`);
+  assert(/RELEASE_QA_CONFIRMED/.test(workflow),
+    `${label} workflow machine-checks release QA confirmation before publishing`);
   assert(new RegExp(`SHA256SUMS\\.${platform}`).test(workflow),
     `${label} workflow copies platform-specific checksum filename`);
   assert(new RegExp(`sbom\\.${platform}\\.cdx\\.json`).test(workflow),
@@ -56,6 +60,7 @@ for (const [label, workflow, platform, extension] of [
 
 assert(/publish_release/.test(docs), 'CODE-SIGNING docs mention the publish_release switch');
 assert(/release_tag/.test(docs), 'CODE-SIGNING docs mention the release_tag input');
+assert(/release_qa_confirmed/.test(docs), 'CODE-SIGNING docs mention the release_qa_confirmed gate');
 assert(/SHA256SUMS\.windows/.test(docs) && /SHA256SUMS\.macos/.test(docs),
   'CODE-SIGNING docs document platform-specific checksum assets');
 assert(/T1-260/.test(docs), 'CODE-SIGNING docs carry T1-260 marker');
