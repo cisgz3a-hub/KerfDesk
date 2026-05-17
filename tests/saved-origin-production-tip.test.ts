@@ -40,8 +40,8 @@ assertContract(
   'ConnectionPanelMain declares a one-time current-mode long-job tip key',
 );
 assertContract(
-  /startMode === 'current'[\s\S]*estimateJobTime\(gcode\)\.totalSeconds > 5 \* 60/.test(panel),
-  'start job path detects current-mode jobs longer than five minutes',
+  /const estimatedSecondsForTip =[\s\S]*estimateJobTime\(gcode\)\.totalSeconds[\s\S]*lastGcodeCompileResult\.machineTransform\.plan\.stats\.estimatedTimeSeconds[\s\S]*startMode === 'current' && \(estimatedSecondsForTip \?\? 0\) > 5 \* 60/.test(panel),
+  'start job path detects current-mode jobs longer than five minutes from materialized G-code or spool-backed plan stats',
 );
 assertContract(
   /showAlert\(\s*'Production positioning tip'[\s\S]*Set Origin[\s\S]*Use saved zero point/.test(panel),
