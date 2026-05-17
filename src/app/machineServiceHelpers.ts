@@ -35,7 +35,7 @@ import type {
   SafetyResultLike,
   SafetyState,
 } from './SafetyStateMachine';
-import type { BurnState } from './MachineService';
+import type { BurnState } from './BurnState';
 import type { LaserController } from '../controllers/ControllerInterface';
 
 /**

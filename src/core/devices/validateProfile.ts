@@ -30,8 +30,6 @@
  * Pure function. No React, no storage, no logging. Easy to unit test
  * against arbitrary profile shapes.
  */
-import type { DeviceProfile, MachineOriginCorner } from './DeviceProfile';
-
 export type ProfileValidationSeverity = 'error' | 'warning';
 
 export interface ProfileValidationIssue {
@@ -49,12 +47,35 @@ export interface ProfileValidationResult {
 const MAX_BED_MM = 5000; // 5 m — beyond any consumer/prosumer laser.
 const MAX_SPINDLE = 65535; // 16-bit PWM ceiling — typical microcontroller upper bound.
 const VALID_BAUD = new Set([9600, 19200, 38400, 57600, 115200, 230400, 250000]);
-const VALID_ORIGIN_CORNERS: ReadonlySet<MachineOriginCorner> = new Set([
+const VALID_ORIGIN_CORNERS: ReadonlySet<string> = new Set([
   'front-left',
   'rear-left',
   'front-right',
   'rear-right',
 ]);
+
+interface ProfileValidationInput {
+  readonly id?: unknown;
+  readonly name?: unknown;
+  readonly bedWidth?: unknown;
+  readonly bedHeight?: unknown;
+  readonly maxSpindle?: unknown;
+  readonly watts?: unknown;
+  readonly baudRate?: unknown;
+  readonly originCorner?: unknown;
+  readonly homeCorner?: unknown;
+  readonly maxFeedRate?: unknown;
+  readonly maxRateX?: unknown;
+  readonly maxRateY?: unknown;
+  readonly maxAccelX?: unknown;
+  readonly maxAccelY?: unknown;
+  readonly maxAccelMmPerS2?: unknown;
+  readonly frameDotFeedRate?: unknown;
+  readonly frameLineDelayMs?: unknown;
+  readonly autoFocusSupported?: unknown;
+  readonly autoFocusCommand?: unknown;
+  readonly autoFocusTimeoutMs?: unknown;
+}
 
 /** True for a finite number > 0 within an inclusive upper bound. */
 function isPositiveFinite(n: unknown, max?: number): boolean {
@@ -100,7 +121,7 @@ const FORBIDDEN_AUTOFOCUS_TOKENS = [
   /[\x18\x21\x7E]/,
 ];
 
-export function validateProfile(profile: DeviceProfile): ProfileValidationResult {
+export function validateProfile(profile: ProfileValidationInput): ProfileValidationResult {
   const issues: ProfileValidationIssue[] = [];
 
   // ── Identity ──
@@ -140,7 +161,7 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
   }
 
   // ── Origin corner ──
-  if (!VALID_ORIGIN_CORNERS.has(profile.originCorner as MachineOriginCorner)) {
+  if (typeof profile.originCorner !== 'string' || !VALID_ORIGIN_CORNERS.has(profile.originCorner)) {
     issues.push({
       field: 'originCorner',
       severity: 'error',
@@ -148,7 +169,10 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
       message: `originCorner must be one of front-left | rear-left | front-right | rear-right (got ${String(profile.originCorner)}).`,
     });
   }
-  if (profile.homeCorner != null && !VALID_ORIGIN_CORNERS.has(profile.homeCorner as MachineOriginCorner)) {
+  if (
+    profile.homeCorner != null
+    && (typeof profile.homeCorner !== 'string' || !VALID_ORIGIN_CORNERS.has(profile.homeCorner))
+  ) {
     issues.push({
       field: 'homeCorner',
       severity: 'error',
@@ -189,7 +213,7 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
   // explicit choice.
   if (
     profile.frameLineDelayMs != null
-    && (!Number.isFinite(profile.frameLineDelayMs) || profile.frameLineDelayMs < 0)
+    && !isNonNegativeFinite(profile.frameLineDelayMs)
   ) {
     issues.push({
       field: 'frameLineDelayMs',
@@ -242,7 +266,7 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
   }
 
   // ── Baud rate ──
-  if (!VALID_BAUD.has(profile.baudRate)) {
+  if (typeof profile.baudRate !== 'number' || !VALID_BAUD.has(profile.baudRate)) {
     issues.push({
       field: 'baudRate',
       severity: 'error',
@@ -284,7 +308,10 @@ export function validateProfile(profile: DeviceProfile): ProfileValidationResult
     (profile.autoFocusCommand ?? '') === '' &&
     profile.autoFocusTimeoutMs === 0;
   if (profile.autoFocusTimeoutMs != null && !disabledAutofocusTimeout) {
-    if (!isPositiveFinite(profile.autoFocusTimeoutMs) || profile.autoFocusTimeoutMs > 5 * 60 * 1000) {
+    if (
+      !isPositiveFinite(profile.autoFocusTimeoutMs)
+      || (typeof profile.autoFocusTimeoutMs === 'number' && profile.autoFocusTimeoutMs > 5 * 60 * 1000)
+    ) {
       issues.push({
         field: 'autoFocusTimeoutMs',
         severity: 'error',

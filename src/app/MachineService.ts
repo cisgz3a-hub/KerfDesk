@@ -116,13 +116,8 @@ import {
   type StructuredLogEvent,
   type StructuredLogEventInput,
 } from './StructuredMessageLog';
-
-export interface BurnState {
-  readonly activeIds: ReadonlySet<string>;
-  readonly burnedIds: ReadonlySet<string>;
-}
-
-export type BurnStateListener = (state: BurnState) => void;
+export type { BurnState, BurnStateListener } from './BurnState';
+import type { BurnState, BurnStateListener } from './BurnState';
 
 /**
  * T2-12 part 1: laser-output safety state union, exported for the

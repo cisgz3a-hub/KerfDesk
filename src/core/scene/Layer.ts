@@ -29,6 +29,24 @@ export const LAYER_COLORS = [
 
 export type LayerMode = 'cut' | 'engrave' | 'score' | 'image';
 
+export type LayerSettingsConfidenceSource =
+  | 'built-in-tested'
+  | 'user-saved'
+  | 'estimated'
+  | 'manual-unverified';
+
+export interface LayerSettingsConfidence {
+  source: LayerSettingsConfidenceSource;
+  tested: {
+    presetId: string;
+    presetName: string;
+    material: string;
+    thickness: string;
+    operation: LayerMode;
+  } | null;
+  warning?: string;
+}
+
 /** How raster image pixels become laser power / 1-bit output. */
 export type ImageRasterMode = 'dither' | 'grayscale' | 'threshold';
 
@@ -152,7 +170,7 @@ export interface LaserSettings {
    * on this layer. This distinguishes built-in tested presets from user-saved,
    * estimated, and manual-unverified values without changing compile output.
    */
-  settingsConfidence?: import('../materials/MaterialSettingConfidence').LayerSettingsConfidence;
+  settingsConfidence?: LayerSettingsConfidence;
 }
 
 // ─── LAYER ───────────────────────────────────────────────────────

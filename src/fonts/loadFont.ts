@@ -5,18 +5,22 @@ const cache = new Map<string, Promise<Font>>();
 /** Bundled registry uses `/fonts/...` paths; resolve from `public/` when running under Node (tests, CLI). */
 async function tryLoadBundledFontFromPublicDir(url: string): Promise<Font | null> {
   if (typeof process === 'undefined' || !process.versions?.node) return null;
+  const nodeProcess = process;
   if (!url.startsWith('/') || url.startsWith('//')) return null;
   try {
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (
+      specifier: string,
+    ) => Promise<unknown>;
     const [{ readFileSync }, { join }] = await Promise.all([
-      import('node:fs'),
-      import('node:path'),
+      dynamicImport('node:fs') as Promise<{ readFileSync(path: string): Buffer }>,
+      dynamicImport('node:path') as Promise<{ join(...segments: string[]): string }>,
     ]);
     const relative = url.replace(/^\//, '');
-    const fullPath = join(process.cwd(), 'public', relative);
+    const fullPath = join(nodeProcess.cwd(), 'public', relative);
     const buffer = readFileSync(fullPath);
-    return parseFontBuffer(
-      buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength),
-    );
+    const bytes = new Uint8Array(buffer.byteLength);
+    bytes.set(buffer);
+    return parseFontBuffer(bytes.buffer);
   } catch {
     return null;
   }

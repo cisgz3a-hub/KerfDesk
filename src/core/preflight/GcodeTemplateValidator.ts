@@ -3,7 +3,6 @@
  * G-code (pre-emission; Output.ts paths unchanged).
  */
 
-import { type DeviceProfile } from '../devices/DeviceProfile';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
   BUILT_IN_HEADER_TEMPLATES,
@@ -44,7 +43,10 @@ export interface TemplateValidationInput {
 const EPS = 0.01;
 
 /** Same footer substitution as compile when return-to-origin is off. */
-export function resolveFooterTemplateForValidation(profile: DeviceProfile): string | undefined {
+export function resolveFooterTemplateForValidation(profile: {
+  gcodeFooterTemplate?: string;
+  returnToOrigin?: boolean;
+}): string | undefined {
   const raw = profile.gcodeFooterTemplate;
   if (!(profile.returnToOrigin ?? true)) {
     if (raw === BUILT_IN_FOOTER_TEMPLATES[DEFAULT_FOOTER_TEMPLATE_NAME]) {
@@ -82,8 +84,13 @@ export function validateGcodeTemplates(input: TemplateValidationInput): Template
 
 type TemplateValidator = (input: TemplateValidationInput) => TemplateFinding[];
 
+interface TemplateProfileDialect {
+  outputDialect?: string;
+  outputFormat?: string;
+}
+
 export function templateValidationDialectFromProfile(
-  profile: Pick<DeviceProfile, 'outputDialect' | 'outputFormat'> | null | undefined,
+  profile: TemplateProfileDialect | null | undefined,
 ): TemplateValidationDialect {
   return normalizeTemplateDialect(profile?.outputDialect ?? profile?.outputFormat);
 }

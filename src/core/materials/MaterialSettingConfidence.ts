@@ -1,25 +1,14 @@
-import type { LaserSettings, Layer, LayerMode } from '../scene/Layer';
+import type {
+  LaserSettings,
+  Layer,
+  LayerMode,
+  LayerSettingsConfidence,
+  LayerSettingsConfidenceSource,
+} from '../scene/Layer';
 import { generateId } from '../types';
 import type { MaterialOperation, MaterialPreset } from './MaterialPreset';
 import { isDefaultMaterialPresetId } from './defaultPresets';
-
-export type LayerSettingsConfidenceSource =
-  | 'built-in-tested'
-  | 'user-saved'
-  | 'estimated'
-  | 'manual-unverified';
-
-export interface LayerSettingsConfidence {
-  source: LayerSettingsConfidenceSource;
-  tested: {
-    presetId: string;
-    presetName: string;
-    material: string;
-    thickness: string;
-    operation: LayerMode;
-  } | null;
-  warning?: string;
-}
+export type { LayerSettingsConfidence, LayerSettingsConfidenceSource } from '../scene/Layer';
 
 export interface SaveLayerSettingsAsUserPresetArgs {
   id?: string;

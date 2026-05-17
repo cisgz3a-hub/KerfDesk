@@ -3,10 +3,9 @@
  * Users with multiple lasers can switch between them instantly.
  */
 
-import { type Scene } from '../scene/Scene';
 import { type ScanningOffsetTable } from '../job/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
-import { type OutputFormat } from '../output/Output';
+import { type OutputFormat } from '../output/OutputFormat';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
   BUILT_IN_HEADER_TEMPLATES,
@@ -18,6 +17,18 @@ import {
 import { getStorage } from '../storage/storage';
 import { generateId } from '../types';
 import { validateProfile, type ProfileValidationIssue } from './validateProfile';
+
+interface ProfileSceneView {
+  machine?: {
+    name?: string;
+    watts?: string;
+    type?: string;
+  };
+  canvas?: {
+    width: number;
+    height: number;
+  };
+}
 
 /** Physical home corner after GRBL homing ($23). Drives Y-flip for G-code vs canvas (Y-down). */
 export type MachineOriginCorner = 'front-left' | 'rear-left' | 'front-right' | 'rear-right';
@@ -748,7 +759,7 @@ export function shouldDefaultStartModeToCurrentForProfile(
 }
 
 /** Create a profile from current scene machine settings */
-export function profileFromScene(name: string, scene: Scene): DeviceProfile {
+export function profileFromScene(name: string, scene: ProfileSceneView): DeviceProfile {
   const profile = createBlankProfile(name);
   const machine = scene.machine;
 
@@ -764,7 +775,7 @@ export function profileFromScene(name: string, scene: Scene): DeviceProfile {
 }
 
 /** Apply a profile to scene machine settings */
-export function applyProfileToScene(profile: DeviceProfile, scene: Scene): Scene {
+export function applyProfileToScene<T extends ProfileSceneView>(profile: DeviceProfile, scene: T): T {
   const name = [profile.brand, profile.model].filter(Boolean).join(' ').trim() || profile.name;
   return {
     ...scene,
@@ -779,5 +790,5 @@ export function applyProfileToScene(profile: DeviceProfile, scene: Scene): Scene
       width: profile.bedWidth,
       height: profile.bedHeight,
     },
-  };
+  } as T;
 }

@@ -13,10 +13,11 @@
  */
 
 import { generateId } from '../types';
+import type { OutputFormat } from './OutputFormat';
 
 // ─── OUTPUT FORMAT ───────────────────────────────────────────────
 
-export type OutputFormat = 'grbl' | 'marlin' | 'smoothie' | 'ruida' | 'custom';
+export type { OutputFormat } from './OutputFormat';
 
 // ─── OUTPUT ──────────────────────────────────────────────────────
 
