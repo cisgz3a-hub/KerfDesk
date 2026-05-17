@@ -30,6 +30,7 @@ import {
   getWorkProgress,
   getDeviceStatus,
 } from './FalconHttpClient';
+import { normalizeFalconWifiIpcTarget } from './FalconTargetPolicy';
 import { connectFalconWebSocket, type FalconWsHandle } from './FalconWebSocket';
 import type {
   FalconDeviceStatus,
@@ -47,14 +48,6 @@ const CH = {
   wsStatus: 'falcon-wifi:ws-status',
   wsEvent: 'falcon-wifi:ws-event',
 } as const;
-
-function isValidIp(s: unknown): s is string {
-  if (typeof s !== 'string' || s.length === 0 || s.length > 64) return false;
-  // Permit hostnames and IPv4 only — anything with scheme or path is rejected.
-  // We do NOT try to validate full RFC compliance; this is a cheap guard against
-  // accidental URL injection from the renderer.
-  return /^[A-Za-z0-9._-]+$/.test(s);
-}
 
 let activeHandle: FalconWsHandle | null = null;
 let activeWindow: BrowserWindow | null = null;
@@ -98,29 +91,33 @@ export function registerFalconWiFiIpc(getWindow: () => BrowserWindow | null): vo
     CH.testConnection,
     async (event, ip: unknown): Promise<FalconTestConnectionResult> => {
       assertTrustedSender(event);
-      if (!isValidIp(ip)) return { ok: false, error: 'Invalid IP/host' };
-      return testConnection(ip);
+      const target = normalizeFalconWifiIpcTarget(ip);
+      if (!target.ok) return { ok: false, error: target.error };
+      return testConnection(target.target);
     },
   );
 
   ipcMain.handle(CH.getState, async (event, ip: unknown): Promise<number> => {
     assertTrustedSender(event);
-    if (!isValidIp(ip)) throw new Error('Invalid IP/host');
-    return getWorkState(ip);
+    const target = normalizeFalconWifiIpcTarget(ip);
+    if (!target.ok) throw new Error(target.error);
+    return getWorkState(target.target);
   });
 
   ipcMain.handle(CH.getProgress, async (event, ip: unknown): Promise<number> => {
     assertTrustedSender(event);
-    if (!isValidIp(ip)) throw new Error('Invalid IP/host');
-    return getWorkProgress(ip);
+    const target = normalizeFalconWifiIpcTarget(ip);
+    if (!target.ok) throw new Error(target.error);
+    return getWorkProgress(target.target);
   });
 
   ipcMain.handle(
     CH.getDeviceStatus,
     async (event, ip: unknown): Promise<FalconDeviceStatus> => {
       assertTrustedSender(event);
-      if (!isValidIp(ip)) throw new Error('Invalid IP/host');
-      return getDeviceStatus(ip);
+      const target = normalizeFalconWifiIpcTarget(ip);
+      if (!target.ok) throw new Error(target.error);
+      return getDeviceStatus(target.target);
     },
   );
 
@@ -128,11 +125,12 @@ export function registerFalconWiFiIpc(getWindow: () => BrowserWindow | null): vo
     CH.wsConnect,
     async (event, ip: unknown): Promise<{ ok: boolean; error?: string }> => {
       assertTrustedSender(event);
-      if (!isValidIp(ip)) return { ok: false, error: 'Invalid IP/host' };
+      const target = normalizeFalconWifiIpcTarget(ip);
+      if (!target.ok) return { ok: false, error: target.error };
       refreshWindow();
       closeActiveHandle();
       try {
-        activeHandle = connectFalconWebSocket(ip, forwardEvent);
+        activeHandle = connectFalconWebSocket(target.target, forwardEvent);
         return { ok: true };
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
