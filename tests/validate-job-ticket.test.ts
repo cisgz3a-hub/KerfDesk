@@ -273,6 +273,7 @@ console.log('\n=== T1-135 validateJobTicket ===\n');
       contentHash: hashString(canonicalGcode),
       lineCount: 2,
       byteCount: canonicalGcode.length,
+      usesM4: false,
       open: async function* () {
         yield { lines: ['G0', 'M5'], cumulativeLineCount: 2, isLast: true };
       },

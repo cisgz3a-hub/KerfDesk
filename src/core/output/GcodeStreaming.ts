@@ -126,6 +126,8 @@ export interface SpoolHandle {
   readonly lineCount: number;
   /** Approximate byte count of the canonical UTF-8 stream. */
   readonly byteCount: number;
+  /** Whether the canonical stream contains an M4 dynamic-power command. */
+  readonly usesM4: boolean;
   /**
    * Re-open the spool for streaming consumption. Each call returns a
    * fresh single-use async iterable. Implementations may serve from
@@ -171,10 +173,14 @@ export async function buildReplayableGcodeSpool(
   let hash = 0x811c9dc5 >>> 0;
   let wroteLine = false;
   let sawLast = false;
+  let usesM4 = false;
 
   for await (const chunk of factory(options)) {
     if (options.signal?.aborted) break;
     for (const line of chunk.lines) {
+      if (!usesM4 && /\bM4\b/i.test(line)) {
+        usesM4 = true;
+      }
       if (wroteLine) {
         hash = hashCharsFnv1a(hash, '\n');
         byteCount += 1;
@@ -205,6 +211,7 @@ export async function buildReplayableGcodeSpool(
     contentHash: (hash >>> 0).toString(16).padStart(8, '0'),
     lineCount,
     byteCount,
+    usesM4,
     open: (openOptions?: GcodeGenerateOptions) => factory(openOptions),
   };
 }

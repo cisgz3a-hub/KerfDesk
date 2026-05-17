@@ -20,11 +20,18 @@ import {
   createJobLog,
   addLogEntry,
   finalizeLog,
+  getJobLogs,
   saveJobLog,
   type JobLog,
 } from '../core/job/JobLog';
+import {
+  JobLogCheckpointer,
+  type CheckpointSchedulerLike,
+  type CheckpointStorage,
+  type JobLogLike,
+} from './JobLogCheckpoint';
 import { recordMaterialOutcome } from '../core/materials/MaterialFeedback';
-import { estimateJobTime, estimateJobTimeFromChunks } from '../core/output/TimeEstimator';
+import { estimateJobTime } from '../core/output/TimeEstimator';
 import {
   type SafetyActionResult,
   makeNotConnectedResult,
@@ -247,6 +254,51 @@ function safetyOffStageFromError(err: unknown): SafetyOffOutcomeStage | null {
   return stage === 'm5' || stage === 'soft-reset' || stage === 'failed' ? stage : null;
 }
 
+function formatEstimatedSeconds(totalSeconds: number): string {
+  const safeSeconds = Math.max(0, totalSeconds);
+  const mins = Math.floor(safeSeconds / 60);
+  const secs = Math.round(safeSeconds % 60);
+  return mins > 0 ? `${mins}m ${secs}s` : `${secs}s`;
+}
+
+function spooledJobTimeEstimateFromPlan(ticket: ValidatedJobTicket): { totalSeconds: number; formatted: string } | null {
+  const totalSeconds = ticket.machineTransform.plan.stats.estimatedTimeSeconds;
+  if (!Number.isFinite(totalSeconds)) return null;
+  return {
+    totalSeconds,
+    formatted: formatEstimatedSeconds(totalSeconds),
+  };
+}
+
+let nextJobLogCheckpointTimerId = 1;
+const jobLogCheckpointTimers = new Map<number, ReturnType<typeof setInterval>>();
+
+const defaultJobLogCheckpointScheduler: CheckpointSchedulerLike = {
+  setInterval(fn, ms) {
+    const id = nextJobLogCheckpointTimerId++;
+    jobLogCheckpointTimers.set(id, setInterval(fn, ms));
+    return { id };
+  },
+  clearInterval(handle) {
+    const timer = jobLogCheckpointTimers.get(handle.id);
+    if (timer != null) {
+      clearInterval(timer);
+      jobLogCheckpointTimers.delete(handle.id);
+    }
+  },
+};
+
+const defaultJobLogCheckpointStorage: CheckpointStorage = {
+  async save(log: JobLogLike): Promise<void> {
+    await saveJobLog(log as JobLog);
+  },
+  list: getJobLogs,
+};
+
+export interface MachineServiceOptions {
+  jobLogCheckpointer?: JobLogCheckpointer;
+}
+
 export class MachineService {
   private state: MachineServiceState = {
     isSimulator: false,
@@ -260,6 +312,7 @@ export class MachineService {
   private activeReplay: JobReplay | null = null;
   private currentJobLog: JobLog | null = null;
   private consumedApprovalNonces = new Map<string, number>();
+  private readonly jobLogCheckpointer: JobLogCheckpointer;
 
   /** Ticket currently driving the running job, if any. Set by
    *  startValidatedJob; cleared by tryFinalizeJobLog when the job
@@ -396,7 +449,12 @@ export class MachineService {
   constructor(
     private readonly controllerRef: MutableRefObject<LaserController>,
     private readonly portRef: MutableRefObject<SerialPortLike | null>,
-  ) {}
+    options: MachineServiceOptions = {},
+  ) {
+    this.jobLogCheckpointer =
+      options.jobLogCheckpointer
+      ?? new JobLogCheckpointer(defaultJobLogCheckpointScheduler, defaultJobLogCheckpointStorage);
+  }
 
   /** Acquire an OS wake lock for the duration of an active job.
    *  Prevents Windows USB Selective Suspend and Chromium renderer
@@ -464,6 +522,7 @@ export class MachineService {
 
   clearJobSession(): void {
     void this.releaseWakeLock();
+    this.jobLogCheckpointer.stop();
     this.activeReplay = null;
     this.currentJobLog = null;
     this.activeTicket = null;
@@ -746,6 +805,7 @@ export class MachineService {
       appendMessage(`\u26A0 ${saveResult.message ?? 'Job log not saved'}`);
     }
     if (this.currentJobLog !== log || this.activeJobSessionId !== sessionId) return;
+    this.jobLogCheckpointer.stop();
     if (replay && replay.status === 'running' && this.activeReplay === replay) {
       finalizeReplay(replay, status, linesCompleted);
       saveReplay(replay);
@@ -1041,7 +1101,7 @@ export class MachineService {
       this.emitBurnState();
 
       const estimate = ticket.gcodeSpool
-        ? await estimateJobTimeFromChunks(ticket.gcodeSpool.open())
+        ? spooledJobTimeEstimateFromPlan(ticket)
         : (ticket.gcodeText ? estimateJobTime(ticket.gcodeText) : null);
 
       const jobLog = createJobLog(
@@ -1061,6 +1121,7 @@ export class MachineService {
       addLogEntry(jobLog, 'milestone',
         `Job started: ${jobLineCount} commands (ticket ${ticket.ticketId})`);
       this.currentJobLog = jobLog;
+      this.jobLogCheckpointer.start(() => this.currentJobLog);
 
       // T1-88: replay capture is no longer Pro-gated. Capture is a
       // diagnostic tool for support; gating it behind Pro means free users
@@ -1172,6 +1233,7 @@ export class MachineService {
         const jobLinesWritten =
           this.controllerRef.current?.getJobLinesWrittenSinceJobStart?.() ?? 0;
 
+        this.jobLogCheckpointer.stop();
         this.activeReplay = null;
         this.currentJobLog = null;
         this.activeTicket = null;

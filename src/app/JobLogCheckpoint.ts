@@ -5,11 +5,11 @@
  * the machine disconnected mid-job, the in-memory `currentJobLog`
  * was lost. The failed job's evidence vanished.
  *
- * Audit 5C Required Priority 7. T2-111 ships the scheduling helper
- * + the orphan detector. Wiring this into `MachineService` (start
- * checkpointing on job-active, stop on idle, find-and-finalize
- * orphans on app boot) is filed as T2-111-followup since it
- * touches MachineService + the storage adapter directly.
+ * Audit 5C Required Priority 7. T2-111 first shipped the scheduling
+ * helper + the orphan detector; S25-10-001 wires the checkpointer into
+ * `MachineService` so active jobs save running checkpoints before idle
+ * finalization. Boot-time orphan finalization remains a separate
+ * recovery/reporting concern.
  *
  * Pairs with T2-105 (crash-loop recovery) — the crash report
  * references the orphaned job log via correlation ID (T2-117); and

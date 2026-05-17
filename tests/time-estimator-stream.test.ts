@@ -65,8 +65,12 @@ async function main(): Promise<void> {
   const machineSrc = readFileSync(resolve(here, '../src/app/MachineService.ts'), 'utf-8');
   assert(/export async function estimateJobTimeFromChunks/.test(estimatorSrc), 'estimateJobTimeFromChunks is exported');
   assert(
-    /ticket\.gcodeSpool[\s\S]*estimateJobTimeFromChunks/.test(machineSrc),
-    'MachineService estimates spooled jobs from gcodeSpool',
+    !/ticket\.gcodeSpool[\s\S]*estimateJobTimeFromChunks\(ticket\.gcodeSpool\.open\(\)\)/.test(machineSrc),
+    'MachineService does not replay spooled jobs only to estimate time before controller handoff',
+  );
+  assert(
+    /function spooledJobTimeEstimateFromPlan\(ticket: ValidatedJobTicket\)[\s\S]*ticket\.machineTransform\.plan\.stats\.estimatedTimeSeconds/.test(machineSrc),
+    'MachineService uses compile-time plan stats for spooled job-time labels',
   );
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

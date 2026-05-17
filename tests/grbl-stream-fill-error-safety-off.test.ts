@@ -34,6 +34,7 @@ function failingRefillSpool(): SpoolHandle {
     contentHash: 'audit-f008',
     lineCount: 2201,
     byteCount: 2201 * 8,
+    usesM4: false,
     open: () => {
       openCount++;
       const shouldFailOnRefill = openCount >= 2;

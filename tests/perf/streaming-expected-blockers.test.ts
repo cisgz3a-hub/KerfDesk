@@ -45,6 +45,7 @@ test('T3-40/T3-15: million-line G-code spool is replayable without a flat line a
   assert.equal(spool.lineCount, totalLines);
   assert.match(spool.contentHash, /^[0-9a-f]{8}$/);
   assert(spool.byteCount > totalLines * 8);
+  assert.equal(spool.usesM4, false, 'spool records M4 usage during the first metadata pass');
   assert.equal(factoryCalls, 1, 'spool metadata is computed by one streaming pass');
 
   let observed = 0;
@@ -57,6 +58,23 @@ test('T3-40/T3-15: million-line G-code spool is replayable without a flat line a
   assert.equal(observed, 10_000);
   assert.equal(maxChunk, chunkLines);
   assert.equal(factoryCalls, 2, 'open replays through the chunk factory instead of a stored string[]');
+});
+
+test('S25-12: spool captures dynamic-power metadata without an extra replay', async () => {
+  let factoryCalls = 0;
+  const spool = await buildReplayableGcodeSpool('m4-metadata-test', () => {
+    factoryCalls++;
+    return (async function* (): AsyncGenerator<GcodeChunk> {
+      yield {
+        lines: ['G21', 'M4 S100', 'G1 X1 F600'],
+        cumulativeLineCount: 3,
+        isLast: true,
+      };
+    })();
+  });
+
+  assert.equal(spool.usesM4, true);
+  assert.equal(factoryCalls, 1, 'M4 metadata is captured during spool construction');
 });
 
 test('T3-40: materialized G-code export is explicitly memory-bounded', () => {

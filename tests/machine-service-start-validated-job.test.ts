@@ -280,13 +280,19 @@ async function run(): Promise<void> {
       gcodeText: [...spoolLines].join('\n'),
       gcodeHash: hashString([...spoolLines].join('\n')),
     };
+    const spoolOpenCountBeforeStart = spoolOpenCount;
     Object.defineProperty(spooledTicket, 'gcodeLines', {
       enumerable: true,
       get() {
         throw new Error('spooled start path must not read legacy gcodeLines');
       },
     });
-    const executeCalls: Array<{ outputKind: string; streamLines: string[]; ticketId: string }> = [];
+    const executeCalls: Array<{
+      outputKind: string;
+      streamLines: string[];
+      ticketId: string;
+      spoolOpenCountAtControllerHandoff: number;
+    }> = [];
     const simLines: string[] = [];
     const mock = {
       ...makeMockController(async () => {
@@ -294,6 +300,7 @@ async function run(): Promise<void> {
       }),
       executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
         const streamLines: string[] = [];
+        const spoolOpenCountAtControllerHandoff = spoolOpenCount;
         if ((output as { kind: string }).kind === 'gcode-stream') {
           for await (const chunk of (output as { spool: { open: () => AsyncIterable<{ lines: readonly string[] }> } }).spool.open()) {
             streamLines.push(...chunk.lines);
@@ -303,6 +310,7 @@ async function run(): Promise<void> {
           outputKind: output.kind,
           streamLines,
           ticketId: jobTicket.ticketId,
+          spoolOpenCountAtControllerHandoff,
         });
         return { id: jobTicket.ticketId, startedAt: 123 };
       },
@@ -329,12 +337,16 @@ async function run(): Promise<void> {
       executeCalls[0]?.streamLines.join('\n') === [...spoolLines].join('\n'),
       'gcode-stream output reopens the ticket spool',
     );
+    assert(
+      executeCalls[0]?.spoolOpenCountAtControllerHandoff === spoolOpenCountBeforeStart,
+      'spooled start path does not replay the spool for job-time estimation before controller handoff',
+    );
     assert(simLines.join('\n') === [...spoolLines].join('\n'),
       'spooled ticket simulator fan-out reads from the spool stream');
-    assert(spoolOpenCount >= 3,
-      'spooled ticket opens the spool for metadata, controller handoff, and simulator fan-out');
-    assert(spoolOpenCount < 6,
-      'spooled ticket avoids legacy gcodeLines fallback opens');
+    assert(
+      spoolOpenCount === spoolOpenCountBeforeStart + 2,
+      'spooled ticket only reopens the spool for controller streaming and simulator fan-out during start',
+    );
     assert(executeCalls[0]?.ticketId === spooledTicket.ticketId, 'gcode-stream keeps the running ticket id');
 
     const activeTicket = svc.getActiveTicket();

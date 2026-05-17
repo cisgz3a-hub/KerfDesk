@@ -438,15 +438,6 @@ async function materializeGcodeSpool(
   return { gcode, gcodeLines };
 }
 
-async function streamUsesM4(spool: SpoolHandle, signal?: AbortSignal): Promise<boolean> {
-  for await (const chunk of spool.open({ signal })) {
-    if (signal?.aborted) break;
-    if (chunk.lines.some(line => /\bM4\b/i.test(line))) return true;
-    if (chunk.isLast) break;
-  }
-  return false;
-}
-
 /**
  * Full pipeline: Scene → G-code string + all intermediate data.
  *
@@ -640,7 +631,7 @@ export async function compileGcode(
       gcodeLines = materialized.gcodeLines;
       outputUsesM4 = /\bM4\b/i.test(gcode);
     } else {
-      outputUsesM4 = await streamUsesM4(gcodeSpool, opts.signal);
+      outputUsesM4 = gcodeSpool.usesM4;
     }
   } else {
     const output = strategy.generate(machineTransform.plan, job, gcodeOptions);
