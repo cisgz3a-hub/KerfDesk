@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 495 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 730 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 497 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 734 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -23,10 +23,10 @@ The source tree is the authority for detailed ownership. This generated map is a
 | Boundary | Files | Direct child directories |
 |---|---:|---|
 | `src/` | 2 | - |
-| `src/app` | 47 | - |
+| `src/app` | 48 | - |
 | `src/communication` | 5 | - |
 | `src/controllers` | 29 | grbl |
-| `src/core` | 115 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
+| `src/core` | 116 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/debug` | 4 | - |
 | `src/diagnostics` | 13 | - |
 | `src/entitlements` | 12 | - |
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 654 | - |
+| `tests/` | 658 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -79,6 +79,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 - `src/app/ActiveJobCanvasContext.ts`
 - `src/app/AutosaveBackupSlot.ts`
+- `src/app/BurnState.ts`
 - `src/app/CompiledJobState.ts`
 - `src/app/ConnectionManager.ts`
 - `src/app/CriticalEventStore.ts`
@@ -222,6 +223,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/core/output/GcodeStreaming.ts`
 - `src/core/output/GrblStrategy.ts`
 - `src/core/output/Output.ts`
+- `src/core/output/OutputFormat.ts`
 - `src/core/output/TimeEstimator.ts`
 - `src/core/output/burnEnvelopeDivergence.ts`
 - `src/core/output/emittedBurnEnvelope.ts`
@@ -851,6 +853,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/falcon-autofocus-heal.test.ts`
 - `tests/falcon-serial-profile.test.ts`
 - `tests/falcon-wifi-fake-server.test.ts`
+- `tests/falcon-wifi-ipc-target-validation.test.ts`
 - `tests/falcon-wifi-trust-blocks-start.test.ts`
 - `tests/falcon-wifi-trust.test.ts`
 - `tests/falcon-ws-frame-cap.test.ts`
@@ -888,6 +891,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/frame-vs-burn-equivalence.test.ts`
 - `tests/gated-feature-per-feature.test.ts`
 - `tests/gcode-emitter-purity-and-zero-distance.test.ts`
+- `tests/gcode-encoder-state-isolation.test.ts`
 - `tests/gcode-header-modal-baseline.test.ts`
 - `tests/gcode-preview-large-job-sampling.test.ts`
 - `tests/gcode-relative-mode.test.ts`
@@ -915,6 +919,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/grbl-safe-state-classifier.test.ts`
 - `tests/grbl-settings-parser.test.ts`
 - `tests/grbl-status-report-parser.test.ts`
+- `tests/grbl-stream-fill-error-safety-off.test.ts`
 - `tests/grbl-system-line-tagging.test.ts`
 - `tests/grbl-unsafe-at-connect-types.test.ts`
 - `tests/grbl-wcs-consent-classifier.test.ts`
@@ -967,6 +972,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/last-machine-position.test.ts`
 - `tests/layer-panel-styles.test.ts`
 - `tests/layer-transforms.test.ts`
+- `tests/lf004-spooled-compile-materialization.test.ts`
 - `tests/license-status-machine.test.ts`
 - `tests/license-status-states.test.ts`
 - `tests/lifecycle-revocation.test.ts`
