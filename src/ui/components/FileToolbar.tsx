@@ -89,6 +89,8 @@ export interface FileToolbarProps {
   onShowShortcuts?: () => void;
   /** Toggle compiled toolpath overlay on the design canvas. */
   onTogglePreview?: () => void;
+  onPreviewGcode?: (gcode: string) => void;
+  onResetLayout?: () => void;
   showToolpathPreview?: boolean;
   productionMode?: boolean;
   onToggleProductionMode?: () => void;
@@ -132,6 +134,8 @@ export function FileToolbar({
   productionMode = false,
   onToggleProductionMode,
   onTogglePreview,
+  onPreviewGcode,
+  onResetLayout,
   showToolpathPreview = false,
   onAfterSuccessfulFileSave,
   machineMaxSpindle = 1000,
@@ -495,6 +499,9 @@ export function FileToolbar({
         },
       }, showToolpathPreview ? '👁 Preview ON' : '👁 Preview')
       : null,
+    onResetLayout
+      ? toolbarBtn('Reset Layout', 'Reset the workspace view, overlays, and preview modal', () => onResetLayout())
+      : null,
     spacer(),
     // T1-112 follow-up: build stamp inline in the toolbar, immediately
     // before Settings so the tester can read the deployed commit at a
@@ -628,6 +635,7 @@ export function FileToolbar({
         a.click();
         URL.revokeObjectURL(url);
       },
+      onPreview: onPreviewGcode,
       defaultMaxSpindle: machineMaxSpindle,
       defaultBedWidth: machineBedWidth,
       defaultBedHeight: machineBedHeight,

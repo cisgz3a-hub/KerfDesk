@@ -291,6 +291,7 @@ export function App(): React.ReactElement {
   const clearToolpathPreview = useAppDialogsStore(s => s.clearToolpathPreview);
   const previewMode = useViewportStore(s => s.previewMode);
   const togglePreviewMode = useViewportStore(s => s.togglePreviewMode);
+  const resetViewport = useViewportStore(s => s.resetViewport);
   const bedTabLayout = useViewportStore(s => s.bedTabLayout);
   const handleViewportLayout = useViewportStore(s => s.setBedTabLayout);
 
@@ -1015,6 +1016,13 @@ export function App(): React.ReactElement {
     setShowToolpathPreview(p => !p);
   }, [setShowToolpathPreview]);
 
+  const handleResetLayout = useCallback(() => {
+    resetViewport();
+    setShowToolpathPreview(false);
+    setGcodePreview(null);
+    viewportActionsRef.current?.fitToBed();
+  }, [resetViewport, setGcodePreview, setShowToolpathPreview]);
+
   // Clear preview state only when preview mode is actually off or suppressed by a job.
   useEffect(() => {
     if (shouldClearToolpathPreview({ showToolpathPreview, isJobRunning: grbl.isJobRunning })) {
@@ -1467,6 +1475,8 @@ export function App(): React.ReactElement {
       onToggleProductionMode: handleToggleProductionMode,
       onExit: handleExit,
       onTogglePreview: handleTogglePreview,
+      onPreviewGcode: setGcodePreview,
+      onResetLayout: handleResetLayout,
       showToolpathPreview,
       machineMaxSpindle: grbl.controller?.maxSpindle ?? 1000,
       machineBedWidth: resolvedMachineBedWidthMm,

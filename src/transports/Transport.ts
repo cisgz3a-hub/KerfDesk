@@ -30,6 +30,7 @@ export interface TransportOpenOptions {
   readonly baudRate?: number;
   readonly signal?: AbortSignal;
   readonly endpoint?: string;
+  readonly serialSignals?: SerialOutputSignals;
 }
 
 export interface Transport {

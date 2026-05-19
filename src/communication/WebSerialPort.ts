@@ -62,7 +62,7 @@ export class WebSerialPort implements SerialPortLike {
   }
 
   async open(options?: TransportOpenOptions): Promise<void> {
-    await this.requestAndOpen(options?.baudRate ?? 115200, options?.signal);
+    await this.requestAndOpen(options?.baudRate ?? 115200, options?.signal, options?.serialSignals);
   }
 
   /**
@@ -82,7 +82,11 @@ export class WebSerialPort implements SerialPortLike {
    * a thrown error. The AbortError surfaces with a stable message so
    * UI gates can distinguish user-cancel from transport failure.
    */
-  async requestAndOpen(baudRate: number = 115200, signal?: AbortSignal): Promise<void> {
+  async requestAndOpen(
+    baudRate: number = 115200,
+    signal?: AbortSignal,
+    serialSignals?: SerialOutputSignals,
+  ): Promise<void> {
     let port: SerialPort | null = null;
     let portOpened = false;
     let writer: WritableStreamDefaultWriter | null = null;
@@ -97,6 +101,8 @@ export class WebSerialPort implements SerialPortLike {
 
       await port.open({ baudRate });
       portOpened = true;
+      signal?.throwIfAborted();
+      await applySerialSignals(port, serialSignals);
       signal?.throwIfAborted();
 
       writer = port.writable?.getWriter() ?? null;
@@ -160,6 +166,7 @@ export class WebSerialPort implements SerialPortLike {
     baudRate: number = 115200,
     fingerprint?: DeviceFingerprint,
     signal?: AbortSignal,
+    serialSignals?: SerialOutputSignals,
   ): Promise<KnownPortConnectResult> {
     signal?.throwIfAborted();
     const known = await WebSerialPort.getKnownPorts();
@@ -176,14 +183,14 @@ export class WebSerialPort implements SerialPortLike {
     }
 
     if (candidate) {
-      await this._openExistingPort(candidate, baudRate, signal);
+      await this._openExistingPort(candidate, baudRate, signal, serialSignals);
       return {
         usedKnownPort: true,
         fingerprint: extractFingerprint(candidate),
       };
     }
 
-    await this.requestAndOpen(baudRate, signal);
+    await this.requestAndOpen(baudRate, signal, serialSignals);
     return {
       usedKnownPort: false,
       fingerprint: this._port ? extractFingerprint(this._port) : undefined,
@@ -199,6 +206,7 @@ export class WebSerialPort implements SerialPortLike {
     port: SerialPort,
     baudRate: number,
     signal?: AbortSignal,
+    serialSignals?: SerialOutputSignals,
   ): Promise<void> {
     let portOpened = false;
     let writer: WritableStreamDefaultWriter | null = null;
@@ -208,6 +216,8 @@ export class WebSerialPort implements SerialPortLike {
       signal?.throwIfAborted();
       await port.open({ baudRate });
       portOpened = true;
+      signal?.throwIfAborted();
+      await applySerialSignals(port, serialSignals);
       signal?.throwIfAborted();
 
       writer = port.writable?.getWriter() ?? null;
@@ -564,6 +574,14 @@ export function messageFromUnknownError(error: unknown): string {
 
 function errorFromUnknownError(error: unknown): Error {
   return error instanceof Error ? error : new Error(messageFromUnknownError(error));
+}
+
+async function applySerialSignals(
+  port: SerialPort,
+  serialSignals?: SerialOutputSignals,
+): Promise<void> {
+  if (!serialSignals || typeof port.setSignals !== 'function') return;
+  await port.setSignals(serialSignals);
 }
 
 /**

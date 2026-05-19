@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 497 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 740 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 749 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -49,7 +49,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 664 | - |
+| `tests/` | 673 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -896,6 +896,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/gcode-hard-off-zero-power-travel.test.ts`
 - `tests/gcode-header-modal-baseline.test.ts`
 - `tests/gcode-preview-large-job-sampling.test.ts`
+- `tests/gcode-preview-laser-state.test.ts`
 - `tests/gcode-relative-mode.test.ts`
 - `tests/gcode-relative-return-template.test.ts`
 - `tests/gcode-settings-custom-start-end-wiring.test.ts`
@@ -915,6 +916,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/grbl-identity-verification.test.ts`
 - `tests/grbl-job-bounds-checker.test.ts`
 - `tests/grbl-job-line-parser.test.ts`
+- `tests/grbl-legacy-jog-mode.test.ts`
 - `tests/grbl-marker-lifecycle.test.ts`
 - `tests/grbl-operation-validators-reject-bad-numbers.test.ts`
 - `tests/grbl-request-work-offsets.test.ts`
@@ -922,6 +924,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/grbl-settings-parser.test.ts`
 - `tests/grbl-status-report-parser.test.ts`
 - `tests/grbl-stream-fill-error-safety-off.test.ts`
+- `tests/grbl-synchronous-transfer-mode.test.ts`
 - `tests/grbl-system-line-tagging.test.ts`
 - `tests/grbl-unsafe-at-connect-types.test.ts`
 - `tests/grbl-wcs-consent-classifier.test.ts`
@@ -933,6 +936,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/history.test.ts`
 - `tests/home-corner-wizard-profile.test.ts`
 - `tests/image-decompression-bomb.test.ts`
+- `tests/image-import-dragdrop-supported-types.test.tsx`
 - `tests/image-import-large-file-blob-store.test.ts`
 - `tests/image-import-max-dim-cap.test.ts`
 - `tests/image-prep-grayscale-equivalence.test.ts`
@@ -962,6 +966,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/job-start-deferred-simulator-fanout.test.ts`
 - `tests/jobcompiler-keeps-pro-settings-with-license.test.ts`
 - `tests/jobcompiler-progress-cancel.test.ts`
+- `tests/jobcompiler-raster-preprocessing-cancel.test.ts`
 - `tests/jobcompiler-strips-pro-settings-without-license.test.ts`
 - `tests/jobcompiler-uses-processed-data-pass4b.test.ts`
 - `tests/joblog-event-window-retention.test.ts`
@@ -979,6 +984,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/license-status-machine.test.ts`
 - `tests/license-status-states.test.ts`
 - `tests/lifecycle-revocation.test.ts`
+- `tests/lightburn-layout-reset-affordance.test.ts`
+- `tests/lightburn-settings-compatibility.test.ts`
 - `tests/load-repair-report.test.ts`
 - `tests/local-origin-transform-preserves-orientation.test.ts`
 - `tests/machine-command-gateway.test.ts`
@@ -1232,6 +1239,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/template-safety-enforcement.test.ts`
 - `tests/template-validation-aggregates-errors.test.ts`
 - `tests/template-validator.test.ts`
+- `tests/test-grid-dialog-preview-flow.test.ts`
 - `tests/test-grid-generator.test.ts`
 - `tests/test-runner-lanes.test.ts`
 - `tests/test-runner-timeout-diagnostics.test.ts`
@@ -1288,6 +1296,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/wcs-no-listener-headless-flag.test.ts`
 - `tests/wcs-query-error-fails-closed.test.ts`
 - `tests/web-serial-byte-stream-harness.test.ts`
+- `tests/web-serial-control-signals.test.ts`
 - `tests/web-serial-partial-open-cleanup.test.ts`
 - `tests/webcrypto-entitlement-verifier.test.ts`
 - `tests/webserial-cable-pull-heartbeat.test.ts`

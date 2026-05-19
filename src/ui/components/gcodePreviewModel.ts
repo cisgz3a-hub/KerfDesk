@@ -4,7 +4,7 @@
  * move while still keeping full-duration and full-bounds estimates.
  */
 
-export type GcodePreviewMoveType = 'rapid' | 'cut';
+export type GcodePreviewMoveType = 'rapid' | 'travel' | 'cut';
 
 export interface GcodePreviewMove {
   fromX: number;
@@ -65,6 +65,25 @@ function forEachGcodeLine(gcode: string, visit: (line: string) => void): void {
   }
 }
 
+function stripGcodeComments(line: string): string {
+  return line
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/;.*$/g, ' ');
+}
+
+function parseGcodeWords(line: string): Array<{ letter: string; value: number }> {
+  const words: Array<{ letter: string; value: number }> = [];
+  const wordPattern = /([A-Za-z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/g;
+  let match: RegExpExecArray | null;
+  while ((match = wordPattern.exec(line)) !== null) {
+    const value = parseFloat(match[2]);
+    if (Number.isFinite(value)) {
+      words.push({ letter: match[1].toUpperCase(), value });
+    }
+  }
+  return words;
+}
+
 function emptyModel(sourceLineCount: number): GcodePreviewModel {
   return {
     moves: [],
@@ -103,40 +122,55 @@ export function buildGcodePreviewModel(
   let totalMoveCount = 0;
   let travelCount = 0;
   let cutCount = 0;
+  let laserModalOn = false;
+  let spindlePower = 0;
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
   let maxY = -Infinity;
 
   forEachGcodeLine(gcode, (line) => {
-    const trimmed = line.trim();
+    const trimmed = stripGcodeComments(line).trim();
     if (!trimmed || trimmed.startsWith(';')) return;
 
-    const gMatch = trimmed.match(/^G\s*(\d+)/i);
-    if (gMatch) {
-      const gNum = parseInt(gMatch[1], 10);
-      modalRapid = gNum === 0;
+    const words = parseGcodeWords(trimmed);
+    let xWord: number | null = null;
+    let yWord: number | null = null;
+
+    for (const word of words) {
+      if (word.letter === 'G') {
+        const gNum = Math.trunc(word.value);
+        if (gNum === 0) modalRapid = true;
+        else if (gNum === 1 || gNum === 2 || gNum === 3) modalRapid = false;
+      } else if (word.letter === 'M') {
+        const mNum = Math.trunc(word.value);
+        if (mNum === 3 || mNum === 4) laserModalOn = true;
+        else if (mNum === 5) laserModalOn = false;
+      } else if (word.letter === 'S') {
+        spindlePower = word.value;
+      } else if (word.letter === 'F') {
+        feedRate = word.value;
+      } else if (word.letter === 'X') {
+        xWord = word.value;
+      } else if (word.letter === 'Y') {
+        yWord = word.value;
+      }
     }
 
-    const fMatch = trimmed.match(/F([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
-    if (fMatch) feedRate = parseFloat(fMatch[1]);
+    if (xWord === null && yWord === null) return;
 
-    const xMatch = trimmed.match(/X([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
-    const yMatch = trimmed.match(/Y([+-]?(?:\d+(?:\.\d*)?|\.\d+))/i);
-
-    if (!xMatch && !yMatch) return;
-
-    const nx = xMatch ? parseFloat(xMatch[1]) : x;
-    const ny = yMatch ? parseFloat(yMatch[1]) : y;
+    const nx = xWord ?? x;
+    const ny = yWord ?? y;
     const dist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
     const isRapid = modalRapid;
+    const isCut = !isRapid && laserModalOn && spindlePower > 0;
     const speed = isRapid ? 5000 : (feedRate || 1000);
     const moveTime = dist > 0 ? (dist / speed) * 60 : 0;
     totalDuration += moveTime;
     totalMoveCount++;
 
-    if (isRapid) travelCount++;
-    else cutCount++;
+    if (isCut) cutCount++;
+    else travelCount++;
 
     minX = Math.min(minX, x, nx);
     minY = Math.min(minY, y, ny);
@@ -150,7 +184,7 @@ export function buildGcodePreviewModel(
         fromY: y,
         toX: nx,
         toY: ny,
-        type: isRapid ? 'rapid' : 'cut',
+        type: isRapid ? 'rapid' : (isCut ? 'cut' : 'travel'),
         time: totalDuration,
       });
     }

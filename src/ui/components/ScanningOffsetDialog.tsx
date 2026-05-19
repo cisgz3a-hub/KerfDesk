@@ -76,8 +76,9 @@ export function ScanningOffsetDialog(props: ScanningOffsetDialogProps) {
         'p',
         { style: { fontSize: 12, color: '#888', lineHeight: 1.5 } },
         'At fast raster speeds, laser firing latency shifts the burn in the direction of travel. ',
-        'Measure the offset at each test speed and enter it here. Offset scales linearly with speed, ',
-        'so two calibration points are usually enough.',
+        'Burn the bidirectional calibration pattern, measure the distance between opposing lines, ',
+        'then enter half that measured distance as the correction for each speed. ',
+        'Use positive or negative values to align left-to-right and right-to-left passes.',
       ),
 
       React.createElement(
@@ -189,7 +190,14 @@ export function ScanningOffsetDialog(props: ScanningOffsetDialogProps) {
           'button',
           {
             onClick: () => {
-              const cleaned = rows.filter(r => r.speedMmPerMin > 0);
+              const cleaned = rows
+                .filter(r =>
+                  Number.isFinite(r.speedMmPerMin)
+                  && r.speedMmPerMin > 0
+                  && Number.isFinite(r.offsetMm)
+                  && Math.abs(r.offsetMm) <= 25,
+                )
+                .sort((a, b) => a.speedMmPerMin - b.speedMmPerMin);
               onSave(cleaned);
               onClose();
             },

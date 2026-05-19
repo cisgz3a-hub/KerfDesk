@@ -15,45 +15,74 @@ export type ImageBytes = Uint8Array<ArrayBuffer>;
 /** Any byte view acceptable as raster input (slices, copies, etc.). */
 export type ImageBytesSource = Uint8Array<ArrayBufferLike>;
 
+export interface ImageProcessingOptions {
+  signal?: AbortSignal;
+}
+
+const ABORT_CHECK_INTERVAL = 1024;
+
 function clampByte(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
 }
 
+function throwIfImageProcessingAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
 /** brightness: -100 to +100. pixel = clamp(pixel + brightness * 2.55) */
-export function adjustBrightness(data: ImageBytesSource, brightness: number): ImageBytes {
+export function adjustBrightness(
+  data: ImageBytesSource,
+  brightness: number,
+  options?: ImageProcessingOptions,
+): ImageBytes {
   const out = new Uint8Array(data.length);
   const delta = brightness * 2.55;
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfImageProcessingAborted(options?.signal);
     out[i] = clampByte(data[i] + delta);
   }
   return out;
 }
 
 /** contrast: -100 to +100. pixel = clamp(((pixel - 128) * (1 + contrast/100)) + 128) */
-export function adjustContrast(data: ImageBytesSource, contrast: number): ImageBytes {
+export function adjustContrast(
+  data: ImageBytesSource,
+  contrast: number,
+  options?: ImageProcessingOptions,
+): ImageBytes {
   const out = new Uint8Array(data.length);
   const factor = 1 + contrast / 100;
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfImageProcessingAborted(options?.signal);
     out[i] = clampByte((data[i] - 128) * factor + 128);
   }
   return out;
 }
 
-export function invertImage(data: ImageBytesSource): ImageBytes {
+export function invertImage(data: ImageBytesSource, options?: ImageProcessingOptions): ImageBytes {
   const out = new Uint8Array(data.length);
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfImageProcessingAborted(options?.signal);
     out[i] = 255 - data[i];
   }
   return out;
 }
 
 /** Gamma curve on a copy; gamma typically 0.1–5, 1 = unchanged. */
-export function adjustGamma(data: ImageBytesSource, gamma: number): ImageBytes {
+export function adjustGamma(
+  data: ImageBytesSource,
+  gamma: number,
+  options?: ImageProcessingOptions,
+): ImageBytes {
   const g = Math.max(0.1, Math.min(5, gamma));
+  throwIfImageProcessingAborted(options?.signal);
   if (g === 1) return new Uint8Array(data);
   const out = new Uint8Array(data.length);
   const invG = 1 / g;
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfImageProcessingAborted(options?.signal);
     const nv = Math.pow(Math.max(0, Math.min(1, data[i] / 255)), invG);
     out[i] = clampByte(nv * 255);
   }
@@ -66,10 +95,12 @@ export function thresholdToOneBit(
   width: number,
   height: number,
   threshold: number,
+  options?: ImageProcessingOptions,
 ): ImageBytes {
   const t = Math.max(0, Math.min(255, threshold));
   const out = new Uint8Array(width * height);
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfImageProcessingAborted(options?.signal);
     out[i] = data[i] < t ? 255 : 0;
   }
   return out;

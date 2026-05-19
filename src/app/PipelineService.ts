@@ -28,7 +28,13 @@ import {
 import { compileJob } from '../core/job/JobCompiler';
 import { optimizePlan } from '../core/plan/PlanOptimizer';
 import '../core/output/GrblStrategy';
-import { getActiveProfile, type DeviceProfile, type MachineOriginCorner } from '../core/devices/DeviceProfile';
+import {
+  getActiveProfile,
+  resolveAirAssistCommand,
+  resolveGrblLaserPowerMode,
+  type DeviceProfile,
+  type MachineOriginCorner,
+} from '../core/devices/DeviceProfile';
 import {
   applyProfileOverrides,
   grblCapabilities,
@@ -593,6 +599,8 @@ export async function compileGcode(
       returnY: machineTransform.returnPosition.y,
     },
     maxSpindle,
+    grblLaserPowerMode: resolveGrblLaserPowerMode(profile),
+    airAssistCommand: resolveAirAssistCommand(profile),
     clock: () => generatedAt,
     signal: opts.signal,
     onProgress: (event) => {

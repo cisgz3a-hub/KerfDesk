@@ -308,8 +308,8 @@ void (async () => {
       assert(ctrl.connectCalls === 0, 'service cancel: controller.connect NOT called when open is aborted');
     }
 
-    assert(/connectKnownPortOrPrompt\(baudRate,\s*profileFingerprint,\s*connectSignal\)/.test(machineServiceSource),
-      'source pin: MachineService passes service-owned AbortSignal into WebSerialPort.connectKnownPortOrPrompt');
+    assert(/connectKnownPortOrPrompt\(\s*baudRate,\s*profileFingerprint,\s*connectSignal,\s*resolveSerialSignals\(activeProfile\),\s*\)/.test(machineServiceSource),
+      'source pin: MachineService passes service-owned AbortSignal into WebSerialPort.connectKnownPortOrPrompt before optional serial signals');
     assert(/controllerRef\.current\.connect\(ws,\s*connectSignal\)/.test(machineServiceSource),
       'source pin: MachineService passes service-owned AbortSignal into controller.connect');
   } finally {

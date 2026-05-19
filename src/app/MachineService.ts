@@ -73,7 +73,13 @@ import {
   type FalconWiFiAction,
   type TrustClassification,
 } from '../security/FalconWiFiTrust';
-import { getActiveProfile, saveDeviceProfile } from '../core/devices/DeviceProfile';
+import {
+  getActiveProfile,
+  resolveGrblJogMode,
+  resolveGrblTransferMode,
+  resolveSerialSignals,
+  saveDeviceProfile,
+} from '../core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import { type ActiveJobCanvasContext } from './ActiveJobCanvasContext';
 import { setUnsafePriorState, clearUnsafePriorState } from './unsafePriorState';
@@ -1175,6 +1181,7 @@ export class MachineService {
         sceneHash: ticket.sceneHash,
         profileHash: ticket.profileHash,
         outputHash: ticket.gcodeHash,
+        transferMode: resolveGrblTransferMode(getActiveProfile()),
       });
       if (ticket.gcodeSpool) {
         this._notifySimulatorSpoolChunked(ticket.gcodeSpool, notifySimulatorTx);
@@ -2182,7 +2189,12 @@ export class MachineService {
         activeProfile?.connection?.kind === 'serial'
           ? activeProfile.connection.fingerprint
           : undefined;
-      const connectResult = await ws.connectKnownPortOrPrompt(baudRate, profileFingerprint, connectSignal);
+      const connectResult = await ws.connectKnownPortOrPrompt(
+        baudRate,
+        profileFingerprint,
+        connectSignal,
+        resolveSerialSignals(activeProfile),
+      );
       connectSignal.throwIfAborted();
       await this.controllerRef.current.connect(ws, connectSignal);
       connectSignal.throwIfAborted();
@@ -2669,7 +2681,12 @@ export class MachineService {
     }
     try {
       try {
-        const result = await ctrl.operations.jog({ axis, distanceMm: distance, feedMmPerMin: feedRate });
+        const result = await ctrl.operations.jog({
+          axis,
+          distanceMm: distance,
+          feedMmPerMin: feedRate,
+          mode: resolveGrblJogMode(getActiveProfile()),
+        });
         if (!result.ok) return { ok: false, reason: result.reason };
       } catch (err: unknown) {
         return { ok: false, reason: err instanceof Error ? err.message : String(err) };

@@ -46,7 +46,7 @@ export interface Output {
 
 import { type Plan, type Move } from '../plan/Plan';
 import { type Job } from '../job/Job';
-import { type GcodeGenerateOptions } from './GcodeOrigin';
+import { type AirAssistCommand, type GcodeGenerateOptions, type GrblLaserPowerMode } from './GcodeOrigin';
 import {
   type GcodeChunk,
   type GcodeGenerateOptions as StreamingChunkOptions,
@@ -185,8 +185,13 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   abstract encodeLaserOff(): string;
   abstract encodePowerValue(power: number): string;
   protected abstract encodePowerValueForMaxSpindle(power: number, maxSpindle: number): string;
-  protected encodeLaserOnForMaxSpindle(power: number, maxSpindle: number): string {
+  protected encodeLaserOnForMaxSpindle(
+    power: number,
+    maxSpindle: number,
+    grblLaserPowerMode?: GrblLaserPowerMode,
+  ): string {
     void maxSpindle;
+    void grblLaserPowerMode;
     return this.encodeLaserOn(power);
   }
 
@@ -442,6 +447,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       currentSpeed: 0,
       hardOffZeroPowerLinearMoves: options?.hardOffZeroPowerLinearMoves ?? true,
       maxSpindle: options?.maxSpindle ?? 1000,
+      grblLaserPowerMode: options?.grblLaserPowerMode ?? 'dynamic-m4',
+      airAssistCommand: options?.airAssistCommand ?? 'M8',
       prevPos: { x: 0, y: 0 },
       relative: options?.startMode === 'current',
       prevZ: 0,
@@ -755,12 +762,18 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return [
       this.encodeLaserOff(),
       travelLine,
-      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle),
+      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle, state.grblLaserPowerMode),
     ].join('\n');
   }
 
   private encodeLaserOnWithState(power: number, state: GcodeEncoderState): string {
-    return this.encodeLaserOnForMaxSpindle(power, state.maxSpindle);
+    return this.encodeLaserOnForMaxSpindle(power, state.maxSpindle, state.grblLaserPowerMode);
+  }
+
+  protected encodeAirAssistForCommand(on: boolean, command: AirAssistCommand): string {
+    if (!on) return 'M9 ; air assist OFF';
+    if (command === 'none') return '; air assist ON skipped (profile command none)';
+    return `${command} ; air assist ON`;
   }
 
   private encodeZMoveWithState(z: number, state: GcodeEncoderState): string {
@@ -837,7 +850,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       case 'laserOn':  return this.encodeLaserOnWithState(move.power, state);
       case 'laserOff': return this.encodeLaserOff();
       case 'dwell':    return this.encodeDwell(move.ms);
-      case 'setAir':   return this.encodeAirAssist(move.on);
+      case 'setAir':   return this.encodeAirAssistForCommand(move.on, state.airAssistCommand);
       case 'setZ':     return this.encodeZMoveWithState(move.z, state);
       case 'marker':
         return `; OBJ ids=${move.sourceObjectIds.join(',')}`;
@@ -849,6 +862,8 @@ interface GcodeEncoderState {
   currentSpeed: number;
   hardOffZeroPowerLinearMoves: boolean;
   maxSpindle: number;
+  grblLaserPowerMode: GrblLaserPowerMode;
+  airAssistCommand: AirAssistCommand;
   prevPos: { x: number; y: number };
   relative: boolean;
   prevZ: number;

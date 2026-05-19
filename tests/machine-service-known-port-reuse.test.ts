@@ -216,8 +216,8 @@ void (async () => {
 
     // 3. Source-level guard: the production path consumes the T3-48
     //    helper, and the serial profile schema has a fingerprint slot.
-    assert(/connectKnownPortOrPrompt\(baudRate,\s*profileFingerprint,\s*connectSignal\)/.test(machineServiceSource),
-      'source pin: MachineService uses connectKnownPortOrPrompt with profile fingerprint and AbortSignal');
+    assert(/connectKnownPortOrPrompt\(\s*baudRate,\s*profileFingerprint,\s*connectSignal,\s*resolveSerialSignals\(activeProfile\),\s*\)/.test(machineServiceSource),
+      'source pin: MachineService uses connectKnownPortOrPrompt with profile fingerprint, AbortSignal, and optional serial signals');
     assert(!/await\s+ws\.requestAndOpen\(baudRate,\s*connectSignal\)/.test(machineServiceSource),
       'source pin: MachineService no longer calls prompt-only requestAndOpen directly');
     assert(/fingerprint\?:\s*SerialDeviceFingerprint/.test(profileSource),

@@ -11,13 +11,22 @@ export interface TestGridDialogProps {
   open: boolean;
   onClose: () => void;
   onGenerate: (gcode: string, bounds: { width: number; height: number }) => void;
+  onPreview?: (gcode: string, bounds: { width: number; height: number }) => void;
   defaultMaxSpindle: number;
   defaultBedWidth: number;
   defaultBedHeight: number;
 }
 
 export function TestGridDialog(props: TestGridDialogProps) {
-  const { open, onClose, onGenerate, defaultMaxSpindle, defaultBedWidth, defaultBedHeight } = props;
+  const {
+    open,
+    onClose,
+    onGenerate,
+    onPreview,
+    defaultMaxSpindle,
+    defaultBedWidth,
+    defaultBedHeight,
+  } = props;
 
   const [opts, setOpts] = React.useState<TestGridOptions>({
     ...DEFAULT_TEST_GRID,
@@ -50,6 +59,10 @@ export function TestGridDialog(props: TestGridDialogProps) {
   const fits =
     width + effectiveOpts.originX <= defaultBedWidth &&
     height + effectiveOpts.originY <= defaultBedHeight;
+  const buildGridGcode = () => ({
+    gcode: generateTestGrid(effectiveOpts),
+    bounds: { width, height },
+  });
 
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
@@ -258,11 +271,36 @@ export function TestGridDialog(props: TestGridDialogProps) {
           >
             Cancel
           </button>
+          {onPreview
+            ? (
+              <button
+                type="button"
+                onClick={() => {
+                  const { gcode } = buildGridGcode();
+                  onPreview?.(gcode, { width, height });
+                }}
+                disabled={!fits || parsedPowers.length === 0 || parsedSpeeds.length === 0}
+                style={{
+                  padding: '6px 14px',
+                  background: fits ? 'rgba(0,212,255,0.1)' : '#333',
+                  border: fits ? '1px solid rgba(0,212,255,0.35)' : '1px solid #333',
+                  borderRadius: 4,
+                  color: fits ? '#00d4ff' : '#0a0a14',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: fits ? 'pointer' : 'not-allowed',
+                  opacity: fits ? 1 : 0.5,
+                }}
+              >
+                Preview G-code
+              </button>
+            )
+            : null}
           <button
             type="button"
             onClick={() => {
-              const gcode = generateTestGrid(effectiveOpts);
-              onGenerate(gcode, { width, height });
+              const { gcode, bounds } = buildGridGcode();
+              onGenerate(gcode, bounds);
               onClose();
             }}
             disabled={!fits || parsedPowers.length === 0 || parsedSpeeds.length === 0}

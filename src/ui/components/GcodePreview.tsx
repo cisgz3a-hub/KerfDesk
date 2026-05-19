@@ -55,20 +55,28 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
         ctx.beginPath();
         ctx.moveTo(toScreenX(move.fromX), toScreenY(move.fromY));
         ctx.lineTo(toScreenX(move.toX), toScreenY(move.toY));
-        ctx.strokeStyle = move.type === 'cut' ? '#ff4466' : '#444466';
+        ctx.strokeStyle = move.type === 'cut'
+          ? '#ff4466'
+          : move.type === 'travel'
+            ? '#00d4ff'
+            : '#444466';
         ctx.lineWidth = move.type === 'cut' ? 1 : 0.5;
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
     }
 
-    // Pass 2: Draw completed travel moves (gray dashed)
-    ctx.setLineDash([4, 4]);
-    ctx.strokeStyle = 'rgba(100, 100, 130, 0.4)';
+    // Pass 2: Draw completed non-cut moves. Rapid and laser-off feed moves
+    // are both travel, but laser-off feed moves are highlighted so they are
+    // not mistaken for active cutting.
     ctx.lineWidth = 0.5;
     for (const move of parsedMoves) {
       if (move.time > currentTime) break;
-      if (move.type !== 'rapid') continue;
+      if (move.type === 'cut') continue;
+      ctx.setLineDash(move.type === 'rapid' ? [4, 4] : [2, 3]);
+      ctx.strokeStyle = move.type === 'rapid'
+        ? 'rgba(100, 100, 130, 0.4)'
+        : 'rgba(0, 212, 255, 0.42)';
       ctx.beginPath();
       ctx.moveTo(toScreenX(move.fromX), toScreenY(move.fromY));
       ctx.lineTo(toScreenX(move.toX), toScreenY(move.toY));
@@ -164,7 +172,7 @@ export function GcodePreview({ gcode, bedWidth, bedHeight, onClose }: GcodePrevi
     ctx.font = '11px JetBrains Mono, monospace';
 
     ctx.fillStyle = 'rgba(100, 100, 130, 0.6)';
-    ctx.fillText(`Travel: ${previewModel.travelCount}  Cut: ${previewModel.cutCount}`, 14, overlayY + 16);
+    ctx.fillText(`Travel/off: ${previewModel.travelCount}  Cut: ${previewModel.cutCount}`, 14, overlayY + 16);
 
     ctx.fillStyle = '#8888aa';
     ctx.fillText(`Progress: ${completedMoves}/${previewModel.totalMoveCount} moves`, 14, overlayY + 32);

@@ -36,11 +36,18 @@ declare global {
     readonly usbProductId?: number;
   }
 
+  interface SerialOutputSignals {
+    readonly dataTerminalReady?: boolean;
+    readonly requestToSend?: boolean;
+    readonly break?: boolean;
+  }
+
   interface SerialPort {
     readonly readable: ReadableStream<Uint8Array> | null;
     readonly writable: WritableStream<Uint8Array> | null;
     open(options: { baudRate: number }): Promise<void>;
     close(): Promise<void>;
+    setSignals?(signals: SerialOutputSignals): Promise<void>;
     /** Chrome 103+: revoke the persistent permission grant for this port. */
     forget?(): Promise<void>;
     /** Returns USB descriptor metadata when available. */

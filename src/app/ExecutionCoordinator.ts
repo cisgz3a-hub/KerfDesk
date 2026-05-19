@@ -12,6 +12,7 @@ import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners } from './frameGcode';
 import { waitForGrblIdleResult } from './grblIdlePoll';
+import { getActiveProfile, resolveGrblJogMode } from '../core/devices/DeviceProfile';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
 
@@ -145,6 +146,7 @@ export class ExecutionCoordinator {
           axis,
           distanceMm: distance,
           feedMmPerMin: feedRate,
+          mode: resolveGrblJogMode(getActiveProfile()),
           onCommand: line => this.notifySimulator(line),
         });
         if (!result.ok) return { ok: false, reason: result.reason };

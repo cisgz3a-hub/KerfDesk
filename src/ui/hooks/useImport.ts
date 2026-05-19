@@ -29,11 +29,15 @@ import {
 } from '../../import/image/ImageImportStorageStrategy';
 import {
   ImageImportLimitError,
+  UnsupportedImageImportTypeError,
+  assertSupportedImageImportFile,
   checkImageBeforeDecode,
   checkImageDimensions,
   checkImageFileSize,
   imageLimitErrorMessage,
+  isSupportedImageImportFile,
   probeImageHeaderDimensions,
+  unsupportedImageTypeMessage,
 } from '../../import/image/ImageImportLimits';
 
 type ImageImportResult =
@@ -140,6 +144,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
       } else {
         // T2-124: stage 1 runs before FileReader reads the bytes.
         checkImageFileSize(source.size);
+        assertSupportedImageImportFile(source);
         dimensionsCheckedBeforeDecode = await probeImageDimensionsBeforeDecode(source);
         fileSource = source;
         storageStrategy = chooseImageImportStorageStrategy({
@@ -339,6 +344,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
 
       return { kind: 'ok', scene: newScene };
     } catch (err) {
+      if (err instanceof UnsupportedImageImportTypeError) {
+        await showAlertRef.current('Unsupported Image', unsupportedImageTypeMessage(err));
+        return { kind: 'blocked' };
+      }
       if (err instanceof ImageImportLimitError) {
         await showAlertRef.current('Image Too Large', imageLimitErrorMessage(err));
         return { kind: 'blocked' };
@@ -433,7 +442,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
           const text = await file.text();
           const updated = importDxfIntoScene(text, scene);
           handleSceneCommit(updated, 'dxf-import');
-        } else if (file.type.startsWith('image/')) {
+        } else if (file.type.startsWith('image/') || isSupportedImageImportFile(file)) {
           const result = await importImageUnified(file, file.name);
           if (result.kind === 'ok') {
             handleSceneCommit(result.scene, 'image-import');

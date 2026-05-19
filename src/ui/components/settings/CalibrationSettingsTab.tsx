@@ -42,7 +42,8 @@ export function CalibrationSettingsTab(props: CalibrationSettingsTabProps) {
     React.createElement('p', { style: hintStyle },
       'Compensates for laser firing latency at fast raster speeds. ',
       'Without calibration, bidirectional scan lines appear offset from each other. ',
-      'Calibrate by burning test patterns at known speeds and measuring the offset.',
+      'Calibrate by burning test patterns at known speeds, measuring the gap between opposing lines, ',
+      'and entering half that distance with the sign that aligns the passes.',
     ),
 
     hasCalibration

@@ -11,6 +11,7 @@
  */
 
 import { BaseGCodeStrategy, type OutputFormat, registerOutputStrategy } from './Output';
+import type { GrblLaserPowerMode } from './GcodeOrigin';
 
 export class GrblOutputStrategy extends BaseGCodeStrategy {
   readonly formatId: OutputFormat = 'grbl';
@@ -26,8 +27,13 @@ export class GrblOutputStrategy extends BaseGCodeStrategy {
     return `M4 ${this.encodePowerValue(power)}`;
   }
 
-  protected encodeLaserOnForMaxSpindle(power: number, maxSpindle: number): string {
-    return `M4 ${this.encodePowerValueForMaxSpindle(power, maxSpindle)}`;
+  protected encodeLaserOnForMaxSpindle(
+    power: number,
+    maxSpindle: number,
+    grblLaserPowerMode: GrblLaserPowerMode = 'dynamic-m4',
+  ): string {
+    const modal = grblLaserPowerMode === 'constant-m3' ? 'M3' : 'M4';
+    return `${modal} ${this.encodePowerValueForMaxSpindle(power, maxSpindle)}`;
   }
 
   encodeLaserOff(): string {

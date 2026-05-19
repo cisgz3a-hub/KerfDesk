@@ -60,6 +60,11 @@ interface ProfileValidationInput {
   readonly bedWidth?: unknown;
   readonly bedHeight?: unknown;
   readonly maxSpindle?: unknown;
+  readonly grblLaserPowerMode?: unknown;
+  readonly grblTransferMode?: unknown;
+  readonly grblJogMode?: unknown;
+  readonly airAssistCommand?: unknown;
+  readonly serialSignals?: unknown;
   readonly watts?: unknown;
   readonly baudRate?: unknown;
   readonly originCorner?: unknown;
@@ -75,6 +80,8 @@ interface ProfileValidationInput {
   readonly autoFocusSupported?: unknown;
   readonly autoFocusCommand?: unknown;
   readonly autoFocusTimeoutMs?: unknown;
+  readonly scanningOffsets?: unknown;
+  readonly zAxis?: unknown;
 }
 
 /** True for a finite number > 0 within an inclusive upper bound. */
@@ -189,6 +196,77 @@ export function validateProfile(profile: ProfileValidationInput): ProfileValidat
       code: 'PROFILE_MAX_SPINDLE_INVALID',
       message: `maxSpindle must be a positive finite number ≤ ${MAX_SPINDLE} (got ${String(profile.maxSpindle)}).`,
     });
+  }
+
+  if (
+    profile.grblLaserPowerMode != null
+    && profile.grblLaserPowerMode !== 'dynamic-m4'
+    && profile.grblLaserPowerMode !== 'constant-m3'
+  ) {
+    issues.push({
+      field: 'grblLaserPowerMode',
+      severity: 'error',
+      code: 'PROFILE_GRBL_LASER_POWER_MODE_INVALID',
+      message: `GRBL laser power mode must be dynamic-m4 or constant-m3 when set (got ${String(profile.grblLaserPowerMode)}).`,
+    });
+  }
+  if (
+    profile.grblTransferMode != null
+    && profile.grblTransferMode !== 'buffered'
+    && profile.grblTransferMode !== 'synchronous'
+  ) {
+    issues.push({
+      field: 'grblTransferMode',
+      severity: 'error',
+      code: 'PROFILE_GRBL_TRANSFER_MODE_INVALID',
+      message: `GRBL transfer mode must be buffered or synchronous when set (got ${String(profile.grblTransferMode)}).`,
+    });
+  }
+  if (
+    profile.grblJogMode != null
+    && profile.grblJogMode !== 'grbl-j'
+    && profile.grblJogMode !== 'legacy-gcode'
+  ) {
+    issues.push({
+      field: 'grblJogMode',
+      severity: 'error',
+      code: 'PROFILE_GRBL_JOG_MODE_INVALID',
+      message: `GRBL jog mode must be grbl-j or legacy-gcode when set (got ${String(profile.grblJogMode)}).`,
+    });
+  }
+  if (
+    profile.airAssistCommand != null
+    && profile.airAssistCommand !== 'M7'
+    && profile.airAssistCommand !== 'M8'
+    && profile.airAssistCommand !== 'none'
+  ) {
+    issues.push({
+      field: 'airAssistCommand',
+      severity: 'error',
+      code: 'PROFILE_AIR_ASSIST_COMMAND_INVALID',
+      message: `Air assist command must be M7, M8, or none when set (got ${String(profile.airAssistCommand)}).`,
+    });
+  }
+  if (profile.serialSignals != null) {
+    const signals = profile.serialSignals as { dataTerminalReady?: unknown; requestToSend?: unknown };
+    if (typeof profile.serialSignals !== 'object' || Array.isArray(profile.serialSignals)) {
+      issues.push({
+        field: 'serialSignals',
+        severity: 'error',
+        code: 'PROFILE_SERIAL_SIGNALS_INVALID',
+        message: 'serialSignals must be an object when set.',
+      });
+    } else if (
+      (signals.dataTerminalReady != null && typeof signals.dataTerminalReady !== 'boolean')
+      || (signals.requestToSend != null && typeof signals.requestToSend !== 'boolean')
+    ) {
+      issues.push({
+        field: 'serialSignals',
+        severity: 'error',
+        code: 'PROFILE_SERIAL_SIGNALS_INVALID',
+        message: 'serialSignals.dataTerminalReady and serialSignals.requestToSend must be booleans when set.',
+      });
+    }
   }
 
   // ── Feed rates ──
@@ -318,6 +396,63 @@ export function validateProfile(profile: ProfileValidationInput): ProfileValidat
         code: 'PROFILE_AUTOFOCUS_TIMEOUT_INVALID',
         message: `autoFocusTimeoutMs must be a positive finite number ≤ 5 minutes (got ${String(profile.autoFocusTimeoutMs)}).`,
       });
+    }
+  }
+
+  if (profile.scanningOffsets != null) {
+    if (!Array.isArray(profile.scanningOffsets)) {
+      issues.push({
+        field: 'scanningOffsets',
+        severity: 'error',
+        code: 'PROFILE_SCANNING_OFFSETS_INVALID',
+        message: 'Scanning offsets must be an array when set.',
+      });
+    } else {
+      profile.scanningOffsets.forEach((entry, index) => {
+        const row = entry as { speedMmPerMin?: unknown; offsetMm?: unknown };
+        if (
+          typeof entry !== 'object'
+          || entry == null
+          || !isPositiveFinite(row.speedMmPerMin)
+          || typeof row.offsetMm !== 'number'
+          || !Number.isFinite(row.offsetMm)
+          || Math.abs(row.offsetMm) > 25
+        ) {
+          issues.push({
+            field: `scanningOffsets[${index}]`,
+            severity: 'error',
+            code: 'PROFILE_SCANNING_OFFSET_ROW_INVALID',
+            message: 'Scanning offset rows must have a positive finite speed and finite offset within +/-25 mm.',
+          });
+        }
+      });
+    }
+  }
+
+  if (profile.zAxis != null) {
+    const zAxis = profile.zAxis as { supported?: unknown; minMm?: unknown; maxMm?: unknown };
+    if (typeof profile.zAxis !== 'object' || Array.isArray(profile.zAxis) || typeof zAxis.supported !== 'boolean') {
+      issues.push({
+        field: 'zAxis',
+        severity: 'error',
+        code: 'PROFILE_Z_AXIS_INVALID',
+        message: 'zAxis must be an object with a boolean supported field when set.',
+      });
+    } else if (zAxis.supported) {
+      if (
+        typeof zAxis.minMm !== 'number'
+        || typeof zAxis.maxMm !== 'number'
+        || !Number.isFinite(zAxis.minMm)
+        || !Number.isFinite(zAxis.maxMm)
+        || zAxis.minMm > zAxis.maxMm
+      ) {
+        issues.push({
+          field: 'zAxis',
+          severity: 'error',
+          code: 'PROFILE_Z_AXIS_RANGE_INVALID',
+          message: 'Supported Z-axis profiles must define finite minMm and maxMm with minMm <= maxMm.',
+        });
+      }
     }
   }
 

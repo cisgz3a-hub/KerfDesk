@@ -26,6 +26,22 @@ export type ImageLimitKey = keyof typeof IMAGE_LIMITS;
 
 export type ImageHeaderFormat = 'png' | 'jpeg' | 'gif' | 'webp' | 'bmp';
 
+export const SUPPORTED_IMAGE_IMPORT_MIME_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/gif',
+  'image/webp',
+] as const;
+
+export const SUPPORTED_IMAGE_IMPORT_EXTENSIONS = [
+  '.png',
+  '.jpg',
+  '.jpeg',
+  '.gif',
+  '.webp',
+] as const;
+
 export interface ImageHeaderDimensions {
   width: number;
   height: number;
@@ -61,6 +77,38 @@ export class ImageImportLimitError extends Error {
     this.width = extras?.width;
     this.height = extras?.height;
     Object.setPrototypeOf(this, ImageImportLimitError.prototype);
+  }
+}
+
+export class UnsupportedImageImportTypeError extends Error {
+  override readonly name = 'UnsupportedImageImportTypeError';
+  readonly fileName: string;
+  readonly mimeType: string;
+
+  constructor(file: Pick<File, 'name' | 'type'>) {
+    const fileName = file.name || 'image';
+    const mimeType = file.type || 'unknown';
+    super(`Unsupported image type: ${mimeType} (${fileName})`);
+    this.fileName = fileName;
+    this.mimeType = mimeType;
+    Object.setPrototypeOf(this, UnsupportedImageImportTypeError.prototype);
+  }
+}
+
+const SUPPORTED_IMAGE_IMPORT_MIME_TYPE_SET = new Set<string>(SUPPORTED_IMAGE_IMPORT_MIME_TYPES);
+
+export function isSupportedImageImportFile(file: Pick<File, 'name' | 'type'>): boolean {
+  const mimeType = (file.type || '').trim().toLowerCase();
+  if (mimeType.length > 0) {
+    return SUPPORTED_IMAGE_IMPORT_MIME_TYPE_SET.has(mimeType);
+  }
+  const name = (file.name || '').trim().toLowerCase();
+  return SUPPORTED_IMAGE_IMPORT_EXTENSIONS.some(ext => name.endsWith(ext));
+}
+
+export function assertSupportedImageImportFile(file: Pick<File, 'name' | 'type'>): void {
+  if (!isSupportedImageImportFile(file)) {
+    throw new UnsupportedImageImportTypeError(file);
   }
 }
 
@@ -270,6 +318,11 @@ export function imageLimitErrorMessage(err: unknown): string {
       return `Image dimension too large${dims}: a side of ${err.observed.toLocaleString()} pixels exceeds the maximum of ${err.maximum.toLocaleString()}.`;
     }
   }
+}
+
+export function unsupportedImageTypeMessage(err: UnsupportedImageImportTypeError): string {
+  const supported = SUPPORTED_IMAGE_IMPORT_EXTENSIONS.join(', ');
+  return `Unsupported image type: ${err.mimeType}. Supported image formats are: ${supported}.`;
 }
 
 /**

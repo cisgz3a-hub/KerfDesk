@@ -7,6 +7,8 @@ import { type Job } from '../job/Job';
 import { type GcodeTemplateContext } from '../plan/GcodeTemplates';
 
 export type GcodeStartMode = 'absolute' | 'current' | 'savedOrigin';
+export type GrblLaserPowerMode = 'dynamic-m4' | 'constant-m3';
+export type AirAssistCommand = 'M7' | 'M8' | 'none';
 
 export interface GcodeGenerateOptions {
   startMode?: GcodeStartMode;
@@ -17,6 +19,10 @@ export interface GcodeGenerateOptions {
   onProgress?: (event: GcodeOutputProgress) => void;
   /** GRBL $30 — max spindle/PWM (S range). Default 1000. */
   maxSpindle?: number;
+  /** GRBL laser power modal command. Default dynamic M4, matching prior output. */
+  grblLaserPowerMode?: GrblLaserPowerMode;
+  /** Air-assist command to emit for setAir moves. Default M8, matching prior output. */
+  airAssistCommand?: AirAssistCommand;
   /**
    * When true, power=0 linear moves are emitted as hard laser-off travel
    * (`M5 S0` -> motion without S -> modal laser restore at S0) instead of

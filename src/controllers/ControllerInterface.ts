@@ -167,11 +167,19 @@ export type ControllerOutput =
   | { kind: 'binary-job'; bytes: Uint8Array; format: 'ruida' | 'trocen' | string }
   | { kind: 'device-job'; payload: unknown; format: string };
 
+export type GrblTransferMode = 'buffered' | 'synchronous';
+
 export interface ControllerJobTicket {
   ticketId: string;
   sceneHash?: string;
   profileHash?: string;
   outputHash?: string;
+  /**
+   * GRBL streaming compatibility mode. `buffered` is the historical
+   * character-counted fast path; `synchronous` sends one line per ok for
+   * controllers that behave like LightBurn's synchronous fallback.
+   */
+  transferMode?: GrblTransferMode;
 }
 
 export interface JobHandle {
@@ -228,7 +236,13 @@ export interface DisconnectOptions {
 }
 
 export interface MachineOperationApi {
-  jog(args: { axis: 'X' | 'Y' | 'Z'; distanceMm: number; feedMmPerMin: number; onCommand?: (line: string) => void }): Promise<OperationResult>;
+  jog(args: {
+    axis: 'X' | 'Y' | 'Z';
+    distanceMm: number;
+    feedMmPerMin: number;
+    mode?: 'grbl-j' | 'legacy-gcode';
+    onCommand?: (line: string) => void;
+  }): Promise<OperationResult>;
   home(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   unlockAlarm(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   setWorkOriginAtCurrentPosition(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;

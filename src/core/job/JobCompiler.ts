@@ -437,7 +437,7 @@ function compileOperation(
 ): Operation | null {
   const type = mapModeToType(layer.settings.mode);
   const settings = resolveSettings(layer, sceneMaterialName, entitlementPolicy, jobOpts);
-  const geometry = compileGeometry(type, layer, objects, entitlementPolicy);
+  const geometry = compileGeometry(type, layer, objects, entitlementPolicy, jobOpts);
 
   if (!geometry) return null;
 
@@ -647,11 +647,13 @@ function mirrorRasterData(
   height: number,
   flipX: boolean,
   flipY: boolean,
+  signal?: AbortSignal,
 ): Uint8Array {
   let buf = data;
   if (flipY) {
     const next = new Uint8Array(width * height);
     for (let r = 0; r < height; r++) {
+      throwIfCompileAborted(signal);
       next.set(buf.subarray(r * width, (r + 1) * width), (height - 1 - r) * width);
     }
     buf = next;
@@ -659,6 +661,7 @@ function mirrorRasterData(
   if (flipX) {
     const next = new Uint8Array(buf.length);
     for (let r = 0; r < height; r++) {
+      throwIfCompileAborted(signal);
       const row = r * width;
       for (let c = 0; c < width; c++) {
         next[row + c] = buf[row + (width - 1 - c)];
@@ -674,6 +677,7 @@ function compileGeometry(
   layer: Layer,
   objects: SceneObject[],
   entitlementPolicy: EntitlementPolicy,
+  jobOpts?: CompileJobOptions,
 ): OperationGeometry | null {
   if (type === 'raster') {
     const img = layer.settings.image;
@@ -744,6 +748,7 @@ function compileGeometry(
 
       const pixelData = geom.grayscaleData;
       if (pixelData && geom.grayscaleWidth && geom.grayscaleHeight) {
+        throwIfCompileAborted(jobOpts?.signal);
         bitmapWidth = geom.grayscaleWidth;
         bitmapHeight = geom.grayscaleHeight;
         // T1-17 Pass 4b: if the UI has pre-computed the post-pipeline
@@ -766,29 +771,30 @@ function compileGeometry(
           gray = new Uint8Array(geom.processedData);
         } else {
           gray = new Uint8Array(pixelData);
-          if (brightness !== 0) gray = adjustBrightness(gray, brightness);
-          if (contrast !== 0) gray = adjustContrast(gray, contrast);
-          if (gamma !== 1) gray = adjustGamma(gray, gamma);
-          if (inverted) gray = invertImage(gray);
+          if (brightness !== 0) gray = adjustBrightness(gray, brightness, { signal: jobOpts?.signal });
+          if (contrast !== 0) gray = adjustContrast(gray, contrast, { signal: jobOpts?.signal });
+          if (gamma !== 1) gray = adjustGamma(gray, gamma, { signal: jobOpts?.signal });
+          if (inverted) gray = invertImage(gray, { signal: jobOpts?.signal });
         }
+        throwIfCompileAborted(jobOpts?.signal);
 
         if (imageMode === 'grayscale') {
           data = gray;
           mode = 'grayscale';
         } else if (imageMode === 'threshold') {
-          data = thresholdToOneBit(gray, bitmapWidth, bitmapHeight, imageThreshold);
+          data = thresholdToOneBit(gray, bitmapWidth, bitmapHeight, imageThreshold, { signal: jobOpts?.signal });
           mode = '1bit';
         } else {
           if (ditherMode === 'none') {
             data = gray;
             mode = 'grayscale';
           } else {
-            data = ditherImage(gray, bitmapWidth, bitmapHeight, ditherMode, imageThreshold);
+            data = ditherImage(gray, bitmapWidth, bitmapHeight, ditherMode, imageThreshold, { signal: jobOpts?.signal });
             mode = '1bit';
           }
         }
         if (flipRasterX || flipRasterY) {
-          data = mirrorRasterData(data, bitmapWidth, bitmapHeight, flipRasterX, flipRasterY);
+          data = mirrorRasterData(data, bitmapWidth, bitmapHeight, flipRasterX, flipRasterY, jobOpts?.signal);
         }
       } else {
         console.warn(

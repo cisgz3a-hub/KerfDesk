@@ -5,6 +5,7 @@
 
 import { type ScanningOffsetTable } from '../job/ScanningOffset';
 import { type ResponseCurve } from '../materials/ResponseCurve';
+import type { AirAssistCommand, GrblLaserPowerMode } from '../output/GcodeOrigin';
 import { type OutputFormat } from '../output/OutputFormat';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -102,6 +103,14 @@ export const DEFAULT_FRAME_DOT_FEED_RATE = 3000;
  */
 export const DEFAULT_FRAME_LINE_DELAY_MS = 50;
 
+export type GrblTransferMode = 'buffered' | 'synchronous';
+export type GrblJogMode = 'grbl-j' | 'legacy-gcode';
+
+export interface SerialSignalSettings {
+  dataTerminalReady?: boolean;
+  requestToSend?: boolean;
+}
+
 export interface DeviceProfile {
   id: string;
   name: string;
@@ -139,6 +148,18 @@ export interface DeviceProfile {
   // GRBL settings
   maxFeedRate: number;     // mm/min
   maxSpindle: number;      // S-value (usually 255 or 1000)
+  /**
+   * GRBL laser modal command. `dynamic-m4` is the safer/default laser-mode
+   * output for GRBL $32=1; `constant-m3` is an explicit compatibility mode
+   * for controllers/material workflows that require constant power.
+   */
+  grblLaserPowerMode?: GrblLaserPowerMode;
+  /** GRBL transfer strategy: character-counted buffered streaming or one-line/ok synchronous mode. */
+  grblTransferMode?: GrblTransferMode;
+  /** Jog command style. `$J` is GRBL 1.1 default; legacy G-code is for older/quirky firmware. */
+  grblJogMode?: GrblJogMode;
+  /** Air-assist on command. M9 remains the off command. */
+  airAssistCommand?: AirAssistCommand;
   /** Low-power frame-dot / mark-center move feed rate. Defaults to 3000 mm/min. */
   frameDotFeedRate?: number;
   /**
@@ -167,6 +188,8 @@ export interface DeviceProfile {
   // Connection
   baudRate: number;
   preferredPort?: string;
+  /** Optional Web Serial control-signal preferences for boards that need DTR/RTS behavior tuned. */
+  serialSignals?: SerialSignalSettings;
 
   // Custom G-code
   startGcode: string;
@@ -511,12 +534,17 @@ export function createBlankProfile(name: string): DeviceProfile {
     homeCorner: 'front-left',
     maxFeedRate: 6000,
     maxSpindle: 1000,
+    grblLaserPowerMode: 'dynamic-m4',
+    grblTransferMode: 'buffered',
+    grblJogMode: 'grbl-j',
+    airAssistCommand: 'M8',
     frameDotFeedRate: DEFAULT_FRAME_DOT_FEED_RATE,
     homingEnabled: false,
     softLimitsEnabled: false,
     invertY: true,
     returnToOrigin: true,
     baudRate: 115200,
+    serialSignals: {},
     startGcode: '',
     endGcode: '',
     gcodeHeaderTemplate: BUILT_IN_HEADER_TEMPLATES[DEFAULT_HEADER_TEMPLATE_NAME],
@@ -762,6 +790,42 @@ export function createPrt4040RouterLaserProfile(
     allowsNegativeWorkspace: true,
     allowUnverifiedWcsStart: true,
   };
+}
+
+export function resolveGrblLaserPowerMode(
+  profile: Pick<DeviceProfile, 'grblLaserPowerMode'> | null | undefined,
+): GrblLaserPowerMode {
+  return profile?.grblLaserPowerMode === 'constant-m3' ? 'constant-m3' : 'dynamic-m4';
+}
+
+export function resolveGrblTransferMode(
+  profile: Pick<DeviceProfile, 'grblTransferMode'> | null | undefined,
+): GrblTransferMode {
+  return profile?.grblTransferMode === 'synchronous' ? 'synchronous' : 'buffered';
+}
+
+export function resolveGrblJogMode(
+  profile: Pick<DeviceProfile, 'grblJogMode'> | null | undefined,
+): GrblJogMode {
+  return profile?.grblJogMode === 'legacy-gcode' ? 'legacy-gcode' : 'grbl-j';
+}
+
+export function resolveAirAssistCommand(
+  profile: Pick<DeviceProfile, 'airAssistCommand'> | null | undefined,
+): AirAssistCommand {
+  const value = profile?.airAssistCommand;
+  return value === 'M7' || value === 'none' ? value : 'M8';
+}
+
+export function resolveSerialSignals(
+  profile: Pick<DeviceProfile, 'serialSignals'> | null | undefined,
+): SerialSignalSettings | undefined {
+  const signals = profile?.serialSignals;
+  if (!signals || typeof signals !== 'object') return undefined;
+  const next: SerialSignalSettings = {};
+  if (typeof signals.dataTerminalReady === 'boolean') next.dataTerminalReady = signals.dataTerminalReady;
+  if (typeof signals.requestToSend === 'boolean') next.requestToSend = signals.requestToSend;
+  return Object.keys(next).length > 0 ? next : undefined;
 }
 
 export function isPrt4040RouterLaserProfile(

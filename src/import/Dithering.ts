@@ -21,6 +21,18 @@ export type DitherMode =
   | 'blue-noise'
   | 'random';
 
+export interface DitherOptions {
+  signal?: AbortSignal;
+}
+
+const ABORT_CHECK_INTERVAL = 1024;
+
+function throwIfDitherAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('Compile cancelled', 'AbortError');
+  }
+}
+
 export function getDitherModes(): { id: DitherMode; name: string }[] {
   return [
     { id: 'none', name: 'None' },
@@ -44,22 +56,24 @@ export function ditherImage(
   width: number,
   height: number,
   mode: DitherMode,
-  threshold: number = 128
+  threshold: number = 128,
+  options?: DitherOptions,
 ): Uint8Array {
+  throwIfDitherAborted(options?.signal);
   switch (mode) {
     case 'none': return data.slice(); // Return copy unchanged
-    case 'threshold': return ditherThreshold(data, width, height, threshold);
-    case 'floyd-steinberg': return ditherErrorDiffusion(data, width, height, threshold, FLOYD_STEINBERG);
-    case 'jarvis': return ditherErrorDiffusion(data, width, height, threshold, JARVIS);
-    case 'stucki': return ditherErrorDiffusion(data, width, height, threshold, STUCKI);
-    case 'atkinson': return ditherErrorDiffusion(data, width, height, threshold, ATKINSON);
-    case 'burkes': return ditherErrorDiffusion(data, width, height, threshold, BURKES);
-    case 'sierra3': return ditherErrorDiffusion(data, width, height, threshold, SIERRA3);
-    case 'sierra2': return ditherErrorDiffusion(data, width, height, threshold, SIERRA2);
-    case 'sierra-lite': return ditherErrorDiffusion(data, width, height, threshold, SIERRA_LITE);
-    case 'blue-noise': return ditherBlueNoise(data, width, height);
-    case 'random': return ditherRandom(data, width, height);
-    case 'ordered': return ditherOrdered(data, width, height);
+    case 'threshold': return ditherThreshold(data, width, height, threshold, options);
+    case 'floyd-steinberg': return ditherErrorDiffusion(data, width, height, threshold, FLOYD_STEINBERG, options);
+    case 'jarvis': return ditherErrorDiffusion(data, width, height, threshold, JARVIS, options);
+    case 'stucki': return ditherErrorDiffusion(data, width, height, threshold, STUCKI, options);
+    case 'atkinson': return ditherErrorDiffusion(data, width, height, threshold, ATKINSON, options);
+    case 'burkes': return ditherErrorDiffusion(data, width, height, threshold, BURKES, options);
+    case 'sierra3': return ditherErrorDiffusion(data, width, height, threshold, SIERRA3, options);
+    case 'sierra2': return ditherErrorDiffusion(data, width, height, threshold, SIERRA2, options);
+    case 'sierra-lite': return ditherErrorDiffusion(data, width, height, threshold, SIERRA_LITE, options);
+    case 'blue-noise': return ditherBlueNoise(data, width, height, options);
+    case 'random': return ditherRandom(data, width, height, options);
+    case 'ordered': return ditherOrdered(data, width, height, options);
     default: return data.slice();
   }
 }
@@ -67,10 +81,11 @@ export function ditherImage(
 // ─── THRESHOLD ───────────────────────────────────────────────────
 
 function ditherThreshold(
-  data: Uint8Array, width: number, height: number, threshold: number
+  data: Uint8Array, width: number, height: number, threshold: number, options?: DitherOptions
 ): Uint8Array {
   const out = new Uint8Array(width * height);
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfDitherAborted(options?.signal);
     out[i] = data[i] < threshold ? 255 : 0;
   }
   return out;
@@ -158,11 +173,15 @@ function ditherErrorDiffusion(
   width: number,
   height: number,
   threshold: number,
-  kernel: DiffusionKernel
+  kernel: DiffusionKernel,
+  options?: DitherOptions,
 ): Uint8Array {
   // Work on float copy to accumulate error
   const buf = new Float32Array(data.length);
-  for (let i = 0; i < data.length; i++) buf[i] = data[i];
+  for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfDitherAborted(options?.signal);
+    buf[i] = data[i];
+  }
 
   const out = new Uint8Array(width * height);
 
@@ -175,6 +194,7 @@ function ditherErrorDiffusion(
   // each other's artifacts. Kernel definitions are unchanged; only the
   // scan order and kernel-dx sign flip per row.
   for (let y = 0; y < height; y++) {
+    throwIfDitherAborted(options?.signal);
     const reverse = (y & 1) === 1;
     const xStart = reverse ? width - 1 : 0;
     const xEnd = reverse ? -1 : width;
@@ -215,11 +235,12 @@ const BAYER_4X4 = [
 ];
 
 function ditherOrdered(
-  data: Uint8Array, width: number, height: number
+  data: Uint8Array, width: number, height: number, options?: DitherOptions
 ): Uint8Array {
   const out = new Uint8Array(width * height);
 
   for (let y = 0; y < height; y++) {
+    throwIfDitherAborted(options?.signal);
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const bayerVal = BAYER_4X4[y % 4][x % 4];
@@ -303,13 +324,14 @@ function getBlueNoiseThresholdTile(): Uint8Array {
 }
 
 function ditherBlueNoise(
-  data: Uint8Array, width: number, height: number
+  data: Uint8Array, width: number, height: number, options?: DitherOptions
 ): Uint8Array {
   const out = new Uint8Array(width * height);
   const tile = getBlueNoiseThresholdTile();
   const size = BLUE_NOISE_TILE_SIZE;
 
   for (let y = 0; y < height; y++) {
+    throwIfDitherAborted(options?.signal);
     for (let x = 0; x < width; x++) {
       const i = y * width + x;
       const threshold = tile[(y % size) * size + (x % size)];
@@ -321,12 +343,13 @@ function ditherBlueNoise(
 }
 
 function ditherRandom(
-  data: Uint8Array, width: number, height: number
+  data: Uint8Array, width: number, height: number, options?: DitherOptions
 ): Uint8Array {
   const out = new Uint8Array(width * height);
   let seed = 42;
 
   for (let i = 0; i < data.length; i++) {
+    if ((i % ABORT_CHECK_INTERVAL) === 0) throwIfDitherAborted(options?.signal);
     seed = (seed * 1103515245 + 12345) & 0x7fffffff;
     const randomThreshold = seed / 0x7fffffff * 255;
     out[i] = data[i] < randomThreshold ? 255 : 0; // dark = burn

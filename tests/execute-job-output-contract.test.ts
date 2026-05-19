@@ -6,6 +6,7 @@ import { GrblController } from '../src/controllers/grbl/GrblController';
 import { MockSerialPort } from '../src/communication/SerialPort';
 import type { ControllerJobTicket, ControllerOutput } from '../src/controllers/ControllerInterface';
 import { buildReplayableGcodeSpool, fromArray } from '../src/core/output/GcodeStreaming';
+import type { GcodeChunk, SpoolHandle } from '../src/core/output/GcodeStreaming';
 import fs from 'node:fs';
 
 let passed = 0;
@@ -153,6 +154,51 @@ async function run(): Promise<void> {
     assert(progressTotals.has(lines.length), 'large gcode-stream progress reports the full stream line total');
     assert(port.received.filter(line => /^G0 X/.test(line)).length === lines.length,
       'large gcode-stream sends every streamed line');
+    await ctrl.disconnect();
+  }
+
+  {
+    const { ctrl, port } = await connectedController();
+    let produced = 0;
+    const totalLines = 50;
+    const spool: SpoolHandle = {
+      id: 'ticket_t2_27_validation_abort',
+      contentHash: 'validation-abort',
+      lineCount: totalLines,
+      byteCount: totalLines * 10,
+      usesM4: false,
+      open: (options) => (async function* (): AsyncGenerator<GcodeChunk> {
+        for (let i = 0; i < totalLines; i++) {
+          if (options?.signal?.aborted) return;
+          produced++;
+          if (i === 2) {
+            ctrl.stop();
+          }
+          await flush(0);
+          yield {
+            lines: [`G0 X${i % 10} Y0`],
+            cumulativeLineCount: i + 1,
+            isLast: i === totalLines - 1,
+          };
+        }
+      })(),
+    };
+    const output: ControllerOutput = {
+      kind: 'gcode-stream',
+      spool,
+      dialect: 'grbl',
+    };
+    const err = await capturesError(() => ctrl.executeJob(output, {
+      ...ticket(),
+      ticketId: 'ticket_t2_27_validation_abort',
+    }));
+    assert(err !== null && /abort|cancel/i.test(err),
+      `stop during spool pre-validation rejects start (got ${err ?? 'no error'})`);
+    assert(!ctrl.isJobRunning, 'stop during spool pre-validation leaves no running job');
+    assert(produced < totalLines,
+      `stop during spool pre-validation aborts before terminal chunk (produced=${produced})`);
+    assert(port.received.filter(line => /^G0 X/.test(line)).length === 0,
+      'stop during spool pre-validation sends no job motion lines');
     await ctrl.disconnect();
   }
 
