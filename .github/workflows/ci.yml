@@ -26,6 +26,10 @@ jobs:
       # at ship time (2026-05-05): `npm audit --omit=dev --audit-level=moderate`
       # → "found 0 vulnerabilities".
       - run: npm audit --omit=dev --audit-level=moderate
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run electron:compile
+      - run: npm run project-map:check
       - run: npm run build
       - run: npm test
 

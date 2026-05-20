@@ -98,6 +98,15 @@ function CompileHarness(props: {
 
 let root: Root | null = null;
 
+async function unmountRoot(): Promise<void> {
+  if (!root) return;
+  await act(async () => {
+    root!.unmount();
+    await flush();
+  });
+  root = null;
+}
+
 async function run(): Promise<void> {
   console.log('\n=== usecompilemanager-stale-no-loop ===\n');
 
@@ -110,16 +119,21 @@ async function run(): Promise<void> {
   setActiveProfileId(p.id);
 
   const errLogs: string[] = [];
+  const expectedConsoleErrors: string[] = [];
   const originalError = console.error;
   console.error = (...args: unknown[]) => {
-    errLogs.push(args.map(String).join(' '));
-    originalError(...args);
+    const message = args.map(String).join(' ');
+    if (/G-code compilation failed/.test(message)) {
+      expectedConsoleErrors.push(message);
+      return;
+    }
+    errLogs.push(message);
   };
 
   let hookResult: UseCompileManagerResult | null = null;
   try {
     const container = win.document.getElementById('root')!;
-    if (root) root.unmount();
+    await unmountRoot();
     root = createRoot(container);
 
     const initialScene = makeScene('CompiledScene');
@@ -135,7 +149,11 @@ async function run(): Promise<void> {
       await flush();
     });
 
-    const compiled = await hookResult!.compileGcode(initialScene);
+    let compiled: unknown = null;
+    await act(async () => {
+      compiled = await hookResult!.compileGcode(initialScene);
+      await flush();
+    });
     assert(compiled != null, 'initial compile succeeded');
 
     for (let i = 0; i < 75; i++) {
@@ -153,17 +171,17 @@ async function run(): Promise<void> {
     }
   } finally {
     console.error = originalError;
-    if (root) {
-      await act(async () => {
-        root!.unmount();
-      });
-      root = null;
-    }
+    await unmountRoot();
   }
 
   assert(
     !errLogs.some(m => m.includes('Maximum update depth exceeded')),
     'no React maximum update depth error during stale compile churn',
+  );
+  const actWarnings = errLogs.filter(m => m.includes('act(...)'));
+  assert(
+    actWarnings.length === 0,
+    'stale compile churn test does not leak React act(...) warnings',
   );
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

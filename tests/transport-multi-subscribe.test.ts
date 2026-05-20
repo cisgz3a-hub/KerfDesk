@@ -273,11 +273,22 @@ void (async () => {
 
 // 21. Listener exception default: errors don't propagate to dispatch caller
 {
-  const set = new SubscriptionSet<[]>();
+  const capturedListenerErrors: unknown[] = [];
+  const set = new SubscriptionSet<[]>({
+    onListenerError: (err: unknown) => {
+      capturedListenerErrors.push(err);
+    },
+  });
   set.subscribe(() => { throw new Error('crash'); });
   let dispatchThrew = false;
   try { set.dispatch(); } catch { dispatchThrew = true; }
   assert(!dispatchThrew, `dispatch swallows listener exception via default handler`);
+  assert(
+    capturedListenerErrors.length === 1
+    && capturedListenerErrors[0] instanceof Error
+    && capturedListenerErrors[0].message === 'crash',
+    `listener exception captured without leaking expected stack to stderr`,
+  );
 }
 
 // 22. Source-level pin

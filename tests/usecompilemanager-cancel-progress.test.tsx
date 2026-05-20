@@ -96,10 +96,15 @@ async function run(): Promise<void> {
   setActiveProfileId(profile.id);
 
   const errLogs: string[] = [];
+  const expectedConsoleErrors: string[] = [];
   const originalError = console.error;
   console.error = (...args: unknown[]) => {
-    errLogs.push(args.map(String).join(' '));
-    originalError(...args);
+    const message = args.map(String).join(' ');
+    if (/G-code compilation failed/.test(message)) {
+      expectedConsoleErrors.push(message);
+      return;
+    }
+    errLogs.push(message);
   };
 
   let hookResult: UseCompileManagerResult | null = null;
@@ -141,6 +146,8 @@ async function run(): Promise<void> {
         'cancelled compile clears compileProgress');
       assert(!errLogs.some(m => m.includes('G-code compilation failed')),
         'cancelled compile is not logged as a compile failure');
+      const actWarnings = errLogs.filter(m => m.includes('act(...)'));
+      assert(actWarnings.length === 0, 'cancelled compile test does not leak React act(...) warnings');
     }
   } finally {
     console.error = originalError;

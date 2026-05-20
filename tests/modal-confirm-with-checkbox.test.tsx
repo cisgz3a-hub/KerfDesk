@@ -52,11 +52,20 @@ function CaptureHook() {
 
 let root: Root | null = null;
 
-function mount(): void {
+async function mount(): Promise<void> {
   hookStore = { api: null };
-  if (root) root.unmount();
+  if (root) {
+    await act(async () => {
+      root!.unmount();
+      await flush();
+    });
+    root = null;
+  }
   root = createRoot(container);
-  root.render(React.createElement(CaptureHook));
+  await act(async () => {
+    root!.render(React.createElement(CaptureHook));
+    await flush();
+  });
 }
 
 async function getApi(): Promise<ModalApi> {
@@ -69,21 +78,54 @@ async function getApi(): Promise<ModalApi> {
 
 async function unmountAll(): Promise<void> {
   if (root) {
-    root.unmount();
+    await act(async () => {
+      root!.unmount();
+      await flush();
+    });
     root = null;
   }
   await flush();
 }
 
+async function finishConfirmWithCheckbox(
+  api: ModalApi,
+  result: { ok: boolean; checkboxChecked: boolean },
+): Promise<void> {
+  await act(async () => {
+    api.finishConfirmWithCheckbox(result);
+    await flush();
+  });
+}
+
+async function dismissModal(api: ModalApi): Promise<void> {
+  await act(async () => {
+    api.dismissModal();
+    await flush();
+  });
+}
+
+async function showConfirmWithCheckboxModal(
+  api: ModalApi,
+  title: string,
+  message: string,
+  checkboxLabel: string,
+  details?: string,
+): Promise<{ promise: Promise<{ ok: boolean; checkboxChecked: boolean }> }> {
+  let result: Promise<{ ok: boolean; checkboxChecked: boolean }> | null = null;
+  await act(async () => {
+    result = api.showConfirmWithCheckbox(title, message, checkboxLabel, details);
+    await flush();
+  });
+  return { promise: result! };
+}
+
 async function main(): Promise<void> {
   console.log('\n=== useModal: confirmWithCheckbox — OK, checkbox on ===');
   {
-    mount();
+    await mount();
     const api = await getApi();
-    const p = api.showConfirmWithCheckbox('T', 'M', "Don't", 'D');
-    await act(() => {
-      api.finishConfirmWithCheckbox({ ok: true, checkboxChecked: true });
-    });
+    const { promise: p } = await showConfirmWithCheckboxModal(api, 'T', 'M', "Don't", 'D');
+    await finishConfirmWithCheckbox(api, { ok: true, checkboxChecked: true });
     const r = await p;
     assert(r.ok === true && r.checkboxChecked === true, 'OK with checkbox on');
     await unmountAll();
@@ -91,11 +133,11 @@ async function main(): Promise<void> {
 
   console.log('\n=== useModal: confirmWithCheckbox — OK, checkbox off ===');
   {
-    mount();
+    await mount();
     const api = await getApi();
-    const p = api.showConfirmWithCheckbox('T2', 'M2', "Don't 2");
+    const { promise: p } = await showConfirmWithCheckboxModal(api, 'T2', 'M2', "Don't 2");
     await flush();
-    api.finishConfirmWithCheckbox({ ok: true, checkboxChecked: false });
+    await finishConfirmWithCheckbox(api, { ok: true, checkboxChecked: false });
     const r = await p;
     assert(r.ok === true && r.checkboxChecked === false, 'OK without checkbox');
     await unmountAll();
@@ -103,11 +145,11 @@ async function main(): Promise<void> {
 
   console.log('\n=== useModal: confirmWithCheckbox — cancel via finish ===');
   {
-    mount();
+    await mount();
     const api = await getApi();
-    const p = api.showConfirmWithCheckbox('T3', 'M3', "Don't 3");
+    const { promise: p } = await showConfirmWithCheckboxModal(api, 'T3', 'M3', "Don't 3");
     await flush();
-    api.finishConfirmWithCheckbox({ ok: false, checkboxChecked: false });
+    await finishConfirmWithCheckbox(api, { ok: false, checkboxChecked: false });
     const r = await p;
     assert(r.ok === false && r.checkboxChecked === false, 'Explicit cancel result');
     await unmountAll();
@@ -115,11 +157,11 @@ async function main(): Promise<void> {
 
   console.log('\n=== useModal: confirmWithCheckbox — dismissModal ===');
   {
-    mount();
+    await mount();
     const api = await getApi();
-    const p = api.showConfirmWithCheckbox('T4', 'M4', "Don't 4");
+    const { promise: p } = await showConfirmWithCheckboxModal(api, 'T4', 'M4', "Don't 4");
     await flush();
-    api.dismissModal();
+    await dismissModal(api);
     const r = await p;
     assert(r.ok === false && r.checkboxChecked === false, 'dismiss matches cancel');
     await unmountAll();

@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build && node scripts/verify-production-build.mjs",
     "preview": "vite preview",
+    "typecheck": "tsc --noEmit --pretty false",
+    "lint": "eslint . --max-warnings 0",
     "electron:dev": "npm run electron:compile && concurrently -k -n vite,electron -c green,cyan \"npm run dev\" \"wait-on http://localhost:3000 && electron dist-electron/main.js\"",
     "electron:compile": "tsc -p electron/tsconfig.json",
     "icons:ico": "node scripts/generate-ico.mjs",

@@ -250,6 +250,15 @@ function PanelHarness(props: {
 
 let root: Root | null = null;
 
+async function unmountRoot(): Promise<void> {
+  if (!root) return;
+  await act(async () => {
+    root!.unmount();
+    await flush();
+  });
+  root = null;
+}
+
 async function run(): Promise<void> {
   console.log('\n=== ui-start-job-uses-ticket ===\n');
 
@@ -291,7 +300,7 @@ async function run(): Promise<void> {
   };
 
   const container = win.document.getElementById('root')!;
-  if (root) root.unmount();
+  await unmountRoot();
   root = createRoot(container);
 
   await act(async () => {
@@ -359,10 +368,7 @@ async function run(): Promise<void> {
     'gcode prop has an extra injected line vs ticket.gcodeLines',
   );
 
-  if (root) {
-    root.unmount();
-    root = null;
-  }
+  await unmountRoot();
 
   // ─── Scenario 2: missing ticket → start blocked ──────────────────
   // T1-118: re-mount the panel with `compiledJobTicket: null` (and a
@@ -402,10 +408,7 @@ async function run(): Promise<void> {
   assert(btn2 != null, 'scenario 2: start button present');
   assert(btn2?.disabled === true, 'scenario 2: start disabled when compiledJobTicket is null');
   assert(startCalls2.length === 0, 'scenario 2: startValidatedJob never invoked without a ticket');
-  if (root) {
-    root.unmount();
-    root = null;
-  }
+  await unmountRoot();
 
   // ─── Scenario 3: stale gcode → start blocked ─────────────────────
   // T1-118: with a live ticket but `gcodeStale: true`, the panel must
@@ -505,10 +508,7 @@ async function run(): Promise<void> {
   assert(btn3 != null, 'scenario 3: start button present');
   assert(btn3?.disabled === true, 'scenario 3: start disabled when gcodeStale=true (even with valid ticket)');
   assert(startCalls3.length === 0, 'scenario 3: startValidatedJob never invoked when gcode is stale');
-  if (root) {
-    root.unmount();
-    root = null;
-  }
+  await unmountRoot();
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
