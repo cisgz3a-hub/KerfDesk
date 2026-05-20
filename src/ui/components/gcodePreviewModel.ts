@@ -123,6 +123,7 @@ export function buildGcodePreviewModel(
   let travelCount = 0;
   let cutCount = 0;
   let laserModalOn = false;
+  let distanceMode: 'absolute' | 'relative' = 'absolute';
   let spindlePower = 0;
   let minX = Infinity;
   let minY = Infinity;
@@ -142,6 +143,8 @@ export function buildGcodePreviewModel(
         const gNum = Math.trunc(word.value);
         if (gNum === 0) modalRapid = true;
         else if (gNum === 1 || gNum === 2 || gNum === 3) modalRapid = false;
+        else if (gNum === 90) distanceMode = 'absolute';
+        else if (gNum === 91) distanceMode = 'relative';
       } else if (word.letter === 'M') {
         const mNum = Math.trunc(word.value);
         if (mNum === 3 || mNum === 4) laserModalOn = true;
@@ -159,8 +162,16 @@ export function buildGcodePreviewModel(
 
     if (xWord === null && yWord === null) return;
 
-    const nx = xWord ?? x;
-    const ny = yWord ?? y;
+    const nx = xWord === null
+      ? x
+      : distanceMode === 'relative'
+        ? x + xWord
+        : xWord;
+    const ny = yWord === null
+      ? y
+      : distanceMode === 'relative'
+        ? y + yWord
+        : yWord;
     const dist = Math.sqrt((nx - x) ** 2 + (ny - y) ** 2);
     const isRapid = modalRapid;
     const isCut = !isRapid && laserModalOn && spindlePower > 0;

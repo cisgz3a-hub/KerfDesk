@@ -112,8 +112,30 @@ export interface PlannedOperation {
   layerName: string;         // For display / comments
   layerColor: string;
   passIndex: number;         // Which pass (0-based)
+  /**
+   * Eagerly materialized moves. Normal vector/fill/preview paths keep the
+   * whole operation here. Large ticket-only raster plans may keep only a
+   * small prefix here and replay row moves through `moveSource`.
+   */
   moves: Move[];
+  /** Lazily replayable suffix used for large raster start/device-send plans. */
+  moveSource?: PlannedMoveSource;
+  /** Eager moves that must execute after `moveSource` (for example air-off). */
+  tailMoves?: Move[];
+  /** Cached total move count including `moves`, `moveSource`, and `tailMoves`. */
+  moveCount?: number;
 }
+
+export interface PlannedMoveSource {
+  readonly kind: 'lazy-raster';
+  readonly description: string;
+  iterate(signal?: AbortSignal): Iterable<Move>;
+}
+
+export type PlannedOperationMoveContainer = Pick<
+  PlannedOperation,
+  'moves' | 'moveSource' | 'tailMoves' | 'moveCount'
+>;
 
 // ─── PLAN STATISTICS ─────────────────────────────────────────────
 
@@ -201,8 +223,10 @@ export function calculatePlanStats(
   let prevPos: Point = { x: 0, y: 0 };
 
   for (const op of plan.operations) {
-    for (const move of op.moves) {
+    let operationMoveCount = 0;
+    for (const move of iteratePlannedOperationMoves(op)) {
       moveCount++;
+      operationMoveCount++;
 
       switch (move.type) {
         case 'rapid': {
@@ -230,6 +254,7 @@ export function calculatePlanStats(
         // setAir, setZ, laserOn, laserOff, marker don't contribute to distance or time
       }
     }
+    op.moveCount = operationMoveCount;
   }
 
   return {
@@ -289,8 +314,10 @@ export function* iterateMoves(
 ): Generator<[number, number, Move]> {
   for (let oi = 0; oi < plan.operations.length; oi++) {
     const op = plan.operations[oi];
-    for (let mi = 0; mi < op.moves.length; mi++) {
-      yield [oi, mi, op.moves[mi]];
+    let mi = 0;
+    for (const move of iteratePlannedOperationMoves(op)) {
+      yield [oi, mi, move];
+      mi++;
     }
   }
 }
@@ -299,5 +326,40 @@ export function* iterateMoves(
  * Count total moves across all operations.
  */
 export function totalMoveCount(plan: Plan): number {
-  return plan.operations.reduce((sum, op) => sum + op.moves.length, 0);
+  return plan.operations.reduce((sum, op) => sum + countPlannedOperationMoves(op), 0);
+}
+
+export function* iteratePlannedOperationMoves(
+  operation: PlannedOperationMoveContainer,
+  signal?: AbortSignal,
+): Generator<Move, void, void> {
+  for (const move of operation.moves) {
+    if (signal?.aborted) return;
+    yield move;
+  }
+  if (operation.moveSource) {
+    for (const move of operation.moveSource.iterate(signal)) {
+      if (signal?.aborted) return;
+      yield move;
+    }
+  }
+  if (operation.tailMoves) {
+    for (const move of operation.tailMoves) {
+      if (signal?.aborted) return;
+      yield move;
+    }
+  }
+}
+
+export function countPlannedOperationMoves(
+  operation: PlannedOperationMoveContainer,
+  signal?: AbortSignal,
+): number {
+  if (operation.moveCount != null) return operation.moveCount;
+  let count = 0;
+  for (const _move of iteratePlannedOperationMoves(operation, signal)) {
+    count++;
+  }
+  operation.moveCount = count;
+  return count;
 }

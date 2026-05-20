@@ -481,6 +481,7 @@ export async function compileGcode(
    */
   opts: CompileOptions = {},
 ): Promise<CompileGcodeResult | null> {
+  const gcodeMaterialization = opts.gcodeMaterialization ?? 'full';
   // T2-17: phase 1 — text expansion.
   throwIfAborted(opts.signal);
   reportPhase(opts, 'text-expansion', 0, 'Expanding text outlines');
@@ -519,6 +520,7 @@ export async function compileGcode(
   reportPhase(opts, 'plan', 0, 'Optimizing toolpath');
   const plan = optimizePlan(job, {
     maxRapidSpeed: profile?.maxFeedRate ?? 6000,
+    deferRasterMoveMaterialization: gcodeMaterialization === 'ticket-only',
     signal: opts.signal,
     onProgress: (event) => {
       reportPhase(opts, 'plan', event.fraction, event.detail ?? 'Optimizing toolpath');
@@ -607,7 +609,6 @@ export async function compileGcode(
       reportPhase(opts, 'output', event.fraction, event.detail ?? 'Emitting G-code');
     },
   };
-  const gcodeMaterialization = opts.gcodeMaterialization ?? 'full';
   let gcode = '';
   let gcodeLines: readonly string[] = [];
   let gcodeSpool: SpoolHandle | null = null;

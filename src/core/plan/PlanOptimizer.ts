@@ -36,12 +36,15 @@ import { type CompoundPath } from '../geometry/CompoundPath';
 import {
   type Plan, type PlannedOperation, type Move,
   createEmptyPlan, calculatePlanStats,
+  iteratePlannedOperationMoves,
   // T1-166 (audit F-030): named-constant fallbacks for the
   // calculatePlanStats time-estimation parameters. Pre-T1-166 these
   // were inline `?? 500` / `?? 6000` magic numbers.
   DEFAULT_PLAN_MAX_ACCELERATION_MM_PER_S2,
   DEFAULT_PLAN_MAX_RAPID_SPEED_MM_PER_MIN,
 } from './Plan';
+
+export { iteratePlannedOperationMoves } from './Plan';
 import {
   applyInsideFirstOrder,
   buildContainmentTree,
@@ -152,6 +155,12 @@ export interface OptimizePlanConfig {
   signal?: AbortSignal;
   /** T2-17-followup: progress through the operation-planning loop. */
   onProgress?: (event: OptimizePlanProgress) => void;
+  /**
+   * F45-11-001: start/device-send plans may keep large raster moves as a
+   * replayable per-row source instead of materializing every Move before the
+   * G-code spool can stream. Default false preserves preview/export behavior.
+   */
+  deferRasterMoveMaterialization?: boolean;
 }
 
 export interface OptimizePlanProgress {
@@ -185,7 +194,7 @@ export function optimizePlan(job: Job, config?: OptimizePlanConfig): Plan {
     // so a 12MP raster (millions of moves in one operation) had to
     // finish before cancel could land — 5–30 s of unresponsive UI
     // after the cancel click.
-    const planned = planOperation(operation, currentPos, config?.signal);
+    const planned = planOperation(operation, currentPos, config);
     if (planned.length === 0) continue;
 
     for (let i = 0; i < planned.length; i++) {
@@ -242,15 +251,23 @@ function reportOptimizeProgress(
 function planOperation(
   operation: Operation,
   startPos: Point,
-  signal?: AbortSignal,
+  config?: OptimizePlanConfig,
 ): PlannedOperation[] {
   const results: PlannedOperation[] = [];
   const settings = operation.settings;
+  const signal = config?.signal;
 
   // Multi-pass: repeat the entire operation N times
   for (let pass = 0; pass < settings.passes; pass++) {
     const moves: Move[] = [];
-    let pos = pass === 0 ? startPos : getFinalPositionFromMoves(results[results.length - 1]?.moves || []) || startPos;
+    const tailMoves: Move[] = [];
+    let moveSource: PlannedOperation['moveSource'] | undefined;
+    const previousPass = results[results.length - 1];
+    let pos = pass === 0
+      ? startPos
+      : (previousPass
+          ? getFinalPositionFromMoves(iteratePlannedOperationMoves(previousPass))
+          : null) || startPos;
 
     // Air assist ON at start of operation (if enabled)
     if (settings.airAssist && pass === 0) {
@@ -268,9 +285,22 @@ function planOperation(
         type: 'marker',
         sourceObjectIds: [operation.geometry.bitmap.sourceObjectId],
       });
-      // RASTER: Convert bitmap pixels to scanline moves
-      for (const rasterMove of iterateRasterOperationMoves(operation.geometry.bitmap, settings, signal)) {
-        moves.push(rasterMove);
+      if (config?.deferRasterMoveMaterialization) {
+        const bitmap = operation.geometry.bitmap;
+        moveSource = {
+          kind: 'lazy-raster',
+          description: `raster:${bitmap.sourceObjectId}:pass:${pass}`,
+          iterate: (sourceSignal?: AbortSignal) => iterateRasterOperationMoves(
+            bitmap,
+            settings,
+            sourceSignal ?? signal,
+          ),
+        };
+      } else {
+        // RASTER: Convert bitmap pixels to scanline moves
+        for (const rasterMove of iterateRasterOperationMoves(operation.geometry.bitmap, settings, signal)) {
+          moves.push(rasterMove);
+        }
       }
     } else if (operation.type === 'engrave' && operation.geometry.type === 'fill') {
       const fillIds = Array.from(new Set(operation.geometry.paths.map(p => p.id)));
@@ -303,7 +333,7 @@ function planOperation(
           // of click even when the operation contains thousands of paths.
           throwIfOptimizeAborted(signal);
           moves.push({ type: 'marker', sourceObjectIds: [path.id] });
-          const pathMoves = planPath(path, reversed, settings, signal);
+          const pathMoves = planPath(path, reversed, settings, signal, pass === settings.passes - 1);
           for (let i = 0; i < pathMoves.length; i++) {
             moves.push(pathMoves[i]);
           }
@@ -314,7 +344,11 @@ function planOperation(
 
     // Air assist OFF at end of operation (if enabled, last pass only)
     if (settings.airAssist && pass === settings.passes - 1) {
-      moves.push({ type: 'setAir', on: false });
+      if (moveSource) {
+        tailMoves.push({ type: 'setAir', on: false });
+      } else {
+        moves.push({ type: 'setAir', on: false });
+      }
     }
 
     results.push({
@@ -323,6 +357,8 @@ function planOperation(
       layerColor: operation.layerColor,
       passIndex: pass,
       moves,
+      ...(moveSource ? { moveSource } : {}),
+      ...(tailMoves.length > 0 ? { tailMoves } : {}),
     });
   }
 
@@ -346,6 +382,7 @@ function planPath(
   reversed: boolean,
   settings: ResolvedLaserSettings,
   signal?: AbortSignal,
+  isFinalPass: boolean = true,
 ): Move[] {
   // T1-165: a single path is usually small (10–10k points) but bezier-
   // tessellated curves can hit 100k+. Check at entry so a cancel before
@@ -378,42 +415,57 @@ function planPath(
     power,
   });
 
-  // Lead-in — approach the start point from slightly before it
-  // This allows the laser to reach full speed before the actual cut begins
+  // Lead-in: approach from an outward off-contour point so the
+  // pierce/start mark is displaced from the finished edge.
   if (path.closed && settings.leadIn > 0) {
     if (n >= 2) {
-      // Get direction from second-to-last point to first point (approach direction)
-      const lastIdx = indices[indices.length - 1];
-      const lastX = coords[lastIdx * 2];
-      const lastY = coords[lastIdx * 2 + 1];
-      const firstX = coords[indices[0] * 2];
-      const firstY = coords[indices[0] * 2 + 1];
+      const firstIdx = indices[0];
+      const firstX = coords[firstIdx * 2];
+      const firstY = coords[firstIdx * 2 + 1];
+      let secondIdx: number | null = null;
 
-      const dx = firstX - lastX;
-      const dy = firstY - lastY;
-      const len = Math.sqrt(dx * dx + dy * dy);
+      for (let i = 1; i < indices.length; i++) {
+        const candidate = indices[i];
+        const candidateX = coords[candidate * 2];
+        const candidateY = coords[candidate * 2 + 1];
+        if (Math.hypot(candidateX - firstX, candidateY - firstY) > 0.001) {
+          secondIdx = candidate;
+          break;
+        }
+      }
 
-      if (len > 0.001) {
-        // Start the rapid move at the lead-in position (before the actual start)
-        const leadInX = firstX - (dx / len) * settings.leadIn;
-        const leadInY = firstY - (dy / len) * settings.leadIn;
+      if (secondIdx != null) {
+        const secondX = coords[secondIdx * 2];
+        const secondY = coords[secondIdx * 2 + 1];
+        const dx = secondX - firstX;
+        const dy = secondY - firstY;
+        const len = Math.sqrt(dx * dx + dy * dy);
 
-        // Override the rapid destination to the lead-in point
-        moves[0] = {
-          type: 'rapid',
-          to: { x: leadInX, y: leadInY },
-        };
+        if (len > 0.001) {
+          const effectiveDirection = reversed
+            ? path.direction === 'cw' ? 'ccw' : 'cw'
+            : path.direction;
+          const normal = effectiveDirection === 'cw'
+            ? { x: dy / len, y: -dx / len }
+            : { x: -dy / len, y: dx / len };
+          const leadInX = firstX + normal.x * settings.leadIn;
+          const leadInY = firstY + normal.y * settings.leadIn;
 
-        // Add a laser-on cut from lead-in to the actual start point
-        // This goes right after laserOn
-        const laserOnIndex = moves.findIndex(m => m.type === 'laserOn');
-        if (laserOnIndex >= 0) {
-          moves.splice(laserOnIndex + 1, 0, {
-            type: 'linear',
-            to: { x: firstX, y: firstY },
-            power,
-            speed,
-          });
+          // Override the rapid destination to the off-contour lead-in point.
+          moves[0] = {
+            type: 'rapid',
+            to: { x: leadInX, y: leadInY },
+          };
+
+          const laserOnIndex = moves.findIndex(m => m.type === 'laserOn');
+          if (laserOnIndex >= 0) {
+            moves.splice(laserOnIndex + 1, 0, {
+              type: 'linear',
+              to: { x: firstX, y: firstY },
+              power,
+              speed,
+            });
+          }
         }
       }
     }
@@ -544,7 +596,7 @@ function planPath(
 
   // Overcut — continue past the start point on closed paths
   // This ensures the cut fully separates the piece
-  if (path.closed && settings.overcut > 0) {
+  if (path.closed && settings.overcut > 0 && isFinalPass) {
     if (n >= 2) {
       // Get the direction from the last point to the first point
       const firstX = coords[indices[0] * 2];
@@ -772,11 +824,11 @@ function planFillOperation(
  * bandwidth. The fill strategy (`planFillOperation`) already used
  * the modal pattern; this brings raster to parity.
  *
- * T3-34 second slice: expose the raster move stream as a generator
+ * T3-34 second slice exposed the raster move stream as a generator
  * so callers can consume row-generated moves without first building
- * a private raster move array. The Plan object still materializes
- * moves; this is a future streaming seam, not an output semantics
- * change.
+ * a private raster move array. F45-11-001 extends that seam: the
+ * ticket-only/start pipeline can now keep raster moves as a lazy
+ * Plan source instead of storing every row move in `PlannedOperation.moves`.
  */
 export function* iterateRasterOperationMoves(
   bitmap: ProcessedBitmap,

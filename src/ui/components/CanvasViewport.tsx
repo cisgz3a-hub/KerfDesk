@@ -59,15 +59,45 @@ import {
 } from './canvas/canvasSnapHelpers';
 // T1-151: cursor / pen-position / time-format helpers hoisted out.
 import {
+  buildToolpathPreviewSegments,
   defaultCursorForTool,
   formatTime,
-  penAfterMoveIndex,
+  type ToolpathPreviewSegment,
+  type ToolpathPreviewSegmentType,
 } from './canvas/canvasViewportHelpers';
 
 // T1-151: defaultCursorForTool + penAfterMoveIndex moved to
 // ./canvas/canvasViewportHelpers.
 
 const GRID_SNAP = 1; // mm — snap to 1mm grid. Set to 0 to disable.
+
+function drawToolpathPreviewSegments(
+  ctx: CanvasRenderingContext2D,
+  transform: Transform,
+  segments: readonly ToolpathPreviewSegment[],
+  segmentTypes: readonly ToolpathPreviewSegmentType[],
+  strokeStyle: string,
+  lineWidthScreenPx: number,
+  lineDashScreenPx: readonly number[] = [],
+): void {
+  if (segments.length === 0) return;
+  const wanted = new Set(segmentTypes);
+  let hasSegment = false;
+  ctx.strokeStyle = strokeStyle;
+  ctx.lineWidth = transform.screenPx(lineWidthScreenPx);
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  ctx.setLineDash(lineDashScreenPx.map(v => transform.screenPx(v)));
+  ctx.beginPath();
+  for (const segment of segments) {
+    if (!wanted.has(segment.type)) continue;
+    ctx.moveTo(segment.from.x, segment.from.y);
+    ctx.lineTo(segment.to.x, segment.to.y);
+    hasSegment = true;
+  }
+  if (hasSegment) ctx.stroke();
+  ctx.setLineDash([]);
+}
 
 function drawJobToolpathRange(
   ctx: CanvasRenderingContext2D,
@@ -79,77 +109,22 @@ function drawJobToolpathRange(
   lineWidthScreenPx: number,
 ): void {
   if (fromIdx >= toIdxExclusive || fromIdx >= moves.length) return;
-  ctx.strokeStyle = strokeStyle;
-  ctx.lineWidth = transform.screenPx(lineWidthScreenPx);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.beginPath();
-  let x = 0;
-  let y = 0;
-  if (fromIdx > 0) {
-    const p = penAfterMoveIndex(moves, fromIdx - 1);
-    x = p.x;
-    y = p.y;
-    ctx.moveTo(x, y);
-  }
-  let hasPen = fromIdx > 0;
-  for (let i = Math.max(0, fromIdx); i < toIdxExclusive && i < moves.length; i++) {
-    const m = moves[i];
-    if (m.type === 'marker') continue;
-    if (m.type === 'rapid') {
-      x = m.to.x;
-      y = m.to.y;
-      ctx.moveTo(x, y);
-      hasPen = true;
-    } else if (m.type === 'linear') {
-      if (m.power > 0) {
-        if (!hasPen) {
-          ctx.moveTo(x, y);
-          hasPen = true;
-        }
-        ctx.lineTo(m.to.x, m.to.y);
-      } else {
-        ctx.moveTo(m.to.x, m.to.y);
-        hasPen = true;
-      }
-      x = m.to.x;
-      y = m.to.y;
-    }
-  }
-  ctx.stroke();
+  const segments = buildToolpathPreviewSegments(moves, fromIdx, toIdxExclusive);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['rapid'], 'rgba(255, 68, 102, 0.18)', 0.45, [2, 4]);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['travel'], 'rgba(255, 212, 80, 0.22)', 0.45, [3, 3]);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['cut'], strokeStyle, lineWidthScreenPx);
 }
-
-/** Planned laser moves (canvas mm) — blue cut lines, dashed rapids. */
+/** Planned machine moves (canvas mm): blue cuts, red rapids, amber laser-off feed travel. */
 function drawPlannedToolpathPreview(
   ctx: CanvasRenderingContext2D,
   transform: Transform,
   moves: readonly Move[],
 ): void {
   if (moves.length === 0) return;
-  drawJobToolpathRange(ctx, transform, moves, 0, moves.length, 'rgba(0, 140, 255, 0.4)', 0.5);
-
-  ctx.strokeStyle = 'rgba(255, 68, 102, 0.15)';
-  ctx.lineWidth = transform.screenPx(0.5);
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-  ctx.setLineDash([transform.screenPx(2), transform.screenPx(4)]);
-  ctx.beginPath();
-  let px = 0;
-  let py = 0;
-  for (const m of moves) {
-    if (m.type === 'marker') continue;
-    if (m.type === 'rapid') {
-      ctx.moveTo(px, py);
-      ctx.lineTo(m.to.x, m.to.y);
-      px = m.to.x;
-      py = m.to.y;
-    } else if (m.type === 'linear') {
-      px = m.to.x;
-      py = m.to.y;
-    }
-  }
-  ctx.stroke();
-  ctx.setLineDash([]);
+  const segments = buildToolpathPreviewSegments(moves);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['rapid'], 'rgba(255, 68, 102, 0.15)', 0.5, [2, 4]);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['travel'], 'rgba(255, 212, 80, 0.26)', 0.5, [3, 3]);
+  drawToolpathPreviewSegments(ctx, transform, segments, ['cut'], 'rgba(0, 140, 255, 0.4)', 0.5);
 }
 
 // T1-150: snapToGrid / getObjectSnapPoints / findSnapPoint moved to

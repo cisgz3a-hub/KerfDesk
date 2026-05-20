@@ -19,7 +19,7 @@
  */
 
 import { type Point } from '../types';
-import { type Plan, type Move, type PlannedOperation } from './Plan';
+import { iteratePlannedOperationMoves, type Plan, type Move, type PlannedOperation } from './Plan';
 
 // ─── PUBLIC TYPES ────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ export function simulatePlan(
   for (let opIdx = 0; opIdx < plan.operations.length; opIdx++) {
     const op = plan.operations[opIdx];
 
-    for (const move of op.moves) {
+    for (const move of iteratePlannedOperationMoves(op)) {
       switch (move.type) {
         case 'rapid': {
           const dist = distance(x, y, move.to.x, move.to.y);

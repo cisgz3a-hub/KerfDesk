@@ -23,6 +23,14 @@
 import type { Move } from '../../../core/plan/Plan';
 import type { ToolType } from '../ToolBar';
 
+export type ToolpathPreviewSegmentType = 'rapid' | 'travel' | 'cut';
+
+export interface ToolpathPreviewSegment {
+  type: ToolpathPreviewSegmentType;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+}
+
 /**
  * CSS cursor for the active tool. Select shows the default arrow;
  * node + shape-creation tools show a crosshair; text shows the
@@ -63,6 +71,39 @@ export function penAfterMoveIndex(
     }
   }
   return { x, y };
+}
+
+export function buildToolpathPreviewSegments(
+  moves: readonly Move[],
+  fromIdx = 0,
+  toIdxExclusive = moves.length,
+): ToolpathPreviewSegment[] {
+  if (fromIdx >= toIdxExclusive || fromIdx >= moves.length) return [];
+
+  const startIndex = Math.max(0, fromIdx);
+  const endIndex = Math.min(toIdxExclusive, moves.length);
+  const segments: ToolpathPreviewSegment[] = [];
+  let pen = startIndex > 0 ? penAfterMoveIndex(moves, startIndex - 1) : { x: 0, y: 0 };
+
+  for (let i = startIndex; i < endIndex; i++) {
+    const move = moves[i];
+    if (move.type === 'marker') continue;
+    if (move.type === 'rapid') {
+      const next = move.to;
+      segments.push({ type: 'rapid', from: pen, to: next });
+      pen = next;
+    } else if (move.type === 'linear') {
+      const next = move.to;
+      segments.push({
+        type: move.power > 0 ? 'cut' : 'travel',
+        from: pen,
+        to: next,
+      });
+      pen = next;
+    }
+  }
+
+  return segments;
 }
 
 /**

@@ -44,7 +44,13 @@ export interface Output {
  * The Plan → Output conversion is delegated to the strategy.
  */
 
-import { type Plan, type Move } from '../plan/Plan';
+import {
+  countPlannedOperationMoves,
+  iteratePlannedOperationMoves,
+  totalMoveCount,
+  type Plan,
+  type Move,
+} from '../plan/Plan';
 import { type Job } from '../job/Job';
 import { type AirAssistCommand, type GcodeGenerateOptions, type GrblLaserPowerMode } from './GcodeOrigin';
 import {
@@ -141,7 +147,7 @@ function throwIfOutputAborted(signal?: AbortSignal): void {
 }
 
 function countPlanMoves(plan: Plan): number {
-  return plan.operations.reduce((sum, operation) => sum + operation.moves.length, 0);
+  return plan.stats.moveCount > 0 ? plan.stats.moveCount : totalMoveCount(plan);
 }
 
 function reportOutputProgress(
@@ -339,9 +345,10 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
           yield rememberLine(`; --- ${op.layerName} (pass ${op.passIndex + 1}) ---`);
         }
 
-        for (let moveIndex = 0; moveIndex < op.moves.length; moveIndex++) {
+        const opMoveCount = countPlannedOperationMoves(op, options?.signal);
+        let moveIndex = 0;
+        for (const move of iteratePlannedOperationMoves(op, options?.signal)) {
           throwIfOutputAborted(options?.signal);
-          const move = op.moves[moveIndex];
           const encoded = this.encodeMoveWithState(move, state);
           for (const line of encoded.split(/\r?\n/)) {
             yield rememberLine(line);
@@ -354,10 +361,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
             operationIndex,
             operationCount: plan.operations.length,
             moveIndex,
-            moveCount: op.moves.length,
+            moveCount: opMoveCount,
             emittedLines,
             detail: `Emitted ${completedMoves}/${totalMoves} G-code moves`,
           });
+          moveIndex++;
           throwIfOutputAborted(options?.signal);
         }
       }

@@ -25,7 +25,12 @@
  */
 import { type Point, type AABB, emptyAABB, mergeAABB } from '../types';
 import type { FlatPath } from '../job/Job';
-import type { Move, Plan } from './Plan';
+import {
+  iteratePlannedOperationMoves,
+  type Move,
+  type Plan,
+  type PlannedOperationMoveContainer,
+} from './Plan';
 
 /** Squared euclidean distance — cheap proxy for sort comparisons. */
 export function distanceSq(a: Point, b: Point): number {
@@ -97,10 +102,10 @@ export function getLastOrderedPathEndpoint(ordered: OrderedPath[], fallback: Poi
  * Final head position after a list of planned operations. Returns
  * (0, 0) if no operations or no positional moves were emitted.
  */
-export function getFinalPosition(ops: ReadonlyArray<{ moves: Move[] }>): Point {
+export function getFinalPosition(ops: ReadonlyArray<PlannedOperationMoveContainer>): Point {
   if (ops.length === 0) return { x: 0, y: 0 };
   const lastOp = ops[ops.length - 1];
-  return getFinalPositionFromMoves(lastOp.moves) || { x: 0, y: 0 };
+  return getFinalPositionFromMoves(iteratePlannedOperationMoves(lastOp)) || { x: 0, y: 0 };
 }
 
 /**
@@ -109,14 +114,14 @@ export function getFinalPosition(ops: ReadonlyArray<{ moves: Move[] }>): Point {
  * dwell, air-assist toggles, and Z-only moves don't carry an X/Y
  * destination.
  */
-export function getFinalPositionFromMoves(moves: Move[]): Point | null {
-  for (let i = moves.length - 1; i >= 0; i--) {
-    const move = moves[i];
+export function getFinalPositionFromMoves(moves: Iterable<Move>): Point | null {
+  let last: Point | null = null;
+  for (const move of moves) {
     if (move.type === 'rapid' || move.type === 'linear') {
-      return { ...move.to };
+      last = { ...move.to };
     }
   }
-  return null;
+  return last;
 }
 
 /**
@@ -128,7 +133,7 @@ export function computePlanBounds(plan: Plan): AABB {
   let bounds = emptyAABB();
 
   for (const op of plan.operations) {
-    for (const move of op.moves) {
+    for (const move of iteratePlannedOperationMoves(op)) {
       if (move.type === 'rapid' || move.type === 'linear') {
         bounds = mergeAABB(bounds, {
           minX: move.to.x, minY: move.to.y,

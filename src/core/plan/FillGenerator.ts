@@ -72,10 +72,23 @@ export interface FillSettings {
   overscanning: number;     // mm extension beyond boundary
 }
 
+export interface FillScanlineIntervalEstimate {
+  requestedInterval: number;
+  safeInterval: number;
+  effectiveInterval: number;
+  estimatedLines: number;
+  rowCount: number;
+  capped: boolean;
+  maxScanlines: number;
+  spanY: number;
+}
+
 // T3-35: Fill rows are pure but expensive for dense closed paths. Cache the
 // generated rows by path fingerprint + fill settings, bounded by LRU so repeat
 // recompiles or cross-hatch passes do not keep rebuilding identical rows.
 const FILL_ROWS_CACHE_MAX = 64;
+export const MIN_FILL_INTERVAL = 0.01;
+export const MAX_FILL_SCANLINES = 50000;
 const fillRowsCache = new Map<string, FillScanlineRow[]>();
 let fillRowsCacheHits = 0;
 let fillRowsCacheMisses = 0;
@@ -145,6 +158,62 @@ export function buildFillRowsCacheKey(
     `r=${initialRowIndex}`,
     `p=${pathKey}`,
   ].join(';');
+}
+
+export function resolveFillScanlineIntervalForSpan(
+  spanY: number,
+  interval: number,
+): FillScanlineIntervalEstimate {
+  const requestedInterval = Number(interval);
+  const safeInterval = Math.max(
+    MIN_FILL_INTERVAL,
+    Number.isFinite(requestedInterval) && requestedInterval > 0 ? requestedInterval : 0.1,
+  );
+  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
+  const capped = estimatedLines > MAX_FILL_SCANLINES;
+  const effectiveInterval = capped && spanY > 0
+    ? spanY / MAX_FILL_SCANLINES
+    : safeInterval;
+  const startY = spanY > 0 ? effectiveInterval / 2 : 0;
+  const rowCount = spanY > 0 ? Math.ceil((spanY - startY) / effectiveInterval) : 0;
+
+  return {
+    requestedInterval,
+    safeInterval,
+    effectiveInterval,
+    estimatedLines,
+    rowCount,
+    capped,
+    maxScanlines: MAX_FILL_SCANLINES,
+    spanY: Math.max(0, spanY),
+  };
+}
+
+export function estimateFillScanlineInterval(
+  paths: readonly FlatPath[],
+  interval: number,
+  angle: number,
+): FillScanlineIntervalEstimate {
+  const closed = paths.filter(p => p.closed);
+  if (closed.length === 0) return resolveFillScanlineIntervalForSpan(0, interval);
+
+  const angleRad = (angle * Math.PI) / 180;
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const path of closed) {
+    const n = path.coords.length / 2;
+    for (let i = 0; i < n; i++) {
+      const x = path.coords[i * 2];
+      const y = path.coords[i * 2 + 1];
+      const ry = x * Math.sin(-angleRad) + y * Math.cos(-angleRad);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    }
+  }
+
+  const spanY = Number.isFinite(minY) && Number.isFinite(maxY) ? maxY - minY : 0;
+  return resolveFillScanlineIntervalForSpan(spanY, interval);
 }
 
 export function __resetFillRowsCacheForTest(): void {
@@ -318,18 +387,9 @@ function generateFillRowsUncached(
     maxY = Math.max(maxY, e.y1, e.y2);
   }
 
-  const MIN_FILL_INTERVAL = 0.01;
-  const MAX_SCANLINES = 50000;
   const rawInterval = Number(settings.interval);
-  let safeInterval = Math.max(
-    MIN_FILL_INTERVAL,
-    Number.isFinite(rawInterval) && rawInterval > 0 ? rawInterval : 0.1,
-  );
   const spanY = maxY - minY;
-  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
-  if (estimatedLines > MAX_SCANLINES) {
-    safeInterval = spanY / MAX_SCANLINES;
-  }
+  const { effectiveInterval: safeInterval } = resolveFillScanlineIntervalForSpan(spanY, rawInterval);
 
   const rows: FillScanlineRow[] = [];
   const startY = minY + safeInterval / 2;
@@ -440,35 +500,7 @@ export function estimateScanlineCount(
   angle: number
 ): number {
   if (interval <= 0) return 0;
-
-  const closed = paths.filter(p => p.closed);
-  if (closed.length === 0) return 0;
-
-  const angleRad = (angle * Math.PI) / 180;
-
-  // Compute rotated bounding box height
-  let minY = Infinity, maxY = -Infinity;
-  for (const path of closed) {
-    const n = path.coords.length / 2;
-    for (let i = 0; i < n; i++) {
-      const x = path.coords[i * 2];
-      const y = path.coords[i * 2 + 1];
-      const ry = x * Math.sin(-angleRad) + y * Math.cos(-angleRad);
-      minY = Math.min(minY, ry);
-      maxY = Math.max(maxY, ry);
-    }
-  }
-
-  const spanY = maxY - minY;
-  const MIN_FILL_INTERVAL = 0.01;
-  const MAX_SCANLINES = 50000;
-  let safeInterval = Math.max(MIN_FILL_INTERVAL, interval);
-  const estimatedLines = spanY > 0 ? Math.ceil(spanY / safeInterval) : 0;
-  if (estimatedLines > MAX_SCANLINES) {
-    safeInterval = spanY / MAX_SCANLINES;
-  }
-
-  return Math.max(0, Math.floor(spanY / safeInterval));
+  return estimateFillScanlineInterval(paths, interval, angle).rowCount;
 }
 
 // T1-156: Edge + ScanlineEdge moved to ./fillGeometryHelpers.

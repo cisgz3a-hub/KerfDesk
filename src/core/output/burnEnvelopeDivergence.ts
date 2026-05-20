@@ -29,7 +29,7 @@
  * upstream transform — out of scope.
  */
 import type { AABB } from '../types';
-import type { Plan } from '../plan/Plan';
+import { iteratePlannedOperationMoves, type Plan } from '../plan/Plan';
 import { analyzeEmittedBurnEnvelope, type EmittedBurnEnvelope } from './emittedBurnEnvelope';
 
 export const BURN_ENVELOPE_DIVERGENCE_TOLERANCE_MM = 0.5;
@@ -72,7 +72,7 @@ export function computePlanBurnEnvelope(plan: Plan): {
   let prevX = 0;
   let prevY = 0;
   for (const op of plan.operations) {
-    for (const move of op.moves) {
+    for (const move of iteratePlannedOperationMoves(op)) {
       if (move.type === 'rapid') {
         prevX = move.to.x;
         prevY = move.to.y;

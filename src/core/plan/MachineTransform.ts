@@ -12,7 +12,13 @@
  * Pipeline position: Plan -> [applyMachineTransform] -> TransformedPlan -> strategy.generate -> Output
  */
 
-import { type Plan, type PlannedOperation, type Move } from './Plan';
+import {
+  iteratePlannedOperationMoves,
+  type Plan,
+  type PlannedOperation,
+  type Move,
+  type PlannedMoveSource,
+} from './Plan';
 import { emptyAABB, expandAABB } from '../types';
 import { type GcodeStartMode, computeGcodeOffset } from '../output/GcodeOrigin';
 import { type MachineOriginCorner } from '../devices/DeviceProfile';
@@ -91,7 +97,7 @@ export function applyMachineTransform(
 ): MachineTransformResult {
   let bounds = emptyAABB();
   for (const op of plan.operations) {
-    for (const move of op.moves) {
+    for (const move of iteratePlannedOperationMoves(op)) {
       if (move.type === 'rapid' || move.type === 'linear') {
         bounds = expandAABB(bounds, move.to.x, move.to.y);
       }
@@ -156,7 +162,37 @@ export function applyMachineTransform(
         newBounds = expandAABB(newBounds, tm.to.x, tm.to.y);
       }
     }
-    return { ...op, moves: transformedMoves };
+    const transformedTailMoves = op.tailMoves?.map(move => {
+      const tm = transformMove(move, offset.x, offset.y, flipReferenceX, flipReferenceY, flipX, flipY);
+      if (tm.type === 'rapid' || tm.type === 'linear') {
+        newBounds = expandAABB(newBounds, tm.to.x, tm.to.y);
+      }
+      return tm;
+    });
+    let transformedMoveSource: PlannedMoveSource | undefined;
+    if (op.moveSource) {
+      transformedMoveSource = {
+        kind: op.moveSource.kind,
+        description: `${op.moveSource.description}:machine-transform`,
+        iterate: function* (signal?: AbortSignal) {
+          for (const move of op.moveSource!.iterate(signal)) {
+            if (signal?.aborted) return;
+            yield transformMove(move, offset.x, offset.y, flipReferenceX, flipReferenceY, flipX, flipY);
+          }
+        },
+      };
+      for (const move of transformedMoveSource.iterate()) {
+        if (move.type === 'rapid' || move.type === 'linear') {
+          newBounds = expandAABB(newBounds, move.to.x, move.to.y);
+        }
+      }
+    }
+    return {
+      ...op,
+      moves: transformedMoves,
+      ...(transformedMoveSource ? { moveSource: transformedMoveSource } : {}),
+      ...(transformedTailMoves ? { tailMoves: transformedTailMoves } : {}),
+    };
   });
 
   const transformedPlan: Plan = {

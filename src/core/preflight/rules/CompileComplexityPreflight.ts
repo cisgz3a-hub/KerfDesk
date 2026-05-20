@@ -25,6 +25,9 @@
 import type { PreflightContext, PreflightResult } from '../PreflightContext';
 import { PREFLIGHT_CODES } from '../PreflightContext';
 import type { Scene } from '../../scene/Scene';
+import type { AABB } from '../../types';
+import { computeObjectBounds } from '../../../geometry/bounds';
+import { resolveFillScanlineIntervalForSpan } from '../../plan/FillGenerator';
 
 export interface ComplexityEstimate {
   rasterPixels: number;
@@ -38,6 +41,83 @@ const WARN_LINE_COUNT_INFO = 1_000_000;
 const WARN_LINE_COUNT_HIGH = 3_000_000;
 const HARD_BLOCK_LINE_COUNT = 10_000_000;
 const HARD_BLOCK_MEMORY_MB = 800;
+
+function hasUsableBounds(bounds: AABB): boolean {
+  return Number.isFinite(bounds.minX) && Number.isFinite(bounds.minY) &&
+    Number.isFinite(bounds.maxX) && Number.isFinite(bounds.maxY) &&
+    bounds.maxX > bounds.minX && bounds.maxY > bounds.minY;
+}
+
+function rotatedBoundsSpanY(bounds: AABB, angle: number): number {
+  const angleRad = (angle * Math.PI) / 180;
+  const corners = [
+    { x: bounds.minX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.minY },
+    { x: bounds.maxX, y: bounds.maxY },
+    { x: bounds.minX, y: bounds.maxY },
+  ];
+  let minY = Infinity;
+  let maxY = -Infinity;
+
+  for (const corner of corners) {
+    const y = corner.x * Math.sin(-angleRad) + corner.y * Math.cos(-angleRad);
+    minY = Math.min(minY, y);
+    maxY = Math.max(maxY, y);
+  }
+
+  return Number.isFinite(minY) && Number.isFinite(maxY) ? maxY - minY : 0;
+}
+
+function fmtMm(n: number): string {
+  return n.toFixed(3);
+}
+
+function runFillIntervalCapChecks(ctx: PreflightContext, out: PreflightResult[]): void {
+  const { scene } = ctx;
+  for (const obj of scene.objects) {
+    if (!obj.visible) continue;
+    const layer = scene.layers.find(l => l.id === obj.layerId);
+    if (!layer || !layer.visible || layer.output === false || layer.settings.mode !== 'engrave') continue;
+
+    const fillActive = layer.settings.fill.enabled || layer.settings.mode === 'engrave';
+    if (!fillActive) continue;
+    const bounds = computeObjectBounds(obj);
+    if (!hasUsableBounds(bounds)) continue;
+
+    const requestedInterval = Number(layer.settings.fill.interval);
+    const angles = layer.settings.fill.mode === 'cross-hatch'
+      ? [layer.settings.fill.angle, layer.settings.fill.angle + 90]
+      : [layer.settings.fill.angle];
+    let cappedEstimate: ReturnType<typeof resolveFillScanlineIntervalForSpan> | null = null;
+    let cappedAngle = angles[0] ?? 0;
+
+    for (const angle of angles) {
+      const estimate = resolveFillScanlineIntervalForSpan(
+        rotatedBoundsSpanY(bounds, angle),
+        requestedInterval,
+      );
+      if (!estimate.capped) continue;
+      if (!cappedEstimate || estimate.effectiveInterval > cappedEstimate.effectiveInterval) {
+        cappedEstimate = estimate;
+        cappedAngle = angle;
+      }
+    }
+
+    if (!cappedEstimate) continue;
+    out.push({
+      severity: 'warning',
+      code: PREFLIGHT_CODES.FILL_INTERVAL_COARSENED,
+      message:
+        `Dense fill for "${obj.name || obj.id}" on layer "${layer.name}" will be coarsened from ` +
+        `${fmtMm(cappedEstimate.safeInterval)}mm to ${fmtMm(cappedEstimate.effectiveInterval)}mm ` +
+        `at ${fmtMm(cappedAngle)}° to stay within the ` +
+        `${cappedEstimate.maxScanlines.toLocaleString('en-US')} scanline cap. ` +
+        `Increase the fill interval or split the job if exact engraving density matters.`,
+      objectId: obj.id,
+      layerId: layer.id,
+    });
+  }
+}
 
 /**
  * Conservative upper-bound estimator. Walks visible objects on output
@@ -147,6 +227,7 @@ export function runCompileComplexityChecks(
   ctx: PreflightContext,
   out: PreflightResult[],
 ): void {
+  runFillIntervalCapChecks(ctx, out);
   const e = estimateCompileComplexity(ctx.scene);
   if (e.expectedGcodeLineCount === 0 && e.rasterPixels === 0) return;
 

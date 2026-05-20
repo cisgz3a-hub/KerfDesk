@@ -74,6 +74,8 @@ export const PREFLIGHT_CODES = {
   COMPILE_COMPLEXITY_INFO: 'COMPILE_COMPLEXITY_INFO',
   COMPILE_COMPLEXITY_WARN: 'COMPILE_COMPLEXITY_WARN',
   COMPILE_COMPLEXITY_BLOCK: 'COMPILE_COMPLEXITY_BLOCK',
+  /** F45-12-001: dense fill line interval was coarsened to stay within the scanline cap. */
+  FILL_INTERVAL_COARSENED: 'FILL_INTERVAL_COARSENED',
   LONG_JOB: 'LONG_JOB',
   BED_SIZE_MISMATCH: 'BED_SIZE_MISMATCH',
   HIDDEN_LAYER_HAS_OBJECTS: 'HIDDEN_LAYER_HAS_OBJECTS',
@@ -189,4 +191,3 @@ export interface PreflightContext {
   preflightBedWidthMm: number;
   preflightBedHeightMm: number;
 }
-
