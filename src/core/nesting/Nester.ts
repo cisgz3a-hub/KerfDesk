@@ -52,6 +52,25 @@ interface ShapeBox {
   height: number;
   area: number;
   longest: number;
+  rotatable: boolean;
+}
+
+interface NestingBounds {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+interface NestingUnit {
+  id: string;
+  objectIds: string[];
+  bounds: NestingBounds;
+  width: number;
+  height: number;
+  area: number;
+  longest: number;
+  rotatable: boolean;
 }
 
 /**
@@ -77,23 +96,16 @@ export function nestShapes(
     binOriginY = 0,
   } = options;
 
-  // Compute bounding box for each object
-  const boxes: ShapeBox[] = [];
-  for (const obj of objects) {
-    if (!obj.visible || obj.locked) continue;
-    const bounds = computeObjectBounds(obj);
-    if (!bounds) continue;
-    const w = bounds.maxX - bounds.minX;
-    const h = bounds.maxY - bounds.minY;
-    if (w <= 0 || h <= 0) continue;
-    boxes.push({
-      id: obj.id,
-      width: w + padding * 2, // Add padding around each shape
-      height: h + padding * 2,
-      area: w * h,
-      longest: Math.max(w, h),
-    });
-  }
+  // Compute each nestable unit. Grouped children move as a single unit so
+  // auto-pack cannot split artwork that the user intentionally grouped.
+  const boxes: ShapeBox[] = buildNestableUnits(objects).map(unit => ({
+    id: unit.id,
+    width: unit.width + padding * 2, // Add padding around each shape
+    height: unit.height + padding * 2,
+    area: unit.area,
+    longest: unit.longest,
+    rotatable: unit.rotatable,
+  }));
 
   // Sort shapes by chosen criterion (largest first for best packing)
   switch (sortMode) {
@@ -146,7 +158,7 @@ export function nestShapes(
         }
       }
       // Try with 90° rotation
-      if (rotationAllowed && box.height <= rect.width && box.width <= rect.height) {
+      if (rotationAllowed && box.rotatable && box.height <= rect.width && box.width <= rect.height) {
         const score = rect.y * 10000 + rect.x;
         if (score < bestScore) {
           bestScore = score;
@@ -275,9 +287,40 @@ export function applyNesting(
 ): SceneObject[] {
   // T1-78 Phase 2a: see nestShapes above.
   assertFeature('nesting');
+  if (result.unplaced.length > 0) {
+    return objects;
+  }
+
   const updates = new Map<string, NestedItem>();
   for (const item of result.items) {
     updates.set(item.objectId, item);
+  }
+
+  const units = buildNestableUnits(objects);
+  const unitById = new Map(units.map(unit => [unit.id, unit]));
+  const unitIdByObjectId = new Map<string, string>();
+  for (const unit of units) {
+    for (const objectId of unit.objectIds) {
+      unitIdByObjectId.set(objectId, unit.id);
+    }
+  }
+
+  if (units.some(unit => updates.has(unit.id) && unit.objectIds.length > 1)) {
+    return objects.map(obj => {
+      const unitId = unitIdByObjectId.get(obj.id);
+      if (unitId) {
+        const unit = unitById.get(unitId);
+        const item = updates.get(unitId);
+        if (!unit || !item) return obj;
+        const dx = item.x - unit.bounds.minX;
+        const dy = item.y - unit.bounds.minY;
+        if (dx === 0 && dy === 0) return obj;
+        return translateObject(obj, dx, dy);
+      }
+
+      const item = updates.get(obj.id);
+      return item ? applyNestedItemToObject(obj, item) : obj;
+    });
   }
 
   return objects.map(obj => {
@@ -317,6 +360,20 @@ export function applyNesting(
       const newTy = sin * (t.tx - cx) + cos * (t.ty - cy) + cy;
 
       newTransform = { a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy };
+
+      const rotatedBounds = computeObjectBounds({
+        ...obj,
+        transform: newTransform,
+        _bounds: null,
+        _worldTransform: null,
+      });
+      if (rotatedBounds) {
+        newTransform = {
+          ...newTransform,
+          tx: newTransform.tx + item.x - rotatedBounds.minX,
+          ty: newTransform.ty + item.y - rotatedBounds.minY,
+        };
+      }
     }
 
     return {
@@ -326,4 +383,171 @@ export function applyNesting(
       _worldTransform: null,
     };
   });
+}
+
+function buildNestableUnits(objects: SceneObject[]): NestingUnit[] {
+  const byId = new Map(objects.map(obj => [obj.id, obj]));
+  const groupIds = new Set(objects.filter(obj => obj.type === 'group').map(obj => obj.id));
+  const grouped = new Map<string, SceneObject[]>();
+  const loose: SceneObject[] = [];
+
+  for (const obj of objects) {
+    if (obj.type === 'group') continue;
+    if (!obj.visible || obj.locked) continue;
+
+    const rootGroupId = findRootGroupId(obj, byId, groupIds);
+    if (rootGroupId) {
+      const members = grouped.get(rootGroupId) ?? [];
+      members.push(obj);
+      grouped.set(rootGroupId, members);
+    } else {
+      loose.push(obj);
+    }
+  }
+
+  const units: NestingUnit[] = [];
+  for (const obj of loose) {
+    const unit = makeNestableUnit(obj.id, [obj], true);
+    if (unit) units.push(unit);
+  }
+
+  for (const [groupId, members] of grouped) {
+    const unit = makeNestableUnit(groupId, members, false);
+    if (unit) units.push(unit);
+  }
+
+  return units;
+}
+
+function findRootGroupId(
+  obj: SceneObject,
+  byId: ReadonlyMap<string, SceneObject>,
+  groupIds: ReadonlySet<string>,
+): string | null {
+  let parentId = obj.parentId;
+  let rootGroupId: string | null = null;
+  const seen = new Set<string>([obj.id]);
+
+  while (parentId && groupIds.has(parentId) && !seen.has(parentId)) {
+    seen.add(parentId);
+    rootGroupId = parentId;
+    const parent = byId.get(parentId);
+    if (!parent || parent.locked) return null;
+    parentId = parent.parentId;
+  }
+
+  return rootGroupId;
+}
+
+function makeNestableUnit(
+  id: string,
+  members: readonly SceneObject[],
+  rotatable: boolean,
+): NestingUnit | null {
+  let bounds: NestingBounds | null = null;
+
+  for (const member of members) {
+    const memberBounds = computeObjectBounds(member);
+    if (!isValidNestingBounds(memberBounds)) continue;
+    bounds = bounds
+      ? {
+          minX: Math.min(bounds.minX, memberBounds.minX),
+          minY: Math.min(bounds.minY, memberBounds.minY),
+          maxX: Math.max(bounds.maxX, memberBounds.maxX),
+          maxY: Math.max(bounds.maxY, memberBounds.maxY),
+        }
+      : { ...memberBounds };
+  }
+
+  if (!bounds) return null;
+  const width = bounds.maxX - bounds.minX;
+  const height = bounds.maxY - bounds.minY;
+  if (width <= 0 || height <= 0) return null;
+
+  return {
+    id,
+    objectIds: members.map(member => member.id),
+    bounds,
+    width,
+    height,
+    area: width * height,
+    longest: Math.max(width, height),
+    rotatable,
+  };
+}
+
+function isValidNestingBounds(bounds: NestingBounds): boolean {
+  return Number.isFinite(bounds.minX)
+    && Number.isFinite(bounds.minY)
+    && Number.isFinite(bounds.maxX)
+    && Number.isFinite(bounds.maxY)
+    && bounds.maxX > bounds.minX
+    && bounds.maxY > bounds.minY;
+}
+
+function applyNestedItemToObject(obj: SceneObject, item: NestedItem): SceneObject {
+  const bounds = computeObjectBounds(obj);
+  if (!isValidNestingBounds(bounds)) return obj;
+
+  const dx = item.x - bounds.minX;
+  const dy = item.y - bounds.minY;
+
+  let newTransform = {
+    ...obj.transform,
+    tx: obj.transform.tx + dx,
+    ty: obj.transform.ty + dy,
+  };
+
+  if (item.rotated) {
+    const rad = Math.PI / 2;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const cx = bounds.minX + (bounds.maxX - bounds.minX) / 2 + dx;
+    const cy = bounds.minY + (bounds.maxY - bounds.minY) / 2 + dy;
+    const t = newTransform;
+
+    const newA = cos * t.a - sin * t.c;
+    const newB = cos * t.b - sin * t.d;
+    const newC = sin * t.a + cos * t.c;
+    const newD = sin * t.b + cos * t.d;
+    const newTx = cos * (t.tx - cx) - sin * (t.ty - cy) + cx;
+    const newTy = sin * (t.tx - cx) + cos * (t.ty - cy) + cy;
+
+    newTransform = { a: newA, b: newB, c: newC, d: newD, tx: newTx, ty: newTy };
+
+    const rotatedBounds = computeObjectBounds({
+      ...obj,
+      transform: newTransform,
+      _bounds: null,
+      _worldTransform: null,
+    });
+    if (isValidNestingBounds(rotatedBounds)) {
+      newTransform = {
+        ...newTransform,
+        tx: newTransform.tx + item.x - rotatedBounds.minX,
+        ty: newTransform.ty + item.y - rotatedBounds.minY,
+      };
+    }
+  }
+
+  return {
+    ...obj,
+    transform: newTransform,
+    _bounds: null,
+    _worldTransform: null,
+  };
+}
+
+function translateObject(obj: SceneObject, dx: number, dy: number): SceneObject {
+  return {
+    ...obj,
+    transform: {
+      ...obj.transform,
+      tx: obj.transform.tx + dx,
+      ty: obj.transform.ty + dy,
+    },
+    _bounds: null,
+    _worldTransform: null,
+  };
 }

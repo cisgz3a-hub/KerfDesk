@@ -44,6 +44,7 @@ export function NestingDialog({ scene, onApply, onClose }: NestingDialogProps) {
   const totalShapes = scene.objects.filter(o => o.visible && !o.locked).length;
   const placedCount = result.items.length;
   const unplacedCount = result.unplaced.length;
+  const canApply = placedCount > 0 && unplacedCount === 0;
   const efficiencyPercent = (result.efficiency * 100).toFixed(1);
 
   const inputStyle: React.CSSProperties = {
@@ -232,13 +233,13 @@ export function NestingDialog({ scene, onApply, onClose }: NestingDialogProps) {
             onApply(newObjects);
             onClose();
           },
-          disabled: placedCount === 0,
+          disabled: !canApply,
           style: {
             flex: 2, padding: '10px',
-            background: placedCount > 0 ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
-            border: placedCount > 0 ? '1px solid #2dd4a0' : '1px solid #252540',
-            borderRadius: 8, color: placedCount > 0 ? '#2dd4a0' : '#333355',
-            fontSize: 13, fontWeight: 600, cursor: placedCount > 0 ? 'pointer' : 'default',
+            background: canApply ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
+            border: canApply ? '1px solid #2dd4a0' : '1px solid #252540',
+            borderRadius: 8, color: canApply ? '#2dd4a0' : '#333355',
+            fontSize: 13, fontWeight: 600, cursor: canApply ? 'pointer' : 'default',
             fontFamily: font,
           },
         }, `Apply Auto-Pack (${placedCount} shapes)`),
