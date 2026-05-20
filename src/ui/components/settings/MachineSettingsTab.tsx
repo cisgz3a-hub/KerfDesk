@@ -2,7 +2,13 @@
  * @copyright (c) 2025 LaserForge. All rights reserved.
  */
 import React from 'react';
-import type { DeviceProfile, MachineOriginCorner } from '../../../core/devices/DeviceProfile';
+import type {
+  DeviceProfile,
+  GrblJogMode,
+  GrblTransferMode,
+  MachineOriginCorner,
+} from '../../../core/devices/DeviceProfile';
+import type { AirAssistCommand, GrblLaserPowerMode } from '../../../core/output/GcodeOrigin';
 import {
   confidenceLabel,
   resolveCapabilityValue,
@@ -196,6 +202,23 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     { value: 'rear-left', label: 'Rear left' },
     { value: 'rear-right', label: 'Rear right' },
   ];
+  const laserPowerModeOptions: Array<{ value: GrblLaserPowerMode; label: string }> = [
+    { value: 'dynamic-m4', label: 'Dynamic M4 (GRBL laser mode)' },
+    { value: 'constant-m3', label: 'Constant M3 compatibility' },
+  ];
+  const transferModeOptions: Array<{ value: GrblTransferMode; label: string }> = [
+    { value: 'buffered', label: 'Buffered character-counting' },
+    { value: 'synchronous', label: 'Synchronous send/ok' },
+  ];
+  const jogModeOptions: Array<{ value: GrblJogMode; label: string }> = [
+    { value: 'grbl-j', label: 'GRBL $J jog' },
+    { value: 'legacy-gcode', label: 'Legacy G-code jog' },
+  ];
+  const airAssistOptions: Array<{ value: AirAssistCommand; label: string }> = [
+    { value: 'M8', label: 'M8 coolant/air assist' },
+    { value: 'M7', label: 'M7 mist/air assist' },
+    { value: 'none', label: 'None' },
+  ];
 
   const rerunSection = onReRunSetup && React.createElement('div', {
     style: {
@@ -282,6 +305,29 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
       },
     },
       cornerOptions.map(option => React.createElement('option', { key: option.value, value: option.value },
+        option.label,
+      )),
+    ),
+    React.createElement('div', { style: hintStyle }, hint),
+  );
+
+  const compatibilitySelectField = (
+    label: string,
+    field: 'grblLaserPowerMode' | 'grblTransferMode' | 'grblJogMode' | 'airAssistCommand',
+    value: string,
+    options: Array<{ value: string; label: string }>,
+    hint: string,
+  ) => React.createElement('div', { style: fieldRowStyle },
+    React.createElement('label', { style: labelStyle }, label),
+    React.createElement('select', {
+      'aria-label': label,
+      value,
+      style: inputStyle,
+      onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
+        onUpdateProfile({ [field]: e.target.value } as Partial<DeviceProfile>);
+      },
+    },
+      options.map(option => React.createElement('option', { key: option.value, value: option.value },
         option.label,
       )),
     ),
@@ -390,6 +436,49 @@ export function MachineSettingsTab(props: MachineSettingsTabProps) {
     React.createElement('div', { style: sectionStyle },
       React.createElement('div', { style: sectionTitleStyle }, 'Laser'),
       numberField('Max spindle (S)', 'maxSpindle', 1, 'S value', 'GRBL $30, typically 1000'),
+    ),
+
+    React.createElement('div', { style: sectionStyle },
+      React.createElement('div', { style: sectionTitleStyle }, 'Advanced GRBL compatibility'),
+      React.createElement('p', {
+        style: {
+          fontSize: 10,
+          color: '#777792',
+          lineHeight: 1.45,
+          marginTop: 0,
+          marginBottom: 12,
+        },
+      },
+        'Change these only when matching a controller profile, LightBurn-style setup, or a machine that cannot use LaserForge defaults.',
+      ),
+      compatibilitySelectField(
+        'Laser power mode',
+        'grblLaserPowerMode',
+        activeProfile.grblLaserPowerMode ?? 'dynamic-m4',
+        laserPowerModeOptions,
+        'Dynamic M4 follows GRBL $32 laser mode. Constant M3 is for controllers that require fixed-power cutting.',
+      ),
+      compatibilitySelectField(
+        'Transfer mode',
+        'grblTransferMode',
+        activeProfile.grblTransferMode ?? 'buffered',
+        transferModeOptions,
+        'Buffered mode is faster. Synchronous mode sends one line per ok for stricter GRBL compatibility.',
+      ),
+      compatibilitySelectField(
+        'Jog mode',
+        'grblJogMode',
+        activeProfile.grblJogMode ?? 'grbl-j',
+        jogModeOptions,
+        'Use legacy G-code jog only for controllers that do not support GRBL $J jogging.',
+      ),
+      compatibilitySelectField(
+        'Air assist command',
+        'airAssistCommand',
+        activeProfile.airAssistCommand ?? 'M8',
+        airAssistOptions,
+        'Select the controller command wired to air assist, or disable emitted air-assist commands.',
+      ),
     ),
 
     React.createElement('div', { style: sectionStyle },

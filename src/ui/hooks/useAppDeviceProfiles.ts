@@ -38,12 +38,12 @@ interface GrblMachineInfoForProfile {
   readonly homingDir: number;
 }
 
-interface WcsConsentPayload {
+export interface WcsConsentPayload {
   readonly g54: { readonly x: number; readonly y: number; readonly z: number };
   readonly statusMask: number;
 }
 
-interface ProfileAwareController {
+export interface ProfileAwareController {
   onWcsConsentNeeded?: (
     listener: (payload: WcsConsentPayload) => void | Promise<void>,
   ) => () => void;
@@ -53,9 +53,21 @@ interface ProfileAwareController {
   getDeviceIdentity?: () => { firmwareVersion?: string | null };
 }
 
-interface ConfirmWithCheckboxResult {
+export interface ConfirmWithCheckboxResult {
   readonly ok: boolean;
   readonly checkboxChecked: boolean;
+}
+
+export interface WcsConsentHandlingDeps {
+  readonly controller: ProfileAwareController;
+  readonly getActiveProfile: () => DeviceProfile | null;
+  readonly saveDeviceProfile: (profile: DeviceProfile) => void;
+  readonly refreshProfiles: () => void;
+  readonly showConfirmWithCheckbox: (
+    title: string,
+    message: string,
+    checkboxLabel: string,
+  ) => Promise<ConfirmWithCheckboxResult>;
 }
 
 interface UseAppDeviceProfilesParams {
@@ -71,6 +83,51 @@ interface UseAppDeviceProfilesParams {
     checkboxLabel: string,
   ) => Promise<ConfirmWithCheckboxResult>;
   readonly applyProfileScene: (scene: Scene) => void;
+}
+
+export async function handleWcsConsentForActiveProfile(
+  { g54, statusMask }: WcsConsentPayload,
+  {
+    controller,
+    getActiveProfile,
+    saveDeviceProfile,
+    refreshProfiles,
+    showConfirmWithCheckbox,
+  }: WcsConsentHandlingDeps,
+): Promise<void> {
+  const profile = getActiveProfile();
+  if (profile?.suppressWcsConsent === true) {
+    controller.applyWcsNormalization?.();
+    return;
+  }
+
+  const g54Line = `G54 offset: X=${g54.x.toFixed(3)} Y=${g54.y.toFixed(3)} Z=${g54.z.toFixed(3)}`;
+  const maskLine = `$10 status mask: ${statusMask}`;
+
+  const result = await showConfirmWithCheckbox(
+    'Normalize machine settings?',
+    'LaserForge requires G54 = (0,0,0) and $10 = 0 for reliable job placement.\n\n'
+      + 'Your machine currently has:\n'
+      + g54Line + '\n'
+      + maskLine
+      + '\n\n'
+      + 'Normalize now? (Decline to leave settings unchanged - job placement is your responsibility.)',
+    "Don't ask again for this profile",
+  );
+
+  if (result.ok) {
+    if (result.checkboxChecked) {
+      const p = getActiveProfile();
+      if (p) {
+        const updated: DeviceProfile = { ...p, suppressWcsConsent: true };
+        saveDeviceProfile(updated);
+        refreshProfiles();
+      }
+    }
+    controller.applyWcsNormalization?.();
+  } else {
+    controller.skipWcsNormalization?.();
+  }
 }
 
 export function useAppDeviceProfiles({
@@ -155,42 +212,14 @@ export function useAppDeviceProfiles({
   useEffect(() => {
     if (!controller || typeof controller.onWcsConsentNeeded !== 'function') return;
 
-    return controller.onWcsConsentNeeded(async ({ g54, statusMask }) => {
-      const profile = getActiveProfile();
-      if (profile?.suppressWcsConsent === true) {
-        controller.applyWcsNormalization?.();
-        return;
-      }
-
-      const g54Line = `G54 offset: X=${g54.x.toFixed(3)} Y=${g54.y.toFixed(3)} Z=${g54.z.toFixed(3)}`;
-      const maskLine = `$10 status mask: ${statusMask}`;
-
-      const result = await showConfirmWithCheckbox(
-        'Normalize machine settings?',
-        'LaserForge requires G54 = (0,0,0) and $10 = 0 for reliable job placement.\n\n'
-          + 'Your machine currently has:\n'
-          + g54Line + '\n'
-          + maskLine
-          + '\n\n'
-          + 'Normalize now? (Decline to leave settings unchanged - job placement is your responsibility.)',
-        "Don't ask again for this profile",
-      );
-
-      if (result.checkboxChecked) {
-        const p = getActiveProfile();
-        if (p) {
-          const updated: DeviceProfile = { ...p, suppressWcsConsent: true };
-          saveDeviceProfile(updated);
-          refreshProfiles();
-        }
-      }
-
-      if (result.ok) {
-        controller.applyWcsNormalization?.();
-      } else {
-        controller.skipWcsNormalization?.();
-      }
-    });
+    return controller.onWcsConsentNeeded((payload) =>
+      handleWcsConsentForActiveProfile(payload, {
+        controller,
+        getActiveProfile,
+        saveDeviceProfile,
+        refreshProfiles,
+        showConfirmWithCheckbox,
+      }));
   }, [controller, showConfirmWithCheckbox, refreshProfiles]);
 
   useEffect(() => {
