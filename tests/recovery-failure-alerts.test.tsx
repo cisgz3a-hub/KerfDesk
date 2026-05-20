@@ -1,10 +1,12 @@
 /**
  * T1-70: handleRecover must surface failures to the user via showAlert
  * instead of swallowing into console.error and unconditionally hiding the
- * recovery prompt. Verifies the three branches:
+ * recovery prompt. Verifies these branches:
  *   1. Empty/missing autosave -> "Recovery unavailable" alert + prompt hidden
  *   2. Corrupt autosave JSON -> "Recovery failed" alert + prompt KEPT visible
- *   3. Successful recover -> no alert, prompt hidden, handleNewProject fired
+ *   3. Atomic autosave record checksum mismatch -> prompt KEPT visible
+ *   4. Embedded project checksum mismatch -> prompt KEPT visible
+ *   5. Successful recover -> no alert, prompt hidden, handleNewProject fired
  *
  * Run: npx tsx tests/recovery-failure-alerts.test.tsx
  */
@@ -13,10 +15,10 @@ import React, { act, useEffect } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { useWizardHandlers, type WizardHandlers } from '../src/ui/hooks/useWizardHandlers';
 import { setStorageForTest } from '../src/core/storage/storage';
-import { resetAutosaveForTest } from '../src/app/autosavePersistence';
+import { resetAutosaveForTest, writeAutosaveAsync } from '../src/app/autosavePersistence';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 import { createScene } from '../src/core/scene/Scene';
-import { serializeScene } from '../src/io/SceneSerializer';
+import { serializeForAutosave, serializeScene } from '../src/io/SceneSerializer';
 
 const dom = new JSDOM('<!DOCTYPE html><div id="root"></div>', { url: 'http://localhost' });
 const win = dom.window;
@@ -51,6 +53,17 @@ function makeControls(): HarnessControls {
     newProjectCalls: 0,
     recoverTimeLabelCalls: [],
   };
+}
+
+function tamperSceneChecksum(json: string): string {
+  const envelope = JSON.parse(json) as {
+    scene?: { metadata?: { name?: string } };
+  };
+  if (!envelope.scene?.metadata) {
+    throw new Error('test fixture is missing scene metadata');
+  }
+  envelope.scene.metadata.name = 'Tampered Autosave';
+  return JSON.stringify(envelope);
 }
 
 function Harness(props: {
@@ -158,7 +171,75 @@ async function run(): Promise<void> {
       );
     }
 
-    // --- Branch 3: successful recover ---
+    // --- Branch 3: atomic autosave record checksum mismatch ---
+    {
+      const goodScene = createScene(400, 300, 'record checksum mismatch');
+      const goodJson = serializeForAutosave(goodScene);
+      const storage = new InMemoryStorageAdapter();
+      await storage.set('laserforge_autosave_record', JSON.stringify({
+        version: 1,
+        json: goodJson,
+        timestamp: new Date().toISOString(),
+        checksum: '00000000',
+      }));
+      setStorageForTest(storage);
+      resetAutosaveForTest();
+      const controls = makeControls();
+      const handlers = await renderAndGetHandlers(controls);
+      await act(async () => { await handlers.handleRecover(); });
+
+      assert(controls.alerts.length === 1, 'record checksum mismatch: showAlert called exactly once');
+      assert(
+        controls.alerts[0]?.title === 'Recovery failed',
+        'record checksum mismatch: alert title is "Recovery failed"',
+      );
+      assert(
+        /checksum|integrity/i.test(controls.alerts[0]?.message ?? ''),
+        'record checksum mismatch: alert explains the integrity failure',
+      );
+      assert(
+        !controls.showRecoverCalls.includes(false),
+        'record checksum mismatch: setShowRecover(false) NOT called - prompt stays visible',
+      );
+      assert(
+        controls.newProjectCalls === 0,
+        'record checksum mismatch: handleNewProject NOT called',
+      );
+    }
+
+    // --- Branch 4: scene checksum mismatch inside an otherwise valid autosave record ---
+    {
+      const goodScene = createScene(400, 300, 'scene checksum mismatch');
+      const tamperedJson = tamperSceneChecksum(serializeForAutosave(goodScene));
+      const storage = new InMemoryStorageAdapter();
+      setStorageForTest(storage);
+      resetAutosaveForTest();
+      await writeAutosaveAsync(tamperedJson);
+      resetAutosaveForTest();
+      const controls = makeControls();
+      const handlers = await renderAndGetHandlers(controls);
+      await act(async () => { await handlers.handleRecover(); });
+
+      assert(controls.alerts.length === 1, 'scene checksum mismatch: showAlert called exactly once');
+      assert(
+        controls.alerts[0]?.title === 'Recovery failed',
+        'scene checksum mismatch: alert title is "Recovery failed"',
+      );
+      assert(
+        /checksum|integrity/i.test(controls.alerts[0]?.message ?? ''),
+        'scene checksum mismatch: alert explains the integrity failure',
+      );
+      assert(
+        !controls.showRecoverCalls.includes(false),
+        'scene checksum mismatch: setShowRecover(false) NOT called - prompt stays visible',
+      );
+      assert(
+        controls.newProjectCalls === 0,
+        'scene checksum mismatch: handleNewProject NOT called',
+      );
+    }
+
+    // --- Branch 5: successful recover ---
     {
       const goodScene = createScene(400, 300, 'recovered');
       const storage = new InMemoryStorageAdapter();

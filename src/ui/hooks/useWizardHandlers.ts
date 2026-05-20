@@ -1,11 +1,11 @@
 import { useCallback, type RefObject } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { deserializeScene } from '../../io/SceneSerializer';
+import { deserializeSceneWithIntegrity } from '../../io/SceneSerializer';
 import {
   formatMissingImageReferenceReport,
   validateAndAnnotateImageReferences,
 } from '../../io/ImageReferenceValidation';
-import { readAutosave } from '../../app/autosavePersistence';
+import { autosaveRecordChecksumValid, readAutosave } from '../../app/autosavePersistence';
 import {
   createBlankProfile,
   createFalconSerialProfile,
@@ -110,7 +110,10 @@ export function useWizardHandlers(params: UseWizardHandlersParams): WizardHandle
       return;
     }
     try {
-      const recovered = deserializeScene(payload.json);
+      if (payload.record && !autosaveRecordChecksumValid(payload.record)) {
+        throw new Error('Autosave record checksum mismatch. The recovery data may be corrupted or incomplete.');
+      }
+      const recovered = deserializeSceneWithIntegrity(payload.json);
       const { scene: annotated, validation } = await validateAndAnnotateImageReferences(recovered);
       handleNewProject(annotated, 'autosave');
       const imageReport = formatMissingImageReferenceReport(validation);

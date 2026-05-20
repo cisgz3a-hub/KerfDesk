@@ -138,6 +138,16 @@ void (async () => {
   assert(importHook.includes('confirmProjectChecksumMismatch'), 'drag/drop project import prompts on checksum mismatch');
   assert(importHook.includes('ProjectChecksumLoadCancelledError'), 'drag/drop project import treats checksum mismatch cancel as non-error');
 
+  const wizardHandlers = readFileSync('src/ui/hooks/useWizardHandlers.ts', 'utf-8');
+  assert(
+    wizardHandlers.includes('deserializeSceneWithIntegrity'),
+    'autosave recovery loads through integrity validation',
+  );
+  assert(
+    wizardHandlers.includes('autosaveRecordChecksumValid'),
+    'autosave recovery checks the atomic autosave record checksum',
+  );
+
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);
 })().catch((error: unknown) => {
