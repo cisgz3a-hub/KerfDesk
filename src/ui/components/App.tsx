@@ -1434,6 +1434,7 @@ export function App(): React.ReactElement {
       onSceneChange: handleSceneChange,
       onSceneCommit: handleSceneCommit,
       onNewProject: handleNewProject,
+      isSceneDirty: () => isDirty(scene, lastManualSaveHashRef.current),
       onAfterSuccessfulFileSave: syncAutosaveAfterFileSave,
       showAlert,
       showConfirm,

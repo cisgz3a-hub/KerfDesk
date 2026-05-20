@@ -50,6 +50,8 @@ export interface FileToolbarProps {
   onSceneCommit: (scene: Scene) => void;
   /** Called when user clicks New — resets history instead of pushing. */
   onNewProject: (scene: Scene, source: 'file' | 'autosave' | 'new') => void;
+  /** Broad dirty predicate shared with keyboard New. Falls back to object count when omitted. */
+  isSceneDirty?: () => boolean;
   showAlert: (title: string, message: string, details?: string) => Promise<void>;
   showConfirm: (title: string, message: string, details?: string) => Promise<boolean>;
   showChoice: (
@@ -111,6 +113,7 @@ export function FileToolbar({
   onSceneChange,
   onSceneCommit,
   onNewProject,
+  isSceneDirty,
   showAlert,
   showConfirm,
   showChoice,
@@ -152,7 +155,8 @@ export function FileToolbar({
   // ─── NEW PROJECT ─────────────────────────────────────────────
 
   const handleNew = useCallback(async () => {
-    if (scene.objects.length > 0) {
+    const shouldConfirm = isSceneDirty ? isSceneDirty() : scene.objects.length > 0;
+    if (shouldConfirm) {
       const ok = await showConfirm('New Project', 'Start a new project? Unsaved changes will be lost.');
       if (!ok) return;
     }
@@ -163,7 +167,7 @@ export function FileToolbar({
       'Untitled'
     );
     onNewProject(newScene, 'new');
-  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, onNewProject, showConfirm]);
+  }, [scene.canvas.width, scene.canvas.height, scene.objects.length, isSceneDirty, onNewProject, showConfirm]);
 
   // ─── IMPORT SVG ──────────────────────────────────────────────
 
