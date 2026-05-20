@@ -1845,6 +1845,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
   // advanced mode can explicitly override that gate.
   const userModeGatePolicy = computeUserModeGatePolicy(userMode);
   const requireFrame = userModeGatePolicy.requireFrameBeforeStart;
+  const showAdvancedConsole = userModeGatePolicy.showProductionConsole && userModeGatePolicy.showManualGcodeSend;
   // T1-22: read laser-output safety state for the start-job gate.
   // T2-12 part 1: subscribed instead of polled. The previous polled
   // getter at this site relied on workflowVersion bumps to refresh on
@@ -2471,6 +2472,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     React.createElement(JobDetailsLaunchers, {
       issueCount: issues.length,
       onOpen: setDetailsPanel,
+      showAdvanced: showAdvancedConsole,
     });
 
   const connectionRecoveryContent = connectionRecoveryVisible
@@ -2622,7 +2624,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     }),
   );
 
-  const advancedMachineDetailsSection = isConnected && React.createElement('div', {
+  const advancedMachineDetailsSection = isConnected && showAdvancedConsole && React.createElement('div', {
     style: {
       padding: '10px 16px 12px',
       display: 'flex',
@@ -2769,7 +2771,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     }),
   );
 
-  const advancedSection = isConnected && React.createElement(ConsolePanel, {
+  const advancedSection = isConnected && showAdvancedConsole && React.createElement(ConsolePanel, {
     isConnected,
     isRunning,
     controller: controllerRef.current,
@@ -2839,6 +2841,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
               workflowSection: workflowStepsSection,
               issuesSection,
               advancedSection,
+              showAdvanced: showAdvancedConsole,
             })
           : React.createElement(React.Fragment, null,
               profileSection,

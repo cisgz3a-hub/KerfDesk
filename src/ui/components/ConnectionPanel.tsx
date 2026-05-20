@@ -37,6 +37,7 @@ import {
   resolveFrameDotFeedRate,
   resolveFrameLineDelayMs,
 } from '../../core/devices/DeviceProfile';
+import { computeUserModeGatePolicy } from '../../app/UserModeGates';
 
 export type ConnectionPanelProps = Omit<
   ConnectionPanelMainProps,
@@ -208,6 +209,8 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
   const machineState = props.machineState;
   const activeProfile = getActiveProfile();
   const machineStatus = machineState?.status ?? null;
+  const setupModePolicy = computeUserModeGatePolicy(props.userMode ?? 'beginner');
+  const showSetupConsole = setupModePolicy.showProductionConsole && setupModePolicy.showManualGcodeSend;
   // Same isConnected derivation as ConnectionPanelMain.tsx:424.
   const isConnected =
     machineStatus !== 'disconnected'
@@ -522,6 +525,7 @@ function WorkflowPanelAdapter(props: ConnectionPanelProps) {
     controller,
     sendUserCommand,
     messageEvents: machineUi.messageEvents,
+    showConsole: showSetupConsole,
   };
 
   // T1-208 (Phase 4): live-job props for ready / running / paused.

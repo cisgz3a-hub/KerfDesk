@@ -16,10 +16,11 @@ const TAB_LABEL: Record<SetupTab, string> = {
 
 export interface TabBarProps {
   readonly active: SetupTab;
+  readonly tabs?: readonly SetupTab[];
   readonly onSelect: (tab: SetupTab) => void;
 }
 
-export function TabBar({ active, onSelect }: TabBarProps): React.ReactElement {
+export function TabBar({ active, tabs = ALL_SETUP_TABS, onSelect }: TabBarProps): React.ReactElement {
   return React.createElement(
     'div',
     {
@@ -34,7 +35,7 @@ export function TabBar({ active, onSelect }: TabBarProps): React.ReactElement {
         borderBottom: '1px solid #1a1a2e',
       },
     },
-    ...ALL_SETUP_TABS.map((tab) => {
+    ...tabs.map((tab) => {
       const isActive = tab === active;
       return React.createElement(
         'button',

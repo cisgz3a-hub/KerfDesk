@@ -27,8 +27,8 @@ const compiler = readFileSync(resolve('src/core/job/JobCompiler.ts'), 'utf8');
 
 assert(/S25-04-001/.test(layerPanel), 'LayerPanel carries S25-04-001 marker');
 assert(
-  /const\s+tabsFeatureUnlocked\s*=\s*isProUnlocked\(\)/.test(layerPanel),
-  'LayerPanel derives tab UI availability from the same entitlement signal used by compiler policy',
+  /const\s+tabsFeatureUnlocked\s*=\s*checkProAccess\('tabs'\)/.test(layerPanel),
+  'LayerPanel derives tab UI availability from the same feature entitlement used by compiler policy',
 );
 assert(
   /const\s+simpleTabsOn\s*=\s*tabsFeatureUnlocked\s*&&/.test(layerPanel),
@@ -58,4 +58,3 @@ assert(
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
-

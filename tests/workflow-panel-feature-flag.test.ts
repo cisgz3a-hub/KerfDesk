@@ -1,19 +1,20 @@
 /**
- * T1-204: regression test for the `uiFeatureFlags` module — the
- * persistence layer behind the `WorkflowPanel` rollout.
+ * T1-204 / F45-14-001: regression test for the `uiFeatureFlags`
+ * module behind the `WorkflowPanel` rollout.
  *
  * What this test pins:
  *   - `workflowPanelV2` default is `false` so existing users see no
  *     change after the T1-204 ship.
- *   - `setUiFeatureFlag` persists to localStorage and round-trips
- *     through `getUiFeatureFlag`.
+ *   - `setUiFeatureFlag` persists to localStorage, but the
+ *     incomplete WorkflowPanel v2 route remains beta-locked at the
+ *     effective read boundary until parity is audited.
  *   - The storage key is namespaced (`laserforge.feature.*`) so a
  *     future flag won't collide with the other localStorage entries
  *     (active profile, autosave state, unsafe prior state, etc.).
  *   - The flag dispatches the `laserforge:ui-feature-flag-changed`
  *     event so subscribed components can re-render without polling.
- *   - Liberal read: legacy storage values 'true' / '1' both parse
- *     as true; anything else parses as false.
+ *   - Liberal read remains default-safe: unknown storage values parse
+ *     false; locked flags also report false for legacy true-ish values.
  *
  * Run: npx tsx tests/workflow-panel-feature-flag.test.ts
  */
@@ -92,13 +93,13 @@ console.log('\n=== T1-204 uiFeatureFlags ===\n');
   assert(all.workflowPanelV2 === false, 'getAllUiFeatureFlags also returns false by default');
 }
 
-// -------- 3. setUiFeatureFlag persists and round-trips --------
+// -------- 3. setUiFeatureFlag persists but v2 remains beta-locked --------
 {
   resetMemoryStore();
   setUiFeatureFlag('workflowPanelV2', true);
   assert(
-    getUiFeatureFlag('workflowPanelV2') === true,
-    'after set(true) → get() returns true',
+    getUiFeatureFlag('workflowPanelV2') === false,
+    'after set(true) -> effective get() remains false while v2 is beta-locked',
   );
   assert(
     memoryStore['laserforge.feature.workflowPanelV2'] === 'true',
@@ -107,7 +108,7 @@ console.log('\n=== T1-204 uiFeatureFlags ===\n');
   setUiFeatureFlag('workflowPanelV2', false);
   assert(
     getUiFeatureFlag('workflowPanelV2') === false,
-    'after set(false) → get() returns false',
+    'after set(false) -> get() returns false',
   );
   assert(
     memoryStore['laserforge.feature.workflowPanelV2'] === 'false',
@@ -125,13 +126,13 @@ console.log('\n=== T1-204 uiFeatureFlags ===\n');
   );
 }
 
-// -------- 5. Liberal read: '1' parses as true --------
+// -------- 5. Locked read: legacy '1' remains false --------
 {
   resetMemoryStore();
   memoryStore['laserforge.feature.workflowPanelV2'] = '1';
   assert(
-    getUiFeatureFlag('workflowPanelV2') === true,
-    "legacy storage value '1' parses as true",
+    getUiFeatureFlag('workflowPanelV2') === false,
+    "legacy storage value '1' remains false while v2 is beta-locked",
   );
 }
 
@@ -151,7 +152,7 @@ console.log('\n=== T1-204 uiFeatureFlags ===\n');
   setUiFeatureFlag('workflowPanelV2', true);
   const snapshot = getAllUiFeatureFlags();
   assert(Object.isFrozen(snapshot), 'getAllUiFeatureFlags returns a frozen object');
-  assert(snapshot.workflowPanelV2 === true, 'snapshot reflects the current value');
+  assert(snapshot.workflowPanelV2 === false, 'snapshot reflects the beta-locked effective value');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

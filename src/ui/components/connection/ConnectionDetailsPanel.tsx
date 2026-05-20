@@ -5,6 +5,7 @@ export type ConnectionDetailsPanelKey = 'workflow' | 'issues' | 'advanced';
 interface JobDetailsLaunchersProps {
   issueCount: number;
   onOpen: (panel: ConnectionDetailsPanelKey) => void;
+  showAdvanced?: boolean;
 }
 
 interface ConnectionDetailsPanelProps {
@@ -15,6 +16,7 @@ interface ConnectionDetailsPanelProps {
   workflowSection: React.ReactNode;
   issuesSection: React.ReactNode;
   advancedSection: React.ReactNode;
+  showAdvanced?: boolean;
 }
 
 const font = "'DM Sans', system-ui, sans-serif";
@@ -30,18 +32,25 @@ function labelFor(key: ConnectionDetailsPanelKey, issueCount: number): string {
   return issueCount > 0 ? `Issues (${issueCount})` : 'Issues';
 }
 
+function availableTabs(showAdvanced: boolean): Array<{ key: ConnectionDetailsPanelKey; label: string }> {
+  return showAdvanced ? tabs : tabs.filter(tab => tab.key !== 'advanced');
+}
+
 function contentFor(
   key: ConnectionDetailsPanelKey,
   workflowSection: React.ReactNode,
   issuesSection: React.ReactNode,
   advancedSection: React.ReactNode,
+  showAdvanced: boolean,
 ): React.ReactNode {
   if (key === 'workflow') return workflowSection;
   if (key === 'issues') return issuesSection;
+  if (!showAdvanced) return workflowSection;
   return advancedSection;
 }
 
-export function JobDetailsLaunchers({ issueCount, onOpen }: JobDetailsLaunchersProps) {
+export function JobDetailsLaunchers({ issueCount, onOpen, showAdvanced = true }: JobDetailsLaunchersProps) {
+  const visibleTabs = availableTabs(showAdvanced);
   return React.createElement('div', {
     'data-testid': 'connection-details-launchers',
     style: {
@@ -61,7 +70,7 @@ export function JobDetailsLaunchers({ issueCount, onOpen }: JobDetailsLaunchersP
       },
     }, 'Job details'),
     React.createElement('div', { style: { display: 'flex', gap: 6 } },
-      tabs.map(tab => React.createElement('button', {
+      visibleTabs.map(tab => React.createElement('button', {
         key: tab.key,
         type: 'button',
         'data-testid': `connection-details-open-${tab.key}`,
@@ -93,12 +102,15 @@ export function ConnectionDetailsPanel({
   workflowSection,
   issuesSection,
   advancedSection,
+  showAdvanced = true,
 }: ConnectionDetailsPanelProps) {
   if (activePanel == null) return null;
+  const visibleTabs = availableTabs(showAdvanced);
+  const effectivePanel = activePanel === 'advanced' && !showAdvanced ? 'workflow' : activePanel;
 
   return React.createElement('section', {
     'data-testid': 'connection-details-panel',
-    'data-active-panel': activePanel,
+    'data-active-panel': effectivePanel,
     style: {
       minHeight: 0,
       flex: 1,
@@ -149,8 +161,8 @@ export function ConnectionDetailsPanel({
         }, 'Job details'),
       ),
       React.createElement('div', { style: { display: 'flex', gap: 6 } },
-        tabs.map(tab => {
-          const active = activePanel === tab.key;
+        visibleTabs.map(tab => {
+          const active = effectivePanel === tab.key;
           return React.createElement('button', {
             key: tab.key,
             type: 'button',
@@ -182,6 +194,6 @@ export function ConnectionDetailsPanel({
         overflowY: 'auto' as const,
         overflowX: 'hidden' as const,
       },
-    }, contentFor(activePanel, workflowSection, issuesSection, advancedSection)),
+    }, contentFor(effectivePanel, workflowSection, issuesSection, advancedSection, showAdvanced)),
   );
 }

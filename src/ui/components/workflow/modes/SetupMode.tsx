@@ -10,12 +10,12 @@
  * `ConsolePanel`) so the safety surface stays shared between the
  * old and new panels during the rollout.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { TabBar } from './setup/TabBar';
 import { MoveTab } from './setup/MoveTab';
 import { JobTab } from './setup/JobTab';
 import { ConsoleTab } from './setup/ConsoleTab';
-import { readSetupTab, writeSetupTab, type SetupTab } from './setup/setupTabPersistence';
+import { ALL_SETUP_TABS, readSetupTab, writeSetupTab, type SetupTab } from './setup/setupTabPersistence';
 import type { DeviceProfile } from '../../../../core/devices/DeviceProfile';
 import type { LaserController } from '../../../../controllers/ControllerInterface';
 import type { StructuredLogEvent } from '../../../../app/StructuredMessageLog';
@@ -59,16 +59,34 @@ export interface SetupModeProps {
   readonly controller: LaserController | null;
   readonly sendUserCommand: (cmd: string) => void | Promise<void>;
   readonly messageEvents: readonly StructuredLogEvent[];
+  readonly showConsole?: boolean;
 }
 
 export function SetupMode(props: SetupModeProps): React.ReactElement {
   const [activeTab, setActiveTab] = useState<SetupTab>(() => readSetupTab());
+  const availableTabs = useMemo(
+    () => props.showConsole === false
+      ? ALL_SETUP_TABS.filter(tab => tab !== 'console')
+      : ALL_SETUP_TABS,
+    [props.showConsole],
+  );
+
   useEffect(() => {
-    writeSetupTab(activeTab);
-  }, [activeTab]);
+    if (!availableTabs.includes(activeTab)) {
+      setActiveTab('move');
+    }
+  }, [activeTab, availableTabs]);
+
+  useEffect(() => {
+    if (availableTabs.includes(activeTab)) {
+      writeSetupTab(activeTab);
+    }
+  }, [activeTab, availableTabs]);
+
+  const effectiveActiveTab = availableTabs.includes(activeTab) ? activeTab : 'move';
 
   let body: React.ReactElement;
-  switch (activeTab) {
+  switch (effectiveActiveTab) {
     case 'move':
       body = React.createElement(MoveTab, {
         jogStep: props.jogStep,
@@ -113,7 +131,7 @@ export function SetupMode(props: SetupModeProps): React.ReactElement {
     'div',
     {
       'data-testid': 'workflow-setup-mode',
-      'data-active-tab': activeTab,
+      'data-active-tab': effectiveActiveTab,
       style: {
         flex: 1,
         minHeight: 0,
@@ -122,7 +140,8 @@ export function SetupMode(props: SetupModeProps): React.ReactElement {
       },
     },
     React.createElement(TabBar, {
-      active: activeTab,
+      active: effectiveActiveTab,
+      tabs: availableTabs,
       onSelect: setActiveTab,
     }),
     body,

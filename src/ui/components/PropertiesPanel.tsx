@@ -44,7 +44,7 @@ import { captureSceneRevision, isSceneStale } from '../hooks/asyncSceneGuard';
 import { traceToSceneObjectAsync, DEFAULT_TRACE_OPTIONS } from '../../import/trace';
 import { NumberInput } from './NumberInput';
 import { FontPicker } from './common/FontPicker';
-import { isProUnlocked } from './TrialGuard';
+import { checkProAccess } from '../utils/proGate';
 import { getActiveProfile } from '../../core/devices/DeviceProfile';
 import { computeSmartOverscan } from '../../core/plan/SmartOverscan';
 import { DEFAULT_GRAYSCALE_POWER_MERGE_TOLERANCE } from '../../core/plan/RasterGenerator';
@@ -332,6 +332,8 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
   }
 
   const obj = selectedObjects[0];
+  const cutStartPointFeatureUnlocked = checkProAccess('cut_start_point');
+  const powerScaleFeatureUnlocked = checkProAccess('power_scale');
 
   const patchTextGeometry = (updates: Partial<TextGeometry>) => {
     if (obj.geometry.type !== 'text') return;
@@ -549,7 +551,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
     ),
 
     (() => {
-      if (!isProUnlocked()) return null;
+      if (!cutStartPointFeatureUnlocked) return null;
       const g = obj.geometry;
       const closedPath = g.type === 'path' && (g as PathGeometry).subPaths.some(sp => sp.closed);
       const eligible =
@@ -593,7 +595,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
       );
     })(),
 
-    isProUnlocked() && productionMode && React.createElement('div', { style: { marginTop: 8 } },
+    powerScaleFeatureUnlocked && productionMode && React.createElement('div', { style: { marginTop: 8 } },
       React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 2 } }, 'Power Scale %'),
       React.createElement(NumberInput, {
         value: Math.round((obj.powerScale ?? 1) * 100),

@@ -6,7 +6,7 @@ import { applyLayerModeChange } from '../../core/scene/layerModeTransition';
 import { MAX_LASER_SPEED } from '../../core/types';
 import { theme } from '../styles/theme';
 import { NumberInput } from './NumberInput';
-import { isProUnlocked } from './TrialGuard';
+import { checkProAccess } from '../utils/proGate';
 import { ObjectPropertiesTab } from './PropertiesPanel';
 import {
   applyMaterialPresetToLayer,
@@ -157,7 +157,14 @@ export function LayerPanel({
   // S25-04-001: the compiler strips tab settings when the tabs
   // entitlement is unavailable, so the layer UI must not display or
   // enable basic tabs as active in that state.
-  const tabsFeatureUnlocked = isProUnlocked();
+  const tabsFeatureUnlocked = checkProAccess('tabs');
+  const crossHatchFeatureUnlocked = checkProAccess('cross_hatch');
+  const overcutFeatureUnlocked = checkProAccess('overcut');
+  const leadInFeatureUnlocked = checkProAccess('lead_in');
+  const showAdvancedCutControls =
+    productionMode
+    && activeLayer?.settings.mode === 'cut'
+    && (overcutFeatureUnlocked || leadInFeatureUnlocked || tabsFeatureUnlocked);
   const simpleTabsOn = tabsFeatureUnlocked && activeLayer?.settings.tabs?.enabled === true;
   const visibleTabs = simpleTabsOn ? activeLayer?.settings.tabs : undefined;
   const detailTabCount =
@@ -1013,7 +1020,7 @@ export function LayerPanel({
             onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
               const v = e.target.value as FillMode;
               if (v === 'offset') return;
-              if (v === 'cross-hatch' && !isProUnlocked()) return;
+              if (v === 'cross-hatch' && !crossHatchFeatureUnlocked) return;
               onSceneCommit(updateLayer(scene, activeLayer.id, l => ({
                 ...l,
                 settings: { ...l.settings, fill: { ...l.settings.fill, mode: v } },
@@ -1023,7 +1030,7 @@ export function LayerPanel({
           },
             React.createElement('option', { value: 'line' }, 'Lines (scanline fill)'),
             React.createElement('option', { value: 'offset', disabled: true }, 'Offset fill (coming soon)'),
-            React.createElement('option', { value: 'cross-hatch', disabled: !isProUnlocked() }, isProUnlocked() ? 'Cross-hatch' : 'Cross-hatch (PRO)'),
+            React.createElement('option', { value: 'cross-hatch', disabled: !crossHatchFeatureUnlocked }, crossHatchFeatureUnlocked ? 'Cross-hatch' : 'Cross-hatch (PRO)'),
           ),
         ),
         React.createElement('label', { style: { ...fieldStyle, marginTop: 4 } },
@@ -1096,13 +1103,13 @@ export function LayerPanel({
             }),
           ),
       ),
-      isProUnlocked() && productionMode && activeLayer.settings.mode === 'cut' && React.createElement('div', {
+      showAdvancedCutControls && React.createElement('div', {
         style: { marginTop: 8, padding: '8px 0', borderTop: '1px solid #1a1a2e' },
       },
         React.createElement('div', {
           style: { fontSize: 9, color: '#555570', marginBottom: 6, textTransform: 'uppercase' as const, letterSpacing: 1 },
         }, 'Advanced Cut'),
-        React.createElement('div', { style: { marginTop: 6 } },
+        overcutFeatureUnlocked && React.createElement('div', { key: 'overcut', style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Overcut (mm)'),
             React.createElement(NumberInput, {
               value: activeLayer.settings.cut.overcut,
@@ -1118,7 +1125,7 @@ export function LayerPanel({
               },
             }),
           ),
-          React.createElement('div', { style: { marginTop: 6 } },
+          leadInFeatureUnlocked && React.createElement('div', { key: 'lead-in', style: { marginTop: 6 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Lead-in (mm)'),
             React.createElement(NumberInput, {
               value: activeLayer.settings.cut.leadIn,
@@ -1134,9 +1141,10 @@ export function LayerPanel({
               },
             }),
           ),
-          ...(simpleTabsOn && !showTabsCustomize
-            ? []
-            : [
+          ...(tabsFeatureUnlocked
+            ? (simpleTabsOn && !showTabsCustomize
+              ? []
+              : [
                 React.createElement('div', { key: 'tab-count', style: { marginTop: 6 } },
                   React.createElement('div', { style: { fontSize: 11, color: '#8888aa', marginBottom: 2 } }, 'Tab count'),
                   React.createElement(NumberInput, {
@@ -1197,7 +1205,8 @@ export function LayerPanel({
                     },
                   }),
                 ),
-              ]),
+              ])
+            : []),
           React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 } },
             React.createElement('div', { style: { fontSize: 11, color: '#8888aa' } }, 'Inside first'),
             React.createElement('button', {

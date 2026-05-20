@@ -42,11 +42,23 @@ const DEFAULTS: UiFeatureFlags = {
 
 type FlagName = keyof UiFeatureFlags;
 
+/**
+ * F45-14-001: WorkflowPanel v2 is not machine-control parity-safe yet.
+ * Keep storage round-tripping so developer/test preferences are not
+ * destroyed, but force the effective beta value off until a later
+ * audited change lifts the lock after parity with ConnectionPanelMain.
+ */
+const EFFECTIVE_FLAG_LOCKS: Partial<Record<FlagName, boolean>> = {
+  workflowPanelV2: false,
+};
+
 function storageKey(name: FlagName): string {
   return STORAGE_KEY_PREFIX + name;
 }
 
 function readBoolean(name: FlagName): boolean {
+  const locked = EFFECTIVE_FLAG_LOCKS[name];
+  if (typeof locked === 'boolean') return locked;
   if (typeof localStorage === 'undefined') return DEFAULTS[name];
   const raw = localStorage.getItem(storageKey(name));
   if (raw === null) return DEFAULTS[name];
