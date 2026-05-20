@@ -18,6 +18,12 @@ import {
 } from './startupCrashLoop';
 import { buildCspPolicy, pickCspMode, serializeCsp } from './cspPolicy';
 import { assertTrustedSender, isTrustedElectronUrl } from './security';
+import {
+  acquireJobLifecycleToken,
+  canReleaseJobWakeLock,
+  hasActiveJobLifecycleToken,
+  releaseJobLifecycleToken,
+} from './jobLifecycleGuard';
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -601,12 +607,31 @@ ipcMain.handle('power:acquireJobWakeLock', (event) => {
   return jobWakeLockId;
 });
 
-ipcMain.handle('power:releaseJobWakeLock', (event) => {
+ipcMain.handle('power:releaseJobWakeLock', (event, token?: unknown) => {
   assertTrustedSender(event);
+  if (token !== undefined && typeof token !== 'string') {
+    throw new Error('Invalid job lifecycle token');
+  }
+  if (!canReleaseJobWakeLock(token)) {
+    return { ok: false, reason: 'job-running' };
+  }
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     powerSaveBlocker.stop(jobWakeLockId);
   }
   jobWakeLockId = null;
+  return { ok: true };
+});
+
+ipcMain.handle('job-lifecycle:acquire', (event, ticketId: unknown) => {
+  assertTrustedSender(event);
+  if (typeof ticketId !== 'string') throw new Error('Invalid job ticket id');
+  return acquireJobLifecycleToken(ticketId);
+});
+
+ipcMain.handle('job-lifecycle:release', (event, token: unknown) => {
+  assertTrustedSender(event);
+  if (typeof token !== 'string') throw new Error('Invalid job lifecycle token');
+  return releaseJobLifecycleToken(token);
 });
 
 ipcMain.handle('update:check', async (event): Promise<UpdateCheckResult> => {
@@ -629,7 +654,7 @@ ipcMain.handle(
   (event, state?: { jobRunning?: boolean }): UpdateInstallResult => {
     assertTrustedSender(event);
     if (isDev) return { ok: false, reason: 'not-packaged' };
-    if (state?.jobRunning === true || isJobWakeLockActive()) {
+    if (state?.jobRunning === true || hasActiveJobLifecycleToken() || isJobWakeLockActive()) {
       return { ok: false, reason: 'job-running' };
     }
     try {
@@ -652,5 +677,9 @@ ipcMain.handle(
 
 ipcMain.handle('app:quit', (event) => {
   assertTrustedSender(event);
+  if (hasActiveJobLifecycleToken()) {
+    return { ok: false, reason: 'job-running' };
+  }
   app.quit();
+  return { ok: true };
 });

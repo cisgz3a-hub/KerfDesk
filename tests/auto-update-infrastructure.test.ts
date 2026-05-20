@@ -48,7 +48,10 @@ assert(/autoUpdater\.on\('error'/.test(main), 'update errors are caught and forw
 assert(/mainWindow\?\.webContents\.send\('update:event'/.test(main), 'update events go through a single renderer channel');
 assert(/ipcMain\.handle\('update:check'/.test(main), 'manual update check IPC exists');
 assert(/ipcMain\.handle\(\s*'update:install'/.test(main), 'install update IPC exists');
-assert(/state\?\.jobRunning === true \|\| isJobWakeLockActive\(\)/.test(main), 'quitAndInstall is blocked while a job is running');
+assert(
+  /state\?\.jobRunning === true \|\| hasActiveJobLifecycleToken\(\) \|\| isJobWakeLockActive\(\)/.test(main),
+  'quitAndInstall is blocked while a job is running',
+);
 assert(/autoUpdater\.quitAndInstall\(\)/.test(main), 'install IPC calls quitAndInstall after guard');
 assert(/scheduleAutoUpdateCheck\(\)/.test(main), 'startup schedules an update check');
 

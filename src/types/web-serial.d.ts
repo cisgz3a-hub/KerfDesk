@@ -10,7 +10,7 @@ declare global {
     openFile?: () => Promise<{ fileName: string; content: string; ext: string } | null>;
     isElectron?: boolean;
     // T2-35: native Electron serial bridge declarations removed.
-    quit?: () => Promise<void>;
+    quit?: () => Promise<unknown>;
     storage?: Record<string, {
       get(key: string): Promise<string | null>;
       set(key: string, value: string): Promise<void>;
@@ -19,7 +19,9 @@ declare global {
     }>;
     // T1-84: storageClear was removed from the IPC.
     acquireJobWakeLock?: () => Promise<number>;
-    releaseJobWakeLock?: () => Promise<void>;
+    releaseJobWakeLock?(token?: string): Promise<unknown>;
+    acquireJobLifecycleToken?(ticketId: string): Promise<unknown>;
+    releaseJobLifecycleToken?(token: string): Promise<unknown>;
     updates?: {
       check(): Promise<unknown>;
       install(state?: { jobRunning?: boolean }): Promise<unknown>;

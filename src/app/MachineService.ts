@@ -339,6 +339,7 @@ export class MachineService {
   private jobObservedRunning = false;
   private nextJobSessionId = 1;
   private activeJobSessionId: number | null = null;
+  private electronJobLifecycleToken: string | null = null;
 
   private detachRecording: (() => void) | null = null;
   /**
@@ -466,28 +467,70 @@ export class MachineService {
    *  Prevents Windows USB Selective Suspend and Chromium renderer
    *  throttling, either of which can stall streaming mid-cut.
    *  Best-effort: silently no-ops outside Electron. */
-  private async acquireWakeLock(): Promise<void> {
+  private async acquireWakeLock(ticketId: string): Promise<void> {
     const api = (globalThis as {
-      electronAPI?: { acquireJobWakeLock?: () => Promise<number> };
+      electronAPI?: {
+        acquireJobWakeLock?: () => Promise<number>;
+        acquireJobLifecycleToken?: (ticketId: string) => Promise<unknown>;
+        releaseJobLifecycleToken?: (token: string) => Promise<unknown>;
+      };
     }).electronAPI;
-    if (!api?.acquireJobWakeLock) return;
+    if (!api?.acquireJobWakeLock && !api?.acquireJobLifecycleToken) return;
     try {
-      await api.acquireJobWakeLock();
+      if (api.acquireJobLifecycleToken) {
+        const result = await api.acquireJobLifecycleToken?.(ticketId);
+        if (
+          !result
+          || typeof result !== 'object'
+          || (result as { ok?: unknown }).ok !== true
+          || typeof (result as { token?: unknown }).token !== 'string'
+        ) {
+          const reason = typeof (result as { reason?: unknown } | null)?.reason === 'string'
+            ? (result as { reason: string }).reason
+            : 'unknown';
+          throw new Error(`Cannot acquire Electron job lifecycle token: ${reason}`);
+        }
+        this.electronJobLifecycleToken = (result as { token: string }).token;
+      }
+      await api.acquireJobWakeLock?.();
     } catch (err) {
-      console.warn('[MachineService] Failed to acquire wake lock:', err);
+      const token = this.electronJobLifecycleToken;
+      if (token) {
+        try {
+          await api.releaseJobLifecycleToken?.(token);
+        } catch {
+          /* best-effort cleanup of a pre-stream lifecycle token */
+        } finally {
+          this.electronJobLifecycleToken = null;
+        }
+      }
+      console.warn('[MachineService] Failed to acquire Electron job lifecycle guard:', err);
+      throw err;
     }
   }
 
   /** Release the wake lock. Idempotent. Best-effort. */
   private async releaseWakeLock(): Promise<void> {
+    const token = this.electronJobLifecycleToken;
     const api = (globalThis as {
-      electronAPI?: { releaseJobWakeLock?: () => Promise<void> };
+      electronAPI?: {
+        releaseJobWakeLock?: (token?: string) => Promise<unknown>;
+        releaseJobLifecycleToken?: (token: string) => Promise<unknown>;
+      };
     }).electronAPI;
-    if (!api?.releaseJobWakeLock) return;
+    if (!api?.releaseJobWakeLock && !api?.releaseJobLifecycleToken) {
+      this.electronJobLifecycleToken = null;
+      return;
+    }
     try {
-      await api.releaseJobWakeLock();
+      await api.releaseJobWakeLock?.(token ?? undefined);
+      if (token) {
+        await api.releaseJobLifecycleToken?.(token);
+      }
     } catch {
       /* best-effort — don't fail the job-end path on this */
+    } finally {
+      this.electronJobLifecycleToken = null;
     }
   }
 
@@ -1071,7 +1114,7 @@ export class MachineService {
       }
     }
 
-    await this.acquireWakeLock();
+    await this.acquireWakeLock(ticket.ticketId);
     const sessionId = this.nextJobSessionId++;
     // T1-29: persist unsafe-prior-state flag at job-begin. The flag is
     // cleared on every clean shutdown path (job completion, service

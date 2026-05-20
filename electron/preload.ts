@@ -22,7 +22,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   isElectron: true,
   // T2-35: native Electron serial IPC exports removed. Web Serial remains the
   // controller path; no renderer-exposed serial:* bridge exists here.
-  quit: () => ipcRenderer.invoke('app:quit') as Promise<void>,
+  quit: () => ipcRenderer.invoke('app:quit') as Promise<unknown>,
   storage: {
     deviceProfiles: storageScope('storage:deviceProfiles'),
     materials: storageScope('storage:materials'),
@@ -36,8 +36,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // T1-84: storageClear removed. See electron/main.ts for the explanation.
   acquireJobWakeLock: () =>
     ipcRenderer.invoke('power:acquireJobWakeLock') as Promise<number>,
-  releaseJobWakeLock: () =>
-    ipcRenderer.invoke('power:releaseJobWakeLock') as Promise<void>,
+  releaseJobWakeLock: (token?: string) =>
+    ipcRenderer.invoke('power:releaseJobWakeLock', token) as Promise<unknown>,
+  acquireJobLifecycleToken: (ticketId: string) =>
+    ipcRenderer.invoke('job-lifecycle:acquire', ticketId) as Promise<unknown>,
+  releaseJobLifecycleToken: (token: string) =>
+    ipcRenderer.invoke('job-lifecycle:release', token) as Promise<unknown>,
   updates: {
     check: () =>
       ipcRenderer.invoke('update:check') as Promise<unknown>,
