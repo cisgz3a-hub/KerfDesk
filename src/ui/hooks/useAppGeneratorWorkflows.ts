@@ -17,6 +17,30 @@ interface UseAppGeneratorWorkflowsParams {
   readonly setShowBoxStudio: (value: boolean) => void;
 }
 
+export function computeGridArraySourceBounds(
+  scene: Scene,
+  selectedIds: ReadonlySet<string>,
+): { w: number; h: number } | null {
+  if (selectedIds.size === 0) return null;
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  for (const obj of scene.objects) {
+    if (!selectedIds.has(obj.id)) continue;
+    const b = computeObjectBounds(obj);
+    if (!b) continue;
+    minX = Math.min(minX, b.minX);
+    minY = Math.min(minY, b.minY);
+    maxX = Math.max(maxX, b.maxX);
+    maxY = Math.max(maxY, b.maxY);
+  }
+
+  if (!isFinite(minX)) return null;
+  return { w: maxX - minX, h: maxY - minY };
+}
+
 export function useAppGeneratorWorkflows({
   scene,
   selectedIds,
@@ -29,23 +53,9 @@ export function useAppGeneratorWorkflows({
   setShowBoxStudio,
 }: UseAppGeneratorWorkflowsParams) {
   const handleGridArray = useCallback(() => {
-    if (selectedIds.size === 0) return;
-
-    let minX = Infinity;
-    let minY = Infinity;
-    let maxX = -Infinity;
-    let maxY = -Infinity;
-    for (const obj of scene.objects) {
-      if (!selectedIds.has(obj.id)) continue;
-      const b = computeObjectBounds(obj);
-      if (!b) continue;
-      minX = Math.min(minX, b.minX);
-      minY = Math.min(minY, b.minY);
-      maxX = Math.max(maxX, b.maxX);
-      maxY = Math.max(maxY, b.maxY);
-    }
-
-    setGridArrayBounds({ w: maxX - minX, h: maxY - minY });
+    const bounds = computeGridArraySourceBounds(scene, selectedIds);
+    if (!bounds) return;
+    setGridArrayBounds(bounds);
     setShowGridArray(true);
   }, [scene, selectedIds, setGridArrayBounds, setShowGridArray]);
 

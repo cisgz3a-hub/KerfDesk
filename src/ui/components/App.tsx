@@ -1226,6 +1226,28 @@ export function App(): React.ReactElement {
     });
   }, [scene, selectedIds, commitSceneTransaction]);
 
+  const {
+    handleGridArray,
+    handleGridArrayConfirm,
+    handleNestingApply,
+    handleBoxGenerate,
+    handleVariableTextGenerate,
+    handleTemplateSelect,
+    openBoxStudio,
+    closeBoxStudio,
+    handleBoxStudioGenerate,
+  } = useAppGeneratorWorkflows({
+    scene,
+    selectedIds,
+    setSelectedIds,
+    handleSceneCommit,
+    setShowGridArray,
+    setGridArrayBounds,
+    setShowTemplates: dialogs.setShowTemplates,
+    showAlert,
+    setShowBoxStudio,
+  });
+
   const { contextMenu, showContextMenu, hideContextMenu } = useContextMenu(
     scene,
     selectedIds,
@@ -1257,7 +1279,7 @@ export function App(): React.ReactElement {
       showAlert,
       showPrompt,
       distributeObjects: sceneOps.distributeObjects,
-      openGridArray: () => setShowGridArray(true),
+      openGridArray: handleGridArray,
       openMaterialTest: () => {
         if (gatedFeature('material_test')) setShowMaterialTest(true);
       },
@@ -1328,28 +1350,6 @@ export function App(): React.ReactElement {
     } catch { /* best effort */ }
     dialogs.setShowConnection(false);
   }, [machineUi.executionCoordinator, dialogs]);
-
-  const {
-    handleGridArray,
-    handleGridArrayConfirm,
-    handleNestingApply,
-    handleBoxGenerate,
-    handleVariableTextGenerate,
-    handleTemplateSelect,
-    openBoxStudio,
-    closeBoxStudio,
-    handleBoxStudioGenerate,
-  } = useAppGeneratorWorkflows({
-    scene,
-    selectedIds,
-    setSelectedIds,
-    handleSceneCommit,
-    setShowGridArray,
-    setGridArrayBounds,
-    setShowTemplates: dialogs.setShowTemplates,
-    showAlert,
-    setShowBoxStudio,
-  });
 
   const {
     handleMaterialTestApply,

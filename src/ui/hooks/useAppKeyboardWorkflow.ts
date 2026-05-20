@@ -1,6 +1,7 @@
 import { useMemo, type RefObject } from 'react';
 import { type ViewportActions } from '../components/CanvasViewport';
 import { type ToolType } from '../components/ToolBar';
+import { gatedFeature } from '../utils/proGate';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 interface KeyboardSceneOperations {
@@ -29,6 +30,16 @@ interface UseAppKeyboardWorkflowParams {
   readonly selectedIds: ReadonlySet<string>;
   readonly clipboardItemCount: number;
   readonly sceneOps: KeyboardSceneOperations;
+}
+
+export function runBooleanKeyboardShortcut(
+  sceneOps: Pick<KeyboardSceneOperations, 'performBoolean'>,
+  op: 'union' | 'subtract' | 'intersect',
+): void {
+  if (!gatedFeature('boolean_ops')) return;
+  void sceneOps.performBoolean(op).catch(error => {
+    console.error('[LaserForge] Boolean keyboard shortcut failed', error);
+  });
 }
 
 export function useAppKeyboardWorkflow({
@@ -87,9 +98,9 @@ export function useAppKeyboardWorkflow({
         onNudge: handleNudge,
         selectionCount: selectedIds.size,
         clipboardItemCount,
-        onBooleanUnion: () => void sceneOps.performBoolean('union'),
-        onBooleanSubtract: () => void sceneOps.performBoolean('subtract'),
-        onBooleanIntersect: () => void sceneOps.performBoolean('intersect'),
+        onBooleanUnion: () => runBooleanKeyboardShortcut(sceneOps, 'union'),
+        onBooleanSubtract: () => runBooleanKeyboardShortcut(sceneOps, 'subtract'),
+        onBooleanIntersect: () => runBooleanKeyboardShortcut(sceneOps, 'intersect'),
         onAlignSelectionCenter: () => {
           if (selectedIds.size === 0) return;
           sceneOps.centerOnMaterial();

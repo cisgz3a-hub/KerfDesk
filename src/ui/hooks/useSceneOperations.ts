@@ -12,62 +12,143 @@ export function alignSelection(scn: Scene, selIds: ReadonlySet<string>, alignmen
   const selected = scn.objects.filter(o => selIds.has(o.id));
   if (selected.length === 0) return scn;
 
+  const selectedBounds = selected
+    .map(object => ({ object, bounds: computeObjectBounds(object) }))
+    .filter((entry): entry is { object: SceneObject; bounds: NonNullable<ReturnType<typeof computeObjectBounds>> } => entry.bounds != null);
+  if (selectedBounds.length === 0) return scn;
+
   let wMinX = Infinity, wMinY = Infinity, wMaxX = -Infinity, wMaxY = -Infinity;
 
-  for (const o of selected) {
-    const b = computeObjectBounds(o);
-    if (!b) continue;
-    wMinX = Math.min(wMinX, b.minX);
-    wMinY = Math.min(wMinY, b.minY);
-    wMaxX = Math.max(wMaxX, b.maxX);
-    wMaxY = Math.max(wMaxY, b.maxY);
+  for (const { bounds } of selectedBounds) {
+    wMinX = Math.min(wMinX, bounds.minX);
+    wMinY = Math.min(wMinY, bounds.minY);
+    wMaxX = Math.max(wMaxX, bounds.maxX);
+    wMaxY = Math.max(wMaxY, bounds.maxY);
   }
 
   if (!isFinite(wMinX)) return scn;
 
-  let dx = 0, dy = 0;
+  if (alignment === 'center') {
+    const targetCx = scn.material
+      ? scn.material.x + scn.material.width / 2
+      : scn.canvas.width / 2;
+    const targetCy = scn.material
+      ? scn.material.y + scn.material.height / 2
+      : scn.canvas.height / 2;
+    const dx = targetCx - (wMinX + wMaxX) / 2;
+    const dy = targetCy - (wMinY + wMaxY) / 2;
+    return {
+      ...scn,
+      objects: scn.objects.map(o => {
+        if (!selIds.has(o.id)) return o;
+        return {
+          ...o,
+          transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+          _bounds: null, _worldTransform: null,
+        };
+      }),
+    };
+  }
 
-  switch (alignment) {
-    case 'center': {
-      const targetCx = scn.material
-        ? scn.material.x + scn.material.width / 2
-        : scn.canvas.width / 2;
-      const targetCy = scn.material
-        ? scn.material.y + scn.material.height / 2
-        : scn.canvas.height / 2;
-      dx = targetCx - (wMinX + wMaxX) / 2;
-      dy = targetCy - (wMinY + wMaxY) / 2;
-      break;
+  const targetCenterX = (wMinX + wMaxX) / 2;
+  const targetCenterY = (wMinY + wMaxY) / 2;
+  const deltas = new Map<string, { dx: number; dy: number }>();
+
+  for (const { object, bounds } of selectedBounds) {
+    let dx = 0;
+    let dy = 0;
+    switch (alignment) {
+      case 'left':
+        dx = wMinX - bounds.minX;
+        break;
+      case 'right':
+        dx = wMaxX - bounds.maxX;
+        break;
+      case 'top':
+        dy = wMinY - bounds.minY;
+        break;
+      case 'bottom':
+        dy = wMaxY - bounds.maxY;
+        break;
+      case 'centerX':
+        dx = targetCenterX - (bounds.minX + bounds.maxX) / 2;
+        break;
+      case 'centerY':
+        dy = targetCenterY - (bounds.minY + bounds.maxY) / 2;
+        break;
+      default:
+        break;
     }
-    case 'left': {
-      const edge = scn.material?.enabled ? scn.material.x : 0;
-      dx = edge - wMinX;
-      break;
-    }
-    case 'right': {
-      const edge = scn.material?.enabled ? scn.material.x + scn.material.width : scn.canvas.width;
-      dx = edge - wMaxX;
-      break;
-    }
-    case 'top': {
-      const edge = scn.material?.enabled ? scn.material.y : 0;
-      dy = edge - wMinY;
-      break;
-    }
-    case 'bottom': {
-      const edge = scn.material?.enabled ? scn.material.y + scn.material.height : scn.canvas.height;
-      dy = edge - wMaxY;
-      break;
-    }
+    deltas.set(object.id, { dx, dy });
   }
 
   return {
     ...scn,
     objects: scn.objects.map(o => {
-      if (!selIds.has(o.id)) return o;
+      const delta = deltas.get(o.id);
+      if (!delta || (delta.dx === 0 && delta.dy === 0)) return o;
       return {
         ...o,
-        transform: { ...o.transform, tx: o.transform.tx + dx, ty: o.transform.ty + dy },
+        transform: { ...o.transform, tx: o.transform.tx + delta.dx, ty: o.transform.ty + delta.dy },
+        _bounds: null, _worldTransform: null,
+      };
+    }),
+  };
+}
+
+export function distributeSelection(scn: Scene, selIds: ReadonlySet<string>, direction: 'horizontal' | 'vertical'): Scene {
+  const selectedBounds = scn.objects
+    .filter(o => selIds.has(o.id))
+    .map(object => ({ object, bounds: computeObjectBounds(object) }))
+    .filter((entry): entry is { object: SceneObject; bounds: NonNullable<ReturnType<typeof computeObjectBounds>> } => entry.bounds != null);
+  if (selectedBounds.length < 3) return scn;
+
+  const sorted = [...selectedBounds].sort((a, b) => {
+    if (direction === 'horizontal') {
+      return a.bounds.minX - b.bounds.minX;
+    }
+    return a.bounds.minY - b.bounds.minY;
+  });
+
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  const totalSize = sorted.reduce((sum, entry) => {
+    if (direction === 'horizontal') {
+      return sum + (entry.bounds.maxX - entry.bounds.minX);
+    }
+    return sum + (entry.bounds.maxY - entry.bounds.minY);
+  }, 0);
+  const span = direction === 'horizontal'
+    ? last.bounds.maxX - first.bounds.minX
+    : last.bounds.maxY - first.bounds.minY;
+  const gap = (span - totalSize) / (sorted.length - 1);
+  const deltas = new Map<string, { dx: number; dy: number }>();
+  let cursor = direction === 'horizontal'
+    ? first.bounds.maxX + gap
+    : first.bounds.maxY + gap;
+
+  for (let idx = 1; idx < sorted.length - 1; idx++) {
+    const { object, bounds } = sorted[idx];
+    if (direction === 'horizontal') {
+      const dx = cursor - bounds.minX;
+      deltas.set(object.id, { dx, dy: 0 });
+      cursor += (bounds.maxX - bounds.minX) + gap;
+    } else {
+      const dy = cursor - bounds.minY;
+      deltas.set(object.id, { dx: 0, dy });
+      cursor += (bounds.maxY - bounds.minY) + gap;
+    }
+  }
+
+  if (deltas.size === 0) return scn;
+  return {
+    ...scn,
+    objects: scn.objects.map(o => {
+      const delta = deltas.get(o.id);
+      if (!delta || (delta.dx === 0 && delta.dy === 0)) return o;
+      return {
+        ...o,
+        transform: { ...o.transform, tx: o.transform.tx + delta.dx, ty: o.transform.ty + delta.dy },
         _bounds: null, _worldTransform: null,
       };
     }),
@@ -138,23 +219,11 @@ export function useSceneOperations({
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignCenterH = useCallback(() => {
-    const b = getSelectionWorldBounds(scene, selectedIds);
-    if (!b) return;
-    const targetCx = scene.material?.enabled
-      ? scene.material.x + scene.material.width / 2
-      : scene.canvas.width / 2;
-    const cx = (b.wMinX + b.wMaxX) / 2;
-    handleSceneCommit(translateSelection(scene, selectedIds, targetCx - cx, 0));
+    handleSceneCommit(alignSelection(scene, selectedIds, 'centerX'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const alignCenterV = useCallback(() => {
-    const b = getSelectionWorldBounds(scene, selectedIds);
-    if (!b) return;
-    const targetCy = scene.material?.enabled
-      ? scene.material.y + scene.material.height / 2
-      : scene.canvas.height / 2;
-    const cy = (b.wMinY + b.wMaxY) / 2;
-    handleSceneCommit(translateSelection(scene, selectedIds, 0, targetCy - cy));
+    handleSceneCommit(alignSelection(scene, selectedIds, 'centerY'));
   }, [scene, selectedIds, handleSceneCommit]);
 
   const centerOnCanvas = useCallback(() => {
@@ -335,44 +404,7 @@ export function useSceneOperations({
 
   const distributeObjects = useCallback(
     (direction: 'horizontal' | 'vertical') => {
-      const selected = scene.objects.filter(o => selectedIds.has(o.id));
-      if (selected.length < 3) return;
-
-      const sorted = [...selected].sort((a, b) =>
-        direction === 'horizontal'
-          ? a.transform.tx - b.transform.tx
-          : a.transform.ty - b.transform.ty,
-      );
-
-      const first = sorted[0];
-      const last = sorted[sorted.length - 1];
-      const totalSpan = direction === 'horizontal'
-        ? last.transform.tx - first.transform.tx
-        : last.transform.ty - first.transform.ty;
-      const step = totalSpan / (sorted.length - 1);
-
-      const newScene = {
-        ...scene,
-        objects: scene.objects.map(o => {
-          const idx = sorted.findIndex(s => s.id === o.id);
-          if (idx <= 0 || idx >= sorted.length - 1) return o;
-          if (direction === 'horizontal') {
-            return {
-              ...o,
-              transform: { ...o.transform, tx: first.transform.tx + step * idx },
-              _bounds: null,
-              _worldTransform: null,
-            };
-          }
-          return {
-            ...o,
-            transform: { ...o.transform, ty: first.transform.ty + step * idx },
-            _bounds: null,
-            _worldTransform: null,
-          };
-        }),
-      };
-      handleSceneCommit(newScene);
+      handleSceneCommit(distributeSelection(scene, selectedIds, direction));
     },
     [scene, selectedIds, handleSceneCommit],
   );

@@ -197,6 +197,7 @@ export function objectToPolygon(obj: SceneObject): MultiPolygon | null {
       const ring: Ring = [];
       let cx = 0;
       let cy = 0;
+      let sawCloseSegment = false;
 
       for (const seg of sp.segments) {
         if (seg.type === 'move') {
@@ -218,14 +219,20 @@ export function objectToPolygon(obj: SceneObject): MultiPolygon | null {
           cx = seg.to.x;
           cy = seg.to.y;
         } else if (seg.type === 'close') {
+          sawCloseSegment = true;
           if (ring.length > 0) {
             ring.push([ring[0][0], ring[0][1]]);
           }
         }
       }
 
-      if (ring.length >= 4) {
-        if (ring[0][0] !== ring[ring.length - 1][0] || ring[0][1] !== ring[ring.length - 1][1]) {
+      const isClosedRing = ring.length >= 2
+        && ring[0][0] === ring[ring.length - 1][0]
+        && ring[0][1] === ring[ring.length - 1][1];
+      const isClosedSubPath = sp.closed === true || sawCloseSegment || isClosedRing;
+
+      if (isClosedSubPath && ring.length >= 4) {
+        if (!isClosedRing) {
           ring.push([ring[0][0], ring[0][1]]);
         }
         rawRings.push(ring);
@@ -237,6 +244,7 @@ export function objectToPolygon(obj: SceneObject): MultiPolygon | null {
   }
 
   if (geom.type === 'polygon') {
+    if (geom.closed !== true) return null;
     const pts = geom.points || [];
     if (pts.length < 3) return null;
     const ring: Ring = pts.map(p => transformPoint(p.x, p.y));
