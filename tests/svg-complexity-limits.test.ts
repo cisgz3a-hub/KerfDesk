@@ -190,6 +190,7 @@ void (async () => {
   assert(/T2-123/.test(src), 'T2-123 marker in SvgComplexityLimits.ts');
   for (const id of [
     'SVG_LIMITS', 'SvgImportLimitError', 'assertSvgLimit',
+    'assertSvgFileSize', 'readSvgFileTextWithinLimit',
     'bumpAndAssert', 'emptyParseContext', 'svgLimitErrorMessage',
   ]) {
     assert(src.includes(id), `export '${id}' declared`);

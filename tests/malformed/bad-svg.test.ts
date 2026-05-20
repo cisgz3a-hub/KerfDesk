@@ -5,6 +5,7 @@
  */
 import { compileGcode } from '../../src/app/PipelineService';
 import { createBlankProfile } from '../../src/core/devices/DeviceProfile';
+import { parsePathData } from '../../src/import/svg/PathParser';
 import { importSvgToSceneWithReport } from '../../src/import/svg/SvgToScene';
 import { parseGcode } from '../helpers/parseGcode';
 
@@ -32,6 +33,58 @@ function profile() {
 
 async function main(): Promise<void> {
   console.log('\n=== T3-39 malformed SVG ===\n');
+
+  {
+    const truncatedLine = parsePathData('M10 10 L');
+    const truncatedLineSegments = truncatedLine.subPaths[0]?.segments ?? [];
+    assert(
+      truncatedLineSegments.length === 1 && truncatedLineSegments[0]?.type === 'move',
+      'truncated L command does not invent a line to origin',
+    );
+
+    const partialLine = parsePathData('M10 10 L20');
+    const partialLineSegments = partialLine.subPaths[0]?.segments ?? [];
+    assert(
+      partialLineSegments.length === 1 && partialLineSegments[0]?.type === 'move',
+      'partial L command does not invent a line with a default y operand',
+    );
+
+    const brokenBeforeMove = parsePathData('M0 0 L M100 100 L200 200');
+    assert(brokenBeforeMove.subPaths.length === 2, 'broken L before M preserves the next subpath boundary');
+    const firstSubpathSegments = brokenBeforeMove.subPaths[0]?.segments ?? [];
+    const secondSubpathSegments = brokenBeforeMove.subPaths[1]?.segments ?? [];
+    assert(
+      firstSubpathSegments.length === 1 && firstSubpathSegments[0]?.type === 'move',
+      'broken L before M does not connect first subpath to second subpath',
+    );
+    assert(
+      secondSubpathSegments.length === 2 &&
+        secondSubpathSegments[0]?.type === 'move' &&
+        secondSubpathSegments[1]?.type === 'line',
+      'valid path data after broken command still imports',
+    );
+  }
+
+  {
+    const report = importSvgToSceneWithReport(`
+      <svg xmlns="http://www.w3.org/2000/svg" width="100mm" height="80mm">
+        <path d="M0 0 L M50 50 L60 50" stroke="red" fill="none"/>
+      </svg>
+    `);
+    const warning = report.warnings.find(w => w.code === 'SVG_PATH_MALFORMED');
+    assert(warning != null, 'malformed SVG path command emits an import warning');
+
+    const path = report.scene.objects.find(obj => obj.geometry.type === 'path')?.geometry;
+    assert(path?.type === 'path', 'malformed path still imports later valid path data');
+    if (path?.type === 'path') {
+      assert(path.subPaths.length === 2, 'full SVG import preserves subpath boundary after malformed command');
+      assert(
+        path.subPaths[0]?.segments.length === 1 &&
+          path.subPaths[0].segments[0]?.type === 'move',
+        'full SVG import does not keep an invented connector segment',
+      );
+    }
+  }
 
   {
     const report = importSvgToSceneWithReport(`

@@ -37,7 +37,7 @@ export interface SvgElement {
   computedStyle: SvgComputedStyle; // Inherited presentation style at flatten time
 }
 
-export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED' | 'SVG_FEATURE_UNSUPPORTED';
+export type SvgImportWarningCode = 'SVG_TEXT_SKIPPED' | 'SVG_FEATURE_UNSUPPORTED' | 'SVG_PATH_MALFORMED';
 
 export interface SvgComputedStyle {
   stroke?: string;

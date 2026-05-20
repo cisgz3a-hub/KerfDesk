@@ -2,6 +2,7 @@
  * Minimal DXF parser for laser-relevant entities.
  * Handles: LINE, CIRCLE, ARC, LWPOLYLINE, ELLIPSE, POLYLINE/VERTEX, POINT
  */
+import { parseDxfUnitInfoFromText, type DxfUnitInfo } from './DxfUnits';
 
 export interface DxfEntity {
   type: string;
@@ -12,6 +13,7 @@ export interface DxfEntity {
 
 export interface DxfFile {
   entities: DxfEntity[];
+  units: DxfUnitInfo;
 }
 
 export const DXF_IMPORT_LIMITS = {
@@ -165,7 +167,62 @@ export function parseDxf(text: string, limitOverrides: Partial<DxfParseLimits> =
     }
   }
 
-  return { entities };
+  return {
+    entities: assembleLegacyPolylines(entities),
+    units: parseDxfUnitInfoFromText(text),
+  };
+}
+
+function cloneEntity(entity: DxfEntity): DxfEntity {
+  return {
+    type: entity.type,
+    layer: entity.layer,
+    color: entity.color,
+    data: new Map(Array.from(entity.data, ([code, values]) => [code, [...values]])),
+  };
+}
+
+function appendEntityData(target: DxfEntity, source: DxfEntity): void {
+  for (const [code, values] of source.data) {
+    if (code === 8 || code === 62) continue;
+    const existing = target.data.get(code) ?? [];
+    existing.push(...values);
+    target.data.set(code, existing);
+  }
+}
+
+function assembleLegacyPolylines(entities: DxfEntity[]): DxfEntity[] {
+  const assembled: DxfEntity[] = [];
+  let activePolyline: DxfEntity | null = null;
+
+  for (const entity of entities) {
+    if (entity.type === 'POLYLINE') {
+      if (activePolyline) assembled.push(activePolyline);
+      activePolyline = cloneEntity(entity);
+      continue;
+    }
+
+    if (activePolyline) {
+      if (entity.type === 'VERTEX') {
+        appendEntityData(activePolyline, entity);
+        continue;
+      }
+      if (entity.type === 'SEQEND') {
+        assembled.push(activePolyline);
+        activePolyline = null;
+        continue;
+      }
+
+      assembled.push(activePolyline);
+      activePolyline = null;
+    }
+
+    if (entity.type === 'VERTEX' || entity.type === 'SEQEND') continue;
+    assembled.push(entity);
+  }
+
+  if (activePolyline) assembled.push(activePolyline);
+  return assembled;
 }
 
 // Helper to get a single numeric value from entity data

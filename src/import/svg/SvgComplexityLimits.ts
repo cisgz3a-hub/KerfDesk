@@ -71,6 +71,15 @@ export function assertSvgLimit(limit: SvgLimitKey, observed: number): void {
   }
 }
 
+export function assertSvgFileSize(sizeBytes: number): void {
+  assertSvgLimit('MAX_BYTES', sizeBytes);
+}
+
+export async function readSvgFileTextWithinLimit(file: Pick<File, 'size' | 'text'>): Promise<string> {
+  assertSvgFileSize(file.size);
+  return file.text();
+}
+
 /**
  * Mutable counters carried alongside traversal. Each new <element>
  * bumps `nodeCount`; entering a child bumps `depth` (decrement on

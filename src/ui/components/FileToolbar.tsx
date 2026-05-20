@@ -17,10 +17,12 @@ import { type Scene, createScene } from '../../core/scene/Scene';
 import '../../core/output/GrblStrategy';
 import { formatSvgImportWarnings, importSvgIntoSceneWithReport } from '../../import/svg/SvgToScene';
 import {
-  chooseSvgUnitModeForImport,
-  type SvgUnitChoiceOption,
-} from '../../import/svg/SvgUnitChoice';
-import { importDxfIntoScene } from '../../import/dxf';
+  SvgImportLimitError,
+  readSvgFileTextWithinLimit,
+  svgLimitErrorMessage,
+} from '../../import/svg/SvgComplexityLimits';
+import { chooseSvgUnitModeForImport } from '../../import/svg/SvgUnitChoice';
+import { chooseDxfUnitModeForImport, importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import { saveSceneToFile } from '../../io/FileIO';
 import {
@@ -57,7 +59,7 @@ export interface FileToolbarProps {
   showChoice: (
     title: string,
     message: string,
-    choices: readonly SvgUnitChoiceOption[],
+    choices: readonly ChoiceOption[],
     details?: string,
   ) => Promise<string | null>;
   onConnect?: () => void;
@@ -103,6 +105,13 @@ export interface FileToolbarProps {
   machineBedWidth?: number;
   machineBedHeight?: number;
   onOpenSettings?: (tab?: 'machine' | 'gcode' | 'calibration' | 'profiles' | 'about') => void;
+}
+
+interface ChoiceOption {
+  value: string;
+  label: string;
+  primary?: boolean;
+  color?: string;
 }
 
 // ─── COMPONENT ───────────────────────────────────────────────────
@@ -180,7 +189,7 @@ export function FileToolbar({
     if (!file) return;
 
     try {
-      const svgString = await file.text();
+      const svgString = await readSvgFileTextWithinLimit(file);
       const layerId = scene.activeLayerId || scene.layers[0]?.id;
       if (!layerId) return;
       const svgUnitMode = await chooseSvgUnitModeForImport(svgString, showChoice);
@@ -216,7 +225,11 @@ export function FileToolbar({
       }
     } catch (e) {
       console.error('SVG import failed:', e);
-      await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
+      if (e instanceof SvgImportLimitError) {
+        await showAlert('SVG Too Large', svgLimitErrorMessage(e));
+      } else {
+        await showAlert('Import Failed', 'Import failed: ' + (e as Error).message);
+      }
     }
 
     // Reset input so the same file can be re-imported
@@ -258,8 +271,13 @@ export function FileToolbar({
     try {
       assertDxfFileSize(file.size);
       const text = await file.text();
+      const dxfUnitMode = await chooseDxfUnitModeForImport(text, showChoice);
+      if (dxfUnitMode === null) {
+        if (dxfInputRef.current) dxfInputRef.current.value = '';
+        return;
+      }
 
-      const updated = importDxfIntoScene(text, scene);
+      const updated = importDxfIntoScene(text, scene, { unitMode: dxfUnitMode });
       onSceneChange(updated);
       onSceneCommit(updated);
     } catch (e) {
@@ -270,7 +288,7 @@ export function FileToolbar({
     if (dxfInputRef.current) {
       dxfInputRef.current.value = '';
     }
-  }, [scene, onSceneChange, onSceneCommit, showAlert]);
+  }, [scene, onSceneChange, onSceneCommit, showAlert, showChoice]);
 
   // ─── SAVE ────────────────────────────────────────────────────
 

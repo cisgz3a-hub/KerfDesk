@@ -80,6 +80,7 @@ export function importSvgToSceneWithReport(
   name: string = 'SVG Import',
 ): SvgSceneImportReport {
   const parsed = parseSvg(svgString);
+  const warnings = [...parsed.warnings];
 
   // Canvas size comes from unit-converted dimensions
   const scene = createScene(parsed.widthMm, parsed.heightMm, name);
@@ -93,7 +94,7 @@ export function importSvgToSceneWithReport(
     const mode = colorToLayerMode(effectiveColor);
     const { layers: updatedLayers, layerId } = getOrCreateLayer(currentLayers, mode);
     currentLayers = updatedLayers;
-    const obj = convertElement(el, layerId);
+    const obj = convertElement(el, layerId, warnings);
     if (obj) objects.push(obj);
   }
 
@@ -105,7 +106,7 @@ export function importSvgToSceneWithReport(
     }
   }
 
-  return { scene: { ...scene, layers: currentLayers, objects }, warnings: parsed.warnings };
+  return { scene: { ...scene, layers: currentLayers, objects }, warnings };
 }
 
 /**
@@ -136,6 +137,7 @@ export function importSvgIntoSceneWithReport(
   const parsed = parseSvg(svgString, {
     unitMode: options?.svgUnitMode,
   });
+  const warnings = [...parsed.warnings];
 
   let currentLayers = [...scene.layers];
   let objects: SceneObject[] = [];
@@ -154,11 +156,11 @@ export function importSvgIntoSceneWithReport(
       layerIdForObj = mappedId;
     }
 
-    const obj = convertElement(el, layerIdForObj);
+    const obj = convertElement(el, layerIdForObj, warnings);
     if (obj) objects.push(obj);
   }
 
-  if (objects.length === 0) return { scene, warnings: parsed.warnings };
+  if (objects.length === 0) return { scene, warnings };
 
   // Apply placement if options provided
   if (options) {
@@ -202,7 +204,7 @@ export function importSvgIntoSceneWithReport(
         modified: new Date().toISOString(),
       },
     },
-    warnings: parsed.warnings,
+    warnings,
   };
 }
 
@@ -310,9 +312,10 @@ function getOrCreateLayer(
 
 function convertElement(
   el: SvgElement,
-  layerId: string
+  layerId: string,
+  warnings: SvgImportWarning[],
 ): SceneObject | null {
-  const geometry = convertGeometry(el);
+  const geometry = convertGeometry(el, warnings);
   if (!geometry) return null;
 
   const typeName = el.tag === 'circle' ? 'ellipse'
@@ -337,7 +340,7 @@ function convertElement(
 
 // ─── GEOMETRY CONVERSION ─────────────────────────────────────────
 
-function convertGeometry(el: SvgElement): Geometry | null {
+function convertGeometry(el: SvgElement, warnings: SvgImportWarning[]): Geometry | null {
   switch (el.tag) {
     case 'rect':     return convertRect(el.attrs);
     case 'circle':   return convertCircle(el.attrs);
@@ -345,7 +348,7 @@ function convertGeometry(el: SvgElement): Geometry | null {
     case 'line':     return convertLine(el.attrs);
     case 'polyline': return convertPolyline(el.attrs, false);
     case 'polygon':  return convertPolyline(el.attrs, true);
-    case 'path':     return convertPath(el.attrs);
+    case 'path':     return convertPath(el.attrs, warnings);
     default:         return null;
   }
 }
@@ -431,10 +434,19 @@ function convertPolyline(attrs: Record<string, string>, closed: boolean): Geomet
 
 // ─── PATH ────────────────────────────────────────────────────────
 
-function convertPath(attrs: Record<string, string>): Geometry | null {
+function convertPath(attrs: Record<string, string>, warnings: SvgImportWarning[]): Geometry | null {
   const d = attrs['d'];
   if (!d) return null;
-  return parsePathData(d);
+  return parsePathData(d, {
+    onWarning: (warning) => {
+      warnings.push({
+        code: warning.code,
+        count: 1,
+        message: warning.message,
+        feature: warning.command,
+      });
+    },
+  });
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────

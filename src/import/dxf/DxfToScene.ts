@@ -3,6 +3,7 @@ import { createLayer, type Layer } from '../../core/scene/Layer';
 import { type SceneObject, type PathSegment, type Geometry } from '../../core/scene/SceneObject';
 import { IDENTITY_MATRIX, generateId, type Point } from '../../core/types';
 import { type DxfFile, type DxfEntity, parseDxf, getNum, getAllNums } from './DxfParser';
+import { resolveDxfUnitScaleToMm, type DxfUnitMode } from './DxfUnits';
 
 /**
  * Map DXF layer names to LaserForge layer modes.
@@ -51,8 +52,10 @@ function getOrCreateDxfLayer(
 export function importDxfIntoScene(
   dxfText: string,
   scene: Scene,
+  options: { unitMode?: DxfUnitMode | null } = {},
 ): Scene {
   const dxf: DxfFile = parseDxf(dxfText);
+  const scaleToMm = resolveDxfUnitScaleToMm(dxf.units, options.unitMode);
   const newObjects: SceneObject[] = [];
 
   let currentLayers = [...scene.layers];
@@ -62,7 +65,7 @@ export function importDxfIntoScene(
     const { layers: updatedLayers, layerId } = getOrCreateDxfLayer(currentLayers, dxfLayerName);
     currentLayers = updatedLayers;
 
-    const obj = convertEntity(entity, layerId);
+    const obj = convertEntity(entity, layerId, scaleToMm);
     if (obj) newObjects.push(obj);
   }
 
@@ -79,16 +82,25 @@ export function importDxfIntoScene(
   };
 }
 
-function convertEntity(entity: DxfEntity, layerId: string): SceneObject | null {
+function convertEntity(entity: DxfEntity, layerId: string, scaleToMm: number): SceneObject | null {
   switch (entity.type) {
-    case 'LINE': return convertLine(entity, layerId);
-    case 'CIRCLE': return convertCircle(entity, layerId);
-    case 'ARC': return convertArc(entity, layerId);
-    case 'ELLIPSE': return convertEllipse(entity, layerId);
-    case 'LWPOLYLINE': return convertLwPolyline(entity, layerId);
+    case 'LINE': return convertLine(entity, layerId, scaleToMm);
+    case 'CIRCLE': return convertCircle(entity, layerId, scaleToMm);
+    case 'ARC': return convertArc(entity, layerId, scaleToMm);
+    case 'ELLIPSE': return convertEllipse(entity, layerId, scaleToMm);
+    case 'LWPOLYLINE': return convertLwPolyline(entity, layerId, scaleToMm);
+    case 'POLYLINE': return convertLwPolyline(entity, layerId, scaleToMm);
     case 'POINT': return null; // Skip points
     default: return null;
   }
+}
+
+function scaledNum(entity: DxfEntity, code: number, scaleToMm: number, fallback: number = 0): number {
+  return getNum(entity, code, fallback) * scaleToMm;
+}
+
+function scaledAllNums(entity: DxfEntity, code: number, scaleToMm: number): number[] {
+  return getAllNums(entity, code).map(value => value * scaleToMm);
 }
 
 function makeObject(layerId: string, type: SceneObject['type'], name: string, geometry: Geometry): SceneObject {
@@ -108,31 +120,31 @@ function makeObject(layerId: string, type: SceneObject['type'], name: string, ge
   };
 }
 
-function convertLine(e: DxfEntity, layerId: string): SceneObject {
+function convertLine(e: DxfEntity, layerId: string, scaleToMm: number): SceneObject {
   return makeObject(layerId, 'line', 'Line', {
     type: 'line',
-    x1: getNum(e, 10),
-    y1: getNum(e, 20),
-    x2: getNum(e, 11),
-    y2: getNum(e, 21),
+    x1: scaledNum(e, 10, scaleToMm),
+    y1: scaledNum(e, 20, scaleToMm),
+    x2: scaledNum(e, 11, scaleToMm),
+    y2: scaledNum(e, 21, scaleToMm),
   });
 }
 
-function convertCircle(e: DxfEntity, layerId: string): SceneObject {
-  const r = getNum(e, 40);
+function convertCircle(e: DxfEntity, layerId: string, scaleToMm: number): SceneObject {
+  const r = scaledNum(e, 40, scaleToMm);
   return makeObject(layerId, 'ellipse', 'Circle', {
     type: 'ellipse',
-    cx: getNum(e, 10),
-    cy: getNum(e, 20),
+    cx: scaledNum(e, 10, scaleToMm),
+    cy: scaledNum(e, 20, scaleToMm),
     rx: r,
     ry: r,
   });
 }
 
-function convertArc(e: DxfEntity, layerId: string): SceneObject {
-  const cx = getNum(e, 10);
-  const cy = getNum(e, 20);
-  const r = getNum(e, 40);
+function convertArc(e: DxfEntity, layerId: string, scaleToMm: number): SceneObject {
+  const cx = scaledNum(e, 10, scaleToMm);
+  const cy = scaledNum(e, 20, scaleToMm);
+  const r = scaledNum(e, 40, scaleToMm);
   const startDeg = getNum(e, 50);
   const endDeg = getNum(e, 51);
 
@@ -166,12 +178,12 @@ function convertArc(e: DxfEntity, layerId: string): SceneObject {
   });
 }
 
-function convertEllipse(e: DxfEntity, layerId: string): SceneObject {
-  const cx = getNum(e, 10);
-  const cy = getNum(e, 20);
+function convertEllipse(e: DxfEntity, layerId: string, scaleToMm: number): SceneObject {
+  const cx = scaledNum(e, 10, scaleToMm);
+  const cy = scaledNum(e, 20, scaleToMm);
   // Major axis endpoint relative to center
-  const mx = getNum(e, 11);
-  const my = getNum(e, 21);
+  const mx = scaledNum(e, 11, scaleToMm);
+  const my = scaledNum(e, 21, scaleToMm);
   const ratio = getNum(e, 40, 1); // minor/major ratio
 
   const majorRadius = Math.sqrt(mx * mx + my * my);
@@ -197,9 +209,9 @@ function convertEllipse(e: DxfEntity, layerId: string): SceneObject {
   return obj;
 }
 
-function convertLwPolyline(e: DxfEntity, layerId: string): SceneObject {
-  const xs = getAllNums(e, 10);
-  const ys = getAllNums(e, 20);
+function convertLwPolyline(e: DxfEntity, layerId: string, scaleToMm: number): SceneObject {
+  const xs = scaledAllNums(e, 10, scaleToMm);
+  const ys = scaledAllNums(e, 20, scaleToMm);
   const bulges = getAllNums(e, 42);
   const closed = getNum(e, 70) === 1;
 

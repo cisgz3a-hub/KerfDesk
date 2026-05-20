@@ -3,10 +3,12 @@ import { type Scene } from '../../core/scene/Scene';
 import { type SceneObject, type ImageGeometry } from '../../core/scene/SceneObject';
 import { formatSvgImportWarnings, importSvgIntoSceneWithReport } from '../../import/svg/SvgToScene';
 import {
-  chooseSvgUnitModeForImport,
-  type SvgUnitChoiceOption,
-} from '../../import/svg/SvgUnitChoice';
-import { importDxfIntoScene } from '../../import/dxf';
+  SvgImportLimitError,
+  readSvgFileTextWithinLimit,
+  svgLimitErrorMessage,
+} from '../../import/svg/SvgComplexityLimits';
+import { chooseSvgUnitModeForImport } from '../../import/svg/SvgUnitChoice';
+import { chooseDxfUnitModeForImport, importDxfIntoScene } from '../../import/dxf';
 import { assertDxfFileSize } from '../../import/dxf/DxfParser';
 import {
   formatMissingImageReferenceReport,
@@ -46,6 +48,13 @@ type ImageImportResult =
   | { kind: 'blocked' }
   | { kind: 'failed' };
 
+interface ChoiceOption {
+  value: string;
+  label: string;
+  primary?: boolean;
+  color?: string;
+}
+
 async function probeImageDimensionsBeforeDecode(source: File): Promise<boolean> {
   const headerDimensions = await probeImageHeaderDimensions(source);
   if (headerDimensions) {
@@ -84,7 +93,7 @@ export interface UseImportDeps {
   showChoice: (
     title: string,
     message: string,
-    choices: readonly SvgUnitChoiceOption[],
+    choices: readonly ChoiceOption[],
     details?: string,
   ) => Promise<string | null>;
 }
@@ -409,7 +418,7 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
             await showAlertRef.current('Missing Images', imageReport);
           }
         } else if (name.endsWith('.svg')) {
-          const text = await file.text();
+          const text = await readSvgFileTextWithinLimit(file);
           const layerId = scene.activeLayerId || scene.layers[0]?.id;
           if (!layerId) return;
           const svgUnitMode = await chooseSvgUnitModeForImport(text, showChoice);
@@ -440,7 +449,9 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         } else if (name.endsWith('.dxf')) {
           assertDxfFileSize(file.size);
           const text = await file.text();
-          const updated = importDxfIntoScene(text, scene);
+          const dxfUnitMode = await chooseDxfUnitModeForImport(text, showChoice);
+          if (dxfUnitMode === null) return;
+          const updated = importDxfIntoScene(text, scene, { unitMode: dxfUnitMode });
           handleSceneCommit(updated, 'dxf-import');
         } else if (file.type.startsWith('image/') || isSupportedImageImportFile(file)) {
           const result = await importImageUnified(file, file.name);
@@ -450,6 +461,10 @@ export function useImport(scene: Scene, deps: UseImportDeps) {
         }
       } catch (err) {
         if (err instanceof ProjectChecksumLoadCancelledError) return;
+        if (err instanceof SvgImportLimitError) {
+          await showAlertRef.current('SVG Too Large', svgLimitErrorMessage(err));
+          return;
+        }
         console.error('Drop import failed:', err);
       }
     },

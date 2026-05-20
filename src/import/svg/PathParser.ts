@@ -32,6 +32,16 @@ import {
 } from '../../core/scene/SceneObject';
 import { assertSvgLimit } from './SvgComplexityLimits';
 
+export interface SvgPathParseWarning {
+  code: 'SVG_PATH_MALFORMED';
+  command: string;
+  message: string;
+}
+
+export interface ParsePathDataOptions {
+  onWarning?: (warning: SvgPathParseWarning) => void;
+}
+
 // ─── PUBLIC API ──────────────────────────────────────────────────
 
 /**
@@ -39,12 +49,12 @@ import { assertSvgLimit } from './SvgComplexityLimits';
  *
  * Example: "M 10 10 L 90 10 L 90 90 Z" → PathGeometry with one closed subpath
  */
-export function parsePathData(d: string): PathGeometry {
+export function parsePathData(d: string, options: ParsePathDataOptions = {}): PathGeometry {
   if (!d || d.trim() === '') return { type: 'path', subPaths: [] };
 
   const tokens = tokenize(d);
   assertSvgLimit('MAX_PATH_TOKENS', tokens.length);
-  const subPaths = buildSubPaths(tokens);
+  const subPaths = buildSubPaths(tokens, options);
 
   return { type: 'path', subPaths };
 }
@@ -76,7 +86,7 @@ function tokenize(d: string): Token[] {
 
 // ─── SUB-PATH BUILDER ────────────────────────────────────────────
 
-function buildSubPaths(tokens: Token[]): SubPath[] {
+function buildSubPaths(tokens: Token[], options: ParsePathDataOptions): SubPath[] {
   const subPaths: SubPath[] = [];
   let currentSegments: PathSegment[] = [];
   let segmentCount = 0;
@@ -87,20 +97,28 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
 
   let i = 0;
 
-  function nextNum(): number {
-    while (i < tokens.length && tokens[i].type !== 'number') i++;
-    if (i >= tokens.length) return 0;
-    return (tokens[i++] as { type: 'number'; value: number }).value;
+  function warnMalformed(command: string): void {
+    options.onWarning?.({
+      code: 'SVG_PATH_MALFORMED',
+      command,
+      message: `Skipped malformed SVG path command "${command}" because it did not include the required numeric operands.`,
+    });
   }
 
-  function hasMoreNumbers(): boolean {
-    let j = i;
-    while (j < tokens.length) {
-      if (tokens[j].type === 'number') return true;
-      if (tokens[j].type === 'command') return false;
-      j++;
+  function nextTokenIsNumber(): boolean {
+    return i < tokens.length && tokens[i].type === 'number';
+  }
+
+  function readNumbers(count: number, command: string): number[] | null {
+    const values: number[] = [];
+    for (let n = 0; n < count; n++) {
+      if (i >= tokens.length || tokens[i].type !== 'number') {
+        warnMalformed(command);
+        return null;
+      }
+      values.push((tokens[i++] as { type: 'number'; value: number }).value);
     }
-    return false;
+    return values;
   }
 
   function finishSubPath(closed: boolean): void {
@@ -144,9 +162,12 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
       case 'M': {
         // First M creates moveto; subsequent pairs are implicit lineto
         let first = true;
-        do {
-          const x = nextNum();
-          const y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(2, lastCmd);
+          if (!nums) break;
+          const [x, y] = nums;
+          parsed = true;
           const absX = isRelative && !first ? curX + x : isRelative ? curX + x : x;
           const absY = isRelative && !first ? curY + y : isRelative ? curY + y : y;
 
@@ -167,50 +188,67 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           }
           lastCp2X = curX;
           lastCp2Y = curY;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'L': {
-        do {
-          const x = nextNum();
-          const y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(2, lastCmd);
+          if (!nums) break;
+          const [x, y] = nums;
+          parsed = true;
           curX = isRelative ? curX + x : x;
           curY = isRelative ? curY + y : y;
           pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'H': {
-        do {
-          const x = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(1, lastCmd);
+          if (!nums) break;
+          const [x] = nums;
+          parsed = true;
           curX = isRelative ? curX + x : x;
           pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'V': {
-        do {
-          const y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(1, lastCmd);
+          if (!nums) break;
+          const [y] = nums;
+          parsed = true;
           curY = isRelative ? curY + y : y;
           pushSegment({ type: 'line', to: { x: curX, y: curY } });
           lastCp2X = curX;
           lastCp2Y = curY;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'C': {
-        do {
-          let x1 = nextNum(), y1 = nextNum();
-          let x2 = nextNum(), y2 = nextNum();
-          let x = nextNum(),  y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(6, lastCmd);
+          if (!nums) break;
+          let [x1, y1, x2, y2, x, y] = nums;
+          parsed = true;
           if (isRelative) {
             x1 += curX; y1 += curY;
             x2 += curX; y2 += curY;
@@ -226,17 +264,21 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           lastCp2Y = y2;
           curX = x;
           curY = y;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'S': {
         // Smooth cubic: cp1 is reflection of previous cp2 across current point
-        do {
+        let parsed = false;
+        while (nextTokenIsNumber()) {
           const cp1X = 2 * curX - lastCp2X;
           const cp1Y = 2 * curY - lastCp2Y;
-          let x2 = nextNum(), y2 = nextNum();
-          let x = nextNum(),  y = nextNum();
+          const nums = readNumbers(4, lastCmd);
+          if (!nums) break;
+          let [x2, y2, x, y] = nums;
+          parsed = true;
           if (isRelative) {
             x2 += curX; y2 += curY;
             x += curX;  y += curY;
@@ -251,14 +293,18 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           lastCp2Y = y2;
           curX = x;
           curY = y;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'Q': {
-        do {
-          let cpX = nextNum(), cpY = nextNum();
-          let x = nextNum(),   y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(4, lastCmd);
+          if (!nums) break;
+          let [cpX, cpY, x, y] = nums;
+          parsed = true;
           if (isRelative) {
             cpX += curX; cpY += curY;
             x += curX;   y += curY;
@@ -272,16 +318,21 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           lastCp2Y = cpY;
           curX = x;
           curY = y;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'T': {
         // Smooth quadratic: cp is reflection of previous cp
-        do {
+        let parsed = false;
+        while (nextTokenIsNumber()) {
           const cpX = 2 * curX - lastCp2X;
           const cpY = 2 * curY - lastCp2Y;
-          let x = nextNum(), y = nextNum();
+          const nums = readNumbers(2, lastCmd);
+          if (!nums) break;
+          let [x, y] = nums;
+          parsed = true;
           if (isRelative) {
             x += curX; y += curY;
           }
@@ -294,18 +345,20 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           lastCp2Y = cpY;
           curX = x;
           curY = y;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
       case 'A': {
         // Arc: approximate with cubic beziers
-        do {
-          const rx = nextNum(), ry = nextNum();
-          const rotation = nextNum();
-          const largeArc = nextNum();
-          const sweep = nextNum();
-          let x = nextNum(), y = nextNum();
+        let parsed = false;
+        while (nextTokenIsNumber()) {
+          const nums = readNumbers(7, lastCmd);
+          if (!nums) break;
+          const [rx, ry, rotation, largeArc, sweep, rawX, rawY] = nums;
+          let x = rawX, y = rawY;
+          parsed = true;
           if (isRelative) {
             x += curX; y += curY;
           }
@@ -319,7 +372,8 @@ function buildSubPaths(tokens: Token[]): SubPath[] {
           lastCp2Y = y;
           curX = x;
           curY = y;
-        } while (hasMoreNumbers());
+        }
+        if (!parsed) warnMalformed(lastCmd);
         break;
       }
 
