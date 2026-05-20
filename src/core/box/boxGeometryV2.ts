@@ -8,6 +8,22 @@ export { createBoxJoineryModel } from './panelModel';
 export { computeBoxJointMetricsV2 } from './jointPattern';
 export { validateBoxJoineryModel, getJointDebugFeatures } from './boxJoineryEngine';
 
+export interface BoxGenerationValidation {
+  ok: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+export function validateBoxGenerationParams(params: BoxJoineryParams): BoxGenerationValidation {
+  const model = createBoxJoineryModel(params);
+  const report = validateBoxJoineryModel(model);
+  return {
+    ok: report.ok,
+    errors: [...report.errors],
+    warnings: [...report.warnings],
+  };
+}
+
 export function generateBoxFacesV2(params: BoxJoineryParams): BoxFace[] {
   const model = createBoxJoineryModel(params);
   const report = validateBoxJoineryModel(model);

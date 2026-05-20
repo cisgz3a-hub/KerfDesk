@@ -20,6 +20,7 @@ interface BoxGeneratorControlsProps {
   dimensionMode: DimensionMode;
   resolved: { width: number; height: number; depth: number };
   faces: BoxFace[];
+  validationErrors: readonly string[];
   sourceText: string;
   onWidthChange: (value: number) => void;
   onHeightChange: (value: number) => void;
@@ -62,6 +63,9 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
       + (props.resolved.depth * props.resolved.height * 2)
       + (props.resolved.width * props.resolved.depth * (props.openTop ? 1 : 2))) / 100,
   );
+  const validationMessage = props.validationErrors.length > 0
+    ? `Box dimensions are too small for the selected material and joint settings. ${props.validationErrors[0] ?? ''}`.trim()
+    : null;
 
   useEffect(() => {
     drawLayoutPreview(canvasRef.current, props.faces, props.resolved);
@@ -143,6 +147,21 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
       statCard('Material', `${props.thickness} mm`),
       statCard('Layout area', `~${materialAreaCm2} cm²`),
     ),
+    validationMessage
+      ? React.createElement('div', {
+          role: 'alert',
+          'data-testid': 'box-cross-field-validation',
+          style: {
+            background: 'rgba(248,113,113,0.10)',
+            border: '1px solid rgba(248,113,113,0.55)',
+            borderRadius: 10,
+            color: '#fecaca',
+            fontSize: 11,
+            lineHeight: 1.45,
+            padding: '9px 10px',
+          },
+        }, validationMessage)
+      : null,
     React.createElement('div', { style: sectionStyle },
       React.createElement('div', { style: { display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'center', marginBottom: 8 } },
         sectionTitle('Generated Layout'),
@@ -169,17 +188,18 @@ export function BoxGeneratorControls(props: BoxGeneratorControlsProps) {
     ),
     React.createElement('button', {
       type: 'button',
-      onClick: props.onGenerate,
+      disabled: validationMessage != null,
+      onClick: validationMessage == null ? props.onGenerate : undefined,
       style: {
         width: '100%',
         padding: '9px 12px',
-        background: 'rgba(45,212,160,0.14)',
-        border: '1px solid #2dd4a0',
+        background: validationMessage == null ? 'rgba(45,212,160,0.14)' : 'rgba(80,80,96,0.28)',
+        border: validationMessage == null ? '1px solid #2dd4a0' : '1px solid #3a3a4c',
         borderRadius: 10,
-        color: '#2dd4a0',
+        color: validationMessage == null ? '#2dd4a0' : '#8f8faa',
         fontSize: 13,
         fontWeight: 800,
-        cursor: 'pointer',
+        cursor: validationMessage == null ? 'pointer' : 'not-allowed',
         fontFamily: font,
       },
     }, `Create ${props.openTop ? 5 : 6}-Face Box`),

@@ -3,7 +3,7 @@ import { generateId } from '../../../core/types';
 import { type Scene } from '../../../core/scene/Scene';
 import { type SceneObject } from '../../../core/scene/SceneObject';
 import { interiorToExterior } from '../../../core/box/boxGeometry';
-import { generateBoxFacesV2 } from '../../../core/box/boxGeometryV2';
+import { generateBoxFacesV2, validateBoxGenerationParams, type BoxJoineryParams } from '../../../core/box/boxGeometryV2';
 import { BOX_LIBRARY_PRESETS, getBoxPresetById } from '../../../core/box/boxLibrary';
 import type { BoxLibraryPreset } from '../../../core/box/boxLibraryTypes';
 import { useBoxLibraryState } from '../../hooks/useBoxLibraryState';
@@ -14,6 +14,15 @@ import { BoxGeneratorControls } from './BoxGeneratorControls';
 
 type DimensionMode = 'outside' | 'inside';
 const DEFAULT_PRESET_ID = 'small-keepsake-box';
+
+interface BoxFeatureSource {
+  preset: BoxLibraryPreset;
+  width: number;
+  height: number;
+  depth: number;
+  thickness: number;
+  openTop: boolean;
+}
 
 interface BoxStudioWorkspaceProps {
   scene: Scene;
@@ -80,7 +89,7 @@ export function BoxStudioWorkspace({
   const resolved = dimensionMode === 'inside'
     ? interiorToExterior(width, height, depth, thickness, openTop)
     : { width, height, depth };
-  const faces = useMemo(() => generateBoxFacesV2({
+  const boxParams = useMemo<BoxJoineryParams>(() => ({
     width: resolved.width,
     height: resolved.height,
     depth: resolved.depth,
@@ -93,6 +102,11 @@ export function BoxStudioWorkspace({
     slotExtraDepth,
     cornerRelief: 'none',
   }), [resolved.width, resolved.height, resolved.depth, thickness, fingerWidth, openTop, kerf, fitAllowance, tabExtraDepth, slotExtraDepth]);
+  const boxValidation = useMemo(() => validateBoxGenerationParams(boxParams), [boxParams]);
+  const faces = useMemo(
+    () => (boxValidation.ok ? generateBoxFacesV2(boxParams) : []),
+    [boxParams, boxValidation.ok],
+  );
 
   const applyPreset = useCallback((preset: BoxLibraryPreset): void => {
     library.setSelectedPresetId(preset.id);
@@ -112,8 +126,19 @@ export function BoxStudioWorkspace({
   }, [library]);
 
   const generateCurrent = useCallback(() => {
-    onGenerate(buildBoxObjects(scene, faces));
-  }, [faces, onGenerate, scene]);
+    if (!boxValidation.ok) return;
+    const featureSource: BoxFeatureSource | null = appliedPreset
+      ? {
+          preset: appliedPreset,
+          width: resolved.width,
+          height: resolved.height,
+          depth: resolved.depth,
+          thickness,
+          openTop,
+        }
+      : null;
+    onGenerate(buildBoxObjects(scene, faces, featureSource));
+  }, [appliedPreset, boxValidation.ok, faces, onGenerate, openTop, resolved.depth, resolved.height, resolved.width, scene, thickness]);
 
   const generateTestCoupon = useCallback(() => {
     const preset = getBoxPresetById('fit-test-mini-box') ?? BOX_LIBRARY_PRESETS[0]!;
@@ -130,7 +155,7 @@ export function BoxStudioWorkspace({
       slotExtraDepth: 0.35,
       cornerRelief: 'none',
     });
-    onGenerate(buildBoxObjects(scene, couponFaces));
+    onGenerate(buildBoxObjects(scene, couponFaces, null));
   }, [onGenerate, scene]);
 
   useEffect(() => {
@@ -193,6 +218,7 @@ export function BoxStudioWorkspace({
         dimensionMode,
         resolved,
         faces,
+        validationErrors: boxValidation.errors,
         sourceText,
         onWidthChange: setWidth,
         onHeightChange: setHeight,
@@ -211,10 +237,14 @@ export function BoxStudioWorkspace({
   );
 }
 
-function buildBoxObjects(scene: Scene, faces: ReturnType<typeof generateBoxFacesV2>): SceneObject[] {
+function buildBoxObjects(
+  scene: Scene,
+  faces: ReturnType<typeof generateBoxFacesV2>,
+  featureSource: BoxFeatureSource | null,
+): SceneObject[] {
   const layerId = scene.activeLayerId || scene.layers[0]?.id;
   if (!layerId) return [];
-  return faces.map(face => ({
+  const faceObjects = faces.map(face => ({
     id: generateId(),
     type: 'polygon' as const,
     name: `Box: ${face.name}`,
@@ -228,6 +258,131 @@ function buildBoxObjects(scene: Scene, faces: ReturnType<typeof generateBoxFaces
     _bounds: null,
     _worldTransform: null,
   }));
+  const featureObjects = featureSource
+    ? buildPresetFeatureObjects(layerId, faces, featureSource)
+    : [];
+  return [...faceObjects, ...featureObjects];
+}
+
+type BoxFace = ReturnType<typeof generateBoxFacesV2>[number];
+
+function buildPresetFeatureObjects(
+  layerId: string,
+  faces: readonly BoxFace[],
+  source: BoxFeatureSource,
+): SceneObject[] {
+  const objects: SceneObject[] = [];
+  const front = faces.find(face => face.name === 'Front');
+  const back = faces.find(face => face.name === 'Back');
+  const top = faces.find(face => face.name === 'Top');
+
+  if (source.preset.handleStyle === 'slot') {
+    for (const face of [front, back]) {
+      if (!face) continue;
+      const slotWidth = Math.min(56, Math.max(24, source.width * 0.3));
+      const slotHeight = Math.min(12, Math.max(6, source.height * 0.12));
+      objects.push(makeFeatureRectObject(
+        layerId,
+        'Box feature: Handle Slot',
+        face,
+        (source.width - slotWidth) / 2,
+        (source.height - slotHeight) / 2,
+        slotWidth,
+        slotHeight,
+      ));
+    }
+  }
+
+  if (presetNeedsVentSlots(source.preset)) {
+    const face = top ?? front;
+    if (face) {
+      const dims = faceDimensions(face, source);
+      const slotCount = 4;
+      const slotWidth = Math.min(7, Math.max(3, dims.width * 0.04));
+      const slotHeight = Math.min(32, Math.max(12, dims.height * 0.42));
+      const gap = slotWidth * 1.25;
+      const totalWidth = slotCount * slotWidth + (slotCount - 1) * gap;
+      const startX = (dims.width - totalWidth) / 2;
+      const y = (dims.height - slotHeight) / 2;
+      for (let i = 0; i < slotCount; i++) {
+        objects.push(makeFeatureRectObject(
+          layerId,
+          'Box feature: Vent Slot',
+          face,
+          startX + i * (slotWidth + gap),
+          y,
+          slotWidth,
+          slotHeight,
+        ));
+      }
+    }
+  }
+
+  if (source.preset.lidType === 'lift-off' && !source.openTop && top) {
+    const slotWidth = Math.min(46, Math.max(20, source.width * 0.22));
+    const slotHeight = Math.min(10, Math.max(5, source.depth * 0.08));
+    objects.push(makeFeatureRectObject(
+      layerId,
+      'Box feature: Lid Pull Slot',
+      top,
+      (source.width - slotWidth) / 2,
+      Math.max(source.thickness * 2, source.depth * 0.16),
+      slotWidth,
+      slotHeight,
+    ));
+  }
+
+  return objects;
+}
+
+function presetNeedsVentSlots(preset: BoxLibraryPreset): boolean {
+  return preset.previewVariant === 'electronics-box'
+    || preset.tags.some(tag => tag.toLowerCase().includes('vent'))
+    || preset.featureBadges.some(badge => badge.toLowerCase().includes('vent'));
+}
+
+function faceDimensions(face: BoxFace, source: BoxFeatureSource): { width: number; height: number } {
+  if (face.name === 'Top' || face.name === 'Bottom') {
+    return { width: source.width, height: source.depth };
+  }
+  if (face.name === 'Left' || face.name === 'Right') {
+    return { width: source.depth, height: source.height };
+  }
+  return { width: source.width, height: source.height };
+}
+
+function makeFeatureRectObject(
+  layerId: string,
+  name: string,
+  face: BoxFace,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+): SceneObject {
+  return {
+    id: generateId(),
+    type: 'polygon',
+    name,
+    layerId,
+    parentId: null,
+    transform: { a: 1, b: 0, c: 0, d: 1, tx: face.offsetX + 20, ty: face.offsetY + 20 },
+    geometry: {
+      type: 'polygon',
+      points: [
+        { x, y },
+        { x: x + width, y },
+        { x: x + width, y: y + height },
+        { x, y: y + height },
+      ],
+      closed: true,
+    },
+    visible: true,
+    locked: false,
+    powerScale: 1.0,
+    _bounds: null,
+    _worldTransform: null,
+  };
 }
 
 const panelStyle: React.CSSProperties = {
