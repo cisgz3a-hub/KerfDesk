@@ -21,7 +21,7 @@
  * Last updated: Phase 1, Step 1 — Foundation
  */
 
-import { type Point, type AABB, emptyAABB, mergeAABB, generateId, MAX_LASER_SPEED, MIN_LASER_SPEED } from '../types';
+import { type Point, type AABB, emptyAABB, mergeAABB, generateId, MAX_LASER_SPEED, MIN_LASER_SPEED, IDENTITY_MATRIX } from '../types';
 import { type Scene, getOutputLayers, getObjectsByLayer } from '../scene/Scene';
 import { type SceneObject, type Geometry, type ImageGeometry } from '../scene/SceneObject';
 import { type ImageRasterMode, type Layer, sortLayersByProcessingOrder } from '../scene/Layer';
@@ -50,6 +50,7 @@ import { EMPTY_OFFSET_TABLE, type ScanningOffsetTable } from './ScanningOffset';
 import { computeSmartOverscan } from './SmartOverscan';
 import { getPresetById } from '../materials/MaterialLibrary';
 import { canUseFeature } from '../../entitlements';
+import { offsetObject } from '../../geometry/OffsetPath';
 // T1-147: pure compound-role inference + point-in-polygon test
 // extracted so the topology classification can be tested in isolation.
 import { inferCompoundRoles } from './compoundRoles';
@@ -437,7 +438,8 @@ function compileOperation(
 ): Operation | null {
   const type = mapModeToType(layer.settings.mode);
   const settings = resolveSettings(layer, sceneMaterialName, entitlementPolicy, jobOpts);
-  const geometry = compileGeometry(type, layer, objects, entitlementPolicy, jobOpts);
+  const materialKerfOffset = type === 'cut' ? resolveMaterialPresetKerfOffset(layer) : 0;
+  const geometry = compileGeometry(type, layer, objects, entitlementPolicy, jobOpts, materialKerfOffset);
 
   if (!geometry) return null;
 
@@ -471,6 +473,37 @@ function compileOperation(
 }
 
 // T1-154: mapModeToType moved to ./jobCompilerHelpers.
+
+function sanitizeMaterialKerfOffset(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return undefined;
+  return Math.max(0, n);
+}
+
+function resolveMaterialPresetKerfOffset(layer: Layer): number {
+  const snapshotKerf = sanitizeMaterialKerfOffset(layer.settings.materialPresetSnapshot?.kerf);
+  if (snapshotKerf !== undefined) return snapshotKerf;
+
+  const preset = layer.settings.materialPresetId ? getPresetById(layer.settings.materialPresetId) : undefined;
+  return sanitizeMaterialKerfOffset(preset?.kerf) ?? 0;
+}
+
+function applyCompileKerfOffset(obj: SceneObject, offsetMm: number): SceneObject {
+  if (offsetMm <= 0) return obj;
+
+  const offsetGeometry = offsetObject(obj, offsetMm);
+  if (!offsetGeometry) return obj;
+
+  return {
+    ...obj,
+    type: 'path',
+    transform: { ...IDENTITY_MATRIX },
+    geometry: offsetGeometry,
+    _bounds: null,
+    _worldTransform: null,
+  };
+}
 
 // ─── RESOLVE SETTINGS ────────────────────────────────────────────
 /**
@@ -678,6 +711,7 @@ function compileGeometry(
   objects: SceneObject[],
   entitlementPolicy: EntitlementPolicy,
   jobOpts?: CompileJobOptions,
+  materialKerfOffset: number = 0,
 ): OperationGeometry | null {
   if (type === 'raster') {
     const img = layer.settings.image;
@@ -837,11 +871,12 @@ function compileGeometry(
 
   for (const obj of objects) {
     if (!obj.visible) continue;
-    const flatPaths = flattenObject(obj, type, entitlementPolicy);
+    const compileObj = type === 'cut' ? applyCompileKerfOffset(obj, materialKerfOffset) : obj;
+    const flatPaths = flattenObject(compileObj, type, entitlementPolicy);
     for (let i = 0; i < flatPaths.length; i++) {
       paths.push(flatPaths[i]);
     }
-    const compoundPath = flattenObjectAsCompound(obj, type);
+    const compoundPath = flattenObjectAsCompound(compileObj, type);
     if (compoundPath && compoundPath.contours.length > 0) {
       compoundPaths.push(compoundPath);
     }

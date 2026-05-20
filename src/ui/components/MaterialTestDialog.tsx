@@ -10,6 +10,95 @@ interface MaterialTestDialogProps {
   onClose: () => void;
 }
 
+interface MaterialTestLayoutInput {
+  rows: number;
+  cols: number;
+  squareSize: number;
+  gap: number;
+}
+
+interface MaterialTestLayout {
+  gridWidth: number;
+  gridHeight: number;
+  footprintWidth: number;
+  footprintHeight: number;
+  gridStartX: number;
+  gridStartY: number;
+  targetLabel: 'material' | 'workspace';
+  target: { x: number; y: number; width: number; height: number };
+  fits: boolean;
+}
+
+interface MaterialTestCell {
+  row: number;
+  col: number;
+  power: number;
+  speed: number;
+}
+
+const MATERIAL_TEST_LABEL_PADDING = {
+  left: 8,
+  top: 8,
+  right: 2,
+  bottom: 8,
+};
+
+export function computeMaterialTestLayout(scene: Scene, input: MaterialTestLayoutInput): MaterialTestLayout {
+  const rows = Math.max(1, Math.floor(input.rows));
+  const cols = Math.max(1, Math.floor(input.cols));
+  const squareSize = Math.max(0, input.squareSize);
+  const gap = Math.max(0, input.gap);
+  const gridWidth = cols * squareSize + Math.max(0, cols - 1) * gap;
+  const gridHeight = rows * squareSize + Math.max(0, rows - 1) * gap;
+  const material = scene.material?.enabled === false ? null : scene.material;
+  const target = material
+    ? { x: material.x, y: material.y, width: material.width, height: material.height }
+    : { x: 0, y: 0, width: scene.canvas.width, height: scene.canvas.height };
+  const footprintWidth = gridWidth + MATERIAL_TEST_LABEL_PADDING.left + MATERIAL_TEST_LABEL_PADDING.right;
+  const footprintHeight = gridHeight + MATERIAL_TEST_LABEL_PADDING.top + MATERIAL_TEST_LABEL_PADDING.bottom;
+  const footprintStartX = target.x + (target.width - footprintWidth) / 2;
+  const footprintStartY = target.y + (target.height - footprintHeight) / 2;
+  const finiteTarget = Number.isFinite(target.x)
+    && Number.isFinite(target.y)
+    && Number.isFinite(target.width)
+    && Number.isFinite(target.height)
+    && target.width > 0
+    && target.height > 0;
+  const finiteFootprint = Number.isFinite(footprintWidth)
+    && Number.isFinite(footprintHeight)
+    && footprintWidth > 0
+    && footprintHeight > 0;
+  const fits = finiteTarget
+    && finiteFootprint
+    && footprintWidth <= target.width
+    && footprintHeight <= target.height
+    && footprintStartX >= target.x
+    && footprintStartY >= target.y
+    && footprintStartX + footprintWidth <= target.x + target.width
+    && footprintStartY + footprintHeight <= target.y + target.height;
+  return {
+    gridWidth,
+    gridHeight,
+    footprintWidth,
+    footprintHeight,
+    gridStartX: footprintStartX + MATERIAL_TEST_LABEL_PADDING.left,
+    gridStartY: footprintStartY + MATERIAL_TEST_LABEL_PADDING.top,
+    targetLabel: material ? 'material' : 'workspace',
+    target,
+    fits,
+  };
+}
+
+function orderMaterialTestCellsForExecution(cells: MaterialTestCell[]): MaterialTestCell[] {
+  return [...cells].sort((a, b) => {
+    const powerDelta = a.power - b.power;
+    if (powerDelta !== 0) return powerDelta;
+    const speedDelta = b.speed - a.speed;
+    if (speedDelta !== 0) return speedDelta;
+    return a.row - b.row || a.col - b.col;
+  });
+}
+
 export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDialogProps) {
   const [powerMin, setPowerMin] = useState(20);
   const [powerMax, setPowerMax] = useState(100);
@@ -31,7 +120,7 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
   };
 
   const grid = useMemo(() => {
-    const cells: Array<{ row: number; col: number; power: number; speed: number }> = [];
+    const cells: MaterialTestCell[] = [];
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const power = rows === 1 ? powerMin : powerMin + (powerMax - powerMin) * (r / (rows - 1));
@@ -41,10 +130,12 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
     }
     return cells;
   }, [rows, cols, powerMin, powerMax, speedMin, speedMax]);
+  const executionGrid = useMemo(() => orderMaterialTestCellsForExecution(grid), [grid]);
 
   const totalWidth = cols * squareSize + (cols - 1) * gap;
   const totalHeight = rows * squareSize + (rows - 1) * gap;
   const labelHeight = 12;
+  const testLayout = computeMaterialTestLayout(scene, { rows, cols, squareSize, gap });
 
   const previewW = 280;
   const previewH = 220;
@@ -55,21 +146,19 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
   const offsetY = (previewH - svgTotalH * scale) / 2;
 
   const handleApply = useCallback(() => {
+    if (!testLayout.fits) return;
+
     const objects: SceneObject[] = [];
     const layerSettings: Array<{ power: number; speed: number }> = [];
 
     const uid = () => generateId();
 
-    const startX = scene.material
-      ? scene.material.x + (scene.material.width - totalWidth) / 2
-      : (scene.canvas.width - totalWidth) / 2;
-    const startY = scene.material
-      ? scene.material.y + (scene.material.height - totalHeight) / 2
-      : (scene.canvas.height - totalHeight) / 2;
+    const startX = testLayout.gridStartX;
+    const startY = testLayout.gridStartY;
 
     const defaultLayerId = scene.layers[0]?.id ?? '';
 
-    for (const cell of grid) {
+    for (const cell of executionGrid) {
       const x = startX + cell.col * (squareSize + gap);
       const y = startY + cell.row * (squareSize + gap);
 
@@ -166,7 +255,7 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
 
     onApply(objects, layerSettings, mode);
     onClose();
-  }, [scene, grid, squareSize, gap, totalWidth, totalHeight, speedMin, speedMax, powerMin, powerMax, mode, onApply, onClose]);
+  }, [scene, executionGrid, squareSize, gap, totalWidth, totalHeight, speedMin, speedMax, powerMin, powerMax, mode, onApply, onClose, testLayout]);
 
   return React.createElement('div', {
     style: {
@@ -265,6 +354,13 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
           },
             React.createElement('div', { style: { fontSize: 9, color: '#555570', marginBottom: 4, textTransform: 'uppercase' as const } }, 'Summary'),
             React.createElement('div', { style: { fontSize: 11, color: '#e0e0ec' } }, `${rows * cols} test squares`),
+            React.createElement('div', {
+              style: { fontSize: 10, color: testLayout.fits ? '#2dd4a0' : '#ff6680', marginTop: 2 },
+            },
+              testLayout.fits
+                ? `Footprint: ${testLayout.footprintWidth.toFixed(0)} x ${testLayout.footprintHeight.toFixed(0)} mm fits ${testLayout.targetLabel}`
+                : `Footprint: ${testLayout.footprintWidth.toFixed(0)} x ${testLayout.footprintHeight.toFixed(0)} mm does not fit ${testLayout.target.width.toFixed(0)} x ${testLayout.target.height.toFixed(0)} mm ${testLayout.targetLabel}`,
+            ),
             React.createElement('div', { style: { fontSize: 10, color: '#8888aa', marginTop: 2 } }, `Grid: ${totalWidth.toFixed(0)} × ${totalHeight.toFixed(0)} mm`),
             React.createElement('div', { style: { fontSize: 10, color: '#8888aa' } }, `Power: ${powerMin}% → ${powerMax}%`),
             React.createElement('div', { style: { fontSize: 10, color: '#8888aa' } }, `Speed: ${speedMin} → ${speedMax} mm/min`),
@@ -331,11 +427,18 @@ export function MaterialTestDialog({ scene, onApply, onClose }: MaterialTestDial
         }, 'Cancel'),
         React.createElement('button', {
           onClick: handleApply,
+          disabled: !testLayout.fits,
           style: {
             flex: 2, padding: '10px',
-            background: 'rgba(0,212,255,0.1)', border: '1px solid #00d4ff',
-            borderRadius: 8, color: '#00d4ff', fontSize: 13, fontWeight: 600,
-            cursor: 'pointer', fontFamily: font,
+            background: testLayout.fits ? 'rgba(0,212,255,0.1)' : '#333344',
+            border: testLayout.fits ? '1px solid #00d4ff' : '1px solid #444455',
+            borderRadius: 8,
+            color: testLayout.fits ? '#00d4ff' : '#777788',
+            fontSize: 13,
+            fontWeight: 600,
+            cursor: testLayout.fits ? 'pointer' : 'not-allowed',
+            fontFamily: font,
+            opacity: testLayout.fits ? 1 : 0.65,
           },
         }, `Generate ${rows * cols} Test Squares`),
       ),

@@ -27,6 +27,13 @@ function assertClose(a: number, b: number, tol: number, message: string): void {
   assert(Math.abs(a - b) <= tol, message);
 }
 
+function waitForClockTick(): void {
+  const start = Date.now();
+  while (Date.now() === start) {
+    // Keep this deterministic test synchronous for the standalone runner.
+  }
+}
+
 console.log('\n=== TestGridGenerator ===\n');
 
 {
@@ -146,6 +153,13 @@ console.log('\n=== TestGridGenerator ===\n');
   assert(!gcode.includes('NaN'), 'no NaN');
   assert(!gcode.includes('Infinity'), 'no Infinity');
   assert(!gcode.includes('undefined'), 'no undefined');
+}
+
+{
+  const first = generateTestGrid(DEFAULT_TEST_GRID);
+  waitForClockTick();
+  const second = generateTestGrid(DEFAULT_TEST_GRID);
+  assert(first === second, 'identical options emit deterministic G-code');
 }
 
 {

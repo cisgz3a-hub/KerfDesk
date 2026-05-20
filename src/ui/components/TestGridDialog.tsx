@@ -17,6 +17,21 @@ export interface TestGridDialogProps {
   defaultBedHeight: number;
 }
 
+function parseNumberList(s: string, minValue: number, includeMin: boolean): { values: number[]; valid: boolean } {
+  const parts = s.split(',').map(x => x.trim()).filter(Boolean);
+  if (parts.length === 0) return { values: [], valid: false };
+  const values: number[] = [];
+  for (const part of parts) {
+    const value = parseFloat(part);
+    const inRange = includeMin ? value >= minValue : value > minValue;
+    if (!Number.isFinite(value) || !inRange) {
+      return { values: [], valid: false };
+    }
+    values.push(value);
+  }
+  return { values, valid: values.length > 0 };
+}
+
 export function TestGridDialog(props: TestGridDialogProps) {
   const {
     open,
@@ -42,11 +57,10 @@ export function TestGridDialog(props: TestGridDialogProps) {
 
   if (!open) return null;
 
-  const parseList = (s: string): number[] =>
-    s.split(',').map(x => parseFloat(x.trim())).filter(x => Number.isFinite(x) && x >= 0);
-
-  const parsedPowers = parseList(powersStr);
-  const parsedSpeeds = parseList(speedsStr);
+  const parsedPowersResult = parseNumberList(powersStr, 0, true);
+  const parsedSpeedsResult = parseNumberList(speedsStr, 0, false);
+  const parsedPowers = parsedPowersResult.values;
+  const parsedSpeeds = parsedSpeedsResult.values;
 
   const effectiveOpts: TestGridOptions = {
     ...opts,
@@ -56,13 +70,25 @@ export function TestGridDialog(props: TestGridDialogProps) {
 
   const width = computeGridWidth(effectiveOpts);
   const height = computeGridHeight(effectiveOpts);
+  const inputsValid = parsedPowersResult.valid && parsedSpeedsResult.valid;
   const fits =
+    inputsValid &&
+    effectiveOpts.originX >= 0 &&
+    effectiveOpts.originY >= 0 &&
     width + effectiveOpts.originX <= defaultBedWidth &&
     height + effectiveOpts.originY <= defaultBedHeight;
+  const canEmit = fits && parsedPowers.length > 0 && parsedSpeeds.length > 0;
   const buildGridGcode = () => ({
     gcode: generateTestGrid(effectiveOpts),
     bounds: { width, height },
   });
+  const validationMessage = !parsedPowersResult.valid
+    ? 'Power values must be finite numbers greater than or equal to 0.'
+    : !parsedSpeedsResult.valid
+      ? 'Speed values must be finite numbers greater than 0.'
+      : effectiveOpts.originX < 0 || effectiveOpts.originY < 0
+        ? 'Origin X and Y must be greater than or equal to 0.'
+        : null;
 
   const labelStyle: React.CSSProperties = {
     fontSize: 11,
@@ -254,6 +280,13 @@ export function TestGridDialog(props: TestGridDialogProps) {
             ? `Grid size: ${width.toFixed(1)} × ${height.toFixed(1)} mm — fits in ${defaultBedWidth}×${defaultBedHeight} bed`
             : `Grid size: ${width.toFixed(1)} × ${height.toFixed(1)} mm — EXCEEDS bed (${defaultBedWidth}×${defaultBedHeight}). Reduce values or move origin.`}
         </div>
+        {validationMessage
+          ? (
+            <div style={{ color: '#ff6680', fontSize: 12, marginTop: 6 }}>
+              {validationMessage}
+            </div>
+          )
+          : null}
 
         <div style={{ marginTop: 16, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button
@@ -276,10 +309,11 @@ export function TestGridDialog(props: TestGridDialogProps) {
               <button
                 type="button"
                 onClick={() => {
+                  if (!canEmit) return;
                   const { gcode } = buildGridGcode();
                   onPreview?.(gcode, { width, height });
                 }}
-                disabled={!fits || parsedPowers.length === 0 || parsedSpeeds.length === 0}
+                disabled={!canEmit}
                 style={{
                   padding: '6px 14px',
                   background: fits ? 'rgba(0,212,255,0.1)' : '#333',
@@ -299,11 +333,12 @@ export function TestGridDialog(props: TestGridDialogProps) {
           <button
             type="button"
             onClick={() => {
+              if (!canEmit) return;
               const { gcode, bounds } = buildGridGcode();
               onGenerate(gcode, bounds);
               onClose();
             }}
-            disabled={!fits || parsedPowers.length === 0 || parsedSpeeds.length === 0}
+            disabled={!canEmit}
             style={{
               padding: '6px 14px',
               background: fits ? 'rgb(0,212,255)' : '#333',

@@ -1,6 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import { type Scene } from '../../core/scene/Scene';
-import { type SceneObject } from '../../core/scene/SceneObject';
+import { type SceneObject, type SubPath } from '../../core/scene/SceneObject';
 import { generateId } from '../../core/types';
 import { NumberInput } from './NumberInput';
 
@@ -14,6 +14,79 @@ interface KerfWizardProps {
 }
 
 type WizardStep = 'intro' | 'generate' | 'cut' | 'measure' | 'apply';
+
+interface KerfTestLayout {
+  startX: number;
+  startY: number;
+  labelY: number;
+  holeFrameSize: number;
+  footprintWidth: number;
+  footprintHeight: number;
+  holeInset: number;
+  holeCouponX: number;
+  fits: boolean;
+}
+
+function squareSubPath(x: number, y: number, size: number, clockwise = false): SubPath {
+  const points = clockwise
+    ? [
+        { x, y },
+        { x, y: y + size },
+        { x: x + size, y: y + size },
+        { x: x + size, y },
+      ]
+    : [
+        { x, y },
+        { x: x + size, y },
+        { x: x + size, y: y + size },
+        { x, y: y + size },
+      ];
+
+  return {
+    closed: true,
+    segments: [
+      { type: 'move', to: points[0]! },
+      { type: 'line', to: points[1]! },
+      { type: 'line', to: points[2]! },
+      { type: 'line', to: points[3]! },
+      { type: 'close' },
+    ],
+  };
+}
+
+function computeKerfTestLayout(scene: Scene, testSize: number): KerfTestLayout {
+  const material = scene.material && scene.material.enabled !== false ? scene.material : null;
+  const targetX = material?.x ?? 0;
+  const targetY = material?.y ?? 0;
+  const targetWidth = material?.width ?? scene.canvas.width;
+  const targetHeight = material?.height ?? scene.canvas.height;
+  const gap = testSize * 0.5;
+  const holeFrameSize = testSize * 1.5;
+  const footprintWidth = testSize + gap + holeFrameSize;
+  const footprintHeight = holeFrameSize;
+  const startX = targetX + (targetWidth - footprintWidth) / 2;
+  const startY = targetY + (targetHeight - footprintHeight) / 2;
+  const labelY = startY - 5;
+  const holeInset = (holeFrameSize - testSize) / 2;
+  const holeCouponX = startX + testSize + gap;
+  const fits =
+    startX >= targetX &&
+    labelY >= targetY &&
+    startX + footprintWidth <= targetX + targetWidth &&
+    startY + footprintHeight <= targetY + targetHeight;
+
+  return {
+    startX,
+    startY,
+    labelY,
+    holeFrameSize,
+    footprintWidth,
+    footprintHeight,
+    holeInset,
+    holeCouponX,
+    fits,
+  };
+}
 
 function btnStyle(active: boolean, color: string = '#00d4ff'): React.CSSProperties {
   const rgb =
@@ -58,16 +131,20 @@ export function KerfWizard({
     background: '#0a0a14', border: '1px solid #252540', borderRadius: 5,
     color: '#e0e0ec', fontSize: 12, outline: 'none', fontFamily: mono,
   };
+  const testLayout = computeKerfTestLayout(scene, testSize);
 
   const handleGenerateTest = useCallback(() => {
-    const uid = () => generateId();
+    if (!testLayout.fits) return;
 
-    const startX = scene.material
-      ? scene.material.x + (scene.material.width - testSize * 2.5) / 2
-      : (scene.canvas.width - testSize * 2.5) / 2;
-    const startY = scene.material
-      ? scene.material.y + (scene.material.height - testSize) / 2
-      : (scene.canvas.height - testSize) / 2;
+    const uid = () => generateId();
+    const {
+      startX,
+      startY,
+      labelY,
+      holeFrameSize,
+      holeInset,
+      holeCouponX,
+    } = testLayout;
 
     const layerId = scene.layers[0]?.id ?? '';
 
@@ -95,20 +172,19 @@ export function KerfWizard({
       },
       {
         id: uid(),
-        type: 'rect',
+        type: 'path',
         name: `Kerf Test Hole (${testSize}mm)`,
         visible: true,
         locked: false,
         layerId,
         parentId: null,
-        transform: { a: 1, b: 0, c: 0, d: 1, tx: startX + testSize * 1.5, ty: startY },
+        transform: { a: 1, b: 0, c: 0, d: 1, tx: holeCouponX, ty: startY },
         geometry: {
-          type: 'rect',
-          x: 0,
-          y: 0,
-          width: testSize,
-          height: testSize,
-          cornerRadius: 0,
+          type: 'path',
+          subPaths: [
+            squareSubPath(0, 0, holeFrameSize),
+            squareSubPath(holeInset, holeInset, testSize, true),
+          ],
         },
         powerScale: 1,
         _bounds: null,
@@ -122,7 +198,7 @@ export function KerfWizard({
         locked: false,
         layerId,
         parentId: null,
-        transform: { a: 1, b: 0, c: 0, d: 1, tx: startX, ty: startY - 5 },
+        transform: { a: 1, b: 0, c: 0, d: 1, tx: startX, ty: labelY },
         geometry: {
           type: 'text',
           text: `Kerf Test: ${testSize}mm squares — measure both after cutting`,
@@ -141,7 +217,7 @@ export function KerfWizard({
     setMeasuredOuter(testSize);
     setMeasuredInner(testSize);
     setStep('cut');
-  }, [scene, testSize, onGenerateTestPiece]);
+  }, [scene, testLayout, testSize, onGenerateTestPiece]);
 
   const handleCalculate = useCallback(() => {
     const outerDiff = testSize - measuredOuter;
@@ -153,6 +229,7 @@ export function KerfWizard({
   }, [testSize, measuredOuter, measuredInner]);
 
   const effectiveKerf = calculatedKerf ?? (savedKerf > 0 ? savedKerf : null);
+  const hasApplyTarget = selectedIds.size > 0;
 
   const handleApply = useCallback(() => {
     const k = calculatedKerf ?? (savedKerf > 0 ? savedKerf : null);
@@ -163,16 +240,15 @@ export function KerfWizard({
     } catch { /* ignore */ }
     setSavedKerf(k);
 
-    const ids = selectedIds.size > 0
-      ? Array.from(selectedIds)
-      : scene.objects.filter(o => o.visible && !o.locked).map(o => o.id);
+    if (selectedIds.size === 0) return;
+    const ids = Array.from(selectedIds);
 
     const halfKerf = k / 2;
     const offset = applyMode === 'outward' ? halfKerf : -halfKerf;
 
     onApplyKerf(offset, ids);
     onClose();
-  }, [calculatedKerf, savedKerf, applyMode, selectedIds, scene, onApplyKerf, onClose]);
+  }, [calculatedKerf, savedKerf, applyMode, selectedIds, onApplyKerf, onClose]);
 
   const handleSaveOnly = useCallback(() => {
     const k = calculatedKerf ?? (savedKerf > 0 ? savedKerf : null);
@@ -281,7 +357,7 @@ export function KerfWizard({
         step === 'generate' && React.createElement('div', null,
           React.createElement('h3', { style: { color: '#e0e0ec', fontSize: 14, marginBottom: 12 } }, 'Step 1: Generate test piece'),
           React.createElement('p', { style: { color: '#8888aa', fontSize: 12, marginBottom: 16, lineHeight: 1.6 } },
-            'We\'ll create two identical squares on your canvas. Cut them both from your target material. Then measure them with calipers.',
+            'We\'ll create a square and an inner-hole coupon on your canvas. Cut them both from your target material. Then measure them with calipers.',
           ),
 
           React.createElement('div', { style: { marginBottom: 16 } },
@@ -291,6 +367,19 @@ export function KerfWizard({
             ),
             React.createElement('div', { style: { fontSize: 9, color: '#555570', marginTop: 4 } }, 'Larger = more accurate measurement. 30mm is recommended.'),
           ),
+
+          !testLayout.fits && React.createElement('div', {
+            style: {
+              padding: '8px 10px',
+              marginBottom: 12,
+              borderRadius: 6,
+              border: '1px solid rgba(255,68,102,0.35)',
+              background: 'rgba(255,68,102,0.08)',
+              color: '#ff8899',
+              fontSize: 11,
+              lineHeight: 1.4,
+            },
+          }, `This kerf coupon does not fit inside the current material/bed at ${Math.ceil(testLayout.footprintWidth)}mm × ${Math.ceil(testLayout.footprintHeight + 5)}mm. Reduce the test size or use a larger workspace.`),
 
           React.createElement('svg', {
             width: 280, height: 100,
@@ -314,7 +403,8 @@ export function KerfWizard({
             React.createElement('button', {
               type: 'button',
               onClick: handleGenerateTest,
-              style: btnStyle(true),
+              disabled: !testLayout.fits,
+              style: { ...btnStyle(true), opacity: testLayout.fits ? 1 : 0.45, cursor: testLayout.fits ? 'pointer' : 'default' },
             }, 'Add to Canvas'),
           ),
         ),
@@ -341,7 +431,7 @@ export function KerfWizard({
             ...[
               'Close this dialog (or leave it open)',
               'Connect to your laser',
-              `Cut the two ${testSize}mm test squares`,
+              `Cut the ${testSize}mm square and the ${testSize}mm inner-hole coupon`,
               'Measure both pieces with calipers',
               'Come back here and click the button below',
             ].map((text, i) =>
@@ -489,7 +579,7 @@ export function KerfWizard({
           React.createElement('div', { style: { fontSize: 10, color: '#555570', marginBottom: 16 } },
             selectedIds.size > 0
               ? `Will apply to ${selectedIds.size} selected object${selectedIds.size !== 1 ? 's' : ''}`
-              : 'Will apply to all visible objects (select specific objects to limit scope)',
+              : 'Select one or more objects before applying kerf compensation. Use Save Kerf Only to store this value without editing the design.',
           ),
 
           React.createElement('div', { style: { display: 'flex', gap: 8 } },
@@ -502,8 +592,12 @@ export function KerfWizard({
             React.createElement('button', {
               type: 'button',
               onClick: handleApply,
-              disabled: !effectiveKerf || effectiveKerf <= 0,
-              style: { ...btnStyle(true, '#2dd4a0'), opacity: !effectiveKerf || effectiveKerf <= 0 ? 0.45 : 1, cursor: !effectiveKerf || effectiveKerf <= 0 ? 'default' : 'pointer' },
+              disabled: !effectiveKerf || effectiveKerf <= 0 || !hasApplyTarget,
+              style: {
+                ...btnStyle(true, '#2dd4a0'),
+                opacity: !effectiveKerf || effectiveKerf <= 0 || !hasApplyTarget ? 0.45 : 1,
+                cursor: !effectiveKerf || effectiveKerf <= 0 || !hasApplyTarget ? 'default' : 'pointer',
+              },
             }, 'Save & Apply to Design'),
           ),
         ),
