@@ -15,6 +15,36 @@ interface VariableTextDialogProps {
   onClose: () => void;
 }
 
+function translateTransformInLocalGrid(
+  transform: SceneObject['transform'],
+  localX: number,
+  localY: number,
+): SceneObject['transform'] {
+  return {
+    ...transform,
+    tx: transform.tx + transform.a * localX + transform.c * localY,
+    ty: transform.ty + transform.b * localX + transform.d * localY,
+  };
+}
+
+function formatVariableText(
+  baseText: string,
+  num: number,
+  prefix: string,
+  suffix: string,
+  zeroPad: number,
+): string {
+  const numStr = zeroPad > 0 ? String(num).padStart(zeroPad, '0') : String(num);
+  return baseText.includes('{n}')
+    ? baseText.replace(/\{n\}/gi, `${prefix}${numStr}${suffix}`)
+    : `${baseText} ${prefix}${numStr}${suffix}`;
+}
+
+function estimateVariableTextCellWidth(texts: readonly string[], fontSize: number): number {
+  const longest = texts.reduce((max, text) => Math.max(max, text.length), 3);
+  return fontSize * longest * 0.6;
+}
+
 export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }: VariableTextDialogProps) {
   const [startNumber, setStartNumber] = useState(1);
   const [endNumber, setEndNumber] = useState(10);
@@ -44,11 +74,7 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
   const previewItems = useMemo(() => {
     const items: string[] = [];
     for (let i = startNumber; i <= Math.min(endNumber, startNumber + 5); i++) {
-      const numStr = zeroPad > 0 ? String(i).padStart(zeroPad, '0') : String(i);
-      const text = baseText.includes('{n}')
-        ? baseText.replace(/\{n\}/gi, `${prefix}${numStr}${suffix}`)
-        : `${baseText} ${prefix}${numStr}${suffix}`;
-      items.push(text);
+      items.push(formatVariableText(baseText, i, prefix, suffix, zeroPad));
     }
     if (endNumber - startNumber > 5) items.push('...');
     return items;
@@ -167,18 +193,19 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
         React.createElement('button', {
           onClick: () => {
             const objects: SceneObject[] = [];
-            const baseX = sourceObject.transform.tx;
-            const baseY = sourceObject.transform.ty;
-            const itemWidth = geom.fontSize * Math.max(baseText.length, 3) * 0.6 + spacingX;
+            const generatedTexts: string[] = [];
+            for (let num = startNumber; num <= endNumber; num++) {
+              generatedTexts.push(formatVariableText(baseText, num, prefix, suffix, zeroPad));
+            }
+            const itemWidth = estimateVariableTextCellWidth(generatedTexts, geom.fontSize) + spacingX;
             const itemHeight = geom.fontSize * 1.3 + spacingY;
 
             for (let num = startNumber, idx = 0; num <= endNumber; num++, idx++) {
               const col = idx % cols;
               const row = Math.floor(idx / cols);
-              const numStr = zeroPad > 0 ? String(num).padStart(zeroPad, '0') : String(num);
-              const text = baseText.includes('{n}')
-                ? baseText.replace(/\{n\}/gi, `${prefix}${numStr}${suffix}`)
-                : `${baseText} ${prefix}${numStr}${suffix}`;
+              const localX = col * itemWidth;
+              const localY = row * itemHeight;
+              const text = generatedTexts[idx] ?? formatVariableText(baseText, num, prefix, suffix, zeroPad);
 
               objects.push({
                 id: generateId(),
@@ -186,7 +213,7 @@ export function VariableTextDialog({ scene, sourceObject, onGenerate, onClose }:
                 name: text.length > 20 ? text.slice(0, 20) + '...' : text,
                 layerId: sourceObject.layerId,
                 parentId: null,
-                transform: { a: sourceObject.transform.a, b: 0, c: 0, d: sourceObject.transform.d, tx: baseX + col * itemWidth, ty: baseY + row * itemHeight },
+                transform: translateTransformInLocalGrid(sourceObject.transform, localX, localY),
                 geometry: {
                   type: 'text',
                   text,

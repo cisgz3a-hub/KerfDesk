@@ -641,8 +641,8 @@ export function App(): React.ReactElement {
   const setTextPlacementHint = useAppDialogsStore(s => s.setTextPlacementHint);
   const textPlacementPt = useAppDialogsStore(s => s.textPlacementPt);
   const setTextPlacementPt = useAppDialogsStore(s => s.setTextPlacementPt);
-  const textPreviewFontReady = useAppDialogsStore(s => s.textPreviewFontReady);
-  const setTextPreviewFontReady = useAppDialogsStore(s => s.setTextPreviewFontReady);
+  const textPreviewFontStatus = useAppDialogsStore(s => s.textPreviewFontStatus);
+  const setTextPreviewFontStatus = useAppDialogsStore(s => s.setTextPreviewFontStatus);
   const lastCalibrationGridResult = useAppDialogsStore(s => s.lastCalibrationGridResult);
   const setLastCalibrationGridResult = useAppDialogsStore(s => s.setLastCalibrationGridResult);
 
@@ -663,18 +663,18 @@ export function App(): React.ReactElement {
     });
     if (!request) return;
     if (typeof document === 'undefined' || !document.fonts?.load) {
-      setTextPreviewFontReady(true);
+      setTextPreviewFontStatus('ready');
       return;
     }
 
     let cancelled = false;
-    setTextPreviewFontReady(false);
+    setTextPreviewFontStatus('loading');
     void document.fonts.load(request.fontSpec, request.sample)
       .then(() => {
-        if (!cancelled) setTextPreviewFontReady(true);
+        if (!cancelled) setTextPreviewFontStatus('ready');
       })
       .catch(() => {
-        if (!cancelled) setTextPreviewFontReady(true);
+        if (!cancelled) setTextPreviewFontStatus('failed');
       });
 
     return () => {
@@ -687,7 +687,7 @@ export function App(): React.ReactElement {
     dialogs.textInput,
     dialogs.textItalic,
     dialogs.textSize,
-    setTextPreviewFontReady,
+    setTextPreviewFontStatus,
   ]);
 
   const handleTextPlaced = useCallback(() => {
@@ -1860,7 +1860,7 @@ export function App(): React.ReactElement {
         textBold: dialogs.textBold,
         textItalic: dialogs.textItalic,
         textOperationMode: dialogs.textOperationMode,
-        textPreviewFontReady,
+        textPreviewFontStatus,
         setTextInput: dialogs.setTextInput,
         setTextFont: dialogs.setTextFont,
         setTextSize: dialogs.setTextSize,

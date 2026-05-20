@@ -67,6 +67,14 @@ assert(
   'App no longer carries preview sample fallback inline',
 );
 assert(
+  appSource.includes("setTextPreviewFontStatus('failed')"),
+  'App records rejected document.fonts.load as failed instead of ready',
+);
+assert(
+  !appSource.includes("catch(() => {\n        if (!cancelled) setTextPreviewFontStatus('ready');"),
+  'App must not hide rejected font loads as ready',
+);
+assert(
   helperSource.includes('T2-6 Phase 3aj'),
   'appTextPreviewFontHelpers carries the T2-6 Phase 3aj marker',
 );

@@ -40,7 +40,7 @@ function assert(condition: unknown, message: string): void {
   assert(state.isDragOver === false, 'drag-over starts off');
   assert(state.textPlacementHint === null, 'text placement hint starts empty');
   assert(state.textPlacementPt === null, 'text placement point starts empty');
-  assert(state.textPreviewFontReady === true, 'text preview font starts ready');
+  assert(state.textPreviewFontStatus === 'ready', 'text preview font starts ready');
   assert(state.showVariableText === false, 'variable text starts closed');
   assert(state.variableTextSource === null, 'variable text source starts empty');
   assert(state.showConnection === false, 'connection starts closed');
@@ -205,7 +205,7 @@ function assert(condition: unknown, message: string): void {
   store.getState().setIsDragOver(true);
   store.getState().setTextPlacementHint('Place text');
   store.getState().setTextPlacementPt({ x: 7, y: 8 });
-  store.getState().setTextPreviewFontReady(false);
+  store.getState().setTextPreviewFontStatus('loading');
   store.getState().setShowVariableText(true);
   store.getState().setVariableTextSource({ id: 'txt-1', type: 'text' } as never);
   store.getState().setShowConnection(true);
@@ -241,7 +241,7 @@ function assert(condition: unknown, message: string): void {
   assert(state.isDragOver === true, 'drag-over toggles on');
   assert(state.textPlacementHint === 'Place text', 'text placement hint updates');
   assert(state.textPlacementPt?.x === 7 && state.textPlacementPt.y === 8, 'text placement point updates');
-  assert(state.textPreviewFontReady === false, 'text preview font ready updates');
+  assert(state.textPreviewFontStatus === 'loading', 'text preview font status updates');
   assert(state.showVariableText === true, 'variable text opens');
   assert(state.variableTextSource?.id === 'txt-1', 'variable text source stored');
   assert(state.showConnection === true, 'connection opens');
@@ -271,7 +271,7 @@ function assert(condition: unknown, message: string): void {
   assert(reset.isDragOver === false, 'drag-over resets off');
   assert(reset.textPlacementHint === null, 'text placement hint resets empty');
   assert(reset.textPlacementPt === null, 'text placement point resets empty');
-  assert(reset.textPreviewFontReady === true, 'text preview font ready resets on');
+  assert(reset.textPreviewFontStatus === 'ready', 'text preview font status resets ready');
   assert(reset.showVariableText === false, 'variable text resets closed');
   assert(reset.variableTextSource === null, 'variable text source resets empty');
   assert(reset.showConnection === false, 'connection resets closed');

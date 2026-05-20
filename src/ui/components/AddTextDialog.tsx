@@ -12,7 +12,7 @@ export interface AddTextDialogProps {
   textBold: boolean;
   textItalic: boolean;
   textOperationMode: TextOperationMode;
-  textPreviewFontReady: boolean;
+  textPreviewFontStatus: 'ready' | 'loading' | 'failed';
 
   setTextInput: (v: string) => void;
   setTextFont: (v: string) => void;
@@ -37,7 +37,7 @@ export function AddTextDialog(props: AddTextDialogProps) {
     textBold,
     textItalic,
     textOperationMode,
-    textPreviewFontReady,
+    textPreviewFontStatus,
     setTextInput,
     setTextFont,
     setTextSize,
@@ -56,6 +56,14 @@ export function AddTextDialog(props: AddTextDialogProps) {
     : textOperationMode === 'engrave'
       ? 'Add Engrave Text'
       : 'Add Cut Text';
+  const textPreviewFontReady = textPreviewFontStatus === 'ready';
+  const textPreviewFontFailed = textPreviewFontStatus === 'failed';
+  const canSubmit = Boolean(textInput.trim()) && textPreviewFontReady;
+  const previewText = textPreviewFontReady
+    ? (textInput || 'Preview')
+    : textPreviewFontFailed
+      ? 'Preview unavailable'
+      : 'Loading preview...';
 
   const renderOperationButton = (mode: TextOperationMode, label: string) => {
     const selected = textOperationMode === mode;
@@ -223,20 +231,34 @@ export function AddTextDialog(props: AddTextDialogProps) {
             opacity: textPreviewFontReady ? 1 : 0.2,
             transition: 'opacity 120ms ease',
           },
-        }, textPreviewFontReady ? (textInput || 'Preview') : 'Loading preview...'),
+        }, previewText),
       ),
+      textPreviewFontFailed && React.createElement('div', {
+        'data-testid': 'text-font-load-warning',
+        style: {
+          margin: '0 18px 12px',
+          padding: '9px 10px',
+          border: '1px solid rgba(255,107,107,0.5)',
+          borderRadius: 8,
+          background: 'rgba(255,107,107,0.08)',
+          color: '#ffb4b4',
+          fontSize: 11,
+          lineHeight: 1.4,
+        },
+      }, `The selected font "${textFont}" did not load. Choose another font before adding this text.`),
 
       React.createElement('div', { style: { padding: '0 18px 16px' } },
         React.createElement('button', {
           type: 'button',
+          'data-testid': 'text-dialog-submit',
           onClick: onSubmit,
-          disabled: !textInput.trim(),
+          disabled: !canSubmit,
           style: {
             width: '100%', padding: '10px',
-            background: textInput.trim() ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
-            border: textInput.trim() ? '1px solid #2dd4a0' : '1px solid #252540',
-            borderRadius: 8, color: textInput.trim() ? '#2dd4a0' : '#333355',
-            fontSize: 13, fontWeight: 600, cursor: textInput.trim() ? 'pointer' : 'default',
+            background: canSubmit ? 'rgba(45,212,160,0.1)' : '#1a1a2e',
+            border: canSubmit ? '1px solid #2dd4a0' : '1px solid #252540',
+            borderRadius: 8, color: canSubmit ? '#2dd4a0' : '#333355',
+            fontSize: 13, fontWeight: 600, cursor: canSubmit ? 'pointer' : 'default',
             fontFamily: "'DM Sans', system-ui, sans-serif",
           },
         }, submitLabel),

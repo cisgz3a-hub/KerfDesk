@@ -3,11 +3,14 @@
  */
 
 import type { TextGeometry } from '../core/scene/SceneObject';
-
-function pctOrDefault(v: unknown, fallback: number): number {
-  const n = typeof v === 'number' ? v : Number(v);
-  return Number.isFinite(n) ? n : fallback;
-}
+import {
+  layoutTextGeometry,
+  measureTextLayoutLineWidth,
+  splitTextGeometryLines,
+  textLetterSpacing,
+  textLineSpacing,
+  textWordSpacingExtra,
+} from './textLayout';
 
 /** Some browsers apply CSS `letterSpacing` on 2D context — reset so our manual spacing is exact. */
 function resetCanvasLetterSpacing(ctx: CanvasRenderingContext2D): void {
@@ -29,40 +32,22 @@ export function applyTextGeometryFont(ctx: CanvasRenderingContext2D, g: TextGeom
   return fontSize;
 }
 
-function letterSpacingPx(g: TextGeometry, fontSize: number): number {
-  return (pctOrDefault(g.letterSpacing, 0) / 100) * fontSize;
-}
-
-function lineSpacingPx(g: TextGeometry, fontSize: number): number {
-  return (pctOrDefault(g.lineSpacing, 120) / 100) * fontSize;
-}
-
-function wordSpacingExtraPx(g: TextGeometry, fontSize: number): number {
-  return ((pctOrDefault(g.wordSpacing, 100) - 100) / 100) * fontSize * 0.3;
-}
-
 /** Pixel width of one line including letter and word spacing. */
 export function measureTextLineWidth(ctx: CanvasRenderingContext2D, g: TextGeometry, line: string): number {
   const fontSize = applyTextGeometryFont(ctx, g);
-  const ls = letterSpacingPx(g, fontSize);
-  const ws = wordSpacingExtraPx(g, fontSize);
+  const ls = textLetterSpacing(g, fontSize);
+  const ws = textWordSpacingExtra(g, fontSize);
   if (Math.abs(ls) < 1e-9 && Math.abs(ws) < 1e-9) {
     return ctx.measureText(line).width;
   }
-  let x = 0;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    x += ctx.measureText(ch).width + ls;
-    if (ch === ' ') x += ws;
-  }
-  return line.length === 0 ? 0 : x - ls;
+  return measureTextLayoutLineWidth({ ...g, text: line }, ch => ctx.measureText(ch).width);
 }
 
 /** Local-space width and height of the full text block. */
 export function measureTextGeometrySize(ctx: CanvasRenderingContext2D, g: TextGeometry): { width: number; height: number } {
   const fontSize = applyTextGeometryFont(ctx, g);
-  const lsp = lineSpacingPx(g, fontSize);
-  const lines = (g.text ?? '').split('\n');
+  const lsp = textLineSpacing(g, fontSize);
+  const lines = splitTextGeometryLines(g);
   let maxW = 0;
   for (const line of lines) maxW = Math.max(maxW, measureTextLineWidth(ctx, g, line));
   const height = lines.length === 0 ? fontSize * 1.25 : (lines.length - 1) * lsp + fontSize * 1.25;
@@ -80,26 +65,17 @@ export function fillTextGeometry(
   oy = 0,
 ): { width: number; height: number } {
   const fontSize = applyTextGeometryFont(ctx, g);
-  const ls = letterSpacingPx(g, fontSize);
-  const lsp = lineSpacingPx(g, fontSize);
-  const ws = wordSpacingExtraPx(g, fontSize);
-  const lines = (g.text ?? '').split('\n');
-  const align = g.textAlign || 'left';
-
-  let blockW = 0;
-  for (const line of lines) blockW = Math.max(blockW, measureTextLineWidth(ctx, g, line));
+  const ls = textLetterSpacing(g, fontSize);
+  const ws = textWordSpacingExtra(g, fontSize);
+  const layout = layoutTextGeometry(g, ch => ctx.measureText(ch).width);
 
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
 
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx];
-    const lineW = measureTextLineWidth(ctx, g, line);
-    const y = oy + lineIdx * lsp;
-    let startX = ox;
-    if (align === 'center') startX = ox + (blockW - lineW) / 2;
-    else if (align === 'right') startX = ox + blockW - lineW;
-
+  for (const layoutLine of layout.lines) {
+    const line = layoutLine.text;
+    const y = oy + layoutLine.y;
+    const startX = ox + layoutLine.x;
     if (Math.abs(ls) < 1e-9 && Math.abs(ws) < 1e-9) {
       ctx.fillText(line, startX, y);
     } else {
@@ -113,6 +89,5 @@ export function fillTextGeometry(
     }
   }
 
-  const height = lines.length === 0 ? fontSize * 1.25 : (lines.length - 1) * lsp + fontSize * 1.25;
-  return { width: blockW, height };
+  return { width: layout.blockWidth, height: layout.blockHeight };
 }

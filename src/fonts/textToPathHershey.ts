@@ -1,4 +1,5 @@
 import type { PathSegment, SubPath, TextGeometry } from '../core/scene/SceneObject';
+import { layoutTextGeometry } from '../geometry/textLayout';
 import hersheyData from './data/hersheytext.min.json';
 
 const HERSHEY_CAP_HEIGHT = 21;
@@ -55,14 +56,13 @@ export function textToPathHershey(
   }
 
   const subPaths: SubPath[] = [];
-  let cursorX = 0;
-  const baselineY = 0;
+  const layout = layoutTextGeometry(geometry, ch => {
+    const glyph = getHersheyGlyph(fontData, ch) ?? getHersheyGlyph(fontData, '?');
+    return (glyph?.width ?? HERSHEY_CAP_HEIGHT) * scale;
+  });
 
-  for (const ch of text) {
-    if (ch === '\n') {
-      cursorX = 0;
-      continue;
-    }
+  for (const layoutGlyph of layout.glyphs) {
+    const ch = layoutGlyph.ch;
     const glyph = getHersheyGlyph(fontData, ch) ?? getHersheyGlyph(fontData, '?');
     if (!glyph || !glyph.d) continue;
 
@@ -74,8 +74,8 @@ export function textToPathHershey(
           return {
             ...seg,
             to: {
-              x: cursorX + seg.to.x * scale,
-              y: baselineY + seg.to.y * scale,
+              x: layoutGlyph.x + seg.to.x * scale,
+              y: layoutGlyph.y + seg.to.y * scale,
             },
           } as PathSegment;
         }),
@@ -83,8 +83,6 @@ export function textToPathHershey(
       };
       subPaths.push(translated);
     }
-
-    cursorX += (glyph.width ?? HERSHEY_CAP_HEIGHT) * scale;
   }
 
   return subPaths;

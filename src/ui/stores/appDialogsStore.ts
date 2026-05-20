@@ -11,6 +11,7 @@ export type { SettingsTab };
 export type BooleanSetterValue = boolean | ((current: boolean) => boolean);
 export type CanvasPoint = { x: number; y: number };
 export type ToastSuggestionState = { suggestion: MaterialSuggestion; materialName: string };
+export type TextPreviewFontStatus = 'ready' | 'loading' | 'failed';
 
 // T2-6: first Zustand boundary for App.tsx UI shell state. Keep this store
 // limited to dialogs, transient prompts, and small modal handoff payloads.
@@ -43,7 +44,7 @@ export interface AppDialogsState {
   isDragOver: boolean;
   textPlacementHint: string | null;
   textPlacementPt: CanvasPoint | null;
-  textPreviewFontReady: boolean;
+  textPreviewFontStatus: TextPreviewFontStatus;
   showVariableText: boolean;
   variableTextSource: SceneObject | null;
   showConnection: boolean;
@@ -92,7 +93,7 @@ export interface AppDialogsActions {
   setIsDragOver: (show: BooleanSetterValue) => void;
   setTextPlacementHint: (hint: string | null) => void;
   setTextPlacementPt: (point: CanvasPoint | null) => void;
-  setTextPreviewFontReady: (ready: boolean) => void;
+  setTextPreviewFontStatus: (status: TextPreviewFontStatus) => void;
   setShowVariableText: (show: BooleanSetterValue) => void;
   setVariableTextSource: (source: SceneObject | null) => void;
   setShowConnection: (show: BooleanSetterValue) => void;
@@ -141,7 +142,7 @@ export const appDialogsInitialState: AppDialogsState = {
   isDragOver: false,
   textPlacementHint: null,
   textPlacementPt: null,
-  textPreviewFontReady: true,
+  textPreviewFontStatus: 'ready',
   showVariableText: false,
   variableTextSource: null,
   showConnection: false,
@@ -260,7 +261,7 @@ export function createAppDialogsStore(
     setIsDragOver: (show) => set(state => ({ isDragOver: resolveBoolean(show, state.isDragOver) })),
     setTextPlacementHint: (hint) => set({ textPlacementHint: hint }),
     setTextPlacementPt: (point) => set({ textPlacementPt: point }),
-    setTextPreviewFontReady: (ready) => set({ textPreviewFontReady: ready }),
+    setTextPreviewFontStatus: (status) => set({ textPreviewFontStatus: status }),
     setShowVariableText: (show) => set(state => ({ showVariableText: resolveBoolean(show, state.showVariableText) })),
     setVariableTextSource: (source) => set({ variableTextSource: source }),
     setShowConnection: (show) => set(state => ({ showConnection: resolveBoolean(show, state.showConnection) })),
