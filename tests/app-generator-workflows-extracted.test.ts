@@ -22,6 +22,14 @@ assert(
   'App.tsx should not compute grid-array launch bounds directly',
 );
 assert(
+  !appSource.includes('openGridArray: () => setShowGridArray(true)'),
+  'App context menu must not bypass grid-array bounds computation',
+);
+assert(
+  appSource.includes('openGridArray: handleGridArray'),
+  'App context menu should route Grid Array through handleGridArray',
+);
+assert(
   hookSource.includes('useGeneratorHandlers'),
   'useAppGeneratorWorkflows should compose the generator handlers',
 );
