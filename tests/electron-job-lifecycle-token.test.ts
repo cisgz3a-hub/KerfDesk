@@ -72,6 +72,23 @@ async function main(): Promise<void> {
     );
   });
 
+  await test('active-job wake lock prevents display sleep, not only app suspension', () => {
+    const acquireWakeLockHandler = mainSource.match(
+      /ipcMain\.handle\('power:acquireJobWakeLock'[\s\S]*?\n\}\);/,
+    )?.[0];
+    assert.ok(acquireWakeLockHandler, 'main registers active-job wake-lock acquire IPC');
+    assert.match(
+      acquireWakeLockHandler,
+      /powerSaveBlocker\.start\('prevent-display-sleep'\)/,
+      'active jobs use Electron display-sleep blocker so screen timeout cannot stop streaming',
+    );
+    assert.doesNotMatch(
+      acquireWakeLockHandler,
+      /powerSaveBlocker\.start\('prevent-app-suspension'\)/,
+      'active jobs must not use the weaker app-suspension-only blocker',
+    );
+  });
+
   await test('preload and renderer types expose lifecycle token acquire/release', () => {
     assert.match(preloadSource, /acquireJobLifecycleToken: \(ticketId: string\) =>[\s\S]*job-lifecycle:acquire/, 'preload exposes lifecycle acquire');
     assert.match(preloadSource, /releaseJobLifecycleToken: \(token: string\) =>[\s\S]*job-lifecycle:release/, 'preload exposes lifecycle release');

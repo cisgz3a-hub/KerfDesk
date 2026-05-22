@@ -594,16 +594,15 @@ for (const namespace of STORAGE_NAMESPACES) {
 // allow-list of key prefixes per scope).
 
 // ─── WAKE LOCK ───────────────────────────────────────────────────
-// Held during active jobs so Windows doesn't suspend USB,
-// Chromium doesn't throttle our renderer, and the OS doesn't
-// sleep. Released on all job-end paths.
+// Held during active jobs so display timeout cannot suspend the renderer,
+// USB stream, or operator-visible job state mid-burn. Released on all job-end paths.
 
 ipcMain.handle('power:acquireJobWakeLock', (event) => {
   assertTrustedSender(event);
   if (jobWakeLockId !== null && powerSaveBlocker.isStarted(jobWakeLockId)) {
     return jobWakeLockId;
   }
-  jobWakeLockId = powerSaveBlocker.start('prevent-app-suspension');
+  jobWakeLockId = powerSaveBlocker.start('prevent-display-sleep');
   return jobWakeLockId;
 });
 
