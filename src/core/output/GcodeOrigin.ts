@@ -31,6 +31,13 @@ export interface GcodeGenerateOptions {
    * Defaults to true.
    */
   hardOffZeroPowerLinearMoves?: boolean;
+  /**
+   * When true, rapid XY moves emitted while a laser modal command is armed
+   * are bracketed as `M5 S0` -> `G0 ...` -> `M3/M4 S0`. This avoids relying
+   * on GRBL $32 laser mode as the only protection against travel burns.
+   * Defaults to true.
+   */
+  hardOffRapidMoves?: boolean;
   /** Machine-space XY to rapid to before M2; omit or null to skip the return move. */
   returnPosition?: { x: number; y: number } | null;
   /** From device profile: lines appended after the standard header (G21/G90/laser off). */

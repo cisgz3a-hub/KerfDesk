@@ -637,18 +637,19 @@ function planPath(
 /**
  * Convert a fill operation's boundary paths into scanline moves.
  *
- * Uses continuous motion across each scanline row with inline S-value
- * toggling instead of per-segment M4/M5 cycling. This matches the
- * GRBL laser mode spec and LightBurn's approach:
+ * Uses inline S-value toggling across each scanline row instead of
+ * per-burn-segment M4/M5 cycling. The output encoder may still hard-off
+ * bracket travel moves as defense-in-depth for controllers whose $32 laser
+ * mode is missing, stale, or misreported.
  *
- *   - M4 S0 set ONCE at the start (dynamic laser mode, initially off)
+ *   - M4 S0 planned ONCE at the start (dynamic laser mode, initially off)
  *   - Per row: rapid to overscan start → G1 S0 approach → G1 S{power}
  *     burn → G1 S0 gap → G1 S{power} burn → ... → G1 S0 exit
- *   - M5 S0 ONCE at the end
+ *   - M5 S0 planned ONCE at the end
  *
- * Per GRBL docs, M4 does NOT stop for inline S changes — the machine
- * maintains constant velocity. This eliminates the acceleration/power
- * loss that occurred with per-segment M4/M5 cycling.
+ * Per GRBL docs, M4 does NOT stop for inline S changes in laser mode. The
+ * planner keeps that compact modal representation; the encoder owns the
+ * final machine-safety guardrails around emitted travel.
  *
  * Overscanning extends the MOTION (laser off) beyond the actual shape
  * boundary, giving the machine room to accelerate before the laser
@@ -864,9 +865,9 @@ export function* iterateRasterOperationMoves(
 
     if (!sawScanline) {
       sawScanline = true;
-      // T1-31: single M4 covers the whole raster operation. M4 dynamic
-      // power mode means the laser auto-cuts during G0 between scanlines
-      // and follows S inline during G1.
+      // T1-31: single planned M4 covers the whole raster operation.
+      // The encoder hard-off brackets emitted G0 while laser modal
+      // state is armed, so this plan no longer relies on $32 alone.
       yield { type: 'laserOn', power: 0 };
     }
 

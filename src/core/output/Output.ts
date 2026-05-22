@@ -406,6 +406,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         prevPos: { x: state.prevPos.x, y: state.prevPos.y },
         prevZ: state.prevZ,
         currentSpeed: state.currentSpeed,
+        laserModalArmed: state.laserModalArmed,
       };
       const previewFooter = this.encodeFooterWithState(job, options, emittedLines + 1, state);
       const footerLineCount = previewFooter.length > 0 ? previewFooter.split(/\r?\n/).length : 0;
@@ -416,6 +417,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       state.prevPos = { x: stateSnapshot.prevPos.x, y: stateSnapshot.prevPos.y };
       state.prevZ = stateSnapshot.prevZ;
       state.currentSpeed = stateSnapshot.currentSpeed;
+      state.laserModalArmed = stateSnapshot.laserModalArmed;
       const footer = this.encodeFooterWithState(job, options, totalLines, state);
       const footerLines = footer.split(/\r?\n/);
       for (let i = 0; i < footerLines.length; i++) {
@@ -454,12 +456,14 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
     return {
       currentSpeed: 0,
       hardOffZeroPowerLinearMoves: options?.hardOffZeroPowerLinearMoves ?? true,
+      hardOffRapidMoves: options?.hardOffRapidMoves ?? true,
       maxSpindle: options?.maxSpindle ?? 1000,
       grblLaserPowerMode: options?.grblLaserPowerMode ?? 'dynamic-m4',
       airAssistCommand: options?.airAssistCommand ?? 'M8',
       prevPos: { x: 0, y: 0 },
       relative: options?.startMode === 'current',
       prevZ: 0,
+      laserModalArmed: false,
     };
   }
 
@@ -677,20 +681,36 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
   private encodeRapidWithState(to: { x: number; y: number }, state: GcodeEncoderState): string {
     const eps = BaseGCodeStrategy._posEps;
+    let travelLine: string;
     if (!state.relative) {
       state.prevPos = { x: to.x, y: to.y };
-      return `G0 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`;
+      travelLine = `G0 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`;
+    } else {
+      const dx = to.x - state.prevPos.x;
+      const dy = to.y - state.prevPos.y;
+      state.prevPos = { x: to.x, y: to.y };
+      if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
+        return '; G0 skipped (no motion)';
+      }
+      const parts: string[] = ['G0'];
+      if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
+      if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
+      travelLine = parts.join(' ');
     }
-    const dx = to.x - state.prevPos.x;
-    const dy = to.y - state.prevPos.y;
-    state.prevPos = { x: to.x, y: to.y };
-    if (Math.abs(dx) < eps && Math.abs(dy) < eps) {
-      return '; G0 skipped (no motion)';
+
+    if (!state.hardOffRapidMoves || !state.laserModalArmed) {
+      return travelLine;
     }
-    const parts: string[] = ['G0'];
-    if (Math.abs(dx) >= eps) parts.push(`X${dx.toFixed(3)}`);
-    if (Math.abs(dy) >= eps) parts.push(`Y${dy.toFixed(3)}`);
-    return parts.join(' ');
+
+    // Defense-in-depth for real machines: GRBL $32=1 should suppress laser
+    // output during G0, but a stale or wrong firmware setting can turn
+    // modal M3/M4 rapids into visible travel burns.
+    state.laserModalArmed = true;
+    return [
+      this.encodeLaserOff(),
+      travelLine,
+      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle, state.grblLaserPowerMode),
+    ].join('\n');
   }
 
   private encodeLinearWithState(
@@ -767,6 +787,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       travelLine = parts.join(' ');
     }
 
+    state.laserModalArmed = true;
     return [
       this.encodeLaserOff(),
       travelLine,
@@ -775,6 +796,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
   }
 
   private encodeLaserOnWithState(power: number, state: GcodeEncoderState): string {
+    state.laserModalArmed = true;
     return this.encodeLaserOnForMaxSpindle(power, state.maxSpindle, state.grblLaserPowerMode);
   }
 
@@ -828,6 +850,7 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 
     const safetyFooter: string[] = [];
     safetyFooter.push(`${this.encodeLaserOff()} ; T2-14 safety baseline: laser off at end`);
+    state.laserModalArmed = false;
     if (state.relative) {
       const backX = -state.prevPos.x;
       const backY = -state.prevPos.y;
@@ -856,7 +879,9 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       case 'rapid':    return this.encodeRapidWithState(move.to, state);
       case 'linear':   return this.encodeLinearWithState(move.to, move.power, move.speed, state);
       case 'laserOn':  return this.encodeLaserOnWithState(move.power, state);
-      case 'laserOff': return this.encodeLaserOff();
+      case 'laserOff':
+        state.laserModalArmed = false;
+        return this.encodeLaserOff();
       case 'dwell':    return this.encodeDwell(move.ms);
       case 'setAir':   return this.encodeAirAssistForCommand(move.on, state.airAssistCommand);
       case 'setZ':     return this.encodeZMoveWithState(move.z, state);
@@ -869,12 +894,14 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
 interface GcodeEncoderState {
   currentSpeed: number;
   hardOffZeroPowerLinearMoves: boolean;
+  hardOffRapidMoves: boolean;
   maxSpindle: number;
   grblLaserPowerMode: GrblLaserPowerMode;
   airAssistCommand: AirAssistCommand;
   prevPos: { x: number; y: number };
   relative: boolean;
   prevZ: number;
+  laserModalArmed: boolean;
 }
 
 function validateTemplatesBeforeEmission(

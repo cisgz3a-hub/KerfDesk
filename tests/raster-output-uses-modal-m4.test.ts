@@ -1,9 +1,9 @@
 /**
  * T1-31: raster operation emits ONE M4 (laserOn) at the start of the
- * operation and ONE M5 (laserOff) at the end — not per segment. Burn
+ * operation and ONE M5 (laserOff) at the end at the plan layer. Burn
  * segments within a scanline are stitched together with power=0 linear
- * moves bridging the gaps; rapids between scanlines rely on M4
- * dynamic-power mode auto-extinguishing the laser during G0.
+ * moves bridging the gaps; the output encoder owns the final hard-off
+ * bracketing around emitted G0 travel.
  *
  * Run: npx tsx tests/raster-output-uses-modal-m4.test.ts
  */
@@ -214,8 +214,8 @@ void (async () => {
     const here = path.dirname(url.fileURLToPath(import.meta.url));
     const src = fs.readFileSync(path.resolve(here, '../src/core/plan/PlanOptimizer.ts'), 'utf-8');
     assert(/T1-31/.test(src), 'T1-31 marker in PlanOptimizer.ts');
-    assert(/single M4 covers the whole raster operation/.test(src),
-      'PlanOptimizer comment documents single-M4 modal scope');
+    assert(/single planned M4 covers the whole raster operation/.test(src),
+      'PlanOptimizer comment documents single planned-M4 modal scope');
     // Pre-T1-31 emitted laserOff + laserOn pairs inside the per-segment
     // loop. The new move iterator emits each only once, outside the
     // scanline segment loop.
