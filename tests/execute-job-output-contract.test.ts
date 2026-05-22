@@ -159,6 +159,51 @@ async function run(): Promise<void> {
 
   {
     const { ctrl, port } = await connectedController();
+    const totalLines = 5_000;
+    let producedBeforeFirstDeviceWrite = 0;
+    let terminalChunkBeforeFirstDeviceWrite = false;
+    const spool: SpoolHandle = {
+      id: 'ticket_t2_27_bounded_first_send',
+      contentHash: 'bounded-first-send',
+      lineCount: totalLines,
+      byteCount: totalLines * 10,
+      usesM4: false,
+      open: () => (async function* (): AsyncGenerator<GcodeChunk> {
+        for (let i = 0; i < totalLines; i++) {
+          const hasWrittenJobLine = port.received.some(line => /^G0 X/.test(line));
+          if (!hasWrittenJobLine) producedBeforeFirstDeviceWrite = i + 1;
+          if (i === totalLines - 1 && !hasWrittenJobLine) {
+            terminalChunkBeforeFirstDeviceWrite = true;
+          }
+          yield {
+            lines: [`G0 X${i % 10} Y0`],
+            cumulativeLineCount: i + 1,
+            isLast: i === totalLines - 1,
+          };
+        }
+      })(),
+    };
+    const output: ControllerOutput = {
+      kind: 'gcode-stream',
+      spool,
+      dialect: 'grbl',
+    };
+    await ctrl.executeJob(output, {
+      ...ticket(),
+      ticketId: 'ticket_t2_27_bounded_first_send',
+    });
+    assert(!terminalChunkBeforeFirstDeviceWrite,
+      'gcode-stream start does not consume the terminal spool chunk before first device write');
+    assert(producedBeforeFirstDeviceWrite > 0 && producedBeforeFirstDeviceWrite < totalLines,
+      `gcode-stream start performs bounded pre-send work (produced ${producedBeforeFirstDeviceWrite}/${totalLines})`);
+    assert(port.received.some(line => /^G0 X/.test(line)),
+      'gcode-stream start writes an initial bounded window to the device');
+    ctrl.stop();
+    await ctrl.disconnect();
+  }
+
+  {
+    const { ctrl, port } = await connectedController();
     let produced = 0;
     const totalLines = 50;
     const spool: SpoolHandle = {
@@ -193,12 +238,12 @@ async function run(): Promise<void> {
       ticketId: 'ticket_t2_27_validation_abort',
     }));
     assert(err !== null && /abort|cancel/i.test(err),
-      `stop during spool pre-validation rejects start (got ${err ?? 'no error'})`);
-    assert(!ctrl.isJobRunning, 'stop during spool pre-validation leaves no running job');
+      `stop during initial spool window fill rejects start (got ${err ?? 'no error'})`);
+    assert(!ctrl.isJobRunning, 'stop during initial spool window fill leaves no running job');
     assert(produced < totalLines,
-      `stop during spool pre-validation aborts before terminal chunk (produced=${produced})`);
+      `stop during initial spool window fill aborts before terminal chunk (produced=${produced})`);
     assert(port.received.filter(line => /^G0 X/.test(line)).length === 0,
-      'stop during spool pre-validation sends no job motion lines');
+      'stop during initial spool window fill sends no job motion lines');
     await ctrl.disconnect();
   }
 
@@ -209,16 +254,28 @@ async function run(): Promise<void> {
       'GRBL gcode-stream execution does not flatten through collectStreamingOutput',
     );
     const sendJobSpoolStart = controllerSrc.indexOf('private async sendJobSpool(');
-    const sendJobSpoolEnd = controllerSrc.indexOf('private async _validateSpoolBeforeStreaming(', sendJobSpoolStart);
+    const sendJobSpoolEnd = controllerSrc.indexOf('private _throwIfSpoolStreamingAborted(', sendJobSpoolStart);
     const sendJobSpoolBody = controllerSrc.slice(sendJobSpoolStart, sendJobSpoolEnd);
     assert(sendJobSpoolBody.length > 500, 'located sendJobSpool body');
-    const validationStart = controllerSrc.indexOf('private async _validateSpoolBeforeStreaming(');
-    const validationEnd = controllerSrc.indexOf('private async _fillStreamWindow(', validationStart);
-    const validationBody = controllerSrc.slice(validationStart, validationEnd);
-    assert(validationBody.length > 500, 'located streaming validation body');
     assert(
-      !/jobLines\.push\(\.\.\.parsed\.jobLines\)/.test(validationBody),
-      'GRBL gcode-stream execution does not accumulate every parsed stream line before sending',
+      !/_validateSpoolBeforeStreaming/.test(controllerSrc),
+      'GRBL gcode-stream start no longer performs a full pre-send spool validation pass',
+    );
+    assert(
+      /spool\.open\(\{\s*signal:\s*streamAbortController\.signal\s*\}\)/.test(sendJobSpoolBody),
+      'GRBL gcode-stream opens the start spool with a cancellation signal',
+    );
+    const fillStart = controllerSrc.indexOf('private async _fillStreamWindow(');
+    const fillEnd = controllerSrc.indexOf('private _handleStreamFillError(', fillStart);
+    const fillBody = controllerSrc.slice(fillStart, fillEnd);
+    assert(fillBody.length > 500, 'located streaming window fill body');
+    assert(
+      /checkGrblJobBoundsChunk/.test(fillBody),
+      'GRBL gcode-stream validates bounds as each bounded stream window is filled',
+    );
+    assert(
+      /this\._jobLines\.length < STREAM_JOB_WINDOW_LINES/.test(fillBody),
+      'GRBL gcode-stream fill remains bounded by STREAM_JOB_WINDOW_LINES',
     );
   }
 

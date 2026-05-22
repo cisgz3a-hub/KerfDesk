@@ -1576,11 +1576,31 @@ export function ConnectionPanelMain({
     const held = isPaused || machineState?.status === 'hold';
     try {
       if (held) {
-        await machineService.resume();
+        const resumeResult = await machineService.resume();
+        if (!resumeResult.accepted) {
+          const msg = resumeResult.message ?? 'resume refused by safety gate';
+          appendMessage(`⚠ Resume command not accepted: ${msg}`);
+          return;
+        }
+        setIsPaused(false);
       } else {
-        await machineService.pause();
+        // GRBL feed-hold is the immediate safety action; MachineService
+        // still awaits the follow-up M5 S0 confirmation before returning
+        // a clean pause result. Flip the v1 UI as soon as the operator
+        // requests hold so the button/progress state does not appear late.
+        setIsPaused(true);
+        const pauseResult = await machineService.pause();
+        if (!pauseResult.accepted) {
+          const msg = pauseResult.message ?? 'pause refused by safety gate';
+          setIsPaused(false);
+          appendMessage(`⚠ Pause command not accepted: ${msg}`);
+          void showAlert(
+            'Pause failed',
+            `The pause command was not accepted by the machine. The job may still be running.\n\n`
+            + `Use Stop to halt the job, or use the machine's physical pause/stop control.`,
+          );
+        }
       }
-      setIsPaused(!held);
     } catch (err: unknown) {
       // T1-64: previously this catch logged to console only. For
       // safety-critical machine controls the user MUST know if their
@@ -1593,6 +1613,7 @@ export function ConnectionPanelMain({
       console.warn('[Pause/Resume]', msg);
       appendMessage(`⚠ ${held ? 'Resume' : 'Pause'} command not accepted: ${msg}`);
       if (!held) {
+        setIsPaused(false);
         void showAlert(
           'Pause failed',
           `The pause command was not accepted by the machine. The job may still be running.\n\n`

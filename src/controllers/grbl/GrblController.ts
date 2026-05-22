@@ -64,6 +64,7 @@ import {
   checkGrblJobBoundsChunk,
   createGrblJobBoundsState,
   type GrblJobBoundsContext,
+  type GrblJobBoundsState,
 } from './GrblJobBoundsChecker';
 import {
   type SafetyActionResult,
@@ -481,9 +482,11 @@ export class GrblController implements GrblControllerApi {
   private _jobTotalLines = 0;
   private _streamIterator: AsyncIterator<GcodeChunk> | null = null;
   private _streamParserState: GrblJobLineParserState | null = null;
+  private _streamBoundsContext: GrblJobBoundsContext | null = null;
+  private _streamBoundsState: GrblJobBoundsState | null = null;
   private _streamDone = false;
   private _streamFillInFlight = false;
-  private _spoolValidationAbortController: AbortController | null = null;
+  private _spoolStreamAbortController: AbortController | null = null;
   private _pending: PendingLine[] = [];
   private _rxBufferSize = DEFAULT_GRBL_BUFFER_SIZE;
   private _bufferAvailable = DEFAULT_GRBL_BUFFER_SIZE;
@@ -1157,26 +1160,24 @@ export class GrblController implements GrblControllerApi {
       );
     }
 
-    const validationAbortController = new AbortController();
-    this._spoolValidationAbortController = validationAbortController;
-    let totalJobLines: number;
-    try {
-      totalJobLines = await this._validateSpoolBeforeStreaming(spool, validationAbortController.signal);
-    } finally {
-      if (this._spoolValidationAbortController === validationAbortController) {
-        this._spoolValidationAbortController = null;
-      }
-    }
-
-    this._streamIterator = spool.open()[Symbol.asyncIterator]();
+    const streamAbortController = new AbortController();
+    this._spoolStreamAbortController = streamAbortController;
+    this._streamIterator = spool.open({ signal: streamAbortController.signal })[Symbol.asyncIterator]();
     this._streamParserState = createGrblJobLineParserState();
+    this._streamBoundsContext = this._jobBoundsContext();
+    this._streamBoundsState = createGrblJobBoundsState(this._streamBoundsContext);
     this._streamDone = false;
     this._streamFillInFlight = false;
     this._jobLines = [];
     this._lineMarkers = [];
-    this._resetJobRuntime(totalJobLines, transferMode);
+    this._resetJobRuntime(spool.lineCount, transferMode);
 
-    await this._fillStreamWindow();
+    try {
+      await this._fillStreamWindow();
+    } catch (err: unknown) {
+      this._abortJob();
+      throw err;
+    }
     if (this._jobLines.length === 0 && this._streamDone) {
       this._clearStreamState();
       this._emitProgress();
@@ -1189,60 +1190,49 @@ export class GrblController implements GrblControllerApi {
     this._drainQueue();
   }
 
-  private _throwIfSpoolValidationAborted(signal?: AbortSignal): void {
-    if (signal?.aborted) {
-      throw new DOMException('Streaming G-code validation cancelled', 'AbortError');
+  private _throwIfSpoolStreamingAborted(signal?: AbortSignal): void {
+    if (signal?.aborted || this._spoolStreamAbortController?.signal.aborted) {
+      throw new DOMException('Streaming G-code cancelled', 'AbortError');
     }
-  }
-
-  private async _validateSpoolBeforeStreaming(spool: SpoolHandle, signal?: AbortSignal): Promise<number> {
-    const parserState = createGrblJobLineParserState();
-    const boundsContext = this._jobBoundsContext();
-    const boundsState = createGrblJobBoundsState(boundsContext);
-    let sawLast = false;
-    let totalJobLines = 0;
-    this._throwIfSpoolValidationAborted(signal);
-    for await (const chunk of spool.open({ signal })) {
-      this._throwIfSpoolValidationAborted(signal);
-      const parsed = parseGrblJobLineChunk(chunk.lines, parserState);
-      this._validateJobLineByteCounts(parsed.jobLines);
-      const boundsError = checkGrblJobBoundsChunk(parsed.jobLines, boundsContext, boundsState);
-      if (boundsError) {
-        throw new Error(boundsError);
-      }
-      totalJobLines += parsed.jobLines.length;
-      if (chunk.isLast) {
-        sawLast = true;
-        break;
-      }
-      this._throwIfSpoolValidationAborted(signal);
-    }
-
-    this._throwIfSpoolValidationAborted(signal);
-    if (!sawLast) {
-      throw new Error('Streaming G-code ended before terminal chunk.');
-    }
-
-    return totalJobLines;
   }
 
   private async _fillStreamWindow(): Promise<void> {
-    if (this._streamIterator === null || this._streamParserState === null || this._streamDone) {
+    if (
+      this._streamIterator === null
+      || this._streamParserState === null
+      || this._streamBoundsContext === null
+      || this._streamBoundsState === null
+      || this._streamDone
+    ) {
       return;
     }
     if (this._streamFillInFlight) return;
 
+    const streamSignal = this._spoolStreamAbortController?.signal;
+    const parserState = this._streamParserState;
+    const boundsContext = this._streamBoundsContext;
+    const boundsState = this._streamBoundsState;
     this._streamFillInFlight = true;
     try {
       while (this._jobLines.length < STREAM_JOB_WINDOW_LINES && !this._streamDone) {
+        this._throwIfSpoolStreamingAborted(streamSignal);
         const next = await this._streamIterator.next();
+        this._throwIfSpoolStreamingAborted(streamSignal);
         if (next.done) {
           this._streamDone = true;
           break;
         }
         const chunk = next.value;
-        const parsed = parseGrblJobLineChunk(chunk.lines, this._streamParserState);
+        const parsed = parseGrblJobLineChunk(chunk.lines, parserState);
         this._validateJobLineByteCounts(parsed.jobLines);
+        const boundsError = checkGrblJobBoundsChunk(
+          parsed.jobLines,
+          boundsContext,
+          boundsState,
+        );
+        if (boundsError) {
+          throw new Error(boundsError);
+        }
         this._jobLines.push(...parsed.jobLines);
         this._lineMarkers.push(...parsed.lineMarkers);
         if (chunk.isLast) {
@@ -1335,8 +1325,11 @@ export class GrblController implements GrblControllerApi {
   private _clearStreamState(): void {
     this._streamIterator = null;
     this._streamParserState = null;
+    this._streamBoundsContext = null;
+    this._streamBoundsState = null;
     this._streamDone = false;
     this._streamFillInFlight = false;
+    this._spoolStreamAbortController = null;
   }
 
   // T1-134: delegates to the pure parseGrblJobLines helper. The parser
@@ -2754,8 +2747,8 @@ export class GrblController implements GrblControllerApi {
   }
 
   private _abortJob(): void {
-    this._spoolValidationAbortController?.abort();
-    this._spoolValidationAbortController = null;
+    this._spoolStreamAbortController?.abort();
+    this._spoolStreamAbortController = null;
     this._resetJobStatusHeartbeat();
     this._isJobRunning = false;
     this._clearStreamState();

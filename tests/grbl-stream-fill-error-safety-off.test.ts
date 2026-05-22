@@ -28,32 +28,22 @@ function flush(ms = 20): Promise<void> {
 }
 
 function failingRefillSpool(): SpoolHandle {
-  let openCount = 0;
   return {
     id: 'stream-fill-fails-after-first-window',
     contentHash: 'audit-f008',
-    lineCount: 2201,
-    byteCount: 2201 * 8,
+    lineCount: 2049,
+    byteCount: 2049 * 8,
     usesM4: false,
-    open: () => {
-      openCount++;
-      const shouldFailOnRefill = openCount >= 2;
-      return (async function* (): AsyncGenerator<GcodeChunk, void, void> {
+    open: () => (
+      async function* (): AsyncGenerator<GcodeChunk, void, void> {
         yield {
-          lines: Array.from({ length: 2200 }, (_, i) => `G1 X${i % 20} Y0`),
-          cumulativeLineCount: 2200,
+          lines: Array.from({ length: 2048 }, (_, i) => `G1 X${i % 20} Y0`),
+          cumulativeLineCount: 2048,
           isLast: false,
         };
-        if (shouldFailOnRefill) {
-          throw new Error('simulated spool refill failure');
-        }
-        yield {
-          lines: ['M5'],
-          cumulativeLineCount: 2201,
-          isLast: true,
-        };
-      })();
-    },
+        throw new Error('simulated spool refill failure');
+      }
+    )(),
   };
 }
 
@@ -85,7 +75,7 @@ void (async () => {
   });
   assert(ctrl.isJobRunning === true, 'precondition: stream job started');
 
-  while (ctrl.isJobRunning && port.received.filter(line => /^G1 X/.test(line)).length < 2200) {
+  while (ctrl.isJobRunning && port.received.filter(line => /^G1 X/.test(line)).length < 2048) {
     port.injectResponse('ok');
     await flush(1);
   }

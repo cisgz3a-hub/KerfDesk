@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 512 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 818 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 820 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -50,7 +50,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 741 | - |
+| `tests/` | 743 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1128,6 +1128,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/packaged-app-no-dev-arg.test.ts`
 - `tests/parse-gcode-helper.test.ts`
 - `tests/path-optimizer-deterministic-budget.test.ts`
+- `tests/pause-button-immediate-feedback.test.ts`
+- `tests/pause-button-safety-result-refusal.test.ts`
 - `tests/pause-emits-m5-after-feed-hold.test.ts`
 - `tests/pause-laser-off-confirmation.test.ts`
 - `tests/pause-resume-stop-surface-errors.test.ts`
