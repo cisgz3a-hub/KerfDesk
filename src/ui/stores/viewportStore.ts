@@ -66,7 +66,10 @@ export function createViewportStore(): UseBoundStore<StoreApi<ViewportStore>> {
       }
       return { bedTabLayout: layout };
     }),
-    resetViewport: () => set(viewportInitialState),
+    resetViewport: () => set(state => ({
+      ...viewportInitialState,
+      canvasSize: state.canvasSize,
+    })),
   }));
 }
 

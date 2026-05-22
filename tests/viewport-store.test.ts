@@ -42,9 +42,12 @@ function assert(condition: unknown, message: string): void {
   store.getState().setBedTabLayout({ bedScreenX: 10, bedScreenY: 20, zoom: 2 });
   assert(store.getState().bedTabLayout === changed, 'same bed tab layout preserves object identity');
 
+  const measuredCanvasSize = store.getState().canvasSize;
   store.getState().resetViewport();
   assert(store.getState().zoomLevel === viewportInitialState.zoomLevel, 'reset restores zoom level');
-  assert(store.getState().canvasSize === viewportInitialState.canvasSize, 'reset restores initial canvas size object');
+  assert(store.getState().canvasSize === measuredCanvasSize, 'reset preserves measured canvas size object');
+  assert(store.getState().canvasSize.width === 1200, 'reset preserves measured canvas width');
+  assert(store.getState().canvasSize.height === 700, 'reset preserves measured canvas height');
   assert(store.getState().previewMode === viewportInitialState.previewMode, 'reset restores preview mode');
   assert(store.getState().bedTabLayout === viewportInitialState.bedTabLayout, 'reset restores initial layout object');
 }
