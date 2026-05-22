@@ -12,7 +12,13 @@ import {
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
@@ -126,6 +132,15 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
   };
 }
 
+function installActiveProfile(): void {
+  resetDeviceProfilesForTest();
+  const profile = createBlankProfile('Job Log Checkpoint Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
+}
+
 function canvasContextFor(ticket: ValidatedJobTicket): ActiveJobCanvasContext {
   return {
     canvasMoves: [],
@@ -169,6 +184,8 @@ console.log('\n=== S25-10-001 MachineService job-log checkpoint wiring ===\n');
 
 void (async () => {
   installMockLocalStorage();
+  for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  installActiveProfile();
 
   const scheduler = new VirtualScheduler();
   const storage = new RecordingCheckpointStorage();

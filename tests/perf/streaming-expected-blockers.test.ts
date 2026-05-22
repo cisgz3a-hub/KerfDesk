@@ -77,6 +77,20 @@ test('S25-12: spool captures dynamic-power metadata without an extra replay', as
   assert.equal(factoryCalls, 1, 'M4 metadata is captured during spool construction');
 });
 
+test('LF-EXT-LGRBL-004: spool M4 metadata ignores comments', async () => {
+  const spool = await buildReplayableGcodeSpool('m4-comment-metadata-test', () => {
+    return (async function* (): AsyncGenerator<GcodeChunk> {
+      yield {
+        lines: ['G21', '; M4 note only', 'G0 X0', 'M3 S100', 'G1 X1 F600', 'M5'],
+        cumulativeLineCount: 6,
+        isLast: true,
+      };
+    })();
+  });
+
+  assert.equal(spool.usesM4, false, 'comment-only M4 does not mark the spool as dynamic-power output');
+});
+
 test('T3-40: materialized G-code export is explicitly memory-bounded', () => {
   assert.equal(MAX_MATERIALIZED_GCODE_LINES, 1_000_000);
   assert.equal(MAX_MATERIALIZED_GCODE_BYTES, 50 * 1024 * 1024);

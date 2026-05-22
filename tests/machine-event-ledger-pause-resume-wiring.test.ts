@@ -65,11 +65,18 @@ const idle: MachineState = {
   errorCode: null,
 };
 
-function makeController(opts: { pauseOk: boolean; resumeOk: boolean }): LaserController {
+function makeController(opts: {
+  pauseOk: boolean;
+  resumeOk: boolean;
+  status?: MachineState['status'];
+}): LaserController {
+  const state: MachineState = { ...idle, status: opts.status ?? 'run' };
   return {
     family: 'grbl' as const,
     protocolName: 'mock',
-    state: { ...idle },
+    get state() {
+      return state;
+    },
     isJobRunning: false,
     maxSpindle: null,
     connect: async () => {},
@@ -93,8 +100,16 @@ function makeController(opts: { pauseOk: boolean; resumeOk: boolean }): LaserCon
       setWorkOriginAtCurrentPosition: async () => ({ ok: true }),
       resetWcsToMachineOrigin: async () => ({ ok: true }),
       laserOff: async () => ({ ok: true }),
-      pauseJob: async () => opts.pauseOk ? { ok: true } : { ok: false, reason: 'pause refused' },
-      resumeJob: async () => opts.resumeOk ? { ok: true } : { ok: false, reason: 'resume refused' },
+      pauseJob: async () => {
+        if (!opts.pauseOk) return { ok: false, reason: 'pause refused' };
+        state.status = 'hold';
+        return { ok: true };
+      },
+      resumeJob: async () => {
+        if (!opts.resumeOk) return { ok: false, reason: 'resume refused' };
+        state.status = 'run';
+        return { ok: true };
+      },
       stopJob: async () => ({ ok: true }),
       emergencyStop: async () => ({ ok: true }),
     },
@@ -162,7 +177,7 @@ void (async () => {
   const ledger = new InMemoryMachineEventLedger();
   _setMachineEventLedgerForTest(ledger);
   resetMemoryStore();
-  const svc = buildService(makeController({ pauseOk: true, resumeOk: true }));
+  const svc = buildService(makeController({ pauseOk: true, resumeOk: true, status: 'hold' }));
   await svc.resume();
   const events = ledger.query({ kinds: new Set(['resume-requested']) });
   assert(events.length === 1, 'resume(): 1 resume-requested event appended');

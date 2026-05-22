@@ -18,7 +18,13 @@ import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
@@ -115,10 +121,20 @@ function ctxFor(t: ValidatedJobTicket): ActiveJobCanvasContext {
   };
 }
 
+function installActiveProfile(): void {
+  resetDeviceProfilesForTest();
+  const profile = createBlankProfile('Try Finalize After Observed Running Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
+}
+
 void (async () => {
   console.log('\n=== tryFinalize after observed running (final path) ===\n');
   installMockLocalStorage();
   for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  installActiveProfile();
 
   const scene = createScene(120, 100, 'after-obs');
   const ticket = makeTicket(scene);

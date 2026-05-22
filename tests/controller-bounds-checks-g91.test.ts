@@ -215,7 +215,27 @@ async function run(): Promise<void> {
   await ctrl.disconnect();
 }
 
-// ── 8. Source-level pin: _positionConfirmed flag + simulation shape ──
+// -------- 8. Malformed status coordinates must not confirm position --------
+{
+  const ctrl = new GrblController();
+  const priv = ctrl as unknown as {
+    _positionConfirmed: boolean;
+    _handleStatusReport: (raw: string) => void;
+  };
+  priv._positionConfirmed = false;
+  priv._handleStatusReport('<Idle|MPos:bad,20,0|FS:0,0>');
+  assert(
+    Boolean(priv._positionConfirmed) === false,
+    'malformed MPos status does not mark controller position confirmed',
+  );
+  priv._handleStatusReport('<Idle|WPos:10,20,0|FS:0,0>');
+  assert(
+    Boolean(priv._positionConfirmed) === true,
+    'valid WPos status still marks controller position confirmed',
+  );
+}
+
+// ── 9. Source-level pin: _positionConfirmed flag + simulation shape ──
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

@@ -1,5 +1,6 @@
 /**
  * Test grid G-code generator. Run: npx tsx tests/test-grid-generator.test.ts
+ * @test-lane output
  */
 
 import {
@@ -9,6 +10,7 @@ import {
   DEFAULT_TEST_GRID,
   type TestGridOptions,
 } from '../src/core/tools/TestGridGenerator';
+import { expectMatchesSnapshot } from './e2e/helpers/snapshot';
 
 let passed = 0;
 let failed = 0;
@@ -180,6 +182,12 @@ console.log('\n=== TestGridGenerator ===\n');
   const coarseLines = (coarse.match(/G1 X/g) || []).length;
   const fineLines = (fine.match(/G1 X/g) || []).length;
   assert(fineLines > coarseLines * 3, 'finer interval yields more scan lines');
+}
+
+{
+  const gcode = generateTestGrid(DEFAULT_TEST_GRID);
+  expectMatchesSnapshot(gcode, 'test-grid-default.gcode');
+  assert(true, 'default test grid matches golden G-code snapshot');
 }
 
 console.log(`\n=== Summary ===\nPassed: ${passed}, Failed: ${failed}\n`);

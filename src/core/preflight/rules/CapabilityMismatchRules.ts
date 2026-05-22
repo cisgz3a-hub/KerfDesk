@@ -33,6 +33,8 @@ export type CapabilityMismatchSeverity = 'warning' | 'error';
 
 export type CapabilityMismatchCode =
   | 'HOMING_PROFILE_VS_FIRMWARE_MISMATCH'
+  | 'SOFT_LIMITS_PROFILE_VS_FIRMWARE_MISMATCH'
+  | 'PROFILE_Z_TRAVEL_EXCEEDS_FIRMWARE'
   | 'PROFILE_FEED_X_EXCEEDS_FIRMWARE'
   | 'PROFILE_FEED_Y_EXCEEDS_FIRMWARE'
   | 'PROFILE_ACCEL_X_EXCEEDS_FIRMWARE'
@@ -87,6 +89,44 @@ export function checkCapabilityMismatches(
         'Either set $22=1 in the firmware (so $H homes the machine) or disable Homing in the profile if the machine has no limit switches.',
       path: 'profile.homingEnabled',
     });
+  }
+
+  if (
+    profile.softLimitsEnabled === true
+    && identity.softLimitsEnabled === false
+  ) {
+    findings.push({
+      code: 'SOFT_LIMITS_PROFILE_VS_FIRMWARE_MISMATCH',
+      severity: 'warning',
+      message:
+        'Profile expects GRBL soft limits enabled, but firmware reports $20=0. Firmware will not provide the configured soft-limit safety net.',
+      fix:
+        'Enable $20=1 after homing is configured, or disable Soft Limits in the profile if this machine intentionally runs without firmware soft limits.',
+      path: 'profile.softLimitsEnabled',
+    });
+  }
+
+  const profileZ = profile.zAxis;
+  const firmwareZTravel = identity.zTravelMm;
+  if (
+    profileZ?.supported === true
+    && Number.isFinite(profileZ.minMm)
+    && Number.isFinite(profileZ.maxMm)
+    && firmwareZTravel != null
+    && firmwareZTravel > 0
+  ) {
+    const profileZSpan = Math.abs((profileZ.maxMm as number) - (profileZ.minMm as number));
+    if (profileZSpan > firmwareZTravel + COMPARE_EPS) {
+      findings.push({
+        code: 'PROFILE_Z_TRAVEL_EXCEEDS_FIRMWARE',
+        severity: 'warning',
+        message:
+          `Profile Z travel span (${profileZSpan} mm) exceeds firmware $132 (${firmwareZTravel} mm). Z-step jobs may alarm or move outside the configured Z envelope.`,
+        fix:
+          'Reduce the profile Z-axis min/max span to fit $132, or update $132 only after verifying the machine has that physical Z travel.',
+        path: 'profile.zAxis',
+      });
+    }
   }
 
   // Rule 2 / 3: $110 / $111 feed rate exceeds firmware (warning).

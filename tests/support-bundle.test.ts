@@ -12,6 +12,7 @@ import {
   findLicenseKeyLeaks,
   type SupportBundleInputs,
 } from '../src/diagnostics/SupportBundle';
+import { buildRxEntry, buildTxEntry } from '../src/app/StructuredRxTxEntry';
 import { emptyCorrelationIds, generateCorrelationId, resetCorrelationIdCounters } from '../src/diagnostics/CorrelationIds';
 
 let passed = 0;
@@ -311,7 +312,181 @@ void (async () => {
   }
 }
 
-// 16. Source-level pin
+// 16. Controller evidence: structured transcript, safety ledger,
+//     compile/preflight metadata, and opt-in emitted G-code survive
+//     into the support bundle.
+{
+  const inputs = makeBaseInputs();
+  inputs.correlationIds = {
+    ...inputs.correlationIds,
+    jobId: 'job-diagnostics',
+    compileId: 'compile-diagnostics',
+    preflightId: 'preflight-diagnostics',
+  };
+  inputs.jobLogs = [
+    {
+      id: 'job-diagnostics',
+      entries: [
+        buildTxEntry({
+          timestamp: 100,
+          raw: 'M4 S0',
+          source: 'job',
+          bufferStateAfter: { freeChars: 124, queueDepth: 1 },
+        }),
+        buildRxEntry({
+          timestamp: 125,
+          raw: 'ok',
+          responseTo: 0,
+          controllerLineNumber: 42,
+          bufferStateAfter: { freeChars: 127, queueDepth: 0 },
+        }),
+      ],
+    },
+  ];
+  inputs.machineEventLedger = {
+    schemaVersion: 1,
+    capturedAt: 150,
+    entries: [
+      { kind: 'safety-off', t: 145, stage: 'm5', message: 'post-fault safety off' },
+    ],
+  };
+  inputs.compileMetadata = [
+    {
+      compileId: 'compile-diagnostics',
+      outputUsesM4: true,
+      gcodeSpoolLineCount: 1024,
+    },
+  ];
+  inputs.preflightReports = [
+    {
+      id: 'preflight-diagnostics',
+      issues: [
+        {
+          code: 'MACHINE_LASER_MODE_UNKNOWN',
+          severity: 'error',
+        },
+      ],
+    },
+  ];
+  inputs.gcodeByJobId = {
+    'job-diagnostics': 'M4 S0\nG1 X1 S100\nM5',
+  };
+
+  const defaultBundle = buildSupportBundle({
+    inputs,
+    bundleId: 'b10',
+    generatedAt: '2026-05-05T00:00:00.000Z',
+  });
+  const logs = JSON.parse(defaultBundle.files['recent-job-logs.json']);
+  assert(logs[0].entries[0].raw === 'M4 S0',
+    'support bundle preserves structured TX raw command');
+  assert(logs[0].entries[0].classification.commandType === 'mcode',
+    'support bundle preserves TX command classification');
+  assert(logs[0].entries[1].classification.controllerLineNumber === 42,
+    'support bundle preserves RX controller line number');
+  assert(logs[0].entries[1].classification.bufferStateAfter.freeChars === 127,
+    'support bundle preserves RX buffer-state evidence');
+
+  const ledger = JSON.parse(defaultBundle.files['machine-event-ledger.json']);
+  assert(ledger.entries[0].kind === 'safety-off',
+    'support bundle includes safety-off machine event evidence');
+  assert(ledger.entries[0].stage === 'm5',
+    'support bundle includes safety-off stage evidence');
+
+  const compile = JSON.parse(defaultBundle.files['compile-metadata.json']);
+  assert(compile[0].outputUsesM4 === true,
+    'support bundle includes M4 output metadata');
+  assert(compile[0].gcodeSpoolLineCount === 1024,
+    'support bundle includes spool-size metadata');
+
+  const preflight = JSON.parse(defaultBundle.files['preflight-reports.json']);
+  assert(preflight[0].issues[0].code === 'MACHINE_LASER_MODE_UNKNOWN',
+    'support bundle includes preflight safety issue evidence');
+  assert(defaultBundle.files['gcode-job-diagnostics.txt'] === undefined,
+    'emitted G-code stays opt-in even when transcript evidence is included');
+
+  const optedInBundle = buildSupportBundle({
+    inputs,
+    inclusions: { gcode: true },
+    bundleId: 'b11',
+    generatedAt: '2026-05-05T00:00:00.000Z',
+  });
+  assert(optedInBundle.files['gcode-job-diagnostics.txt'].includes('M4 S0'),
+    'opt-in support bundle includes emitted G-code for replay');
+}
+
+// 17. Controller identifiers and secrets are redacted from support evidence.
+{
+  const inputs = makeBaseInputs();
+  inputs.systemInfo = {
+    platform: 'win32',
+    arch: 'x64',
+    locale: 'en-US',
+  };
+  const systemInfoWithPrivateFields = inputs.systemInfo as typeof inputs.systemInfo & Record<string, unknown>;
+  systemInfoWithPrivateFields.userDataPath = 'C:\\Users\\Alice\\AppData\\Roaming\\LaserForge';
+  systemInfoWithPrivateFields.operatorEmail = 'alice@example.com';
+  inputs.machineProfile = {
+    name: 'Customer Falcon',
+    serialNumber: 'LF-FALCON-123456',
+    macAddress: 'AA:BB:CC:DD:EE:FF',
+    lanTarget: '192.168.1.42',
+  };
+  inputs.jobLogs = [
+    {
+      id: 'job-secret',
+      entries: [
+        buildTxEntry({
+          timestamp: 100,
+          raw: 'G1 X1 ; Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456',
+          source: 'job',
+        }),
+      ],
+    },
+  ];
+  inputs.storage = {
+    apiKey: 'sk_live_1234567890abcdef1234567890abcdef',
+    privateKey: '-----BEGIN PRIVATE KEY-----\nnot-a-real-key-material\n-----END PRIVATE KEY-----',
+  };
+  inputs.gcodeByJobId = {
+    'job-secret': [
+      'G1 X100.0 Y50.0 F3000 ; token=sk_live_1234567890abcdef1234567890abcdef',
+      'M4 S200 ; mac AA:BB:CC:DD:EE:FF serial LF-FALCON-123456',
+    ].join('\n'),
+  };
+
+  const bundle = buildSupportBundle({
+    inputs,
+    inclusions: { gcode: true },
+    bundleId: 'b12',
+    generatedAt: '2026-05-05T00:00:00.000Z',
+  });
+  const allFiles = JSON.stringify(bundle.files);
+  for (const raw of [
+    'Alice',
+    'alice@example.com',
+    '192.168.1.42',
+    'AA:BB:CC:DD:EE:FF',
+    'LF-FALCON-123456',
+    'abcdefghijklmnopqrstuvwxyz123456',
+    'sk_live_',
+    'not-a-real-key-material',
+  ]) {
+    assert(!allFiles.includes(raw), `support bundle redacts raw sensitive value '${raw}'`);
+  }
+  for (const placeholder of [
+    '[REDACTED:PATH]', '[REDACTED:EMAIL]', '[REDACTED:IP]', '[REDACTED:MAC]',
+    '[REDACTED:SERIAL]', '[REDACTED:TOKEN]', '[REDACTED:PRIVATE_KEY]',
+  ]) {
+    assert(allFiles.includes(placeholder), `support bundle contains ${placeholder}`);
+  }
+  assert(bundle.files['gcode-job-secret.txt'].includes('G1 X100.0 Y50.0 F3000'),
+    'opted-in diagnostic G-code keeps motion commands after secret redaction');
+  assert(bundle.files['gcode-job-secret.txt'].includes('M4 S200'),
+    'opted-in diagnostic G-code keeps laser modal commands after secret redaction');
+}
+
+// 18. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');

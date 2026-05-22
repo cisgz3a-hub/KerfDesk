@@ -75,8 +75,20 @@ assertRejected(
 );
 
 assertRejected(
+  'custom start with embedded relative mode',
+  { customStart: 'G0 X0 G91' },
+  'TEMPLATE_G91_IN_HEADER',
+);
+
+assertRejected(
   'custom start with laser-on command',
   { customStart: 'M3 S1000' },
+  'TEMPLATE_LASER_ON_NO_MOTION',
+);
+
+assertRejected(
+  'custom start with embedded laser-on command',
+  { customStart: 'G0 X0 M3 S1000' },
   'TEMPLATE_LASER_ON_NO_MOTION',
 );
 
@@ -93,6 +105,18 @@ assertRejected(
 );
 
 assertRejected(
+  'footer with embedded work-coordinate mutation',
+  { footerTemplate: 'M5\nG90 G10 L2 P1 X0 Y0' },
+  'TEMPLATE_G10',
+);
+
+assertRejected(
+  'custom end with embedded temporary coordinate reset',
+  { customEnd: 'G0 X0 G92 X0 Y0\nM5' },
+  'TEMPLATE_G92',
+);
+
+assertRejected(
   'template injecting unlock command',
   { headerTemplate: '$X' },
   'TEMPLATE_UNLOCK',
@@ -101,6 +125,12 @@ assertRejected(
 assertRejected(
   'template motion outside bed bounds',
   { headerTemplate: 'G0 X201 Y50' },
+  'TEMPLATE_MOTION_OUT_OF_BED',
+);
+
+assertRejected(
+  'template embedded motion outside bed bounds',
+  { headerTemplate: 'G21 G0 X201 Y50' },
   'TEMPLATE_MOTION_OUT_OF_BED',
 );
 

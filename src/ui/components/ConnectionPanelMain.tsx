@@ -27,6 +27,10 @@ import { type MachineService, type LaserOutputState } from '../../app/MachineSer
 import { recoveryAllowsStart } from '../../runtime/RecoveryState';
 import { type StructuredLogEvent, type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
+import {
+  classifyConnectionFailure,
+  formatConnectionFailureMessage,
+} from '../../app/ConnectionFailureGuidance';
 // T1-143: describeFrameFailure usage moved into connectionPanelLabels.
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
@@ -107,6 +111,12 @@ import { type SettingsTab } from './SettingsModal';
 import { type SafetyState } from '../../app/SafetyStateMachine';
 import { analyzeOperationOrder } from '../../app/OperationOrder';
 import { computeUserModeGatePolicy, type UserMode } from '../../app/UserModeGates';
+import {
+  buildControllerPanelModel,
+  dispatchResetWcsToBaseline,
+} from '../../machine-control-v2/ControllerPanelAdapter';
+import type { MachineIntent } from '../../machine-control-v2/MachineIntent';
+import type { MachineControlState } from '../../machine-control-v2/MachineStateMachine';
 import { RecoveryCard } from '../recovery/RecoveryCard';
 import { buildRecoveryCard, type RecoveryAction } from '../recovery/RecoveryCardContent';
 
@@ -118,6 +128,11 @@ type StartMode = GcodeStartMode;
 const STREAMING_WARNING_HOLD_MS = 3000;
 const CURRENT_MODE_LONG_JOB_TIP_KEY = 'laserforge_current_mode_long_job_tip_acknowledged';
 const ACTIVE_PROFILE_CHANGED_EVENT = 'laserforge:active-profile-changed';
+const connectionPanelEnv = (import.meta as ImportMeta & {
+  env?: Partial<ImportMetaEnv>;
+}).env;
+const MACHINE_CONTROL_V2_DIAGNOSTICS_ENABLED =
+  connectionPanelEnv?.DEV === true && connectionPanelEnv?.VITE_MACHINE_CONTROL_V2_ENABLED === 'true';
 
 // T1-143: formatJobTime / readyStartModeLabel / layerModeToOperationKind
 // / buildReadyOperationRows / frameFailureLogLine all moved to
@@ -892,7 +907,9 @@ export function ConnectionPanelMain({
 
   const connectRealLaser = async () => {
     if (!WebSerialPort.isSupported()) {
-      appendMessage('ERROR: Web Serial not supported in this browser');
+      appendMessage(`ERROR: ${formatConnectionFailureMessage(
+        classifyConnectionFailure(new Error('Web Serial not supported in this browser')),
+      )}`);
       return;
     }
     // T1-50 Part A: see comment on the `connecting` state above.
@@ -910,7 +927,7 @@ export function ConnectionPanelMain({
       if (connectAbortController.signal.aborted) {
         appendMessage('Connection cancelled by user');
       } else {
-        appendMessage(`Connection failed: ${e.message}`);
+        appendMessage(`Connection failed: ${formatConnectionFailureMessage(classifyConnectionFailure(e))}`);
       }
     } finally {
       if (connectAbortRef.current === connectAbortController) {
@@ -1969,6 +1986,21 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     activeOperation == null &&
     controllerRef.current?.applyWcsNormalization,
   );
+  const dispatchMachineControlV2Intent = useCallback(
+    (intent: MachineIntent) => {
+      switch (intent.kind) {
+        case 'resetWcsToBaseline':
+          controllerRef.current?.applyWcsNormalization?.();
+          return;
+        default:
+          appendMessage(`Machine-control v2 intent is not wired yet: ${intent.kind}`);
+      }
+    },
+    [appendMessage],
+  );
+  const resetWcsToBaselineViaV2 = useCallback(() => {
+    void dispatchResetWcsToBaseline(dispatchMachineControlV2Intent);
+  }, [dispatchMachineControlV2Intent]);
   /**
    * T1-96: structured Start-button readiness for the diagnostics panel.
    *
@@ -2008,9 +2040,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     // applyWcsNormalization sends `G10 L2 P1 X0 Y0 Z0` + `$10=0`
     // and clears _placementUncertain locally — the gate flips to
     // ok without a reconnect cycle.
-    onResetWcsToBaseline: () => {
-      controllerRef.current?.applyWcsNormalization?.();
-    },
+    onResetWcsToBaseline: resetWcsToBaselineViaV2,
     recoveryAllowsStart: recoveryAllowsStart(recoveryState),
     wifiTrust,
     wifiStartAllowed,
@@ -2019,6 +2049,39 @@ void executionCoordinator.beginTestFire({ maxSpindle })
   });
   void workflowVersion;
 
+  const machineControlV2State: MachineControlState = (() => {
+    if (machineState == null || machineState.status === 'disconnected') return 'disconnected';
+    if (machineState.status === 'connecting') return 'connecting';
+    if (machineState.status === 'alarm') return 'alarm';
+    if (machineState.status === 'faulted_requires_inspection') return 'fault';
+    if (displayPaused || machineState.status === 'hold') return 'hold';
+    if (isRunning || machineState.status === 'run') return 'streaming';
+    if (activeOperation?.kind === 'jog') return 'jogging';
+    if (activeOperation?.kind === 'frame' || activeOperation?.kind === 'frameDot') return 'framing';
+    if (activeOperation?.kind === 'testFire') return 'testFiring';
+    if (machineState.status === 'idle') return 'idle';
+    return 'fault';
+  })();
+  const machineControlV2PanelModel = MACHINE_CONTROL_V2_DIAGNOSTICS_ENABLED
+    ? buildControllerPanelModel({
+        state: machineControlV2State,
+        capabilities: {
+          canStart: isConnected,
+          canPause: isConnected,
+          canResume: isConnected,
+          canStop: isConnected,
+          canEmergencyStop: isConnected,
+          canJog: gates?.canJog ?? false,
+          canHome,
+          canUnlock: isConnected,
+          canResetWcs: Boolean(controllerRef.current?.applyWcsNormalization),
+          canTestFire: gates?.canTestFire ?? false,
+          canFrame,
+        },
+        hasValidatedTicket: hasCompiledGcode && !gcodeStale && preflight?.canStart === true,
+        hasFrameProof: !requireFrame || hasFramed.current,
+      })
+    : null;
   const statusSection = React.createElement(StatusBar, {
     isConnected,
     isSimulator,
@@ -2158,6 +2221,10 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       : []),
   ];
   const readyBounds = lastGcodeCompileResult?.machinePlanBounds ?? machinePlanBounds ?? frameMachineBounds;
+  const readyLaserModeLabel =
+    (activeProfile?.grblLaserPowerMode ?? 'dynamic-m4') === 'constant-m3'
+      ? 'Constant M3'
+      : 'Dynamic M4';
   const readyToRunData: ReadyToRunPanelData = {
     machine: {
       connectionLabel: isSimulator ? 'Connected (Sim)' : 'Connected',
@@ -2172,6 +2239,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       summaryLabel: `${readyOperationRows.length} operation${readyOperationRows.length === 1 ? '' : 's'}`,
       boundsLabel: `X${fmtMm(readyBounds.minX)} Y${fmtMm(readyBounds.minY)} to X${fmtMm(readyBounds.maxX)} Y${fmtMm(readyBounds.maxY)}`,
       estimatedTimeLabel: estimatedTimeFormatted,
+      laserModeLabel: readyLaserModeLabel,
       operationAnalysis: readyOperationAnalysis,
       complexity: jobComplexitySummary,
     },
@@ -2593,9 +2661,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       : undefined,
     onFrame: () => { void handleFrameSafe(); },
     onStartJob: () => { void handleStartJob(); },
-    onResetWcsToBaseline: () => {
-      controllerRef.current?.applyWcsNormalization?.();
-    },
+    onResetWcsToBaseline: resetWcsToBaselineViaV2,
     onPauseResume: () => { void handlePauseResume(); },
     onStop: () => { void handleStop(); },
   });
@@ -2623,6 +2689,49 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       onOpenSettings,
     }),
   );
+
+  const machineControlV2DiagnosticsSection = machineControlV2PanelModel && showAdvancedConsole &&
+    React.createElement('div', {
+      'data-testid': 'machine-control-v2-diagnostics',
+      style: {
+        margin: '0 16px 8px',
+        padding: '10px 12px',
+        border: '1px solid rgba(0,212,255,0.18)',
+        borderRadius: 6,
+        background: 'rgba(0,212,255,0.04)',
+        color: '#8888aa',
+        flexShrink: 0,
+      },
+    },
+      React.createElement('div', {
+        style: {
+          fontSize: 10,
+          color: '#00d4ff',
+          fontWeight: 700,
+          marginBottom: 6,
+          textTransform: 'uppercase' as const,
+          letterSpacing: 0,
+        },
+      }, 'Machine Control V2'),
+      React.createElement('pre', {
+        style: {
+          margin: 0,
+          whiteSpace: 'pre-wrap' as const,
+          fontSize: 10,
+          lineHeight: 1.4,
+          color: '#8888aa',
+          fontFamily: mono,
+        },
+      }, JSON.stringify({
+        state: machineControlV2State,
+        start: machineControlV2PanelModel.buttons.start,
+        pause: machineControlV2PanelModel.buttons.pause,
+        resume: machineControlV2PanelModel.buttons.resume,
+        stop: machineControlV2PanelModel.buttons.stop,
+        jog: machineControlV2PanelModel.buttons.jog,
+        resetWcs: machineControlV2PanelModel.buttons.resetWcs,
+      }, null, 2)),
+    );
 
   const advancedMachineDetailsSection = isConnected && showAdvancedConsole && React.createElement('div', {
     style: {
@@ -2845,6 +2954,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
             })
           : React.createElement(React.Fragment, null,
               profileSection,
+              machineControlV2DiagnosticsSection,
               !isRunning && !displayPaused && controlsSection,
               !isRunning && !displayPaused && jobPositionSection,
               !isRunning && !displayPaused && detailLaunchersSection,

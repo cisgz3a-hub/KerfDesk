@@ -108,14 +108,14 @@ async function main(): Promise<void> {
     const mockController = {
       protocolName: 'mock',
       state: {
-        status: 'idle',
+        status: 'run',
         position: { x: 0, y: 0, z: 0 },
         feedRate: 0,
         spindleSpeed: 0,
         alarmCode: null,
         errorCode: null,
       },
-      isJobRunning: false,
+      isJobRunning: true,
       maxSpindle: null,
       operations: {
         pauseJob: async () => ({

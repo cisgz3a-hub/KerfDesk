@@ -7,6 +7,10 @@ import { type MachineState, type JobProgress } from '../controllers/ControllerIn
 import { type Scene } from '../core/scene/Scene';
 import { type GcodeStartMode } from '../core/output/GcodeOrigin';
 import { type OutputFormat } from '../core/output/Output';
+import {
+  grblCapabilities,
+  type ControllerCapabilities,
+} from '../controllers/ControllerCapabilities';
 // T1-88: requireFeature import removed — the only consumer was the
 // job_replay capture gate, which is now always-on.
 import {
@@ -91,7 +95,17 @@ import { getMachineEventLedger } from './MachineEventLedger';
 // (scene/profile/controller/gcode hash) can be tested in isolation.
 // Hashing imports + the ControllerId type moved with the logic.
 import { validateJobTicket } from './validateJobTicket';
-import { buildPipelineJobFingerprint } from './PipelineService';
+import {
+  bedDimensionsKnown,
+  buildPipelineJobFingerprint,
+  resolvePipelineControllerCapabilities,
+} from './PipelineService';
+import {
+  canExecuteOperation,
+  decisionMessage,
+  type Operation,
+  type OperationGateMachineState,
+} from './OperationGate';
 import {
   type FrameTicket,
   validateFrameTicketForStart,
@@ -273,6 +287,59 @@ function spooledJobTimeEstimateFromPlan(ticket: ValidatedJobTicket): { totalSeco
   return {
     totalSeconds,
     formatted: formatEstimatedSeconds(totalSeconds),
+  };
+}
+
+function operationGateStatusFromMachineState(
+  state: MachineState | null | undefined,
+): OperationGateMachineState['status'] {
+  switch (state?.status) {
+    case 'idle':
+    case 'run':
+    case 'hold':
+    case 'alarm':
+    case 'door':
+    case 'check':
+      return state.status;
+    case 'homing':
+      return 'home';
+    default:
+      return 'unknown';
+  }
+}
+
+function operationGateConnectedFromMachineState(
+  state: MachineState | null | undefined,
+): boolean {
+  return state?.status !== 'disconnected' && state?.status !== 'connecting';
+}
+
+function operationFromActiveOperationKind(kind: ActiveOperationKind): Operation {
+  switch (kind) {
+    case 'jog': return 'jog';
+    case 'frame': return 'frame-safe';
+    case 'frameDot': return 'frame-dot';
+    case 'testFire': return 'test-fire';
+    case 'autoFocus': return 'autofocus';
+    case 'setOrigin': return 'set-origin';
+  }
+}
+
+function makeOperationGateRefusalSafetyResult(
+  action: 'pause' | 'resume',
+  message: string,
+): SafetyActionResult {
+  return {
+    action,
+    accepted: false,
+    motionState: 'unknown',
+    laserState: 'unknown',
+    positionTrusted: 'unknown',
+    requiresRehome: 'unknown',
+    requiresReconnect: false,
+    requiresInspection: false,
+    message,
+    timestamp: Date.now(),
   };
 }
 
@@ -1071,6 +1138,35 @@ export class MachineService {
         `Work-coordinate state could not be confirmed (reason: ${placementReason}). `
         + 'Reconnect or address the underlying WCS issue before starting a job.',
       );
+    }
+
+    // VisiCut/LibLaserCut comparison sector: the service is the last
+    // machine-control boundary, so unknown bed dimensions must not be
+    // only a UI preflight blocker. A controller that does not report
+    // $130/$131 is still allowed when the active profile has explicit
+    // dimensions; otherwise the 300mm compile fallback must not stream.
+    const machineInfo = this.readControllerMachineInfo();
+    const currentProfile = getActiveProfile();
+    if (!bedDimensionsKnown(currentProfile, machineInfo.bed)) {
+      throw new Error(
+        'Machine bed dimensions are unknown. Set the machine bed size in the active profile '
+        + 'or reconnect to a controller that reports $130/$131 before starting a job.',
+      );
+    }
+
+    const baseCapabilities: ControllerCapabilities = controller.capabilities ?? grblCapabilities;
+    const controllerCapabilities = resolvePipelineControllerCapabilities(
+      currentProfile,
+      baseCapabilities,
+    );
+    const startDecision = canExecuteOperation('job-start', controllerCapabilities, {
+      connected: true,
+      status: operationGateStatusFromMachineState(machineState ?? controller.state),
+      activeOperation: null,
+      homingRequiredAtBoot: false,
+    });
+    if (!startDecision.allowed) {
+      throw new Error(decisionMessage(startDecision) ?? startDecision.detail);
     }
 
     const validation = this.validateTicket(ticket, scene, {
@@ -2757,6 +2853,25 @@ export class MachineService {
     getMachineEventLedger().append({ kind: 'pause-requested', t: Date.now() });
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('pause'));
+    const currentProfile = getActiveProfile();
+    const controllerCapabilities = resolvePipelineControllerCapabilities(
+      currentProfile,
+      ctrl.capabilities ?? grblCapabilities,
+    );
+    const decision = canExecuteOperation('pause', controllerCapabilities, {
+      connected: operationGateConnectedFromMachineState(ctrl.state),
+      status: operationGateStatusFromMachineState(ctrl.state),
+      activeOperation: this._activeOperation == null
+        ? null
+        : operationFromActiveOperationKind(this._activeOperation.kind),
+      homingRequiredAtBoot: false,
+    });
+    if (!decision.allowed) {
+      return makeOperationGateRefusalSafetyResult(
+        'pause',
+        decisionMessage(decision) ?? decision.detail,
+      );
+    }
     try {
       const result = await ctrl.operations.pauseJob();
       if (!result.ok) {
@@ -2792,6 +2907,25 @@ export class MachineService {
     getMachineEventLedger().append({ kind: 'resume-requested', t: Date.now() });
     const ctrl = this.controllerRef.current;
     if (!ctrl) return this._recordSafetyResult(makeNotConnectedResult('resume'));
+    const currentProfile = getActiveProfile();
+    const controllerCapabilities = resolvePipelineControllerCapabilities(
+      currentProfile,
+      ctrl.capabilities ?? grblCapabilities,
+    );
+    const decision = canExecuteOperation('resume', controllerCapabilities, {
+      connected: operationGateConnectedFromMachineState(ctrl.state),
+      status: operationGateStatusFromMachineState(ctrl.state),
+      activeOperation: this._activeOperation == null
+        ? null
+        : operationFromActiveOperationKind(this._activeOperation.kind),
+      homingRequiredAtBoot: false,
+    });
+    if (!decision.allowed) {
+      return makeOperationGateRefusalSafetyResult(
+        'resume',
+        decisionMessage(decision) ?? decision.detail,
+      );
+    }
     try {
       const result = await ctrl.operations.resumeJob();
       if (!result.ok) throw new Error(result.reason);

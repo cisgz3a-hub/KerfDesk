@@ -81,8 +81,11 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
   const calls: MockCounters = {
     pause: 0, resume: 0, stop: 0, emergency: 0, safetyOff: 0, disconnect: 0,
   };
+  const state: MachineState = { ...idle, status: 'run' };
   const ctrl: Partial<LaserController> = {
-    state: idle,
+    get state() {
+      return state;
+    },
     isJobRunning: false,
     maxSpindle: 1000,
     connect: async () => {},
@@ -114,10 +117,12 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       laserOff: async () => ({ ok: true }),
       pauseJob: async () => {
         calls.pause++;
+        state.status = 'hold';
         return { ok: true };
       },
       resumeJob: async () => {
         calls.resume++;
+        state.status = 'run';
         return { ok: true };
       },
       stopJob: async () => {

@@ -5,6 +5,7 @@ import { createBlankProfile, getActiveProfile } from '../devices/DeviceProfile';
 import type { Scene } from '../scene/Scene';
 import type { ValidatedJobTicket } from '../job/ValidatedJobTicket';
 import type { GcodeStartMode } from '../output/GcodeOrigin';
+import { gcodeTextUsesM4 } from '../output/GcodeStreaming';
 import type { DeviceIdentity, MachineState } from '../../controllers/ControllerInterface';
 import { runMachineStateChecks } from './rules/MachineStatePreflight';
 import { runSceneChecks, runDesignOutputLayerChecks } from './rules/ScenePreflight';
@@ -312,7 +313,7 @@ export function runPreflightSummary(
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
     emittedGcode: gcode,
-    outputUsesM4: compiledOutput?.outputUsesM4 ?? (gcode != null && /\bM4\b/i.test(gcode)),
+    outputUsesM4: compiledOutput?.outputUsesM4 ?? gcodeTextUsesM4(gcode),
     gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {
       bedWidthMm: bedWidth > 0 ? bedWidth : undefined,

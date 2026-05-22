@@ -109,11 +109,34 @@ console.log('\n=== T1-126 GRBL $$ settings parser ===\n');
   assert(interpretGrblSettingValue(32, '0').laserMode === false, `$32=0 → laserMode false`);
   assert(interpretGrblSettingValue(32, '255').laserMode === true,
     `$32=255 → laserMode true (any non-zero int)`);
-  // Pin the exact pre-fix idiom: parseInt(rawVal, 10) !== 0.
-  // parseInt('bogus', 10) = NaN; NaN !== 0 is TRUE; so laserMode = true.
-  // That's intentional — preserves pre-T1-126 inline behavior.
-  assert(interpretGrblSettingValue(32, 'bogus').laserMode === true,
-    `$32=bogus → laserMode true (NaN !== 0 holds; matches pre-T1-126 idiom)`);
+  assert(interpretGrblSettingValue(32, 'bogus').laserMode === undefined,
+    `$32=bogus → laserMode unknown (malformed $32 must not be treated as safe)`);
+}
+
+// -------- 5b. interpretGrblSettingValue: $20/$22 capability booleans --------
+{
+  assert(interpretGrblSettingValue(20, '1').softLimitsEnabled === true,
+    `$20=1 -> softLimitsEnabled true`);
+  assert(interpretGrblSettingValue(20, '0').softLimitsEnabled === false,
+    `$20=0 -> softLimitsEnabled false`);
+  assert(interpretGrblSettingValue(20, 'bogus').softLimitsEnabled === undefined,
+    `$20=bogus -> softLimitsEnabled unknown`);
+  assert(interpretGrblSettingValue(22, '1').homingEnabled === true,
+    `$22=1 -> homingEnabled true`);
+  assert(interpretGrblSettingValue(22, '0').homingEnabled === false,
+    `$22=0 -> homingEnabled false`);
+  assert(interpretGrblSettingValue(22, 'bogus').homingEnabled === undefined,
+    `$22=bogus -> homingEnabled unknown`);
+}
+
+// -------- 5c. interpretGrblSettingValue: $31 minimum spindle --------
+{
+  assert(interpretGrblSettingValue(31, '0').minSpindle === 0,
+    `$31=0 -> minSpindle=0`);
+  assert(interpretGrblSettingValue(31, '5').minSpindle === 5,
+    `$31=5 -> minSpindle=5`);
+  assert(interpretGrblSettingValue(31, '-1').minSpindle === undefined,
+    `$31=-1 -> minSpindle undefined (gate: >= 0)`);
 }
 
 // -------- 6. interpretGrblSettingValue: $23 homingDir --------
@@ -131,14 +154,24 @@ console.log('\n=== T1-126 GRBL $$ settings parser ===\n');
   assert(interpretGrblSettingValue(130, 'bogus').bedWidth === undefined,
     `$130=bogus → bedWidth undefined (gate: finite)`);
   // Pre-T1-126 didn't gate negative values for $130/$131; preserve that.
-  assert(interpretGrblSettingValue(130, '-50').bedWidth === -50,
+  assert(interpretGrblSettingValue(130, '-50').bedWidth === undefined,
     `$130=-50 → bedWidth=-50 (no positive-only gate; matches pre-T1-126)`);
+  assert(interpretGrblSettingValue(131, '0').bedHeight === undefined,
+    `$131=0 -> bedHeight undefined (gate: > 0)`);
+  assert(interpretGrblSettingValue(132, '50').zTravelMm === 50,
+    `$132=50 -> zTravelMm=50`);
+  assert(interpretGrblSettingValue(132, '-50').zTravelMm === undefined,
+    `$132=-50 -> zTravelMm undefined (gate: > 0)`);
 }
 
 // -------- 8. $110/$111 max feed --------
 {
   assert(interpretGrblSettingValue(110, '12000').maxFeedX === 12000, `$110=12000 → maxFeedX=12000`);
   assert(interpretGrblSettingValue(111, '10000').maxFeedY === 10000, `$111 → maxFeedY`);
+  assert(interpretGrblSettingValue(110, '-1').maxFeedX === undefined,
+    `$110=-1 -> maxFeedX undefined (gate: > 0)`);
+  assert(interpretGrblSettingValue(111, '0').maxFeedY === undefined,
+    `$111=0 -> maxFeedY undefined (gate: > 0)`);
 }
 
 // -------- 9. $120/$121 max accel (positive-only gate) --------

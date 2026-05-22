@@ -29,6 +29,7 @@ export interface ReadyToRunJobSummary {
   summaryLabel: string;
   boundsLabel: string;
   estimatedTimeLabel: string | null;
+  laserModeLabel?: string | null;
   operationAnalysis: OrderAnalysis;
   complexity: JobComplexitySummary | null;
 }
@@ -142,10 +143,17 @@ function displayOperationRow(rowData: OrderAnalysis['rows'][number]): string {
     : rowData.kind === 'cut' ? 'Cut'
     : 'Travel';
   const passes = rowData.passes > 1 ? ` - ${rowData.passes} passes` : '';
+  const zStep = rowData.zStepPerPassMm != null && Math.abs(rowData.zStepPerPassMm) > 0
+    ? ` - Z ${formatZStep(rowData.zStepPerPassMm)} mm/pass`
+    : '';
   return (
     `${rowData.index}. ${kindLabel} - ${rowData.layerName} - ` +
-    `${rowData.powerPercent}% power - ${rowData.feedRateMmPerMin} mm/min${passes}`
+    `${rowData.powerPercent}% power - ${rowData.feedRateMmPerMin} mm/min${passes}${zStep}`
   );
+}
+
+function formatZStep(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
 }
 
 function renderComplexityWarning(warning: JobComplexitySummary['warnings'][number]): React.ReactElement {
@@ -229,6 +237,7 @@ export function ReadyToRunPanel({
         row('Summary', data.job.summaryLabel),
         row('Bounds', data.job.boundsLabel),
         row('Estimated', data.job.estimatedTimeLabel),
+        row('Laser mode', data.job.laserModeLabel ?? null),
       ), 'ready-to-run-section-job'),
       section('Job complexity', React.createElement(React.Fragment, null,
         row('Commands', data.job.complexity?.commandCountLabel ?? null),

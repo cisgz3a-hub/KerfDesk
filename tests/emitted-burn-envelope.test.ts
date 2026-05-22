@@ -178,7 +178,50 @@ console.log('\n=== T1-182 emitted-burn-envelope parser (audit High #2 + #8) ===\
   }
 }
 
-// -------- 8. Source pins on the parser + ticket field + PipelineService wiring --------
+// -------- 8. Same-block modal words keep both motion and distance state --------
+{
+  const motionFirst = [
+    'G21',
+    'G90',
+    'G0 X100 Y0',
+    'M4 S500',
+    'G1 X10 Y0 G91',
+    'M5 S0',
+  ].join('\n');
+  const motionFirstResult = analyzeEmittedBurnEnvelope(motionFirst);
+  assert(
+    motionFirstResult.burnMoveCount === 1,
+    `same-block G1 X... G91: movement and distance mode both apply (got ${motionFirstResult.burnMoveCount})`,
+  );
+  if (motionFirstResult.burnBounds) {
+    assert(
+      motionFirstResult.burnBounds.minX === 100 && motionFirstResult.burnBounds.maxX === 110,
+      `same-block G1 X... G91 burns relative from X100 to X110 (got ${JSON.stringify(motionFirstResult.burnBounds)})`,
+    );
+  }
+
+  const distanceFirst = [
+    'G21',
+    'G90',
+    'G0 X100 Y0',
+    'M4 S500',
+    'G91 G1 X10 Y0',
+    'M5 S0',
+  ].join('\n');
+  const distanceFirstResult = analyzeEmittedBurnEnvelope(distanceFirst);
+  assert(
+    distanceFirstResult.burnMoveCount === 1,
+    `same-block G91 G1 X...: parser keeps both modal words (got ${distanceFirstResult.burnMoveCount})`,
+  );
+  if (distanceFirstResult.burnBounds) {
+    assert(
+      distanceFirstResult.burnBounds.minX === 100 && distanceFirstResult.burnBounds.maxX === 110,
+      `same-block G91 G1 X... burns relative from X100 to X110 (got ${JSON.stringify(distanceFirstResult.burnBounds)})`,
+    );
+  }
+}
+
+// -------- 9. Source pins on the parser + ticket field + PipelineService wiring --------
 {
   const parserSrc = readFileSync(resolve(here, '../src/core/output/emittedBurnEnvelope.ts'), 'utf-8');
   const ticketSrc = readFileSync(resolve(here, '../src/core/job/ValidatedJobTicket.ts'), 'utf-8');

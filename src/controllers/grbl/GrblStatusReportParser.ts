@@ -86,13 +86,20 @@ const EMPTY_RESULT: ParsedGrblStatusReport = {
 function parsePosition(value: string): MachinePosition | null {
   const coords = value.split(',').map(Number);
   if (coords.length < 2) return null;
-  // The pre-T1-124 inline parser applied `Number(...) || 0` for the
-  // z coordinate, which collapsed both NaN and missing-coordinate to
-  // zero. Preserve that behavior so callers see the same shape.
+  const x = coords[0];
+  const y = coords[1];
+  const z = coords.length >= 3 ? coords[2] : 0;
+  // LF-EXT-BCNC-003: do not mark position confirmed from malformed
+  // controller coordinates. Missing z still defaults to 0 for the
+  // existing two-axis GRBL reports, but non-finite x/y/z makes the
+  // entire position unusable.
+  if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) {
+    return null;
+  }
   return {
-    x: coords[0],
-    y: coords[1],
-    z: coords[2] || 0,
+    x,
+    y,
+    z,
   };
 }
 

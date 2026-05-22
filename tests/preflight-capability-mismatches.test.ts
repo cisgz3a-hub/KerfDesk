@@ -128,6 +128,28 @@ void (async () => {
 
   // 5. Profile X feed exceeds firmware $110 → warning.
   {
+    {
+      const f = checkCapabilityMismatches(
+        profile({ softLimitsEnabled: true }),
+        identity({ softLimitsEnabled: false } as Partial<DeviceIdentity>),
+      );
+      const issue = f.find((x) => x.code === 'SOFT_LIMITS_PROFILE_VS_FIRMWARE_MISMATCH');
+      assert(issue !== undefined, 'Soft limits: warning emitted when profile expects $20=1 but firmware reports $20=0');
+      assert(issue?.severity === 'warning', 'Soft limits: severity warning');
+      assert(/\$20|soft/i.test(issue?.message ?? ''), 'Soft limits: message names $20 or soft limits');
+    }
+
+    {
+      const f = checkCapabilityMismatches(
+        profile({ zAxis: { supported: true, minMm: -60, maxMm: 0 } }),
+        identity({ zTravelMm: 50 } as Partial<DeviceIdentity>),
+      );
+      const issue = f.find((x) => x.code === 'PROFILE_Z_TRAVEL_EXCEEDS_FIRMWARE');
+      assert(issue !== undefined, 'Z travel: warning emitted when profile span exceeds firmware $132');
+      assert(issue?.severity === 'warning', 'Z travel: severity warning');
+      assert(/\$132|Z/i.test(issue?.message ?? ''), 'Z travel: message names $132 or Z travel');
+    }
+
     const f = checkCapabilityMismatches(
       profile({ maxRateX: 10000 }),
       identity({ maxRateXMmPerMin: 6000 }),

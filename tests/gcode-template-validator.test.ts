@@ -147,7 +147,7 @@ console.log('\n=== gcode-template-validator ===\n');
 }
 {
   const f = validateGcodeTemplates(baseInput({ headerTemplate: 'M3' }));
-  assert(!codes(f).has('TEMPLATE_LASER_ON_NO_MOTION'), 'M3 alone does not trigger TEMPLATE_LASER_ON_NO_MOTION');
+  assert(codes(f).has('TEMPLATE_LASER_ON_NO_MOTION'), 'M3 alone triggers TEMPLATE_LASER_ON_NO_MOTION');
 }
 {
   const f = validateGcodeTemplates(baseInput({ headerTemplate: 'M3 S0' }));

@@ -42,6 +42,45 @@ export interface TemplateValidationInput {
 
 const EPS = 0.01;
 
+interface ParsedGcodeWord {
+  readonly letter: string;
+  readonly value: number;
+}
+
+function stripGcodeComments(line: string): string {
+  return line
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/;.*$/, ' ')
+    .trim();
+}
+
+function parseGcodeWords(line: string): ParsedGcodeWord[] {
+  const words: ParsedGcodeWord[] = [];
+  const re = /([A-Za-z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(line)) !== null) {
+    const value = Number.parseFloat(match[2] ?? '');
+    if (Number.isFinite(value)) {
+      words.push({ letter: (match[1] ?? '').toUpperCase(), value });
+    }
+  }
+  return words;
+}
+
+function hasWord(words: readonly ParsedGcodeWord[], letter: string, value: number): boolean {
+  const expectedLetter = letter.toUpperCase();
+  return words.some(word => word.letter === expectedLetter && word.value === value);
+}
+
+function lastWordValue(words: readonly ParsedGcodeWord[], letter: string): number | undefined {
+  const expectedLetter = letter.toUpperCase();
+  for (let i = words.length - 1; i >= 0; i--) {
+    const word = words[i];
+    if (word?.letter === expectedLetter) return word.value;
+  }
+  return undefined;
+}
+
 /** Same footer substitution as compile when return-to-origin is off. */
 export function resolveFooterTemplateForValidation(profile: {
   gcodeFooterTemplate?: string;
@@ -236,9 +275,9 @@ function validateResolvedText(
 
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i] ?? '';
-    const line = raw.trim();
+    const line = stripGcodeComments(raw);
     if (line.length === 0) continue;
-    if (line.startsWith(';')) continue;
+    const words = parseGcodeWords(line);
 
     const push = (severity: 'error' | 'warning', code: string, message: string): void => {
       findings.push({
@@ -277,27 +316,23 @@ function validateResolvedText(
       continue;
     }
 
-    const mHead = line.match(/^[mM]([34])(?![0-9])/);
-    if (mHead) {
-      const afterM = line.slice(mHead[0].length);
-      const sMatch = afterM.match(/(?:^|\b)S\s*([+-]?\d*\.?\d+(?:[eE][+-]?\d+)?)/i);
-      if (sMatch) {
-        const sVal = parseFloat(sMatch[1] ?? 'NaN');
-        if (Number.isFinite(sVal) && sVal > 0) {
-          push(
-            'error',
-            'TEMPLATE_LASER_ON_NO_MOTION',
-            'Templates must not turn the laser on at non-zero power without a motion context. Use M5 or M3/M4 with S0 only.',
-          );
-          continue;
-        }
+    const laserOnWord = words.find(word => word.letter === 'M' && (word.value === 3 || word.value === 4));
+    if (laserOnWord) {
+      const sVal = lastWordValue(words, 'S');
+      if (sVal === undefined || sVal > 0) {
+        push(
+          'error',
+          'TEMPLATE_LASER_ON_NO_MOTION',
+          'Templates must not turn the laser on at non-zero power without a motion context. Use M5 or M3/M4 with S0 only.',
+        );
+        continue;
       }
     }
 
     // T1-43: G91 / G90 in header or customStart conflict with LaserForge mode
     // management. G91 keeps code TEMPLATE_G91_IN_HEADER (existing test pin);
     // messages name the actual source when customStart.
-    if (/^G91(?![0-9])/i.test(line) && (source === 'header' || source === 'customStart')) {
+    if (hasWord(words, 'G', 91) && (source === 'header' || source === 'customStart')) {
       const where = source === 'customStart' ? 'a custom start g-code block' : 'a header';
       push(
         'error',
@@ -306,7 +341,7 @@ function validateResolvedText(
       );
       continue;
     }
-    if (/^G90(?![0-9])/i.test(line) && (source === 'header' || source === 'customStart')) {
+    if (hasWord(words, 'G', 90) && (source === 'header' || source === 'customStart')) {
       const where = source === 'customStart' ? 'a custom start g-code block' : 'a header';
       push(
         'error',
@@ -315,7 +350,7 @@ function validateResolvedText(
       );
       continue;
     }
-    if (/^G92(?![0-9])/i.test(line)) {
+    if (hasWord(words, 'G', 92)) {
       push(
         'error',
         'TEMPLATE_G92',
@@ -323,7 +358,7 @@ function validateResolvedText(
       );
       continue;
     }
-    if (/^G10(?![0-9])/i.test(line)) {
+    if (hasWord(words, 'G', 10)) {
       push(
         'error',
         'TEMPLATE_G10',
@@ -332,12 +367,11 @@ function validateResolvedText(
       continue;
     }
 
-    const motion = /^G([0-3])(?![0-9])/i.exec(line);
+    const motion = words.find(word => word.letter === 'G' && word.value >= 0 && word.value <= 3);
     if (motion && (input.bedWidthMm > 0 || input.bedHeightMm > 0)) {
-      const xMatch = /\bX([-+]?\d*\.?\d+)/i.exec(line);
-      const yMatch = /\bY([-+]?\d*\.?\d+)/i.exec(line);
-      if (input.bedWidthMm > 0 && xMatch) {
-        const x = parseFloat(xMatch[1] ?? 'NaN');
+      const x = lastWordValue(words, 'X');
+      const y = lastWordValue(words, 'Y');
+      if (input.bedWidthMm > 0 && x !== undefined) {
         if (Number.isFinite(x) && (x < -EPS || x > input.bedWidthMm + EPS)) {
           push(
             'error',
@@ -347,8 +381,7 @@ function validateResolvedText(
           continue;
         }
       }
-      if (input.bedHeightMm > 0 && yMatch) {
-        const y = parseFloat(yMatch[1] ?? 'NaN');
+      if (input.bedHeightMm > 0 && y !== undefined) {
         if (Number.isFinite(y) && (y < -EPS || y > input.bedHeightMm + EPS)) {
           push(
             'error',

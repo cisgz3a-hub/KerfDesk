@@ -125,11 +125,27 @@ function ctx(opts: {
 // ── 7. M4 inside a comment is still treated as M4-emission (conservative)
 //       The fix-it message tells the user to change templates if false-positive. ──
 {
-  const results = runPreflight(ctx({ laserMode: false, gcode: '; uses M4 dynamic\nG0 X10\nM3 S500\nM5\n' }));
-  const offending = results.find(r => r.code === PREFLIGHT_CODES.MACHINE_LASER_MODE_DISABLED);
+  const summary = runPreflightSummary(
+    emptyScene(),
+    '; M4 note only\nG0 X10\nM3 S500\nG1 X20 F600\nM5\n',
+    {
+      status: 'idle',
+      position: { x: 0, y: 0, z: 0 },
+      feedRate: 0,
+      spindleSpeed: 0,
+      alarmCode: null,
+      errorCode: null,
+    },
+    300,
+    300,
+    { minX: 0, minY: 0, maxX: 100, maxY: 100 },
+    undefined,
+    false,
+  );
+  const offending = summary.issues.find(r => r.id === PREFLIGHT_CODES.MACHINE_LASER_MODE_DISABLED);
   assert(
-    offending != null,
-    'M4 in a comment is still flagged — \\bM4\\b matches comment text; conservative bias for safety',
+    offending == null,
+    'M4 in a comment does not trip the $32 dynamic-power blocker',
   );
 }
 
@@ -186,8 +202,8 @@ function ctx(opts: {
     'MACHINE_LASER_MODE_DISABLED preflight code constant declared');
   assert(/firmwareLaserModeFromMachine\?:\s*boolean/.test(preflightSrc),
     'runPreflightSummary takes firmwareLaserModeFromMachine parameter');
-  assert(/outputUsesM4: compiledOutput\?\.outputUsesM4 \?\? \(gcode != null && \/\\bM4\\b\/i\.test\(gcode\)\)/.test(preflightSrc),
-    'runPreflightSummary uses spool-aware outputUsesM4 metadata with materialized-gcode fallback');
+  assert(/outputUsesM4: compiledOutput\?\.outputUsesM4 \?\? gcodeTextUsesM4\(gcode\)/.test(preflightSrc),
+    'runPreflightSummary uses spool-aware outputUsesM4 metadata with parsed materialized-gcode fallback');
 
   const ruleSrc = fs.readFileSync(
     path.resolve(here, '../src/core/preflight/rules/MachinePreflight.ts'),

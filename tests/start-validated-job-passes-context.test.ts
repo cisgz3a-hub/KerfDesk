@@ -36,6 +36,7 @@ const idle: MachineState = {
   alarmCode: null,
   errorCode: null,
 };
+const TEST_MACHINE_BED = { width: 100, height: 100 };
 
 void (async () => {
   console.log('\n=== startValidatedJob passes canvas context by reference ===\n');
@@ -66,6 +67,7 @@ void (async () => {
       profile,
       startMode: 'current',
       savedOrigin: null,
+      machineBedFromController: TEST_MACHINE_BED,
     }),
     gcodeLines: ['G0 X1', 'M5'],
     gcodeText,
@@ -88,6 +90,11 @@ void (async () => {
     state: idle,
     isJobRunning: false,
     maxSpindle: null,
+    getMachineInfo: () => ({
+      bedWidth: TEST_MACHINE_BED.width,
+      bedHeight: TEST_MACHINE_BED.height,
+      maxSpindle: null,
+    }),
     connect: async () => {},
     disconnect: async () => {},
     executeJob: async (_output: ControllerOutput, jobTicket: ControllerJobTicket) => ({ id: jobTicket.ticketId, startedAt: 123 }),

@@ -44,8 +44,8 @@ void (async () => {
     `GRBL: pauseStopsLaserOutput='unknown' ($32 dependent) (got ${String(c.pauseStopsLaserOutput)})`);
   assert(c.pauseLatencyClass === 'realtime',
     `GRBL: pauseLatencyClass='realtime' (got ${c.pauseLatencyClass})`);
-  assert(c.resumeRequiresStateRestore === false,
-    'GRBL: resumeRequiresStateRestore=false (modal state preserved)');
+  assert(c.resumeRequiresStateRestore === true,
+    'GRBL: resumeRequiresStateRestore=true (pause emits M5, resume reasserts M3/M4 S0 before cycle-start)');
   assert(c.resumeSupportedAfterError === false,
     'GRBL: resumeSupportedAfterError=false (alarm requires re-home)');
   assert(c.supportsLaserOff === true, 'GRBL: supportsLaserOff=true');

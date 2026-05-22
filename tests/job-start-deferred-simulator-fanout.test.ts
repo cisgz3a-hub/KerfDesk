@@ -81,6 +81,7 @@ function makeMockController(onSendJob: (lines: string[]) => Promise<void>): Lase
     maxSpindle: 1000,
     safetyOff: async () => ({ stage: 'm5' as const }),
     requestStatusReport: () => {},
+    getMachineInfo: () => ({ bedWidth: TEST_MACHINE_BED.width, bedHeight: TEST_MACHINE_BED.height, maxSpindle: 1000 }),
     laserOnAt: () => {},
     laserOff: () => {},
   } as unknown as unknown as LaserController;
@@ -92,6 +93,7 @@ const idle: MachineState = {
 };
 
 const scene = createScene(120, 100, 'fanout test');
+const TEST_MACHINE_BED = { width: 120, height: 100 };
 
 function makeBigTicket(lineCount: number): ValidatedJobTicket {
   const lines: string[] = [];
@@ -122,6 +124,7 @@ function makeBigTicket(lineCount: number): ValidatedJobTicket {
       startMode: 'current',
       savedOrigin: null,
       controllerMaxSpindle: 1000,
+      machineBedFromController: TEST_MACHINE_BED,
     }),
     emittedBurnBounds: null,
     burnEnvelopeDivergence: null,

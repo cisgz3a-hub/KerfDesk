@@ -35,6 +35,7 @@ function assert(cond: boolean, message: string): void {
 
 let acquireCallCount = 0;
 let releaseCallCount = 0;
+const TEST_MACHINE_BED = { width: 120, height: 100 };
 
 function installElectronApiWakeLockSpies(): void {
   acquireCallCount = 0;
@@ -107,6 +108,7 @@ function makeTestTicket(scene: ReturnType<typeof createScene>, overrides?: Parti
       profile,
       startMode: 'current',
       savedOrigin: null,
+      machineBedFromController: TEST_MACHINE_BED,
     }),
     gcodeLines: [...gcodeLines],
     gcodeText,
@@ -161,6 +163,11 @@ function makeMockController(sendJobImpl: (lines: string[]) => Promise<void>): La
     emergencyStop: () => {},
     sendCommand: () => {},
     requestStatusReport: () => {},
+    getMachineInfo: () => ({
+      bedWidth: TEST_MACHINE_BED.width,
+      bedHeight: TEST_MACHINE_BED.height,
+      maxSpindle: null,
+    }),
     onStateChange: () => () => {},
     onProgress: () => () => {},
     onError: () => () => {},

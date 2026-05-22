@@ -159,6 +159,19 @@ async function main(): Promise<void> {
   {
     const { service, sent } = makeHarness();
     service.setSavedOriginG54Snapshot({ x: 100, y: 75, z: 0 });
+    const command = 'G90 G10 L20 P1 X0 Y0';
+    const token = service.requestApproval(command) as ApprovalToken;
+    await service.sendCommand(command, 'user', token);
+    assert(sent.length === 1 && sent[0]?.cmd === command, 'approved embedded console G10 reaches controller');
+    assert(
+      service.getSavedOriginG54Snapshot() === null,
+      'approved embedded console G10 invalidates saved-origin G54 snapshot immediately',
+    );
+  }
+
+  {
+    const { service, sent } = makeHarness();
+    service.setSavedOriginG54Snapshot({ x: 100, y: 75, z: 0 });
     let blocked = false;
     try {
       await service.sendCommand('G10 L2 P1 X0 Y0', 'user');

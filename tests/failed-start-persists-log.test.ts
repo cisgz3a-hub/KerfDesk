@@ -34,7 +34,13 @@ import {
   type MachineState,
 } from '../src/controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { createScene } from '../src/core/scene/Scene';
@@ -121,6 +127,15 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
   };
 }
 
+function installActiveProfile(): void {
+  resetDeviceProfilesForTest();
+  const profile = createBlankProfile('Failed Start Log Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
+}
+
 function ctxFor(t: ValidatedJobTicket): ActiveJobCanvasContext {
   return {
     canvasMoves: [],
@@ -177,6 +192,7 @@ void (async () => {
     const adapter = new InMemoryStorageAdapter();
     setStorageForTest(adapter);
     resetJobLogsForTest();
+    installActiveProfile();
 
     const scene = createScene(120, 100, 'failed-start');
     const ticket = makeTicket(scene);

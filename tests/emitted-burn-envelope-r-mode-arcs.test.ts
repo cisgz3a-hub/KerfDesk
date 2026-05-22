@@ -163,7 +163,7 @@ console.log('\n=== T1-189 R-mode arc parsing in emittedBurnEnvelope ===\n');
     'centerFromRMode helper present',
   );
   assert(
-    /words\.R !== undefined && words\.I === undefined && words\.J === undefined/.test(src),
+    /rWord !== undefined && iWord === undefined && jWord === undefined/.test(src),
     'R-mode branch gated on R present AND I/J absent',
   );
 }

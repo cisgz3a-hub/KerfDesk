@@ -83,10 +83,18 @@ if (cliIsAvailable) {
   const transportSim = listLane('transport-sim');
   const controllerSim = listLane('controller-sim');
   const perf = listLane('perf');
+  const allowedStandaloneOutputTests = new Set([
+    'e2e-semantic-assertions.test.ts',
+    'test-grid-generator.test.ts',
+  ]);
 
   assert(output.some((file) => file.startsWith('e2e/')), 'output lane includes E2E golden tests');
   assert(output.includes('e2e-semantic-assertions.test.ts'), 'output lane includes semantic E2E assertions');
-  assert(output.every((file) => file.startsWith('e2e/') || file === 'e2e-semantic-assertions.test.ts'), 'output lane is limited to output/golden tests');
+  assert(output.includes('test-grid-generator.test.ts'), 'output lane includes test-grid output snapshot coverage');
+  assert(
+    output.every((file) => file.startsWith('e2e/') || allowedStandaloneOutputTests.has(file)),
+    'output lane is limited to output/golden tests',
+  );
 
   assert(transportSim.includes('web-serial-byte-stream-harness.test.ts'), 'transport-sim includes fake WebSerial harness');
   assert(transportSim.includes('falcon-wifi-fake-server.test.ts'), 'transport-sim includes fake Falcon WiFi server');

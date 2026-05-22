@@ -76,8 +76,8 @@ const MACHINES: {
   { name: 'Small Diode', icon: '🔹', w: 200, h: 200, watts: '5-10W', desc: 'Atomstack, Ortur, Sculpfun S9', type: 'diode' },
   { name: 'Medium Diode', icon: '🔷', w: 400, h: 400, watts: '10-20W', desc: 'xTool D1 Pro, Sculpfun S30', type: 'diode' },
   { name: 'Large Diode', icon: '🟦', w: 800, h: 400, watts: '20-40W', desc: 'Large format diode laser', type: 'diode' },
-  { name: 'Small CO2', icon: '🔴', w: 300, h: 200, watts: '40W', desc: 'K40, OMTech 40W', type: 'co2' },
-  { name: 'Medium CO2', icon: '🟠', w: 500, h: 300, watts: '50-60W', desc: 'OMTech 50W, 60W', type: 'co2' },
+  { name: 'Small CO2', icon: '🔴', w: 300, h: 200, watts: '40W', desc: 'GRBL-compatible CO2', type: 'co2' },
+  { name: 'Medium CO2', icon: '🟠', w: 500, h: 300, watts: '50-60W', desc: 'GRBL-compatible CO2', type: 'co2' },
   { name: 'Large CO2', icon: '🟡', w: 700, h: 500, watts: '80-130W', desc: '80W, 100W, 130W CO2', type: 'co2' },
   { name: 'Fiber Laser', icon: '⚪', w: 110, h: 110, watts: '20-50W', desc: 'Metal marking, MOPA', type: 'fiber' },
 ];

@@ -77,11 +77,24 @@ export function controllerDisconnectStopsJob(ctrl: LaserController): DisconnectS
 /**
  * Returns true if `command` is a G-code that mutates the work
  * coordinate system. Stock GRBL: G10 (set work offset), G92 (set
- * position). The regex uses negative lookahead `(?![0-9])` so G100
- * / G920 / G1010 don't false-match. Case-insensitive.
+ * position). Scan G-code words across the whole block so same-block
+ * modal prefixes like `G90 G10 ...` still invalidate saved-origin
+ * state while G100 / G920 / G1010 do not false-match.
  */
 export function mutatesWorkCoordinateSystem(command: string): boolean {
-  return /^G10(?![0-9])/i.test(command) || /^G92(?![0-9])/i.test(command);
+  const code = command
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/;.*$/, ' ');
+  const wordRe = /([A-Za-z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/g;
+  let match: RegExpExecArray | null;
+  while ((match = wordRe.exec(code)) !== null) {
+    const letter = (match[1] ?? '').toUpperCase();
+    const value = Number(match[2] ?? NaN);
+    if (letter === 'G' && (value === 10 || value === 92)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

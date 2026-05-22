@@ -1226,6 +1226,7 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
             onChange: (e: React.ChangeEvent<HTMLSelectElement>) => {
               const mode = e.target.value as DitherMode;
               setDitherMode(mode);
+              commitRasterLayer({ dithering: mode, imageMode: 'dither' });
               const imgObj = selectedObjects[0];
               if (!imgObj || imgObj.geometry.type !== 'image') return;
               const g = imgObj.geometry as ImageGeometry;
@@ -1247,6 +1248,14 @@ export function ObjectPropertiesTab({ scene, selectedIds, onSceneCommit, onScene
               void ditherInWorker(pre, targetWidth, targetHeight, mode, thr).then((dithered) => {
                 const s = sceneRef.current;
                 const liveObj = s.objects.find(o => o.id === targetObjId);
+                const liveLayer = s.layers.find(l => l.id === targetLayerId);
+                if (
+                  !liveLayer
+                  || liveLayer.settings.image.dithering !== mode
+                  || liveLayer.settings.image.imageMode !== 'dither'
+                ) {
+                  return; // user changed raster mode again; drop stale dither.
+                }
                 if (!liveObj || liveObj.geometry.type !== 'image') return;
                 const liveGeom = liveObj.geometry as ImageGeometry;
                 if (

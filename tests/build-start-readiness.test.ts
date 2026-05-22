@@ -679,7 +679,9 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     );
   }
 
-  // Source pin: ConnectionPanelMain wires applyWcsNormalization.
+  // Source pin: ConnectionPanelMain wires the reset button through the
+  // machine-control v2 intent path, whose handler still reaches
+  // applyWcsNormalization for the actual controller command.
   {
     const here = dirname(fileURLToPath(import.meta.url));
     const panelSrc = readFileSync(
@@ -691,8 +693,16 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       'ConnectionPanelMain carries T1-205 marker',
     );
     assert(
-      /onResetWcsToBaseline:[\s\S]{0,200}applyWcsNormalization/.test(panelSrc),
-      'ConnectionPanelMain wires onResetWcsToBaseline to applyWcsNormalization',
+      /onResetWcsToBaseline:\s*resetWcsToBaselineViaV2/.test(panelSrc),
+      'ConnectionPanelMain wires onResetWcsToBaseline to the v2 Reset WCS callback',
+    );
+    assert(
+      /dispatchResetWcsToBaseline\(dispatchMachineControlV2Intent\)/.test(panelSrc),
+      'ConnectionPanelMain dispatches the Reset WCS intent through machine-control v2',
+    );
+    assert(
+      /case 'resetWcsToBaseline':[\s\S]{0,200}controllerRef\.current\?\.applyWcsNormalization\?\.\(\)/.test(panelSrc),
+      'ConnectionPanelMain Reset WCS intent handler calls applyWcsNormalization',
     );
   }
 }

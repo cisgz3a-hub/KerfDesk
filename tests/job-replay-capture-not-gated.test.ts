@@ -50,6 +50,8 @@ import { setStorageForTest } from '../src/core/storage/storage';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 import { makeTestFrameTicket } from './helpers/testFrameTicket';
 
+const TEST_MACHINE_BED = { width: 120, height: 100 };
+
 let passed = 0;
 let failed = 0;
 
@@ -105,6 +107,7 @@ function makeTicket(scene: ReturnType<typeof createScene>): ValidatedJobTicket {
       profile,
       startMode: 'current',
       savedOrigin: null,
+      machineBedFromController: TEST_MACHINE_BED,
     }),
     gcodeLines: ['G0 X1', 'M5'],
     gcodeText: 'G0 X1\nM5',
@@ -138,6 +141,11 @@ function makeController(sendJob: (lines: string[]) => Promise<void>): LaserContr
     state: idle,
     isJobRunning: false,
     maxSpindle: null,
+    getMachineInfo: () => ({
+      bedWidth: TEST_MACHINE_BED.width,
+      bedHeight: TEST_MACHINE_BED.height,
+      maxSpindle: null,
+    }),
     connect: async () => {},
     disconnect: async () => {},
     executeJob: async (output: ControllerOutput, jobTicket: ControllerJobTicket) => {
@@ -208,7 +216,7 @@ void (async () => {
   // 1. The throw still propagates (existing contract from T1-87).
   assert(
     propagated === 'triggered to verify replay was created',
-    'sendJob throw propagates',
+    `sendJob throw propagates (got "${propagated}")`,
   );
 
   await drainMicrotasks();

@@ -18,11 +18,21 @@ interface ResetWcsController {
  */
 export async function sendResetWcsCommand(
   controller: ResetWcsController | null | undefined,
-): Promise<void> {
-  if (!controller || typeof controller.operations?.resetWcsToMachineOrigin !== 'function') return;
+): Promise<OperationResult> {
+  if (!controller || typeof controller.operations?.resetWcsToMachineOrigin !== 'function') {
+    return {
+      ok: false,
+      reason: 'no-controller',
+      message: 'No controller is available to reset WCS.',
+    };
+  }
   try {
-    await controller.operations.resetWcsToMachineOrigin();
-  } catch {
-    /* best-effort WCS cleanup */
+    return await controller.operations.resetWcsToMachineOrigin();
+  } catch (error) {
+    return {
+      ok: false,
+      reason: error instanceof Error ? error.message : 'reset-failed',
+      message: 'Reset WCS command failed before the controller accepted it.',
+    };
   }
 }

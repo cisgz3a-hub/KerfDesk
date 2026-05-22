@@ -91,6 +91,9 @@ export interface ControllerSafetyCapabilities {
  *
  * - `pauseStopsLaserOutput: 'unknown'` — depends on `$32` (laser
  *   mode); without reading it from `$$` we cannot promise either.
+ * - `resumeRequiresStateRestore: true` — LaserForge's pause path
+ *   sends `M5 S0`, so resume must reassert the captured `M3/M4 S0`
+ *   modal spindle state before GRBL cycle-start (`~`).
  * - `resumeSupportedAfterError: false` — once GRBL enters Alarm,
  *   resume is not the right path; the user clears alarm + rehomes.
  * - `laserOffCanBeVerified: false` — we send M5 but cannot read back
@@ -109,7 +112,7 @@ export const grblSafetyCapabilities: ControllerSafetyCapabilities = {
   supportsRecoverablePause: true,
   pauseStopsLaserOutput: 'unknown',
   pauseLatencyClass: 'realtime',
-  resumeRequiresStateRestore: false,
+  resumeRequiresStateRestore: true,
   resumeSupportedAfterError: false,
 
   supportsLaserOff: true,

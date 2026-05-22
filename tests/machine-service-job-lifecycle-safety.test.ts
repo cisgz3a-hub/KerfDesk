@@ -13,7 +13,12 @@ import {
   type MachineState,
 } from '../src/controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
 import { createScene } from '../src/core/scene/Scene';
@@ -174,6 +179,11 @@ void (async () => {
   installMockLocalStorage();
   for (const k of Object.keys(memoryStore)) delete memoryStore[k];
   const scene = createScene(120, 100, 'job lifecycle');
+  const profile = createBlankProfile('MachineService Lifecycle Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
   const ticket = makeTicket(scene);
 
   {

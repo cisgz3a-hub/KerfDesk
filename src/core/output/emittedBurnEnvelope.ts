@@ -80,6 +80,11 @@ interface EmittedBurnEnvelopeState {
   zeroDistanceLinearCount: number;
 }
 
+interface GcodeWord {
+  readonly letter: string;
+  readonly value: number;
+}
+
 function createEmittedBurnEnvelopeState(): EmittedBurnEnvelopeState {
   return {
     motionMode: null,
@@ -242,23 +247,20 @@ function stripComments(line: string): string {
 }
 
 /**
- * Parse a line into word tokens (G/M/X/Y/F/S/etc). Returns a map
- * `{ G?: number, M?: number, X?: number, ... }`. Unknown words are
- * silently dropped (out-of-scope letters).
+ * Parse a line into ordered word tokens (G/M/X/Y/F/S/etc). Keeping
+ * order matters because one GRBL block can contain both a motion
+ * modal and a distance modal, e.g. `G91 G1 X10`.
  */
-function parseWords(line: string): Record<string, number> {
-  const result: Record<string, number> = {};
-  // Match letter-prefixed numeric tokens: e.g. `G1`, `X-12.34`, `S1000`.
-  const re = /([A-Za-z])(-?\d+(?:\.\d+)?)/g;
+function parseWords(line: string): GcodeWord[] {
+  const result: GcodeWord[] = [];
+  // Match letter-prefixed numeric tokens: e.g. `G1`, `X-12.34`, `X+.5`, `S1e3`.
+  const re = /([A-Za-z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?)/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(line)) !== null) {
     const letter = m[1].toUpperCase();
     const value = parseFloat(m[2]);
     if (Number.isFinite(value)) {
-      // Single-letter words: the last occurrence on a line wins.
-      // GRBL semantics: G0 G1 on the same line is invalid; we keep
-      // the last for safety (downstream code shouldn't rely on this).
-      result[letter] = value;
+      result.push({ letter, value });
     }
   }
   return result;
@@ -277,35 +279,55 @@ function analyzeEmittedBurnEnvelopeLine(state: EmittedBurnEnvelopeState, raw: st
   if (stripped.length === 0) return;
   const words = parseWords(stripped);
 
-  if (words.G === 90) state.distanceMode = 'absolute';
-  if (words.G === 91) state.distanceMode = 'relative';
+  let motion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
+  let distanceMode = state.distanceMode;
+  let xWord: number | undefined;
+  let yWord: number | undefined;
+  let iWord: number | undefined;
+  let jWord: number | undefined;
+  let rWord: number | undefined;
 
-  if (words.M === 3) state.laserMode = 'M3';
-  if (words.M === 4) state.laserMode = 'M4';
-  if (words.M === 5) { state.laserMode = 'off'; state.spindle = 0; }
-
-  if (words.S !== undefined) {
-    state.spindle = words.S;
+  for (const word of words) {
+    if (word.letter === 'G') {
+      if (word.value === 90) distanceMode = 'absolute';
+      else if (word.value === 91) distanceMode = 'relative';
+      else if (word.value === 0) motion = 'G0';
+      else if (word.value === 1) motion = 'G1';
+      else if (word.value === 2) motion = 'G2';
+      else if (word.value === 3) motion = 'G3';
+    } else if (word.letter === 'M') {
+      if (word.value === 3) state.laserMode = 'M3';
+      else if (word.value === 4) state.laserMode = 'M4';
+      else if (word.value === 5) { state.laserMode = 'off'; state.spindle = 0; }
+    } else if (word.letter === 'S') {
+      state.spindle = word.value;
+    } else if (word.letter === 'X') {
+      xWord = word.value;
+    } else if (word.letter === 'Y') {
+      yWord = word.value;
+    } else if (word.letter === 'I') {
+      iWord = word.value;
+    } else if (word.letter === 'J') {
+      jWord = word.value;
+    } else if (word.letter === 'R') {
+      rWord = word.value;
+    }
   }
 
-  let motion: 'G0' | 'G1' | 'G2' | 'G3' | null = null;
-  if (words.G === 0) motion = 'G0';
-  else if (words.G === 1) motion = 'G1';
-  else if (words.G === 2) motion = 'G2';
-  else if (words.G === 3) motion = 'G3';
+  state.distanceMode = distanceMode;
   if (motion !== null) state.motionMode = motion;
 
-  const hasMotionWord = words.X !== undefined || words.Y !== undefined;
+  const hasMotionWord = xWord !== undefined || yWord !== undefined;
   if (!hasMotionWord || state.motionMode === null) return;
 
   let nextX = state.posX;
   let nextY = state.posY;
   if (state.distanceMode === 'absolute') {
-    if (words.X !== undefined) nextX = words.X;
-    if (words.Y !== undefined) nextY = words.Y;
+    if (xWord !== undefined) nextX = xWord;
+    if (yWord !== undefined) nextY = yWord;
   } else {
-    if (words.X !== undefined) nextX = state.posX + words.X;
-    if (words.Y !== undefined) nextY = state.posY + words.Y;
+    if (xWord !== undefined) nextX = state.posX + xWord;
+    if (yWord !== undefined) nextY = state.posY + yWord;
   }
 
   const zeroDistance = nextX === state.posX && nextY === state.posY;
@@ -321,8 +343,8 @@ function analyzeEmittedBurnEnvelopeLine(state: EmittedBurnEnvelopeState, raw: st
     let cx: number;
     let cy: number;
     let arcValid = true;
-    if (words.R !== undefined && words.I === undefined && words.J === undefined) {
-      const c = centerFromRMode(state.motionMode, state.posX, state.posY, nextX, nextY, words.R);
+    if (rWord !== undefined && iWord === undefined && jWord === undefined) {
+      const c = centerFromRMode(state.motionMode, state.posX, state.posY, nextX, nextY, rWord);
       if (c === null) {
         expand(state.burnBounds, state.posX, state.posY);
         expand(state.burnBounds, nextX, nextY);
@@ -335,8 +357,8 @@ function analyzeEmittedBurnEnvelopeLine(state: EmittedBurnEnvelopeState, raw: st
         cy = c.cy;
       }
     } else {
-      cx = state.posX + (words.I ?? 0);
-      cy = state.posY + (words.J ?? 0);
+      cx = state.posX + (iWord ?? 0);
+      cy = state.posY + (jWord ?? 0);
     }
     if (arcValid) {
       expandWithArc(state.burnBounds, state.motionMode, state.posX, state.posY, nextX, nextY, cx, cy);

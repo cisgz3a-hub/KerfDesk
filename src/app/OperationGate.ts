@@ -128,8 +128,19 @@ function operationCapabilityRequirement(
     case 'emergency-stop':
       return { supported: caps.operations.canEmergencyStop, detail: 'Controller does not support emergency stop.' };
     case 'wcs-normalize':
-    case 'raw-console':
-      return { supported: true, detail: '' };  // app-level operations, not capability-gated
+      return {
+        supported: caps.operations.canSetWorkOrigin,
+        detail: 'Controller does not support WCS/work-origin normalization.',
+      };
+    case 'raw-console': {
+      const supportsGcodeConsole =
+        caps.output.supportsGcode
+        || caps.output.formats.includes('gcode-text');
+      return {
+        supported: supportsGcodeConsole,
+        detail: 'Controller does not advertise a G-code console command path.',
+      };
+    }
     case 'job-start': {
       const hasExecutableOutput =
         caps.output.supportsGcode
@@ -186,7 +197,7 @@ function operationMachineStateGate(
       return ALLOW;
     case 'pause':
       if (state.status !== 'run' && state.status !== 'jog') {
-        return refuse('machine-state-prevents', `Pause requires 'run' state (current: '${state.status}').`);
+        return refuse('machine-state-prevents', `Pause requires 'run' or 'jog' state (current: '${state.status}').`);
       }
       return ALLOW;
     case 'resume':

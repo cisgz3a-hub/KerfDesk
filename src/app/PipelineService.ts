@@ -22,6 +22,7 @@ import {
   buildReplayableGcodeSpool,
   collectStreamingOutput,
   fromArray,
+  gcodeTextUsesM4,
   type GcodeChunk,
   type SpoolHandle,
 } from '../core/output/GcodeStreaming';
@@ -638,7 +639,7 @@ export async function compileGcode(
       throwIfAborted(opts.signal);
       gcode = materialized.gcode;
       gcodeLines = materialized.gcodeLines;
-      outputUsesM4 = /\bM4\b/i.test(gcode);
+      outputUsesM4 = gcodeTextUsesM4(gcode);
     } else {
       outputUsesM4 = gcodeSpool.usesM4;
     }
@@ -646,7 +647,7 @@ export async function compileGcode(
     const output = strategy.generate(machineTransform.plan, job, gcodeOptions);
     gcode = output.text ?? '';
     gcodeLines = gcode.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-    outputUsesM4 = /\bM4\b/i.test(gcode);
+    outputUsesM4 = gcodeTextUsesM4(gcode);
   }
   if (gcodeMaterialization === 'full' && !gcode) return null;
   if (gcodeMaterialization === 'ticket-only' && !gcodeSpool && !gcode) return null;

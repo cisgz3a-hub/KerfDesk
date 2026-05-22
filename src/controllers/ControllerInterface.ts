@@ -9,6 +9,7 @@
 
 import { type SerialPortLike } from '../communication/SerialPort';
 import type { SafetyActionResult } from './SafetyActionResult';
+import type { ControllerCapabilities } from './ControllerCapabilities';
 import type { GcodeStartMode } from '../core/output/GcodeOrigin';
 import type { SpoolHandle } from '../core/output/GcodeStreaming';
 // T1-163 (audit F-001): surface the T1-116 token type so the
@@ -215,10 +216,16 @@ export interface DeviceIdentity {
   readonly firmwareVersion: string | null;
   readonly buildOptions: string | null;
   readonly maxSpindle: number | null;
+  /** GRBL $31 minimum spindle/PWM. null until reported. */
+  readonly minSpindle?: number | null;
   readonly bedWidthMm: number | null;
   readonly bedHeightMm: number | null;
+  /** GRBL $132 maximum Z travel in mm. null until reported. */
+  readonly zTravelMm?: number | null;
   readonly homingDirection: number | null;
   readonly homingEnabled: boolean | null;
+  /** GRBL $20 soft-limits enable. null until reported. */
+  readonly softLimitsEnabled?: boolean | null;
   readonly laserMode: boolean | null;
   /** T3-57: GRBL `$110` max X feed rate (mm/min). null until reported. */
   readonly maxRateXMmPerMin?: number | null;
@@ -274,6 +281,7 @@ export interface ControllerEventBus {
 export interface ProtocolNeutralLaserController {
   readonly id: string;
   readonly family: ControllerFamily;
+  readonly capabilities?: ControllerCapabilities;
   readonly state: MachineState;
   readonly isJobRunning: boolean;
   readonly operations: MachineOperationApi;
@@ -296,6 +304,7 @@ export interface GcodeLineController {
 
 export interface GrblControllerApi extends GcodeLineController {
   readonly protocolName: string;
+  readonly capabilities?: ControllerCapabilities;
   readonly state: MachineState;
   readonly isJobRunning: boolean;
   readonly operations: MachineOperationApi;

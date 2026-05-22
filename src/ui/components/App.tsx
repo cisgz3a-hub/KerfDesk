@@ -928,10 +928,17 @@ export function App(): React.ReactElement {
     // G91-relative and doesn't depend on WCS but users expect the X:Y
     // readout to reflect machine coords after switching. Only 'savedOrigin'
     // mode wants the WCS offset to persist (user will Set Origin manually).
-    if (result.shouldResetWcs) {
-      void sendResetWcsCommand(grbl.controller);
+    if (result.shouldResetWcs && grbl.controller) {
+      void sendResetWcsCommand(grbl.controller).then(result => {
+        if (!result.ok) {
+          void showAlert(
+            'Reset WCS failed',
+            `LaserForge could not reset the controller WCS baseline (${result.reason}). Verify the connection, use the Reset WCS button, or reconnect before starting from Bed coordinates.`,
+          );
+        }
+      });
     }
-  }, [scene, handleSceneCommit, grbl.controller, setStartMode]);
+  }, [scene, handleSceneCommit, grbl.controller, setStartMode, showAlert]);
 
   const handleExit = useCallback(async () => {
     const ctrl = grbl.controllerRef.current;

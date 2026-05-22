@@ -182,13 +182,17 @@ void (async () => {
     buildInfoRaw: null,
     parserStateRaw: null,
     wcsOffsetsRaw: null,
-    dollarDollarRaw: '$30=1000\n$32=1\n$130=410\n$131=305',
+    dollarDollarRaw: '$20=1\n$22=1\n$30=1000\n$31=0\n$32=1\n$130=410\n$131=305\n$132=50',
   });
   const v = safetyRelevantValues(snap);
+  assert(v.softLimitsEnabled === true, `softLimitsEnabled=true (got ${v.softLimitsEnabled})`);
+  assert(v.homingEnabled === true, `homingEnabled=true (got ${v.homingEnabled})`);
   assert(v.maxSpindle === 1000, `maxSpindle=1000 (got ${v.maxSpindle})`);
+  assert(v.minSpindle === 0, `minSpindle=0 (got ${v.minSpindle})`);
   assert(v.laserMode === true, `laserMode=true (got ${v.laserMode})`);
   assert(v.bedWidth === 410, `bedWidth=410 (got ${v.bedWidth})`);
   assert(v.bedHeight === 305, `bedHeight=305 (got ${v.bedHeight})`);
+  assert(v.zTravelMm === 50, `zTravelMm=50 (got ${v.zTravelMm})`);
 }
 
 // 15. safetyRelevantValues: missing fields → null
@@ -200,6 +204,10 @@ void (async () => {
     dollarDollarRaw: '',
   });
   const v = safetyRelevantValues(snap);
+  assert(v.softLimitsEnabled === null, 'missing $20 -> softLimitsEnabled=null');
+  assert(v.homingEnabled === null, 'missing $22 -> homingEnabled=null');
+  assert(v.minSpindle === null, 'missing $31 -> minSpindle=null');
+  assert(v.zTravelMm === null, 'missing $132 -> zTravelMm=null');
   assert(v.maxSpindle === null, 'missing $30 → maxSpindle=null');
   assert(v.laserMode === null, 'missing $32 → laserMode=null');
   assert(v.bedWidth === null, 'missing $130 → bedWidth=null');

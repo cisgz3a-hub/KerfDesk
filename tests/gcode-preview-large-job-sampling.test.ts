@@ -39,6 +39,11 @@ async function run(): Promise<void> {
   assert.equal(largeModel.totalMoveCount, 120_001, 'model still reports the full motion count');
   assert(largeModel.cutCount > 0, 'sampled model keeps cut moves visible');
   assert(largeModel.totalDuration > 0, 'sampled model keeps duration estimate');
+  assert.deepEqual(
+    largeModel.bounds,
+    { minX: 0, minY: 0, maxX: 120_000, maxY: 199 },
+    'sampled model reports full-job bounds, not only retained sample-move bounds',
+  );
 
   const smallModel = buildGcodePreviewModel('G21\nG90\nG0 X0 Y0\nG1 X10 Y0 F1000\nG1 X10 Y10\n');
   assert(!smallModel.isSampled, 'small preview is not sampled');

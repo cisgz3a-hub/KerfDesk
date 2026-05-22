@@ -53,9 +53,24 @@ export function defaultRedactionOptions(): RedactionOptions {
  * carry usernames). Email + IPv4 are the standard shapes.
  */
 const LICENSE_KEY = /[A-F0-9]{8}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{4}-[A-F0-9]{12}/gi;
+const PRIVATE_KEY_BLOCK = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z0-9 ]*PRIVATE KEY-----/g;
+const BEARER_TOKEN = /\bBearer\s+[A-Za-z0-9._~+/=-]{16,}\b/g;
+const SECRET_ASSIGNMENT = /\b(?:api[_-]?key|token|access[_-]?token|refresh[_-]?token|secret|password)\s*[:=]\s*["']?[A-Za-z0-9._~+/=-]{12,}["']?/gi;
+const CONTROLLER_SERIAL = /\b(?:serial(?:\s*(?:number|no\.?|#))?|sn)\s*[:= ]\s*[A-Za-z0-9][A-Za-z0-9._-]{5,}\b/gi;
+const MAC_ADDRESS = /\b(?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b/g;
 const EMAIL = /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g;
 const IPV4 = /\b(?:\d{1,3}\.){3}\d{1,3}\b/g;
 const FILE_PATH = /(?:[A-Z]:[\\/]|\/(?:Users|home)\/)[^\s"'<>]+/g;
+
+function redactAlwaysSensitive(text: string): string {
+  return text
+    .replace(LICENSE_KEY, '[REDACTED:LICENSE]')
+    .replace(PRIVATE_KEY_BLOCK, '[REDACTED:PRIVATE_KEY]')
+    .replace(BEARER_TOKEN, '[REDACTED:TOKEN]')
+    .replace(SECRET_ASSIGNMENT, '[REDACTED:TOKEN]')
+    .replace(CONTROLLER_SERIAL, '[REDACTED:SERIAL]')
+    .replace(MAC_ADDRESS, '[REDACTED:MAC]');
+}
 
 /**
  * Apply redaction to a string. Order matters: license-key first (tightest
@@ -64,11 +79,10 @@ const FILE_PATH = /(?:[A-Z]:[\\/]|\/(?:Users|home)\/)[^\s"'<>]+/g;
  * names), then emails + IPs.
  */
 export function redactString(text: string, options: RedactionOptions): string {
-  let out = text;
-  // Always-on: license keys redacted regardless of options.redactLicenseKeys
-  // (the field is kept for explicitness but the always-on rule is the
-  // defence-in-depth contract).
-  out = out.replace(LICENSE_KEY, '[REDACTED:LICENSE]');
+  let out = redactAlwaysSensitive(text);
+  // Always-on: license keys and high-risk machine/credential identifiers are
+  // redacted regardless of caller options. The option field is kept for
+  // explicitness, but these are defence-in-depth support-export rules.
   if (options.redactFilePaths) {
     out = out.replace(FILE_PATH, '[REDACTED:PATH]');
   }
@@ -83,6 +97,23 @@ export function redactString(text: string, options: RedactionOptions): string {
 
 const PROJECT_NAME_KEYS = new Set(['projectName', 'sceneName', 'fileName', 'name']);
 const IMAGE_BUFFER_KEYS = new Set(['data', 'imageData', 'rawData', 'pixels', 'grayscaleData', 'adjustedData', 'processedData']);
+
+function normalizedKey(key: string): string {
+  return key.replace(/[^a-z0-9]/gi, '').toLowerCase();
+}
+
+function keyRedactionPlaceholder(key: string): string | null {
+  const normalized = normalizedKey(key);
+  if (/privatekey|secretkey/.test(normalized)) return '[REDACTED:PRIVATE_KEY]';
+  if (/apikey|apitoken|accesstoken|refreshtoken|bearertoken|auth(?:orization)?token|password|secret/.test(normalized)) {
+    return '[REDACTED:TOKEN]';
+  }
+  if (/macaddress|hardwareaddress|bssid/.test(normalized)) return '[REDACTED:MAC]';
+  if (/serialnumber|deviceserial|controllerserial|machineserial/.test(normalized)) {
+    return '[REDACTED:SERIAL]';
+  }
+  return null;
+}
 
 function isGcodeLine(text: string): boolean {
   return /\b(?:G0|G1|G2|G3|G21|G90|G91|M3|M4|M5|M30|M2|S\d+|F\d+)\b/.test(text);
@@ -104,6 +135,10 @@ export function redactObject<T = unknown>(value: T, options: RedactionOptions): 
 function _redactRec(value: unknown, options: RedactionOptions, parentKey: string | null): unknown {
   if (value === null || value === undefined) return value;
   if (typeof value === 'string') {
+    if (parentKey != null) {
+      const placeholder = keyRedactionPlaceholder(parentKey);
+      if (placeholder != null) return placeholder;
+    }
     if (parentKey != null && options.redactProjectNames && PROJECT_NAME_KEYS.has(parentKey)) {
       return '[REDACTED:PROJECT_NAME]';
     }
@@ -112,7 +147,7 @@ function _redactRec(value: unknown, options: RedactionOptions, parentKey: string
       // Still redact license keys (defence-in-depth) but skip path/email/IP
       // — those don't legitimately appear in G-code anyway, but a comment
       // line could.
-      return value.replace(LICENSE_KEY, '[REDACTED:LICENSE]');
+      return redactAlwaysSensitive(value);
     }
     return redactString(value, options);
   }

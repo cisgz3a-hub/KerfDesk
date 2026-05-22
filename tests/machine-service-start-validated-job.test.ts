@@ -13,13 +13,22 @@ import {
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
+import {
+  grblCapabilities,
+  type ControllerCapabilities,
+} from '../src/controllers/ControllerCapabilities';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { getJobLogs } from '../src/core/job/JobLog';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { buildReplayableGcodeSpool, fromArray } from '../src/core/output/GcodeStreaming';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 import { makeTestFrameTicket } from './helpers/testFrameTicket';
@@ -169,7 +178,23 @@ async function run(): Promise<void> {
   installMockLocalStorage();
 
   const scene = createScene(120, 100, 'ticket svc test');
+  const profile = createBlankProfile('MachineService Start Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
   const ticket = makeTestTicket(scene);
+
+  const noExecutableOutputCapabilities: ControllerCapabilities = {
+    ...grblCapabilities,
+    output: {
+      ...grblCapabilities.output,
+      formats: [],
+      jobExecution: 'device-native',
+      supportsGcode: false,
+      supportsBinary: false,
+    },
+  };
 
   {
     const sentBatches: string[][] = [];
@@ -218,6 +243,41 @@ async function run(): Promise<void> {
       && ctx0.canvasMoves.length === 0,
       'getActiveJobCanvasContext holds same machineTransform ref and snapshot',
     );
+  }
+
+  {
+    let executeCount = 0;
+    const mock = {
+      ...makeMockController(async () => {
+        executeCount++;
+      }),
+      capabilities: noExecutableOutputCapabilities,
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    let message = '';
+    try {
+      await svc.startValidatedJob({
+        ticket,
+        frameTicket: makeTestFrameTicket(ticket),
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: canvasContextForTicket(ticket),
+        currentStartMode: ticket.startMode,
+        currentSavedOrigin: ticket.savedOrigin,
+      });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    assert(
+      /executable job output format/i.test(message),
+      'controller without executable output is rejected at service start boundary',
+    );
+    assert(executeCount === 0, 'capability rejection happens before executeJob');
   }
 
   {

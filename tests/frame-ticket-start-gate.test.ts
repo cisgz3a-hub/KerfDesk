@@ -25,7 +25,12 @@ import {
   type LaserController,
   type MachineState,
 } from '../src/controllers/ControllerInterface';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import {
   captureEntitlementPolicySnapshot,
@@ -81,6 +86,15 @@ function installMockLocalStorage(): void {
       memoryStore[key] = value;
     },
   } as Storage;
+}
+
+function installKnownBedProfile(): void {
+  const profile = createBlankProfile('Frame Ticket Gate Profile');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  profile.homeCorner = 'front-left';
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
 }
 
 function makeTicket(
@@ -180,6 +194,7 @@ async function expectStartRejects(
 void (async () => {
   console.log('\n=== frame-ticket service start gate ===\n');
   installMockLocalStorage();
+  installKnownBedProfile();
   const scene = createScene(120, 100, 'frame-ticket');
   const ticket = makeTicket(scene);
 

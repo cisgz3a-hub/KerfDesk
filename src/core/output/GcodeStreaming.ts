@@ -153,6 +153,38 @@ function utf8ByteLength(text: string): number {
     : text.length;
 }
 
+function stripGcodeComments(line: string): string {
+  let out = '';
+  let inParenComment = false;
+  for (const ch of line) {
+    if (inParenComment) {
+      if (ch === ')') inParenComment = false;
+      continue;
+    }
+    if (ch === ';') break;
+    if (ch === '(') {
+      inParenComment = true;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+export function gcodeLineUsesM4(line: string): boolean {
+  const code = stripGcodeComments(line);
+  for (const match of code.matchAll(/[mM]\s*([+-]?\d+(?:\.\d+)?)/g)) {
+    const value = Number(match[1]);
+    if (Number.isFinite(value) && value === 4) return true;
+  }
+  return false;
+}
+
+export function gcodeTextUsesM4(gcode: string | null | undefined): boolean {
+  if (!gcode) return false;
+  return gcode.split(/\r?\n/).some(gcodeLineUsesM4);
+}
+
 /**
  * Build a replayable spool handle from a deterministic chunk factory without
  * collecting the job into a flat `string[]`.
@@ -178,7 +210,7 @@ export async function buildReplayableGcodeSpool(
   for await (const chunk of factory(options)) {
     if (options.signal?.aborted) break;
     for (const line of chunk.lines) {
-      if (!usesM4 && /\bM4\b/i.test(line)) {
+      if (!usesM4 && gcodeLineUsesM4(line)) {
         usesM4 = true;
       }
       if (wroteLine) {

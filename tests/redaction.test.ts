@@ -255,7 +255,41 @@ void (async () => {
     `undefined → undefined`);
 }
 
-// 24. Source-level pin
+// 24. Controller identifiers and secret tokens are redacted by default.
+{
+  const text = [
+    'Controller SN: LF-FALCON-123456',
+    'mac=AA:BB:CC:DD:EE:FF',
+    'Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456',
+    'apiKey=sk_live_1234567890abcdef1234567890abcdef',
+    '-----BEGIN PRIVATE KEY-----',
+    'not-a-real-key-material',
+    '-----END PRIVATE KEY-----',
+  ].join('\n');
+  const out = redactString(text, defaultRedactionOptions());
+  assert(out.includes('[REDACTED:SERIAL]'), `controller serial redacted (got '${out}')`);
+  assert(out.includes('[REDACTED:MAC]'), `MAC address redacted (got '${out}')`);
+  assert(out.includes('[REDACTED:TOKEN]'), `bearer/API token redacted (got '${out}')`);
+  assert(out.includes('[REDACTED:PRIVATE_KEY]'), `private key block redacted (got '${out}')`);
+  assert(!/LF-FALCON-123456|AA:BB:CC:DD:EE:FF|abcdefghijklmnopqrstuvwxyz123456|sk_live_|not-a-real-key/.test(out),
+    'raw controller identifiers and secrets do not remain');
+}
+
+// 25. Opted-in G-code preserves motion but still redacts secrets in comments.
+{
+  const gcode = [
+    'G1 X100.0 Y50.0 F3000 ; token=sk_live_1234567890abcdef1234567890abcdef',
+    'M4 S200 ; mac AA:BB:CC:DD:EE:FF',
+  ].join('\n');
+  const out = redactString(gcode, { ...defaultRedactionOptions(), redactGcode: false });
+  assert(out.includes('G1 X100.0 Y50.0 F3000'), 'opted-in G-code motion is preserved');
+  assert(out.includes('M4 S200'), 'opted-in G-code laser command is preserved');
+  assert(out.includes('[REDACTED:TOKEN]'), `G-code comment token redacted (got '${out}')`);
+  assert(out.includes('[REDACTED:MAC]'), `G-code comment MAC redacted (got '${out}')`);
+  assert(!/sk_live_|AA:BB:CC:DD:EE:FF/.test(out), 'raw G-code comment secrets do not remain');
+}
+
+// 26. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');
@@ -266,7 +300,10 @@ void (async () => {
   for (const fn of ['redactString', 'redactObject', 'defaultRedactionOptions', 'redactDefault']) {
     assert(src.includes(fn), `helper ${fn} declared`);
   }
-  for (const placeholder of ['[REDACTED:LICENSE]', '[REDACTED:EMAIL]', '[REDACTED:IP]', '[REDACTED:PATH]']) {
+  for (const placeholder of [
+    '[REDACTED:LICENSE]', '[REDACTED:EMAIL]', '[REDACTED:IP]', '[REDACTED:PATH]',
+    '[REDACTED:MAC]', '[REDACTED:TOKEN]', '[REDACTED:PRIVATE_KEY]', '[REDACTED:SERIAL]',
+  ]) {
     assert(src.includes(placeholder), `placeholder '${placeholder}' present`);
   }
   // defence-in-depth contract: license redaction not gated on the option

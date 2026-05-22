@@ -51,18 +51,26 @@ export interface ParsedGrblSetting {
  *     unparseable value lands as false
  */
 export interface InterpretedGrblSetting {
+  /** $20 - soft limits enable. Undefined when rawValue is unparseable. */
+  readonly softLimitsEnabled?: boolean;
+  /** $22 - homing cycle enable. Undefined when rawValue is unparseable. */
+  readonly homingEnabled?: boolean;
   /** $23 — homing-cycle direction. Always present after parse;
    *  defaults to 0 when rawValue is unparseable (matches `parseInt
    *  || 0` from the pre-fix code). */
   readonly homingDir?: number;
   /** $30 — max spindle / PWM. Only set when parseFloat is finite and > 0. */
   readonly maxSpindle?: number;
+  /** $31 - min spindle / PWM. Set when parseFloat is finite and >= 0. */
+  readonly minSpindle?: number;
   /** $32 — laser-mode boolean. parseInt(rawValue) !== 0 (NaN → false). */
   readonly laserMode?: boolean;
   /** $130 — bed width (mm). Set when parseFloat is finite. */
   readonly bedWidth?: number;
   /** $131 — bed height (mm). Set when parseFloat is finite. */
   readonly bedHeight?: number;
+  /** $132 - Z travel (mm). Set when parseFloat is finite and > 0. */
+  readonly zTravelMm?: number;
   /** $110 — max X feed (mm/min). Set when parseFloat is finite. */
   readonly maxFeedX?: number;
   /** $111 — max Y feed (mm/min). Set when parseFloat is finite. */
@@ -99,17 +107,31 @@ export function interpretGrblSettingValue(
   rawValue: string,
 ): InterpretedGrblSetting {
   const out: {
+    softLimitsEnabled?: boolean;
+    homingEnabled?: boolean;
     homingDir?: number;
     maxSpindle?: number;
+    minSpindle?: number;
     laserMode?: boolean;
     bedWidth?: number;
     bedHeight?: number;
+    zTravelMm?: number;
     maxFeedX?: number;
     maxFeedY?: number;
     maxAccelX?: number;
     maxAccelY?: number;
   } = {};
   switch (num) {
+    case 20: {
+      const v = parseInt(rawValue, 10);
+      if (Number.isFinite(v)) out.softLimitsEnabled = v !== 0;
+      break;
+    }
+    case 22: {
+      const v = parseInt(rawValue, 10);
+      if (Number.isFinite(v)) out.homingEnabled = v !== 0;
+      break;
+    }
     case 23: {
       // pre-fix: parseInt(rawVal, 10) || 0 — NaN coerces to 0.
       const v = parseInt(rawValue, 10);
@@ -121,18 +143,24 @@ export function interpretGrblSettingValue(
       if (Number.isFinite(v) && v > 0) out.maxSpindle = v;
       break;
     }
+    case 31: {
+      const v = parseFloat(rawValue);
+      if (Number.isFinite(v) && v >= 0) out.minSpindle = v;
+      break;
+    }
     case 32: {
-      out.laserMode = parseInt(rawValue, 10) !== 0;
+      const v = parseInt(rawValue, 10);
+      if (Number.isFinite(v)) out.laserMode = v !== 0;
       break;
     }
     case 110: {
       const v = parseFloat(rawValue);
-      if (Number.isFinite(v)) out.maxFeedX = v;
+      if (Number.isFinite(v) && v > 0) out.maxFeedX = v;
       break;
     }
     case 111: {
       const v = parseFloat(rawValue);
-      if (Number.isFinite(v)) out.maxFeedY = v;
+      if (Number.isFinite(v) && v > 0) out.maxFeedY = v;
       break;
     }
     case 120: {
@@ -147,12 +175,17 @@ export function interpretGrblSettingValue(
     }
     case 130: {
       const v = parseFloat(rawValue);
-      if (Number.isFinite(v)) out.bedWidth = v;
+      if (Number.isFinite(v) && v > 0) out.bedWidth = v;
       break;
     }
     case 131: {
       const v = parseFloat(rawValue);
-      if (Number.isFinite(v)) out.bedHeight = v;
+      if (Number.isFinite(v) && v > 0) out.bedHeight = v;
+      break;
+    }
+    case 132: {
+      const v = parseFloat(rawValue);
+      if (Number.isFinite(v) && v > 0) out.zTravelMm = v;
       break;
     }
     default:

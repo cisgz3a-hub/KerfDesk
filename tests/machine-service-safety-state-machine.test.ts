@@ -36,10 +36,14 @@ function makeController(args?: {
   resume?: () => void;
   stop?: () => void;
   emergencyStop?: () => void;
+  status?: MachineState['status'];
 }): LaserController {
+  const state: MachineState = { ...idle, status: args?.status ?? 'run' };
   return {
     protocolName: 'mock',
-    state: { ...idle },
+    get state() {
+      return state;
+    },
     isJobRunning: false,
     maxSpindle: null,
     connect: async () => {},
@@ -65,10 +69,12 @@ function makeController(args?: {
       laserOff: async () => ({ ok: true }),
       pauseJob: async () => {
         args?.pause?.();
+        state.status = 'hold';
         return { ok: true };
       },
       resumeJob: async () => {
         args?.resume?.();
+        state.status = 'run';
         return { ok: true };
       },
       stopJob: async () => {

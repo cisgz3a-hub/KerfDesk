@@ -18,9 +18,39 @@ import { createEmptyPlan } from '../src/core/plan/Plan';
 import { createScene } from '../src/core/scene/Scene';
 import { hashObject, hashSceneForTicket, hashString } from '../src/core/job/ticketHashing';
 import { captureEntitlementPolicySnapshot, hashEntitlementPolicy, hashReferencedMaterialPresets } from '../src/core/job/compileInputHashes';
-import { getActiveProfile } from '../src/core/devices/DeviceProfile';
+import {
+  createBlankProfile,
+  getActiveProfile,
+  resetDeviceProfilesForTest,
+  saveDeviceProfile,
+  setActiveProfileId,
+} from '../src/core/devices/DeviceProfile';
 import { makeTestJobFingerprint } from './helpers/testJobFingerprint';
 import { makeTestFrameTicket } from './helpers/testFrameTicket';
+
+const memoryStore: Record<string, string> = {};
+function installMockLocalStorage(): void {
+  (globalThis as unknown as { localStorage: Storage }).localStorage = {
+    get length() {
+      return Object.keys(memoryStore).length;
+    },
+    clear(): void {
+      for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+    },
+    getItem(key: string): string | null {
+      return Object.prototype.hasOwnProperty.call(memoryStore, key) ? memoryStore[key] : null;
+    },
+    key(index: number): string | null {
+      return Object.keys(memoryStore)[index] ?? null;
+    },
+    removeItem(key: string): void {
+      delete memoryStore[key];
+    },
+    setItem(key: string, value: string): void {
+      memoryStore[key] = value;
+    },
+  } as Storage;
+}
 
 let passed = 0;
 let failed = 0;
@@ -91,8 +121,20 @@ function ctxFor(t: ValidatedJobTicket): ActiveJobCanvasContext {
   };
 }
 
+function installActiveProfile(): void {
+  resetDeviceProfilesForTest();
+  const profile = createBlankProfile('Start Then Try Finalize Test');
+  profile.bedWidth = 120;
+  profile.bedHeight = 100;
+  saveDeviceProfile(profile);
+  setActiveProfileId(profile.id);
+}
+
 void (async () => {
   console.log('\n=== startValidatedJob + immediate stale tryFinalize (race) ===\n');
+  installMockLocalStorage();
+  for (const k of Object.keys(memoryStore)) delete memoryStore[k];
+  installActiveProfile();
 
   const scene = createScene(120, 100, 'race');
   const ticket = makeTicket(scene);

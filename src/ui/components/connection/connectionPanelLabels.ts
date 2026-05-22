@@ -107,6 +107,7 @@ export function buildReadyOperationRows(scene: Scene): OperationRow[] {
       powerPercent: Math.round(layer.settings.power.max),
       feedRateMmPerMin: Math.round(layer.settings.speed),
       passes: Math.max(1, Math.round(layer.settings.passes)),
+      zStepPerPassMm: layer.settings.zStepPerPass,
     });
   }
   return rows;

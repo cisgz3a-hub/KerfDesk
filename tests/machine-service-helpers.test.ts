@@ -66,9 +66,14 @@ console.log('\n=== T1-145 MachineService helpers ===\n');
     'M3 → no mutate');
   assert(!mutatesWorkCoordinateSystem(''),
     'empty string → no mutate');
-  // Anchored at start of string — interior G10/G92 ignored
-  assert(!mutatesWorkCoordinateSystem('G0 G10'),
-    'G10 mid-command → no mutate (anchor ^)');
+  // Same-block modal/manual commands can hide coordinate mutations after
+  // another G word; those still have to invalidate saved-origin state.
+  assert(mutatesWorkCoordinateSystem('G0 G10'),
+    'G10 mid-command → mutates');
+  assert(mutatesWorkCoordinateSystem('G90 G10 L20 P1 X0 Y0'),
+    'G10 after modal word → mutates');
+  assert(mutatesWorkCoordinateSystem('G0 X0 G92 X0 Y0'),
+    'G92 after motion word → mutates');
 }
 
 // -------- safetyResultForStateMachine --------

@@ -92,6 +92,22 @@ console.log('\n=== T1-124 GRBL status-report parser ===\n');
     `MPos with only x,y → z defaults to 0 (got z=${r.mPos?.z})`);
 }
 
+// -------- 4b. Malformed/non-finite coordinates are not trusted --------
+{
+  const r = parseGrblStatusReport('<Idle|MPos:bad,20,0|WPos:1,2,3|FS:0,0>');
+  assert(r.mPos === null,
+    `malformed MPos x -> mPos=null, not a trusted position (got ${JSON.stringify(r.mPos)})`);
+  assert(r.wPos != null && r.wPos.x === 1,
+    'valid WPos still parses when MPos is malformed');
+}
+{
+  const r = parseGrblStatusReport('<Idle|MPos:10,20,0|WPos:1,NaN,3|FS:0,0>');
+  assert(r.wPos === null,
+    `malformed WPos y -> wPos=null, not a trusted position (got ${JSON.stringify(r.wPos)})`);
+  assert(r.mPos != null && r.mPos.x === 10,
+    'valid MPos still parses when WPos is malformed');
+}
+
 // -------- 5. FS field: feed + spindle, with NaN coerced to 0 --------
 {
   const r = parseGrblStatusReport('<Run|FS:1500,500>');

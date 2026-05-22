@@ -125,10 +125,14 @@ export function buildControllerSettingsSnapshot(args: SnapshotInputs): Controlle
  * profile's declared value.
  */
 export function safetyRelevantValues(snap: ControllerSettingsSnapshot): {
+  softLimitsEnabled: boolean | null;
+  homingEnabled: boolean | null;
   maxSpindle: number | null;
+  minSpindle: number | null;
   laserMode: boolean | null;
   bedWidth: number | null;
   bedHeight: number | null;
+  zTravelMm: number | null;
 } {
   const num = (k: string): number | null => {
     const v = snap.settings[k];
@@ -136,11 +140,29 @@ export function safetyRelevantValues(snap: ControllerSettingsSnapshot): {
     const n = parseFloat(v);
     return Number.isFinite(n) ? n : null;
   };
+  const nonNegative = (k: string): number | null => {
+    const n = num(k);
+    return n != null && n >= 0 ? n : null;
+  };
+  const positive = (k: string): number | null => {
+    const n = num(k);
+    return n != null && n > 0 ? n : null;
+  };
+  const bool = (k: string): boolean | null => {
+    const v = snap.settings[k];
+    if (v == null) return null;
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) ? n !== 0 : null;
+  };
   const laser = snap.settings['$32'];
   return {
-    maxSpindle: num('$30'),
-    laserMode: laser == null ? null : parseInt(laser, 10) !== 0,
-    bedWidth: num('$130'),
-    bedHeight: num('$131'),
+    softLimitsEnabled: bool('$20'),
+    homingEnabled: bool('$22'),
+    maxSpindle: positive('$30'),
+    minSpindle: nonNegative('$31'),
+    laserMode: laser == null ? null : bool('$32'),
+    bedWidth: positive('$130'),
+    bedHeight: positive('$131'),
+    zTravelMm: positive('$132'),
   };
 }

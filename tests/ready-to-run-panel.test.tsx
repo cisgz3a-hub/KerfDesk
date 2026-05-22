@@ -49,6 +49,7 @@ const baseData: ReadyToRunPanelData = {
     summaryLabel: '3 operations',
     boundsLabel: 'X0.0 Y0.0 to X120.0 Y80.0',
     estimatedTimeLabel: '3:42',
+    laserModeLabel: 'Dynamic M4',
     complexity: {
       commandCount: 18420,
       commandCountLabel: '18,420',
@@ -73,7 +74,7 @@ const baseData: ReadyToRunPanelData = {
     operationAnalysis: analyzeOperationOrder([
       { index: 1, layerName: 'Engrave text', kind: 'engrave', powerPercent: 35, feedRateMmPerMin: 2500, passes: 1 },
       { index: 2, layerName: 'Score fold', kind: 'score', powerPercent: 15, feedRateMmPerMin: 1800, passes: 1 },
-      { index: 3, layerName: 'Cut outline', kind: 'cut', powerPercent: 80, feedRateMmPerMin: 220, passes: 2 },
+      { index: 3, layerName: 'Cut outline', kind: 'cut', powerPercent: 80, feedRateMmPerMin: 220, passes: 2, zStepPerPassMm: -1 },
     ]),
   },
   material: {
@@ -142,6 +143,8 @@ async function run(): Promise<void> {
         text.includes('Operation order') &&
         text.includes('Job complexity') &&
         text.includes('18,420') &&
+        text.includes('Dynamic M4') &&
+        text.includes('Z -1 mm/pass') &&
         text.includes('300 DPI equivalent') &&
         text.includes('12.4 m') &&
         container.querySelector('[data-testid="job-layout-mini-map"]') != null,

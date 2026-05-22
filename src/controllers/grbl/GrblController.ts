@@ -1,5 +1,5 @@
 /**
- * GRBL 1.1 controller with character-counting buffer management.
+ * GRBL 1.1 controller with byte-counting buffer management.
  * Pipelines G-code for maximum throughput — no stuttering.
  */
 
@@ -74,8 +74,9 @@ import {
   makeSoftResetStopResult,
 } from '../SafetyActionResult';
 import { appendStructuredDiagnosticLogEvent } from '../../core/logging/StructuredDiagnosticLog';
+import { grblCapabilities } from '../ControllerCapabilities';
 
-const GRBL_BUFFER_SIZE = 127;
+const DEFAULT_GRBL_BUFFER_SIZE = 127;
 const STATUS_POLL_INTERVAL = 200;
 const JOB_STATUS_REPLY_WARN_MS = 1500;
 const JOB_NO_RX_ABORT_MS = 8000;
@@ -84,6 +85,60 @@ const REALTIME_FEED_HOLD = 0x21; // '!'
 const REALTIME_CYCLE_START = 0x7E; // '~'
 const REALTIME_RESET = 0x18;
 const STREAM_JOB_WINDOW_LINES = 2048;
+
+function encodedByteLength(text: string): number {
+  return new TextEncoder().encode(text).byteLength;
+}
+
+function grblLineByteCount(line: string): number {
+  return encodedByteLength(`${line}\n`);
+}
+
+function assertGrblLineFitsBuffer(line: string, label: string, bufferSize = DEFAULT_GRBL_BUFFER_SIZE): void {
+  const byteCount = grblLineByteCount(line);
+  if (byteCount > bufferSize) {
+    throw new Error(`${label} exceeds GRBL buffer size (${bufferSize} bytes; got ${byteCount})`);
+  }
+}
+
+function grblUsableRxBufferFromBuildOptions(buildOptions: string): number | null {
+  const tokens = buildOptions.split(',').map(token => token.trim()).filter(Boolean);
+  const rxSizeToken = tokens.at(-1);
+  if (rxSizeToken == null || !/^\d+$/.test(rxSizeToken)) return null;
+
+  const reportedRxBytes = Number(rxSizeToken);
+  if (!Number.isSafeInteger(reportedRxBytes) || reportedRxBytes < 2) return null;
+
+  return Math.min(DEFAULT_GRBL_BUFFER_SIZE, reportedRxBytes - 1);
+}
+
+function stripGcodeComments(line: string): string {
+  let out = '';
+  let inParenComment = false;
+  for (const ch of line) {
+    if (inParenComment) {
+      if (ch === ')') inParenComment = false;
+      continue;
+    }
+    if (ch === ';') break;
+    if (ch === '(') {
+      inParenComment = true;
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
+function orderedMWords(line: string): number[] {
+  const codePart = stripGcodeComments(line);
+  const words: number[] = [];
+  for (const match of codePart.matchAll(/[mM]\s*([+-]?\d+(?:\.\d+)?)/g)) {
+    const value = Number(match[1]);
+    if (Number.isFinite(value)) words.push(value);
+  }
+  return words;
+}
 
 
 interface PendingLine {
@@ -254,6 +309,7 @@ export interface GrblMachineInfo {
 export class GrblController implements GrblControllerApi {
   readonly family = 'grbl' as const;
   readonly protocolName = 'GRBL 1.1';
+  readonly capabilities = grblCapabilities;
   readonly operations = {
     jog: async (args: {
       axis: 'X' | 'Y' | 'Z';
@@ -429,7 +485,8 @@ export class GrblController implements GrblControllerApi {
   private _streamFillInFlight = false;
   private _spoolValidationAbortController: AbortController | null = null;
   private _pending: PendingLine[] = [];
-  private _bufferAvailable = GRBL_BUFFER_SIZE;
+  private _rxBufferSize = DEFAULT_GRBL_BUFFER_SIZE;
+  private _bufferAvailable = DEFAULT_GRBL_BUFFER_SIZE;
   private _activeTransferMode: ControllerJobTicket['transferMode'] = 'buffered';
   private _linesAcknowledged = 0;
   private _jobStartTime = 0;
@@ -714,6 +771,8 @@ export class GrblController implements GrblControllerApi {
     // connect partially failed without going through disconnect.
     this._firmwareVersion = null;
     this._buildOptions = null;
+    this._rxBufferSize = DEFAULT_GRBL_BUFFER_SIZE;
+    this._bufferAvailable = DEFAULT_GRBL_BUFFER_SIZE;
     // T1-44: clear position-confirmed at connect; the welcome handshake's first
     // status report sets it back to true.
     this._positionConfirmed = false;
@@ -986,6 +1045,8 @@ export class GrblController implements GrblControllerApi {
     // newly-attached device's identity, not the previous session's.
     this._firmwareVersion = null;
     this._buildOptions = null;
+    this._rxBufferSize = DEFAULT_GRBL_BUFFER_SIZE;
+    this._bufferAvailable = DEFAULT_GRBL_BUFFER_SIZE;
     // T1-20: nothing to be uncertain about when not connected.
     this._placementUncertain = false;
     this._lastPlacementUncertainReason = null;
@@ -1023,6 +1084,8 @@ export class GrblController implements GrblControllerApi {
     // T3-50: clear identity snapshot on transport-error disconnect.
     this._firmwareVersion = null;
     this._buildOptions = null;
+    this._rxBufferSize = DEFAULT_GRBL_BUFFER_SIZE;
+    this._bufferAvailable = DEFAULT_GRBL_BUFFER_SIZE;
     this._placementUncertain = false;
     this._lastPlacementUncertainReason = null;
     this._positionConfirmed = false;
@@ -1142,6 +1205,7 @@ export class GrblController implements GrblControllerApi {
     for await (const chunk of spool.open({ signal })) {
       this._throwIfSpoolValidationAborted(signal);
       const parsed = parseGrblJobLineChunk(chunk.lines, parserState);
+      this._validateJobLineByteCounts(parsed.jobLines);
       const boundsError = checkGrblJobBoundsChunk(parsed.jobLines, boundsContext, boundsState);
       if (boundsError) {
         throw new Error(boundsError);
@@ -1178,6 +1242,7 @@ export class GrblController implements GrblControllerApi {
         }
         const chunk = next.value;
         const parsed = parseGrblJobLineChunk(chunk.lines, this._streamParserState);
+        this._validateJobLineByteCounts(parsed.jobLines);
         this._jobLines.push(...parsed.jobLines);
         this._lineMarkers.push(...parsed.lineMarkers);
         if (chunk.isLast) {
@@ -1221,6 +1286,7 @@ export class GrblController implements GrblControllerApi {
     lineMarkers: (readonly string[] | null)[],
     transferMode: ControllerJobTicket['transferMode'] = 'buffered',
   ): void {
+    this._validateJobLineByteCounts(jobLines);
     this._jobLines = jobLines;
     this._lineMarkers = lineMarkers;
     this._clearStreamState();
@@ -1245,7 +1311,7 @@ export class GrblController implements GrblControllerApi {
   ): void {
     this._queueIndex = 0;
     this._pending = [];
-    this._bufferAvailable = GRBL_BUFFER_SIZE;
+    this._bufferAvailable = this._rxBufferSize;
     this._activeTransferMode = transferMode === 'synchronous' ? 'synchronous' : 'buffered';
     this._linesAcknowledged = 0;
     this._jobTotalLines = totalLines;
@@ -1254,6 +1320,7 @@ export class GrblController implements GrblControllerApi {
     this._jobStatusHeartbeatWarned = false;
     this._pausePending = false;
     this._resumeRequested = false;
+    this._lastSpindleMode = null;
     this._ackTimestamps = [];
     this._sendTimestamps = [];
     // T1-220: reset the bytes-written counter at the start of every
@@ -1281,6 +1348,12 @@ export class GrblController implements GrblControllerApi {
     lineMarkers: (readonly string[] | null)[];
   } {
     return parseGrblJobLines(lines);
+  }
+
+  private _validateJobLineByteCounts(lines: readonly string[]): void {
+    for (const line of lines) {
+      assertGrblLineFitsBuffer(line, 'G-code line', this._rxBufferSize);
+    }
   }
 
   /**
@@ -1720,13 +1793,11 @@ export class GrblController implements GrblControllerApi {
       throw new Error('Invalid command: empty');
     }
 
-    if (command.length > 127) {
-      throw new Error('Command exceeds GRBL buffer size (127 bytes)');
-    }
-
     if (/[\r\n]/.test(command)) {
       throw new Error('Multi-line commands not allowed');
     }
+
+    assertGrblLineFitsBuffer(command, 'Command', this._rxBufferSize);
 
     this._writeLine(command);
   }
@@ -1782,12 +1853,10 @@ export class GrblController implements GrblControllerApi {
     if (typeof command !== 'string' || command.length === 0) {
       throw new Error('Invalid autofocus command: empty');
     }
-    if (command.length > 127) {
-      throw new Error('Autofocus command exceeds GRBL buffer size (127 bytes)');
-    }
     if (/[\r\n]/.test(command)) {
       throw new Error('Autofocus command must be single-line');
     }
+    assertGrblLineFitsBuffer(command, 'Autofocus command', this._rxBufferSize);
 
     return await new Promise<void>((resolve, reject) => {
       let completed = false;
@@ -1942,6 +2011,13 @@ export class GrblController implements GrblControllerApi {
    */
   applyWcsNormalization(): void {
     if (!this._port?.isOpen) return;
+    if (this._isJobRunning || this._state.status !== 'idle') {
+      console.warn(
+        `[GrblController] Refusing WCS normalization while machine is '${this._state.status}'`
+        + (this._isJobRunning ? ' and a job is running.' : '.'),
+      );
+      return;
+    }
     this._writeSystemLine('G10 L2 P1 X0 Y0 Z0');
     this._writeSystemLine('$10=0');
     this._settingsQueried = true;
@@ -2317,6 +2393,13 @@ export class GrblController implements GrblControllerApi {
       this._firmwareVersion = parsed.firmwareVersion;
     } else {
       this._buildOptions = parsed.buildOptions;
+      const usableRxBuffer = grblUsableRxBufferFromBuildOptions(parsed.buildOptions);
+      if (usableRxBuffer !== null) {
+        this._rxBufferSize = usableRxBuffer;
+        this._bufferAvailable = this._isJobRunning
+          ? Math.min(this._bufferAvailable, usableRxBuffer)
+          : usableRxBuffer;
+      }
     }
     return true;
   }
@@ -2589,7 +2672,7 @@ export class GrblController implements GrblControllerApi {
 
   /**
    * Send as many queued lines as the GRBL buffer can hold.
-   * Each line costs (line.length + 1) bytes.
+   * Each line costs its encoded serial byte length plus newline.
    * Don't send if it would overflow the 127-byte buffer.
    * On each 'ok', free the bytes for the oldest pending line.
    */
@@ -2605,7 +2688,7 @@ export class GrblController implements GrblControllerApi {
     while (this._queueIndex < this._jobLines.length) {
       if (this._activeTransferMode === 'synchronous' && this._pending.length > 0) break;
       const line = this._jobLines[this._queueIndex];
-      const byteCount = line.length + 1;
+      const byteCount = grblLineByteCount(line);
 
       if (byteCount > this._bufferAvailable) break;
 
@@ -2628,7 +2711,7 @@ export class GrblController implements GrblControllerApi {
     while (this._jobLines.length > 0) {
       if (this._activeTransferMode === 'synchronous' && this._pending.length > 0) break;
       const line = this._jobLines[0];
-      const byteCount = line.length + 1;
+      const byteCount = grblLineByteCount(line);
 
       if (byteCount > this._bufferAvailable) break;
 
@@ -2681,7 +2764,7 @@ export class GrblController implements GrblControllerApi {
     this._queueIndex = 0;
     this._jobTotalLines = 0;
     this._pending = [];
-    this._bufferAvailable = GRBL_BUFFER_SIZE;
+    this._bufferAvailable = this._rxBufferSize;
     this._activeTransferMode = 'buffered';
     this._pausePending = false;
     this._resumeRequested = false;
@@ -2744,21 +2827,19 @@ export class GrblController implements GrblControllerApi {
   }
 
   /**
-   * T1-23: track modal spindle/laser mode from outgoing gcode. Parenthesized
-   * comments are stripped so an M5 mention in a comment does not clear state.
+   * T1-23: track modal spindle/laser mode from outgoing gcode. Comments are
+   * stripped and M words are parsed exactly so M30 or `; M5` text cannot
+   * corrupt the pause/resume modal restore state.
    */
   private _trackSpindleMode(line: string): void {
-    const codePart = line.split('(')[0]!;
-    if (codePart.includes('M5')) {
-      this._lastSpindleMode = null;
-      return;
-    }
-    if (codePart.includes('M4')) {
-      this._lastSpindleMode = 'M4';
-      return;
-    }
-    if (codePart.includes('M3')) {
-      this._lastSpindleMode = 'M3';
+    for (const m of orderedMWords(line)) {
+      if (m === 5) {
+        this._lastSpindleMode = null;
+      } else if (m === 4) {
+        this._lastSpindleMode = 'M4';
+      } else if (m === 3) {
+        this._lastSpindleMode = 'M3';
+      }
     }
   }
 
@@ -2793,13 +2874,13 @@ export class GrblController implements GrblControllerApi {
 
   private _emitProgress(): void {
     const total = this._jobTotalLines || this._jobLines.length;
-    const bufferFill = GRBL_BUFFER_SIZE - this._bufferAvailable;
+    const bufferFill = this._rxBufferSize - this._bufferAvailable;
     const { healthStatus, ackRateHz, expectedAckRateHz } = computeStreamingHealth({
       now: Date.now(),
       ackTimestamps: this._ackTimestamps,
       sendTimestamps: this._sendTimestamps,
       bufferFill,
-      grblBufferCapacity: GRBL_BUFFER_SIZE,
+      grblBufferCapacity: this._rxBufferSize,
       isJobRunning: this._isJobRunning,
     });
     const progress: JobProgress = {
@@ -3087,6 +3168,15 @@ export class GrblController implements GrblControllerApi {
     return n !== 0;
   }
 
+  /** GRBL $20: soft limits enable. */
+  getFirmwareSoftLimitsEnabled(): boolean | undefined {
+    if (!this._grblSettings.has(20)) return undefined;
+    const v = this._grblSettings.get(20)!.trim();
+    const n = parseInt(v, 10);
+    if (Number.isNaN(n)) return undefined;
+    return n !== 0;
+  }
+
   /**
    * GRBL $32: laser mode. `true` if $32=1 (laser dynamic mode), `false` if $32=0 (CNC/spindle mode),
    * `undefined` if not in $$ cache. T1-32: surfaces the live firmware value so preflight can refuse
@@ -3100,6 +3190,22 @@ export class GrblController implements GrblControllerApi {
     const n = parseInt(v, 10);
     if (Number.isNaN(n)) return undefined;
     return n !== 0;
+  }
+
+  private _getFiniteFirmwareSetting(settingNumber: number): number | null {
+    if (!this._grblSettings.has(settingNumber)) return null;
+    const n = parseFloat(this._grblSettings.get(settingNumber)!.trim());
+    return Number.isFinite(n) ? n : null;
+  }
+
+  private _getNonNegativeFirmwareSetting(settingNumber: number): number | null {
+    const n = this._getFiniteFirmwareSetting(settingNumber);
+    return n != null && n >= 0 ? n : null;
+  }
+
+  private _getPositiveFirmwareSetting(settingNumber: number): number | null {
+    const n = this._getFiniteFirmwareSetting(settingNumber);
+    return n != null && n > 0 ? n : null;
   }
 
   /**
@@ -3117,10 +3223,13 @@ export class GrblController implements GrblControllerApi {
       firmwareVersion: this._firmwareVersion,
       buildOptions: this._buildOptions,
       maxSpindle: this._maxSpindle,
+      minSpindle: this._getNonNegativeFirmwareSetting(31),
       bedWidthMm: this._bedWidth > 0 ? this._bedWidth : null,
       bedHeightMm: this._bedHeight > 0 ? this._bedHeight : null,
+      zTravelMm: this._getPositiveFirmwareSetting(132),
       homingDirection: this._grblSettings.has(23) ? this._homingDir : null,
       homingEnabled: this.getFirmwareHomingCycleEnabled() ?? null,
+      softLimitsEnabled: this.getFirmwareSoftLimitsEnabled() ?? null,
       laserMode: this.getFirmwareLaserModeEnabled() ?? null,
       // T3-57: $110/$111/$120/$121 read from the latest $$ dump. The
       // private `_maxFeedX/Y` / `_maxAccelX/Y` fields default to 0

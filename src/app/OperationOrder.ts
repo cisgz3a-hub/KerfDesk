@@ -31,6 +31,7 @@ export interface OperationRow {
   readonly powerPercent: number;
   readonly feedRateMmPerMin: number;
   readonly passes: number;
+  readonly zStepPerPassMm?: number;
 }
 
 export type OrderWarningKind =
