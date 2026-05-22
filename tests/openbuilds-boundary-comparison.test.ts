@@ -26,7 +26,14 @@ function read(rel: string): string {
 
 function* walk(dir: string): Generator<string> {
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'audit' || entry === 'laserforge-external-repo-study') continue;
+    if (
+      entry === '.claude'
+      || entry === 'node_modules'
+      || entry === 'audit'
+      || entry === 'laserforge-external-repo-study'
+    ) {
+      continue;
+    }
     const full = join(dir, entry);
     const stat = statSync(full);
     if (stat.isDirectory()) {
