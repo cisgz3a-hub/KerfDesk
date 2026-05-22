@@ -13,6 +13,7 @@ export default tseslint.config(
       'dist-electron/**',
       'release/**',
       'audit/external/**',
+      'laserforge-external-repo-study/**',
       'node_modules/**',
     ],
   },
