@@ -15,6 +15,7 @@ const STORAGE_KEY = 'laserforge_license';
 const PRO_FLAG_KEY = 'laserforge_pro';
 const LICENSE_CACHE_KEY = 'laserforge_license_cache';
 const LICENSE_CACHE_MAX_AGE = 7 * 24 * 60 * 60 * 1000;
+const TEMPORARY_PRO_ACCESS_ENABLED = true;
 
 const GUMROAD_PRODUCT_ID = 'Fpj-vH0Hklzn3O2j5LMeWw==';
 
@@ -78,6 +79,7 @@ export interface EntitlementServiceOptions {
    */
   readonly signedTokenVerifier?: EntitlementVerifier | null;
   readonly now?: () => number;
+  readonly temporaryProAccess?: boolean;
 }
 
 export class EntitlementService {
@@ -86,17 +88,23 @@ export class EntitlementService {
   private initPromise: Promise<void> | null = null;
   private readonly signedTokenVerifier: EntitlementVerifier | null;
   private readonly now: () => number;
+  private readonly temporaryProAccess: boolean;
 
   constructor(options: EntitlementServiceOptions = {}) {
     this.signedTokenVerifier = options.signedTokenVerifier ?? null;
     this.now = options.now ?? (() => Date.now());
+    this.temporaryProAccess = options.temporaryProAccess === true;
   }
 
   getState(): EntitlementState {
+    if (this.temporaryProAccess) {
+      return temporaryProAccessState(this.state);
+    }
     return { ...this.state };
   }
 
   hasPro(): boolean {
+    if (this.temporaryProAccess) return true;
     return this.state.hasPro;
   }
 
@@ -114,6 +122,7 @@ export class EntitlementService {
    *      tokens yet) keep working.
    */
   canUse(feature: ProFeature): boolean {
+    if (this.temporaryProAccess) return true;
     if (this.state.tier === 'developer') return true;
     if (this.state.tier === 'tester_permanent') return true;
     if (this.state.features) {
@@ -165,6 +174,11 @@ export class EntitlementService {
   }
 
   private async runInitialize(): Promise<void> {
+    if (this.temporaryProAccess) {
+      this.setState(temporaryProAccessState(this.state));
+      return;
+    }
+
     await this.migrateFromLocalStorage();
 
     if (isDevBuild()) {
@@ -265,6 +279,10 @@ export class EntitlementService {
 
   /** Session-only free tier (no license in storage); matches legacy TrialGuard behavior. */
   skipToFreeSession(): void {
+    if (this.temporaryProAccess) {
+      this.setState(temporaryProAccessState(this.state));
+      return;
+    }
     if (isDevBuild()) return;
     this.setState({ tier: 'free', hasPro: false, status: 'free', label: 'Free User' });
   }
@@ -287,11 +305,21 @@ export class EntitlementService {
         label: 'Developer build',
       });
     } else {
-      this.setState({ tier: 'free', hasPro: false, status: 'free' });
+      this.setState(
+        this.temporaryProAccess
+          ? temporaryProAccessState(this.state)
+          : { tier: 'free', hasPro: false, status: 'free' },
+      );
     }
   }
 
   async activate(code: string): Promise<ActivateResult> {
+    if (this.temporaryProAccess) {
+      const state = temporaryProAccessState(this.state);
+      this.setState(state);
+      return { ok: true, state };
+    }
+
     const trimmed = code.trim();
     if (!trimmed) {
       return { ok: false, error: 'Enter a license or tester key' };
@@ -606,12 +634,28 @@ function deriveStatusDetail(state: EntitlementState): import('./LicenseStatus').
   });
 }
 
+function temporaryProAccessState(base: EntitlementState): EntitlementState {
+  return {
+    ...base,
+    tier: 'tester_permanent',
+    hasPro: true,
+    status: 'tester',
+    statusDetail: buildStatusDetail({
+      status: 'tester',
+      testerSlug: 'Temporary Pro access',
+    }),
+    label: 'Temporary Pro access',
+    features: PRO_FEATURES,
+  };
+}
+
 const entitlementEnv = (import.meta as ImportMeta & {
   env?: Partial<Record<string, string | undefined>>;
 }).env;
 
 export const entitlementService = new EntitlementService({
   signedTokenVerifier: createConfiguredEntitlementVerifierFromEnv(entitlementEnv),
+  temporaryProAccess: TEMPORARY_PRO_ACCESS_ENABLED,
 });
 
 export function tierDisplayName(tier: EntitlementTier): string {

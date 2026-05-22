@@ -575,13 +575,7 @@ export function App(): React.ReactElement {
       productionMode,
       proUnlocked: isProUnlocked(),
     });
-    if (decision.kind === 'set') {
-      setProductionMode(decision.enabled);
-      return;
-    }
-    if (confirm('PRO mode is a paid feature ($30 one-time).\n\nClick OK to learn more.')) {
-      window.open('https://laserforge.pages.dev/landing.html', '_blank');
-    }
+    setProductionMode(decision.enabled);
   }, [productionMode, setProductionMode]);
 
   useEffect(() => {

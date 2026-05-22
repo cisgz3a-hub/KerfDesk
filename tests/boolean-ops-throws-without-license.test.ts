@@ -1,5 +1,5 @@
 /**
- * Core boolean ops refuse free-tier use.
+ * Core boolean ops remain available during temporary Pro access.
  * Run: npx tsx tests/boolean-ops-throws-without-license.test.ts
  */
 import { booleanOperation } from '../src/geometry/BooleanOps';
@@ -26,18 +26,20 @@ function setEntitlement(state: EntitlementState): void {
 }
 
 void (() => {
-  console.log('\n=== boolean ops throw without license ===\n');
+  console.log('\n=== boolean ops available during temporary Pro access ===\n');
   setEntitlement({ tier: 'free', hasPro: false });
   const scene = createScene(100, 100, 'Boolean gate');
   const a = createRect(scene.layers[0].id, 0, 0, 20, 20);
   const b = createRect(scene.layers[0].id, 10, 10, 20, 20);
   let err = '';
+  let result: unknown;
   try {
-    booleanOperation(a, b, 'union');
+    result = booleanOperation(a, b, 'union');
   } catch (e: unknown) {
     err = e instanceof Error ? e.message : String(e);
   }
-  assert(/pro license/i.test(err), 'booleanOperation throws Pro license error');
+  assert(err === '', 'booleanOperation does not throw a Pro license error');
+  assert(result != null, 'booleanOperation returns a result under temporary Pro access');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);

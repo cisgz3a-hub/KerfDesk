@@ -73,10 +73,9 @@ assert.deepEqual(
 );
 
 setEntitlement({ tier: 'free', hasPro: false });
-assert.throws(
-  () => booleanCompoundPaths(left, right, 'union'),
-  /requires a Pro license/i,
-  'compound boolean operations keep the existing Pro gate',
+assert.ok(
+  booleanCompoundPaths(left, right, 'union'),
+  'compound boolean operations remain available during temporary Pro access',
 );
 
 console.log('compound boolean ops: ok');

@@ -183,7 +183,7 @@ export function TrialGuard({ children }: TrialGuardProps) {
                   paddingBottom: 2,
                 },
               },
-              'Get PRO for $30 →',
+              'PRO access is temporarily open',
             ),
           ),
 
@@ -361,7 +361,7 @@ export function TrialGuard({ children }: TrialGuardProps) {
             flexShrink: 0,
           },
         },
-        React.createElement('span', { style: { color: '#555570' } }, 'EASY mode (free) — Some features locked'),
+        React.createElement('span', { style: { color: '#555570' } }, 'EASY mode — PRO tools temporarily unlocked'),
         React.createElement(
           'a',
           {
@@ -375,7 +375,7 @@ export function TrialGuard({ children }: TrialGuardProps) {
               borderRadius: 4,
             },
           },
-          'Unlock PRO $30',
+          'PRO access open',
         ),
       ),
 

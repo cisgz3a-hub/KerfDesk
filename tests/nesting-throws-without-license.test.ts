@@ -1,5 +1,5 @@
 /**
- * Core nesting refuses free-tier use.
+ * Core nesting remains available during temporary Pro access.
  * Run: npx tsx tests/nesting-throws-without-license.test.ts
  */
 import { applyNesting, nestShapes } from '../src/core/nesting/Nester';
@@ -26,14 +26,16 @@ function setEntitlement(state: EntitlementState): void {
 }
 
 void (() => {
-  console.log('\n=== nesting throws without license ===\n');
+  console.log('\n=== nesting available during temporary Pro access ===\n');
   setEntitlement({ tier: 'free', hasPro: false });
   const scene = createScene(100, 100, 'Nesting gate');
   const rect = createRect(scene.layers[0].id, 1, 1, 10, 10);
   let nestErr = '';
   let applyErr = '';
+  let result: unknown;
+  let applied: unknown;
   try {
-    nestShapes([rect], {
+    result = nestShapes([rect], {
       binWidth: 100,
       binHeight: 100,
       padding: 1,
@@ -45,12 +47,14 @@ void (() => {
     nestErr = e instanceof Error ? e.message : String(e);
   }
   try {
-    applyNesting([rect], { items: [], unplaced: [], efficiency: 0, binsUsed: 1 });
+    applied = applyNesting([rect], { items: [], unplaced: [], efficiency: 0, binsUsed: 1 });
   } catch (e: unknown) {
     applyErr = e instanceof Error ? e.message : String(e);
   }
-  assert(/pro license/i.test(nestErr), 'nestShapes throws Pro license error');
-  assert(/pro license/i.test(applyErr), 'applyNesting throws Pro license error');
+  assert(nestErr === '', 'nestShapes does not throw a Pro license error');
+  assert(applyErr === '', 'applyNesting does not throw a Pro license error');
+  assert(result != null, 'nestShapes returns a result under temporary Pro access');
+  assert(applied != null, 'applyNesting returns objects under temporary Pro access');
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
   process.exit(failed > 0 ? 1 : 0);

@@ -154,20 +154,36 @@ void (async () => {
   }
 
   // 7. Service-layer Pro feature throws when canUse returns false.
-  //    Behavioral pin without needing to mutate entitlement state —
-  //    the `entitlementService` default tier is 'free' in test
-  //    environments (no stored license), so `canUseFeature` returns
-  //    false and `assertFeature` must throw `EntitlementError`.
+  //    The exported app singleton currently has temporary Pro access
+  //    enabled while payments are disabled, so use a non-temporary
+  //    EntitlementService instance to prove the underlying engine still
+  //    fails closed. Then monkey-patch the singleton canUse method to
+  //    prove canUseFeature/assertFeature still delegate correctly when
+  //    the entitlement decision is false.
   {
-    const { assertFeature, EntitlementError, canUseFeature } = await import('../../src/entitlements');
-    assert(canUseFeature('boolean_ops') === false, 'Default test env: canUseFeature("boolean_ops") false');
-    assert(canUseFeature('nesting') === false, 'Default test env: canUseFeature("nesting") false');
+    const {
+      assertFeature,
+      EntitlementError,
+      canUseFeature,
+      entitlementService,
+      EntitlementService,
+    } = await import('../../src/entitlements');
+    assert(canUseFeature('boolean_ops') === true, 'Temporary app singleton: canUseFeature("boolean_ops") true');
+    const rawService = new EntitlementService();
+    assert(rawService.canUse('boolean_ops') === false, 'Non-temporary service: canUse("boolean_ops") false');
+    assert(rawService.canUse('nesting') === false, 'Non-temporary service: canUse("nesting") false');
 
     let caught: unknown = null;
+    const svc = entitlementService as unknown as { canUse: (feature: string) => boolean };
+    const originalCanUse = svc.canUse.bind(entitlementService);
     try {
+      svc.canUse = () => false;
+      assert(canUseFeature('boolean_ops') === false, 'patched canUseFeature("boolean_ops") false');
       assertFeature('boolean_ops');
     } catch (e) {
       caught = e;
+    } finally {
+      svc.canUse = originalCanUse;
     }
     assert(caught instanceof EntitlementError, 'assertFeature("boolean_ops") throws EntitlementError when not paid');
     if (caught instanceof EntitlementError) {

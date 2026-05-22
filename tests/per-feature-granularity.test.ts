@@ -8,7 +8,7 @@
  *
  * Run: npx tsx tests/per-feature-granularity.test.ts
  */
-import { entitlementService } from '../src/entitlements';
+import { EntitlementService } from '../src/entitlements';
 import type { EntitlementState, ProFeature } from '../src/entitlements/types';
 import { PRO_FEATURES } from '../src/entitlements/types';
 
@@ -31,6 +31,8 @@ console.log('\n=== T2-92 Per-feature granularity ===\n');
 // these tests we only care about the canUse rules, so a partial
 // override is fine. Restored at the end.
 type WithState = { state: EntitlementState };
+const entitlementService = new EntitlementService();
+
 function withState(next: Partial<EntitlementState>, body: () => void): void {
   const svc = entitlementService as unknown as WithState;
   const original = svc.state;

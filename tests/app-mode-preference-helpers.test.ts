@@ -34,7 +34,7 @@ assert(
 }
 {
   const result = resolveProductionModeToggle({ productionMode: false, proUnlocked: false });
-  assert(result.kind === 'show-paywall', 'locked production mode opens the paywall decision');
+  assert(result.kind === 'set' && result.enabled === true, 'temporary Pro access lets production mode toggle on');
 }
 {
   const result = resolveProductionModeToggle({ productionMode: false, proUnlocked: true });
@@ -59,6 +59,14 @@ assert(
 assert(
   !appSource.includes('if (productionMode) {'),
   'App no longer carries the production-mode toggle-off branch inline',
+);
+assert(
+  !appSource.includes('PRO mode is a paid feature'),
+  'App no longer shows a paid production-mode prompt during temporary Pro access',
+);
+assert(
+  !helperSource.includes('show-paywall'),
+  'production-mode helper no longer emits a paywall decision during temporary Pro access',
 );
 assert(
   helperSource.includes('T2-6 Phase 3af'),

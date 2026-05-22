@@ -1,5 +1,5 @@
 /**
- * JobCompiler strips Pro-only executable settings without a Pro entitlement.
+ * JobCompiler preserves Pro-only executable settings during temporary Pro access.
  * Run: npx tsx tests/jobcompiler-strips-pro-settings-without-license.test.ts
  */
 import { compileJob } from '../src/core/job/JobCompiler';
@@ -47,7 +47,7 @@ function makeProScene() {
 }
 
 void (() => {
-  console.log('\n=== JobCompiler strips Pro settings without license ===\n');
+  console.log('\n=== JobCompiler preserves Pro settings during temporary Pro access ===\n');
   setEntitlement({ tier: 'free', hasPro: false });
 
   const warns: string[] = [];
@@ -68,24 +68,18 @@ void (() => {
   assert(engraveOp != null, 'engrave operation compiled');
   if (!cutOp || !engraveOp) process.exit(1);
 
-  assert(cutOp.settings.tabCount === 0, 'tabs stripped');
-  assert(cutOp.settings.tabWidth === 0, 'tab width stripped');
-  assert(cutOp.settings.overcut === 0, 'overcut stripped');
-  assert(cutOp.settings.leadIn === 0, 'lead-in stripped');
-  assert(engraveOp.settings.fillMode === 'line', 'cross-hatch downgraded to line fill');
+  assert(cutOp.settings.tabCount === 3, 'tabs preserved');
+  assert(cutOp.settings.tabWidth === 4, 'tab width preserved');
+  assert(cutOp.settings.overcut === 5, 'overcut preserved');
+  assert(cutOp.settings.leadIn === 2, 'lead-in preserved');
+  assert(engraveOp.settings.fillMode === 'cross-hatch', 'cross-hatch fill preserved');
   assert(
-    cutOp.geometry.type === 'vector' && cutOp.geometry.paths.every(p => p.powerScale === 1),
-    'powerScale stripped to 1.0',
+    cutOp.geometry.type === 'vector' && cutOp.geometry.paths.every(p => p.powerScale === 0.5),
+    'powerScale preserved',
   );
   assert(
-    warns.some(w =>
-      w.includes('tabs')
-      && w.includes('overcut')
-      && w.includes('lead_in')
-      && w.includes('cross_hatch')
-      && w.includes('power_scale')
-      && w.includes('cut_start_point')),
-    'single entitlement warning lists dropped Pro features',
+    warns.every(w => !w.includes('dropped Pro features')),
+    'no entitlement warning is emitted for preserved Pro features',
   );
 
   console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

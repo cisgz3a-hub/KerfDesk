@@ -15,7 +15,7 @@ export function checkProAccess(feature: ProFeature): boolean {
 }
 
 /**
- * Show a paywall prompt if the feature is locked.
+ * Run the locked-action callback if the feature is locked.
  * Returns true if user has access, false if they don't.
  *
  * T1-followup-safety-gated-feature (2026-05-10): pre-fix this called
@@ -36,10 +36,6 @@ export function gatedFeature(feature: ProFeature, onLockedAction?: () => void): 
   if (checkProAccess(feature)) return true;
   if (onLockedAction) {
     onLockedAction();
-  } else {
-    if (confirm('This is a PRO feature. Unlock LaserForge PRO for $30?\n\nClick OK to learn more.')) {
-      window.open('/landing.html', '_blank');
-    }
   }
   return false;
 }

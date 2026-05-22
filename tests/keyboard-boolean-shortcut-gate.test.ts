@@ -67,10 +67,10 @@ async function run(): Promise<void> {
         'union',
       );
       await waitForMicrotasks();
-      assert(performCalls === 0, 'Free user shortcut does not call performBoolean');
-      assert(confirmCalls === 1, 'Free user shortcut invokes the UI Pro gate');
+      assert(performCalls === 1, 'Temporary Pro access lets a free-state shortcut call performBoolean');
+      assert(confirmCalls === 0, 'Temporary Pro access does not invoke the UI Pro gate');
       assert(windowOpenCalls === 0, 'Dismissed Pro gate does not open the landing page');
-      assert(unhandled.length === 0, 'Locked shortcut produces no unhandled rejection');
+      assert(unhandled.length === 0, 'Temporary Pro shortcut produces no unhandled rejection');
     }
 
     {
@@ -85,9 +85,9 @@ async function run(): Promise<void> {
         'subtract',
       );
       await waitForMicrotasks();
-      assert(performCalls === 0, 'Partial license without boolean_ops does not call performBoolean');
-      assert(confirmCalls === 2, 'Partial license without boolean_ops also invokes the UI Pro gate');
-      assert(unhandled.length === 0, 'Partial-license rejection produces no unhandled rejection');
+      assert(performCalls === 1, 'Temporary Pro access lets a partial-license shortcut call performBoolean');
+      assert(confirmCalls === 0, 'Temporary Pro access does not invoke the UI Pro gate for partial licenses');
+      assert(unhandled.length === 0, 'Temporary Pro partial-license shortcut produces no unhandled rejection');
     }
 
     {
@@ -103,7 +103,7 @@ async function run(): Promise<void> {
       );
       await waitForMicrotasks();
       assert(seen.join(',') === 'intersect', 'Allowed shortcut calls performBoolean with the requested operation');
-      assert(confirmCalls === 2, 'Allowed shortcut does not invoke the Pro gate');
+      assert(confirmCalls === 0, 'Allowed shortcut does not invoke the Pro gate');
       assert(unhandled.length === 0, 'Allowed shortcut success produces no unhandled rejection');
     }
   } finally {

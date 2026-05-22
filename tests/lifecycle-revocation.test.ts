@@ -14,7 +14,7 @@ import {
 } from '../src/entitlements/EntitlementLifecycle';
 import type { EntitlementTokenPayload } from '../src/entitlements/SignedEntitlementToken';
 import type { EntitlementState, ProFeature } from '../src/entitlements/types';
-import { entitlementService } from '../src/entitlements';
+import { EntitlementService } from '../src/entitlements';
 
 let passed = 0;
 let failed = 0;
@@ -54,6 +54,8 @@ function paidState(features: readonly ProFeature[] = ['nesting', 'tabs']): Entit
 }
 
 type WithState = { state: EntitlementState };
+const entitlementService = new EntitlementService();
+
 function withEntitlementState(state: EntitlementState, body: () => void): void {
   const svc = entitlementService as unknown as WithState;
   const original = svc.state;
