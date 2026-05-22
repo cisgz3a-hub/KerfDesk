@@ -1,13 +1,10 @@
 /**
- * T1-110: StartReadinessPanel auto-expands when the blocking gate
- * is one the user just invalidated or can directly fix
- * (currentModeAnchor / framing / frameControls / wcsState), so the
- * explanation is immediately visible
- * instead of one click away.
+ * Controller UX regression: StartReadinessPanel must never auto-open.
+ * Jogging can invalidate currentModeAnchor/framing readiness, but the
+ * checklist should remain collapsed until the user explicitly expands it.
  *
- * Other gates (controllerConnected, gcodeCompiled, etc.) — which
- * represent long-lived setup state — keep the pre-T1-110
- * collapsed-by-default behavior.
+ * The collapsed headline may update as gates change. The details list is
+ * user-owned state, not a side effect of jogging/framing/WCS changes.
  *
  * Run: npx tsx tests/start-readiness-auto-expand.test.tsx
  */
@@ -40,10 +37,10 @@ let failed = 0;
 function assert(cond: boolean, msg: string): void {
   if (cond) {
     passed++;
-    console.log(`  ✓ ${msg}`);
+    console.log(`  PASS ${msg}`);
   } else {
     failed++;
-    console.error(`  ✗ ${msg}`);
+    console.error(`  FAIL ${msg}`);
   }
 }
 
@@ -102,153 +99,103 @@ function makeReadinessFor(gateId: StartReadinessGate['id']): StartReadiness {
   };
 }
 
-async function run(): Promise<void> {
-  console.log('\n=== T1-110 StartReadinessPanel auto-expand ===\n');
+function assertCollapsed(container: HTMLElement, message: string): void {
+  const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
+  const list = container.querySelector('[data-testid="start-readiness-list"]');
+  assert(toggle?.getAttribute('aria-expanded') === 'false' && list == null, message);
+}
 
-  // 1. currentModeAnchor → auto-expanded
+async function run(): Promise<void> {
+  console.log('\n=== StartReadinessPanel no automatic opening ===\n');
+
   {
     const { container, root } = await renderPanel(makeReadinessFor('currentModeAnchor'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
-    const list = container.querySelector('[data-testid="start-readiness-list"]');
-    assert(
-      toggle?.getAttribute('aria-expanded') === 'true' && list != null,
-      'currentModeAnchor blocking gate → panel mounts expanded',
-    );
+    assertCollapsed(container, 'currentModeAnchor gate mounts collapsed after jog/current-position invalidation');
     await cleanup(root);
   }
 
-  // 2. framing → auto-expanded
   {
     const { container, root } = await renderPanel(makeReadinessFor('framing'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
-    assert(
-      toggle?.getAttribute('aria-expanded') === 'true',
-      'framing blocking gate → panel mounts expanded',
-    );
+    assertCollapsed(container, 'framing gate mounts collapsed');
     await cleanup(root);
   }
 
-  // 3. frameControls → auto-expanded
   {
     const { container, root } = await renderPanel(makeReadinessFor('frameControls'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
-    assert(
-      toggle?.getAttribute('aria-expanded') === 'true',
-      'frameControls blocking gate → panel mounts expanded',
-    );
+    assertCollapsed(container, 'frameControls gate mounts collapsed');
     await cleanup(root);
   }
 
-  // 4. controllerConnected (setup state) → collapsed by default
+  {
+    const { container, root } = await renderPanel(makeReadinessFor('wcsState'));
+    assertCollapsed(container, 'wcsState gate mounts collapsed');
+    await cleanup(root);
+  }
+
   {
     const { container, root } = await renderPanel(makeReadinessFor('controllerConnected'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
-    const list = container.querySelector('[data-testid="start-readiness-list"]');
-    assert(
-      toggle?.getAttribute('aria-expanded') === 'false' && list == null,
-      'controllerConnected blocking gate → panel mounts collapsed (setup gate UX preserved)',
-    );
+    assertCollapsed(container, 'controllerConnected setup gate still mounts collapsed');
     await cleanup(root);
   }
 
-  // 5. gcodeCompiled (setup state) → collapsed by default
   {
     const { container, root } = await renderPanel(makeReadinessFor('gcodeCompiled'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]');
-    assert(
-      toggle?.getAttribute('aria-expanded') === 'false',
-      'gcodeCompiled blocking gate → panel mounts collapsed',
-    );
+    assertCollapsed(container, 'gcodeCompiled setup gate still mounts collapsed');
     await cleanup(root);
   }
 
-  // 6. Manual collapse persists during the same blocking gate
   {
     const { container, root } = await renderPanel(makeReadinessFor('currentModeAnchor'));
     const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLButtonElement;
-    assert(
-      toggle.getAttribute('aria-expanded') === 'true',
-      'manual-collapse precondition: panel started expanded',
-    );
-    // User collapses
+    assert(toggle.getAttribute('aria-expanded') === 'false', 'manual-expand precondition: panel started collapsed');
     await act(async () => { toggle.click(); });
-    assert(
-      toggle.getAttribute('aria-expanded') === 'false',
-      'manual collapse takes effect',
-    );
-    // Same gate still failing — re-render with same id
+    assert(toggle.getAttribute('aria-expanded') === 'true', 'manual expansion takes effect');
+    await rerender(root, makeReadinessFor('currentModeAnchor'));
+    assert(toggle.getAttribute('aria-expanded') === 'true', 'same blocking gate re-render does not close a user-opened panel');
+    await cleanup(root);
+  }
+
+  {
+    const { container, root } = await renderPanel(makeReadinessFor('controllerConnected'));
+    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLButtonElement;
+    assert(toggle.getAttribute('aria-expanded') === 'false', 'transition precondition: started collapsed');
     await rerender(root, makeReadinessFor('currentModeAnchor'));
     assert(
       toggle.getAttribute('aria-expanded') === 'false',
-      'same blocking gate re-render does NOT override user collapse',
+      'blocking gate transition controllerConnected -> currentModeAnchor stays collapsed',
     );
     await cleanup(root);
   }
 
-  // 7. Transition to a NEW auto-expand gate re-expands
-  {
-    const { container, root } = await renderPanel(makeReadinessFor('currentModeAnchor'));
-    const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLButtonElement;
-    await act(async () => { toggle.click(); });
-    assert(
-      toggle.getAttribute('aria-expanded') === 'false',
-      'transition precondition: user collapsed currentModeAnchor view',
-    );
-    await rerender(root, makeReadinessFor('framing'));
-    assert(
-      toggle.getAttribute('aria-expanded') === 'true',
-      'blocking gate transition currentModeAnchor → framing re-expands the panel',
-    );
-    await cleanup(root);
-  }
-
-  // 8. Transition from auto-expand to non-auto-expand DOES NOT auto-expand
   {
     const { container, root } = await renderPanel(makeReadinessFor('controllerConnected'));
     const toggle = container.querySelector('[data-testid="start-readiness-toggle"]') as HTMLButtonElement;
-    assert(
-      toggle.getAttribute('aria-expanded') === 'false',
-      'transition precondition: started collapsed for controllerConnected',
-    );
+    assert(toggle.getAttribute('aria-expanded') === 'false', 'non-auto transition precondition: started collapsed');
     await rerender(root, makeReadinessFor('gcodeCompiled'));
-    assert(
-      toggle.getAttribute('aria-expanded') === 'false',
-      'transition between two non-auto-expand gates keeps panel collapsed',
-    );
+    assert(toggle.getAttribute('aria-expanded') === 'false', 'transition between setup gates keeps panel collapsed');
     await cleanup(root);
   }
 
-  // 9. Source-pin: disabled-Start contrast bumped per T1-110
   {
     const controlsPath = path.resolve(__dirname, '..', 'src', 'ui', 'components', 'connection', 'Controls.tsx');
     const src = fs.readFileSync(controlsPath, 'utf8');
     assert(
       /color:\s*canStartJob\s*\?\s*'#2dd4a0'\s*:\s*'#8888a0'/.test(src),
-      'Controls.tsx disabled Start uses #8888a0 (was #333355 pre-T1-110)',
+      'Controls.tsx disabled Start uses #8888a0',
     );
     assert(
       /border:\s*canStartJob\s*\?\s*'1px solid #2dd4a0'\s*:\s*'1px solid #3a3a55'/.test(src),
-      'Controls.tsx disabled Start border uses #3a3a55 (was #252540 pre-T1-110)',
+      'Controls.tsx disabled Start border uses #3a3a55',
     );
-    assert(
-      !src.includes("'#333355'"),
-      'Controls.tsx no longer references the old low-contrast #333355',
-    );
-    const readinessPanelPath = path.resolve(__dirname, '..', 'src', 'ui', 'components', 'connection', 'StartReadinessPanel.tsx');
-    const readinessPanelSrc = fs.readFileSync(readinessPanelPath, 'utf8');
-    assert(
-      /AUTO_EXPAND_GATE_IDS[\s\S]*'wcsState'/.test(readinessPanelSrc),
-      'StartReadinessPanel auto-expands wcsState so the Reset WCS action is visible',
-    );
+    assert(!src.includes("'#333355'"), 'Controls.tsx does not reference old low-contrast #333355');
   }
 
-  // 10. Source-pin: 0.25mm Head-mode anchor tolerance unchanged
   {
     const anchorPath = path.resolve(__dirname, '..', 'src', 'app', 'CurrentFrameAnchor.ts');
     const src = fs.readFileSync(anchorPath, 'utf8');
     assert(
       /CURRENT_FRAME_ANCHOR_TOLERANCE_MM\s*=\s*0\.25/.test(src),
-      'Head-mode anchor tolerance still 0.25mm (T1-110 ships UX, not a tolerance change)',
+      'Head-mode anchor tolerance still 0.25mm',
     );
   }
 

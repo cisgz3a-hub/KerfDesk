@@ -89,10 +89,7 @@ async function run(): Promise<void> {
   }
 
   {
-    // T1-110: gcodeFresh is NOT in AUTO_EXPAND_GATE_IDS, so this
-    // case still verifies the collapsed-by-default UX. The
-    // currentModeAnchor / framing / frameControls auto-expand
-    // behavior is pinned in tests/start-readiness-auto-expand.test.tsx.
+    // The checklist remains collapsed until the user explicitly opens it.
     const failingGate = makeGate('gcodeFresh', 'fail', {
       label: 'G-code matches current design',
       failHeadline: 'Design changed since last compile',
@@ -166,8 +163,7 @@ async function run(): Promise<void> {
   }
 
   {
-    // T1-110: gcodeFresh is NOT in AUTO_EXPAND_GATE_IDS so the
-    // panel mounts collapsed; clicking toggle expands.
+    // The panel mounts collapsed; clicking toggle expands.
     const failingGate = makeGate('gcodeFresh', 'fail', {
       label: 'G-code matches current design',
       failHeadline: 'Design changed since last compile',
