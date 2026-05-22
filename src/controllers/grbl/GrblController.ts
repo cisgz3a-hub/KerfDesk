@@ -451,6 +451,13 @@ export class GrblController implements GrblControllerApi {
   private _activeConnectionToken: ConnectionToken | null = null;
   private _isJobRunning = false;
   /**
+   * True after the final queued job line has been acknowledged by GRBL, but
+   * before a fresh realtime status report has confirmed the planner is idle.
+   * GRBL `ok` means the line was accepted/processed; physical completion is
+   * only safe to publish after `<Idle...>` arrives after that final ack.
+   */
+  private _awaitingControllerIdleForCompletion = false;
+  /**
    * T1-220 (v30 audit #8): monotonic counter of job lines written
    * to the transport since the most recent sendJob() call. Used by
    * MachineService.startValidatedJob's failed-start carve-out to
@@ -1310,6 +1317,7 @@ export class GrblController implements GrblControllerApi {
     this._jobStatusHeartbeatWarned = false;
     this._pausePending = false;
     this._resumeRequested = false;
+    this._awaitingControllerIdleForCompletion = false;
     this._lastSpindleMode = null;
     this._ackTimestamps = [];
     this._sendTimestamps = [];
@@ -2414,7 +2422,7 @@ export class GrblController implements GrblControllerApi {
     if (this._isJobRunning &&
         this._isQueueDrainedForCompletion() &&
         this._pending.length === 0) {
-      this._completeJob();
+      this._awaitControllerIdleForCompletion();
       return;
     }
 
@@ -2586,17 +2594,21 @@ export class GrblController implements GrblControllerApi {
       }
     }
 
-    // Defensive: if a job is marked running but the status report shows alarm, or
-    // idle with queue drained, reset internal job state. Covers alarm reported only
-    // via periodic '?' (no `ALARM:N` line) or a stuck _isJobRunning after completion.
+    // Defensive: if a job is marked running but the status report shows alarm,
+    // reset internal job state. If the stream has been fully acknowledged,
+    // completion is allowed only after this fresh `<Idle...>` report.
     if (this._isJobRunning) {
       const st = this._state.status;
-      if (
-        st === 'alarm' ||
-        (st === 'idle' &&
-          this._isQueueDrainedForCompletion() &&
-          this._pending.length === 0)
-      ) {
+      const drainedAfterFinalAck =
+        this._isQueueDrainedForCompletion() && this._pending.length === 0;
+      if (st === 'idle' && drainedAfterFinalAck) {
+        if (this._awaitingControllerIdleForCompletion) {
+          this._completeJob();
+        } else {
+          this._abortJob();
+          this._emitProgress();
+        }
+      } else if (st === 'alarm') {
         this._abortJob();
         this._emitProgress();
       }
@@ -2735,9 +2747,21 @@ export class GrblController implements GrblControllerApi {
 
   // ─── JOB LIFECYCLE ──────────────────────────────────────────
 
+  private _awaitControllerIdleForCompletion(): void {
+    if (this._awaitingControllerIdleForCompletion) return;
+    this._awaitingControllerIdleForCompletion = true;
+    try {
+      this.requestStatusReport();
+    } catch (err: unknown) {
+      this._handleStatusPollFailure(err);
+    }
+    this._emitProgress();
+  }
+
   private _completeJob(): void {
     this._resetJobStatusHeartbeat();
     this._isJobRunning = false;
+    this._awaitingControllerIdleForCompletion = false;
     this._clearStreamState();
     this._activeTransferMode = 'buffered';
     this._updateStatus('idle');
@@ -2751,6 +2775,7 @@ export class GrblController implements GrblControllerApi {
     this._spoolStreamAbortController = null;
     this._resetJobStatusHeartbeat();
     this._isJobRunning = false;
+    this._awaitingControllerIdleForCompletion = false;
     this._clearStreamState();
     this._jobLines = [];
     this._lineMarkers = [];

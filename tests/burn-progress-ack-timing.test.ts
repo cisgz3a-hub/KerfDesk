@@ -72,9 +72,18 @@ async function main(): Promise<void> {
   await flush();
   assert(sawActive(lifecycleEvents, 'obj-a'), 'object lifecycle advances after line ok ack');
 
+  const statusQueriesBeforeFinalOk = port.realtimeBytes.filter(byte => byte === 0x3F).length;
+  port.nextStatusQueryResponse = '<Run|MPos:0.500,0.000,0.000|FS:100,0>';
   port.injectResponse('ok');
   await flush();
-  assert(!ctrl.isJobRunning, 'job completes after remaining ok ack');
+  assert(ctrl.isJobRunning, 'final ok does not complete until controller reports physical idle');
+  assert(
+    port.realtimeBytes.filter(byte => byte === 0x3F).length > statusQueriesBeforeFinalOk,
+    'controller queries fresh status after final ok');
+  port.nextStatusQueryResponse = '<Idle|MPos:1.000,0.000,0.000|FS:0,0>';
+  ctrl.requestStatusReport();
+  await flush();
+  assert(!ctrl.isJobRunning, 'job completes after later fresh Idle status');
 
   await ctrl.disconnect();
 
