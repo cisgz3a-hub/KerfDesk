@@ -698,18 +698,20 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       travelLine = parts.join(' ');
     }
 
-    if (!state.hardOffRapidMoves || !state.laserModalArmed) {
+    if (!state.hardOffRapidMoves) {
       return travelLine;
     }
 
     // Defense-in-depth for real machines: GRBL $32=1 should suppress laser
     // output during G0, but a stale or wrong firmware setting can turn
-    // modal M3/M4 rapids into visible travel burns.
-    state.laserModalArmed = true;
+    // modal M3/M4 rapids into visible travel burns. This is unconditional
+    // because custom/header G-code can arm M3/M4 outside this state machine.
+    // Leave the controller hard-off after the rapid and re-arm only when a
+    // positive-power burn move is actually emitted.
+    state.laserModalArmed = false;
     return [
       this.encodeLaserOff(),
       travelLine,
-      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle, state.grblLaserPowerMode),
     ].join('\n');
   }
 
@@ -732,6 +734,11 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       return this.encodeHardOffLinearTravelWithState(to, speed, state);
     }
 
+    const rearm = !state.laserModalArmed
+      ? this.encodeLaserOnForMaxSpindle(0, state.maxSpindle, state.grblLaserPowerMode)
+      : null;
+    if (rearm) state.laserModalArmed = true;
+
     if (!state.relative) {
       state.prevPos = { x: to.x, y: to.y };
       const parts = [`G1 X${to.x.toFixed(3)} Y${to.y.toFixed(3)}`];
@@ -740,7 +747,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
         state.currentSpeed = speed;
       }
       parts.push(this.encodePowerValueForMaxSpindle(power, state.maxSpindle));
-      return parts.join(' ');
+      const line = parts.join(' ');
+      return rearm ? `${rearm}\n${line}` : line;
     }
 
     state.prevPos = { x: to.x, y: to.y };
@@ -754,7 +762,8 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       state.currentSpeed = speed;
     }
     parts.push(this.encodePowerValueForMaxSpindle(power, state.maxSpindle));
-    return parts.join(' ');
+    const line = parts.join(' ');
+    return rearm ? `${rearm}\n${line}` : line;
   }
 
   private encodeHardOffLinearTravelWithState(
@@ -787,17 +796,22 @@ export abstract class BaseGCodeStrategy implements OutputStrategy {
       travelLine = parts.join(' ');
     }
 
-    state.laserModalArmed = true;
+    state.laserModalArmed = false;
     return [
       this.encodeLaserOff(),
       travelLine,
-      this.encodeLaserOnForMaxSpindle(0, state.maxSpindle, state.grblLaserPowerMode),
     ].join('\n');
   }
 
   private encodeLaserOnWithState(power: number, state: GcodeEncoderState): string {
     state.laserModalArmed = true;
-    return this.encodeLaserOnForMaxSpindle(power, state.maxSpindle, state.grblLaserPowerMode);
+    // Arm at S0. The following positive-power motion line carries the
+    // actual S value, avoiding a stationary nonzero-power laser-on point.
+    return this.encodeLaserOnForMaxSpindle(
+      power > 0 ? 0 : power,
+      state.maxSpindle,
+      state.grblLaserPowerMode,
+    );
   }
 
   protected encodeAirAssistForCommand(on: boolean, command: AirAssistCommand): string {

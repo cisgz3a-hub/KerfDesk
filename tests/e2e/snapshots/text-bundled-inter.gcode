@@ -10,8 +10,9 @@ M5 S0 ; T2-14 safety baseline: laser off at start
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
 ; OBJ ids=det-000003
+M5 S0
 G0 X55.400 Y-13.223
-M4 S800
+M4 S0
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X0.634 Y0.041 F150 S800
 G1 X0.603 Y0.124 S800
@@ -67,8 +68,9 @@ G1 X0.638 Y-0.042 S800
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000003
+M5 S0
 G0 Y-1.719
-M4 S800
+M4 S0
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 G1 X-0.907 Y0.056 S800
 G1 X-0.857 Y0.169 S800
@@ -124,8 +126,9 @@ G1 X-0.907 Y-0.056 S800
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000003
+M5 S0
 G0 X-8.613 Y0.195
-M4 S800
+M4 S0
 G1 X-8.594 S800
 G1 Y14.551 S800
 G1 X1.855 S800
@@ -135,8 +138,9 @@ G1 Y-1.641 S800
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000003
+M5 S0
 G0 X-11.309
-M4 S800
+M4 S0
 G1 X-8.594 S800
 G1 Y14.551 S800
 G1 X1.855 S800
@@ -146,8 +150,9 @@ G1 Y-1.641 S800
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000003
+M5 S0
 G0 X-11.660
-M4 S800
+M4 S0
 G1 X-8.955 S800
 G1 Y14.551 S800
 G1 X8.867 S800
@@ -163,8 +168,9 @@ G1 Y-1.641 S800
 ; G1 skipped (zero distance — would dwell-burn at S800 if emitted)
 M5 S0
 ; OBJ ids=det-000003
+M5 S0
 G0 X-21.963
-M4 S800
+M4 S0
 G1 X-1.855 S800
 G1 Y14.551 S800
 G1 X1.855 S800

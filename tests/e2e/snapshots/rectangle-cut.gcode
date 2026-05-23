@@ -11,7 +11,7 @@ M5 S0 ; T2-14 safety baseline: laser off at start
 M8 ; air assist ON
 ; OBJ ids=det-000003
 ; G0 skipped (no motion)
-M4 S800
+M4 S0
 G1 X40.000 F150 S800
 G1 Y-20.000 S800
 G1 X-40.000 S800

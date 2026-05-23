@@ -25,16 +25,18 @@ export interface GcodeGenerateOptions {
   airAssistCommand?: AirAssistCommand;
   /**
    * When true, power=0 linear moves are emitted as hard laser-off travel
-   * (`M5 S0` -> motion without S -> modal laser restore at S0) instead of
-   * relying on inline `G1 ... S0`. This protects machines/controllers that
-   * visibly mark blank raster gaps even though the G-code requested S0.
+   * (`M5 S0` -> motion without S) instead of relying on inline `G1 ... S0`.
+   * The next positive-power burn re-arms modal laser state immediately before
+   * the burn. This protects machines/controllers that visibly mark blank
+   * raster gaps even though the G-code requested S0.
    * Defaults to true.
    */
   hardOffZeroPowerLinearMoves?: boolean;
   /**
-   * When true, rapid XY moves emitted while a laser modal command is armed
-   * are bracketed as `M5 S0` -> `G0 ...` -> `M3/M4 S0`. This avoids relying
-   * on GRBL $32 laser mode as the only protection against travel burns.
+   * When true, rapid XY moves are emitted through a hard-off boundary:
+   * `M5 S0` -> `G0 ...`. The next positive-power burn re-arms modal laser
+   * state immediately before the burn. This avoids relying on GRBL $32 laser
+   * mode as the only protection against travel burns.
    * Defaults to true.
    */
   hardOffRapidMoves?: boolean;

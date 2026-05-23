@@ -10,8 +10,9 @@ M5 S0 ; T2-14 safety baseline: laser off at start
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
 ; OBJ ids=det-000003
+M5 S0
 G0 X30.000 Y120.000
-M4 S800
+M4 S0
 G1 X70.000 Y120.000 F150 S800
 G1 X70.000 Y100.000 S800
 G1 X30.000 Y100.000 S800
@@ -20,5 +21,6 @@ M5 S0
 M9 ; air assist OFF
 
 M5 S0 ; T2-14 safety baseline: laser off at end
+M5 S0
 G0 X0.000 Y0.000 ; return to job origin
 M2 ; T2-14 safety baseline: program end

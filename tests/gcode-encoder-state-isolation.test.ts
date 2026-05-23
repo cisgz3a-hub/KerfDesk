@@ -180,8 +180,8 @@ async function main(): Promise<void> {
   assert(interleaved.a === baselineA, 'overlapping compile A keeps its own relative position and modal state');
   assert(interleaved.b === baselineB, 'overlapping compile B keeps its own absolute position and S-value state');
 
-  assert(/M4 S500/.test(baselineA), 'job A uses its per-run max spindle value for 50% power');
-  assert(/M4 S204/.test(baselineB), 'job B uses its per-run max spindle value for 80% power');
+  assert(/G1\b[^\n]*\bS500\b/.test(baselineA), 'job A uses its per-run max spindle value for 50% burn power');
+  assert(/G1\b[^\n]*\bS204\b/.test(baselineB), 'job B uses its per-run max spindle value for 80% burn power');
   assert(/G91/.test(baselineA) && /G1 X10\.000/.test(baselineA), 'relative job emits relative deltas from its own run context');
   assert(/G90/.test(baselineB) && /G1 X10\.000 Y3\.000/.test(baselineB), 'absolute job emits absolute positions from its own run context');
 

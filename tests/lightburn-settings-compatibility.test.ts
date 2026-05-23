@@ -110,13 +110,17 @@ function generateLines(options: Record<string, unknown> = {}): string[] {
 async function main() {
   await test('GRBL constant-power mode emits M3 instead of hard-coded M4', () => {
     const lines = generateLines({ grblLaserPowerMode: 'constant-m3' });
-    assert(lines.some(line => /^M3 S500\b/.test(line)), `expected M3 S500 in:\n${lines.join('\n')}`);
+    assert(lines.some(line => /^M3 S0\b/.test(line)), `expected safe M3 S0 arm in:\n${lines.join('\n')}`);
+    assert(lines.some(line => /^G1\b.*\bS500\b/.test(line)), `expected moving burn line with S500 in:\n${lines.join('\n')}`);
+    assert(!lines.some(line => /^M3 S500\b/.test(line)), `did not expect stationary M3 S500 in:\n${lines.join('\n')}`);
     assert(!lines.some(line => /^M4 S500\b/.test(line)), `did not expect M4 S500 in:\n${lines.join('\n')}`);
   });
 
   await test('GRBL dynamic-power mode remains the default M4 behavior', () => {
     const lines = generateLines();
-    assert(lines.some(line => /^M4 S500\b/.test(line)), `expected default M4 S500 in:\n${lines.join('\n')}`);
+    assert(lines.some(line => /^M4 S0\b/.test(line)), `expected default safe M4 S0 arm in:\n${lines.join('\n')}`);
+    assert(lines.some(line => /^G1\b.*\bS500\b/.test(line)), `expected moving burn line with S500 in:\n${lines.join('\n')}`);
+    assert(!lines.some(line => /^M4 S500\b/.test(line)), `did not expect stationary M4 S500 in:\n${lines.join('\n')}`);
   });
 
   await test('air assist command can be configured to use M7 instead of hard-coded M8', () => {

@@ -10,7 +10,7 @@ M5 S0 ; T2-14 safety baseline: laser off at start
 ; --- Score (pass 1) ---
 ; OBJ ids=det-000004
 ; G0 skipped (no motion)
-M4 S150
+M4 S0
 G1 X160.000 F2200 S150
 M5 S0
 

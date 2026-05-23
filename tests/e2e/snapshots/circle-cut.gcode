@@ -10,8 +10,9 @@ M5 S0 ; T2-14 safety baseline: laser off at start
 ; --- Cut (pass 1) ---
 M8 ; air assist ON
 ; OBJ ids=det-000003
+M5 S0
 G0 X79.969 Y-28.822
-M4 S800
+M4 S0
 G1 X-0.092 Y1.176 F150 S800
 G1 X-0.154 Y1.172 S800
 G1 X-0.215 Y1.167 S800
