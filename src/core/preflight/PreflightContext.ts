@@ -19,6 +19,14 @@ export interface PreflightResult {
   fix?: PreflightFix;
 }
 
+export interface PreflightOutputSemanticFinding {
+  severity: 'error' | 'warning';
+  code: string;
+  message: string;
+  lineNumber: number;
+  line: string;
+}
+
 export interface PreflightFix {
   label: string;
   action:
@@ -178,6 +186,8 @@ export interface PreflightContext {
   gcodeTravelScan?: string | null;
   /** Final emitted G-code text for T3-18 semantic safety validation. */
   emittedGcode?: string | null;
+  /** Precomputed semantic findings from a spool-backed output stream. */
+  emittedGcodeFindings?: readonly PreflightOutputSemanticFinding[];
   /**
    * T1-32: precomputed flag for "the compiled output emits M4 dynamic-power somewhere."
    * Set at the runPreflightSummary boundary by scanning the gcode once. Drives the

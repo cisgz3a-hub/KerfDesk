@@ -8,7 +8,7 @@
 | Area | Files | Source of truth |
 |---|---:|---|
 | `src/` | 512 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 822 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `tests/` | 824 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -50,7 +50,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 745 | - |
+| `tests/` | 747 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -1276,6 +1276,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/source-maps-hidden-mode.test.ts`
 - `tests/source-maps-not-shipped.test.ts`
 - `tests/source-text-migration.test.ts`
+- `tests/spool-semantic-gcode-validation.test.ts`
 - `tests/stale-followup-doc-sweep.test.ts`
 - `tests/stale-gcode-blocks-start.test.ts`
 - `tests/start-mode-labels.test.ts`
@@ -1308,6 +1309,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/svg-import.test.ts`
 - `tests/svg-inherited-group-styles.test.ts`
 - `tests/svg-parser-helpers.test.ts`
+- `tests/svg-renderability-and-clip-mask-safety.test.ts`
 - `tests/svg-text-import-warning.test.ts`
 - `tests/svg-unsupported-feature-warning.test.ts`
 - `tests/svg-use-defs-import.test.ts`

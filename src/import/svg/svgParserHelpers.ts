@@ -79,7 +79,8 @@ export function unsupportedFeatureMessage(feature: string, count: number): strin
   }
   if (feature === '<style>') {
     return `${count} SVG <style> block${count === 1 ? '' : 's'} found. `
-      + 'CSS rules are not applied during import; use presentation attributes or inline styles on shapes.';
+      + 'Only simple tag, id, and class CSS paint/renderability rules are applied during import; '
+      + 'flatten complex CSS styling before machine output.';
   }
   return `${count} unsupported SVG ${feature} feature${count === 1 ? '' : 's'} found during import.`;
 }

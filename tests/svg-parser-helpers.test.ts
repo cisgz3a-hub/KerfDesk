@@ -119,7 +119,7 @@ console.log('\n=== T1-158 SVG parser helpers ===\n');
   const r = unsupportedFeatureMessage('<style>', 1);
   assert(r.includes('1 SVG <style> block found'),
     '<style>: singular');
-  assert(r.includes('use presentation attributes'),
+  assert(r.includes('Only simple tag, id, and class CSS'),
     '<style> includes recovery hint');
 }
 {

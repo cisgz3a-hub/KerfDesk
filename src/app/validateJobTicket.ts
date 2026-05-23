@@ -207,5 +207,17 @@ export function validateJobTicket(input: ValidateJobTicketInput): TicketValidati
     };
   }
 
+  const blockingOutputFinding = ticket.outputSemanticFindings?.find(
+    finding => finding.severity === 'error',
+  );
+  if (blockingOutputFinding) {
+    return {
+      ok: false,
+      reason:
+        'Generated G-code failed semantic safety validation. '
+        + 'Update G-code before starting.',
+    };
+  }
+
   return { ok: true };
 }

@@ -38,8 +38,8 @@ const message = formatSvgImportWarnings(parsed.warnings);
 assert(codes.includes('SVG_FEATURE_UNSUPPORTED'), 'unsupported feature warning code is emitted');
 assert(message.includes('clipPath'), 'warning mentions clipPath is not applied');
 assert(message.includes('mask'), 'warning mentions mask is not applied');
-assert(message.includes('<style>'), 'warning mentions CSS style rules are not applied');
-assert(parsed.elements.length === 2, 'supported visible geometry still imports');
+assert(message.includes('<style>'), 'warning mentions limited CSS style-rule support');
+assert(parsed.elements.length === 0, 'clip/mask affected raw geometry is not imported as machine output');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

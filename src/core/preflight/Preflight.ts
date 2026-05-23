@@ -270,6 +270,7 @@ export function runPreflightSummary(
   compiledOutput?: {
     readonly hasGcode?: boolean;
     readonly outputUsesM4?: boolean;
+    readonly outputSemanticFindings?: PreflightContext['emittedGcodeFindings'];
   },
   firmwareDeviceIdentityFromMachine?: DeviceIdentity | null,
 ): PreflightSummary {
@@ -313,6 +314,7 @@ export function runPreflightSummary(
     machinePlanBounds: machinePlanBounds ?? null,
     gcodeTravelScan: !machinePlanBounds && gcode ? gcode : null,
     emittedGcode: gcode,
+    emittedGcodeFindings: compiledOutput?.outputSemanticFindings,
     outputUsesM4: compiledOutput?.outputUsesM4 ?? gcodeTextUsesM4(gcode),
     gcodeHeaderPreview: profile.gcodeHeaderTemplate?.trim() || undefined,
     liveMachineInfo: {

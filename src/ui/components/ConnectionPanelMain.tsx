@@ -447,6 +447,7 @@ export function ConnectionPanelMain({
       {
         hasGcode: hasCompiledGcode,
         outputUsesM4: lastGcodeCompileResult?.outputUsesM4,
+        outputSemanticFindings: lastGcodeCompileResult?.outputSemanticFindings,
       },
       controllerRef.current?.getDeviceIdentity?.() ?? null,
     );
@@ -474,6 +475,7 @@ export function ConnectionPanelMain({
     preflightGcodeHeaderTemplate,
     hasCompiledGcode,
     lastGcodeCompileResult?.outputUsesM4,
+    lastGcodeCompileResult?.outputSemanticFindings,
     unsafeAtConnectReason,
     compiledJobTicket,
     startMode,

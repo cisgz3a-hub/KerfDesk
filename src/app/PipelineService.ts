@@ -70,6 +70,11 @@ import { checkBurnEnvelopeDivergenceFromEnvelope, computePlanBurnEnvelope } from
 // to the shared ledger so support bundles can correlate compile-time
 // encoder regressions with the runtime stream they affected.
 import { getMachineEventLedger } from './MachineEventLedger';
+import {
+  validateEmittedGcode,
+  validateEmittedGcodeChunks,
+  type OutputGcodeFinding,
+} from '../core/preflight/rules/OutputValidator';
 import type { ValidatedJobTicket } from '../core/job/ValidatedJobTicket';
 import {
   BUILT_IN_FOOTER_TEMPLATES,
@@ -334,6 +339,8 @@ export interface CompileGcodeResult {
   ticket: ValidatedJobTicket;
   /** True when emitted output contains M4 dynamic-power laser mode. */
   outputUsesM4: boolean;
+  /** Semantic validation findings over the emitted output stream. */
+  outputSemanticFindings: readonly OutputGcodeFinding[];
 }
 
 export interface CompileToolpathResult {
@@ -614,6 +621,7 @@ export async function compileGcode(
   let gcodeLines: readonly string[] = [];
   let gcodeSpool: SpoolHandle | null = null;
   let outputUsesM4 = false;
+  let outputSemanticFindings: readonly OutputGcodeFinding[] = [];
   if (typeof strategy.generateGcode === 'function') {
     const ticketId = generateTicketId();
     let reportSpoolBuildProgress = true;
@@ -667,6 +675,10 @@ export async function compileGcode(
       options => fromArray(gcodeLines, options),
     );
   }
+  outputSemanticFindings = gcodeSpool
+    ? await validateEmittedGcodeChunks(gcodeSpool.open({ signal: opts.signal }), { maxSpindle })
+    : validateEmittedGcode(gcode, { maxSpindle });
+  throwIfAborted(opts.signal);
   const emittedBurnEnvelope = await analyzeEmittedBurnEnvelopeFromChunks(
     gcodeSpool.open({ signal: opts.signal }),
   );
@@ -733,6 +745,7 @@ export async function compileGcode(
     // via console.warn so support tooling captures the divergence
     // event even when no listener consumes the ticket field.
     burnEnvelopeDivergence,
+    outputSemanticFindings,
     gcodeSpool,
     gcodeLines,
     gcodeText: gcode,
@@ -754,6 +767,7 @@ export async function compileGcode(
     failedTextObjects,
     ticket,
     outputUsesM4,
+    outputSemanticFindings,
   };
 }
 

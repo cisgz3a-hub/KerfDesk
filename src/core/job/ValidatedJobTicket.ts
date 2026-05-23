@@ -74,6 +74,14 @@ export interface ValidatedJobTicket {
    * tooling can diagnose encoder regressions.
    */
   readonly burnEnvelopeDivergence: BurnEnvelopeDivergenceReport | null;
+  /** Semantic findings produced from the emitted G-code stream at compile time. */
+  readonly outputSemanticFindings?: readonly {
+    readonly severity: 'error' | 'warning';
+    readonly code: string;
+    readonly message: string;
+    readonly lineNumber: number;
+    readonly line: string;
+  }[];
   /**
    * T3-15 first production boundary: replayable G-code stream handle.
    *

@@ -1,5 +1,6 @@
 import type { PreflightContext, PreflightResult } from '../PreflightContext';
 import { PREFLIGHT_CODES } from '../PreflightContext';
+import type { GcodeChunk } from '../../output/GcodeStreaming';
 
 // T3-18: semantic validation over the final emitted G-code stream.
 export interface OutputValidatorOptions {
@@ -69,10 +70,7 @@ function formatLine(lineNumber: number, line: string): string {
   return `Line ${lineNumber}: ${line.trim()}`;
 }
 
-export function validateEmittedGcode(
-  gcode: string,
-  options: OutputValidatorOptions = {},
-): OutputGcodeFinding[] {
+function createOutputGcodeScanner(options: OutputValidatorOptions = {}) {
   const findings: OutputGcodeFinding[] = [];
   const maxSpindle = options.maxSpindle ?? null;
   const state: ModalState = {
@@ -101,12 +99,9 @@ export function validateEmittedGcode(
     });
   };
 
-  const lines = gcode.split(/\r?\n/);
-  for (let i = 0; i < lines.length; i++) {
-    const rawLine = lines[i] ?? '';
-    const lineNumber = i + 1;
+  const scanLine = (rawLine: string, lineNumber: number): void => {
     const clean = stripComments(rawLine);
-    if (!clean) continue;
+    if (!clean) return;
 
     if (clean.length > MAX_GRBL_LINE_LENGTH) {
       push(
@@ -191,23 +186,66 @@ export function validateEmittedGcode(
         rawLine,
       );
     }
-  }
+  };
 
-  if (state.laserMode !== 'off' && state.spindle > EPS) {
-    const lastLineNumber = Math.max(1, lines.length);
-    const lastLine = lines[lines.length - 1] ?? '';
-    push(
-      PREFLIGHT_CODES.OUTPUT_LASER_LEFT_ON,
-      'Final emitted G-code leaves M3/M4 active. The job must end with M5 before program end.',
-      lastLineNumber,
-      lastLine,
-    );
-  }
+  const finish = (lastLineNumber: number, lastLine: string): OutputGcodeFinding[] => {
+    if (state.laserMode !== 'off' && state.spindle > EPS) {
+      push(
+        PREFLIGHT_CODES.OUTPUT_LASER_LEFT_ON,
+        'Final emitted G-code leaves M3/M4 active. The job must end with M5 before program end.',
+        Math.max(1, lastLineNumber),
+        lastLine,
+      );
+    }
 
-  return findings;
+    return findings;
+  };
+
+  return { scanLine, finish };
+}
+
+export function validateEmittedGcode(
+  gcode: string,
+  options: OutputValidatorOptions = {},
+): OutputGcodeFinding[] {
+  const scanner = createOutputGcodeScanner(options);
+  const lines = gcode.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i++) {
+    scanner.scanLine(lines[i] ?? '', i + 1);
+  }
+  return scanner.finish(Math.max(1, lines.length), lines[lines.length - 1] ?? '');
+}
+
+export async function validateEmittedGcodeChunks(
+  source: AsyncIterable<GcodeChunk>,
+  options: OutputValidatorOptions = {},
+): Promise<OutputGcodeFinding[]> {
+  const scanner = createOutputGcodeScanner(options);
+  let lineNumber = 0;
+  let lastLine = '';
+  for await (const chunk of source) {
+    for (const rawLine of chunk.lines) {
+      lineNumber++;
+      lastLine = rawLine;
+      scanner.scanLine(rawLine, lineNumber);
+    }
+    if (chunk.isLast) break;
+  }
+  return scanner.finish(Math.max(1, lineNumber), lastLine);
 }
 
 export function runOutputGcodeSemanticChecks(ctx: PreflightContext, out: PreflightResult[]): void {
+  if (ctx.emittedGcodeFindings) {
+    for (const finding of ctx.emittedGcodeFindings) {
+      out.push({
+        severity: finding.severity,
+        code: finding.code,
+        message: finding.message,
+      });
+    }
+    return;
+  }
+
   const gcode = ctx.emittedGcode;
   if (!gcode) return;
   const maxSpindle =

@@ -310,7 +310,38 @@ console.log('\n=== T1-135 validateJobTicket ===\n');
     'gate order: only the first failing gate logs (no double-warn)');
 }
 
-// -------- 10. Source-level pin: MachineService delegates --------
+// -------- 10. output semantic findings block start --------
+{
+  resetWarns();
+  const scene = makeScene();
+  const profile = makeProfile();
+  const ticket = {
+    ...makeTicket({ scene, profile, gcodeText: 'G0\nM5' }),
+    outputSemanticFindings: [{
+      severity: 'error',
+      code: 'OUTPUT_RAPID_WITH_LASER_ON',
+      message: 'Line 2: G0 X10\nRapid with laser on.',
+      lineNumber: 2,
+      line: 'G0 X10',
+    }],
+  } as ValidatedJobTicket;
+  const r = validateJobTicket({
+    ticket,
+    scene,
+    currentProfile: profile,
+    currentControllerType: 'grbl',
+  });
+  assert(r.ok === false, 'output semantic error finding blocks start');
+  assert(
+    r.ok === false &&
+      r.reason ===
+        'Generated G-code failed semantic safety validation. '
+          + 'Update G-code before starting.',
+    'output semantic finding: user-facing copy matches verbatim',
+  );
+}
+
+// -------- 11. Source-level pin: MachineService delegates --------
 {
   const here = dirname(fileURLToPath(import.meta.url));
   const svcSrc = readFileSync(
