@@ -24,7 +24,9 @@
  *
  * The pure format helpers are exported separately in
  * `src/integrity/checksumFormat.ts` so tests can verify the format
- * without spawning a child process. The hashing primitive
+ * without spawning a child process. This script keeps equivalent
+ * tiny JS helpers inline because CI/release jobs invoke it directly
+ * with `node`, not through the TypeScript test runner. The hashing primitive
  * `computeSha256Hex` lives in `scripts/checksumHash.mjs` because
  * `src/` must not statically import `node:*` (T1-89 renderer-
  * sandbox contract).
@@ -33,11 +35,38 @@ import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, basename } from 'node:path';
 
 import { computeSha256Hex } from './checksumHash.mjs';
-import {
-  formatChecksumLine,
-  formatChecksumsFile,
-  matchesAnyPattern,
-} from '../src/integrity/checksumFormat.js';
+
+const HEX64 = /^[0-9a-f]{64}$/;
+
+function formatChecksumLine(hashHex, filename) {
+  if (!HEX64.test(hashHex)) {
+    throw new Error(`Invalid SHA256 hex: '${hashHex}' (expected 64 lowercase hex chars)`);
+  }
+  if (filename.length === 0) throw new Error('filename must not be empty');
+  if (/[\r\n]/.test(filename)) {
+    throw new Error('filename must not contain newline characters');
+  }
+  return `${hashHex}  ${filename}`;
+}
+
+function formatChecksumsFile(lines) {
+  const sorted = [...lines].sort((a, b) => {
+    const fa = a.split(/\s+/, 2)[1] ?? '';
+    const fb = b.split(/\s+/, 2)[1] ?? '';
+    return fa.localeCompare(fb);
+  });
+  return sorted.join('\n') + '\n';
+}
+
+function matchesAnyPattern(name, patterns) {
+  for (const p of patterns) {
+    const re = new RegExp(
+      '^' + p.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*') + '$',
+    );
+    if (re.test(name)) return true;
+  }
+  return false;
+}
 
 function parseArgs(argv) {
   let dir = null;
