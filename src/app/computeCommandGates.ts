@@ -78,7 +78,7 @@ export interface CommandGates {
   canFrameDot: boolean;
   canTestFire: boolean;
 
-  /** True only when controller status === 'run'. */
+  /** True when controller status is active motion: 'run' or 'jog'. */
   canPause: boolean;
   /** True only when controller status === 'hold'. */
   canResume: boolean;
@@ -111,7 +111,7 @@ export function computeCommandGates(input: CommandGatesInput): CommandGates {
     canFrameSafe: baseSafe,
     canFrameDot: baseSafe,
     canTestFire: baseSafe,
-    canPause: state.status === 'run',
+    canPause: state.status === 'run' || state.status === 'jog',
     canResume: state.status === 'hold',
     canStop: isConnected,
     canEmergencyStop: isConnected,

@@ -64,6 +64,12 @@ export interface BuildStartReadinessInput {
   readonly placementUncertainReason: WcsUncertainReason | null;
   readonly allowUnverifiedWcsStart: boolean;
   /**
+   * Same machine/safety gate used by the footer Reset WCS button. The
+   * inline readiness action must not receive a raw callback that can
+   * bypass the footer's idle / laser-off / operation gate.
+   */
+  readonly canResetWcsToBaseline?: boolean;
+  /**
    * T1-205: callback for the "Reset WCS to baseline" recovery
    * button. When set AND the WCS gate is failing with a
    * data-failure reason (missing/malformed G54 or $10), the gate
@@ -167,7 +173,7 @@ function wcsStateGate(input: BuildStartReadinessInput): StartReadinessGate {
     status: 'fail',
     failHeadline,
     failAction,
-    failActionButton: offerResetButton && input.onResetWcsToBaseline
+    failActionButton: offerResetButton && input.canResetWcsToBaseline && input.onResetWcsToBaseline
       ? {
           label: 'Reset WCS to baseline (G10 L2 P1 X0 Y0 Z0)',
           onClick: input.onResetWcsToBaseline,

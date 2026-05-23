@@ -96,9 +96,13 @@ class GrblFirmwareAdapter implements FirmwareAdapter {
     // text blob. The adapter adds the burn envelope (T1-182) so
     // downstream consumers can run the T1-188 divergence check.
     const strategy = new GrblOutputStrategy();
+    const generatedAt = new Date().toISOString();
     const spool = await buildReplayableGcodeSpool(
       generateTicketId(),
-      options => strategy.generateGcode(plan, job, options),
+      options => strategy.generateGcode(plan, job, {
+        ...options,
+        clock: () => generatedAt,
+      }),
     );
     const envelope = await analyzeEmittedBurnEnvelopeFromChunks(spool.open());
     return {

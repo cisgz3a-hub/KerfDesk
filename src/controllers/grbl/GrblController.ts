@@ -1480,6 +1480,20 @@ export class GrblController implements GrblControllerApi {
    */
   async resume(): Promise<SafetyActionResult> {
     if (!this._port?.isOpen) return makeNotConnectedResult('resume');
+    if (!this._isJobRunning) {
+      return {
+        action: 'resume',
+        accepted: false,
+        motionState: this._state.status === 'hold' ? 'paused' : 'unknown',
+        laserState: 'unknown',
+        positionTrusted: 'unknown',
+        requiresRehome: 'unknown',
+        requiresReconnect: false,
+        requiresInspection: false,
+        message: 'Resume blocked: controller is in Hold, but there is no active LaserForge job paused by LaserForge.',
+        timestamp: Date.now(),
+      };
+    }
     if (this._state.status !== 'hold' && !this._pausePending) {
       return {
         action: 'resume',

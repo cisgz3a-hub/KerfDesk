@@ -115,6 +115,7 @@ console.log('\n=== LF-EXT-CANDLE-005 machine setup compatibility contract ===\n'
     placementUncertainReason: 'missing_g54',
     recoveryAllowsStart: false,
     canStartJob: false,
+    canResetWcsToBaseline: true,
     onResetWcsToBaseline: reset,
   });
   assert.equal(blocked.blockingGate?.id, 'wcsState', 'WCS reset action is surfaced before generic recovery blocking copy');

@@ -11,9 +11,8 @@
  * T2-70 ships the typed slot identifier + the rotation algorithm +
  * the corruption-resilient read path so when latest can't be parsed,
  * the recovery dialog (T1-71) can fall back to the previous slot.
- * Wiring the rotation into `autosavePersistence.persistAutosave`
- * + adding the "previous" slot to the recovery dialog is filed as
- * T2-70-followup.
+ * The live autosave persistence path wires this rotation while keeping
+ * the T2-69 atomic record key as a compatibility mirror.
  */
 
 export type AutosaveSlot = 'current' | 'previous';

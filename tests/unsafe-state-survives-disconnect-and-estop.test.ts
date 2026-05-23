@@ -29,6 +29,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MachineService } from '../src/app/MachineService';
+import { ExecutionCoordinator } from '../src/app/ExecutionCoordinator';
 import {
   setUnsafePriorState,
   getUnsafePriorState,
@@ -232,7 +233,43 @@ void (async () => {
 
   // -------- 6. Source pins on the implementation --------
   {
+    resetMemoryStore();
+    setFlag();
+    resetWarns();
+    let running = true;
+    const ctrl = {
+      ...makeController({ isJobRunning: true }),
+      get isJobRunning(): boolean {
+        return running;
+      },
+      stop: () => {
+        running = false;
+      },
+    } as LaserController;
+    const svc = buildService(ctrl);
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef: { current: ctrl },
+      notifySimulatorRef: { current: () => {} },
+    });
+    await coord.safeDisconnect();
+    assert(
+      getUnsafePriorState() !== null,
+      'BUG-001: safeDisconnect preserves running-job proof even when pre-stop flips isJobRunning false',
+    );
+    assert(
+      warnsContain(/disconnect while job was running/i),
+      'BUG-001: pre-stop safeDisconnect still emits running-job preservation warning',
+    );
+  }
+
+  // -------- 7. Source pins on the implementation --------
+  {
     const src = readFileSync(resolve(here, '../src/app/MachineService.ts'), 'utf-8');
+    const connectionPanelSrc = readFileSync(
+      resolve(here, '../src/ui/components/ConnectionPanelMain.tsx'),
+      'utf-8',
+    );
     assert(/T1-175/.test(src), 'MachineService.ts carries T1-175 marker');
     assert(
       /audit Critical #2|external audit Critical #2/.test(src),
@@ -242,10 +279,14 @@ void (async () => {
       /audit Critical #3|external audit Critical #3/.test(src),
       'MachineService.ts cross-references audit Critical #3',
     );
-    // disconnect captures wasJobRunning at entry.
+    // disconnect preserves explicit pre-stop running-job proof.
     assert(
-      /const wasJobRunning = ctrl\?\.isJobRunning === true/.test(src),
-      'disconnect() captures wasJobRunning at entry',
+      /options\?\.jobWasRunningAtSequenceStart === true \|\| ctrl\?\.isJobRunning === true/.test(src),
+      'disconnect() preserves running-job proof captured before pre-stop paths',
+    );
+    assert(
+      /const jobWasRunningAtSequenceStart = ctrl\?\.isJobRunning === true;[\s\S]*machineService\.disconnect\(\{ jobWasRunningAtSequenceStart \}\)/.test(connectionPanelSrc),
+      'ConnectionPanelMain direct disconnect passes pre-stop running-job proof to MachineService.disconnect()',
     );
     // disconnect clearUnsafePriorState is gated on !wasJobRunning.
     assert(

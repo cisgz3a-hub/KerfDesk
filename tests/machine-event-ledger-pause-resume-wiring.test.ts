@@ -77,7 +77,7 @@ function makeController(opts: {
     get state() {
       return state;
     },
-    isJobRunning: false,
+    isJobRunning: true,
     maxSpindle: null,
     connect: async () => {},
     disconnect: async () => {},

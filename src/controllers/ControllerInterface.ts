@@ -21,6 +21,7 @@ export type MachineStatus =
   | 'connecting'
   | 'idle'
   | 'run'
+  | 'jog'
   | 'hold'
   | 'alarm'
   | 'homing'

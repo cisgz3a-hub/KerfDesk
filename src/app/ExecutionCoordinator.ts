@@ -580,6 +580,7 @@ export class ExecutionCoordinator {
       return;
     }
 
+    const jobWasRunningAtSequenceStart = ctrl.isJobRunning === true;
     if (!options?.skipStop) {
       try {
         ctrl.stop();
@@ -588,7 +589,7 @@ export class ExecutionCoordinator {
       }
     }
     try {
-      await this.deps.machineService.disconnect();
+      await this.deps.machineService.disconnect({ jobWasRunningAtSequenceStart });
     } catch (err) {
       console.warn('[Disconnect] failed:', err instanceof Error ? err.message : err);
     }

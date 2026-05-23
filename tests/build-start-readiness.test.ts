@@ -88,6 +88,7 @@ function happy(): BuildStartReadinessInput {
     placementUncertain: false,
     placementUncertainReason: null,
     allowUnverifiedWcsStart: false,
+    canResetWcsToBaseline: true,
     onResetWcsToBaseline: null,
     recoveryAllowsStart: true,
     wifiTrust: trustedTrust,
@@ -676,6 +677,47 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     assert(
       g?.failActionButton === undefined,
       'missing_g54 + no callback → no button (graceful degrade)',
+    );
+  }
+
+  // BUG-010: the inline recovery button must respect the same footer
+  // safety gate as the main Reset WCS button. Passing a raw callback
+  // is not enough; the helper must also know whether the footer gate
+  // currently allows reset.
+  {
+    let resets = 0;
+    const reset = () => { resets++; };
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'missing_g54',
+      onResetWcsToBaseline: reset,
+      canStartJob: false,
+      canResetWcsToBaseline: false,
+    } as BuildStartReadinessInput & { canResetWcsToBaseline: boolean });
+    const g = r.gates.find((gate) => gate.id === 'wcsState');
+    assert(
+      g?.failActionButton === undefined,
+      'inline Reset WCS action is hidden when the footer safety gate blocks reset',
+    );
+    g?.failActionButton?.onClick();
+    assert(resets === 0, 'blocked inline Reset WCS action cannot invoke the raw reset callback');
+  }
+
+  {
+    const reset = () => {};
+    const r = buildStartReadiness({
+      ...happy(),
+      placementUncertain: true,
+      placementUncertainReason: 'missing_g54',
+      onResetWcsToBaseline: reset,
+      canStartJob: false,
+      canResetWcsToBaseline: true,
+    } as BuildStartReadinessInput & { canResetWcsToBaseline: boolean });
+    const g = r.gates.find((gate) => gate.id === 'wcsState');
+    assert(
+      g?.failActionButton?.onClick === reset,
+      'inline Reset WCS action remains available when the footer safety gate allows reset',
     );
   }
 

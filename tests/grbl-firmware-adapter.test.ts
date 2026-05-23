@@ -97,6 +97,25 @@ const adapter = getGrblFirmwareAdapter();
         if (chunk.isLast) break;
       }
       assert(streamed.some(l => /M4|M5|G[01]/.test(l)), 'emit produced recognizable GRBL output');
+
+      const replayedWithSmallChunks: string[] = [];
+      for await (const chunk of artifact.spool.open({ chunkLines: 3 })) {
+        replayedWithSmallChunks.push(...chunk.lines);
+        if (chunk.isLast) break;
+      }
+      const replayedWithLargeChunks: string[] = [];
+      for await (const chunk of artifact.spool.open({ chunkLines: 7 })) {
+        replayedWithLargeChunks.push(...chunk.lines);
+        if (chunk.isLast) break;
+      }
+      assert(
+        replayedWithSmallChunks.join('\n') === replayedWithLargeChunks.join('\n'),
+        'BUG-006: firmware adapter spool replay is deterministic across materialization chunk sizes',
+      );
+      assert(
+        replayedWithSmallChunks.join('\n') === streamed.join('\n'),
+        'BUG-006: firmware adapter spool replay preserves the original emitted line order',
+      );
     }
     // The burn AABB should be non-null (we have a real burn move).
     assert(artifact.burnBounds !== null, 'artifact.burnBounds non-null for a real burn');

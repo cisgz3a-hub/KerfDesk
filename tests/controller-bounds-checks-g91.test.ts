@@ -280,10 +280,10 @@ async function run(): Promise<void> {
     'position-unknown message phrasing matches contract');
   assert(/Reconnect to refresh status/.test(helperSrc),
     'position-unknown message names "Reconnect" remediation');
-  assert(/state\.curX \+= parseFloat\(xMatch\[1\]\)/.test(helperSrc),
-    'helper relative branch accumulates X delta');
-  assert(/state\.curY \+= parseFloat\(yMatch\[1\]\)/.test(helperSrc),
-    'helper relative branch accumulates Y delta');
+  assert(/if \(x !== null\) state\.curX \+= x;/.test(helperSrc),
+    'helper relative branch accumulates parsed X delta');
+  assert(/if \(y !== null\) state\.curY \+= y;/.test(helperSrc),
+    'helper relative branch accumulates parsed Y delta');
   // The OLD `if (relative) continue` short-circuit must be gone.
   assert(!/if \(relative\) continue;/.test(helperSrc),
     'OLD `if (relative) continue` short-circuit removed');

@@ -78,11 +78,33 @@ console.log('\n=== T1-139 GRBL job-bounds checker ===\n');
     'error includes bed width');
 }
 
+// -------- BUG-005. compact absolute motion words are bounds-checked --------
+{
+  const rapid = checkGrblJobBounds(['G0X500Y10'], ctx());
+  assert(rapid != null && rapid.includes('X=500'),
+    'compact G0X500Y10 rejects X past bed width');
+
+  const linear = checkGrblJobBounds(['G1X500Y10'], ctx());
+  assert(linear != null && linear.includes('X=500'),
+    'compact G1X500Y10 rejects X past bed width');
+}
+
 // -------- 5. Y over bed height --------
 {
   const r = checkGrblJobBounds(['G0 X10 Y500'], ctx());
   assert(r != null && r.includes('Y=500'),
     'Y past bed height → error mentions Y=500');
+}
+
+// -------- BUG-005 follow-up. modal G0/G1 persists across axis-only lines --------
+{
+  const linear = checkGrblJobBounds(['G1 X10 Y10', 'X500 Y10'], ctx());
+  assert(linear != null && linear.includes('X=500'),
+    'modal G1 axis-only X500 Y10 rejects X past bed width');
+
+  const rapid = checkGrblJobBounds(['G0 X10 Y10', 'Y500'], ctx());
+  assert(rapid != null && rapid.includes('Y=500'),
+    'modal G0 axis-only Y500 rejects Y past bed height');
 }
 
 // -------- 6. negative coords beyond EPS --------
@@ -209,6 +231,13 @@ console.log('\n=== T1-139 GRBL job-bounds checker ===\n');
 {
   const r = checkGrblJobBounds(['g0 x500 y10'], ctx());
   assert(r != null, 'lowercase g0/x/y still triggers the bounds check');
+}
+
+// -------- BUG-005. compact lowercase motion words are bounds-checked --------
+{
+  const r = checkGrblJobBounds(['g1x500y10'], ctx());
+  assert(r != null && r.includes('X=500'),
+    'compact lowercase g1x500y10 rejects X past bed width');
 }
 
 // -------- 16. fractional coords parse correctly --------

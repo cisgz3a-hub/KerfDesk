@@ -110,6 +110,10 @@ import {
   type FrameTicket,
   validateFrameTicketForStart,
 } from './FrameState';
+import {
+  describeSavedOriginDrift,
+  verifySavedOriginG54,
+} from './savedOriginVerify';
 // T1-136: approval-nonce eviction extracted so the TTL + FIFO rules
 // can be unit-tested without mounting the service.
 import {
@@ -296,6 +300,7 @@ function operationGateStatusFromMachineState(
   switch (state?.status) {
     case 'idle':
     case 'run':
+    case 'jog':
     case 'hold':
     case 'alarm':
     case 'door':
@@ -1138,6 +1143,29 @@ export class MachineService {
         `Work-coordinate state could not be confirmed (reason: ${placementReason}). `
         + 'Reconnect or address the underlying WCS issue before starting a job.',
       );
+    }
+
+    // BUG-007: saved-origin jobs depend on the G54 offset captured when
+    // the operator clicked Set Origin. The UI verifies this before Start,
+    // but the service is the final boundary before bytes stream to the
+    // controller. Re-query G54 here and fail closed on missing snapshot,
+    // missing live offsets, or drift.
+    if (currentStartMode === 'savedOrigin') {
+      const savedOriginVerification = verifySavedOriginG54(
+        this._savedOriginG54Snapshot,
+        await this.requestWorkOffsets(),
+      );
+      if (!savedOriginVerification.ok) {
+        let reason: string;
+        if (savedOriginVerification.reason === 'drift' && savedOriginVerification.drift) {
+          reason = describeSavedOriginDrift(savedOriginVerification.drift);
+        } else if (savedOriginVerification.reason === 'no-snapshot') {
+          reason = 'Saved origin has no recorded G54 snapshot. Set Origin again before starting.';
+        } else {
+          reason = 'Saved-origin start could not read the controller G54 work offset. Reconnect or retry Set Origin before starting.';
+        }
+        throw new Error(reason);
+      }
     }
 
     // VisiCut/LibLaserCut comparison sector: the service is the last
@@ -2421,7 +2449,7 @@ export class MachineService {
     });
   }
 
-  async disconnect(): Promise<SafetyActionResult> {
+  async disconnect(options?: { jobWasRunningAtSequenceStart?: boolean }): Promise<SafetyActionResult> {
     const ctrl = this.controllerRef.current;
     // T1-169 (audit F-013): capture the port at entry so the finally
     // clause only nulls it if it's still the same reference. Pre-T1-169
@@ -2442,7 +2470,8 @@ export class MachineService {
     // safer contract: if a job was running at disconnect time, the
     // recovery flag survives to the next launch so the user is
     // prompted to inspect before reusing the setup.
-    const wasJobRunning = ctrl?.isJobRunning === true;
+    const wasJobRunning =
+      options?.jobWasRunningAtSequenceStart === true || ctrl?.isJobRunning === true;
     const gatedResult = ctrl ? await this._guardDisconnectStopsJob(ctrl) : null;
     if (gatedResult) return gatedResult;
 
@@ -2925,6 +2954,17 @@ export class MachineService {
         'resume',
         decisionMessage(decision) ?? decision.detail,
       );
+    }
+    const ownsPausedJob =
+      this.activeJobSessionId != null
+      || this.activeTicket != null
+      || this.currentJobLog?.status === 'running'
+      || ctrl.isJobRunning;
+    if (!ownsPausedJob) {
+      return this._recordSafetyResult(makeOperationGateRefusalSafetyResult(
+        'resume',
+        'Resume blocked: controller is in Hold, but there is no active LaserForge job paused by LaserForge.',
+      ));
     }
     try {
       const result = await ctrl.operations.resumeJob();

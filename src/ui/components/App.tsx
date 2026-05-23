@@ -1007,7 +1007,12 @@ export function App(): React.ReactElement {
   const handleNewProject = useCallback(
     (newScene: Scene, source: 'file' | 'autosave' | 'new') => {
       const plan = buildProjectLoadCommitPlan(newScene, source);
-      lastManualSaveHashRef.current = lastAutosaveHashRef.current = plan.cleanHash;
+      if (source === 'autosave') {
+        lastAutosaveHashRef.current = plan.cleanHash;
+      } else {
+        lastManualSaveHashRef.current = plan.cleanHash;
+        lastAutosaveHashRef.current = plan.cleanHash;
+      }
       commitSceneTransaction(newScene, plan.reason, plan.meta);
     },
     [commitSceneTransaction],

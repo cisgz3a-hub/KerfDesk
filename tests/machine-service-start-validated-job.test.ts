@@ -533,6 +533,93 @@ async function run(): Promise<void> {
 
   {
     let executeCount = 0;
+    const savedOrigin = { x: 10, y: 20 };
+    const savedOriginTicket = makeTestTicket(scene, {
+      ticketId: 'tkt_saved_origin_drift',
+      startMode: 'savedOrigin',
+      savedOrigin,
+      fingerprint: makeTestJobFingerprint({
+        scene,
+        profile: getActiveProfile(),
+        startMode: 'savedOrigin',
+        savedOrigin,
+      }),
+    });
+    const mock = {
+      ...makeMockController(async () => {
+        executeCount++;
+      }),
+      requestWorkOffsets: async () => ({ x: 0, y: 0, z: 0 }),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    svc.setSavedOriginG54Snapshot({ x: 10, y: 20, z: 0 });
+
+    let message = '';
+    try {
+      await svc.startValidatedJob({
+        ticket: savedOriginTicket,
+        frameTicket: makeTestFrameTicket(savedOriginTicket),
+        scene,
+        machineState: idle,
+        notifySimulatorTx: () => {},
+        canvasContext: canvasContextForTicket(savedOriginTicket),
+        currentStartMode: 'savedOrigin',
+        currentSavedOrigin: savedOrigin,
+      });
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+
+    assert(
+      /saved origin/i.test(message) && /work coordinate|G54|drift/i.test(message),
+      'saved-origin start rejects when live G54 no longer matches the Set Origin snapshot',
+    );
+    assert(executeCount === 0, 'saved-origin G54 drift rejection prevents executeJob');
+  }
+
+  {
+    let executeCount = 0;
+    const savedOrigin = { x: 10, y: 20 };
+    const savedOriginTicket = makeTestTicket(scene, {
+      ticketId: 'tkt_saved_origin_verified',
+      startMode: 'savedOrigin',
+      savedOrigin,
+      fingerprint: makeTestJobFingerprint({
+        scene,
+        profile: getActiveProfile(),
+        startMode: 'savedOrigin',
+        savedOrigin,
+      }),
+    });
+    const mock = {
+      ...makeMockController(async () => {
+        executeCount++;
+      }),
+      requestWorkOffsets: async () => ({ x: 10, y: 20, z: 0 }),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+    svc.setSavedOriginG54Snapshot({ x: 10, y: 20, z: 0 });
+
+    await svc.startValidatedJob({
+      ticket: savedOriginTicket,
+      frameTicket: makeTestFrameTicket(savedOriginTicket),
+      scene,
+      machineState: idle,
+      notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(savedOriginTicket),
+      currentStartMode: 'savedOrigin',
+      currentSavedOrigin: savedOrigin,
+    });
+
+    assert(executeCount === 1, 'verified saved-origin G54 still allows executeJob');
+  }
+
+  {
+    let executeCount = 0;
     const mock = {
       ...makeMockController(async () => {
         executeCount++;

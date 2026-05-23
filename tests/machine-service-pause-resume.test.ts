@@ -26,6 +26,7 @@ const pauseCalls: string[] = [];
 const resumeCalls: string[] = [];
 const rawPauseCalls: string[] = [];
 const rawResumeCalls: string[] = [];
+let isMockJobRunning = false;
 const mockMachineState: MachineState = {
   status: 'idle',
   position: { x: 0, y: 0, z: 0 },
@@ -44,7 +45,9 @@ const mockController: LaserController = {
   get capabilities() {
     return mockCapabilities;
   },
-  isJobRunning: false,
+  get isJobRunning() {
+    return isMockJobRunning;
+  },
   maxSpindle: null,
   connect: async () => {},
   disconnect: async () => {},
@@ -95,6 +98,7 @@ void (async () => {
 function reset(status: typeof mockMachineState.status, capabilities: ControllerCapabilities = grblCapabilities): void {
   mockMachineState.status = status;
   mockCapabilities = capabilities;
+  isMockJobRunning = false;
   pauseCalls.length = 0;
   resumeCalls.length = 0;
   rawPauseCalls.length = 0;
@@ -114,6 +118,7 @@ assert(pauseResult.positionTrusted === true, 'pause() preserves position trust')
 assert(pauseResult.requiresRehome === false, 'pause() does not require rehome');
 
 reset('hold');
+isMockJobRunning = true;
 const resumeResult: SafetyActionResult = await svc.resume();
 assert(resumeCalls.length === 1 && pauseCalls.length === 0, 'resume() calls operations.resumeJob() once, not pause');
 assert(rawPauseCalls.length === 0 && rawResumeCalls.length === 0, 'resume() does not call raw controller pause/resume');
@@ -122,6 +127,13 @@ assert(resumeResult.action === 'resume', 'resume() result action=resume');
 assert(resumeResult.accepted === true, 'resume() result accepted=true');
 assert(resumeResult.motionState === 'running', 'resume() result motionState=running');
 assert(resumeResult.positionTrusted === true, 'resume() preserves position trust');
+
+reset('hold');
+const unownedHoldResumeResult = await svc.resume();
+assert(resumeCalls.length === 0, 'resume() for unowned Hold does not call operations.resumeJob');
+assert(unownedHoldResumeResult.accepted === false, 'resume() for unowned Hold returns accepted=false');
+assert(/no active laserforge job/i.test(unownedHoldResumeResult.message ?? ''),
+  `resume() for unowned Hold message names ownership gate (got: ${unownedHoldResumeResult.message ?? ''})`);
 
 reset('idle');
 const idlePauseResult = await svc.pause();

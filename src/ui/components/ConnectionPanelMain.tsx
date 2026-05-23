@@ -947,6 +947,7 @@ export function ConnectionPanelMain({
 
   const handleDisconnect = useCallback(async () => {
     const ctrl = controllerRef.current;
+    const jobWasRunningAtSequenceStart = ctrl?.isJobRunning === true;
     jobStoppedByUserRef.current = true;
     intentionalDisconnectRef.current = true;
     try {
@@ -961,7 +962,7 @@ export function ConnectionPanelMain({
       stopTestFire();
 
       try {
-        await machineService.disconnect();
+        await machineService.disconnect({ jobWasRunningAtSequenceStart });
       } catch {
         /* ignore */
       }
@@ -2059,6 +2060,7 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     placementUncertain,
     placementUncertainReason,
     allowUnverifiedWcsStart,
+    canResetWcsToBaseline,
     // T1-205: wire the "Reset WCS to baseline" recovery button.
     // applyWcsNormalization sends `G10 L2 P1 X0 Y0 Z0` + `$10=0`
     // and clears _placementUncertain locally — the gate flips to

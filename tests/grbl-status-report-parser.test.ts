@@ -48,6 +48,7 @@ console.log('\n=== T1-124 GRBL status-report parser ===\n');
   const cases: Array<[string, string]> = [
     ['<Idle|MPos:0,0,0|FS:0,0>', 'idle'],
     ['<Run|MPos:0,0,0|FS:1000,500>', 'run'],
+    ['<Jog|MPos:0,0,0|FS:1000,0>', 'jog'],
     ['<Hold|MPos:0,0,0|FS:0,0>', 'hold'],
     ['<Hold:0|MPos:0,0,0|FS:0,0>', 'hold'],
     ['<Hold:1|MPos:0,0,0|FS:0,0>', 'hold'],

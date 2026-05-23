@@ -87,6 +87,20 @@ function input(overrides: Partial<CommandGatesInput> = {}): CommandGatesInput {
   assert(g.canStop, 'hold: canStop = true');
 }
 
+// 3b. Status === 'jog' blocks unsafe actions until fresh Idle.
+{
+  const g = computeCommandGates(input({
+    state: { ...idleState, status: 'jog' },
+  }));
+  assert(!g.baseSafe, 'jog: baseSafe = false');
+  assert(!g.canJog, 'jog: canJog = false until a fresh Idle arrives');
+  assert(!g.canFrameSafe, 'jog: canFrameSafe = false');
+  assert(!g.canFrameDot, 'jog: canFrameDot = false');
+  assert(!g.canTestFire, 'jog: canTestFire = false');
+  assert(g.canPause, 'jog: canPause = true');
+  assert(g.canStop, 'jog: canStop = true');
+}
+
 // 4. Status === 'alarm' → only canStop / canEmergencyStop / canUnlock true
 {
   const g = computeCommandGates(input({

@@ -196,7 +196,11 @@ void (async () => {
     // the finally clauses. We check this indirectly: in the disconnect
     // / emergencyStop bodies, the only `this.portRef.current = null`
     // must be inside the compare-and-swap guard.
-    const disconnectBody = src.match(/async disconnect\(\)[\s\S]*?\n  \}/);
+    const disconnectStart = src.indexOf('async disconnect(');
+    const disconnectEnd = src.indexOf('private async _guardDisconnectStopsJob', disconnectStart);
+    const disconnectBody = disconnectStart >= 0 && disconnectEnd > disconnectStart
+      ? src.slice(disconnectStart, disconnectEnd)
+      : null;
     const emergencyBody = src.match(/async emergencyStop\(\)[\s\S]*?\n  \}/);
     assert(
       disconnectBody !== null,
@@ -207,7 +211,7 @@ void (async () => {
       'emergencyStop body extracted for inspection',
     );
     if (disconnectBody) {
-      const matches = disconnectBody[0].match(/this\.portRef\.current = null/g);
+      const matches = disconnectBody.match(/this\.portRef\.current = null/g);
       assert(
         matches !== null && matches.length === 1,
         `disconnect: portRef nulling appears exactly once (inside the CAS guard); got ${matches?.length ?? 0}`,

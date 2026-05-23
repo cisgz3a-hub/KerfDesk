@@ -61,6 +61,7 @@ export interface ParsedGrblStatusReport {
 const STATUS_MAP: Record<string, MachineStatus> = {
   idle: 'idle',
   run: 'run',
+  jog: 'jog',
   hold: 'hold',
   'hold:0': 'hold',
   'hold:1': 'hold',

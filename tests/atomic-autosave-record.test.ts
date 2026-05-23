@@ -21,6 +21,8 @@ import { setStorageForTest } from '../src/core/storage/storage';
 import { InMemoryStorageAdapter } from '../src/core/storage/InMemoryStorageAdapter';
 
 const RECORD_KEY = 'laserforge_autosave_record';
+const CURRENT_SLOT_KEY = 'laserforge_autosave_current';
+const PREVIOUS_SLOT_KEY = 'laserforge_autosave_previous';
 const LEGACY_JSON_KEY = 'laserforge_autosave';
 const LEGACY_TIME_KEY = 'laserforge_autosave_time';
 
@@ -195,7 +197,58 @@ void (async () => {
   assert(payload == null, 'no autosave: readAutosave returns null');
 }
 
-// 8. Source-level pin
+// 8. Live persistence rotates current -> previous backup slot.
+{
+  const adapter = new InMemoryStorageAdapter();
+  setStorageForTest(adapter);
+  resetAutosaveForTest();
+
+  await writeAutosaveAsync('{"v":"first"}');
+  await writeAutosaveAsync('{"v":"second"}');
+
+  const currentRaw = await adapter.get(CURRENT_SLOT_KEY);
+  const previousRaw = await adapter.get(PREVIOUS_SLOT_KEY);
+  assert(currentRaw != null, 'backup slots: current slot written by live autosave');
+  assert(previousRaw != null, 'backup slots: previous slot rotated by live autosave');
+  const current = currentRaw ? JSON.parse(currentRaw) as AutosaveRecord : null;
+  const previous = previousRaw ? JSON.parse(previousRaw) as AutosaveRecord : null;
+  assert(current?.json === '{"v":"second"}',
+    `backup slots: current slot has latest JSON (got ${current?.json})`);
+  assert(previous?.json === '{"v":"first"}',
+    `backup slots: previous slot has prior JSON (got ${previous?.json})`);
+}
+
+// 9. Live read falls back to previous when current slot is corrupt.
+{
+  const adapter = new InMemoryStorageAdapter();
+  setStorageForTest(adapter);
+  resetAutosaveForTest();
+
+  await writeAutosaveAsync('{"v":"first"}');
+  await writeAutosaveAsync('{"v":"second"}');
+  await adapter.set(CURRENT_SLOT_KEY, '{not json');
+
+  const payload = await readAutosave();
+  assert(payload?.json === '{"v":"first"}',
+    `backup slots: corrupt current falls back to previous (got ${payload?.json})`);
+}
+
+// 10. Live read falls back to previous when current slot is missing.
+{
+  const adapter = new InMemoryStorageAdapter();
+  setStorageForTest(adapter);
+  resetAutosaveForTest();
+
+  await writeAutosaveAsync('{"v":"first"}');
+  await writeAutosaveAsync('{"v":"second"}');
+  await adapter.remove(CURRENT_SLOT_KEY);
+
+  const payload = await readAutosave();
+  assert(payload?.json === '{"v":"first"}',
+    `backup slots: missing current falls back to previous (got ${payload?.json})`);
+}
+
+// 11. Source-level pin
 {
   const fs = await import('node:fs');
   const url = await import('node:url');
@@ -214,6 +267,10 @@ void (async () => {
     'autosaveRecordChecksumValid helper exported');
   assert(/AUTOSAVE_RECORD_VERSION = 1/.test(src),
     'pinned record version = 1');
+  assert(/runAutosaveRotation/.test(src),
+    'live autosave persistence wires the backup-slot rotation');
+  assert(/readWithFallback/.test(src),
+    'live autosave persistence wires backup-slot fallback reads');
 }
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);

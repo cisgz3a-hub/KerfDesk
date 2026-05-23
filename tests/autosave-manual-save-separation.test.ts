@@ -35,6 +35,11 @@ const fileHandlersEnd = app.indexOf('});', fileHandlersStart);
 const fileHandlersBody = fileHandlersStart >= 0 && fileHandlersEnd > fileHandlersStart
   ? app.slice(fileHandlersStart, fileHandlersEnd)
   : '';
+const handleNewProjectStart = app.indexOf('const handleNewProject = useCallback');
+const handleNewProjectEnd = app.indexOf('const handleTogglePreview', handleNewProjectStart);
+const handleNewProjectBody = handleNewProjectStart >= 0 && handleNewProjectEnd > handleNewProjectStart
+  ? app.slice(handleNewProjectStart, handleNewProjectEnd)
+  : '';
 
 assert(/lastManualSaveHashRef/.test(app), 'App tracks a manual-save hash separately');
 assert(/lastAutosaveHashRef/.test(app), 'App tracks an autosave hash separately');
@@ -54,6 +59,16 @@ assert(/isSceneDirty:[\s\S]{0,120}lastManualSaveHashRef\.current/.test(fileHandl
   'New/Open dirty checks use the manual-save hash');
 assert(/markSceneSaved:[\s\S]{0,180}lastManualSaveHashRef\.current/.test(fileHandlersBody),
   'manual save callback updates the manual-save hash');
+
+assert(handleNewProjectBody.length > 0, 'handleNewProject body found');
+assert(!/lastManualSaveHashRef\.current\s*=\s*lastAutosaveHashRef\.current\s*=\s*plan\.cleanHash/.test(handleNewProjectBody),
+  'project load handler does not unconditionally mark autosave recovery as manually saved');
+assert(/source\s*===\s*'autosave'/.test(handleNewProjectBody),
+  'project load handler distinguishes autosave recovery from manual file/new loads');
+assert(/source\s*===\s*'autosave'[\s\S]{0,180}lastAutosaveHashRef\.current\s*=\s*plan\.cleanHash/.test(handleNewProjectBody),
+  'autosave recovery advances only the autosave baseline');
+assert(/lastManualSaveHashRef\.current\s*=\s*plan\.cleanHash/.test(handleNewProjectBody),
+  'manual file/new project loads still advance the manual-save baseline');
 
 console.log(`\nResult: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

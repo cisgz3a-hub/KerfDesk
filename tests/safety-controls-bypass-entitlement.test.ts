@@ -86,7 +86,9 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
     get state() {
       return state;
     },
-    isJobRunning: false,
+    get isJobRunning() {
+      return state.status === 'run' || state.status === 'hold';
+    },
     maxSpindle: 1000,
     connect: async () => {},
     disconnect: async () => { calls.disconnect++; },
@@ -127,6 +129,7 @@ function makeMockCtrl(): { ctrl: LaserController; calls: MockCounters } {
       },
       stopJob: async () => {
         calls.stop++;
+        state.status = 'idle';
         return { ok: true };
       },
       emergencyStop: async () => ({ ok: true }),

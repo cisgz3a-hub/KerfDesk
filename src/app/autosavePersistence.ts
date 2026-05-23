@@ -1,4 +1,9 @@
 import { getStorage } from '../core/storage/storage';
+import {
+  clearBothSlots,
+  readWithFallback,
+  runAutosaveRotation,
+} from './AutosaveBackupSlot';
 
 /**
  * T2-69: atomic autosave record. Pre-T2-69 the autosave write was two
@@ -131,6 +136,12 @@ function parseRecord(raw: string): AutosaveRecord | null {
   return null;
 }
 
+function parseRecordOrThrow(raw: string): AutosaveRecord {
+  const record = parseRecord(raw);
+  if (record == null) throw new Error('Invalid autosave record');
+  return record;
+}
+
 /**
  * T2-69: returns true if the record's stored checksum matches the FNV-1a
  * of its `json` field. Callers MAY surface a "save may be corrupted"
@@ -182,8 +193,16 @@ async function persistAutosave(json: string): Promise<void> {
   await migrateAutosaveToRecordKey();
   const storage = getStorage();
   const record = buildRecord(json);
+  const serialised = JSON.stringify(record);
+  const rotation = await runAutosaveRotation({
+    storage,
+    newSerialisedRecord: serialised,
+  });
+  if (!rotation.currentWriteSucceeded) {
+    throw rotation.errors[rotation.errors.length - 1] ?? new Error('Autosave current-slot write failed');
+  }
   // T2-69: single atomic write replaces the pre-T2-69 two-key sequence.
-  await storage.set(AUTOSAVE_RECORD_KEY, JSON.stringify(record));
+  await storage.set(AUTOSAVE_RECORD_KEY, serialised);
 }
 
 /**
@@ -221,6 +240,18 @@ export async function readAutosave(): Promise<AutosavePayload | null> {
   await migrateAutosaveToRecordKey();
   const storage = getStorage();
   try {
+    const slotResult = await readWithFallback({
+      storage,
+      parse: parseRecordOrThrow,
+    });
+    if (slotResult.record != null) {
+      return {
+        json: slotResult.record.json,
+        timestamp: slotResult.record.timestamp,
+        record: slotResult.record,
+      };
+    }
+
     const raw = await storage.get(AUTOSAVE_RECORD_KEY);
     if (raw) {
       const record = parseRecord(raw);
@@ -260,6 +291,7 @@ export function clearAutosave(): void {
 async function clearAutosaveAsync(): Promise<void> {
   await migrateAutosaveFromLocalStorage();
   const storage = getStorage();
+  await clearBothSlots(storage);
   await Promise.all([
     storage.remove(AUTOSAVE_RECORD_KEY),
     storage.remove(AUTOSAVE_KEY),

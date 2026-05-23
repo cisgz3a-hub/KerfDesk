@@ -50,6 +50,7 @@ export interface GrblJobBoundsState {
   relative: boolean;
   curX: number;
   curY: number;
+  motionMode: 'g0' | 'g1' | null;
 }
 
 export function createGrblJobBoundsState(ctx: GrblJobBoundsContext): GrblJobBoundsState {
@@ -57,6 +58,7 @@ export function createGrblJobBoundsState(ctx: GrblJobBoundsContext): GrblJobBoun
     relative: false,
     curX: ctx.headPosition.x,
     curY: ctx.headPosition.y,
+    motionMode: null,
   };
 }
 
@@ -79,6 +81,22 @@ function stripGrblComments(line: string): string {
   return out;
 }
 
+interface GrblWord {
+  letter: string;
+  value: number;
+}
+
+function parseGrblWords(line: string): GrblWord[] {
+  const words: GrblWord[] = [];
+  for (const match of line.matchAll(/([A-Z])\s*([+-]?(?:\d+(?:\.\d*)?|\.\d+))/gi)) {
+    const value = Number(match[2]);
+    if (Number.isFinite(value)) {
+      words.push({ letter: match[1].toUpperCase(), value });
+    }
+  }
+  return words;
+}
+
 export function checkGrblJobBoundsChunk(
   lines: ReadonlyArray<string>,
   ctx: GrblJobBoundsContext,
@@ -91,15 +109,28 @@ export function checkGrblJobBoundsChunk(
 
   for (let i = 0; i < lines.length; i++) {
     const line = stripGrblComments(lines[i]);
-    for (const modeMatch of line.matchAll(/\bG(90|91)\b/gi)) {
-      state.relative = modeMatch[1] === '91';
+    const words = parseGrblWords(line);
+    let hasMotionWord = false;
+    let x: number | null = null;
+    let y: number | null = null;
+
+    for (const word of words) {
+      if (word.letter === 'G') {
+        if (word.value === 90) state.relative = false;
+        if (word.value === 91) state.relative = true;
+        if (word.value === 0 || word.value === 1) {
+          state.motionMode = word.value === 0 ? 'g0' : 'g1';
+          hasMotionWord = true;
+        }
+      } else if (word.letter === 'X' && x === null) {
+        x = word.value;
+      } else if (word.letter === 'Y' && y === null) {
+        y = word.value;
+      }
     }
 
-    if (!/\bG0\d*\b/i.test(line) && !/\bG1\d*\b/i.test(line)) continue;
-
-    const xMatch = line.match(/\bX([+-]?\d+(?:\.\d+)?)/i);
-    const yMatch = line.match(/\bY([+-]?\d+(?:\.\d+)?)/i);
-    if (!xMatch && !yMatch) continue;
+    if (x === null && y === null) continue;
+    if (!hasMotionWord && state.motionMode == null) continue;
 
     if (state.relative) {
       // T1-44: refuse the job if we don't actually know where the head is.
@@ -109,11 +140,11 @@ export function checkGrblJobBoundsChunk(
           + 'Reconnect to refresh status, then try again.'
         );
       }
-      if (xMatch) state.curX += parseFloat(xMatch[1]);
-      if (yMatch) state.curY += parseFloat(yMatch[1]);
+      if (x !== null) state.curX += x;
+      if (y !== null) state.curY += y;
     } else {
-      if (xMatch) state.curX = parseFloat(xMatch[1]);
-      if (yMatch) state.curY = parseFloat(yMatch[1]);
+      if (x !== null) state.curX = x;
+      if (y !== null) state.curY = y;
     }
 
     if (Number.isFinite(state.curX) && (state.curX < -EPS || state.curX > bedW + EPS)) {
