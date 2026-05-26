@@ -38,6 +38,10 @@ assert(/window\.electronAPI\?\.updates/.test(noticeSrc), 'component reads option
 assert(/updates\.onEvent/.test(noticeSrc), 'component subscribes to update events');
 assert(/return unsubscribe/.test(noticeSrc), 'component cleans up update event subscription');
 assert(/updates\.check\(\)/.test(noticeSrc), 'manual update check button calls updates.check()');
+assert(/message\?: unknown/.test(noticeSrc),
+  'failed update IPC result parser reads optional message');
+assert(/maybe\.message/.test(noticeSrc) && /maybe\.reason/.test(noticeSrc),
+  'failed update IPC result parser prefers detailed message over reason code');
 assert(/updates\.install\(\{ jobRunning: isJobRunning \}\)/.test(noticeSrc), 'restart button passes job-running guard to install IPC');
 assert(/kind: 'downloaded'/.test(noticeSrc), 'downloaded event maps to restart-ready state');
 assert(/Restart to update/.test(noticeSrc), 'downloaded state offers restart action');

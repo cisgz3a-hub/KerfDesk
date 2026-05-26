@@ -41,13 +41,18 @@ assert(/sbom\.cdx\.json/.test(script), 'SBOM generator writes sbom.cdx.json by d
 for (const [label, workflow, artifactPattern] of [
   ['CI Windows', ci, 'release/\\*\\.exe'],
   ['CI macOS', ci, 'release/\\*\\.dmg'],
-  ['signed Windows', win, 'release/\\*\\.exe'],
+  ['signed Windows', win, 'release/LaserForge-Setup-\\*\\.exe'],
   ['signed macOS', mac, 'release/\\*\\.dmg'],
 ] as const) {
   assert(/node scripts\/generate-sbom\.mjs release\/sbom\.cdx\.json/.test(workflow),
     `${label} workflow generates sbom.cdx.json`);
-  const uploadRe = new RegExp(`path:\\s*\\|[\\s\\S]*${artifactPattern}[\\s\\S]*release/SHA256SUMS[\\s\\S]*release/sbom\\.cdx\\.json`);
-  assert(uploadRe.test(workflow), `${label} workflow uploads installer, SHA256SUMS, and SBOM together`);
+  if (label === 'signed Windows') {
+    const uploadRe = new RegExp(`path:\\s*\\|[\\s\\S]*${artifactPattern}[\\s\\S]*release/\\*\\.blockmap[\\s\\S]*release/latest\\.yml[\\s\\S]*release/SHA256SUMS[\\s\\S]*release/sbom\\.cdx\\.json`);
+    assert(uploadRe.test(workflow), `${label} workflow uploads installer, updater metadata, SHA256SUMS, and SBOM together`);
+  } else {
+    const uploadRe = new RegExp(`path:\\s*\\|[\\s\\S]*${artifactPattern}[\\s\\S]*release/SHA256SUMS[\\s\\S]*release/sbom\\.cdx\\.json`);
+    assert(uploadRe.test(workflow), `${label} workflow uploads installer, SHA256SUMS, and SBOM together`);
+  }
 }
 
 console.log(`\nT1-258 release SBOM workflows: ${passed} passed, ${failed} failed\n`);

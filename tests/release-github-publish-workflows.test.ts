@@ -52,8 +52,15 @@ for (const [label, workflow, platform, extension] of [
     `${label} publish steps are gated behind publish_release`);
   assert(/gh release view/.test(workflow) && /gh release create/.test(workflow),
     `${label} workflow creates a draft release only when needed`);
-  assert(new RegExp(`gh release upload[\\s\\S]*release/\\*\\.${extension}[\\s\\S]*release/SHA256SUMS\\.${platform}[\\s\\S]*release/sbom\\.${platform}\\.cdx\\.json`).test(workflow),
-    `${label} workflow uploads installer, platform checksum, and platform SBOM`);
+  if (platform === 'windows') {
+    assert(/gh release upload[\s\S]*release\/LaserForge-Setup-\*\.exe[\s\S]*release\/\*\.blockmap[\s\S]*release\/latest\.yml[\s\S]*release\/SHA256SUMS\.windows[\s\S]*release\/sbom\.windows\.cdx\.json/.test(workflow),
+      'Windows workflow uploads installer, updater metadata, platform checksum, and platform SBOM');
+    assert(/gh release edit[^\n]*--draft=false/.test(workflow),
+      'Windows workflow publishes the release after updater metadata upload');
+  } else {
+    assert(new RegExp(`gh release upload[\\s\\S]*release/\\*\\.${extension}[\\s\\S]*release/SHA256SUMS\\.${platform}[\\s\\S]*release/sbom\\.${platform}\\.cdx\\.json`).test(workflow),
+      `${label} workflow uploads installer, platform checksum, and platform SBOM`);
+  }
   assert(/GH_TOKEN:\s*\$\{\{\s*github\.token\s*\}\}/.test(workflow),
     `${label} workflow uses the GitHub token for gh release commands`);
 }
@@ -63,6 +70,8 @@ assert(/release_tag/.test(docs), 'CODE-SIGNING docs mention the release_tag inpu
 assert(/release_qa_confirmed/.test(docs), 'CODE-SIGNING docs mention the release_qa_confirmed gate');
 assert(/SHA256SUMS\.windows/.test(docs) && /SHA256SUMS\.macos/.test(docs),
   'CODE-SIGNING docs document platform-specific checksum assets');
+assert(/latest\.yml/.test(docs) && /\.blockmap/.test(docs),
+  'CODE-SIGNING docs document Windows updater metadata assets');
 assert(/T1-260/.test(docs), 'CODE-SIGNING docs carry T1-260 marker');
 
 console.log(`\nT1-260 signed release GitHub publishing: ${passed} passed, ${failed} failed\n`);

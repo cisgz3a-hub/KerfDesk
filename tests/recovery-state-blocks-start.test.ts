@@ -1,6 +1,7 @@
 /**
- * T1-122: regression test that the production start gate consumes
- * RecoveryState. Pre-T1-122 the runtime type at
+ * T1-122/T-GRBL4040: regression test that MachineService owns
+ * RecoveryState without letting the stale checklist become a hard
+ * Start gate. Pre-T1-122 the runtime type at
  * `src/runtime/RecoveryState.ts` (T2-87) was framework-only — no
  * production code held a RecoveryState instance, no triggers fired,
  * and `recoveryAllowsStart()` was never consulted by the UI's local
@@ -12,14 +13,15 @@
  *   - getRecoveryState / setRecoveryState / acknowledgeRecoveryComplete
  *     wired
  *   - onRecoveryStateChange listener fires on transitions
- *   - startValidatedJob throws when recovery is non-none
+ *   - RecoveryState still records alarm / stop recovery state
+ *   - startValidatedJob no longer consumes RecoveryState directly
  *   - alarm during an active job auto-triggers triggerAlarm via the
  *     existing onStateChange subscriber
  *   - notifyLaserSafetyOutcome('failed') auto-triggers
  *     triggerEmergencyStop (matching the laser-output-unknown
  *     contract)
- *   - source-pin: ConnectionPanelMain reads recovery state and ANDs
- *     it into canStartJob
+ *   - source-pin: ConnectionPanelMain still reads recovery state for
+ *     guidance but no longer ANDs it into canStartJob
  *
  * Run: npx tsx tests/recovery-state-blocks-start.test.ts
  */
@@ -42,7 +44,6 @@ import {
 } from '../src/controllers/ControllerInterface';
 import { type ValidatedJobTicket } from '../src/core/job/ValidatedJobTicket';
 import { ackInspection, ackUnlock, ackRehome, ackReframe } from '../src/runtime/RecoveryState';
-import { type Scene } from '../src/core/scene/Scene';
 
 let passed = 0;
 let failed = 0;
@@ -124,7 +125,7 @@ function makeController(): { ctrl: LaserController; fireStateChange: (s: Machine
   return { ctrl, fireStateChange };
 }
 
-console.log('\n=== T1-122 RecoveryState wired into canonical start gate ===\n');
+console.log('\n=== T1-122 RecoveryState advisory, controller gates canonical ===\n');
 
 void (async () => {
 
@@ -176,7 +177,7 @@ void (async () => {
   assert(seen.length === 2, 'unsubscribed listener stops receiving updates');
 }
 
-// -------- 3. startValidatedJob throws when recovery is non-none --------
+// -------- 3. RecoveryState can stay active without being the job-start authority --------
 {
   const { ctrl } = makeController();
   const ref = { current: ctrl } as MutableRefObject<LaserController>;
@@ -194,28 +195,8 @@ void (async () => {
     reframeDone: false,
   });
 
-  let threw = false;
-  let message = '';
-  try {
-    await svc.startValidatedJob({
-      ticket: { ticketId: 't', gcodeLines: ['G0 X0'], gcodeText: 'G0 X0' } as unknown as ValidatedJobTicket,
-      frameTicket: null,
-      scene: {} as Scene,
-      machineState: idle,
-      notifySimulatorTx: () => {},
-      canvasContext: {} as never,
-      currentStartMode: 'absolute',
-      currentSavedOrigin: null,
-    });
-  } catch (e) {
-    threw = true;
-    message = (e as Error).message ?? '';
-  }
-  assert(threw, 'startValidatedJob throws when recovery is non-none');
-  assert(/recovery is still active/i.test(message),
-    `error message names recovery (got: '${message.slice(0, 80)}...')`);
-  assert(/alarm/i.test(message),
-    'error message includes the recovery status name');
+  const r = svc.getRecoveryState();
+  assert(r.status === 'alarm', 'RecoveryState still records active alarm recovery');
 }
 
 // -------- 4. After per-step ack chain → recovery clears → start no longer recovery-blocked --------
@@ -343,8 +324,8 @@ void (async () => {
 
   const svcSrc = readFileSync(resolve(repoRoot, 'src/app/MachineService.ts'), 'utf-8');
   assert(/T1-122/.test(svcSrc), 'MachineService.ts carries T1-122 marker');
-  assert(/recoveryAllowsStart\(this\._recoveryState\)/.test(svcSrc),
-    'MachineService.startValidatedJob calls recoveryAllowsStart(this._recoveryState)');
+  assert(!/recoveryAllowsStart\(this\._recoveryState\)/.test(svcSrc),
+    'MachineService.startValidatedJob no longer hard-blocks on RecoveryState');
   assert(/triggerAlarm\(/.test(svcSrc),
     'MachineService imports / calls triggerAlarm');
   assert(/triggerEmergencyStop\(/.test(svcSrc),
@@ -358,10 +339,10 @@ void (async () => {
     resolve(repoRoot, 'src/ui/components/ConnectionPanelMain.tsx'),
     'utf-8',
   );
-  assert(/import \{ recoveryAllowsStart \} from '\.\.\/\.\.\/runtime\/RecoveryState'/.test(panelSrc),
-    'ConnectionPanelMain imports recoveryAllowsStart');
-  assert(/recoveryAllowsStart\(recoveryState\)/.test(panelSrc),
-    'ConnectionPanelMain canStartJob conjunct calls recoveryAllowsStart(recoveryState)');
+  assert(!/import \{ recoveryAllowsStart \} from '\.\.\/\.\.\/runtime\/RecoveryState'/.test(panelSrc),
+    'ConnectionPanelMain does not import recoveryAllowsStart for Start gating');
+  assert(!/recoveryAllowsStart\(recoveryState\)/.test(panelSrc),
+    'ConnectionPanelMain canStartJob no longer conjuncts RecoveryState');
   assert(/onRecoveryStateChange\(setRecoveryStateLocal\)/.test(panelSrc),
     'ConnectionPanelMain subscribes to onRecoveryStateChange');
   assert(/T1-122/.test(panelSrc), 'ConnectionPanelMain carries T1-122 marker');

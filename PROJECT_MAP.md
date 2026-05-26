@@ -7,8 +7,8 @@
 
 | Area | Files | Source of truth |
 |---|---:|---|
-| `src/` | 512 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
-| `tests/` | 826 | Executable regression, integration, source-pin, simulator, and E2E tests |
+| `src/` | 513 | Production code, UI, controller, app, geometry, import, storage, and worker modules |
+| `tests/` | 828 | Executable regression, integration, source-pin, simulator, and E2E tests |
 
 ## Pipeline Overview
 
@@ -25,7 +25,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 | `src/` | 2 | - |
 | `src/app` | 49 | - |
 | `src/communication` | 5 | - |
-| `src/controllers` | 29 | grbl |
+| `src/controllers` | 30 | grbl |
 | `src/core` | 116 | box, devices, geometry, grbl, image, job, logging, materials, nesting, output, plan, preflight, replay, scene, storage, tools |
 | `src/debug` | 4 | - |
 | `src/diagnostics` | 13 | - |
@@ -50,7 +50,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 
 | Boundary | Files | Direct child directories |
 |---|---:|---|
-| `tests/` | 749 | - |
+| `tests/` | 751 | - |
 | `tests/capability-regression` | 1 | - |
 | `tests/connection-lifecycle` | 1 | - |
 | `tests/controller-matrix` | 1 | - |
@@ -153,6 +153,7 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `src/controllers/SafetyActionResult.ts`
 - `src/controllers/grbl/CommandClassifier.ts`
 - `src/controllers/grbl/ForceSafeState.ts`
+- `src/controllers/grbl/GrblAlarmPolicy.ts`
 - `src/controllers/grbl/GrblController.ts`
 - `src/controllers/grbl/GrblFrameGcode.ts`
 - `src/controllers/grbl/GrblIdentityParser.ts`
@@ -947,6 +948,8 @@ The source tree is the authority for detailed ownership. This generated map is a
 - `tests/gcode-templates.test.ts`
 - `tests/gcode-travel-hard-off-boundaries.test.ts`
 - `tests/geometry-deep-validation.test.ts`
+- `tests/grbl-alarm-policy.test.ts`
+- `tests/grbl-alarm-recovery-operation.test.ts`
 - `tests/grbl-byte-buffer-accounting.test.ts`
 - `tests/grbl-compatibility-settings-ui.test.tsx`
 - `tests/grbl-connect-abort-signal.test.ts`

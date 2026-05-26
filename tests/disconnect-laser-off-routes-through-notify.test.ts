@@ -146,7 +146,8 @@ void (async () => {
   {
     const { controller } = makeController({ ok: false, reason: 'failed', message: 'port write timeout' });
     const svc = new MachineService({ current: controller }, makePortRef());
-    assert(laserStateOf(svc) === 'off', 'precondition: laser state is off (default)');
+    svc.notifyLaserSafetyOutcome('failed');
+    assert(laserStateOf(svc) === 'unknown', 'precondition: laser state is unknown before disconnect');
 
     await svc.disconnect();
     assert(
@@ -159,6 +160,7 @@ void (async () => {
   {
     const { controller } = makeController({ ok: false, reason: 'soft-reset', message: 'M5 transport failed; soft reset succeeded' });
     const svc = new MachineService({ current: controller }, makePortRef());
+    svc.notifyLaserSafetyOutcome('failed');
 
     await svc.disconnect();
     assert(
@@ -171,11 +173,12 @@ void (async () => {
   {
     const { controller } = makeController({ ok: false, reason: 'failed', message: 'Not connected' });
     const svc = new MachineService({ current: controller }, makePortRef());
-    assert(laserStateOf(svc) === 'off', 'precondition: laser state is off (default)');
+    svc.notifyLaserSafetyOutcome('failed');
+    assert(laserStateOf(svc) === 'unknown', 'precondition: laser state is unknown before disconnect');
 
     await svc.disconnect();
     assert(
-      laserStateOf(svc) === 'off',
+      laserStateOf(svc) === 'unknown',
       `Not connected: laser state stays 'off' (audit-allowed swallow — controller never had a live port we could have left on)`,
     );
   }
@@ -184,6 +187,7 @@ void (async () => {
   {
     const { controller } = makeController(() => { throw new Error('port already gone'); });
     const svc = new MachineService({ current: controller }, makePortRef());
+    svc.notifyLaserSafetyOutcome('failed');
 
     await svc.disconnect();
     assert(
@@ -196,10 +200,11 @@ void (async () => {
   {
     const { controller } = makeController(() => { throw new Error('Not connected'); });
     const svc = new MachineService({ current: controller }, makePortRef());
+    svc.notifyLaserSafetyOutcome('failed');
 
     await svc.disconnect();
     assert(
-      laserStateOf(svc) === 'off',
+      laserStateOf(svc) === 'unknown',
       `thrown "Not connected" is swallowed — state stays 'off'`,
     );
   }

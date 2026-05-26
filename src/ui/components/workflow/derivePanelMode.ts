@@ -59,9 +59,9 @@ export interface PanelModeInput {
   readonly machineStatus: MachineStatus | null;
   readonly recoveryState: RecoveryState;
   /**
-   * Result of the existing `buildStartReadiness({...}).ready` check
-   * AND `recoveryAllowsStart(recoveryState)`. Caller is responsible
-   * for the conjunction — this module doesn't recompute readiness.
+   * Result of the existing `buildStartReadiness({...}).ready` check.
+   * RecoveryState is advisory here; Start is blocked by live controller
+   * and preflight evidence, not by the stale recovery checklist.
    */
   readonly canStartJob: boolean;
   /**

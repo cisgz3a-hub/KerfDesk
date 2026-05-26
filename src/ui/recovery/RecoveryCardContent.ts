@@ -15,6 +15,7 @@
  * the in-the-moment toast/banner copy; T2-62 is the persistent
  * recovery surface with next-step buttons.
  */
+import { describeGrblAlarmCode } from '../../controllers/grbl/GrblAlarmPolicy';
 
 export type RecoveryVariant =
   | 'alarm'
@@ -143,19 +144,7 @@ export function jobFailedRecoveryCard(errorMessage: string): RecoveryCardContent
 
 /** GRBL alarm-code reasons (1.1 spec). */
 export function alarmCodeReason(code: number): string {
-  switch (code) {
-    case 1:  return 'hard limit triggered';
-    case 2:  return 'motion exceeded travel limits or homing failed';
-    case 3:  return 'reset while in motion';
-    case 4:  return 'probe fail (initial state)';
-    case 5:  return 'probe fail (no contact)';
-    case 6:  return 'homing fail (reset during homing)';
-    case 7:  return 'homing fail (door opened during homing)';
-    case 8:  return 'homing fail (cycle failed)';
-    case 9:  return 'homing fail (limit switch not triggered)';
-    case 10: return 'soft limit error';
-    default: return 'unknown alarm code';
-  }
+  return describeGrblAlarmCode(code);
 }
 
 /** Map a variant to the card builder. Used by tests + UI router. */

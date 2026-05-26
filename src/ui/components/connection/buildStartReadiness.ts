@@ -80,12 +80,6 @@ export interface BuildStartReadinessInput {
    * callback) leaves the gate text-only as before T1-205.
    */
   readonly onResetWcsToBaseline: (() => void) | null;
-  /**
-   * True only when the recovery state machine says Start may run.
-   * Kept as a caller-supplied boolean so this pure helper does not
-   * import runtime recovery logic.
-   */
-  readonly recoveryAllowsStart: boolean;
   readonly wifiTrust: TrustClassification;
   readonly wifiStartAllowed: boolean;
   readonly isRunning: boolean;
@@ -334,17 +328,6 @@ export function buildStartReadiness(input: BuildStartReadinessInput): StartReadi
       failAction: 'Read the controller log and clear the error before starting',
     },
     wcsStateGate(input),
-    {
-      id: 'recoveryComplete',
-      label: 'Machine recovery confirmed',
-      status: input.recoveryPending || !input.recoveryAllowsStart ? 'fail' : 'ok',
-      failHeadline: input.recoveryPending
-        ? 'Previous-session unsafe state pending'
-        : 'Machine recovery still needs confirmation',
-      failAction: input.recoveryPending
-        ? 'Acknowledge the recovery dialog that appeared at startup, or open Settings > Recovery'
-        : 'Use the recovery banner controls before starting a job',
-    },
     {
       id: 'connectionTrust',
       label: `Connection trust (${input.wifiTrust.label})`,

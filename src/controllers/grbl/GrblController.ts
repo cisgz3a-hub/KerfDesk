@@ -226,7 +226,7 @@ function machineStatusFromGrblReportToken(token: string): MachineStatus | null {
   };
   if (exact[token]) return exact[token];
   if (token.startsWith('hold')) return 'hold';
-  if (token.startsWith('door')) return 'hold';
+  if (token.startsWith('door')) return 'door';
   if (token.startsWith('sleep')) return 'check';
   if (token.startsWith('jog')) return 'run';
   if (token.startsWith('alarm')) return 'alarm';
@@ -344,6 +344,20 @@ export class GrblController implements GrblControllerApi {
       this._trySendInternalOperationCommand('$H', args?.onCommand),
     unlockAlarm: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
       this._trySendInternalOperationCommand('$X', args?.onCommand),
+    recoverFromAlarm: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> => {
+      if (!this._port?.isOpen) return { ok: false, reason: 'Not connected' };
+      try {
+        await this._port.writeByteCritical(REALTIME_RESET);
+        this._emitRawLine('0x18', 'tx', 'system');
+        await new Promise<void>(resolve => setTimeout(resolve, 100));
+        const unlock = this._trySendInternalOperationCommand('$X', args?.onCommand);
+        if (!unlock.ok) return unlock;
+        this.requestStatusReport();
+        return { ok: true };
+      } catch (err: unknown) {
+        return this._operationError(err);
+      }
+    },
     setWorkOriginAtCurrentPosition: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>
       this._trySendInternalOperationCommand('G10 L20 P1 X0 Y0', args?.onCommand),
     resetWcsToMachineOrigin: async (args?: { onCommand?: (line: string) => void }): Promise<OperationResult> =>

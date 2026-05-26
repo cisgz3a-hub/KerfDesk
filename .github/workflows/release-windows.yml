@@ -76,7 +76,9 @@ jobs:
         with:
           name: windows-signed-installer
           path: |
-            release/*.exe
+            release/LaserForge-Setup-*.exe
+            release/*.blockmap
+            release/latest.yml
             release/SHA256SUMS
             release/sbom.cdx.json
           if-no-files-found: error
@@ -98,4 +100,5 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             gh release create "$env:RELEASE_TAG" --repo "$env:GITHUB_REPOSITORY" --draft --title "$env:RELEASE_TAG" --notes "Draft LaserForge release created by the signed Windows workflow."
           }
-          gh release upload "$env:RELEASE_TAG" release/*.exe release/SHA256SUMS.windows release/sbom.windows.cdx.json --repo "$env:GITHUB_REPOSITORY" --clobber
+          gh release upload "$env:RELEASE_TAG" release/LaserForge-Setup-*.exe release/*.blockmap release/latest.yml release/SHA256SUMS.windows release/sbom.windows.cdx.json --repo "$env:GITHUB_REPOSITORY" --clobber
+          gh release edit "$env:RELEASE_TAG" --repo "$env:GITHUB_REPOSITORY" --draft=false

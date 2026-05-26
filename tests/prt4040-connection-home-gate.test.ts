@@ -28,10 +28,14 @@ console.log('\n=== PRT4040 home gate ===\n');
 
 assert(/canHome\?: boolean/.test(jogSrc), 'Jog accepts canHome prop');
 assert(/disabled:\s*!canHome/.test(jogSrc), 'Home button is disabled when canHome is false');
-assert(/Home disabled for this profile/.test(jogSrc), 'disabled Home tooltip explains profile policy');
+assert(/Home disabled/.test(jogSrc), 'disabled Home tooltip explains unavailable Home');
 
 assert(/const canHome =/.test(panelSrc), 'ConnectionPanelMain computes canHome');
-assert(/activeProfile\?\.homingEnabled === true/.test(panelSrc), 'canHome requires profile homingEnabled=true');
+assert(/canExecuteOperation\('home'/.test(panelSrc), 'canHome uses the central operation gate');
+assert(
+  !/activeProfile\?\.homingEnabled === true[\s\S]{0,120}activeOperation === null/.test(panelSrc),
+  'GRBL4040: canHome is not hard-disabled only because no device profile is selected',
+);
 assert(/if \(!canHome\)/.test(panelSrc), 'handleHome refuses when canHome is false');
 assert(/canHome,/.test(panelSrc), 'ConnectionPanelMain passes canHome into Jog');
 

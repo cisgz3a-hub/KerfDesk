@@ -197,6 +197,10 @@ async function run(): Promise<void> {
     // to the parser.
     assert(/parseGrblStatusReport\(raw\)/.test(grblSrc),
       'GrblController._handleStatusReport delegates to parseGrblStatusReport');
+    assert(!/token\.startsWith\('door'\)\) return 'hold'/.test(grblSrc),
+      "GRBL welcome-status token mapper no longer collapses Door:* to 'hold'");
+    assert(/token\.startsWith\('door'\)\) return 'door'/.test(grblSrc),
+      "GRBL welcome-status token mapper collapses Door:* to 'door'");
     const parserSrc = readFileSync(
       resolve(here, '../src/controllers/grbl/GrblStatusReportParser.ts'),
       'utf-8',

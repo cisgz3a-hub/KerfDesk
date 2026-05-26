@@ -142,8 +142,8 @@ void (async () => {
     const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
     await svc.disconnect();
     assert(
-      portDisconnectCalls === 1 && sent[0] === 'M5 S0' && sent.length === 1,
-      'machineService.disconnect: M5 S0 then controller.disconnect (single M5)',
+      portDisconnectCalls === 1 && sent.length === 0,
+      'machineService.disconnect: no-job idle/off fast path closes without redundant M5',
     );
   }
 
@@ -374,7 +374,7 @@ void (async () => {
     await coord.safeDisconnect();
     assert(stopCalls === 1, 'safeDisconnect calls stop');
     const m5FromSend = sent.filter(s => s === 'M5 S0').length;
-    assert(m5FromSend === 1, 'safeDisconnect: exactly one M5 (from machineService.disconnect only)');
+    assert(m5FromSend === 0, 'safeDisconnect: no-job idle/off fast path skips redundant M5');
     assert(disconnectCalls === 1, 'safeDisconnect calls machineService.disconnect');
   }
 
@@ -558,8 +558,8 @@ void (async () => {
     });
     await coord.safeDisconnect({ skipStop: true });
     assert(
-      stopCalls === 0 && sent.filter(s => s === 'M5 S0').length === 1,
-      'skipStop: no stop, still one M5 from service.disconnect',
+      stopCalls === 0 && sent.filter(s => s === 'M5 S0').length === 0,
+      'skipStop: no stop and no redundant M5 on no-job idle/off disconnect',
     );
   }
 

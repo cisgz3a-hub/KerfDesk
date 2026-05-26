@@ -71,7 +71,6 @@ function readiness(overrides: Partial<Parameters<typeof buildStartReadiness>[0]>
     placementUncertainReason: null,
     allowUnverifiedWcsStart: false,
     onResetWcsToBaseline: null,
-    recoveryAllowsStart: true,
     wifiTrust: {
       kind: 'usb-serial',
       tier: 'trusted',
@@ -113,12 +112,11 @@ console.log('\n=== LF-EXT-CANDLE-005 machine setup compatibility contract ===\n'
   const blocked = readiness({
     placementUncertain: true,
     placementUncertainReason: 'missing_g54',
-    recoveryAllowsStart: false,
     canStartJob: false,
     canResetWcsToBaseline: true,
     onResetWcsToBaseline: reset,
   });
-  assert.equal(blocked.blockingGate?.id, 'wcsState', 'WCS reset action is surfaced before generic recovery blocking copy');
+  assert.equal(blocked.blockingGate?.id, 'wcsState', 'WCS reset action is surfaced when WCS blocks Start');
   assert.equal(blocked.blockingGate?.failActionButton?.onClick, reset, 'WCS gate exposes the Reset WCS callback');
   assert.match(blocked.blockingGate?.failActionButton?.label ?? '', /G10 L2 P1 X0 Y0 Z0/, 'Reset WCS button names the baseline command');
 
@@ -135,17 +133,9 @@ console.log('\n=== LF-EXT-CANDLE-005 machine setup compatibility contract ===\n'
 }
 
 {
-  const recoveryBlocked = readiness({
-    recoveryAllowsStart: false,
-    canStartJob: false,
-  });
-  const gate = recoveryBlocked.gates.find((g) => g.id === 'recoveryComplete');
-  assert.equal(gate?.status, 'fail', 'active recovery still blocks Start');
-  assert.doesNotMatch(
-    `${gate?.failHeadline ?? ''} ${gate?.failAction ?? ''}`,
-    /Recovery checklist incomplete/i,
-    'recovery gate no longer shows the dead-end checklist wording',
-  );
+  const recoveryAdvisory = readiness({ canStartJob: false });
+  const gate = recoveryAdvisory.gates.find((g) => String(g.id) === 'recoveryComplete');
+  assert.equal(gate, undefined, 'GRBL4040 recovery checklist is not a Start-readiness gate');
 }
 
 {

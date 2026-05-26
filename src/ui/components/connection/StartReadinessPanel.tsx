@@ -25,7 +25,6 @@ export interface StartReadinessGate {
     | 'laserState'
     | 'noActiveOperation'
     | 'noControllerError'
-    | 'recoveryComplete'
     | 'wcsState'
     | 'connectionTrust'
     | 'controllerConnected';

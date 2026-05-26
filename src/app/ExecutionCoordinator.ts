@@ -11,7 +11,7 @@ import { type FrameTicket } from './FrameState';
 import { type AABB } from '../core/types';
 import { type MachineTransformOptions } from '../core/plan/MachineTransform';
 import { buildFrameCorners } from './frameGcode';
-import { waitForGrblIdleResult } from './grblIdlePoll';
+import { waitForGrblIdleResult, FRAME_IDLE_POLL_MS } from './grblIdlePoll';
 import { getActiveProfile, resolveGrblJogMode } from '../core/devices/DeviceProfile';
 
 export type { MachineTransformOptions as MachineTransformOpts } from '../core/plan/MachineTransform';
@@ -89,9 +89,31 @@ export interface FrameResult {
  */
 export const TEST_FIRE_DEADMAN_MS = 5000;
 export const TEST_FIRE_POWER_PERCENT = 5;
+const ALARM_RECOVERY_IDLE_TIMEOUT_MS = 3000;
+const HOME_IDLE_TIMEOUT_MS = 60_000;
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+async function waitForControllerStatus(
+  ctrl: LaserController,
+  accept: (status: MachineState['status']) => boolean,
+  timeoutMs: number,
+): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      ctrl.requestStatusReport();
+    } catch {
+      /* disconnected */
+    }
+    const status = ctrl.state.status;
+    if (accept(status)) return true;
+    if (status === 'disconnected') return false;
+    await new Promise<void>(r => setTimeout(r, FRAME_IDLE_POLL_MS));
+  }
+  return accept(ctrl.state.status);
 }
 
 /**
@@ -213,10 +235,23 @@ export class ExecutionCoordinator {
   async unlock(): Promise<void> {
     const ctrl = this.deps.controllerRef.current;
     if (!ctrl) return;
-    const result = await ctrl.operations.unlockAlarm({
+    const recoverFromAlarm = ctrl.operations.recoverFromAlarm;
+    const result = recoverFromAlarm
+      ? await recoverFromAlarm({
+        onCommand: line => this.notifySimulator(line),
+      })
+      : await ctrl.operations.unlockAlarm({
       onCommand: line => this.notifySimulator(line),
     });
     if (!result.ok) throw new Error(result.reason);
+    const cleared = await waitForControllerStatus(
+      ctrl,
+      status => status !== 'alarm' && status !== 'connecting' && status !== 'disconnected',
+      ALARM_RECOVERY_IDLE_TIMEOUT_MS,
+    );
+    if (!cleared) {
+      throw new Error('Controller stayed in alarm after unlock.');
+    }
   }
 
   /** Home ($H). Caller must confirm the user intends to home before invoking this. */
@@ -227,6 +262,14 @@ export class ExecutionCoordinator {
       onCommand: line => this.notifySimulator(line),
     });
     if (!result.ok) throw new Error(result.reason);
+    const idle = await waitForControllerStatus(
+      ctrl,
+      status => status === 'idle',
+      HOME_IDLE_TIMEOUT_MS,
+    );
+    if (!idle) {
+      throw new Error('Controller did not report idle after homing.');
+    }
   }
 
   /** Frame without firing the laser (rapid moves only). */

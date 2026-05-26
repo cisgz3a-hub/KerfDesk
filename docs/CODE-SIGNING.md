@@ -120,11 +120,17 @@ with `publish_release: true`, `release_tag` set to the target tag
 the installer QA/hardware verification checklist has been completed.
 The workflow refuses to publish signed release assets unless that QA
 gate is machine-confirmed. The workflow creates a draft release when
-the tag does not already have one, then uploads:
+the tag does not already have one, uploads the release assets, then
+publishes the release so updater clients can read the final asset set.
 
 - the platform installer (`.exe` or `.dmg`),
 - `SHA256SUMS.windows` or `SHA256SUMS.macos`,
 - `sbom.windows.cdx.json` or `sbom.macos.cdx.json`.
+
+Windows releases also upload electron-updater metadata:
+
+- `latest.yml`,
+- the NSIS installer `.blockmap`.
 
 The platform-specific checksum and SBOM filenames avoid Windows and
 macOS workflows overwriting each other's release assets.

@@ -123,6 +123,134 @@ void (async () => {
   }
 
   {
+    const sent: string[] = [];
+    const sim: string[] = [];
+    let recoverCalls = 0;
+    let unlockFallbackCalls = 0;
+    let status: 'alarm' | 'idle' = 'alarm';
+    const mock = {
+      protocolName: 'mock',
+      get state() {
+        return { ...idle, status, alarmCode: status === 'alarm' ? 1 : null };
+      },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {},
+      emergencyStop: () => {},
+      sendCommand: () => {},
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async () => ({ ok: true as const }),
+        recoverFromAlarm: async (args?: { onCommand?: (line: string) => void }) => {
+          recoverCalls++;
+          sent.push('0x18');
+          sent.push('$X');
+          args?.onCommand?.('$X');
+          setTimeout(() => { status = 'idle'; }, 25);
+          return { ok: true as const };
+        },
+        unlockAlarm: async () => {
+          unlockFallbackCalls++;
+          return { ok: true as const };
+        },
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation(sent),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
+      safetyOff: async () => ({ stage: 'm5' as const }),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: (line: string) => { sim.push(line); } },
+    });
+
+    await coord.unlock();
+    assert(recoverCalls === 1, 'GRBL4040 unlock uses alarm recovery operation when available');
+    assert(unlockFallbackCalls === 0, 'GRBL4040 unlock does not fall back to bare $X when recovery operation exists');
+    assert(sent.join('|') === '0x18|$X', 'GRBL4040 unlock recovery sends soft reset before $X');
+    assert((status as string) === 'idle', 'GRBL4040 unlock waits until controller leaves alarm before returning');
+    assert(sim.includes('$X'), 'GRBL4040 unlock still mirrors $X to simulator/log sinks');
+  }
+
+  {
+    const sent: string[] = [];
+    let status: 'alarm' | 'idle' = 'alarm';
+    const mock = {
+      protocolName: 'mock',
+      get state() {
+        return { ...idle, status, alarmCode: status === 'alarm' ? 1 : null };
+      },
+      isJobRunning: false,
+      maxSpindle: null,
+      connect: async () => {},
+      disconnect: async () => {},
+      sendJob: async () => {},
+      pause: () => {},
+      resume: () => {},
+      stop: () => {},
+      emergencyStop: () => {},
+      sendCommand: () => {},
+      requestStatusReport: () => {},
+      onStateChange: () => () => {},
+      onProgress: () => () => {},
+      onError: () => () => {},
+      onRawLine: () => () => {},
+      operations: {
+        jog: async () => ({ ok: true as const }),
+        home: async (args?: { onCommand?: (line: string) => void }) => {
+          sent.push('$H');
+          args?.onCommand?.('$H');
+          setTimeout(() => { status = 'idle'; }, 25);
+          return { ok: true as const };
+        },
+        unlockAlarm: async () => ({ ok: true as const }),
+        setWorkOriginAtCurrentPosition: async () => ({ ok: true as const }),
+        resetWcsToMachineOrigin: async () => ({ ok: true as const }),
+        testFire: async () => ({ ok: true as const }),
+        frame: frameOperation(sent),
+        laserOff: async () => ({ ok: true as const }),
+        pauseJob: async () => ({ ok: true as const }),
+        resumeJob: async () => ({ ok: true as const }),
+        stopJob: async () => ({ ok: true as const }),
+        emergencyStop: async () => ({ ok: true as const }),
+      },
+      safetyOff: async () => ({ stage: 'm5' as const }),
+    } as unknown as LaserController;
+    const controllerRef = { current: mock };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef as { current: LaserController }, portRef);
+    const coord = new ExecutionCoordinator({
+      machineService: svc,
+      controllerRef,
+      notifySimulatorRef: { current: (_line: string) => {} },
+    });
+
+    await coord.home();
+    assert(sent.includes('$H'), 'GRBL4040 re-home sends $H from alarm');
+    assert((status as string) === 'idle', 'GRBL4040 re-home waits until controller reports idle before returning');
+  }
+
+  {
     const portRef = { current: null } as { current: SerialPortLike | null };
     const controllerRef = { current: null } as { current: LaserController | null };
     const svc = new MachineService(controllerRef as { current: LaserController }, portRef);

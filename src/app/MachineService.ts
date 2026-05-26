@@ -60,7 +60,6 @@ import {
   ackReconnect,
   ackRecompile,
   recoveryStateInitial,
-  recoveryAllowsStart,
   triggerAlarm,
   triggerEmergencyStop,
   type RecoveryState,
@@ -257,6 +256,7 @@ export interface JobRecordingSink {
 }
 
 const APPROVAL_TOKEN_TTL_MS = 30_000;
+const DISCONNECT_CLOSE_TIMEOUT_MS = 100;
 // T1-136: re-export from the helper module so a single source of
 // truth pins the cap. Local alias kept for readability at the call
 // site that initializes the Map's expected hard-cap.
@@ -327,6 +327,24 @@ function operationFromActiveOperationKind(kind: ActiveOperationKind): Operation 
     case 'testFire': return 'test-fire';
     case 'autoFocus': return 'autofocus';
     case 'setOrigin': return 'set-origin';
+  }
+}
+
+async function withTimeout<T>(
+  work: Promise<T>,
+  timeoutMs: number,
+  timeoutMessage: string,
+): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer != null) clearTimeout(timer);
   }
 }
 
@@ -442,21 +460,11 @@ export class MachineService {
   private _laserOutputState: LaserOutputState = 'off';
   private _safetyState: SafetyState = safetyStateInitial;
   /**
-   * T1-122: explicit `RecoveryState` machine. Pre-T1-122 the runtime
-   * type defined in `src/runtime/RecoveryState.ts` (T2-87) was
-   * type-only — no production owner held an instance, no triggers
-   * fired in production, and `recoveryAllowsStart()` was never
-   * consulted by the live start gate. The audit's Phase 2 #6 finding
-   * called this out as a "foundation exists but product does not use
-   * it" bug. T1-122 wires it: MachineService is the natural owner;
-   * `startValidatedJob` consults `recoveryAllowsStart`; `triggerAlarm`
-   * fires from the controller-state subscriber when alarm hits during
-   * an active job; `triggerEmergencyStop` fires from the safetyOff
-   * unknown-outcome path; `acknowledgeRecoveryComplete()` lets the UI
-   * clear recovery to 'none' once the user confirms inspection /
-   * rehome / reframe. Per-step ack functions (ackInspection /
-   * ackUnlock / ackRehome / ackReframe / ackReconnect / ackRecompile)
-   * are exposed via `setRecoveryState` for the recovery card UI.
+   * Advisory `RecoveryState` for recovery cards and support evidence.
+   * Start is gated by live controller/preflight proof instead: connected,
+   * controller-safe, laser off, WCS confirmed, and a fresh frame ticket.
+   * This avoids deadlocking GRBL4040 users on a stale checklist while the
+   * real machine-safety gates remain fail-closed.
    */
   private _recoveryState: RecoveryState = recoveryStateInitial;
   /**
@@ -1108,22 +1116,6 @@ export class MachineService {
         `Job start blocked over an untrusted connection (${wifiGate.trust.label}). `
         + `${wifiGate.userMessage} `
         + 'Connect via USB, or grant a WiFi override before retrying.',
-      );
-    }
-
-    // T1-122: refuse to start a job while RecoveryState is non-none.
-    // Pre-T1-122 this gate was missing from the production start path
-    // entirely (the runtime type + triggers in src/runtime/RecoveryState.ts
-    // were defined but no production code consumed them). After alarm /
-    // disconnect-during-job / emergency-stop / frame-fail / compile-fail
-    // the controller may be reachable and report idle, but the user has
-    // not acknowledged the recovery checklist (inspect machine / unlock /
-    // rehome / reframe / etc.). Recovery transitions back to 'none' only
-    // after every required step is done — see RecoveryState.checkRecoveryComplete.
-    if (!recoveryAllowsStart(this._recoveryState)) {
-      throw new Error(
-        `Machine recovery is still active (status: ${this._recoveryState.status}). `
-        + 'Use the recovery banner controls before starting a new job.',
       );
     }
 
@@ -2478,54 +2470,65 @@ export class MachineService {
     let result = makeDisconnectResult();
     try {
       if (ctrl) {
-        // T1-164 (audit F-011): route the disconnect-time laserOff
-        // outcome through notifyLaserSafetyOutcome so the safety-state
-        // machine sees the attempt. Pre-T1-164 the try/catch swallowed
-        // both success and failure — a transport-failure laserOff
-        // during disconnect couldn't escalate _laserOutputState to
-        // 'unknown', and a successful M5 couldn't downgrade it to
-        // 'off'. The audit notes the comment ("not connected, buffer
-        // full, or port already gone") was misleading: only the first
-        // is safe to swallow; the others are real safety events that
-        // must reach notifyLaserSafetyOutcome('failed') so the next
-        // job-start is gated until the user re-resolves the safe state.
-        let stage: 'm5' | 'soft-reset' | 'failed' = 'failed';
-        let safeToSwallow = false;
-        try {
-          const laserResult = await ctrl.operations.laserOff();
-          if (laserResult.ok) {
-            stage = 'm5';
-          } else {
-            // operations.laserOff() converts safetyOff().stage into
-            // OperationResult.reason. The kind passes through verbatim,
-            // so 'soft-reset' / 'failed' map straight back.
-            stage = laserResult.reason === 'soft-reset' ? 'soft-reset' : 'failed';
-            // "Not connected" is the one swallowable case the audit
-            // calls out: the controller never had a live port we could
-            // have left in a laser-on state. Anything else (buffer
-            // full, port closed mid-flight, soft-reset fallback) is a
-            // real safety event.
-            const msg = laserResult.message ?? '';
-            if (stage === 'failed' && /Not connected/i.test(msg)) {
+        const controllerStatus = ctrl.state.status;
+        const skipVerifiedLaserOff =
+          !wasJobRunning
+          && this._laserOutputState === 'off'
+          && (controllerStatus === 'idle' || controllerStatus === 'alarm');
+        if (!skipVerifiedLaserOff) {
+          // T1-164 (audit F-011): route the disconnect-time laserOff
+          // outcome through notifyLaserSafetyOutcome so the safety-state
+          // machine sees the attempt. Pre-T1-164 the try/catch swallowed
+          // both success and failure — a transport-failure laserOff
+          // during disconnect couldn't escalate _laserOutputState to
+          // 'unknown', and a successful M5 couldn't downgrade it to
+          // 'off'. The audit notes the comment ("not connected, buffer
+          // full, or port already gone") was misleading: only the first
+          // is safe to swallow; the others are real safety events that
+          // must reach notifyLaserSafetyOutcome('failed') so the next
+          // job-start is gated until the user re-resolves the safe state.
+          let stage: 'm5' | 'soft-reset' | 'failed' = 'failed';
+          let safeToSwallow = false;
+          try {
+            const laserResult = await ctrl.operations.laserOff();
+            if (laserResult.ok) {
+              stage = 'm5';
+            } else {
+              // operations.laserOff() converts safetyOff().stage into
+              // OperationResult.reason. The kind passes through verbatim,
+              // so 'soft-reset' / 'failed' map straight back.
+              stage = laserResult.reason === 'soft-reset' ? 'soft-reset' : 'failed';
+              // "Not connected" is the one swallowable case the audit
+              // calls out: the controller never had a live port we could
+              // have left in a laser-on state. Anything else (buffer
+              // full, port closed mid-flight, soft-reset fallback) is a
+              // real safety event.
+              const msg = laserResult.message ?? '';
+              if (stage === 'failed' && /Not connected/i.test(msg)) {
+                safeToSwallow = true;
+              }
+            }
+          } catch (err: unknown) {
+            // operations.laserOff() shouldn't throw under normal flow
+            // (it returns OperationResult), but if the underlying safetyOff
+            // throws synchronously we still want a 'failed' notify unless
+            // it's the "Not connected" case.
+            const msg = err instanceof Error ? err.message : String(err);
+            if (/Not connected/i.test(msg)) {
               safeToSwallow = true;
             }
+            stage = 'failed';
           }
-        } catch (err: unknown) {
-          // operations.laserOff() shouldn't throw under normal flow
-          // (it returns OperationResult), but if the underlying safetyOff
-          // throws synchronously we still want a 'failed' notify unless
-          // it's the "Not connected" case.
-          const msg = err instanceof Error ? err.message : String(err);
-          if (/Not connected/i.test(msg)) {
-            safeToSwallow = true;
+          if (!safeToSwallow) {
+            this.notifyLaserSafetyOutcome(stage);
           }
-          stage = 'failed';
-        }
-        if (!safeToSwallow) {
-          this.notifyLaserSafetyOutcome(stage);
         }
         try {
-          await ctrl.disconnect();
+          await withTimeout(
+            ctrl.disconnect(),
+            DISCONNECT_CLOSE_TIMEOUT_MS,
+            'Controller disconnect timed out while closing the transport.',
+          );
         } catch (err: unknown) {
           result = makeDisconnectResult({
             accepted: false,

@@ -9,10 +9,11 @@
  * and T2-67 (job outcome enum) into a single discriminated union
  * with per-status checklist of required steps.
  *
- * Hard rule: `canStart` consumes `recoveryAllowsStart(recovery)`. Start
- * is impossible while recovery is incomplete, regardless of any other
- * state. Recovery transitions to `'none'` only when ALL required
- * steps for the active recovery have been completed.
+ * GRBL4040 update: the production Start path now gates on live
+ * controller/preflight evidence instead of this advisory checklist.
+ * `recoveryAllowsStart` remains for state-machine consumers and tests;
+ * recovery transitions to `'none'` only when ALL required steps for the
+ * active recovery have been completed.
  *
  * T2-87 ships the type + the trigger functions + the per-step
  * acknowledgement transitions. Wiring this into MachineService /

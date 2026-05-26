@@ -60,8 +60,9 @@ function normalizeUpdateEvent(event: unknown): UpdateNoticeState | null {
 
 function resultFailed(result: unknown): string | null {
   if (result == null || typeof result !== 'object') return null;
-  const maybe = result as { ok?: unknown; reason?: unknown };
+  const maybe = result as { ok?: unknown; reason?: unknown; message?: unknown };
   if (maybe.ok !== false) return null;
+  if (typeof maybe.message === 'string' && maybe.message.trim()) return maybe.message;
   return typeof maybe.reason === 'string' && maybe.reason.trim()
     ? maybe.reason
     : 'Update operation failed.';

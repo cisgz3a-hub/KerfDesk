@@ -26,16 +26,25 @@ const here = path.dirname(url.fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, '..');
 const pkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8')) as {
   dependencies?: Record<string, string>;
-  build?: { publish?: Array<Record<string, string>> };
+  build?: {
+    publish?: Array<Record<string, string>>;
+    win?: { artifactName?: string };
+  };
 };
 const main = fs.readFileSync(path.join(repoRoot, 'electron', 'main.ts'), 'utf8');
 const preload = fs.readFileSync(path.join(repoRoot, 'electron', 'preload.ts'), 'utf8');
 const types = fs.readFileSync(path.join(repoRoot, 'src', 'types', 'web-serial.d.ts'), 'utf8');
+const windowsReleaseWorkflow = fs.readFileSync(
+  path.join(repoRoot, '.github', 'workflows', 'release-windows.yml'),
+  'utf8',
+);
 
 assert(typeof pkg.dependencies?.['electron-updater'] === 'string', 'electron-updater is a runtime dependency');
 assert(pkg.build?.publish?.[0]?.provider === 'github', 'electron-builder publish provider is GitHub');
 assert(pkg.build?.publish?.[0]?.owner === 'stolkjohannjohann-sudo', 'publish owner is configured');
 assert(pkg.build?.publish?.[0]?.repo === 'LaserForge', 'publish repo is configured');
+assert(pkg.build?.win?.artifactName === 'LaserForge-Setup-${version}.${ext}',
+  'Windows artifactName is stable and matches updater latest.yml asset URLs');
 
 assert(/import \{ autoUpdater \} from 'electron-updater'/.test(main), 'main imports autoUpdater');
 assert(/const UPDATE_CHECK_DELAY_MS = 30_000/.test(main), 'auto-update check is delayed after startup');
@@ -64,6 +73,15 @@ assert(/removeListener\('update:event'/.test(preload), 'preload returns an updat
 assert(/updates\?: \{[\s\S]*check\(\): Promise<unknown>/.test(types), 'ElectronAPI typing includes update check');
 assert(/install\(state\?: \{ jobRunning\?: boolean \}\): Promise<unknown>/.test(types), 'ElectronAPI typing includes guarded install');
 assert(/onEvent\(handler: \(event: unknown\) => void\): \(\) => void/.test(types), 'ElectronAPI typing includes update event subscription');
+
+assert(/release\/latest\.yml/.test(windowsReleaseWorkflow),
+  'Windows release workflow uploads electron-updater latest.yml');
+assert(/release\/\*\.blockmap/.test(windowsReleaseWorkflow),
+  'Windows release workflow uploads NSIS blockmap');
+assert(/release\/LaserForge-Setup-\*\.exe/.test(windowsReleaseWorkflow),
+  'Windows release workflow uploads the stable hyphenated installer asset');
+assert(/gh release edit[^\n]*--draft=false/.test(windowsReleaseWorkflow),
+  'Windows release workflow publishes the release after updater assets upload');
 
 console.log(`\nT2-101 auto-update infrastructure: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);

@@ -31,14 +31,21 @@ const idle: MachineState = {
   errorCode: null,
 };
 
+const alarm: MachineState = {
+  ...idle,
+  status: 'alarm',
+  alarmCode: 1,
+};
+
 function makeController(args?: {
   disconnect?: () => Promise<void>;
   sendCommand?: (cmd: string) => void;
+  state?: MachineState;
 }): { controller: LaserController; calls: { disconnect: number; commands: string[]; laserOff: number } } {
   const calls = { disconnect: 0, commands: [] as string[], laserOff: 0 };
   const controller = {
     protocolName: 'mock',
-    state: { ...idle },
+    state: { ...(args?.state ?? idle) },
     isJobRunning: false,
     maxSpindle: null,
     connect: async () => {},
@@ -87,10 +94,11 @@ void (async () => {
     const { controller, calls } = makeController();
     const portRef = { current: {} as SerialPortLike } as { current: SerialPortLike | null };
     const svc = new MachineService({ current: controller }, portRef);
+    svc.notifyLaserSafetyOutcome('failed');
 
     const result: SafetyActionResult = await svc.disconnect();
 
-    assert(calls.laserOff === 1, 'disconnect uses controller operations.laserOff before controller disconnect');
+    assert(calls.laserOff === 1, 'unknown laser state: disconnect uses controller operations.laserOff before controller disconnect');
     assert(calls.commands.length === 0, 'disconnect does not construct a raw M5 command in MachineService');
     assert(calls.disconnect === 1, 'disconnect calls controller.disconnect once');
     assert(portRef.current === null, 'disconnect clears portRef');
@@ -100,6 +108,36 @@ void (async () => {
     assert(result.laserState === 'commandedOff', 'result laserState=commandedOff');
     assert(result.requiresReconnect === true, 'result requires reconnect after port close');
     assert(result.requiresInspection === false, 'routine disconnect does not require inspection');
+  }
+
+  {
+    const { controller, calls } = makeController({ state: alarm });
+    const portRef = { current: {} as SerialPortLike } as { current: SerialPortLike | null };
+    const svc = new MachineService({ current: controller }, portRef);
+
+    const result: SafetyActionResult = await svc.disconnect();
+
+    assert(calls.laserOff === 0, 'GRBL4040 no-job alarm disconnect skips redundant laserOff when laser is already off');
+    assert(calls.disconnect === 1, 'GRBL4040 no-job alarm disconnect still closes the controller transport');
+    assert(portRef.current === null, 'GRBL4040 no-job alarm disconnect clears portRef');
+    assert(result.action === 'disconnectSafe', 'GRBL4040 fast disconnect result action=disconnectSafe');
+  }
+
+  {
+    const { controller } = makeController({
+      state: alarm,
+      disconnect: async () => new Promise<void>(() => {}),
+    });
+    const portRef = { current: {} as SerialPortLike } as { current: SerialPortLike | null };
+    const svc = new MachineService({ current: controller }, portRef);
+
+    const result = await Promise.race([
+      svc.disconnect(),
+      new Promise<'timeout'>(resolve => setTimeout(() => resolve('timeout'), 150)),
+    ]);
+
+    assert(result !== 'timeout', 'GRBL4040 no-job alarm disconnect is bounded when transport close stalls');
+    assert(portRef.current === null, 'bounded disconnect still clears portRef');
   }
 
   {

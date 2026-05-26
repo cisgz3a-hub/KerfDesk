@@ -246,6 +246,43 @@ async function run(): Promise<void> {
   }
 
   {
+    const sentBatches: string[][] = [];
+    const mock = makeMockController(async lines => {
+      sentBatches.push([...lines]);
+    });
+    const controllerRef = { current: mock } as { current: LaserController };
+    const portRef = { current: null } as { current: SerialPortLike | null };
+    const svc = new MachineService(controllerRef, portRef);
+
+    svc.setRecoveryState({
+      status: 'alarm',
+      alarmCode: 1,
+      occurredAt: 0,
+      requiresRehome: true,
+      inspectionDone: false,
+      unlockDone: false,
+      rehomeDone: false,
+      reframeDone: false,
+    });
+
+    await svc.startValidatedJob({
+      ticket,
+      frameTicket: makeTestFrameTicket(ticket),
+      scene,
+      machineState: idle,
+      notifySimulatorTx: () => {},
+      canvasContext: canvasContextForTicket(ticket),
+      currentStartMode: ticket.startMode,
+      currentSavedOrigin: ticket.savedOrigin,
+    });
+
+    assert(
+      sentBatches.length === 1,
+      'GRBL4040: stale RecoveryState alone no longer blocks a controller-safe start',
+    );
+  }
+
+  {
     let executeCount = 0;
     const mock = {
       ...makeMockController(async () => {

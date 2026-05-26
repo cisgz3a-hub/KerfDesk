@@ -253,6 +253,7 @@ export interface MachineOperationApi {
   }): Promise<OperationResult>;
   home(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   unlockAlarm(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
+  recoverFromAlarm?(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   setWorkOriginAtCurrentPosition(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   resetWcsToMachineOrigin(args?: { onCommand?: (line: string) => void }): Promise<OperationResult>;
   testFire(args: { powerPercent: number; maxSpindle: number; onCommand?: (line: string) => void }): Promise<OperationResult>;

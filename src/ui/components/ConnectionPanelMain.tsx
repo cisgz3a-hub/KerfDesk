@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo, type MutableRefObject } from 'react';
 import { type LaserController } from '../../controllers/ControllerInterface';
+import { alarmInvalidatesPositionProof } from '../../controllers/grbl/GrblAlarmPolicy';
 import { type WcsUncertainReason } from '../../controllers/grbl/GrblWcsConsentClassifier';
 import { MockSerialPort, type SerialPortLike } from '../../communication/SerialPort';
 import { WebSerialPort } from '../../communication/WebSerialPort';
@@ -24,7 +25,7 @@ import {
 } from '../../core/devices/DeviceProfile';
 import { GRBL_USER_LINE_FOR_UNLOCK_CLASSIFY } from '../../core/grbl/grblClassifierLines';
 import { type MachineService, type LaserOutputState } from '../../app/MachineService';
-import { recoveryAllowsStart } from '../../runtime/RecoveryState';
+import { grblCapabilities } from '../../controllers/ControllerCapabilities';
 import { type StructuredLogEvent, type StructuredLogEventInput } from '../../app/StructuredMessageLog';
 import { buildJobComplexitySummary } from '../../app/JobComplexitySummary';
 import {
@@ -34,10 +35,15 @@ import {
 // T1-143: describeFrameFailure usage moved into connectionPanelLabels.
 import { type ApprovalToken } from '../../app/MachineCommandGateway';
 import { computeCommandGates } from '../../app/computeCommandGates';
+import { canExecuteOperation, type Operation, type OperationGateMachineState } from '../../app/OperationGate';
 import { getUnsafePriorState } from '../../app/unsafePriorState';
 import { computeFrameFreshnessKey } from '../../app/computeFrameFreshnessKey';
 import { ExecutionCoordinator, type FrameResult } from '../../app/ExecutionCoordinator';
-import { type CompileGcodeResult, type CompileProgress } from '../../app/PipelineService';
+import {
+  resolvePipelineControllerCapabilities,
+  type CompileGcodeResult,
+  type CompileProgress,
+} from '../../app/PipelineService';
 import { buildFrameCorners } from '../../app/frameGcode';
 import {
   createFramedStartTicket,
@@ -548,13 +554,55 @@ export function ConnectionPanelMain({
       })
     : null;
   const canAutoFocus = gates?.baseSafe ?? false;
+  const homeGateStatus: OperationGateMachineState['status'] =
+    machineState?.status === 'idle'
+    || machineState?.status === 'run'
+    || machineState?.status === 'jog'
+    || machineState?.status === 'hold'
+    || machineState?.status === 'alarm'
+    || machineState?.status === 'door'
+    || machineState?.status === 'check'
+      ? machineState.status
+      : machineState?.status === 'homing'
+        ? 'home'
+        : 'unknown';
+  const liveHomingEnabled = controllerRef.current?.getFirmwareHomingCycleEnabled?.();
+  const resolvedHomeCapabilitiesBase = resolvePipelineControllerCapabilities(
+    activeProfile,
+    controllerRef.current?.capabilities ?? grblCapabilities,
+  );
+  const resolvedHomeCapabilities =
+    liveHomingEnabled === undefined
+      ? resolvedHomeCapabilitiesBase
+      : {
+        ...resolvedHomeCapabilitiesBase,
+        operations: {
+          ...resolvedHomeCapabilitiesBase.operations,
+          canHome: liveHomingEnabled,
+        },
+      };
+  const activeHomeOperation: Operation | null =
+    activeOperation == null
+      ? null
+      : activeOperation.kind === 'frame'
+        ? 'frame-safe'
+        : activeOperation.kind === 'frameDot'
+          ? 'frame-dot'
+          : activeOperation.kind === 'testFire'
+            ? 'test-fire'
+            : activeOperation.kind === 'autoFocus'
+              ? 'autofocus'
+              : activeOperation.kind === 'setOrigin'
+                ? 'set-origin'
+                : activeOperation.kind;
   const canHome =
-    isConnected
-    && activeProfile?.homingEnabled === true
-    && activeOperation === null
-    && machineState != null
-    && machineState.status !== 'run'
-    && machineState.status !== 'hold';
+    machineState != null
+    && canExecuteOperation('home', resolvedHomeCapabilities, {
+      connected: isConnected,
+      status: homeGateStatus,
+      activeOperation: activeHomeOperation,
+      homingRequiredAtBoot: liveHomingEnabled ?? null,
+    }).allowed;
   const lastPositionMoves = buildGoToLastPositionJogs({
     current: currentMachinePosition,
     target: lastJobStartPosition,
@@ -639,6 +687,14 @@ export function ConnectionPanelMain({
     }
     lastFrameKeyRef.current = frameFreshnessKey;
   }, [frameFreshnessKey]);
+
+  const invalidatePositionProof = useCallback(() => {
+    hasFramed.current = false;
+    currentFrameAnchorRef.current = null;
+    lastFrameTicketRef.current = null;
+    machineService.setSavedOriginG54Snapshot(null);
+    setWorkflowVersion(v => v + 1);
+  }, [machineService]);
 
   jobProgressRef.current = jobProgress;
 
@@ -1498,6 +1554,7 @@ export function ConnectionPanelMain({
     if (!ok) return false;
     try {
       await executionCoordinator.home();
+      invalidatePositionProof();
       return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1505,7 +1562,7 @@ export function ConnectionPanelMain({
       await showAlert('Homing failed', msg);
       return false;
     }
-  }, [canHome, showAlert, showConfirm, executionCoordinator, setMessages]);
+  }, [canHome, showAlert, showConfirm, executionCoordinator, invalidatePositionProof, setMessages]);
 
   const handleAutoFocus = useCallback(async () => {
     if (!showAutoFocus || !canAutoFocus || isAutoFocusing) return;
@@ -1534,8 +1591,15 @@ export function ConnectionPanelMain({
       appendMessage(`Blocked: ${classification.command}`);
       return false;
     }
+    const positionLostByAlarm =
+      machineState?.status === 'alarm'
+      && alarmInvalidatesPositionProof(machineState.alarmCode);
     try {
       await executionCoordinator.unlock();
+      if (positionLostByAlarm) {
+        invalidatePositionProof();
+        appendMessage('Position proof cleared after GRBL alarm; re-home or re-frame before starting.');
+      }
       return true;
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -1543,7 +1607,7 @@ export function ConnectionPanelMain({
       await showAlert('Unlock failed', msg);
       return false;
     }
-  }, [appendMessage, machineService, showAlert, showConfirm, executionCoordinator]);
+  }, [appendMessage, machineService, machineState?.alarmCode, machineState?.status, showAlert, showConfirm, executionCoordinator, invalidatePositionProof]);
 
   /**
    * T2-12 part 2: clear a 'faulted_requires_inspection' state after
@@ -1923,14 +1987,10 @@ void executionCoordinator.beginTestFire({ maxSpindle })
       | null;
   const allowUnverifiedWcsStart = activeProfile?.allowUnverifiedWcsStart === true;
   const wcsBlocksJobStart = placementUncertain && !allowUnverifiedWcsStart;
-  // T1-122: live RecoveryState. Pre-T1-122 the runtime RecoveryState
-  // type was defined but no production owner held an instance and no
-  // canonical canStartJob consulted `recoveryAllowsStart`. Now
-  // MachineService owns the state; this subscription is the UI half
-  // of the wiring so the start button refuses while recovery is
-  // incomplete (alarm pending acknowledgement, disconnect-during-job
-  // not yet rehomed, etc.) regardless of what the live controller
-  // status reports.
+  // T1-122/T-GRBL4040: live RecoveryState remains the recovery-card
+  // model, but it is advisory for Start. Real Start gating lives in
+  // controller/preflight proof: controller-safe, laser off, WCS
+  // confirmed, and a fresh frame ticket.
   const [recoveryState, setRecoveryStateLocal] = useState(
     () => machineService.getRecoveryState(),
   );
@@ -1938,6 +1998,21 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     setRecoveryStateLocal(machineService.getRecoveryState());
     return machineService.onRecoveryStateChange(setRecoveryStateLocal);
   }, [machineService]);
+  const recoveryFrameInvalidationKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (recoveryState.status === 'none') {
+      recoveryFrameInvalidationKeyRef.current = null;
+      return;
+    }
+    const occurredAt =
+      'occurredAt' in recoveryState
+        ? recoveryState.occurredAt
+        : 0;
+    const key = `${recoveryState.status}:${occurredAt}`;
+    if (recoveryFrameInvalidationKeyRef.current === key) return;
+    recoveryFrameInvalidationKeyRef.current = key;
+    invalidatePositionProof();
+  }, [invalidatePositionProof, recoveryState]);
   // T1-123: live WiFi trust verdict + override snapshot. Pre-T1-123
   // the panel never showed trust at all — the user couldn't tell a
   // USB connection (trusted local control) from a Falcon WiFi
@@ -1969,10 +2044,10 @@ void executionCoordinator.beginTestFire({ maxSpindle })
   // explicitly accepted by the active machine profile)
   // and adds `gates.baseSafe` as a defense-in-depth conjunct. baseSafe
   // collapses status === 'idle', laserOutput === 'off', no active
-  // operation, no error code, and no pending recovery into one check;
+  // operation, no error code, and no pending prior-session recovery into one check;
   // each of those now has a matching visible readiness row
-  // (machine idle, laser off, active operation, controller error, and
-  // recovery state), so consolidating here makes the safety story
+  // (machine idle, laser off, active operation, and controller error),
+  // so consolidating here makes the safety story
   // legible and prevents drift if any upstream gate weakens.
   const canStartJob =
     hasCompiledGcode &&
@@ -1984,14 +2059,6 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     currentModeFrameAnchorValid &&
     laserOutputState !== 'unknown' &&
     !wcsBlocksJobStart &&
-    // T1-122: recovery checklist must be complete. recoveryAllowsStart
-    // returns true exactly when state.status === 'none' (every required
-    // step for the active recovery has been acknowledged). Audit Phase
-    // 2 #6: previously this conjunct was missing entirely, so the UI
-    // would re-enable Start as soon as the controller cleared back to
-    // idle even though the user hadn't acknowledged inspection /
-    // rehome / reframe.
-    recoveryAllowsStart(recoveryState) &&
     // T1-123: connection-trust gate. Trusted (USB) connections pass
     // automatically; Falcon WiFi connections need an explicit override
     // grant. Audit Phase 2 #7: previously trust was never consulted
@@ -2066,7 +2133,6 @@ void executionCoordinator.beginTestFire({ maxSpindle })
     // and clears _placementUncertain locally — the gate flips to
     // ok without a reconnect cycle.
     onResetWcsToBaseline: resetWcsToBaselineViaV2,
-    recoveryAllowsStart: recoveryAllowsStart(recoveryState),
     wifiTrust,
     wifiStartAllowed,
     isRunning,

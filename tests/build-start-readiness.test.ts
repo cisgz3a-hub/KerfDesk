@@ -9,7 +9,7 @@
  * without mounting ConnectionPanelMain with ~50 fixture props.
  *
  * This test pins:
- *   - All 14 readiness gates render in canonical order with correct
+ *   - All 13 readiness gates render in canonical order with correct
  *     status / headline / action text.
  *   - Per-gate fail headlines reflect the relevant input slice.
  *   - The frame-control failHeadline switches based on the failure
@@ -90,7 +90,6 @@ function happy(): BuildStartReadinessInput {
     allowUnverifiedWcsStart: false,
     canResetWcsToBaseline: true,
     onResetWcsToBaseline: null,
-    recoveryAllowsStart: true,
     wifiTrust: trustedTrust,
     wifiStartAllowed: true,
     isRunning: false,
@@ -105,7 +104,7 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   const r = buildStartReadiness(happy());
   assert(r.ready === true, 'happy path: ready=true');
   assert(r.blockingGate === null, 'happy path: no blocking gate');
-  assert(r.gates.length === 14, `14 gates rendered (got ${r.gates.length})`);
+  assert(r.gates.length === 13, `13 gates rendered (got ${r.gates.length})`);
   assert(r.gates.every((g) => g.status === 'ok'),
     'happy path: every gate status ok');
 }
@@ -125,7 +124,6 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
     'noActiveOperation',
     'noControllerError',
     'wcsState',
-    'recoveryComplete',
     'connectionTrust',
   ];
   const r = buildStartReadiness(happy());
@@ -752,9 +750,11 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
 // -------- 17. Hidden canStartJob conjuncts are visible --------
 //
 // Regression: Start could be disabled while every readiness row
-// looked green because canStartJob also depended on baseSafe and
-// recoveryAllowsStart. These rows keep the explanation aligned with
-// the real Start button predicate.
+// looked green because canStartJob also depended on baseSafe. These
+// rows keep the explanation aligned with the real Start button
+// predicate. GRBL4040 recovery removed the stale recovery checklist as
+// a visible/readiness Start gate; controller state, laser state, WCS,
+// framing, and active-operation gates remain the source of truth.
 {
   {
     const r = buildStartReadiness({
@@ -781,27 +781,13 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
   {
     const r = buildStartReadiness({
       ...happy(),
-      recoveryAllowsStart: false,
-      canStartJob: false,
-    });
-    const g = r.gates.find((g) => g.id === 'recoveryComplete');
-    assert(g?.status === 'fail', 'recoveryAllowsStart=false: recoveryComplete fails');
-    assert(
-      !/Recovery checklist incomplete/i.test(`${g?.failHeadline ?? ''} ${g?.failAction ?? ''}`),
-      'recoveryAllowsStart=false: recovery gate no longer shows dead-end checklist wording',
-    );
-  }
-
-  {
-    const r = buildStartReadiness({
-      ...happy(),
       recoveryPending: true,
       canStartJob: false,
     });
-    const g = r.gates.find((g) => g.id === 'recoveryComplete');
-    assert(g?.status === 'fail', 'recoveryPending=true: recoveryComplete fails');
-    assert(/unsafe state pending/i.test(g?.failHeadline ?? ''),
-      'recoveryPending: failHeadline names unsafe prior state');
+    assert(
+      !r.gates.some((g) => String(g.id) === 'recoveryComplete'),
+      'GRBL4040: stale Machine recovery confirmed gate is removed',
+    );
   }
 
   {
@@ -821,27 +807,26 @@ console.log('\n=== T1-129 buildStartReadiness ===\n');
       'happy: noActiveOperation ok');
     assert(r.gates.find((g) => g.id === 'noControllerError')?.status === 'ok',
       'happy: noControllerError ok');
-    assert(r.gates.find((g) => g.id === 'recoveryComplete')?.status === 'ok',
-      'happy: recoveryComplete ok');
+    assert(!r.gates.some((g) => String(g.id) === 'recoveryComplete'),
+      'happy: no recoveryComplete row');
   }
 }
 
-// -------- 19. WCS reset is surfaced before recovery copy when both block Start --------
+// -------- 19. WCS reset remains the visible recovery action when WCS blocks Start --------
 {
   const noop = () => {};
   const r = buildStartReadiness({
     ...happy(),
     placementUncertain: true,
     placementUncertainReason: 'missing_g54',
-    recoveryAllowsStart: false,
     canStartJob: false,
     onResetWcsToBaseline: noop,
   });
   const wcs = r.gates.find((g) => g.id === 'wcsState');
   assert(r.blockingGate?.id === 'wcsState',
-    `WCS reset should be first blocking action when WCS and recovery both fail (got ${r.blockingGate?.id})`);
+    `WCS reset should be the first blocking action when WCS fails (got ${r.blockingGate?.id})`);
   assert(wcs?.failActionButton?.onClick === noop,
-    'WCS gate keeps the reset-to-baseline action while recovery state also blocks Start');
+    'WCS gate keeps the reset-to-baseline action');
 }
 
 // -------- Source-level pin: ConnectionPanelMain delegates --------

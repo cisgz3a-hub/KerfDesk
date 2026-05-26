@@ -34,7 +34,7 @@ void (async () => {
   assert(c.variant === 'alarm', `variant=alarm`);
   assert(c.title === 'Machine Alarm', `title`);
   assert(c.whatHappened.includes('ALARM:2'), `code in whatHappened`);
-  assert(c.whatHappened.includes('travel limits'), `reason text`);
+  assert(/exceeds machine travel/i.test(c.whatHappened), `reason text`);
 }
 
 // 2. alarmRecoveryCard with null code: generic copy
