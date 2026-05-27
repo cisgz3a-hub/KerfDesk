@@ -11,6 +11,7 @@ import {
 import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
+import { useUiStore } from '../state/ui-store';
 
 // F-A13 dirty-check. Returns true if it's safe to proceed (project is clean,
 // or the user confirmed discard). Phase A uses the native confirm() —
@@ -93,6 +94,7 @@ function FileButtons(): JSX.Element {
       >
         Import SVG…
       </button>
+      <TextButton />
       <button
         type="button"
         title="Export G-code for the current scene (Ctrl+E)"
@@ -101,6 +103,22 @@ function FileButtons(): JSX.Element {
         Save G-code…
       </button>
     </>
+  );
+}
+
+// Phase D — Add Text opens the AddTextDialog. Edit happens by
+// double-clicking an existing text in the workspace; that path is
+// in Workspace.tsx.
+function TextButton(): JSX.Element {
+  const openTextDialog = useUiStore((s) => s.openTextDialog);
+  return (
+    <button
+      type="button"
+      title="Add text to the scene"
+      onClick={() => openTextDialog({ mode: 'add' })}
+    >
+      Text…
+    </button>
   );
 }
 

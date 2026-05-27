@@ -53,10 +53,40 @@ export type ImportedSvg = {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
-// Single variant in Phase A. Future variants land here:
-//   | { readonly kind: 'text'; ... }        // Phase D — ADR-012
-//   | { readonly kind: 'traced-image'; ... } // Phase E — ADR-013
-export type SceneObject = ImportedSvg;
+// Text variant added in Phase D (ADR-012). Kept inline here (alongside
+// ImportedSvg) so the SceneObject union remains the single source of
+// truth — every variant's full shape is in one file. The font
+// registry + opentype rendering pipeline live in core/text/ and
+// reference TextObject FROM here, not the other way around (avoids a
+// circular dependency).
+export type TextAlignment = 'left' | 'center' | 'right';
+
+// The string-keyed font identifier. Concrete keys are enumerated in
+// core/text/font-registry.ts; this module stays unaware of which
+// fonts are bundled (so adding a font doesn't ripple here).
+export type FontKey = string;
+
+export type TextObject = {
+  readonly kind: 'text';
+  readonly id: string;
+  readonly content: string;
+  readonly fontKey: FontKey;
+  readonly sizeMm: number;
+  readonly alignment: TextAlignment;
+  readonly lineHeight: number; // multiplier of sizeMm
+  readonly color: string; // hex; default black
+  readonly bounds: Bounds; // computed at edit time from `paths`
+  readonly transform: Transform;
+  // Pre-rendered polylines. Set when the text is created/edited by
+  // calling `textToPolylines` in the UI layer (opentype.js needs the
+  // font ArrayBuffer, which is a UI-layer concern). compileJob then
+  // iterates these like it does for an ImportedSvg — single code
+  // path for both variants once they're materialized.
+  readonly paths: ReadonlyArray<ColoredPath>;
+};
+
+// Phase D union expansion (ADR-014). Phase E adds 'traced-image'.
+export type SceneObject = ImportedSvg | TextObject;
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the

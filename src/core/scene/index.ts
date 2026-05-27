@@ -8,9 +8,12 @@ export { LAYER_DEFAULTS, createLayer } from './layer';
 export type {
   Bounds,
   ColoredPath,
+  FontKey,
   ImportedSvg,
   Polyline,
   SceneObject,
+  TextAlignment,
+  TextObject,
   Transform,
   Vec2,
 } from './scene-object';

@@ -10,7 +10,15 @@
 // arrays, indexed loops) → repeatable across runs.
 
 import { type DeviceProfile, toMachineCoords } from '../devices';
-import { applyTransform, type Scene, type SceneObject, type Vec2 } from '../scene';
+import {
+  applyTransform,
+  assertNever,
+  type ColoredPath,
+  type Scene,
+  type SceneObject,
+  type Transform,
+  type Vec2,
+} from '../scene';
 import type { CutGroup, CutSegment, Job } from './job';
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
@@ -54,19 +62,39 @@ function appendSegmentsFromObject(
   out: CutSegment[],
 ): void {
   // Exhaustive over SceneObject.kind — enforced by
-  // `@typescript-eslint/switch-exhaustiveness-check`. Phase D's TextObject and
-  // Phase E's TracedImage each add a case arm here.
+  // `@typescript-eslint/switch-exhaustiveness-check`. The default arm's
+  // assertNever turns missing arms into compile errors when a new
+  // variant lands (per ADR-014).
   switch (obj.kind) {
-    case 'imported-svg': {
-      for (const path of obj.paths) {
-        if (path.color !== color) continue;
-        for (const polyline of path.polylines) {
-          const points: Vec2[] = polyline.points.map((p) =>
-            toMachineCoords(applyTransform(p, obj.transform), device),
-          );
-          out.push({ polyline: points, closed: polyline.closed });
-        }
-      }
+    case 'imported-svg':
+      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      return;
+    case 'text':
+      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      return;
+    default:
+      assertNever(obj, 'SceneObject');
+  }
+}
+
+// Shared materializer for any SceneObject whose paths are already
+// available as ColoredPath polylines (ImportedSvg, TextObject). The
+// switch above stays one-arm-per-kind for exhaustiveness, but each
+// arm just delegates here — no duplicated coordinate-transform math.
+function appendPathSegments(
+  paths: ReadonlyArray<ColoredPath>,
+  transform: Transform,
+  color: string,
+  device: DeviceProfile,
+  out: CutSegment[],
+): void {
+  for (const path of paths) {
+    if (path.color !== color) continue;
+    for (const polyline of path.polylines) {
+      const points: Vec2[] = polyline.points.map((p) =>
+        toMachineCoords(applyTransform(p, transform), device),
+      );
+      out.push({ polyline: points, closed: polyline.closed });
     }
   }
 }

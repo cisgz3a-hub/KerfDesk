@@ -121,7 +121,8 @@ function drawObjects(
 ): void {
   const layerByColor = new Map(project.scene.layers.map((l) => [l.color, l]));
   for (const obj of project.scene.objects) {
-    if (obj.kind !== 'imported-svg') continue;
+    // ImportedSvg and TextObject share the same polyline shape after
+    // text renders to paths in the UI layer — single drawing path.
     drawObjectPolylines(ctx, obj, layerByColor, view);
     if (obj.id === selectedId) {
       drawSelectionBox(ctx, obj, view);
@@ -137,7 +138,10 @@ function drawObjectPolylines(
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
 ): void {
-  if (obj.kind !== 'imported-svg') return;
+  // Both 'imported-svg' and 'text' carry a `paths: ColoredPath[]`
+  // field of the same shape. The text path is populated by the UI
+  // (font-loader + textToPolylines) on edit and stored on the object.
+  if (obj.kind !== 'imported-svg' && obj.kind !== 'text') return;
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;

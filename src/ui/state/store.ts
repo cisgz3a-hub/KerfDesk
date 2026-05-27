@@ -6,39 +6,29 @@
 import { create } from 'zustand';
 import type { DeviceProfile } from '../../core/devices';
 import {
-  addLayer,
-  addObject,
-  createLayer,
   createProject,
-  fitObjectToBed,
-  type ImportedSvg,
   type Layer,
   type Project,
   removeObject,
-  replaceObject,
-  type Scene,
   type SceneObject,
+  type TextObject,
   type Transform,
   updateLayer,
   type Vec2,
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
+import {
+  applyFreshImport,
+  applyReimport,
+  applyUpsertText,
+  findReimportTarget,
+  type ImportOutcome,
+  pushUndo,
+} from './scene-mutations';
+
+export type { ImportOutcome } from './scene-mutations';
 
 const HISTORY_DEPTH = 50;
-
-// Discriminated outcome of importSvgObject. `added` is a fresh import;
-// `replaced` is a re-import (Phase C) that swapped an existing object's
-// content while preserving its id + transform + the surviving color
-// layers' settings. Diff counts are colors-set comparisons.
-export type ImportOutcome =
-  | { readonly kind: 'added' }
-  | {
-      readonly kind: 'replaced';
-      readonly source: string;
-      readonly kept: number;
-      readonly added: number;
-      readonly removed: number;
-    };
 
 export type AppState = {
   readonly project: Project;
@@ -79,6 +69,11 @@ export type AppState = {
   // for a re-import (existing object with matching source filename
   // found) it's `{ kind: 'replaced', kept, added, removed }`.
   readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
+  // Phase D — insert or update a TextObject by id. The dialog's
+  // Submit always calls this; on add it's a new id, on edit it
+  // matches an existing id and replaces in place (preserves the
+  // user's position/transform).
+  readonly upsertTextObject: (text: TextObject) => void;
   readonly removeSceneObject: (id: string) => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
@@ -110,10 +105,6 @@ export type AppState = {
 type Setter = (
   fn: AppState | Partial<AppState> | ((state: AppState) => AppState | Partial<AppState>),
 ) => void;
-
-function pushUndo(prev: Project, stack: ReadonlyArray<Project>): ReadonlyArray<Project> {
-  return [...stack, prev].slice(-HISTORY_DEPTH);
-}
 
 function initialState(): Pick<
   AppState,
@@ -152,103 +143,10 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
   };
 }
 
-const MULTI_IMPORT_OFFSET_MM = 10;
-
-// Find an existing imported-SVG object whose `source` filename matches
-// the about-to-be-imported one. Used by importSvgObject to decide
-// between fresh-add and replace-in-place semantics (Phase C re-import).
-function findReimportTarget(scene: Scene, object: SceneObject): ImportedSvg | null {
-  if (object.kind !== 'imported-svg') return null;
-  for (const existing of scene.objects) {
-    if (existing.kind === 'imported-svg' && existing.source === object.source) {
-      return existing;
-    }
-  }
-  return null;
-}
-
-function ensureLayersForColors(scene: Scene, paths: ImportedSvg['paths']): Scene {
-  let out = scene;
-  for (const path of paths) {
-    const exists = out.layers.some((l) => l.color === path.color);
-    if (!exists) {
-      out = addLayer(out, createLayer({ id: path.color, color: path.color }));
-    }
-  }
-  return out;
-}
-
-function applyFreshImport(
-  s: AppState,
-  object: SceneObject,
-  batchOffsetIdx: number,
-): Partial<AppState> {
-  // Auto-fit + center on the bed so a 1000 mm SVG dropped on a 400 mm
-  // bed doesn't disappear off the corner. Small designs stay at scale 1.
-  const fitted = fitObjectToBed(object, s.project.device.bedWidth, s.project.device.bedHeight);
-  // Multi-import stagger (F-A3): shift Nth file by 10 mm × N right+down.
-  const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
-  const positioned =
-    offset === 0
-      ? fitted
-      : { ...fitted, transform: { ...fitted.transform, x: fitted.transform.x + offset, y: fitted.transform.y + offset } };
-  let scene = addObject(s.project.scene, positioned);
-  if (positioned.kind === 'imported-svg') {
-    scene = ensureLayersForColors(scene, positioned.paths);
-  }
-  return {
-    project: { ...s.project, scene },
-    // Auto-select the newly-imported object (F-A3 step 5).
-    selectedObjectId: positioned.id,
-    undoStack: pushUndo(s.project, s.undoStack),
-    redoStack: [],
-    dirty: true,
-  };
-}
-
-function applyReimport(
-  s: AppState,
-  existing: ImportedSvg,
-  incoming: ImportedSvg,
-): { readonly state: Partial<AppState>; readonly outcome: ImportOutcome } {
-  // Swap content + bounds but keep id and transform so the user's
-  // chosen position/scale/rotation survives. Layer settings carry over
-  // for any color still present (layers are keyed by color, scene-wide).
-  const replaced: ImportedSvg = {
-    ...incoming,
-    id: existing.id,
-    transform: existing.transform,
-  };
-  let scene = replaceObject(s.project.scene, existing.id, replaced);
-  scene = ensureLayersForColors(scene, replaced.paths);
-  const oldColors = new Set(existing.paths.map((p) => p.color));
-  const newColors = new Set(replaced.paths.map((p) => p.color));
-  let kept = 0;
-  let added = 0;
-  let removed = 0;
-  for (const c of newColors) {
-    if (oldColors.has(c)) kept += 1;
-    else added += 1;
-  }
-  for (const c of oldColors) {
-    if (!newColors.has(c)) removed += 1;
-  }
-  return {
-    state: {
-      project: { ...s.project, scene },
-      selectedObjectId: existing.id,
-      undoStack: pushUndo(s.project, s.undoStack),
-      redoStack: [],
-      dirty: true,
-    },
-    outcome: { kind: 'replaced', source: replaced.source, kept, added, removed },
-  };
-}
-
 function importSvgObjectAction(
   set: Setter,
   get: () => AppState,
-): Pick<AppState, 'importSvgObject'> {
+): Pick<AppState, 'importSvgObject' | 'upsertTextObject'> {
   return {
     importSvgObject: (object, batchOffsetIdx = 0): ImportOutcome => {
       const existing = findReimportTarget(get().project.scene, object);
@@ -262,6 +160,9 @@ function importSvgObjectAction(
         return applyFreshImport(s, object, batchOffsetIdx);
       });
       return outcome;
+    },
+    upsertTextObject: (text) => {
+      set((s) => applyUpsertText(s, text));
     },
   };
 }

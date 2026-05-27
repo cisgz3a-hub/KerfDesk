@@ -5,10 +5,27 @@
 // an editable action.
 
 import { create } from 'zustand';
+import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 16;
 export const ZOOM_STEP = 1.25;
+
+// Phase D add-text dialog state. Null = closed; populated with
+// initial field values when opened. `mode` discriminates add vs edit
+// so submit knows whether to create a new object or upsert by id.
+export type TextDialogState =
+  | { readonly mode: 'add' }
+  | {
+      readonly mode: 'edit';
+      readonly id: string;
+      readonly content: string;
+      readonly fontKey: string;
+      readonly sizeMm: number;
+      readonly alignment: TextAlignment;
+      readonly lineHeight: number;
+      readonly color: string;
+    };
 
 type UiState = {
   readonly dragOverlay: boolean;
@@ -31,6 +48,12 @@ type UiState = {
   // read the same source of truth.
   readonly spaceDown: boolean;
   readonly setSpaceDown: (next: boolean) => void;
+  // Phase D text dialog. Toolbar's "Text…" opens with mode='add';
+  // Workspace's double-click-on-text opens with mode='edit' + the
+  // current field values. AddTextDialog renders nothing when null.
+  readonly textDialog: TextDialogState | null;
+  readonly openTextDialog: (next: TextDialogState) => void;
+  readonly closeTextDialog: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -48,6 +71,9 @@ export const useUiStore = create<UiState>((set) => ({
   setPan: (panX, panY) => set({ panX, panY }),
   spaceDown: false,
   setSpaceDown: (next) => set({ spaceDown: next }),
+  textDialog: null,
+  openTextDialog: (next) => set({ textDialog: next }),
+  closeTextDialog: () => set({ textDialog: null }),
 }));
 
 function clamp01(n: number): number {

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { createProject, IDENTITY_TRANSFORM, type SceneObject } from '../../core/scene';
+import { createProject, IDENTITY_TRANSFORM, type ImportedSvg } from '../../core/scene';
 import { useStore } from './store';
 
 function reset(): void {
@@ -18,7 +18,7 @@ function reset(): void {
   });
 }
 
-function svgObj(id: string, colors: ReadonlyArray<string>): SceneObject {
+function svgObj(id: string, colors: ReadonlyArray<string>): ImportedSvg {
   return {
     kind: 'imported-svg',
     id,
@@ -121,7 +121,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
 
   it('returns { kind: "replaced" } when an object with the same source already exists', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
-    const replacement: SceneObject = { ...svgObj('NEW-id', ['#ff0000']), source: 'O1.svg' };
+    const replacement: ImportedSvg = { ...svgObj('NEW-id', ['#ff0000']), source: 'O1.svg' };
     const outcome = useStore.getState().importSvgObject(replacement);
     expect(outcome.kind).toBe('replaced');
     if (outcome.kind === 'replaced') {
@@ -135,7 +135,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
   it('re-import preserves the existing object id (so selection / refs stay valid)', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     const original = useStore.getState().project.scene.objects[0];
-    const replacement: SceneObject = { ...svgObj('different-id', ['#ff0000']), source: 'O1.svg' };
+    const replacement: ImportedSvg = { ...svgObj('different-id', ['#ff0000']), source: 'O1.svg' };
     useStore.getState().importSvgObject(replacement);
     const after = useStore.getState().project.scene.objects[0];
     expect(after?.id).toBe(original?.id);
@@ -150,7 +150,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
     useStore
       .getState()
       .setObjectTransform(orig.id, { ...orig.transform, x: 123, y: 45 });
-    const replacement: SceneObject = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
+    const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
     useStore.getState().importSvgObject(replacement);
     const after = useStore.getState().project.scene.objects[0];
     expect(after?.transform.x).toBe(123);
@@ -160,7 +160,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
   it('re-import preserves layer settings for surviving colors', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { power: 85, speed: 1234, passes: 3 });
-    const replacement: SceneObject = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
+    const replacement: ImportedSvg = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
     useStore.getState().importSvgObject(replacement);
     const red = useStore.getState().project.scene.layers.find((l) => l.color === '#ff0000');
     expect(red?.power).toBe(85);
@@ -170,7 +170,7 @@ describe('useStore — SVG re-import (Phase C #7)', () => {
 
   it('re-import adds layers for genuinely new colors', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
-    const replacement: SceneObject = {
+    const replacement: ImportedSvg = {
       ...svgObj('new', ['#ff0000', '#00ff00']),
       source: 'O1.svg',
     };
