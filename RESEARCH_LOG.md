@@ -122,19 +122,20 @@ push.
 
 These have been chosen in advance but are not yet in `package.json`. Re-verify at the start of the relevant phase before adoption.
 
-### opentype.js — Phase D
+### opentype.js — adopted Phase D (2026-05-27)
 
-- **Version target:** latest stable at Phase D kickoff; verify license unchanged
-- **License (last checked):** MIT
+- **Version:** 2.0.0
+- **License:** MIT (re-verified 2026-05-27 against the upstream `package.json`)
 - **Source:** https://github.com/opentypejs/opentype.js
 - **Decision affected:** ADR-012 (text + fonts as Phase D)
-- **Evaluated:** 2026-05-26 (preliminary; full evaluation at Phase D kickoff)
-- **Confidence:** medium
-- **Re-verify by:** Phase D kickoff
-- **Alternatives considered:**
-  - `fontkit` (MIT) — heavier; supports more font formats than we need.
-  - `harfbuzzjs` (MIT) — text shaping for complex scripts; overkill for Latin-script MVP-D.
-- **Notes:** Used for TTF/OTF → SVG path conversion. Bundle impact deferred; library is non-trivial in size (~250 KB minified) — at Phase D kickoff, consider lazy-loading.
+- **Status:** ADOPTED as runtime dependency
+- **Evaluated:** 2026-05-26 (preliminary) → re-verified + adopted 2026-05-27
+- **Confidence:** high
+- **Alternatives reconsidered at kickoff:**
+  - `fontkit` (MIT) — heavier (~600 KB unminified); supports more font formats than we need (WOFF2, etc.). Skipped.
+  - `harfbuzzjs` (MIT) — text shaping for complex scripts; overkill for Latin-script MVP-D and 10× the size.
+- **Bundle impact:** adds ~265 KB to the JS bundle (524 KB total → 161 KB gzip). Within PROJECT.md's "< 1 MB compressed" target with margin. Lazy-loading deferred — could re-evaluate if a future feature pushes the bundle past 200 KB gzip.
+- **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1). All MIT-compatible per ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
 
 ### imagetracer.js — Phase E
 

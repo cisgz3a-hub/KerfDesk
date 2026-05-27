@@ -77,6 +77,7 @@ export function Workspace(): JSX.Element {
         onMouseMove={handlers.onMouseMove}
         onMouseUp={handlers.onMouseUp}
         onMouseLeave={handlers.onMouseUp}
+        onDoubleClick={openTextEditForSelectedText}
         onWheel={(e) => {
           // Pinch-to-zoom on trackpads + Ctrl+Wheel on mice. Both arrive
           // here as wheel events with ctrlKey true (browser convention).
@@ -102,6 +103,29 @@ export function Workspace(): JSX.Element {
       {previewMode && <PreviewScrubber />}
     </>
   );
+}
+
+// Phase D — double-click on a selected text opens the edit dialog
+// with its current values pre-populated. Non-text objects are a
+// no-op (a future "rename / properties" dialog could land here).
+// Module-level so the canvas onDoubleClick prop reference is stable
+// and the parent Workspace function stays under the line cap.
+function openTextEditForSelectedText(): void {
+  const s = useStore.getState();
+  const id = s.selectedObjectId;
+  if (id === null) return;
+  const obj = s.project.scene.objects.find((o) => o.id === id);
+  if (obj === undefined || obj.kind !== 'text') return;
+  useUiStore.getState().openTextDialog({
+    mode: 'edit',
+    id: obj.id,
+    content: obj.content,
+    fontKey: obj.fontKey,
+    sizeMm: obj.sizeMm,
+    alignment: obj.alignment,
+    lineHeight: obj.lineHeight,
+    color: obj.color,
+  });
 }
 
 type DragHandlers = {
