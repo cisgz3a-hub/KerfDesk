@@ -84,30 +84,46 @@ async function createWindow(): Promise<void> {
     });
   });
 
-  // Permission gate: deny everything by default, allow `serial` (Phase B).
-  // Electron exposes WebSerial via four cooperating hooks; missing any of
-  // them and the renderer's `navigator.serial.requestPort()` either errors
-  // silently or never shows a picker.
+  // Permission gate: deny everything by default, allow only what the app
+  // actually uses.
   //
-  // 1) setPermissionCheckHandler — return true for 'serial' so the API isn't
-  //    gated out before requestPort even fires.
-  // 2) setDevicePermissionHandler — approve serial-device grants (per-device).
-  // 3) select-serial-port — pick which port to return from the discovered
-  //    list. Phase B initial: auto-pick the first one; surface a custom
-  //    picker via IPC in Phase B polish.
-  // 4) setPermissionRequestHandler — accept 'serial' explicitly.
+  // WebSerial (Phase B) needs four cooperating hooks; missing any of them
+  // and the renderer's `navigator.serial.requestPort()` either errors
+  // silently or never shows a picker:
+  //   1) setPermissionCheckHandler   — accept 'serial' so the API isn't
+  //      gated out before requestPort even fires.
+  //   2) setDevicePermissionHandler  — approve serial-device grants per-device.
+  //   3) select-serial-port event    — pick which port to return.
+  //   4) setPermissionRequestHandler — accept 'serial' explicitly.
+  //
+  // File System Access (Phase A: SVG import, .lf2 save/open) is gated
+  // on Electron 33+ via these same handlers. Chromium uses several
+  // permission names for the API's sub-operations:
+  //   'fileSystem'              — read via showOpenFilePicker → getFile
+  //   'fileSystem-write'        — write via handle.createWritable
+  //   'fileSystem-read-write'   — combined read/write request
+  //   (future variants)         — Chrome ships new names occasionally
+  // Allowing anything starting with 'fileSystem' covers all of them
+  // and stays safe: all File System Access entry points require a
+  // user gesture, so drive-by content can't trigger pickers.
+  //
+  // Electron 32 didn't route FileSystemFileHandle.getFile() through
+  // these hooks at all; Electron 33+ does. F-2's bump to 42 surfaced
+  // the gap.
+  const isAllowedPermission = (permission: string): boolean =>
+    permission === 'serial' || permission.startsWith('fileSystem');
   const ses = session.defaultSession;
   // setPermissionCheckHandler's permission type isn't exposed in Electron's
   // public type union (it's a wider string set than RequestHandler). The
   // (permission: string) cast below is verified against Electron docs.
   ses.setPermissionCheckHandler((_wc, permission) => {
-    return (permission as string) === 'serial';
+    return isAllowedPermission(permission as string);
   });
   ses.setDevicePermissionHandler((details) => {
     return details.deviceType === 'serial';
   });
   ses.setPermissionRequestHandler((_wc, permission, cb) => {
-    cb((permission as string) === 'serial');
+    cb(isAllowedPermission(permission as string));
   });
   // The `select-serial-port` event fires when the renderer calls
   // navigator.serial.requestPort(). The callback closes the loop with the
