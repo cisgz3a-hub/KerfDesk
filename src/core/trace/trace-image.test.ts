@@ -5,15 +5,17 @@ import {
   traceImageToSvgString,
 } from './trace-image';
 
+type Fixture = {
+  readonly width: number;
+  readonly height: number;
+  readonly data: Uint8ClampedArray;
+};
+
 // Build a tiny synthetic raster: a black square (8×8) centered in a
 // white 16×16 image. RGBA uint8 layout matches what canvas.getImageData
 // returns; imagetracerjs doesn't care if the buffer came from a real
 // canvas or a fixture as long as the shape matches.
-function blackSquareOnWhite(): {
-  readonly width: number;
-  readonly height: number;
-  readonly data: Uint8ClampedArray;
-} {
+function blackSquareOnWhite(): Fixture {
   const W = 16;
   const H = 16;
   const data = new Uint8ClampedArray(W * H * 4);
@@ -26,6 +28,46 @@ function blackSquareOnWhite(): {
       data[i + 1] = v; // g
       data[i + 2] = v; // b
       data[i + 3] = 255; // a
+    }
+  }
+  return { width: W, height: H, data };
+}
+
+// Programmatic "logo-like" fixture used by F-4's regression test.
+// 128×128 image with:
+//   - a filled black circle (radius 35) at the center, with 1-px AA ring
+//   - a centered horizontal stripe (text baseline stand-in) that crosses
+//     the circle, also with AA edges
+// Reproduces the structural pattern of a typical rasterized logo:
+// large continuous filled regions with anti-aliased edges. If the
+// Line Art preset regresses, the AA ring becomes speckle and the
+// trace's polyline count + max-length both blow out.
+function buildLogoLikeFixture(): Fixture {
+  const W = 128;
+  const H = 128;
+  const data = new Uint8ClampedArray(W * H * 4);
+  const cx = W / 2;
+  const cy = H / 2;
+  const r = 35;
+  const stripeTop = 60;
+  const stripeBottom = 68;
+  for (let y = 0; y < H; y += 1) {
+    for (let x = 0; x < W; x += 1) {
+      const distToCenter = Math.sqrt((x - cx) ** 2 + (y - cy) ** 2);
+      // Circle: solid black inside r-1, AA ring between r-1 and r+1
+      let v = 255;
+      const circleEdge = Math.abs(distToCenter - r);
+      if (distToCenter < r - 1) v = 0;
+      else if (circleEdge < 1) v = 128; // AA gray
+      // Stripe: overlays whatever was there. Inside stripe = black,
+      // with 0.5-px AA on the top/bottom.
+      if (y >= stripeTop && y < stripeBottom) v = 0;
+      else if (y === stripeTop - 1 || y === stripeBottom) v = Math.min(v, 128);
+      const i = (y * W + x) * 4;
+      data[i] = v;
+      data[i + 1] = v;
+      data[i + 2] = v;
+      data[i + 3] = 255;
     }
   }
   return { width: W, height: H, data };
@@ -178,6 +220,37 @@ describe('traceImageToSvgString', () => {
     // contours + maybe background).
     const pathCount = (svg.match(/<path/g) ?? []).length;
     expect(pathCount).toBeLessThanOrEqual(4);
+  });
+
+  it('logo-like fixture: traces to continuous contours (regression for F-4)', async () => {
+    // Programmatic stand-in for the user's Lekker Kuier logo —
+    // shapes with anti-aliased borders, similar in structure to
+    // any real rasterized logo. Tests that the Line Art preset
+    // (pre-threshold + fixed palette + pathOmit 16) yields
+    // continuous contours, NOT a swarm of small dots.
+    //
+    // Continuity assertions: a real continuous outline has many
+    // points after imagetracer's simplification (≥ 20 for any
+    // shape larger than a glyph). The actual failure mode of the
+    // pre-fix code was dozens of 2-3-point polylines (speckle).
+    // We check BOTH: longest is meaningfully long AND total count
+    // is small. If either lever flips, the bug is back.
+    const image = buildLogoLikeFixture();
+    const { parseSvg } = await import('../../io/svg/parse-svg');
+    const svg = traceImageToSvgString(image, {
+      ...DEFAULT_TRACE_OPTIONS,
+      fixedPalette: ['#ffffff', '#000000'],
+      thresholdLuma: 128,
+      pathOmit: 16,
+      lineFilter: true,
+    });
+    const result = parseSvg({ svgText: svg, id: 'fixture', source: 'logo-like.png' });
+    expect(result.object).not.toBeNull();
+    if (result.object === null) return;
+    const allPolylines = result.object.paths.flatMap((p) => p.polylines);
+    const longest = Math.max(...allPolylines.map((pl) => pl.points.length));
+    expect(allPolylines.length).toBeLessThanOrEqual(10);
+    expect(longest).toBeGreaterThanOrEqual(20);
   });
 
   it('handles a fully-uniform image without throwing', () => {

@@ -8,9 +8,15 @@
 // rather than a separate modal page. The fields are few enough that
 // a modal would add modality without adding clarity (CLAUDE.md
 // "simplicity first").
+//
+// AutofocusEditor + PlannerAdvanced live in sibling files (F-1 audit
+// fix) so this file stays under the 400-line hard cap.
 
 import type { Origin } from '../../core/devices';
 import { useStore } from '../state';
+import { AutofocusEditor } from './AutofocusEditor';
+import { numInputStyle, Row, unitStyle } from './device-settings-shared';
+import { PlannerAdvanced } from './PlannerAdvanced';
 
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
@@ -75,11 +81,16 @@ function HomingEditor(props: {
 }): JSX.Element {
   return (
     <>
-      <label style={inlineLabelStyle} title="If enabled, the Home button sends $H and waits for completion.">
+      <label
+        style={inlineLabelStyle}
+        title="If enabled, the Home button sends $H and waits for completion."
+      >
         <input
           type="checkbox"
           checked={props.enabled}
-          onChange={(e) => props.onChange({ enabled: e.target.checked, direction: props.direction })}
+          onChange={(e) =>
+            props.onChange({ enabled: e.target.checked, direction: props.direction })
+          }
           aria-label="Homing enabled"
         />
         <span>$H supported</span>
@@ -105,9 +116,8 @@ function HomingEditor(props: {
 }
 
 // The five always-visible numeric fields: Name, Bed (W×H), Origin,
-// Max feed, $30 max power. Extracted to keep DeviceSettings itself
-// under the 80-line function cap and to keep this UI as a single
-// scannable list.
+// Max feed, $30 max power. Sub-component so DeviceSettings itself
+// stays under the 80-line function cap and reads as a list.
 function BasicRows(props: {
   readonly device: ReturnType<typeof useStore.getState>['project']['device'];
   readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
@@ -178,142 +188,9 @@ function BasicRows(props: {
   );
 }
 
-// Hidden-by-default editor for the planner's GRBL settings. Most
-// users never touch these; they only matter when the job-time
-// estimate is systematically off and the user wants to dial it in
-// to their machine. <details> gives us native expand/collapse with
-// no state management.
-function PlannerAdvanced(props: {
-  readonly accel: number;
-  readonly jd: number;
-  readonly onAccelChange: (next: number) => void;
-  readonly onJdChange: (next: number) => void;
-}): JSX.Element {
-  return (
-    <details style={advancedDetailsStyle}>
-      <summary style={advancedSummaryStyle}>Advanced: estimator tuning</summary>
-      <div style={advancedBodyStyle}>
-        <Row label="$120 accel">
-          <input
-            type="number"
-            min={1}
-            step={50}
-            value={props.accel}
-            onChange={(e) =>
-              props.onAccelChange(Math.max(1, Number(e.target.value) || 0))
-            }
-            style={numInputStyle}
-            aria-label="Acceleration (mm/s²)"
-            title="GRBL $120/$121. Higher = faster cornering and shorter estimates. Typical 100-2500 mm/s²."
-          />
-          <span style={unitStyle}>mm/s²</span>
-        </Row>
-        <Row label="$11 junction">
-          <input
-            type="number"
-            min={0.001}
-            step={0.001}
-            value={props.jd}
-            onChange={(e) =>
-              props.onJdChange(Math.max(0, Number(e.target.value) || 0))
-            }
-            style={numInputStyle}
-            aria-label="Junction deviation (mm)"
-            title="GRBL $11. Higher = faster corners but more shake. Grbl default is 0.010 mm."
-          />
-          <span style={unitStyle}>mm</span>
-        </Row>
-        <p style={advancedHintStyle}>
-          Tune these to match your machine&apos;s <code style={inlineCodeStyle}>$$</code> output
-          when burn times consistently differ from the estimate. Defaults match the GRBL
-          shipping standard.
-        </p>
-      </div>
-    </details>
-  );
-}
-
-// Single-click presets for the autofocus command. Each preset is the
-// minimum the named machine needs; users on something else either paste
-// a known command from their controller docs or leave blank to disable.
-//
-// Falcon: GrblHAL on the Creality "A1 Pro Laser Master" mainboard
-// implements `$HZ1` as a single-line firmware macro that runs the
-// internal autofocus probe. Requires firmware ≥ 1.0.38; older firmware
-// rejects with error:20 (unsupported G-code).
-const AUTOFOCUS_PRESETS: ReadonlyArray<{
-  readonly label: string;
-  readonly command: string;
-  readonly hint: string;
-}> = [
-  {
-    label: 'Creality Falcon A1 Pro',
-    command: '$HZ1',
-    hint: 'Firmware ≥ 1.0.38. Older firmware rejects with error:20.',
-  },
-  {
-    label: 'GRBL probe (Z-axis machines)',
-    command: 'G91 G21\nG38.2 Z-30 F100\nG92 Z0\nG90\nG1 Z3 F600',
-    hint: 'Standard probe-down sequence. Diode lasers without a probe pin reply error:9.',
-  },
-];
-
-function AutofocusEditor(props: {
-  readonly value: string;
-  readonly onChange: (next: string) => void;
-}): JSX.Element {
-  return (
-    <div style={focusBlockStyle}>
-      <label htmlFor="autofocus-cmd" style={focusLabelStyle}>
-        Auto-focus command
-      </label>
-      <textarea
-        id="autofocus-cmd"
-        value={props.value}
-        onChange={(e) => props.onChange(e.target.value)}
-        rows={5}
-        spellCheck={false}
-        placeholder="Pick a preset below, or paste your machine's autofocus command"
-        style={textareaStyle}
-      />
-      <div style={presetsRowStyle}>
-        {AUTOFOCUS_PRESETS.map((p) => (
-          <button
-            key={p.label}
-            type="button"
-            onClick={() => props.onChange(p.command)}
-            title={p.hint}
-            style={presetButtonStyle}
-          >
-            {p.label}
-          </button>
-        ))}
-      </div>
-      <p style={focusHintStyle}>
-        Empty by default — autofocus protocols are vendor-specific. Pick a preset above for known
-        machines, or paste your controller&apos;s command. Common error replies:{' '}
-        <code style={inlineCodeStyle}>error:9</code> (no probe pin) and{' '}
-        <code style={inlineCodeStyle}>error:20</code> (unsupported G-code on this firmware).
-      </p>
-    </div>
-  );
-}
-
-function Row({
-  label,
-  children,
-}: {
-  readonly label: string;
-  readonly children: React.ReactNode;
-}): JSX.Element {
-  return (
-    <div style={rowStyle}>
-      <span style={labelStyle}>{label}</span>
-      <span style={fieldStyle}>{children}</span>
-    </div>
-  );
-}
-
+// File-local styles. Anything shared with AutofocusEditor /
+// PlannerAdvanced lives in device-settings-shared.tsx; what's left
+// here is genuinely DeviceSettings-only.
 const panelStyle: React.CSSProperties = {
   border: '1px solid #ddd',
   borderRadius: 4,
@@ -324,53 +201,8 @@ const panelStyle: React.CSSProperties = {
   gap: 4,
 };
 const headingStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, margin: 0 };
-const rowStyle: React.CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 6,
-  fontSize: 12,
-};
-const labelStyle: React.CSSProperties = { width: 80, color: '#444' };
-const fieldStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 4, flex: 1 };
-const numInputStyle: React.CSSProperties = { width: 64 };
 const textInputStyle: React.CSSProperties = { width: 140 };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
 const timesStyle: React.CSSProperties = { fontSize: 12, color: '#666' };
-const focusBlockStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 2,
-  marginTop: 4,
-  borderTop: '1px solid #eee',
-  paddingTop: 4,
-};
-const focusLabelStyle: React.CSSProperties = { fontSize: 12, color: '#444', fontWeight: 500 };
-const textareaStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, Menlo, monospace',
-  fontSize: 11,
-  width: '100%',
-  boxSizing: 'border-box',
-  resize: 'vertical',
-};
-const inlineCodeStyle: React.CSSProperties = {
-  fontFamily: 'ui-monospace, Menlo, monospace',
-  background: '#eee',
-  padding: '0 3px',
-  borderRadius: 2,
-  fontStyle: 'normal',
-};
-const focusHintStyle: React.CSSProperties = {
-  fontSize: 10,
-  color: '#777',
-  margin: '2px 0 0 0',
-  fontStyle: 'italic',
-};
-const presetsRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap', gap: 4 };
-const presetButtonStyle: React.CSSProperties = {
-  fontSize: 10,
-  padding: '2px 6px',
-  cursor: 'pointer',
-};
 const inlineLabelStyle: React.CSSProperties = {
   display: 'inline-flex',
   alignItems: 'center',
@@ -378,26 +210,4 @@ const inlineLabelStyle: React.CSSProperties = {
   fontSize: 12,
   cursor: 'pointer',
 };
-const advancedDetailsStyle: React.CSSProperties = {
-  marginTop: 4,
-  borderTop: '1px solid #eee',
-  paddingTop: 4,
-};
-const advancedSummaryStyle: React.CSSProperties = {
-  fontSize: 11,
-  color: '#666',
-  cursor: 'pointer',
-  userSelect: 'none',
-};
-const advancedBodyStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: 4,
-  marginTop: 6,
-};
-const advancedHintStyle: React.CSSProperties = {
-  fontSize: 10,
-  color: '#777',
-  margin: '4px 0 0 0',
-  fontStyle: 'italic',
-};
+
