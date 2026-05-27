@@ -1,0 +1,132 @@
+// shape-to-polylines — converts a single SVG primitive element (rect, line,
+// polyline, polygon, circle, ellipse, path) into a list of subpaths in
+// object-local coordinates. Color/stroke attribution is handled by the caller
+// in parse-svg.ts.
+//
+// Phase A scope: the seven primitive elements above. Curves inside <path d>
+// are flattened via parsePathD's Phase-A lossy approach (endpoint-only). The
+// SVG spec also defines <use>, <g>, <symbol>, gradients, masks, clip-paths,
+// patterns — these are walked transparently in parse-svg.ts where applicable.
+
+import type { Vec2 } from '../../core/scene';
+import { parsePathD, type SubPath } from './parse-path-d';
+
+const CIRCLE_SEGMENTS = 72; // 5° per segment — coarse but adequate for Phase A
+
+export function elementToSubPaths(el: Element): ReadonlyArray<SubPath> {
+  const tag = el.tagName.toLowerCase();
+  switch (tag) {
+    case 'path':
+      return pathToSubs(el);
+    case 'line':
+      return lineToSubs(el);
+    case 'polyline':
+      return polylineToSubs(el, false);
+    case 'polygon':
+      return polylineToSubs(el, true);
+    case 'rect':
+      return rectToSubs(el);
+    case 'circle':
+      return circleToSubs(el);
+    case 'ellipse':
+      return ellipseToSubs(el);
+    default:
+      return [];
+  }
+}
+
+function numAttr(el: Element, name: string, fallback = 0): number {
+  const raw = el.getAttribute(name);
+  if (raw === null) return fallback;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function pathToSubs(el: Element): ReadonlyArray<SubPath> {
+  const d = el.getAttribute('d');
+  if (d === null || d.trim() === '') return [];
+  return parsePathD(d);
+}
+
+function lineToSubs(el: Element): ReadonlyArray<SubPath> {
+  const x1 = numAttr(el, 'x1');
+  const y1 = numAttr(el, 'y1');
+  const x2 = numAttr(el, 'x2');
+  const y2 = numAttr(el, 'y2');
+  return [
+    {
+      points: [
+        { x: x1, y: y1 },
+        { x: x2, y: y2 },
+      ],
+      closed: false,
+    },
+  ];
+}
+
+function parsePointsAttr(value: string): ReadonlyArray<Vec2> {
+  const nums = (value.match(/[+-]?(?:\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?/g) ?? []).map(Number);
+  const points: Vec2[] = [];
+  for (let i = 0; i + 1 < nums.length; i += 2) {
+    const x = nums[i];
+    const y = nums[i + 1];
+    if (x === undefined || y === undefined) continue;
+    points.push({ x, y });
+  }
+  return points;
+}
+
+function polylineToSubs(el: Element, closed: boolean): ReadonlyArray<SubPath> {
+  const raw = el.getAttribute('points') ?? '';
+  const points = parsePointsAttr(raw);
+  if (points.length < 2) return [];
+  if (closed && points.length >= 2) {
+    const first = points[0];
+    if (first === undefined) return [];
+    return [{ points: [...points, first], closed: true }];
+  }
+  return [{ points, closed: false }];
+}
+
+function rectToSubs(el: Element): ReadonlyArray<SubPath> {
+  const x = numAttr(el, 'x');
+  const y = numAttr(el, 'y');
+  const w = numAttr(el, 'width');
+  const h = numAttr(el, 'height');
+  if (w <= 0 || h <= 0) return [];
+  // Rounded corners (rx/ry) — Phase A treats as sharp corners.
+  const points: Vec2[] = [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+    { x, y },
+  ];
+  return [{ points, closed: true }];
+}
+
+function arcPolygon(cx: number, cy: number, rx: number, ry: number): SubPath {
+  const points: Vec2[] = [];
+  for (let i = 0; i <= CIRCLE_SEGMENTS; i += 1) {
+    const t = (i / CIRCLE_SEGMENTS) * Math.PI * 2;
+    points.push({ x: cx + rx * Math.cos(t), y: cy + ry * Math.sin(t) });
+  }
+  return { points, closed: true };
+}
+
+function circleToSubs(el: Element): ReadonlyArray<SubPath> {
+  const cx = numAttr(el, 'cx');
+  const cy = numAttr(el, 'cy');
+  const r = numAttr(el, 'r');
+  if (r <= 0) return [];
+  return [arcPolygon(cx, cy, r, r)];
+}
+
+function ellipseToSubs(el: Element): ReadonlyArray<SubPath> {
+  const cx = numAttr(el, 'cx');
+  const cy = numAttr(el, 'cy');
+  const rx = numAttr(el, 'rx');
+  const ry = numAttr(el, 'ry');
+  if (rx <= 0 || ry <= 0) return [];
+  return [arcPolygon(cx, cy, rx, ry)];
+}

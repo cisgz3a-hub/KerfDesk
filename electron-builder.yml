@@ -1,0 +1,35 @@
+appId: dev.laserforge.app
+productName: LaserForge 2.0
+
+directories:
+  output: release/${version}
+  buildResources: build
+
+# Only ship what's needed at runtime: the compiled Electron main + the Vite
+# web bundle. node_modules pruning is handled by electron-builder using the
+# production dependency tree.
+files:
+  - dist-electron/**/*
+  - dist/web/**/*
+  - package.json
+
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+  artifactName: LaserForge-2.0-${version}-${arch}-setup.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  shortcutName: LaserForge 2.0
+
+# macOS / Linux targets remain commented; ADR-007 keeps them out of MVP.
+# mac:
+#   target: dmg
+# linux:
+#   target: AppImage
+
+publish: null

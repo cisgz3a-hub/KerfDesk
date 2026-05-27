@@ -1,0 +1,33 @@
+import { describe, expect, it } from 'vitest';
+import { createLayer, LAYER_DEFAULTS } from './layer';
+
+describe('createLayer', () => {
+  it('applies WORKFLOW.md F-A7 defaults (power 30, speed 1500, passes 1, visible+output on, mode line)', () => {
+    const layer = createLayer({ id: 'L1', color: '#ff0000' });
+    expect(layer).toEqual({
+      id: 'L1',
+      color: '#ff0000',
+      mode: 'line',
+      power: 30,
+      speed: 1500,
+      passes: 1,
+      visible: true,
+      output: true,
+    });
+  });
+
+  it('preserves the provided id and color', () => {
+    const layer = createLayer({ id: 'custom', color: '#0066cc' });
+    expect(layer.id).toBe('custom');
+    expect(layer.color).toBe('#0066cc');
+  });
+});
+
+describe('LAYER_DEFAULTS', () => {
+  it('is frozen at compile time via `as const`', () => {
+    // Type-level guarantee covered by `as const satisfies …`. Runtime sanity:
+    expect(LAYER_DEFAULTS.passes).toBeGreaterThanOrEqual(1);
+    expect(LAYER_DEFAULTS.power).toBeGreaterThanOrEqual(0);
+    expect(LAYER_DEFAULTS.power).toBeLessThanOrEqual(100);
+  });
+});

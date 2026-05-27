@@ -1,0 +1,27 @@
+All Rights Reserved
+
+Copyright (c) 2026 Johann Stolk
+
+This software and its source code are proprietary. No license — express or
+implied — is granted to any person to use, copy, modify, merge, publish,
+distribute, sublicense, or sell copies of this software or any portion of
+it, except with the prior written permission of the copyright holder.
+
+Viewing this source code does not grant any rights to use it.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+NOTE ON THIRD-PARTY DEPENDENCIES
+
+This project uses third-party libraries under their own open-source licenses
+(MIT, BSD, Apache-2.0, MPL-2.0, ISC). Those dependencies remain governed by
+their respective upstream licenses; this LICENSE file applies only to the
+first-party source code authored for this project.

@@ -1,0 +1,58 @@
+// Root App component. Wires Toolbar (top) + Workspace (center) +
+// CutsLayersPanel (right) + StatusBar (bottom). Window-level drag-drop import
+// and keyboard shortcuts live in dedicated hooks so this component stays a
+// thin layout shell.
+
+import { CutsLayersPanel } from '../layers';
+import { StatusBar, Toasts, Toolbar } from '../common';
+import { LaserWindow } from '../laser';
+import { Workspace } from '../workspace';
+import { useImportDragDrop } from './use-import-drag-drop';
+import { useShortcuts } from './use-shortcuts';
+import { useSpacePan } from './use-space-pan';
+import { useWindowTitle } from './use-window-title';
+
+export function App(): JSX.Element {
+  useImportDragDrop();
+  useShortcuts();
+  useSpacePan();
+  useWindowTitle();
+  return (
+    <div style={shellStyle}>
+      <Toolbar />
+      <main style={mainStyle}>
+        <div style={canvasAreaStyle}>
+          <Workspace />
+        </div>
+        <CutsLayersPanel />
+        <LaserWindow />
+      </main>
+      <StatusBar />
+      <Toasts />
+    </div>
+  );
+}
+
+const shellStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  height: '100vh',
+  margin: 0,
+  fontFamily: 'system-ui, sans-serif',
+};
+const mainStyle: React.CSSProperties = {
+  display: 'flex',
+  flex: 1,
+  minHeight: 0,
+  minWidth: 0,
+  overflow: 'hidden',
+};
+const canvasAreaStyle: React.CSSProperties = {
+  // flex:1 + minWidth:0 lets the workspace shrink to whatever the side rails
+  // leave. overflow:hidden prevents the inner canvas (with width: 100%) from
+  // forcing the flexbox open when sized between paint frames.
+  flex: 1,
+  minWidth: 0,
+  position: 'relative',
+  overflow: 'hidden',
+};

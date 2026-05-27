@@ -1,0 +1,7 @@
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  electron: true
+  electron-builder: true
+  app-builder-lib: true
+  '@electron/get': true

@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel in-progress runs on the same PR / branch when a new commit lands.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: Lint, typecheck, license, test, build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript typecheck
+        run: pnpm typecheck
+
+      - name: ESLint
+        run: pnpm lint
+
+      - name: Prettier
+        run: pnpm format:check
+
+      - name: License audit (ADR-008 / ADR-017)
+        run: pnpm license-check
+
+      - name: Vitest (unit + property + snapshot)
+        run: pnpm test
+
+      - name: Build web bundle
+        run: pnpm build:web
+
+      - name: Verify file-size discipline (no file > 400 lines)
+        run: |
+          MAX=400
+          BAD=$(find src -name '*.ts' -o -name '*.tsx' | xargs wc -l | awk -v max=$MAX '$1 > max && $2 != "total" { print $2 " (" $1 " lines)" }')
+          if [ -n "$BAD" ]; then
+            echo "Files exceeding $MAX lines:"
+            echo "$BAD"
+            exit 1
+          fi
