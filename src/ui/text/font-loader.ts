@@ -13,11 +13,13 @@ import type { KnownFontKey } from '../../core/text';
 import robotoUrl from './fonts/Roboto-Regular.ttf?url';
 import inconsolataUrl from './fonts/Inconsolata-Regular.ttf?url';
 import pacificoUrl from './fonts/Pacifico-Regular.ttf?url';
+import dancingScriptUrl from './fonts/DancingScript-Regular.ttf?url';
 
 const URL_BY_KEY: Readonly<Record<KnownFontKey, string>> = {
   'roboto-regular': robotoUrl,
   'inconsolata-regular': inconsolataUrl,
   'pacifico-regular': pacificoUrl,
+  'dancing-script-regular': dancingScriptUrl,
 };
 
 const cache = new Map<KnownFontKey, ArrayBuffer>();

@@ -16,12 +16,16 @@
 // to a known asset path. Pure-core stays binary-free; this module
 // only declares the registry shape.
 
-// KnownFontKey narrows the bundle to the three fonts we actually ship.
+// KnownFontKey narrows the bundle to the four fonts we actually ship.
 // TextObject.fontKey is `string` (the union member in scene-object) so
 // .lf2 files can carry future-unknown keys without rejection; this
 // narrow type is what the UI uses for compile-time safety and what
 // the registry constrains its keys to.
-export type KnownFontKey = 'roboto-regular' | 'inconsolata-regular' | 'pacifico-regular';
+export type KnownFontKey =
+  | 'roboto-regular'
+  | 'inconsolata-regular'
+  | 'pacifico-regular'
+  | 'dancing-script-regular';
 
 export type FontEntry = {
   readonly key: KnownFontKey;
@@ -34,6 +38,12 @@ export const FONT_REGISTRY: ReadonlyArray<FontEntry> = [
   { key: 'roboto-regular', displayName: 'Roboto', license: 'Apache-2.0', styleClass: 'sans' },
   { key: 'inconsolata-regular', displayName: 'Inconsolata', license: 'OFL-1.1', styleClass: 'mono' },
   { key: 'pacifico-regular', displayName: 'Pacifico', license: 'OFL-1.1', styleClass: 'script' },
+  {
+    key: 'dancing-script-regular',
+    displayName: 'Dancing Script',
+    license: 'OFL-1.1',
+    styleClass: 'script',
+  },
 ];
 
 export const DEFAULT_FONT_KEY: KnownFontKey = 'roboto-regular';
