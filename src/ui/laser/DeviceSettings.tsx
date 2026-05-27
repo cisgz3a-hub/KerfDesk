@@ -168,6 +168,22 @@ function BasicRows(props: {
           onChange={(e) => update({ maxFeed: Math.max(1, Number(e.target.value) || 0) })}
           style={numInputStyle}
           aria-label="Max feed (mm/min)"
+          title="Hardware ceiling on commanded feed — the planner clamps every move to this."
+        />
+        <span style={unitStyle}>mm/min</span>
+      </Row>
+      <Row label="Frame feed">
+        <input
+          type="number"
+          min={1}
+          step={100}
+          value={device.framingFeedMmPerMin}
+          onChange={(e) =>
+            update({ framingFeedMmPerMin: Math.max(1, Number(e.target.value) || 0) })
+          }
+          style={numInputStyle}
+          aria-label="Framing feed (mm/min)"
+          title="Feed used by the Frame button. Independent of cut/engrave speeds — capped at Max feed at emit time."
         />
         <span style={unitStyle}>mm/min</span>
       </Row>

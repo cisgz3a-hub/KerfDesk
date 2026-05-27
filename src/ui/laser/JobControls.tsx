@@ -177,7 +177,11 @@ function useFrameAction(): () => void {
       pushToast(describeFramePreflightFailure(pre), 'error');
       return;
     }
-    const feed = Math.min(project.device.maxFeed, 5000);
+    // Frame uses its own dedicated feed so changing layer / cut speed
+    // doesn't slow the framing pass. Capped at maxFeed so we never
+    // command past the machine's hardware rate. See ADR / device-profile
+    // notes on framingFeedMmPerMin.
+    const feed = Math.min(project.device.framingFeedMmPerMin, project.device.maxFeed);
     void frame(bounds, feed);
   };
 }

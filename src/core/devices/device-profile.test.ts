@@ -51,4 +51,14 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.junctionDeviationMm).toBeGreaterThan(0);
     expect(DEFAULT_DEVICE_PROFILE.junctionDeviationMm).toBeLessThan(0.1);
   });
+
+  it('framing feed defaults to a safe diode-laser jog rate (LightBurn parity)', () => {
+    // 6000 mm/min matches LightBurn's default frame speed and runs
+    // reliably on the Falcon / xTool diode-laser class. Anything below
+    // 1000 mm/min would make framing painfully slow; anything above
+    // the typical max rate (~15000) would skip steps on most diode
+    // gantries.
+    expect(DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin).toBeGreaterThanOrEqual(1000);
+    expect(DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin).toBeLessThanOrEqual(15000);
+  });
 });
