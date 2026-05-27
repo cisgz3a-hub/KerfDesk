@@ -12,12 +12,18 @@ import type { RawImageData } from '../../core/trace';
 // and starts to feel slow above ~1 megapixel on modest hardware.
 // Larger inputs are downsampled proportionally before tracing.
 const MAX_EDGE_PX = 1024;
+// Smaller cap used by the live preview path so re-tracing on every
+// preset switch stays sub-200ms even on photo-class input.
+export const PREVIEW_MAX_EDGE_PX = 400;
 
-export async function loadImageAsRawData(file: File): Promise<RawImageData> {
+export async function loadImageAsRawData(
+  file: File,
+  maxEdge: number = MAX_EDGE_PX,
+): Promise<RawImageData> {
   const url = URL.createObjectURL(file);
   try {
     const img = await decodeImage(url);
-    const { width, height } = scaleToCap(img.width, img.height, MAX_EDGE_PX);
+    const { width, height } = scaleToCap(img.width, img.height, maxEdge);
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
