@@ -51,10 +51,7 @@ export type MutationResult = {
 // Push the previous project onto undoStack with a depth cap. Co-located
 // with the mutation helpers since every action that calls them needs
 // the same shape.
-export function pushUndo(
-  prev: Project,
-  stack: ReadonlyArray<Project>,
-): ReadonlyArray<Project> {
+export function pushUndo(prev: Project, stack: ReadonlyArray<Project>): ReadonlyArray<Project> {
   return [...stack, prev].slice(-HISTORY_DEPTH);
 }
 
@@ -93,7 +90,10 @@ export function ensureLayersForColors(
 // Empty selection → no-op; the caller's `set((s) => ...)` should fall
 // through without changing state (the undefined return signals that).
 export function applyDuplicate(
-  s: StateSlice & { readonly selectedObjectId: string | null; readonly additionalSelectedIds: ReadonlySet<string> },
+  s: StateSlice & {
+    readonly selectedObjectId: string | null;
+    readonly additionalSelectedIds: ReadonlySet<string>;
+  },
   newIdFor: (oldId: string) => string,
 ): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
   const ids: string[] = [
@@ -161,7 +161,14 @@ export function applyFreshImport(
   const positioned =
     offset === 0
       ? fitted
-      : { ...fitted, transform: { ...fitted.transform, x: fitted.transform.x + offset, y: fitted.transform.y + offset } };
+      : {
+          ...fitted,
+          transform: {
+            ...fitted.transform,
+            x: fitted.transform.x + offset,
+            y: fitted.transform.y + offset,
+          },
+        };
   let scene = addObject(s.project.scene, positioned);
   if (
     positioned.kind === 'imported-svg' ||

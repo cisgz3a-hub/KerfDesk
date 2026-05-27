@@ -43,11 +43,7 @@ export class ErrorBoundary extends Component<Props, State> {
   override render(): ReactNode {
     if (this.state.kind === 'crashed') {
       return (
-        <CrashScreen
-          error={this.state.error}
-          when={this.state.when}
-          onRetry={this.handleRetry}
-        />
+        <CrashScreen error={this.state.error} when={this.state.when} onRetry={this.handleRetry} />
       );
     }
     return this.props.children;

@@ -145,9 +145,7 @@ describe('optimizePaths', () => {
     // Use 10% as the floor so the contract is "visible improvement,"
     // not "exact percentage" (the percentage depends on which corners
     // get hit first by the greedy step).
-    expect(after.breakdown.travelSeconds).toBeLessThan(
-      before.breakdown.travelSeconds * 0.9,
-    );
+    expect(after.breakdown.travelSeconds).toBeLessThan(before.breakdown.travelSeconds * 0.9);
   });
 
   it('honest about NN limits — may pessimize tiny amounts on pathological 2-segment inputs', () => {
@@ -251,13 +249,7 @@ describe('optimizePaths', () => {
   it('preserves cut content (same set of polylines, possibly reordered/reversed)', () => {
     // Optimization cannot drop or duplicate any cut.
     const j: Job = {
-      groups: [
-        group([
-          seg([10, 10], [20, 20]),
-          seg([30, 30], [40, 40]),
-          seg([5, 5], [15, 15]),
-        ]),
-      ],
+      groups: [group([seg([10, 10], [20, 20]), seg([30, 30], [40, 40]), seg([5, 5], [15, 15])])],
     };
     const result = optimizePaths(j);
     expect(result.groups[0]?.segments.length).toBe(3);

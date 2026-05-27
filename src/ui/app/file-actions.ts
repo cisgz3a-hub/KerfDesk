@@ -12,7 +12,11 @@ import type { PlatformAdapter, SaveTarget } from '../../platform/types';
 import { clearAutosave } from '../state/autosave';
 import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
-import { describeImportError, describeImportResult, describeReimportOutcome } from './import-toasts';
+import {
+  describeImportError,
+  describeImportResult,
+  describeReimportOutcome,
+} from './import-toasts';
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
@@ -89,10 +93,7 @@ export type SaveProjectCtx = {
 // SaveTarget from the last save (no dialog, toast just says "Saved").
 // `forceDialog` = true is Save As — always prompts. New/Open clear
 // lastSaveTarget so the next save will prompt regardless.
-export async function handleSaveProject(
-  ctx: SaveProjectCtx,
-  forceDialog = false,
-): Promise<void> {
+export async function handleSaveProject(ctx: SaveProjectCtx, forceDialog = false): Promise<void> {
   const reuseTarget = !forceDialog && ctx.lastSaveTarget !== null;
   const target = reuseTarget
     ? ctx.lastSaveTarget
@@ -132,10 +133,7 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
     // Opening a real .lf2 makes any autosaved snapshot stale.
     clearAutosave();
     if (result.migratedFrom !== undefined) {
-      ctx.pushToast(
-        `Opened ${file.name} — migrated from schema v${result.migratedFrom}`,
-        'info',
-      );
+      ctx.pushToast(`Opened ${file.name} — migrated from schema v${result.migratedFrom}`, 'info');
     } else {
       ctx.pushToast(`Opened ${file.name}`, 'success');
     }

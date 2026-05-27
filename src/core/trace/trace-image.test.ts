@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_TRACE_OPTIONS,
-  thresholdToMonochrome,
-  traceImageToSvgString,
-} from './trace-image';
+import { DEFAULT_TRACE_OPTIONS, thresholdToMonochrome, traceImageToSvgString } from './trace-image';
 
 type Fixture = {
   readonly width: number;
@@ -159,17 +155,26 @@ describe('traceImageToSvgString', () => {
     // 180 (light gray), 255 (white). With threshold 128, the first
     // two become black, the last two become white.
     const data = new Uint8ClampedArray([
-      0, 0, 0, 255, // black
-      100, 100, 100, 255, // dark gray — below threshold
-      180, 180, 180, 255, // light gray — above threshold
-      255, 255, 255, 255, // white
+      0,
+      0,
+      0,
+      255, // black
+      100,
+      100,
+      100,
+      255, // dark gray — below threshold
+      180,
+      180,
+      180,
+      255, // light gray — above threshold
+      255,
+      255,
+      255,
+      255, // white
     ]);
     const result = thresholdToMonochrome({ width: 4, height: 1, data }, 128);
     expect(Array.from(result.data)).toEqual([
-      0, 0, 0, 255,
-      0, 0, 0, 255,
-      255, 255, 255, 255,
-      255, 255, 255, 255,
+      0, 0, 0, 255, 0, 0, 0, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     ]);
   });
 
@@ -195,8 +200,10 @@ describe('traceImageToSvgString', () => {
         const dy = y - 16;
         const distToCenter = Math.max(Math.abs(dx), Math.abs(dy));
         let v: number;
-        if (distToCenter < 5) v = 0; // pure black square center
-        else if (distToCenter > 8) v = 255; // pure white outside
+        if (distToCenter < 5)
+          v = 0; // pure black square center
+        else if (distToCenter > 8)
+          v = 255; // pure white outside
         else v = 128; // AA gray on the border ring
         const i = (y * W + x) * 4;
         data[i] = v;

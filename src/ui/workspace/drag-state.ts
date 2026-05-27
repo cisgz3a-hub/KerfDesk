@@ -5,7 +5,13 @@
 // owns the React state + listeners, the helpers here are testable
 // without rendering.
 
-import { hitTest, type Project, type SceneObject, type Transform, type Vec2 } from '../../core/scene';
+import {
+  hitTest,
+  type Project,
+  type SceneObject,
+  type Transform,
+  type Vec2,
+} from '../../core/scene';
 import { useUiStore } from '../state/ui-store';
 import { type HandleKind, hitHandle, scaleObjectByHandleDrag } from './handles';
 import { hitRotateHandle, rotateObjectByDrag } from './rotate-handle';
@@ -120,8 +126,8 @@ export function panOffsetForDrag(args: {
     args.project.device.bedHeight,
     args.viewState,
   );
-  const dxMm = ((args.e.clientX - args.drag.startClientX) / cssScale) / view.scale;
-  const dyMm = ((args.e.clientY - args.drag.startClientY) / cssScale) / view.scale;
+  const dxMm = (args.e.clientX - args.drag.startClientX) / cssScale / view.scale;
+  const dyMm = (args.e.clientY - args.drag.startClientY) / cssScale / view.scale;
   return { panX: args.drag.startPanX + dxMm, panY: args.drag.startPanY + dyMm };
 }
 

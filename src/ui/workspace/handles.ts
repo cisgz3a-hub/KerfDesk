@@ -66,11 +66,7 @@ export function hitHandle(object: SceneObject, point: Vec2, pxToMm: number): Han
 // When `fromCenter` is true (alt-drag) the anchor is the bbox center —
 // scaling pulls both halves outward / inward symmetrically. For edge
 // handles, the anchor mirrors the axis we're not scaling.
-function anchorPoint(
-  object: SceneObject,
-  dragging: HandleKind,
-  fromCenter: boolean,
-): Vec2 {
+function anchorPoint(object: SceneObject, dragging: HandleKind, fromCenter: boolean): Vec2 {
   const bbox = transformedBBox(object);
   if (fromCenter) {
     return { x: (bbox.minX + bbox.maxX) / 2, y: (bbox.minY + bbox.maxY) / 2 };
@@ -173,10 +169,7 @@ function constrainByEdgeKind(
   return { factorX, factorY };
 }
 
-function applyLockAspect(
-  factorX: number,
-  factorY: number,
-): { factorX: number; factorY: number } {
+function applyLockAspect(factorX: number, factorY: number): { factorX: number; factorY: number } {
   const u = Math.min(Math.abs(factorX), Math.abs(factorY));
   return {
     factorX: Math.sign(factorX || 1) * u,

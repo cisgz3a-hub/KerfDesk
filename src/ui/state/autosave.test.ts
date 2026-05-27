@@ -1,11 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createProject } from '../../core/scene';
-import {
-  clearAutosave,
-  readAutosave,
-  startAutosaveLoop,
-  writeAutosave,
-} from './autosave';
+import { clearAutosave, readAutosave, startAutosaveLoop, writeAutosave } from './autosave';
 
 const KEY = 'lf2:autosave:v1';
 
@@ -72,10 +67,7 @@ describe('startAutosaveLoop', () => {
 
   it('writes when dirty and not streaming, on each interval tick', () => {
     const project = createProject();
-    const stop = startAutosaveLoop(
-      () => ({ project, dirty: true, isStreaming: false }),
-      100,
-    );
+    const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: false }), 100);
     expect(readAutosave()).toBeNull(); // no tick yet
     vi.advanceTimersByTime(100);
     expect(readAutosave()).not.toBeNull();
@@ -84,10 +76,7 @@ describe('startAutosaveLoop', () => {
 
   it('skips writes when the project is not dirty', () => {
     const project = createProject();
-    const stop = startAutosaveLoop(
-      () => ({ project, dirty: false, isStreaming: false }),
-      100,
-    );
+    const stop = startAutosaveLoop(() => ({ project, dirty: false, isStreaming: false }), 100);
     vi.advanceTimersByTime(500);
     expect(readAutosave()).toBeNull();
     stop();
@@ -95,10 +84,7 @@ describe('startAutosaveLoop', () => {
 
   it('skips writes during streaming (do not perturb the render loop)', () => {
     const project = createProject();
-    const stop = startAutosaveLoop(
-      () => ({ project, dirty: true, isStreaming: true }),
-      100,
-    );
+    const stop = startAutosaveLoop(() => ({ project, dirty: true, isStreaming: true }), 100);
     vi.advanceTimersByTime(500);
     expect(readAutosave()).toBeNull();
     stop();
@@ -107,10 +93,7 @@ describe('startAutosaveLoop', () => {
   it('stop function cancels future writes', () => {
     let dirty = true;
     const project = createProject();
-    const stop = startAutosaveLoop(
-      () => ({ project, dirty, isStreaming: false }),
-      100,
-    );
+    const stop = startAutosaveLoop(() => ({ project, dirty, isStreaming: false }), 100);
     vi.advanceTimersByTime(100);
     expect(readAutosave()).not.toBeNull();
     clearAutosave();

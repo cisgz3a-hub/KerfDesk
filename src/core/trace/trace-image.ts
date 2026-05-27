@@ -160,10 +160,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
 // Internal type for the imagetracer module surface we use. Keeps
 // the `as` cast contained to one place.
 type ImageTracerModule = {
-  readonly imagedataToSVG: (
-    imgd: RawImageData,
-    options?: Record<string, unknown>,
-  ) => string;
+  readonly imagedataToSVG: (imgd: RawImageData, options?: Record<string, unknown>) => string;
 };
 
 export function traceImageToSvgString(
@@ -209,10 +206,7 @@ export function traceImageToSvgString(
 //
 // Allocates a fresh Uint8ClampedArray rather than mutating in place
 // so callers don't see their input change. Pure function.
-export function thresholdToMonochrome(
-  image: RawImageData,
-  threshold: number,
-): RawImageData {
+export function thresholdToMonochrome(image: RawImageData, threshold: number): RawImageData {
   const data = new Uint8ClampedArray(image.data.length);
   const cutoff = Math.max(0, Math.min(255, threshold));
   for (let i = 0; i < image.data.length; i += 4) {

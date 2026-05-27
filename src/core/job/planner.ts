@@ -61,7 +61,8 @@ export function estimateWithPlanner(job: Job, device: DeviceProfile): PlannedDur
   const jd = Math.max(0, device.junctionDeviationMm);
   const travelV = Math.max(1, device.maxFeed) / SECONDS_PER_MINUTE;
   const blocks = buildBlocks(job, device, travelV);
-  if (blocks.length === 0) return { totalSeconds: 0, breakdown: { cutSeconds: 0, travelSeconds: 0 } };
+  if (blocks.length === 0)
+    return { totalSeconds: 0, breakdown: { cutSeconds: 0, travelSeconds: 0 } };
   const plan = planVelocities(blocks, accel, jd);
   let cutSeconds = 0;
   let travelSeconds = 0;
@@ -121,11 +122,7 @@ type PlanEntry = { entryV: number; exitV: number };
 // Two-pass lookahead. Sets entry/exit velocities per block such that
 // physics holds (accel/decel reachable) AND cornering doesn't exceed
 // junction-deviation limits.
-function planVelocities(
-  blocks: ReadonlyArray<Block>,
-  accel: number,
-  jd: number,
-): PlanEntry[] {
+function planVelocities(blocks: ReadonlyArray<Block>, accel: number, jd: number): PlanEntry[] {
   const plan: PlanEntry[] = blocks.map(() => ({ entryV: 0, exitV: 0 }));
   capJunctionEntries(blocks, plan, accel, jd);
   backwardPass(blocks, plan, accel);
@@ -203,12 +200,7 @@ export function junctionVelocity(prev: Block, next: Block, accel: number, jd: nu
 
 // Generalized trapezoidal time from v_entry through optional v_peak
 // to v_exit over a given distance, capped at v_target.
-export function blockTime(
-  block: Block,
-  entryV: number,
-  exitV: number,
-  accel: number,
-): number {
+export function blockTime(block: Block, entryV: number, exitV: number, accel: number): number {
   const d = block.distance;
   if (d <= 0) return 0;
   const vTarget = block.targetVelocity;

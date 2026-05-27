@@ -16,12 +16,15 @@ const robotoBuffer = readFileSync(robotoPath).buffer.slice(0) as ArrayBuffer;
 const dancingPath = resolve(__dirname, '../../ui/text/fonts/DancingScript-Regular.ttf');
 const dancingBuffer = readFileSync(dancingPath).buffer.slice(0) as ArrayBuffer;
 
-function render(content: string, overrides: Partial<{
-  sizeMm: number;
-  alignment: 'left' | 'center' | 'right';
-  lineHeight: number;
-  color: string;
-}> = {}) {
+function render(
+  content: string,
+  overrides: Partial<{
+    sizeMm: number;
+    alignment: 'left' | 'center' | 'right';
+    lineHeight: number;
+    color: string;
+  }> = {},
+) {
   return textToPolylines({
     fontBuffer: robotoBuffer,
     content,

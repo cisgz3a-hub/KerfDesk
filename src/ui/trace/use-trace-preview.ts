@@ -12,11 +12,7 @@
 //      defense-in-depth even though imagetracerjs's output is trusted
 
 import { useEffect, useRef, useState } from 'react';
-import {
-  type RawImageData,
-  type TraceOptions,
-  traceImageToSvgString,
-} from '../../core/trace';
+import { type RawImageData, type TraceOptions, traceImageToSvgString } from '../../core/trace';
 import { sanitizeSvg } from '../../io/svg/sanitize';
 import { loadImageAsRawData, PREVIEW_MAX_EDGE_PX } from './image-loader';
 
@@ -37,10 +33,7 @@ export type TracePreviewState =
 // that a normal click feels instant.
 const DEBOUNCE_MS = 300;
 
-export function useTracePreview(
-  file: File | null,
-  options: TraceOptions,
-): TracePreviewState {
+export function useTracePreview(file: File | null, options: TraceOptions): TracePreviewState {
   const [state, setState] = useState<TracePreviewState>({ kind: 'idle' });
   const decodedRef = useRef<RawImageData | null>(null);
   // Monotonic token. Each effect run captures its token; on completion

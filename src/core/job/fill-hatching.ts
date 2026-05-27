@@ -70,10 +70,7 @@ export function fillHatching(input: HatchInput): ReadonlyArray<Polyline> {
   // Counting via `Math.round((maxY - yStart) / spacing) + 1` gives the
   // same scanline count for two polygons that span the same height,
   // independent of rotation angle.
-  const scanCount = Math.max(
-    0,
-    Math.floor((yBounds.maxY - yStart) / spacing + SCANLINE_EPS) + 1,
-  );
+  const scanCount = Math.max(0, Math.floor((yBounds.maxY - yStart) / spacing + SCANLINE_EPS) + 1);
   for (let scanIndex = 0; scanIndex < scanCount; scanIndex += 1) {
     const y = yStart + scanIndex * spacing;
     const intersections = collectIntersectionsAtY(rotated, y);
@@ -158,10 +155,7 @@ function polylineYBounds(
 // edges (p.y === q.y) contribute nothing — the scanline would either
 // miss or overlap entirely, which the half-open rule handles by giving
 // zero intersections in both cases.
-function collectIntersectionsAtY(
-  polylines: ReadonlyArray<Polyline>,
-  y: number,
-): number[] {
+function collectIntersectionsAtY(polylines: ReadonlyArray<Polyline>, y: number): number[] {
   const out: number[] = [];
   for (const pl of polylines) {
     pushIntersectionsForPolyline(pl, y, out);

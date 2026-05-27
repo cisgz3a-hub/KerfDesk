@@ -18,12 +18,7 @@
 
 import { useEffect } from 'react';
 import { useStore } from '../state';
-import {
-  clearAutosave,
-  readAutosave,
-  startAutosaveLoop,
-  writeAutosave,
-} from '../state/autosave';
+import { clearAutosave, readAutosave, startAutosaveLoop, writeAutosave } from '../state/autosave';
 import { useLaserStore } from '../state/laser-store';
 
 function snapshotForAutosave(): {

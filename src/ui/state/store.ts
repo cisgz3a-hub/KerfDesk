@@ -368,8 +368,7 @@ function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | 'markLoa
     // drop any save target — the next Ctrl+S re-prompts (we'd need to keep
     // the FileSystemFileHandle / Electron path to write through without a
     // dialog, which is Phase C autosave-territory).
-    markLoaded: (filename) =>
-      set({ dirty: false, savedName: filename, lastSaveTarget: null }),
+    markLoaded: (filename) => set({ dirty: false, savedName: filename, lastSaveTarget: null }),
   };
 }
 

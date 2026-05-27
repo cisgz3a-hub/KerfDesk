@@ -162,10 +162,7 @@ function pushLinePolylines(
 // or per disjoint segment. De Casteljau sampling for curves — same
 // approach as src/io/svg/flatten-curves.ts (kept self-contained here
 // rather than reaching across module boundaries).
-function flattenPath(
-  commands: ReadonlyArray<opentype.PathCommand>,
-  out: Polyline[],
-): void {
+function flattenPath(commands: ReadonlyArray<opentype.PathCommand>, out: Polyline[]): void {
   let current: Vec2[] = [];
   let startPoint: Vec2 | null = null;
   const finish = (close: boolean): void => {
@@ -237,4 +234,3 @@ function bezierQuadratic(p0: number, p1: number, p2: number, t: number): number 
   const u = 1 - t;
   return u * u * p0 + 2 * u * t * p1 + t * t * p2;
 }
-
