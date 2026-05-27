@@ -8,6 +8,14 @@ import { textToPolylines } from './text-to-polylines';
 const robotoPath = resolve(__dirname, '../../ui/text/fonts/Roboto-Regular.ttf');
 const robotoBuffer = readFileSync(robotoPath).buffer.slice(0) as ArrayBuffer;
 
+// Variable-font smoke check — Dancing Script ships as a variable
+// `[wght]` TTF. opentype.js 2.0 supports VF for default-instance
+// rendering, but a corrupted download (e.g., GitHub error HTML
+// disguised as .ttf) makes opentype throw "unsupported OpenType
+// signature". This test catches that regression.
+const dancingPath = resolve(__dirname, '../../ui/text/fonts/DancingScript-Regular.ttf');
+const dancingBuffer = readFileSync(dancingPath).buffer.slice(0) as ArrayBuffer;
+
 function render(content: string, overrides: Partial<{
   sizeMm: number;
   alignment: 'left' | 'center' | 'right';
@@ -101,6 +109,23 @@ describe('textToPolylines', () => {
     const h = r.bounds.maxY - r.bounds.minY;
     expect(h).toBeGreaterThan(50);
     expect(h).toBeLessThan(110);
+  });
+
+  it('parses Dancing Script (variable font) and produces drawable polylines', () => {
+    // Regression for the github-error-html-as-ttf bug: an invalid
+    // font binary throws "unsupported OpenType signature" inside
+    // opentype.parse. Verify the bundled DancingScript-Regular.ttf
+    // is a real font and renders.
+    const r = textToPolylines({
+      fontBuffer: dancingBuffer,
+      content: 'Aa',
+      sizeMm: 20,
+      alignment: 'left',
+      lineHeight: 1.4,
+      color: '#000000',
+    });
+    expect(r.paths[0]?.polylines.length).toBeGreaterThan(0);
+    expect(r.bounds.maxX - r.bounds.minX).toBeGreaterThan(0);
   });
 });
 

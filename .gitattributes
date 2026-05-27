@@ -1,0 +1,18 @@
+# Treat binary assets as binary explicitly, so git's autocrlf logic
+# never tries to "fix" line endings inside them. The previous Dancing
+# Script font failed to parse because the download was an HTML error
+# page (which IS text and got CRLF-normalized) committed under a .ttf
+# name. Forcing -text on these patterns makes that class of bug
+# fail loudly at download time instead of silently corrupting the
+# binary on commit.
+*.ttf binary
+*.otf binary
+*.woff binary
+*.woff2 binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.pdf binary
+*.gcode binary
+*.lf2 binary
