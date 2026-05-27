@@ -124,6 +124,7 @@ function openTextEditForSelectedText(): void {
     sizeMm: obj.sizeMm,
     alignment: obj.alignment,
     lineHeight: obj.lineHeight,
+    letterSpacing: obj.letterSpacing,
     color: obj.color,
   });
 }

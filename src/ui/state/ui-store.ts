@@ -24,6 +24,7 @@ export type TextDialogState =
       readonly sizeMm: number;
       readonly alignment: TextAlignment;
       readonly lineHeight: number;
+      readonly letterSpacing: number;
       readonly color: string;
     };
 

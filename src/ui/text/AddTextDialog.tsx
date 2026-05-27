@@ -16,6 +16,7 @@ import { DEFAULT_FONT_KEY, FONT_REGISTRY, type KnownFontKey, textToPolylines } f
 import {
   DEFAULT_TEXT_ALIGNMENT,
   DEFAULT_TEXT_COLOR,
+  DEFAULT_TEXT_LETTER_SPACING,
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_SIZE_MM,
 } from '../../core/text';
@@ -69,6 +70,7 @@ type DialogValues = {
   sizeMm: number;
   alignment: TextAlignment;
   lineHeight: number;
+  letterSpacing: number;
 };
 
 type DialogFields = {
@@ -78,6 +80,7 @@ type DialogFields = {
   readonly setSizeMm: (v: number) => void;
   readonly setAlignment: (v: TextAlignment) => void;
   readonly setLineHeight: (v: number) => void;
+  readonly setLetterSpacing: (v: number) => void;
 };
 
 function useTextDialogFields(
@@ -96,13 +99,17 @@ function useTextDialogFields(
   const [lineHeight, setLineHeight] = useState(
     state.mode === 'edit' ? state.lineHeight : DEFAULT_TEXT_LINE_HEIGHT,
   );
+  const [letterSpacing, setLetterSpacing] = useState(
+    state.mode === 'edit' ? state.letterSpacing : DEFAULT_TEXT_LETTER_SPACING,
+  );
   return {
-    values: { content, fontKey, sizeMm, alignment, lineHeight },
+    values: { content, fontKey, sizeMm, alignment, lineHeight, letterSpacing },
     setContent,
     setFontKey,
     setSizeMm,
     setAlignment,
     setLineHeight,
+    setLetterSpacing,
   };
 }
 
@@ -129,6 +136,7 @@ async function commitText(
       sizeMm: v.sizeMm,
       alignment: v.alignment,
       lineHeight: v.lineHeight,
+      letterSpacing: v.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
     });
     const obj: TextObject = {
@@ -139,6 +147,7 @@ async function commitText(
       sizeMm: v.sizeMm,
       alignment: v.alignment,
       lineHeight: v.lineHeight,
+      letterSpacing: v.letterSpacing,
       color: state.mode === 'edit' ? state.color : DEFAULT_TEXT_COLOR,
       bounds: rendered.bounds,
       transform: IDENTITY_TRANSFORM,
@@ -157,7 +166,15 @@ async function commitText(
 }
 
 function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
-  const { values, setContent, setFontKey, setSizeMm, setAlignment, setLineHeight } = props.fields;
+  const {
+    values,
+    setContent,
+    setFontKey,
+    setSizeMm,
+    setAlignment,
+    setLineHeight,
+    setLetterSpacing,
+  } = props.fields;
   return (
     <>
       <Field label="Content">
@@ -203,6 +220,19 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
           style={numStyle}
         />
         <span style={unitStyle}>× size</span>
+      </Field>
+      <Field label="Spacing">
+        <input
+          type="number"
+          min={-0.5}
+          max={2}
+          step={0.05}
+          value={values.letterSpacing}
+          onChange={(e) => setLetterSpacing(Number(e.target.value) || 0)}
+          style={numStyle}
+          title="Letter spacing (tracking). 0 = font's natural spacing. Positive widens, negative tightens."
+        />
+        <span style={unitStyle}>× size (0 = natural)</span>
       </Field>
     </>
   );

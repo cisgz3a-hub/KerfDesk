@@ -112,6 +112,53 @@ describe('deserializeProject', () => {
     expect(result.kind).toBe('schema-too-old');
   });
 
+  it('back-fills missing letterSpacing on text objects from pre-D.1 .lf2 files', () => {
+    // D.1 added letterSpacing to TextObject. Files saved before D.1 are
+    // missing the field; normalizeSceneObject must fill it with the
+    // default (0 = natural spacing) so the renderer doesn't see NaN.
+    const oldShape = JSON.stringify({
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      device: {
+        name: 'Default',
+        bedWidth: 300,
+        bedHeight: 300,
+        maxFeed: 3000,
+        maxPowerS: 1000,
+        origin: 'front-left',
+        homing: { enabled: false, direction: 'front-left' },
+        autofocusCommand: '',
+      },
+      workspace: { width: 300, height: 300, units: 'mm' },
+      scene: {
+        objects: [
+          {
+            kind: 'text',
+            id: 'T1',
+            content: 'Hello',
+            fontKey: 'roboto',
+            sizeMm: 10,
+            alignment: 'left',
+            lineHeight: 1.4,
+            color: '#000000',
+            bounds: { minX: 0, minY: 0, maxX: 30, maxY: 10 },
+            transform: { tx: 0, ty: 0, sx: 1, sy: 1, rot: 0 },
+            paths: [],
+          },
+        ],
+        layers: [],
+      },
+    });
+    const r = deserializeProject(oldShape);
+    expect(r.kind).toBe('ok');
+    if (r.kind === 'ok') {
+      const obj = r.project.scene.objects[0];
+      expect(obj?.kind).toBe('text');
+      if (obj?.kind === 'text') {
+        expect(obj.letterSpacing).toBe(0);
+      }
+    }
+  });
+
   it('back-fills missing planner fields (accel + junctionDeviation) on old .lf2 files', () => {
     // Pre-planner .lf2 files had no accelMmPerSec2 / junctionDeviationMm
     // on the device profile. They must still deserialize cleanly — the
