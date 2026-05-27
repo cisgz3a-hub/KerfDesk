@@ -10,6 +10,14 @@ export { parseStatusReport } from './status-parser';
 export type { GrblResponse } from './response';
 export { classifyResponse } from './response';
 
+export type { SettingsCollectorState } from './parse-settings';
+export {
+  idleCollector,
+  onResponse as collectorOnResponse,
+  settingsMapToProfilePatch,
+  startCollecting,
+} from './parse-settings';
+
 export type { AckKind, AckResult, StepResult, StreamerState, StreamerStatus } from './streamer';
 export {
   DEFAULT_RX_BUFFER_BYTES,

@@ -22,16 +22,24 @@ import {
   cancel as cancelStreamer,
   classifyResponse,
   createStreamer,
+  idleCollector,
   type JogParams,
   onAck,
   pause as pauseStreamer,
   resume as resumeStreamer,
+  type SettingsCollectorState,
+  startCollecting,
   step,
   type StatusReport,
   type StreamerState,
 } from '../../core/controllers/grbl';
+import type { DeviceProfile } from '../../core/devices';
 import type { PlatformAdapter, SerialConnection } from '../../platform/types';
 import { type AutofocusResult, runAutofocus } from './autofocus-action';
+import {
+  applyDetectedSettingsPatch,
+  consumeSettingsResponse,
+} from './detected-settings-action';
 
 export type { AutofocusResult } from './autofocus-action';
 export { describeAutofocusResult } from './autofocus-action';
@@ -52,6 +60,11 @@ export type LaserState = {
   readonly lastError: number | null;
   readonly streamer: StreamerState | null;
   readonly log: ReadonlyArray<string>;
+  // F-7: settings auto-detected from the `$$` dump on connect. Non-null
+  // means "the user hasn't responded to the detection banner yet" —
+  // null after either Apply (which dispatched updateDeviceProfile) or
+  // Dismiss (which left the profile alone).
+  readonly detectedSettings: Partial<DeviceProfile> | null;
 
   readonly connect: (adapter: PlatformAdapter) => Promise<void>;
   readonly disconnect: () => Promise<void>;
@@ -73,6 +86,8 @@ export type LaserState = {
   readonly pauseJob: () => void;
   readonly resumeJob: () => Promise<void>;
   readonly stopJob: () => Promise<void>;
+  readonly applyDetectedSettings: () => void;
+  readonly dismissDetectedSettings: () => void;
 };
 
 // Live state held outside Zustand. The connection / pollHandle references are
@@ -83,6 +98,11 @@ type LiveRefs = {
   unsubscribeLine: (() => void) | null;
   unsubscribeClose: (() => void) | null;
   pollHandle: ReturnType<typeof setInterval> | null;
+  // F-7: pure state machine collecting the `$$` settings dump. Kept
+  // out of the React-observable state because every interim setting
+  // line would otherwise re-render Laser components for no reason —
+  // only the final `done` patch matters to the UI.
+  settingsCollector: SettingsCollectorState;
 };
 
 const refs: LiveRefs = {
@@ -90,6 +110,7 @@ const refs: LiveRefs = {
   unsubscribeLine: null,
   unsubscribeClose: null,
   pollHandle: null,
+  settingsCollector: idleCollector(),
 };
 
 const LOG_MAX = 200;
@@ -106,6 +127,7 @@ function teardown(): void {
   refs.unsubscribeLine = null;
   refs.unsubscribeClose = null;
   refs.pollHandle = null;
+  refs.settingsCollector = idleCollector();
 }
 
 async function safeWrite(line: string): Promise<void> {
@@ -125,7 +147,13 @@ type GetFn = () => LaserState;
 
 function initialLaserState(): Pick<
   LaserState,
-  'connection' | 'statusReport' | 'alarmCode' | 'lastError' | 'streamer' | 'log'
+  | 'connection'
+  | 'statusReport'
+  | 'alarmCode'
+  | 'lastError'
+  | 'streamer'
+  | 'log'
+  | 'detectedSettings'
 > {
   return {
     connection: { kind: 'disconnected' },
@@ -134,6 +162,7 @@ function initialLaserState(): Pick<
     lastError: null,
     streamer: null,
     log: [],
+    detectedSettings: null,
   };
 }
 
@@ -254,11 +283,29 @@ function jobActions(
   };
 }
 
+function detectedSettingsActions(
+  set: SetFn,
+  get: GetFn,
+): Pick<LaserState, 'applyDetectedSettings' | 'dismissDetectedSettings'> {
+  return {
+    applyDetectedSettings: () => {
+      const patch = get().detectedSettings;
+      if (!applyDetectedSettingsPatch(patch)) return;
+      set({
+        detectedSettings: null,
+        log: pushLog(get(), '[lf2] Applied detected machine settings to device profile.'),
+      });
+    },
+    dismissDetectedSettings: () => set({ detectedSettings: null }),
+  };
+}
+
 export const useLaserStore = create<LaserState>((set, get) => ({
   ...initialLaserState(),
   ...connectionActions(set, get),
   ...jogActions(set, get),
   ...jobActions(set, get),
+  ...detectedSettingsActions(set, get),
 }));
 
 // Validates the connection by waiting up to HANDSHAKE_TIMEOUT_MS for *any*
@@ -286,7 +333,14 @@ async function runHandshake(set: SetFn, get: GetFn): Promise<void> {
     return;
   }
   // Got a reply — query settings so the operator can see $30, $32, etc.
-  set({ log: pushLog(get(), '[lf2] Connected. Querying settings ($$)…') });
+  // Reset detectedSettings + arm the collector first so handleLine can
+  // build up the patch as setting lines stream in. The collector closes
+  // on the trailing `ok` that GRBL emits at the end of $$.
+  set({
+    log: pushLog(get(), '[lf2] Connected. Querying settings ($$)…'),
+    detectedSettings: null,
+  });
+  refs.settingsCollector = startCollecting();
   await safeWrite(`${CMD_SETTINGS}\n`);
 }
 
@@ -298,6 +352,10 @@ function handleLine(
   const cls = classifyResponse(line);
   // Always log the raw line for the user-visible console. Truncated above.
   set({ log: pushLog(get(), line) });
+  // F-7: feed every classified response to the settings collector.
+  // Returns a patch only when the `$$` response window just closed.
+  const patch = consumeSettingsResponse(refs, cls);
+  if (patch !== null) set({ detectedSettings: patch });
   if (cls.kind === 'status') {
     set({ statusReport: cls.report });
     return;

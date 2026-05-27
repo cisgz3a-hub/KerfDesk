@@ -1,0 +1,137 @@
+import { describe, expect, it } from 'vitest';
+import { classifyResponse } from './response';
+import {
+  idleCollector,
+  onResponse,
+  settingsMapToProfilePatch,
+  startCollecting,
+} from './parse-settings';
+
+// Realistic settings dump from a Creality Falcon A1 Pro (GrblHAL 1.1f).
+// Trimmed to the lines our collector actually reads, plus a stray $32 to
+// confirm we ignore unknown settings cleanly.
+const FALCON_DUMP = [
+  '$11=0.010',
+  '$30=1000',
+  '$32=1',
+  '$110=10000.000',
+  '$111=10000.000',
+  '$120=2500.000',
+  '$121=2500.000',
+  '$130=400.000',
+  '$131=400.000',
+];
+
+describe('settingsMapToProfilePatch', () => {
+  it('maps a complete Falcon-like dump to a full DeviceProfile patch', () => {
+    const map = new Map<number, string>([
+      [11, '0.010'],
+      [30, '1000'],
+      [110, '10000.000'],
+      [111, '10000.000'],
+      [120, '2500.000'],
+      [121, '2500.000'],
+      [130, '400.000'],
+      [131, '400.000'],
+    ]);
+    const patch = settingsMapToProfilePatch(map);
+    expect(patch.junctionDeviationMm).toBe(0.01);
+    expect(patch.maxPowerS).toBe(1000);
+    expect(patch.maxFeed).toBe(10000);
+    expect(patch.accelMmPerSec2).toBe(2500);
+    expect(patch.bedWidth).toBe(400);
+    expect(patch.bedHeight).toBe(400);
+  });
+
+  it('takes the max of $110/$111 for maxFeed (vector reach)', () => {
+    const map = new Map([
+      [110, '3000'],
+      [111, '5000'],
+    ]);
+    expect(settingsMapToProfilePatch(map).maxFeed).toBe(5000);
+  });
+
+  it('takes the min of $120/$121 for accel (slowest axis bounds the planner)', () => {
+    const map = new Map([
+      [120, '1000'],
+      [121, '500'],
+    ]);
+    expect(settingsMapToProfilePatch(map).accelMmPerSec2).toBe(500);
+  });
+
+  it('omits a field when only one of its axes parsed', () => {
+    // Asymmetric machines or partial dumps: one axis present, one missing.
+    // We still produce a value from the single axis rather than dropping
+    // the field — better one estimate than none.
+    const map = new Map([[110, '4000']]);
+    expect(settingsMapToProfilePatch(map).maxFeed).toBe(4000);
+  });
+
+  it('returns an empty patch when no recognized settings parse', () => {
+    expect(settingsMapToProfilePatch(new Map())).toEqual({});
+    expect(
+      settingsMapToProfilePatch(
+        new Map([
+          [22, '1'],
+          [32, '1'],
+        ]),
+      ),
+    ).toEqual({});
+  });
+
+  it('rejects non-numeric or non-positive values rather than poisoning the profile', () => {
+    // A machine reporting $130=0 (no homing, no max travel) shouldn't
+    // collapse the bed to zero — drop the field instead.
+    expect(settingsMapToProfilePatch(new Map([[130, '0']]))).toEqual({});
+    expect(settingsMapToProfilePatch(new Map([[120, '-5']]))).toEqual({});
+    expect(settingsMapToProfilePatch(new Map([[11, 'abc']]))).toEqual({});
+  });
+});
+
+describe('SettingsCollector state machine', () => {
+  it('idle ignores all responses', () => {
+    let state = idleCollector();
+    for (const line of FALCON_DUMP) {
+      state = onResponse(state, classifyResponse(line));
+    }
+    state = onResponse(state, classifyResponse('ok'));
+    expect(state.kind).toBe('idle');
+  });
+
+  it('collecting accumulates settings and transitions to done on the trailing ok', () => {
+    let state: ReturnType<typeof startCollecting> | ReturnType<typeof onResponse> = startCollecting();
+    for (const line of FALCON_DUMP) {
+      state = onResponse(state, classifyResponse(line));
+    }
+    expect(state.kind).toBe('collecting');
+    state = onResponse(state, classifyResponse('ok'));
+    expect(state.kind).toBe('done');
+    if (state.kind === 'done') {
+      expect(state.patch.bedWidth).toBe(400);
+      expect(state.patch.accelMmPerSec2).toBe(2500);
+    }
+  });
+
+  it('ignores a pre-collection ok (e.g., handshake ack arriving before any setting)', () => {
+    // Bug guard: an `ok` that lands while map is empty must NOT close the
+    // window early. Real GRBL boards send a welcome banner on connect, and
+    // a status-poll reply could interleave with the $$ response.
+    let state = startCollecting();
+    state = onResponse(state, classifyResponse('ok'));
+    expect(state.kind).toBe('collecting');
+  });
+
+  it('treats `[MSG:...]` and status reports as no-ops', () => {
+    // Status polls (`?` → `<Idle|...>`) and bracketed messages can arrive
+    // while $$ is streaming. The collector must pass them through without
+    // disrupting the in-progress map.
+    let state = startCollecting();
+    state = onResponse(state, classifyResponse('$30=1000'));
+    state = onResponse(state, classifyResponse('<Idle|MPos:0,0,0|FS:0,0>'));
+    state = onResponse(state, classifyResponse('[MSG:Pgm End]'));
+    expect(state.kind).toBe('collecting');
+    state = onResponse(state, classifyResponse('ok'));
+    expect(state.kind).toBe('done');
+    if (state.kind === 'done') expect(state.patch.maxPowerS).toBe(1000);
+  });
+});

@@ -7,6 +7,7 @@ import { usePlatform } from '../app/platform-context';
 import { useStore } from '../state';
 import { useLaserStore } from '../state/laser-store';
 import { ConnectionBar } from './ConnectionBar';
+import { DetectedSettingsBanner } from './DetectedSettingsBanner';
 import { DeviceSettings } from './DeviceSettings';
 import { LaserLog } from './LaserLog';
 import { StatusDisplay } from './StatusDisplay';
@@ -51,6 +52,7 @@ export function LaserWindow(): JSX.Element {
         disabled={!supportsSerial}
       />
       {alarmCode !== null && <AlarmBanner code={alarmCode} onUnlock={() => void unlockAlarm()} />}
+      <DetectedSettingsBanner />
       <StatusDisplay />
       <JogPad disabled={connection.kind !== 'connected'} />
       <JobControls
