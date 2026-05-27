@@ -25,6 +25,7 @@ import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { loadFont } from './font-loader';
+import { FontPicker } from './FontPicker';
 
 export function AddTextDialog(): JSX.Element | null {
   const state = useUiStore((s) => s.textDialog);
@@ -187,13 +188,7 @@ function FormFields(props: { readonly fields: DialogFields }): JSX.Element {
         />
       </Field>
       <Field label="Font">
-        <select value={values.fontKey} onChange={(e) => setFontKey(e.target.value)} style={selectStyle}>
-          {FONT_REGISTRY.map((f) => (
-            <option key={f.key} value={f.key}>
-              {f.displayName} ({f.styleClass})
-            </option>
-          ))}
-        </select>
+        <FontPicker value={values.fontKey} onChange={setFontKey} />
       </Field>
       <Field label="Size">
         <input
@@ -332,7 +327,6 @@ const textareaStyle: React.CSSProperties = {
   fontSize: 13,
   resize: 'vertical',
 };
-const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
 const numStyle: React.CSSProperties = { width: 80 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
 const alignmentStyle: React.CSSProperties = { display: 'flex', gap: 12 };

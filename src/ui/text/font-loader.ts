@@ -42,3 +42,37 @@ export async function loadFont(key: KnownFontKey): Promise<ArrayBuffer> {
 export function getCachedFont(key: KnownFontKey): ArrayBuffer | null {
   return cache.get(key) ?? null;
 }
+
+// CSS family name used by the font preview picker. Each bundled .ttf
+// is registered as a FontFace under this family so the picker (and
+// any other UI that wants to preview text) can use a regular CSS
+// `font-family` rather than rasterizing the glyphs by hand.
+export function cssFamilyForFont(key: KnownFontKey): string {
+  return `lf2-${key}`;
+}
+
+// Tracks which font keys have already been added to document.fonts.
+// FontFace.load() is idempotent but adding the same FontFace twice
+// would still leak — keep one entry per key.
+const cssRegistered = new Set<KnownFontKey>();
+
+// Register a bundled .ttf with the browser's font system so CSS
+// `font-family: lf2-<key>` works. Pulls from the same in-memory
+// cache as opentype-side loading so we never fetch a font twice.
+// Resolves once the FontFace is fully loaded and ready for layout;
+// rejects if the file can't be parsed as a font.
+export async function ensureFontCss(key: KnownFontKey): Promise<void> {
+  if (cssRegistered.has(key)) return;
+  if (typeof document === 'undefined' || typeof FontFace === 'undefined') {
+    // Non-browser / test env — nothing to register. Calls become
+    // no-ops so the picker still functions (with system fallback).
+    return;
+  }
+  const buf = await loadFont(key);
+  // FontFace accepts the raw ArrayBuffer / BufferSource directly,
+  // avoiding a second network fetch on top of `loadFont`.
+  const face = new FontFace(cssFamilyForFont(key), buf);
+  await face.load();
+  document.fonts.add(face);
+  cssRegistered.add(key);
+}
