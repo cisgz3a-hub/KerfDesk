@@ -1,15 +1,20 @@
 name: Deploy to Cloudflare Pages
 
-# Runs on every push to main AFTER the CI workflow has had a chance.
+# Runs AFTER the CI workflow succeeds on main (R-H5 audit fix —
+# previously deploy ran in parallel with CI, so a commit that broke
+# tests / lint but built cleanly would publish). Manual trigger from
+# the Actions tab still works for re-deploys without a new commit
+# (e.g. after editing _headers).
+#
 # Cloudflare Pages serves a "Preview" environment per branch by default;
 # we force --branch=master to hit the production URL (the legacy repo
-# was created with master as the production branch). See ADR/note in
+# was created with master as the production branch). See note in
 # package.json's deploy:web script.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
-  # Manual trigger from the Actions tab — useful for re-deploys
-  # without a new commit (e.g., after editing _headers).
   workflow_dispatch:
 
 # Cancel a queued deploy if a newer commit lands while one is running.
@@ -28,15 +33,10 @@ jobs:
   deploy:
     name: Build + deploy web bundle
     runs-on: ubuntu-latest
-    # Don't deploy if CI failed. The ci.yml workflow has its own gates
-    # (typecheck, lint, test, license, build, file-size); reusing them
-    # as a precondition keeps a red build from publishing.
-    needs: [] # No needs — Cloudflare Pages keeps the last green deploy
-      # live if this one errors. Skipping needs means CI and
-      # deploy run in parallel; deploys for a CI-broken commit
-      # still publish if the *build* step itself works. If you
-      # want stricter gating, add `needs: [ci]` after both
-      # workflows live on the same trigger.
+    # workflow_run fires for EVERY CI completion (success + failure).
+    # The condition below gates on the success path; manual dispatches
+    # also pass (they have no workflow_run to inspect).
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4

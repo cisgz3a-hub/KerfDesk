@@ -44,7 +44,13 @@ export default defineConfig({
   build: {
     outDir: 'dist/web',
     target: 'es2022',
-    sourcemap: true,
+    // No sourcemaps in production builds. The repo is proprietary
+    // (ADR-018) and the production URL is public — shipping the
+    // .js.map would expose the full TS source incl. planning
+    // comments and vendor-quirk notes (R-H3 audit finding). When a
+    // Sentry-class error tracker lands, switch to `'hidden'` and
+    // upload the maps server-side.
+    sourcemap: false,
     // Web bundle target per PROJECT.md "Accessibility / performance": < 1 MB
     // compressed. Warn if a chunk pushes past 500 KB compressed.
     chunkSizeWarningLimit: 500,

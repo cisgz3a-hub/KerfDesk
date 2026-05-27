@@ -37,14 +37,26 @@ export function useDebouncedCommit<T>(args: UseDebouncedCommitArgs<T>): Debounce
     debouncerRef.current = createDebouncer<T>({ initial: value, debounceMs, commit });
   }
 
+  // Mirror callbacks + draft via refs so the reconcile-effect below can
+  // depend only on `value` (the deliberate trigger) without the
+  // exhaustive-deps rule flagging the closure-captures as missing
+  // deps. Adding draft/parse/format to the dep array would re-fire the
+  // effect on every keystroke and wipe the user's input.
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const parseRef = useRef(parse);
+  parseRef.current = parse;
+  const formatRef = useRef(format);
+  formatRef.current = format;
+
   // Reconcile when the store changes the canonical value out from under us
   // (e.g. undo / external setLayerParam from a different surface). We only
   // overwrite the local draft when the parsed draft doesn't already match —
   // otherwise the user's in-flight typing would be wiped mid-keystroke.
   useEffect(() => {
     debouncerRef.current?.acknowledge(value);
-    if (parse(draft) !== value) {
-      setDraft(format(value));
+    if (parseRef.current(draftRef.current) !== value) {
+      setDraft(formatRef.current(value));
     }
   }, [value]);
 
