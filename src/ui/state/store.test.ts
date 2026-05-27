@@ -98,6 +98,32 @@ describe('useStore', () => {
     expect(useStore.getState().selectedObjectId).toBeNull();
   });
 
+  it('removeSceneObject prunes orphan layers — last consumer of a color leaves no row behind', () => {
+    // Phase E.1 fix: deleting the only object using a color should
+    // also drop the auto-created layer for that color. Before this
+    // fix the Cuts/Layers panel kept stale rows with the previous
+    // power/speed/passes for the deleted object's color.
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    expect(useStore.getState().project.scene.layers).toHaveLength(2);
+    useStore.getState().removeSceneObject('O1');
+    expect(useStore.getState().project.scene.layers).toHaveLength(0);
+  });
+
+  it('removeSceneObject keeps layers still used by other objects', () => {
+    // Two objects share '#ff0000'. Deleting one must NOT drop the
+    // red layer; the other object still uses it.
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#ff0000', '#00ff00']));
+    expect(useStore.getState().project.scene.layers).toHaveLength(2);
+    useStore.getState().removeSceneObject('O1');
+    const layerColors = useStore
+      .getState()
+      .project.scene.layers.map((l) => l.color)
+      .sort();
+    // Red stays (O2 uses it), green stays (O2 uses it). Two layers total.
+    expect(layerColors).toEqual(['#00ff00', '#ff0000']);
+  });
+
   it('setLayerParam patches the matching layer', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { power: 75 });

@@ -85,6 +85,23 @@ export function ensureLayersForColors(
   return out;
 }
 
+// Drop layers whose color isn't referenced by any remaining object.
+// Called after removeSceneObject so the Cuts/Layers panel doesn't
+// stay polluted with stale per-color settings. Only object kinds
+// that own `paths` count as consumers (imported-svg, text,
+// traced-image). Match the same kinds compileJob walks.
+export function pruneOrphanLayers(scene: Scene): Scene {
+  const usedColors = new Set<string>();
+  for (const obj of scene.objects) {
+    if (obj.kind === 'imported-svg' || obj.kind === 'text' || obj.kind === 'traced-image') {
+      for (const p of obj.paths) usedColors.add(p.color);
+    }
+  }
+  const kept = scene.layers.filter((l) => usedColors.has(l.color));
+  if (kept.length === scene.layers.length) return scene;
+  return { ...scene, layers: kept };
+}
+
 export function applyFreshImport(
   s: StateSlice,
   object: SceneObject,

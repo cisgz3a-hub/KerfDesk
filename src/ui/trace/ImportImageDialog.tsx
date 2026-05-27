@@ -21,6 +21,7 @@ import { useState } from 'react';
 import { IDENTITY_TRANSFORM, type TracedImage } from '../../core/scene';
 import {
   DEFAULT_TRACE_OPTIONS,
+  TRACE_PRESETS,
   type TraceOptions,
   traceImageToSvgString,
 } from '../../core/trace';
@@ -41,9 +42,9 @@ function DialogBody(): JSX.Element {
   const importSvgObject = useStore((s) => s.importSvgObject);
   const pushToast = useToastStore((s) => s.pushToast);
   const [file, setFile] = useState<File | null>(null);
-  const [colors, setColors] = useState(DEFAULT_TRACE_OPTIONS.numberOfColors);
-  const [smoothing, setSmoothing] = useState(DEFAULT_TRACE_OPTIONS.lineTolerance);
+  const [preset, setPreset] = useState<string>('Smooth');
   const [busy, setBusy] = useState(false);
+  const options: TraceOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -51,7 +52,7 @@ function DialogBody(): JSX.Element {
       pushToast('Pick an image file first.', 'warning');
       return;
     }
-    void commit({ file, colors, smoothing }, { importSvgObject, pushToast, close, setBusy });
+    void commit({ file, options }, { importSvgObject, pushToast, close, setBusy });
   };
 
   return (
@@ -59,16 +60,12 @@ function DialogBody(): JSX.Element {
       <form onSubmit={onSubmit} style={panelStyle}>
         <h2 style={headingStyle}>Trace Image</h2>
         <FilePicker file={file} onPick={setFile} />
-        <TraceControls
-          colors={colors}
-          smoothing={smoothing}
-          onColors={setColors}
-          onSmoothing={setSmoothing}
-        />
+        <PresetPicker value={preset} onChange={setPreset} />
         <p style={hintStyle}>
-          Tracing converts the raster into vector paths grouped by color. Lower color counts
-          produce cleaner cuts; raise smoothing if the trace is jagged. Large images are
-          downsampled before tracing.
+          <strong>Smooth</strong> — flowing lines, best for logos and clean engraving.{' '}
+          <strong>Sharp</strong> — keeps fine pixel detail at the cost of jaggedness.{' '}
+          <strong>Detailed</strong> — small features, ~4 color layers.{' '}
+          <strong>Photo</strong> — many colors + heavy blur, for photographic input.
         </p>
         <DialogActions canSubmit={file !== null && !busy} busy={busy} onCancel={close} />
       </form>
@@ -76,8 +73,25 @@ function DialogBody(): JSX.Element {
   );
 }
 
+function PresetPicker(props: {
+  readonly value: string;
+  readonly onChange: (next: string) => void;
+}): JSX.Element {
+  return (
+    <Field label="Preset">
+      <select value={props.value} onChange={(e) => props.onChange(e.target.value)} style={selectStyle}>
+        {Object.keys(TRACE_PRESETS).map((key) => (
+          <option key={key} value={key}>
+            {key}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
 async function commit(
-  args: { readonly file: File; readonly colors: number; readonly smoothing: number },
+  args: { readonly file: File; readonly options: TraceOptions },
   ctx: {
     readonly importSvgObject: ReturnType<typeof useStore.getState>['importSvgObject'];
     readonly pushToast: ReturnType<typeof useToastStore.getState>['pushToast'];
@@ -88,13 +102,7 @@ async function commit(
   ctx.setBusy(true);
   try {
     const image = await loadImageAsRawData(args.file);
-    const options: TraceOptions = {
-      ...DEFAULT_TRACE_OPTIONS,
-      numberOfColors: Math.max(2, Math.min(16, args.colors)),
-      lineTolerance: args.smoothing,
-      quadraticTolerance: args.smoothing,
-    };
-    const svg = traceImageToSvgString(image, options);
+    const svg = traceImageToSvgString(image, args.options);
     const id = crypto.randomUUID();
     const result = parseSvg({ svgText: svg, id, source: args.file.name });
     if (result.object === null) {
@@ -149,42 +157,6 @@ function FilePicker(props: {
         </span>
       )}
     </Field>
-  );
-}
-
-function TraceControls(props: {
-  readonly colors: number;
-  readonly smoothing: number;
-  readonly onColors: (n: number) => void;
-  readonly onSmoothing: (n: number) => void;
-}): JSX.Element {
-  return (
-    <>
-      <Field label="Colors">
-        <input
-          type="number"
-          min={2}
-          max={16}
-          step={1}
-          value={props.colors}
-          onChange={(e) => props.onColors(Math.max(2, Math.min(16, Number(e.target.value) || 2)))}
-          style={numStyle}
-        />
-        <span style={unitStyle}>2-16</span>
-      </Field>
-      <Field label="Smoothing">
-        <input
-          type="number"
-          min={0.5}
-          max={3}
-          step={0.1}
-          value={props.smoothing}
-          onChange={(e) => props.onSmoothing(Math.max(0.5, Number(e.target.value) || 1))}
-          style={numStyle}
-        />
-        <span style={unitStyle}>higher = smoother</span>
-      </Field>
-    </>
   );
 }
 
@@ -258,8 +230,7 @@ const fileNameStyle: React.CSSProperties = {
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
 };
-const numStyle: React.CSSProperties = { width: 80 };
-const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666' };
+const selectStyle: React.CSSProperties = { flex: 1, fontSize: 13 };
 const hintStyle: React.CSSProperties = {
   fontSize: 11,
   color: '#666',
