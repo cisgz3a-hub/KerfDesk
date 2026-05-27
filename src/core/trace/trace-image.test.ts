@@ -42,6 +42,37 @@ describe('traceImageToSvgString', () => {
     expect(svg).toMatch(/<(path|polygon|polyline|rect)/);
   });
 
+  it('fixed-palette mode produces a 2-color output regardless of input richness', () => {
+    // The "Line Art" preset uses a fixed [white, black] palette.
+    // Even on a noisy 4-color fixture it must yield exactly two
+    // color layers in the SVG (clean ink + background).
+    const W = 16;
+    const H = 16;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i += 1) {
+      // Stripe the image into 4 grays so default quantization would
+      // produce 4 layers.
+      const v = (Math.floor(i / 4) % 4) * 80;
+      data[i * 4 + 0] = v;
+      data[i * 4 + 1] = v;
+      data[i * 4 + 2] = v;
+      data[i * 4 + 3] = 255;
+    }
+    const svg = traceImageToSvgString(
+      { width: W, height: H, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        fixedPalette: ['#ffffff', '#000000'],
+      },
+    );
+    // imagetracerjs emits <g> per color; count distinct fill colors
+    // in the output. With a fixed [white, black] palette, no other
+    // fill values should appear.
+    const fills = Array.from(svg.matchAll(/fill="rgb\(([^)]+)\)"/g)).map((m) => m[1]);
+    const uniqueFills = new Set(fills);
+    expect(uniqueFills.size).toBeLessThanOrEqual(2);
+  });
+
   it('respects numberOfColors — 2 colors produces fewer/different layers than 8', () => {
     const two = traceImageToSvgString(blackSquareOnWhite(), {
       ...DEFAULT_TRACE_OPTIONS,

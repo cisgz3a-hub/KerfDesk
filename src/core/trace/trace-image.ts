@@ -54,6 +54,11 @@ export type TraceOptions = {
   // imagetracerjs setting is false; we ship it true for cleaner
   // output on hand-drawn / photo-like inputs.
   readonly lineFilter: boolean;
+  // When set, forces a fixed palette instead of color-quantizing the
+  // input. Use ['#ffffff', '#000000'] for line art — guarantees the
+  // output is two layers (background + ink) with no banding from
+  // imagetracer's clustering. Hex strings, parsed at the boundary.
+  readonly fixedPalette?: ReadonlyArray<string>;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -72,9 +77,29 @@ export const DEFAULT_TRACE_OPTIONS: TraceOptions = {
 
 // Named presets — each tuned for a different input class. Dialog
 // surfaces these so the user doesn't have to know which knob
-// controls what.
+// controls what. ORDER matters: the first key is the default,
+// and "Line Art" is the by-far most common laser-engraving case
+// (vector-like logos, line drawings, monochrome signs).
 export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
+  'Line Art': {
+    // For clean black-on-white logos / line drawings. The fixed
+    // palette is the key knob: it forces a pure 2-color (white +
+    // black) output instead of letting imagetracer's clustering
+    // invent gray bands that fragment fine strokes. pathOmit 16
+    // drops the small disconnected dots that otherwise litter the
+    // result on noisy scans.
+    numberOfColors: 2,
+    pathOmit: 16,
+    lineTolerance: 1,
+    quadraticTolerance: 1,
+    blurRadius: 0,
+    blurDelta: 0,
+    lineFilter: true,
+    fixedPalette: ['#ffffff', '#000000'],
+  },
   Smooth: {
+    // For slightly noisy / hand-drawn line art. Adds blur to
+    // suppress noise at the cost of a little detail loss.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 2,
@@ -84,8 +109,11 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     lineFilter: true,
   },
   Sharp: {
+    // For pixel-art / blueprint inputs where every notch matters.
+    // No blur, low tolerances, but pathOmit still 16 to drop
+    // single-pixel speckle.
     numberOfColors: 2,
-    pathOmit: 4,
+    pathOmit: 16,
     lineTolerance: 0.5,
     quadraticTolerance: 0.5,
     blurRadius: 0,
@@ -93,8 +121,10 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     lineFilter: false,
   },
   Detailed: {
+    // For line drawings with some shading — 4 colors keeps
+    // mid-tones as distinct cut layers.
     numberOfColors: 4,
-    pathOmit: 4,
+    pathOmit: 8,
     lineTolerance: 1,
     quadraticTolerance: 1,
     blurRadius: 1,
@@ -102,6 +132,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     lineFilter: true,
   },
   Photo: {
+    // For actual photographs — heavy blur + many colors. Produces
+    // many layers; intended for posterized-style engraving.
     numberOfColors: 8,
     pathOmit: 8,
     lineTolerance: 1.5,
@@ -126,21 +158,43 @@ export function traceImageToSvgString(
   options: TraceOptions = DEFAULT_TRACE_OPTIONS,
 ): string {
   const tracer = ImageTracer as unknown as ImageTracerModule;
-  return tracer.imagedataToSVG(image, {
+  const baseOpts: Record<string, unknown> = {
     numberofcolors: options.numberOfColors,
     pathomit: options.pathOmit,
     ltres: options.lineTolerance,
     qtres: options.quadraticTolerance,
-    // Pre-blur + line-filter — the quality knobs Phase E v1 missed.
-    // Higher blurradius + lineFilter together produce noticeably
-    // cleaner traces on photo-like and hand-drawn input.
+    // Pre-blur + line-filter — quality knobs Phase E v1 missed.
     blurradius: options.blurRadius,
     blurdelta: options.blurDelta,
     linefilter: options.lineFilter,
-    // Disable scale + viewbox attributes — we want raw mm-scale
-    // coordinates that match the input image dimensions, so the
-    // workspace fit-to-bed math treats it like any other SVG.
+    // Disable scale + viewbox attributes so the raw mm-scale
+    // coordinates match the input image dimensions.
     viewbox: false,
     desc: false,
-  });
+  };
+  // Fixed palette overrides color quantization entirely — the
+  // tracer's `pal` accepts {r, g, b, a} entries. Used by the
+  // "Line Art" preset to force a clean 2-color output.
+  if (options.fixedPalette !== undefined && options.fixedPalette.length > 0) {
+    baseOpts['pal'] = options.fixedPalette.map(hexToRgba);
+  }
+  return tracer.imagedataToSVG(image, baseOpts);
+}
+
+// Convert '#rrggbb' (or '#rgb') to {r, g, b, a} as imagetracerjs
+// expects. Tolerates malformed input by falling back to black.
+function hexToRgba(hex: string): { r: number; g: number; b: number; a: number } {
+  const cleaned = hex.replace('#', '').trim();
+  const expanded =
+    cleaned.length === 3
+      ? cleaned
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : cleaned;
+  const r = Number.parseInt(expanded.slice(0, 2), 16);
+  const g = Number.parseInt(expanded.slice(2, 4), 16);
+  const b = Number.parseInt(expanded.slice(4, 6), 16);
+  const valid = Number.isFinite(r) && Number.isFinite(g) && Number.isFinite(b);
+  return valid ? { r, g, b, a: 255 } : { r: 0, g: 0, b: 0, a: 255 };
 }
