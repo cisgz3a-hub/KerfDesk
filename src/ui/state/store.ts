@@ -18,6 +18,7 @@ import {
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
 import {
+  applyDuplicate,
   applyFreshImport,
   applyReimport,
   applyUpsertText,
@@ -76,6 +77,10 @@ export type AppState = {
   // user's position/transform).
   readonly upsertTextObject: (text: TextObject) => void;
   readonly removeSceneObject: (id: string) => void;
+  // Clone every currently-selected SceneObject with a fresh id and a
+  // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
+  // new selection. No-op when nothing is selected.
+  readonly duplicateSelection: () => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
@@ -226,6 +231,17 @@ function sceneActions(
   };
 }
 
+function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {
+  return {
+    duplicateSelection: () =>
+      set((s) => {
+        const result = applyDuplicate(s, () => crypto.randomUUID());
+        if (result === null) return s;
+        return result;
+      }),
+  };
+}
+
 function historyActions(set: Setter): Pick<AppState, 'undo' | 'redo'> {
   return {
     undo: () =>
@@ -362,6 +378,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...projectActions(set),
   ...importSvgObjectAction(set, get),
   ...sceneActions(set),
+  ...duplicateAction(set),
   ...historyActions(set),
   ...viewActions(set),
   ...interactionActions(set),

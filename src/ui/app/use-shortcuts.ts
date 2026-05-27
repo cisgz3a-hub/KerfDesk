@@ -38,6 +38,7 @@ export function useShortcuts(): void {
   const removeSceneObject = useStore((s) => s.removeSceneObject);
   const selectObject = useStore((s) => s.selectObject);
   const selectAllObjects = useStore((s) => s.selectAllObjects);
+  const duplicateSelection = useStore((s) => s.duplicateSelection);
   const undo = useStore((s) => s.undo);
   const redo = useStore((s) => s.redo);
   const togglePreview = useStore((s) => s.togglePreview);
@@ -50,60 +51,40 @@ export function useShortcuts(): void {
   const resetView = useUiStore((s) => s.resetView);
   const zoomBy = useUiStore((s) => s.zoomBy);
 
+  // Two effects because four handler categories don't fit under the
+  // 80-line per-function lint cap in one function body. File + Edit
+  // share the keydown lane; Transform + View share another. Order
+  // matters: File runs first so Ctrl+S beats Ctrl+anything-else; the
+  // second effect's listener fires only if the first didn't preventDefault.
   useEffect(() => {
-    const fileCtx = {
-      platform,
-      project,
-      importSvgObject,
-      setProject,
-      newProject,
-      savedName,
-      lastSaveTarget,
-      markSaved,
-      markLoaded,
-      pushToast,
-      confirmDiscard,
-    };
-    const editCtx = {
-      undo,
-      redo,
-      selectedObjectId,
-      additionalSelectedIds,
-      removeSceneObject,
-      selectObject,
-      selectAllObjects,
-    };
-    const transformCtx = { project, selectedObjectId, applyObjectTransform };
-    const viewCtx = { togglePreview, resetView, zoomBy };
     const onKeyDown = (e: KeyboardEvent): void => {
+      const fileCtx = {
+        platform, project, importSvgObject, setProject, newProject,
+        savedName, lastSaveTarget, markSaved, markLoaded, pushToast,
+        confirmDiscard,
+      };
+      const editCtx = {
+        undo, redo, selectedObjectId, additionalSelectedIds,
+        removeSceneObject, selectObject, selectAllObjects, duplicateSelection,
+      };
       if (handleFileShortcut(e, fileCtx)) return;
-      if (handleEditShortcut(e, editCtx)) return;
-      if (handleTransformShortcut(e, transformCtx)) return;
-      handleViewShortcut(e, viewCtx);
+      handleEditShortcut(e, editCtx);
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [
-    platform,
-    project,
-    importSvgObject,
-    setProject,
-    newProject,
-    selectedObjectId,
-    removeSceneObject,
-    selectObject,
-    undo,
-    redo,
-    togglePreview,
-    applyObjectTransform,
-    savedName,
-    lastSaveTarget,
-    markSaved,
-    markLoaded,
-    pushToast,
-    resetView,
-    zoomBy,
-    additionalSelectedIds,
-    selectAllObjects,
+    platform, project, importSvgObject, setProject, newProject,
+    savedName, lastSaveTarget, markSaved, markLoaded, pushToast,
+    undo, redo, selectedObjectId, additionalSelectedIds,
+    removeSceneObject, selectObject, selectAllObjects, duplicateSelection,
   ]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent): void => {
+      if (handleTransformShortcut(e, { project, selectedObjectId, applyObjectTransform })) return;
+      handleViewShortcut(e, { togglePreview, resetView, zoomBy });
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [project, selectedObjectId, applyObjectTransform, togglePreview, resetView, zoomBy]);
 }

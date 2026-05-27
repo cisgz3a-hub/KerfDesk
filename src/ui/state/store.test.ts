@@ -124,6 +124,47 @@ describe('useStore', () => {
     expect(layerColors).toEqual(['#00ff00', '#ff0000']);
   });
 
+  it('duplicateSelection clones the selected object with a 10 mm offset', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().selectObject('O1');
+    const before = useStore.getState().project.scene.objects[0];
+    useStore.getState().duplicateSelection();
+    const after = useStore.getState().project.scene.objects;
+    expect(after).toHaveLength(2);
+    const clone = after[1];
+    expect(clone).toBeDefined();
+    if (clone === undefined || before === undefined) return;
+    expect(clone.id).not.toBe(before.id);
+    expect(clone.transform.x).toBeCloseTo(before.transform.x + 10, 5);
+    expect(clone.transform.y).toBeCloseTo(before.transform.y + 10, 5);
+    // New clone becomes the selection.
+    expect(useStore.getState().selectedObjectId).toBe(clone.id);
+  });
+
+  it('duplicateSelection on multi-select clones every selected object', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().importSvgObject(svgObj('O2', ['#0000ff']));
+    useStore.getState().selectObject('O1');
+    useStore.getState().toggleSelectObject('O2');
+    useStore.getState().duplicateSelection();
+    const objs = useStore.getState().project.scene.objects;
+    expect(objs).toHaveLength(4);
+    // Original primary is still in selection-extras? No — selection
+    // resets to the new clones. Just confirm the new primary is one
+    // of the clones (not O1 / O2).
+    const sel = useStore.getState().selectedObjectId;
+    expect(sel === 'O1' || sel === 'O2').toBe(false);
+    expect(useStore.getState().additionalSelectedIds.size).toBe(1);
+  });
+
+  it('duplicateSelection is a no-op with no selection', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().selectObject(null);
+    const before = useStore.getState().project.scene.objects.length;
+    useStore.getState().duplicateSelection();
+    expect(useStore.getState().project.scene.objects).toHaveLength(before);
+  });
+
   it('setLayerParam patches the matching layer', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
     useStore.getState().setLayerParam('#ff0000', { power: 75 });
