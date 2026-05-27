@@ -159,6 +159,35 @@ function BasicRows(props: {
       <Row label="Origin">
         <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
       </Row>
+      <FeedRows device={device} update={update} />
+      <Row label="$30 (max S)">
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={device.maxPowerS}
+          onChange={(e) =>
+            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
+          }
+          style={numInputStyle}
+          aria-label="GRBL $30 max power S"
+        />
+      </Row>
+    </>
+  );
+}
+
+// Two related feed knobs: machine hardware ceiling + dedicated frame
+// speed. Sit next to each other so the relationship (one caps the
+// other) is immediately legible. Extracted from BasicRows so each
+// component stays under the 80-line per-function lint cap.
+function FeedRows(props: {
+  readonly device: ReturnType<typeof useStore.getState>['project']['device'];
+  readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
+}): JSX.Element {
+  const { device, update } = props;
+  return (
+    <>
       <Row label="Max feed">
         <input
           type="number"
@@ -186,19 +215,6 @@ function BasicRows(props: {
           title="Feed used by the Frame button. Independent of cut/engrave speeds — capped at Max feed at emit time."
         />
         <span style={unitStyle}>mm/min</span>
-      </Row>
-      <Row label="$30 (max S)">
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={device.maxPowerS}
-          onChange={(e) =>
-            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
-          }
-          style={numInputStyle}
-          aria-label="GRBL $30 max power S"
-        />
       </Row>
     </>
   );
