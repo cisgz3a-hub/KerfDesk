@@ -21,7 +21,7 @@ import {
   nextTransformForDrag,
   panOffsetForDrag,
 } from './drag-state';
-import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber } from './overlays';
+import { DragOverlay, DragReadout, EmptyHint, PreviewScrubber, ZoomControls } from './overlays';
 import { canvasMouseToScene } from './view-transform';
 
 export function Workspace(): JSX.Element {
@@ -101,6 +101,9 @@ export function Workspace(): JSX.Element {
         />
       )}
       {previewMode && <PreviewScrubber />}
+      {/* Bottom-right zoom controls — hidden during preview so the
+          scrubber gets the whole bottom strip. */}
+      {!previewMode && <ZoomControls />}
     </>
   );
 }

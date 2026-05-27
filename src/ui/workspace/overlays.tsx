@@ -24,6 +24,65 @@ export function DragOverlay(): JSX.Element {
   );
 }
 
+// Visible zoom controls: −, percentage readout, +, fit. Sits at the
+// bottom-right of the canvas overlay. Surfaces the same actions that
+// Ctrl+Wheel and the +/-/0/F shortcuts already do — most users don't
+// discover the keyboard bindings, so the buttons make zoom obvious.
+// 1.25× per click matches the keyboard step and Ctrl+Wheel notch.
+const ZOOM_STEP = 1.25;
+export function ZoomControls(): JSX.Element {
+  const zoomFactor = useUiStore((s) => s.zoomFactor);
+  const zoomBy = useUiStore((s) => s.zoomBy);
+  const resetView = useUiStore((s) => s.resetView);
+  const percent = Math.round(zoomFactor * 100);
+  return (
+    <div style={zoomControlsStyle} role="group" aria-label="Zoom">
+      <button
+        type="button"
+        onClick={() => zoomBy(1 / ZOOM_STEP)}
+        title="Zoom out (−)"
+        aria-label="Zoom out"
+        style={zoomBtnStyle}
+      >
+        −
+      </button>
+      <span
+        style={zoomReadoutStyle}
+        title="Click to fit-to-bed (F or 0)"
+        role="button"
+        tabIndex={0}
+        onClick={resetView}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            resetView();
+          }
+        }}
+      >
+        {percent}%
+      </span>
+      <button
+        type="button"
+        onClick={() => zoomBy(ZOOM_STEP)}
+        title="Zoom in (+)"
+        aria-label="Zoom in"
+        style={zoomBtnStyle}
+      >
+        +
+      </button>
+      <button
+        type="button"
+        onClick={resetView}
+        title="Fit to bed (F)"
+        aria-label="Fit to bed"
+        style={zoomBtnStyle}
+      >
+        ⊡
+      </button>
+    </div>
+  );
+}
+
 export function PreviewScrubber(): JSX.Element {
   const scrubberT = useUiStore((s) => s.scrubberT);
   const setScrubberT = useUiStore((s) => s.setScrubberT);
@@ -160,4 +219,42 @@ const scrubberLabelStyle: React.CSSProperties = {
   color: '#333',
   minWidth: 40,
   textAlign: 'right',
+};
+const zoomControlsStyle: React.CSSProperties = {
+  position: 'absolute',
+  right: 12,
+  bottom: 12,
+  display: 'flex',
+  alignItems: 'stretch',
+  gap: 0,
+  background: 'rgba(255,255,255,0.92)',
+  border: '1px solid #ccc',
+  borderRadius: 4,
+  boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+  overflow: 'hidden',
+  fontFamily: 'system-ui, sans-serif',
+};
+const zoomBtnStyle: React.CSSProperties = {
+  width: 28,
+  height: 28,
+  border: 'none',
+  background: 'transparent',
+  cursor: 'pointer',
+  fontSize: 16,
+  color: '#333',
+  padding: 0,
+};
+const zoomReadoutStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  minWidth: 52,
+  height: 28,
+  borderLeft: '1px solid #e0e0e0',
+  borderRight: '1px solid #e0e0e0',
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 11,
+  color: '#222',
+  cursor: 'pointer',
+  userSelect: 'none',
 };
