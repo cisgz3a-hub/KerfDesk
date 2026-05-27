@@ -22,6 +22,13 @@ export type DeviceProfile = {
   readonly bedHeight: number; // mm
   readonly maxFeed: number; // mm/min
   readonly maxPowerS: number; // GRBL $30 value (e.g. 1000)
+  // Feed used by the Frame button (jog around the job bounding box).
+  // Separate from `maxFeed` so a user who lowers maxFeed to constrain
+  // cut speeds doesn't also slow framing. Capped at maxFeed at
+  // emit time so we never command past the machine's safe rate.
+  // 6000 mm/min matches LightBurn's default and most diode-laser
+  // jog speeds from the Creality Falcon / xTool class.
+  readonly framingFeedMmPerMin: number;
   // GRBL acceleration ($120/$121) in mm/sec². Used by the job-time
   // estimator's planner. Generic default of 500 sits in the middle of
   // the hobby/diode-laser range (real machines run 100-2500). Tune
@@ -75,4 +82,5 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   // settings (Advanced) if burns systematically miss the ETA.
   accelMmPerSec2: 500,
   junctionDeviationMm: 0.01,
+  framingFeedMmPerMin: 6000,
 };

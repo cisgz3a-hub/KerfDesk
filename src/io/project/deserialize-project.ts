@@ -91,6 +91,12 @@ function normalizeProject(raw: Record<string, unknown>): Project {
         typeof dev['junctionDeviationMm'] === 'number'
           ? dev['junctionDeviationMm']
           : DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
+      // Back-fill for pre-framing-feed .lf2 files. Same additive-with-
+      // default pattern as accel / junctionDeviation above.
+      framingFeedMmPerMin:
+        typeof dev['framingFeedMmPerMin'] === 'number' && dev['framingFeedMmPerMin'] > 0
+          ? dev['framingFeedMmPerMin']
+          : DEFAULT_DEVICE_PROFILE.framingFeedMmPerMin,
     },
     scene: {
       ...scene,
