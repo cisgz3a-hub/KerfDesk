@@ -54,6 +54,11 @@ type UiState = {
   readonly textDialog: TextDialogState | null;
   readonly openTextDialog: (next: TextDialogState) => void;
   readonly closeTextDialog: () => void;
+  // Phase E import-image dialog. Single-flag state (no add-vs-edit
+  // mode yet — "re-trace existing image" is a Phase E.1 follow-on).
+  readonly imageDialogOpen: boolean;
+  readonly openImageDialog: () => void;
+  readonly closeImageDialog: () => void;
 };
 
 export const useUiStore = create<UiState>((set) => ({
@@ -74,6 +79,9 @@ export const useUiStore = create<UiState>((set) => ({
   textDialog: null,
   openTextDialog: (next) => set({ textDialog: next }),
   closeTextDialog: () => set({ textDialog: null }),
+  imageDialogOpen: false,
+  openImageDialog: () => set({ imageDialogOpen: true }),
+  closeImageDialog: () => set({ imageDialogOpen: false }),
 }));
 
 function clamp01(n: number): number {

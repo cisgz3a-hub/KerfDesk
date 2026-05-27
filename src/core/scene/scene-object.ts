@@ -85,8 +85,23 @@ export type TextObject = {
   readonly paths: ReadonlyArray<ColoredPath>;
 };
 
-// Phase D union expansion (ADR-014). Phase E adds 'traced-image'.
-export type SceneObject = ImportedSvg | TextObject;
+// Traced raster image, Phase E (ADR-013). Same shape pattern as
+// TextObject — the raster is pre-traced (via imagetracerjs +
+// parseSvg) at import time and the polylines are stored on the
+// object. compileJob iterates `paths` like any other variant.
+// The `source` field carries the original filename for display.
+export type TracedImage = {
+  readonly kind: 'traced-image';
+  readonly id: string;
+  readonly source: string;
+  readonly bounds: Bounds;
+  readonly transform: Transform;
+  readonly paths: ReadonlyArray<ColoredPath>;
+};
+
+// Full union expanded through Phase E (ADR-014). Future variants
+// require an ADR + a PROJECT.md scope revision.
+export type SceneObject = ImportedSvg | TextObject | TracedImage;
 
 // Exhaustiveness helper. Place in the default arm of every `switch` over a
 // discriminated union so adding a variant produces exactly one TS error (the

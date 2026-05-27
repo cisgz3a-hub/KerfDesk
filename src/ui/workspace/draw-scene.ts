@@ -138,10 +138,11 @@ function drawObjectPolylines(
   layerByColor: Map<string, Layer>,
   view: ViewTransform,
 ): void {
-  // Both 'imported-svg' and 'text' carry a `paths: ColoredPath[]`
-  // field of the same shape. The text path is populated by the UI
-  // (font-loader + textToPolylines) on edit and stored on the object.
-  if (obj.kind !== 'imported-svg' && obj.kind !== 'text') return;
+  // imported-svg, text, AND traced-image all carry the same
+  // ColoredPath[] shape — single drawing path. Each variant
+  // populates `paths` upstream (parseSvg for SVG, textToPolylines
+  // for text, traceImageToSvgString→parseSvg for traced image).
+  if (obj.kind !== 'imported-svg' && obj.kind !== 'text' && obj.kind !== 'traced-image') return;
   for (const path of obj.paths) {
     const layer = layerByColor.get(path.color);
     if (layer === undefined || !layer.visible) continue;

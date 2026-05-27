@@ -137,19 +137,21 @@ These have been chosen in advance but are not yet in `package.json`. Re-verify a
 - **Bundle impact:** adds ~265 KB to the JS bundle (524 KB total → 161 KB gzip). Within PROJECT.md's "< 1 MB compressed" target with margin. Lazy-loading deferred — could re-evaluate if a future feature pushes the bundle past 200 KB gzip.
 - **Bundled fonts:** Roboto Regular (Apache-2.0), Inconsolata Regular (OFL-1.1), Pacifico Regular (OFL-1.1). All MIT-compatible per ADR-017. Loaded on-demand via UI-layer `font-loader.ts` — fonts are not in the initial JS bundle.
 
-### imagetracer.js — Phase E
+### imagetracerjs — adopted Phase E (2026-05-27)
 
-- **Version target:** latest stable at Phase E kickoff; verify license unchanged
-- **License (last checked):** MIT
+- **Version:** 1.2.6 (npm package name is `imagetracerjs`, not `imagetracer.js`)
+- **License:** **Unlicense** (public domain) — more permissive than the preliminary "MIT" note; on the ADR-017 allow-list either way
 - **Source:** https://github.com/jankovicsandras/imagetracerjs
 - **Decision affected:** ADR-013 (image vectorize as Phase E)
-- **Evaluated:** 2026-05-26 (preliminary)
-- **Confidence:** medium
-- **Re-verify by:** Phase E kickoff
-- **Alternatives considered:**
-  - `potrace-wasm` — **rejected**; potrace is GPL-2, fails the dependency-license allow-list per ADR-017.
-  - `image-trace` — alternative MIT lib, evaluate at Phase E kickoff for trace quality and bundle size.
-- **Notes:** Trace quality is the primary evaluation axis at Phase E. If imagetracer.js trace quality is insufficient on the fixture corpus, this entry will need a written re-evaluation before adoption.
+- **Status:** ADOPTED as runtime dependency
+- **Evaluated:** 2026-05-26 (preliminary) → re-verified + adopted 2026-05-27
+- **Confidence:** high
+- **Alternatives reconsidered at kickoff:**
+  - `potrace-wasm` — **rejected** again; potrace is GPL-2, fails the dependency-license allow-list per ADR-017.
+  - `image-trace` — looked unmaintained at kickoff. Skipped.
+- **Bundle impact:** ~50 KB minified. Negligible vs the existing bundle.
+- **Integration shape:** UI layer decodes file → canvas → ImageData, then `core/trace/trace-image.ts` runs `imagedataToSVG`. The resulting SVG string flows through the existing `parseSvg()` pipeline (reuses DOMPurify sanitization + bezier flattening + color-keyed layer assignment). Output becomes a `TracedImage` SceneObject — same `paths: ColoredPath[]` shape as ImportedSvg and TextObject, so compileJob / draw-scene need only one new switch arm each.
+- **Trace quality:** Acceptable on the fixture corpus (synthetic black-on-white square + standard test). Real-world quality depends heavily on input contrast and the `numberofcolors` parameter; the dialog exposes 2-16 colors with 2 as the default for clean engraving cuts.
 
 ---
 

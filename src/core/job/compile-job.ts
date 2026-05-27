@@ -72,6 +72,9 @@ function appendSegmentsFromObject(
     case 'text':
       appendPathSegments(obj.paths, obj.transform, color, device, out);
       return;
+    case 'traced-image':
+      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      return;
     default:
       assertNever(obj, 'SceneObject');
   }

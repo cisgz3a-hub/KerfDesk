@@ -7,6 +7,7 @@ import { CutsLayersPanel } from '../layers';
 import { StatusBar, Toasts, Toolbar } from '../common';
 import { LaserWindow } from '../laser';
 import { AddTextDialog } from '../text/AddTextDialog';
+import { ImportImageDialog } from '../trace/ImportImageDialog';
 import { Workspace } from '../workspace';
 import { useAutosave, useAutosaveRecovery } from './use-autosave';
 import { useGlobalErrorHandlers } from './use-global-error-handlers';
@@ -40,6 +41,7 @@ export function App(): JSX.Element {
       <StatusBar />
       <Toasts />
       <AddTextDialog />
+      <ImportImageDialog />
     </div>
   );
 }
