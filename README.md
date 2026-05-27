@@ -56,7 +56,25 @@ pnpm dev:web        # Vite dev server, browser build
 pnpm dev:desktop    # Vite + Electron, desktop build
 pnpm build:web      # Static bundle to dist/web
 pnpm build:desktop  # Signed .exe to dist/desktop
+pnpm deploy:web     # Manual deploy of dist/web to Cloudflare Pages
 ```
+
+### Cloudflare Pages — auto-deploy on push
+
+The `.github/workflows/deploy.yml` workflow publishes the bundle to
+`https://laserforge.pages.dev` after every push to `main`. It needs two
+repository secrets to authenticate:
+
+1. **`CLOUDFLARE_API_TOKEN`** — create at
+   <https://dash.cloudflare.com/profile/api-tokens> using the
+   **Cloudflare Pages — Edit** template. Scope to the Pages project.
+2. **`CLOUDFLARE_ACCOUNT_ID`** — visible in the URL when you're inside
+   any Cloudflare dashboard page (the long hex string after
+   `dash.cloudflare.com/`).
+
+Add both at **Settings → Secrets and variables → Actions → New
+repository secret**. Until both are set the workflow will fail at the
+"Publish to Cloudflare Pages" step (CI itself stays green).
 
 ## License
 

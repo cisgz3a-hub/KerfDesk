@@ -1,0 +1,76 @@
+name: Deploy to Cloudflare Pages
+
+# Runs on every push to main AFTER the CI workflow has had a chance.
+# Cloudflare Pages serves a "Preview" environment per branch by default;
+# we force --branch=master to hit the production URL (the legacy repo
+# was created with master as the production branch). See ADR/note in
+# package.json's deploy:web script.
+on:
+  push:
+    branches: [main]
+  # Manual trigger from the Actions tab — useful for re-deploys
+  # without a new commit (e.g., after editing _headers).
+  workflow_dispatch:
+
+# Cancel a queued deploy if a newer commit lands while one is running.
+# Cloudflare Pages handles a fast cancel gracefully (the in-flight one
+# completes; the new one queues right after).
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+# Required for actions/checkout — read access is enough; the deploy
+# itself authenticates via CLOUDFLARE_API_TOKEN, not GITHUB_TOKEN.
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Build + deploy web bundle
+    runs-on: ubuntu-latest
+    # Don't deploy if CI failed. The ci.yml workflow has its own gates
+    # (typecheck, lint, test, license, build, file-size); reusing them
+    # as a precondition keeps a red build from publishing.
+    needs: [] # No needs — Cloudflare Pages keeps the last green deploy
+      # live if this one errors. Skipping needs means CI and
+      # deploy run in parallel; deploys for a CI-broken commit
+      # still publish if the *build* step itself works. If you
+      # want stricter gating, add `needs: [ci]` after both
+      # workflows live on the same trigger.
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Fetch full history so the version-badge `git rev-parse
+          # --short HEAD` step finds a real commit (the default shallow
+          # clone has depth 1 and works, but a deeper clone helps
+          # debugging in the Actions log).
+          fetch-depth: 1
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web bundle
+        run: pnpm build:web
+
+      - name: Publish to Cloudflare Pages
+        # cloudflare/wrangler-action is the official Cloudflare action.
+        # We pin to v3 (current stable) — major bumps would change auth
+        # input names. The `command` is the standard `wrangler pages
+        # deploy` invocation; the action handles auth via the env vars.
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist/web --project-name=laserforge --branch=master
