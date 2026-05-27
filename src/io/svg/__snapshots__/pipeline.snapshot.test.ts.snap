@@ -1,0 +1,99 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Phase A pipeline — fixture snapshots > closed-polygon produces stable G-code 1`] = `
+"G21
+G90
+M3 S0
+; layer L1 color #008000 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X50.000 Y395.000 S0
+G1 X95.000 Y360.000 F1500 S300
+G1 X75.000 Y305.000
+G1 X25.000 Y305.000
+G1 X5.000 Y360.000
+G1 X50.000 Y395.000
+M5
+G0 X0.000 Y0.000 S0
+"
+`;
+
+exports[`Phase A pipeline — fixture snapshots > multi-shape produces stable G-code 1`] = `
+"G21
+G90
+M3 S0
+; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X10.000 Y390.000 S0
+G1 X60.000 Y390.000 F1500 S300
+G1 X60.000 Y360.000
+G1 X10.000 Y360.000
+G1 X10.000 Y390.000
+; layer L2 color #00ff00 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X100.000 Y380.000 S0
+G1 X180.000 Y380.000 F1500 S300
+; layer L3 color #0000ff power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X100.000 Y360.000 S0
+G1 X120.000 Y340.000 F1500 S300
+G1 X140.000 Y360.000
+G1 X160.000 Y340.000
+G1 X180.000 Y360.000
+M5
+G0 X0.000 Y0.000 S0
+"
+`;
+
+exports[`Phase A pipeline — fixture snapshots > rectangle-single-color produces stable G-code 1`] = `
+"G21
+G90
+M3 S0
+; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X0.000 Y400.000 S0
+G1 X50.000 Y400.000 F1500 S300
+G1 X50.000 Y370.000
+G1 X0.000 Y370.000
+G1 X0.000 Y400.000
+M5
+G0 X0.000 Y0.000 S0
+"
+`;
+
+exports[`Phase A pipeline — fixture snapshots > two-color-paths produces stable G-code 1`] = `
+"G21
+G90
+M3 S0
+; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X10.000 Y390.000 S0
+G1 X90.000 Y390.000 F1500 S300
+; layer L2 color #0000ff power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X10.000 Y350.000 S0
+G1 X90.000 Y350.000 F1500 S300
+M5
+G0 X0.000 Y0.000 S0
+"
+`;
+
+exports[`Phase A pipeline — fixture snapshots > zigzag produces stable G-code 1`] = `
+"G21
+G90
+M3 S0
+; layer L1 color #ff0000 power 30% speed 1500 mm/min passes 1
+; pass 1 of 1
+G0 X5.000 Y385.000 S0
+G1 X15.000 Y395.000 F1500 S300
+G1 X25.000 Y375.000
+G1 X35.000 Y395.000
+G1 X45.000 Y375.000
+G1 X55.000 Y395.000
+G1 X65.000 Y375.000
+G1 X75.000 Y395.000
+G1 X85.000 Y375.000
+G1 X95.000 Y385.000
+M5
+G0 X0.000 Y0.000 S0
+"
+`;

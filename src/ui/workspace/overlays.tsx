@@ -1,0 +1,163 @@
+// Workspace overlays — UI chrome that sits above the canvas: empty-state
+// hint (F-A2), drag-to-import zone (F-A3), drag-readout chip (F-A6),
+// preview scrubber (F-A8). Extracted from Workspace.tsx to keep that file
+// under the 250-line soft cap per CLAUDE.md.
+
+import type { Project } from '../../core/scene';
+import { transformedBBox } from '../../core/scene';
+import { useUiStore } from '../state/ui-store';
+import { computeView } from './view-transform';
+
+export function EmptyHint(): JSX.Element {
+  return (
+    <div style={emptyHintStyle} aria-hidden="true">
+      Drag an SVG here, or use File → Import
+    </div>
+  );
+}
+
+export function DragOverlay(): JSX.Element {
+  return (
+    <div style={dragOverlayStyle} aria-hidden="true">
+      <span style={dragOverlayLabelStyle}>Drop to import</span>
+    </div>
+  );
+}
+
+export function PreviewScrubber(): JSX.Element {
+  const scrubberT = useUiStore((s) => s.scrubberT);
+  const setScrubberT = useUiStore((s) => s.setScrubberT);
+  return (
+    <div style={scrubberContainerStyle}>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.005}
+        value={scrubberT}
+        onChange={(e) => setScrubberT(Number.parseFloat(e.target.value))}
+        aria-label="Preview toolpath scrubber"
+        style={scrubberInputStyle}
+      />
+      <span style={scrubberLabelStyle}>{Math.round(scrubberT * 100)}%</span>
+    </div>
+  );
+}
+
+// Live X/Y or W×H or angle label rendered as a floating chip near the
+// dragged object's top-right corner.
+export function DragReadout(props: {
+  readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  readonly project: Project;
+  readonly selectedId: string | null;
+  readonly kind: 'move' | 'scale' | 'rotate';
+  readonly viewState: { readonly zoomFactor: number; readonly panX: number; readonly panY: number };
+}): JSX.Element | null {
+  const canvas = props.canvasRef.current;
+  const obj = props.project.scene.objects.find((o) => o.id === props.selectedId);
+  if (canvas === null || obj === undefined) return null;
+  const view = computeView(
+    canvas.width,
+    canvas.height,
+    props.project.device.bedWidth,
+    props.project.device.bedHeight,
+    props.viewState,
+  );
+  const bbox = transformedBBox(obj);
+  const w = bbox.maxX - bbox.minX;
+  const h = bbox.maxY - bbox.minY;
+  const label = readoutLabel(props.kind, obj, bbox, w, h);
+  // Convert bed-mm to CSS px. The canvas element scales (width/height attrs
+  // vs CSS layout size) so we map through the canvas's CSS bounding rect.
+  const rect = canvas.getBoundingClientRect();
+  const cssScaleX = rect.width / canvas.width;
+  const cssScaleY = rect.height / canvas.height;
+  const cssX = (view.offsetX + bbox.maxX * view.scale) * cssScaleX;
+  const cssY = (view.offsetY + bbox.minY * view.scale) * cssScaleY;
+  return (
+    <div style={{ ...dragReadoutStyle, left: cssX + 8, top: cssY - 8 }} aria-hidden="true">
+      {label}
+    </div>
+  );
+}
+
+function readoutLabel(
+  kind: 'move' | 'scale' | 'rotate',
+  obj: { readonly transform: { readonly rotationDeg: number } },
+  bbox: { readonly minX: number; readonly minY: number },
+  w: number,
+  h: number,
+): string {
+  if (kind === 'move') return `X ${bbox.minX.toFixed(1)}, Y ${bbox.minY.toFixed(1)} mm`;
+  if (kind === 'scale') return `${w.toFixed(1)} × ${h.toFixed(1)} mm`;
+  return `${obj.transform.rotationDeg.toFixed(1)}°`;
+}
+
+const emptyHintStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  pointerEvents: 'none',
+  color: '#888',
+  fontStyle: 'italic',
+  fontSize: 14,
+  fontFamily: 'system-ui, sans-serif',
+  textShadow: '0 1px 0 #fff',
+};
+const dragOverlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 12,
+  border: '3px dashed #1976d2',
+  borderRadius: 8,
+  background: 'rgba(25, 118, 210, 0.08)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  pointerEvents: 'none',
+};
+const dragOverlayLabelStyle: React.CSSProperties = {
+  fontFamily: 'system-ui, sans-serif',
+  fontSize: 18,
+  fontWeight: 600,
+  color: '#1565c0',
+  background: '#fff',
+  padding: '6px 16px',
+  borderRadius: 4,
+  boxShadow: '0 1px 4px rgba(0,0,0,0.15)',
+};
+const dragReadoutStyle: React.CSSProperties = {
+  position: 'absolute',
+  background: '#1976d2',
+  color: '#fff',
+  padding: '2px 6px',
+  borderRadius: 3,
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 11,
+  fontWeight: 600,
+  pointerEvents: 'none',
+  whiteSpace: 'nowrap',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+};
+const scrubberContainerStyle: React.CSSProperties = {
+  position: 'absolute',
+  left: 24,
+  right: 24,
+  bottom: 12,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
+  background: 'rgba(255,255,255,0.85)',
+  borderRadius: 4,
+  padding: '6px 10px',
+  boxShadow: '0 1px 4px rgba(0,0,0,0.2)',
+};
+const scrubberInputStyle: React.CSSProperties = { flex: 1 };
+const scrubberLabelStyle: React.CSSProperties = {
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  fontSize: 11,
+  color: '#333',
+  minWidth: 40,
+  textAlign: 'right',
+};

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>LaserForge 2.0</title>
+    <!-- CSP is intentionally NOT set via a meta tag here.
+         * Web deploy: set CSP via HTTP response headers at the hosting
+           platform (Cloudflare Pages / Netlify / Vercel rule file). The meta
+           form has known limitations and can't gate things like form-action
+           or frame-ancestors.
+         * Electron: contextIsolation + sandbox + no nodeIntegration is the
+           security boundary; CSP would be set via session.webRequest if we
+           wanted defense-in-depth (file:// origin makes meta CSP unreliable).
+         Phase B will land both — the Electron session-based CSP and the web
+         deploy header file. -->
+  </head>
+  <body>
+    <div id="app-root"></div>
+    <script type="module" src="/src/ui/app/main.tsx"></script>
+  </body>
+</html>

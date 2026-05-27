@@ -1,0 +1,130 @@
+import { describe, expect, it } from 'vitest';
+import {
+  cancel,
+  createStreamer,
+  DEFAULT_RX_BUFFER_BYTES,
+  onAck,
+  pause,
+  progress,
+  resume,
+  step,
+} from './streamer';
+
+describe('createStreamer', () => {
+  it('strips blank lines and comments, terminates each line with \\n', () => {
+    const s = createStreamer('G21\n; comment\n\nG90\nM5\n');
+    expect(s.total).toBe(3);
+    expect(s.queued).toEqual(['G21\n', 'G90\n', 'M5\n']);
+  });
+
+  it('returns done state for empty input', () => {
+    const s = createStreamer('');
+    expect(s.status).toBe('done');
+    expect(s.total).toBe(0);
+  });
+
+  it('uses the default 127-byte buffer unless overridden', () => {
+    expect(createStreamer('G21').rxBufferBytes).toBe(DEFAULT_RX_BUFFER_BYTES);
+    expect(createStreamer('G21', { rxBufferBytes: 64 }).rxBufferBytes).toBe(64);
+  });
+});
+
+describe('step — buffer filling', () => {
+  it('sends as many lines as fit in the rx buffer', () => {
+    const s = createStreamer(['G21', 'G90', 'M5'].join('\n'));
+    const r = step(s);
+    expect(r.toSend).toBe('G21\nG90\nM5\n');
+    expect(r.state.inFlight.map((f) => f.line)).toEqual(['G21\n', 'G90\n', 'M5\n']);
+    expect(r.state.queued).toHaveLength(0);
+    expect(r.state.status).toBe('streaming');
+  });
+
+  it('stops at the buffer boundary', () => {
+    // Each line is 10 bytes (9 chars + \n). Buffer 25 → 2 lines fit (20),
+    // third line would overflow (30).
+    const s = createStreamer(['LINE1ABCD', 'LINE2ABCD', 'LINE3ABCD'].join('\n'), {
+      rxBufferBytes: 25,
+    });
+    const r = step(s);
+    expect(r.state.inFlight).toHaveLength(2);
+    expect(r.state.queued).toHaveLength(1);
+  });
+
+  it('returns toSend="" when paused', () => {
+    const s = pause(createStreamer('G21\nG90'));
+    const r = step(s);
+    expect(r.toSend).toBe('');
+    expect(r.state.status).toBe('paused');
+  });
+});
+
+describe('onAck — consuming acks', () => {
+  it('pops the head of in-flight on ok', () => {
+    const s = step(createStreamer('G21\nG90\nM5')).state;
+    const r = onAck(s, 'ok');
+    expect(r.acked).toBe('G21\n');
+    expect(r.state.inFlight).toHaveLength(2);
+    expect(r.state.completed).toBe(1);
+  });
+
+  it('treats error like ok for buffer accounting (still consumes)', () => {
+    const s = step(createStreamer('G21\nG90')).state;
+    const r = onAck(s, 'error');
+    expect(r.acked).toBe('G21\n');
+    expect(r.state.inFlight).toHaveLength(1);
+  });
+
+  it('cancels the stream on alarm', () => {
+    const s = step(createStreamer('G21\nG90')).state;
+    const r = onAck(s, 'alarm');
+    expect(r.state.status).toBe('cancelled');
+  });
+
+  it('returns acked=null if an ack arrives with empty in-flight', () => {
+    const s = createStreamer('G21');
+    expect(onAck(s, 'ok').acked).toBeNull();
+  });
+
+  it('transitions to done when last line is acked', () => {
+    let state = step(createStreamer('G21\nG90')).state;
+    state = onAck(state, 'ok').state;
+    state = onAck(state, 'ok').state;
+    expect(state.status).toBe('done');
+  });
+});
+
+describe('pause / resume / cancel', () => {
+  it('pause halts further sends until resume', () => {
+    let s = createStreamer(['G21', 'G90', 'M5', 'M2'].join('\n'), { rxBufferBytes: 8 });
+    s = step(s).state; // fills as much as fits
+    s = pause(s);
+    expect(step(s).toSend).toBe('');
+    s = resume(s);
+    // Acks free buffer; subsequent step sends more
+    s = onAck(s, 'ok').state;
+    expect(step(s).toSend.length).toBeGreaterThan(0);
+  });
+
+  it('cancel empties the queue and sets status', () => {
+    const s = cancel(createStreamer('G21\nG90'));
+    expect(s.queued).toHaveLength(0);
+    expect(s.status).toBe('cancelled');
+  });
+});
+
+describe('progress', () => {
+  it('reports completed / total', () => {
+    let s = createStreamer('G21\nG90\nM5');
+    expect(progress(s)).toBe(0);
+    s = step(s).state;
+    s = onAck(s, 'ok').state;
+    expect(progress(s)).toBeCloseTo(1 / 3);
+    s = onAck(s, 'ok').state;
+    s = onAck(s, 'ok').state;
+    expect(progress(s)).toBe(1);
+  });
+
+  it('reports 1 for an empty job', () => {
+    expect(progress(createStreamer(''))).toBe(1);
+  });
+});

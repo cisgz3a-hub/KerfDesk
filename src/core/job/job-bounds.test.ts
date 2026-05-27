@@ -1,0 +1,48 @@
+import { describe, expect, it } from 'vitest';
+import type { Job } from './job';
+import { computeJobBounds } from './job-bounds';
+
+const empty: Job = { groups: [] };
+
+const job: Job = {
+  groups: [
+    {
+      layerId: 'L1',
+      color: '#ff0000',
+      power: 30,
+      speed: 1500,
+      passes: 1,
+      segments: [
+        {
+          polyline: [
+            { x: 10, y: 20 },
+            { x: 100, y: 20 },
+          ],
+          closed: false,
+        },
+        {
+          polyline: [
+            { x: 50, y: 5 },
+            { x: 50, y: 80 },
+          ],
+          closed: false,
+        },
+      ],
+    },
+  ],
+};
+
+describe('computeJobBounds', () => {
+  it('returns null for an empty job', () => {
+    expect(computeJobBounds(empty)).toBeNull();
+  });
+
+  it('returns the AABB across all polylines', () => {
+    expect(computeJobBounds(job)).toEqual({
+      minX: 10,
+      minY: 5,
+      maxX: 100,
+      maxY: 80,
+    });
+  });
+});

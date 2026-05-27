@@ -1,0 +1,12 @@
+node_modules
+dist
+build
+release
+dist-electron
+coverage
+pnpm-lock.yaml
+.claude
+
+# Spec documents are hand-formatted. Re-enable per-file once we're ready to
+# adopt prettier's markdown style across the docs.
+*.md

@@ -1,0 +1,253 @@
+// Keyboard shortcut handlers (WORKFLOW.md F-A15). Each category has its own
+// handler and bindings table so individual functions stay small per ADR-015.
+//
+// Categories:
+//   * File: Cmd/Ctrl+N, O, S, I, E
+//   * Edit: Cmd/Ctrl+Z, Shift+Z, Delete/Backspace, Escape
+//   * Transform: arrow keys (nudge), H/V (flip)
+//   * View: P (preview toggle)
+
+import type { Project, SceneObject, Transform } from '../../core/scene';
+import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import type { ToastVariant } from '../state/toast-store';
+import {
+  handleImportSvg,
+  handleOpenProject,
+  handleSaveGcode,
+  handleSaveProject,
+} from './file-actions';
+
+const NUDGE_MM = 1;
+const NUDGE_BIG_MM = 10;
+
+export type FileCtx = {
+  readonly platform: PlatformAdapter;
+  readonly project: Project;
+  readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => void;
+  readonly setProject: (p: Project) => void;
+  readonly newProject: () => void;
+  readonly savedName: string | null;
+  readonly lastSaveTarget: SaveTarget | null;
+  readonly markSaved: (target: SaveTarget) => void;
+  readonly markLoaded: (filename: string) => void;
+  readonly pushToast: (message: string, variant?: ToastVariant) => void;
+  // F-A13 dirty-check. Returns false to abort destructive actions (New /
+  // Open). Wired in use-shortcuts.ts to the same window.confirm() the
+  // toolbar uses; tests can stub a true-returning fn.
+  readonly confirmDiscard: (action: string) => boolean;
+};
+
+export type EditCtx = {
+  readonly undo: () => void;
+  readonly redo: () => void;
+  readonly selectedObjectId: string | null;
+  readonly additionalSelectedIds: ReadonlySet<string>;
+  readonly removeSceneObject: (id: string) => void;
+  readonly selectObject: (id: string | null) => void;
+  readonly selectAllObjects: () => void;
+};
+
+export type TransformCtx = {
+  readonly project: Project;
+  readonly selectedObjectId: string | null;
+  readonly applyObjectTransform: (id: string, transform: Transform) => void;
+};
+
+export type ViewCtx = {
+  readonly togglePreview: () => void;
+  readonly resetView: () => void; // F (fit) and 0 (100%) both call this in Phase A
+  readonly zoomBy: (factor: number) => void;
+};
+
+function hasMeta(e: KeyboardEvent): boolean {
+  return e.ctrlKey || e.metaKey;
+}
+
+function isEditableTarget(e: KeyboardEvent): boolean {
+  const target = e.target as HTMLElement | null;
+  return target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
+}
+
+const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i', 'e'];
+const FILE_DISPATCH: Readonly<Record<string, (c: FileCtx) => void>> = {
+  n: (c) => {
+    if (c.confirmDiscard('start a new project')) c.newProject();
+  },
+  o: (c) => {
+    if (!c.confirmDiscard('open another project')) return;
+    void handleOpenProject({
+      platform: c.platform,
+      setProject: c.setProject,
+      markLoaded: c.markLoaded,
+      pushToast: c.pushToast,
+    });
+  },
+  s: (c) =>
+    void handleSaveProject({
+      platform: c.platform,
+      project: c.project,
+      savedName: c.savedName,
+      lastSaveTarget: c.lastSaveTarget,
+      markSaved: c.markSaved,
+      pushToast: c.pushToast,
+    }),
+  i: (c) => void handleImportSvg(c.platform, c.importSvgObject, c.pushToast),
+  e: (c) =>
+    void handleSaveGcode({
+      platform: c.platform,
+      project: c.project,
+      savedName: c.savedName,
+      pushToast: c.pushToast,
+    }),
+};
+
+export function handleFileShortcut(e: KeyboardEvent, ctx: FileCtx): boolean {
+  if (!hasMeta(e)) return false;
+  // Ctrl+Shift+S = Save As (F-A15); always opens the dialog.
+  if (e.shiftKey && e.key.toLowerCase() === 's') {
+    e.preventDefault();
+    void handleSaveProject(
+      {
+        platform: ctx.platform,
+        project: ctx.project,
+        savedName: ctx.savedName,
+        lastSaveTarget: ctx.lastSaveTarget,
+        markSaved: ctx.markSaved,
+        pushToast: ctx.pushToast,
+      },
+      true,
+    );
+    return true;
+  }
+  if (e.shiftKey) return false;
+  const key = e.key.toLowerCase();
+  if (!FILE_KEYS.includes(key)) return false;
+  e.preventDefault();
+  FILE_DISPATCH[key]?.(ctx);
+  return true;
+}
+
+type EditBinding = {
+  readonly match: (e: KeyboardEvent) => boolean;
+  readonly invoke: (c: EditCtx) => void;
+};
+
+const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
+  {
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'z' && !e.shiftKey,
+    invoke: (c) => c.undo(),
+  },
+  {
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'z' && e.shiftKey,
+    invoke: (c) => c.redo(),
+  },
+  {
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'a' && !e.shiftKey,
+    invoke: (c) => c.selectAllObjects(),
+  },
+  {
+    match: (e) => !hasMeta(e) && (e.key === 'Delete' || e.key === 'Backspace'),
+    invoke: (c) => {
+      // Multi-delete (F-A14 / F-A5). Remove the primary first, then every
+      // extra. removeSceneObject auto-clears the matching selection so we
+      // can iterate the captured set safely.
+      const all = [
+        ...(c.selectedObjectId !== null ? [c.selectedObjectId] : []),
+        ...c.additionalSelectedIds,
+      ];
+      for (const id of all) c.removeSceneObject(id);
+    },
+  },
+  {
+    match: (e) => !hasMeta(e) && e.key === 'Escape',
+    invoke: (c) => c.selectObject(null),
+  },
+];
+
+export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
+  for (const binding of EDIT_BINDINGS) {
+    if (binding.match(e)) {
+      e.preventDefault();
+      binding.invoke(ctx);
+      return true;
+    }
+  }
+  return false;
+}
+
+const ARROW_DELTAS: Readonly<Record<string, { dx: number; dy: number }>> = {
+  ArrowLeft: { dx: -1, dy: 0 },
+  ArrowRight: { dx: 1, dy: 0 },
+  ArrowUp: { dx: 0, dy: -1 },
+  ArrowDown: { dx: 0, dy: 1 },
+};
+
+function tryNudge(e: KeyboardEvent, ctx: TransformCtx): boolean {
+  const arrow = ARROW_DELTAS[e.key];
+  if (arrow === undefined) return false;
+  e.preventDefault();
+  const obj = ctx.project.scene.objects.find((o) => o.id === ctx.selectedObjectId);
+  if (obj === undefined) return true;
+  const step = e.shiftKey ? NUDGE_BIG_MM : NUDGE_MM;
+  ctx.applyObjectTransform(obj.id, {
+    ...obj.transform,
+    x: obj.transform.x + arrow.dx * step,
+    y: obj.transform.y + arrow.dy * step,
+  });
+  return true;
+}
+
+function tryFlip(e: KeyboardEvent, ctx: TransformCtx): boolean {
+  const key = e.key.toLowerCase();
+  if (key !== 'h' && key !== 'v') return false;
+  e.preventDefault();
+  const obj = ctx.project.scene.objects.find((o) => o.id === ctx.selectedObjectId);
+  if (obj === undefined) return true;
+  const next: Transform = {
+    ...obj.transform,
+    mirrorX: key === 'h' ? !obj.transform.mirrorX : obj.transform.mirrorX,
+    mirrorY: key === 'v' ? !obj.transform.mirrorY : obj.transform.mirrorY,
+  };
+  ctx.applyObjectTransform(obj.id, next);
+  return true;
+}
+
+export function handleTransformShortcut(e: KeyboardEvent, ctx: TransformCtx): boolean {
+  if (ctx.selectedObjectId === null) return false;
+  if (hasMeta(e) || e.altKey) return false;
+  if (isEditableTarget(e)) return false;
+  if (tryNudge(e, ctx)) return true;
+  if (tryFlip(e, ctx)) return true;
+  return false;
+}
+
+export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
+  if (hasMeta(e) || e.shiftKey) return false;
+  if (isEditableTarget(e)) return false;
+  const key = e.key.toLowerCase();
+  // F-A15 View shortcuts. Phase A treats F (fit) and 0 (100%) identically
+  // since the only "100%" state we model is fit-to-bed; if a Phase C ADR
+  // introduces real device-units zoom, '0' will diverge from F.
+  switch (key) {
+    case 'p':
+      e.preventDefault();
+      ctx.togglePreview();
+      return true;
+    case 'f':
+    case '0':
+      e.preventDefault();
+      ctx.resetView();
+      return true;
+    case '+':
+    case '=': // '=' is shift-less '+', the literal key in most keyboards
+      e.preventDefault();
+      ctx.zoomBy(1.25);
+      return true;
+    case '-':
+      e.preventDefault();
+      ctx.zoomBy(1 / 1.25);
+      return true;
+    default:
+      return false;
+  }
+}
