@@ -10,6 +10,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import boundariesPlugin from 'eslint-plugin-boundaries';
 import importPlugin from 'eslint-plugin-import';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import prettierConfig from 'eslint-config-prettier';
 import globals from 'globals';
 
@@ -81,6 +82,10 @@ export default tseslint.config(
     plugins: {
       boundaries: boundariesPlugin,
       import: importPlugin,
+      // react-hooks plugin enforces rules-of-hooks + exhaustive-deps.
+      // Catches closure-stale-state bugs in useEffect (R-H1 audit
+      // finding was exactly this class).
+      'react-hooks': reactHooksPlugin,
     },
     languageOptions: {
       ecmaVersion: 2022,
@@ -114,6 +119,13 @@ export default tseslint.config(
       'boundaries/dependencies': ['error', { default: 'disallow', rules: boundaryRules }],
       'boundaries/no-unknown': 'error',
       'boundaries/no-unknown-files': 'error',
+
+      // React hooks rules (R-H4 audit finding). rules-of-hooks is an
+      // error because violations break at runtime; exhaustive-deps is a
+      // warning so a deliberate dep-omission (with a comment) doesn't
+      // fail CI, but it surfaces in every editor.
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
 
       // Type strictness (CLAUDE.md "Type strictness")
       '@typescript-eslint/no-explicit-any': 'error',

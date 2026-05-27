@@ -264,18 +264,29 @@ function jobActions(
     },
     resumeJob: async () => {
       await safeWrite(RT_RESUME);
-      const s = get().streamer;
-      if (s !== null) {
-        const resumed = resumeStreamer(s);
-        const stepped = step(resumed);
-        set({ streamer: stepped.state });
-        if (stepped.toSend.length > 0) await safeWrite(stepped.toSend);
-      }
+      // Functional set so the snapshot is taken AT WRITE TIME — during
+      // the await above, ack-driven handleLine paths can have advanced
+      // the streamer via advanceStream. A `const s = get().streamer`
+      // before the set would clobber those concurrent updates with a
+      // state derived from a stale snapshot, drifting the in-flight
+      // accounting against the real GRBL 127-byte buffer (R-H2 audit
+      // finding). On a laser cutter, accounting drift can push more
+      // bytes than the buffer holds → dropped commands → uncontrolled
+      // head motion.
+      let toSend = '';
+      set((s) => {
+        if (s.streamer === null) return s;
+        const stepped = step(resumeStreamer(s.streamer));
+        toSend = stepped.toSend;
+        return { streamer: stepped.state };
+      });
+      if (toSend.length > 0) await safeWrite(toSend);
     },
     stopJob: async () => {
       await safeWrite(RT_SOFT_RESET);
-      const s = get().streamer;
-      if (s !== null) set({ streamer: cancelStreamer(s) });
+      // Same race window as resumeJob — use functional set so the
+      // cancel applies to the current state, not a pre-await snapshot.
+      set((s) => (s.streamer !== null ? { streamer: cancelStreamer(s.streamer) } : s));
     },
   };
 }

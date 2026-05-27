@@ -411,6 +411,186 @@ are already patched by our F-2 bump to Electron 42.
 
 ---
 
+## Re-audit (2026-05-28 — independent second pass)
+
+The first pass above used the same author. This second pass was done by
+an independent agent that did NOT read AUDIT.md until after forming its
+own findings. New findings below — three of them are concrete bugs the
+first pass missed.
+
+### R-H1 — `useTracePreview` decoder effect uses stale options (HIGH, functional bug)
+
+**Evidence:** `src/ui/trace/use-trace-preview.ts:44-75`. The file-effect
+captures `options` from closure but only depends on `[file]`. The first
+`runTrace(img, options, setState)` after a decode uses whatever `options`
+was at the render that fired the effect — not the live current value.
+The dropped-dep is a known react-hooks/exhaustive-deps catch (see R-H4).
+
+**Risk path:** User opens dialog, changes preset to "Photo," picks a PNG.
+First trace renders with whatever preset was current when the effect was
+queued — usually "Line Art" (the default). Preview lies; user submits
+the "wrong" trace.
+
+**Fix:** Use a ref to read the latest `options` inside the file-effect
+without re-running the effect on every options change. ~4 LOC.
+
+**Status:** **FIX THIS SESSION.**
+
+### R-H2 — `resumeJob` / `stopJob` race against ack-driven state updates (HIGH, safety-relevant)
+
+**Evidence:** `src/ui/state/laser-store.ts:265-274` (resume) and 275-279
+(stop). Both do `await safeWrite(...)` then `const s = get().streamer`
+then `set({ streamer: ... })`. During the await, GRBL's ack stream feeds
+`handleLine` → `advanceStream` → onAck/step → `set`, which mutates
+streamer state under our feet. Our subsequent `set({ streamer: stepped })`
+clobbers those concurrent updates with a state derived from the stale
+snapshot.
+
+**Risk path:** The streamer's `inFlight` / `inFlightBytes` accounting
+drifts vs reality. If accounting underestimates inFlight bytes (because
+the ack that already landed was overwritten), `step()` could push more
+bytes into the 127-byte GRBL serial buffer than fit → GRBL drops bytes
+mid-command → unpredictable head moves or stuck job with laser still on.
+A genuinely safety-relevant bug on a laser.
+
+**Fix:** Use Zustand's functional `set((s) => ...)` form so the read
+happens at the moment of write. Pattern:
+```ts
+set((s) => {
+  if (s.streamer === null) return s;
+  const stepped = step(resumeStreamer(s.streamer));
+  toSend = stepped.toSend;
+  return { streamer: stepped.state };
+});
+```
+
+**Status:** **FIX THIS SESSION** — highest priority.
+
+### R-H3 — Public sourcemaps leak full proprietary source over Cloudflare (HIGH, IP exposure)
+
+**Evidence:** `vite.config.ts:47` sets `sourcemap: true`. The 2 MB
+`dist/web/assets/index-*.js.map` contains `sourcesContent` for ~120
+source files (every `.ts` in `src/`, plus resolved pnpm paths for our
+deps). Cloudflare Pages serves it with `Cache-Control: public,
+max-age=31536000, immutable`.
+
+**Risk path:** The project is **proprietary, All Rights Reserved
+(ADR-018)**. The Cloudflare URL is **public**. Anyone who hits
+`laserforge.pages.dev/assets/index-*.js.map` gets the full TS source
+including planning comments, vendor-quirks notes, audit-fix annotations.
+First-pass audit acknowledged this as "acceptable for a private
+proprietary app" — that wording mis-frames the situation: the *repo* is
+private, the *deploy URL* is public. These are different things.
+
+**Fix:** `build.sourcemap: false` in `vite.config.ts`. Sourcemaps are
+useful only for error trackers (Sentry-class) we don't run. If we add
+one later, switch to `'hidden'` and upload maps server-side.
+
+**Status:** **FIX THIS SESSION.**
+
+### R-H4 — `eslint-plugin-react-hooks` installed but never wired (MEDIUM)
+
+**Evidence:** `package.json:56` lists `eslint-plugin-react-hooks ^5.0.0`
+in devDependencies. `eslint.config.mjs` does not import or enable it
+(`grep -c react-hooks eslint.config.mjs` = 0). The exhaustive-deps rule
+would have flagged R-H1 at lint time.
+
+**Fix:** Add to `eslint.config.mjs`:
+```js
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+// in plugins: { 'react-hooks': reactHooksPlugin },
+// in rules:   'react-hooks/rules-of-hooks': 'error',
+//             'react-hooks/exhaustive-deps': 'warn',
+```
+
+**Status:** **FIX THIS SESSION.**
+
+### R-H5 — Deploy workflow lacks gating on CI (MEDIUM)
+
+**Evidence:** `.github/workflows/deploy.yml:34` sets `needs: []` with a
+comment explicitly noting CI and deploy run in parallel; a commit that
+fails tests/lint but builds will publish. The workflow's own preamble
+("Runs on every push to main AFTER CI has had a chance") contradicts
+this.
+
+**Risk path:** A commit that breaks the streamer's char-buffer math but
+passes `vite build` ships to production. Next user to connect their
+laser gets the broken streamer.
+
+**Fix:** Trigger via `workflow_run` against CI's success:
+```yaml
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  deploy:
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch'
+```
+
+**Status:** **FIX THIS SESSION.**
+
+### R-M1 — Dialogs lack Escape close, focus trap, and `aria-modal` (MEDIUM, a11y)
+
+**Evidence:** `AddTextDialog.tsx:60` and `ImportImageDialog.tsx:62` render
+`<div role="dialog" aria-label="...">` with:
+- no `aria-modal="true"`
+- no Escape handler at the dialog level
+- no focus trap (tabbing reaches Toolbar buttons under the backdrop)
+- no return-focus on close
+
+Keyboard-only and screen-reader users can't dismiss without clicking
+Cancel; focus escapes the modal.
+
+**Fix:** Add `aria-modal="true"`, an `onKeyDown` on the form calling
+close() for Escape, and trap focus to the dialog while open. ~30 LOC.
+Separate session — needs a small focus-trap utility (~50 LOC) which is
+worth its own module + tests.
+
+**Status:** **TRACKED.**
+
+### R-L1 — Toast `setTimeout` not tracked across manual dismiss (LOW)
+
+**Evidence:** `src/ui/state/toast-store.ts:39`. Timers are fire-and-forget.
+On manual dismiss the timer still runs and no-ops at fire time.
+
+**Status:** **TRACKED** — harmless; cleanup adds ~10 LOC.
+
+### R-L2 — `runHandshake` busy-waits on Date.now (LOW, code smell)
+
+**Evidence:** `src/ui/state/laser-store.ts:319-322` polls with 50 ms
+loop instead of `Promise.race([... timeout])`. Fine in prod, brittle
+under fake-time testing.
+
+**Status:** **TRACKED.**
+
+### R-L3 — `URL.createObjectURL` cleanup correct but brittle (NOTE)
+
+**Evidence:** `src/ui/trace/image-loader.ts:23-39`. The `finally`-revoke
+is fine. Document this so a future refactor doesn't drop it.
+
+**Status:** **NOTE.**
+
+### Comparison: where the first-pass audit was over- or under-rated
+
+| Original | Re-audit verdict | Why |
+|---|---|---|
+| A1 ASAR fuses (Medium) | Still Medium but **DEFERRED status mis-uses severity field**. Should be a tracked future-task note, not a finding. | First pass conflated present state with hypothetical-future risk. |
+| A4 `protocol.handle()` (Low) | Closer to **Note** — pure defense-in-depth on top of a strict CSP. |  |
+| **Vite sourcemap** | First pass buried this in External-cross-check #5 as "acceptable" — **R-H3 elevates it to HIGH** given the proprietary license + public URL. | First-pass missed that "private repo" ≠ "private deploy URL." |
+| A7 UI test gap (Medium) | Accurate, but **didn't note `react-hooks` plugin would catch a chunk of those issues at lint** — R-H4. |  |
+
+### Re-audit verdict
+
+First-pass audit was correct in its broad assessment (no critical or
+high security findings) but missed three concrete bugs and one IP-exposure
+issue. After fixing R-H1/R-H2/R-H3/R-H4/R-H5 this session, the project
+returns to ship-ready.
+
+---
+
 ## How this audit was produced
 
 Verified locally:

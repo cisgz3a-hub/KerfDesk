@@ -40,6 +40,14 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
   // it bails if the latest token has advanced — stops slow traces
   // from clobbering a newer "ready" result.
   const tokenRef = useRef(0);
+  // Latest-options ref. The file-effect below depends only on `file`
+  // (re-decoding on every options change would be wasteful), but the
+  // first runTrace after a decode used to capture `options` from
+  // closure — i.e. whatever value was current when the file-effect
+  // FIRST fired. A user who picks a file before changing the preset
+  // saw a trace at the original preset. R-H1 audit finding.
+  const optionsRef = useRef(options);
+  optionsRef.current = options;
 
   useEffect(() => {
     if (file === null) {
@@ -56,7 +64,10 @@ export function useTracePreview(file: File | null, options: TraceOptions): Trace
         if (tokenRef.current !== myToken) return;
         decodedRef.current = img;
         setState({ kind: 'tracing' });
-        runTrace(img, options, setState);
+        // Read options through the ref so the latest preset wins even
+        // if the user changed it between picking the file and decode
+        // completing (R-H1 fix).
+        runTrace(img, optionsRef.current, setState);
       })
       .catch((err: unknown) => {
         if (tokenRef.current !== myToken) return;
