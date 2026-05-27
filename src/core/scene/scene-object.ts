@@ -74,6 +74,10 @@ export type TextObject = {
   readonly sizeMm: number;
   readonly alignment: TextAlignment;
   readonly lineHeight: number; // multiplier of sizeMm
+  // Letter spacing (tracking) as a multiplier of sizeMm. 0 = font's
+  // natural spacing. Positive = wider, negative = tighter. opentype.js
+  // applies this as an extra advance after each glyph. Phase D.1 add.
+  readonly letterSpacing: number;
   readonly color: string; // hex; default black
   readonly bounds: Bounds; // computed at edit time from `paths`
   readonly transform: Transform;

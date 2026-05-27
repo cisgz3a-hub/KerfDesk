@@ -11,6 +11,7 @@ export type { FontKey, TextAlignment, TextObject } from './text-object';
 export {
   DEFAULT_TEXT_ALIGNMENT,
   DEFAULT_TEXT_COLOR,
+  DEFAULT_TEXT_LETTER_SPACING,
   DEFAULT_TEXT_LINE_HEIGHT,
   DEFAULT_TEXT_SIZE_MM,
 } from './text-object';

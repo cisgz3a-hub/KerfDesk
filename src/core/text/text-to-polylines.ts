@@ -35,6 +35,10 @@ export type TextRenderInput = {
   readonly sizeMm: number;
   readonly alignment: 'left' | 'center' | 'right';
   readonly lineHeight: number; // multiplier of sizeMm
+  // Letter spacing as a multiplier of sizeMm. Defaults to 0 (natural).
+  // Passed straight through to opentype.js's getPath options, which
+  // adds spacing × fontSize to each glyph's advance.
+  readonly letterSpacing?: number;
   readonly color: string;
 };
 
@@ -47,9 +51,15 @@ export function textToPolylines(input: TextRenderInput): TextRenderResult {
   const font = opentype.parse(input.fontBuffer);
   const lines = input.content.split('\n');
   const lineSpacingMm = input.sizeMm * input.lineHeight;
-  // Per-line widths drive alignment (right-align means right edges
-  // line up, so we need each line's natural width vs max width).
-  const lineWidths = lines.map((line) => measureLineWidth(font, line, input.sizeMm));
+  const letterSpacing = input.letterSpacing ?? 0;
+  // Per-line widths drive alignment. With letterSpacing != 0 the
+  // natural advance changes — add (N-1) * spacing × sizeMm per line
+  // since opentype's getAdvanceWidth doesn't apply our tracking.
+  const lineWidths = lines.map(
+    (line) =>
+      measureLineWidth(font, line, input.sizeMm) +
+      Math.max(0, line.length - 1) * letterSpacing * input.sizeMm,
+  );
   const maxWidth = lineWidths.reduce((m, w) => (w > m ? w : m), 0);
   const raw: Polyline[] = [];
   for (let i = 0; i < lines.length; i += 1) {
@@ -57,7 +67,7 @@ export function textToPolylines(input: TextRenderInput): TextRenderResult {
     const lineWidth = lineWidths[i] ?? 0;
     const xOffset = alignOffset(input.alignment, lineWidth, maxWidth);
     const yBaseline = i * lineSpacingMm;
-    pushLinePolylines(font, line, input.sizeMm, xOffset, yBaseline, raw);
+    pushLinePolylines(font, line, input.sizeMm, xOffset, yBaseline, letterSpacing, raw);
   }
   // Normalize: translate so the natural bounds are (0, 0)-rooted,
   // matching ImportedSvg's viewBox convention. fit-to-bed, hit-test,
@@ -131,12 +141,19 @@ function pushLinePolylines(
   sizeMm: number,
   xOffset: number,
   yBaseline: number,
+  letterSpacing: number,
   out: Polyline[],
 ): void {
   // opentype's getPath returns SVG-like commands in mm-equivalent
   // units when we pass sizeMm directly. The baseline sits at y = 0
-  // by convention; we translate to (xOffset, yBaseline).
-  const path = font.getPath(line, xOffset, yBaseline, sizeMm);
+  // by convention; we translate to (xOffset, yBaseline). The
+  // letterSpacing option (since opentype.js 1.3) is a multiplier of
+  // fontSize added after each glyph's natural advance — opentype's
+  // implementation just does `x += options.letterSpacing * fontSize`
+  // per char (verified in node_modules/opentype.js source).
+  const path = font.getPath(line, xOffset, yBaseline, sizeMm, {
+    letterSpacing,
+  });
   flattenPath(path.commands, out);
 }
 

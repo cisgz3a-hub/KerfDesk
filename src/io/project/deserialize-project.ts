@@ -8,6 +8,7 @@
 
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
+import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 
 export type DeserializeResult =
@@ -75,6 +76,8 @@ export function deserializeProject(jsonText: string): DeserializeResult {
 
 function normalizeProject(raw: Record<string, unknown>): Project {
   const dev = (raw['device'] ?? {}) as Record<string, unknown>;
+  const scene = (raw['scene'] ?? {}) as Record<string, unknown>;
+  const objects = Array.isArray(scene['objects']) ? scene['objects'] : [];
   const normalized = {
     ...raw,
     device: {
@@ -88,8 +91,23 @@ function normalizeProject(raw: Record<string, unknown>): Project {
           ? dev['junctionDeviationMm']
           : DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
     },
+    scene: {
+      ...scene,
+      objects: objects.map(normalizeSceneObject),
+    },
   };
   return normalized as unknown as Project;
+}
+
+// Back-fill additive TextObject fields on load. D.1 added letterSpacing —
+// .lf2 files saved before D.1 don't have it. Treating missing as the
+// default (0 = natural spacing) keeps the schema additive without forcing
+// a schemaVersion bump.
+function normalizeSceneObject(obj: unknown): unknown {
+  if (!isObject(obj)) return obj;
+  if (obj['kind'] !== 'text') return obj;
+  if (typeof obj['letterSpacing'] === 'number') return obj;
+  return { ...obj, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
 }
 
 function validateShape(raw: Record<string, unknown>): string | null {

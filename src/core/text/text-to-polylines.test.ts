@@ -111,6 +111,32 @@ describe('textToPolylines', () => {
     expect(h).toBeLessThan(110);
   });
 
+  it('letter spacing widens the bounds proportionally (D.1 polish)', () => {
+    // letterSpacing is a multiplier of sizeMm added per glyph by
+    // opentype's getPath. "HELLO" has 5 glyphs → 4 gaps. At sizeMm=10
+    // and letterSpacing=0.5, the line should be ~20mm wider than at
+    // letterSpacing=0 (4 gaps × 5mm extra each).
+    const tight = render('HELLO', { sizeMm: 10 });
+    const wide = render('HELLO', { sizeMm: 10 });
+    const wideSpaced = textToPolylines({
+      fontBuffer: robotoBuffer,
+      content: 'HELLO',
+      sizeMm: 10,
+      alignment: 'left',
+      lineHeight: 1.4,
+      letterSpacing: 0.5,
+      color: '#000000',
+    });
+    const tightW = tight.bounds.maxX - tight.bounds.minX;
+    const wideW = wideSpaced.bounds.maxX - wideSpaced.bounds.minX;
+    // 4 gaps × 0.5 × 10mm = 20mm extra. Allow ±2mm slop for the
+    // last-glyph trailing edge.
+    expect(wideW - tightW).toBeGreaterThan(15);
+    expect(wideW - tightW).toBeLessThan(25);
+    // sanity: passing the same value twice gives the same result
+    expect(wide.bounds.maxX).toBeCloseTo(tight.bounds.maxX, 5);
+  });
+
   it('parses Dancing Script (variable font) and produces drawable polylines', () => {
     // Regression for the github-error-html-as-ttf bug: an invalid
     // font binary throws "unsupported OpenType signature" inside
