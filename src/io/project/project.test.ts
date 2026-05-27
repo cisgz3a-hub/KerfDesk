@@ -111,4 +111,32 @@ describe('deserializeProject', () => {
     const result = deserializeProject('{"schemaVersion":0}');
     expect(result.kind).toBe('schema-too-old');
   });
+
+  it('back-fills missing planner fields (accel + junctionDeviation) on old .lf2 files', () => {
+    // Pre-planner .lf2 files had no accelMmPerSec2 / junctionDeviationMm
+    // on the device profile. They must still deserialize cleanly — the
+    // normalize step in deserializeProject fills sensible defaults so
+    // the planner doesn't get NaN/undefined and crash.
+    const oldShape = JSON.stringify({
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      device: {
+        name: 'Old Profile',
+        bedWidth: 300,
+        bedHeight: 300,
+        maxFeed: 3000,
+        maxPowerS: 1000,
+        origin: 'front-left',
+        homing: { enabled: false, direction: 'front-left' },
+        autofocusCommand: '',
+      },
+      workspace: { width: 300, height: 300, units: 'mm' },
+      scene: { objects: [], layers: [] },
+    });
+    const r = deserializeProject(oldShape);
+    expect(r.kind).toBe('ok');
+    if (r.kind === 'ok') {
+      expect(r.project.device.accelMmPerSec2).toBeGreaterThan(0);
+      expect(r.project.device.junctionDeviationMm).toBeGreaterThan(0);
+    }
+  });
 });

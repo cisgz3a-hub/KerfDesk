@@ -266,6 +266,18 @@ Libraries that were evaluated and explicitly rejected. Keeping this list prevent
 - **Rejection reason:** HTML-focused; weaker SVG support than DOMPurify. DOMPurify's `USE_PROFILES: { svg: true }` is purpose-built for our use case.
 - **Re-evaluate if:** DOMPurify becomes unmaintained or has a security incident we can't accept the response time on.
 
+### grbl-sim / grbl (as references for the planner-aware estimator)
+
+- **Subject:** GRBL motion planner — junction-deviation cornering + two-pass lookahead
+- **Sources consulted:**
+  - **grbl** itself (github.com/gnea/grbl) — `planner.c`, `stepper.c`. License: **GPL-3.0**. Read-only reference per ADR-017 (same status this log gives CNCjs for protocol work). No code copied.
+  - **grbl-sim** (github.com/grbl/grbl-sim) — earlier-thought-to-be-MIT; actually GPL-3. Same read-only reference.
+  - **Sonny Jeon's "Improving Grbl: cornering algorithm"** (2014 design paper, publicly published). Algorithm and math are public — algorithms are not copyrightable.
+  - **MeerK40t** (github.com/meerk40t/meerk40t) — MIT-licensed laser app. Skimmed for sanity-check; their planner is heavier than what we needed for an estimator and we did not adopt code.
+- **Evaluated:** 2026-05-27
+- **Outcome:** wrote `src/core/job/planner.ts` from first principles using the published junction-deviation formula (`v_j = √(a·δ·sin(θ/2) / (1−sin(θ/2)))`) and standard motion-control trapezoidal-profile math. No code copied from any source; the algorithm is the same one every GRBL-class machine implements internally.
+- **Re-evaluate if:** estimate accuracy regressions appear that the formula alone can't explain — at that point, comparing against grbl-sim's instrumented output is the right reference.
+
 ---
 
 ## Notes on style

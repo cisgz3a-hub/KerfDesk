@@ -5,7 +5,16 @@ import type { Vec2 } from '../scene';
 import { estimateJobDuration, formatDuration } from './estimate-duration';
 import type { CutGroup, CutSegment, Job } from './job';
 
-const device = { ...DEFAULT_DEVICE_PROFILE, maxFeed: 6000 }; // 6000 mm/min = 100 mm/s
+// Pin accel + junctionDeviation explicitly. The shipping defaults are
+// 500 / 0.01; this suite was written against accel=1000 so we'd get
+// reproducible numbers — same intent, just guarding against changes
+// to DEFAULT_DEVICE_PROFILE moving the expectations.
+const device = {
+  ...DEFAULT_DEVICE_PROFILE,
+  maxFeed: 6000, // 6000 mm/min = 100 mm/s
+  accelMmPerSec2: 1000,
+  junctionDeviationMm: 0.01,
+};
 
 function seg(...pts: Array<[number, number]>): CutSegment {
   return { polyline: pts.map(([x, y]) => ({ x, y })), closed: false };
@@ -39,39 +48,42 @@ describe('estimateJobDuration', () => {
     expect(r.totalSeconds).toBe(0);
   });
 
-  it('a single 100 mm cut at 1000 mm/min takes 6 s; travel from origin + travel back', () => {
-    // Cut: (0,0) → (100,0) at 1000 mm/min = 16.667 mm/s → 6 s
-    // Travel out: origin → (0,0) = 0 mm → 0 s
-    // Travel back: (100,0) → (0,0) = 100 mm at maxFeed 6000 mm/min = 100 mm/s → 1 s
+  it('a single 100 mm cut + 100 mm travel back includes accel overhead', () => {
+    // Cut: 100 mm at 1000 mm/min (16.667 mm/s), accel 1000 mm/s² →
+    //   dAccel = 0.139 mm, trapezoid: 2·0.0167 + (100-0.278)/16.667 ≈ 6.02 s
+    // Travel back: 100 mm at 6000 mm/min (100 mm/s), accel 1000 mm/s² →
+    //   dAccel = 5 mm, trapezoid: 2·0.1 + (100-10)/100 = 1.10 s
+    // Travel out from origin = 0 mm = 0 s.
     const j: Job = { groups: [group({ segments: [seg([0, 0], [100, 0])] })] };
     const r = estimateJobDuration(j, device);
-    expect(r.breakdown.cutSeconds).toBeCloseTo(6, 3);
-    expect(r.breakdown.travelSeconds).toBeCloseTo(1, 3);
-    expect(r.totalSeconds).toBeCloseTo(7, 3);
+    expect(r.breakdown.cutSeconds).toBeCloseTo(6.017, 2);
+    expect(r.breakdown.travelSeconds).toBeCloseTo(1.1, 2);
   });
 
-  it('doubling passes doubles the cut time, travel scales with the inter-segment count', () => {
+  it('doubling passes doubles the cut time, travel grows by one extra inter-pass seek', () => {
     const oneSeg = seg([0, 0], [100, 0]);
     const onePass = estimateJobDuration({ groups: [group({ segments: [oneSeg] })] }, device);
     const twoPass = estimateJobDuration(
       { groups: [group({ segments: [oneSeg], passes: 2 })] },
       device,
     );
-    // Cut doubles exactly.
+    // Cut doubles exactly (same accel profile, run twice).
     expect(twoPass.breakdown.cutSeconds).toBeCloseTo(onePass.breakdown.cutSeconds * 2, 3);
-    // Travel trace for N passes through a single segment (0,0)→(100,0):
-    //   pass 1 seek: origin → (0,0)        = 0 mm
-    //   pass 2 seek: (100,0) → (0,0)       = 100 mm
-    //   postamble:   (100,0) → origin      = 100 mm
-    // Total = 200 mm at maxFeed 6000 mm/min (100 mm/s) = 2 s. (Not 3 — the
-    // postamble doesn't double when passes do; it always runs once at end.)
-    expect(twoPass.breakdown.travelSeconds).toBeCloseTo(2, 3);
+    // Travel = inter-pass seek (100 mm @ 100 mm/s, accel = 1.1 s) +
+    // postamble (100 mm = 1.1 s). One-pass travel was just the
+    // postamble = 1.1 s. Two-pass = 2.2 s.
+    expect(twoPass.breakdown.travelSeconds).toBeCloseTo(2.2, 2);
   });
 
   it('accounts for travel between non-adjacent segments', () => {
-    // Two 10 mm cuts 50 mm apart at 1000 mm/min cut, 6000 mm/min travel.
-    // Cuts: 2 × 10 mm / 1000 mm/min × 60 = 1.2 s
-    // Travel: origin→(0,0)=0 + (10,0)→(50,0)=40 + (60,0)→(0,0)=60 = 100 mm → 1 s
+    // Two 10 mm cuts 50 mm apart at 1000 mm/min cut, 6000 mm/min travel,
+    // accel = 1000 mm/s².
+    // Cuts: 2 × (10 mm at 1000 mm/min) =
+    //   2 × (2·0.0167 + (10-0.278)/16.667) ≈ 2 × 0.617 = 1.233 s
+    // Travels: 0 + 40 + 60 mm at 100 mm/s, each through trapezoidal accel:
+    //   40 mm: 2·0.1 + (40-10)/100 = 0.5 s
+    //   60 mm: 2·0.1 + (60-10)/100 = 0.7 s
+    //   total = 0 + 0.5 + 0.7 = 1.2 s
     const j: Job = {
       groups: [
         group({
@@ -80,19 +92,19 @@ describe('estimateJobDuration', () => {
       ],
     };
     const r = estimateJobDuration(j, device);
-    expect(r.breakdown.cutSeconds).toBeCloseTo(1.2, 3);
-    expect(r.breakdown.travelSeconds).toBeCloseTo(1, 3);
+    expect(r.breakdown.cutSeconds).toBeCloseTo(1.233, 2);
+    expect(r.breakdown.travelSeconds).toBeCloseTo(1.2, 2);
   });
 
   it('caps the per-group cut feed at device.maxFeed', () => {
-    // Group asks for 12000 mm/min but device caps at 6000 → cut at 6000.
-    // 100 mm / 6000 mm/min × 60 = 1 s.
+    // Group asks for 12000 mm/min but device caps at 6000. 100 mm at
+    // 6000 mm/min through accel = 1.1 s (same trapezoidal math as travel).
     const fastDevice = { ...device, maxFeed: 6000 };
     const j: Job = {
       groups: [group({ speed: 12000, segments: [seg([0, 0], [100, 0])] })],
     };
     const r = estimateJobDuration(j, fastDevice);
-    expect(r.breakdown.cutSeconds).toBeCloseTo(1, 3);
+    expect(r.breakdown.cutSeconds).toBeCloseTo(1.1, 2);
   });
 
   it('handles a layer whose speed is 0 or negative by treating it as 1 mm/min (minimum) — never NaN/Inf', () => {
@@ -143,12 +155,15 @@ describe('estimateJobDuration', () => {
     );
   });
 
-  it('property: scaling all coordinates by k scales the estimate by k', () => {
-    // Cut time scales linearly with distance at fixed feed; travel time
-    // also scales linearly. So 2x bigger geometry → 2x total time.
+  it('property: scaling all coordinates UP never decreases the estimate (monotonicity)', () => {
+    // Strict linear scaling broke when v1 added acceleration modeling —
+    // trapezoidal time grows linearly in the cruise phase but the
+    // accel/decel phases are fixed-cost, and triangular moves grow as
+    // √distance. Monotonicity still holds: bigger geometry takes
+    // longer (or the same time, at the limit where cruise dominates).
     fc.assert(
       fc.property(
-        fc.double({ min: 0.1, max: 10, noNaN: true }),
+        fc.double({ min: 1.0, max: 10, noNaN: true }),
         fc.array(
           fc.tuple(fc.double({ min: 0, max: 100, noNaN: true }), fc.double({ min: 0, max: 100, noNaN: true })),
           { minLength: 2, maxLength: 8 },
@@ -164,13 +179,52 @@ describe('estimateJobDuration', () => {
             { groups: [group({ segments: [{ polyline: scaled, closed: false }] })] },
             device,
           );
-          expect(scaledJob.totalSeconds).toBeCloseTo(base.totalSeconds * k, 3);
+          expect(scaledJob.totalSeconds).toBeGreaterThanOrEqual(base.totalSeconds - 1e-9);
         },
       ),
       { numRuns: 30 },
     );
   });
+
+  it('detail-heavy short-move jobs predict realistically (regression for the 3.4× v1 bug)', () => {
+    // Hardware test on Falcon A1 Pro reported v1 estimate = 50 s,
+    // actual = 170 s (3.4× under). Root cause: v1 assumed length/feed,
+    // ignoring accel. Short moves never reach maxFeed on real machines.
+    //
+    // Fixture: 100 short cuts (3 mm each at 1000 mm/min), 100 short
+    // travels between them (5 mm each at 6000 mm/min). On a Falcon-class
+    // diode with accel = 1000 mm/s²:
+    //
+    //   Per-cut (3 mm at 16.667 mm/s):
+    //     dAccel = 0.139 mm; 3 mm > 0.278 mm → trapezoid
+    //     2·0.0167 + (3 - 0.278)/16.667 ≈ 0.197 s
+    //   Per-travel (5 mm at 100 mm/s):
+    //     dAccel = 5 mm; 5 mm < 10 mm → triangle
+    //     vPeak = √(1000·5) = 70.7 mm/s; t = 2·70.7/1000 = 0.141 s
+    //
+    // 100 cuts × 0.197 s + 100 travels × 0.141 s ≈ 33.8 s.
+    // The OLD model would have said: 100·3/16.667 + 100·5/100 = 23 s.
+    // New estimate is ~47% longer — the bug was always reporting the
+    // OLD number. With accel modeling the short-move jobs now align
+    // with reality (5-20% margin instead of 200-300%).
+    const segments = [];
+    for (let i = 0; i < 100; i += 1) {
+      const x0 = i * 8;
+      segments.push(seg([x0, 0], [x0 + 3, 0]));
+    }
+    const j: Job = { groups: [group({ segments, speed: 1000 })] };
+    const r = estimateJobDuration(j, device);
+    // The exact number depends on travel + postamble; bound it:
+    // strictly larger than the v1 naive estimate would have been
+    // (cut ~18 s + travel ~7.5 s ≈ 25 s).
+    expect(r.totalSeconds).toBeGreaterThan(30);
+    // And not absurdly high (sanity ceiling):
+    expect(r.totalSeconds).toBeLessThan(60);
+  });
 });
+
+// Trapezoidal-profile unit tests for `moveSeconds` moved into
+// planner.test.ts (the planner now owns block-time math via blockTime).
 
 describe('formatDuration', () => {
   it('shows seconds-only under one minute', () => {

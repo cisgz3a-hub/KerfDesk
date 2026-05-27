@@ -22,6 +22,17 @@ export type DeviceProfile = {
   readonly bedHeight: number; // mm
   readonly maxFeed: number; // mm/min
   readonly maxPowerS: number; // GRBL $30 value (e.g. 1000)
+  // GRBL acceleration ($120/$121) in mm/sec². Used by the job-time
+  // estimator's planner. Generic default of 500 sits in the middle of
+  // the hobby/diode-laser range (real machines run 100-2500). Tune
+  // per machine if estimates are systematically off. Phase D will
+  // auto-read this from the `$$` settings dump on connect.
+  readonly accelMmPerSec2: number;
+  // GRBL junction deviation ($11) in mm. Controls cornering velocity:
+  // larger → faster corners but more shake; smaller → slower corners,
+  // smoother motion. Grbl's shipping default is 0.010 mm; rarely
+  // overridden. Used by the planner's junction-velocity formula.
+  readonly junctionDeviationMm: number;
   readonly origin: Origin;
   readonly homing: HomingConfig;
   // Multi-line G-code (or vendor M-code) sequence the "Auto-focus" button
@@ -60,4 +71,8 @@ export const DEFAULT_DEVICE_PROFILE: DeviceProfile = {
   origin: 'front-left',
   homing: { enabled: false, direction: 'front-left' },
   autofocusCommand: DEFAULT_AUTOFOCUS_COMMAND,
+  // Generic GRBL planner defaults. Tune per machine via Device
+  // settings (Advanced) if burns systematically miss the ETA.
+  accelMmPerSec2: 500,
+  junctionDeviationMm: 0.01,
 };

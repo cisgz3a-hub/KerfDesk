@@ -2,9 +2,13 @@
 // React lifecycle. Two effects, mounted once each in App.
 //
 // useAutosave:
-//   Starts a 30s interval that snapshots project + dirty + streaming
-//   from both stores (Zustand getState — no re-render on store change,
-//   which is the whole point of an interval). Clears on unmount.
+//   * 30s interval that snapshots project + dirty + streaming from
+//     both stores. Background safety net for force-kills.
+//   * beforeunload listener that writes synchronously if dirty when
+//     the window closes (X button / Cmd+Q / Alt+F4 / app quit). This
+//     is the path the user actually takes — the 30s interval was
+//     never going to fire in time for normal closes.
+//   Clears both on unmount.
 //
 // useAutosaveRecovery:
 //   Runs once on mount. If localStorage has an autosave AND the
@@ -18,20 +22,40 @@ import {
   clearAutosave,
   readAutosave,
   startAutosaveLoop,
+  writeAutosave,
 } from '../state/autosave';
 import { useLaserStore } from '../state/laser-store';
 
+function snapshotForAutosave(): {
+  readonly project: ReturnType<typeof useStore.getState>['project'];
+  readonly dirty: boolean;
+  readonly isStreaming: boolean;
+} {
+  const s = useStore.getState();
+  const ls = useLaserStore.getState();
+  const streamer = ls.streamer;
+  const isStreaming =
+    streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
+  return { project: s.project, dirty: s.dirty, isStreaming };
+}
+
 export function useAutosave(): void {
   useEffect(() => {
-    const stop = startAutosaveLoop(() => {
-      const s = useStore.getState();
-      const ls = useLaserStore.getState();
-      const streamer = ls.streamer;
-      const isStreaming =
-        streamer !== null && (streamer.status === 'streaming' || streamer.status === 'paused');
-      return { project: s.project, dirty: s.dirty, isStreaming };
-    });
-    return stop;
+    const stopInterval = startAutosaveLoop(snapshotForAutosave);
+    const onBeforeUnload = (): void => {
+      const snap = snapshotForAutosave();
+      // Even mid-stream: if the user closed the window, persisting
+      // their scene is more important than respecting "don't write
+      // during streaming." The streaming guard exists so the 30s
+      // interval doesn't perturb the render loop — that no longer
+      // applies once the page is unloading.
+      if (snap.dirty) writeAutosave(snap.project);
+    };
+    window.addEventListener('beforeunload', onBeforeUnload);
+    return () => {
+      stopInterval();
+      window.removeEventListener('beforeunload', onBeforeUnload);
+    };
   }, []);
 }
 
