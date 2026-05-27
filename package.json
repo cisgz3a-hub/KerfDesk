@@ -28,7 +28,7 @@
     "dev:desktop": "pnpm build:electron-main && vite build && electron .",
     "build:desktop": "pnpm build:electron-main && vite build && electron-builder --win --x64",
     "electron:start": "electron .",
-    "deploy:web": "pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge",
+    "deploy:web": "pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=master",
     "deploy:web:preview": "pnpm build:web && wrangler pages deploy dist/web --project-name=laserforge --branch=preview"
   },
   "dependencies": {
