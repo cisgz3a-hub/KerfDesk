@@ -30,6 +30,8 @@ import { useStore } from '../state';
 import { useToastStore } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
 import { loadImageAsRawData } from './image-loader';
+import { TracePreview } from './TracePreview';
+import { useTracePreview } from './use-trace-preview';
 
 export function ImportImageDialog(): JSX.Element | null {
   const open = useUiStore((s) => s.imageDialogOpen);
@@ -45,6 +47,7 @@ function DialogBody(): JSX.Element {
   const [preset, setPreset] = useState<string>('Line Art');
   const [busy, setBusy] = useState(false);
   const options: TraceOptions = TRACE_PRESETS[preset] ?? DEFAULT_TRACE_OPTIONS;
+  const preview = useTracePreview(file, options);
 
   const onSubmit = (e: React.FormEvent): void => {
     e.preventDefault();
@@ -61,6 +64,7 @@ function DialogBody(): JSX.Element {
         <h2 style={headingStyle}>Trace Image</h2>
         <FilePicker file={file} onPick={setFile} />
         <PresetPicker value={preset} onChange={setPreset} />
+        <TracePreview state={preview} />
         <p style={hintStyle}>
           <strong>Line Art</strong> (default) — black-on-white logos / SVG-style line drawings.
           Forces pure 2-color output. <strong>Smooth</strong> — slightly noisy line art with
