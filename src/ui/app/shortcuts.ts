@@ -66,7 +66,19 @@ function hasMeta(e: KeyboardEvent): boolean {
 
 function isEditableTarget(e: KeyboardEvent): boolean {
   const target = e.target as HTMLElement | null;
-  return target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA';
+  if (target === null) return false;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return true;
+  // Defensive: contenteditable + ARIA textbox surfaces. We don't ship any
+  // today, but a future rich-text or jog-readout that opts into editing
+  // would otherwise eat user keystrokes via the global handlers.
+  // (Check both the property and the attribute — jsdom computes the
+  // property differently from real browsers, and tests need the
+  // attribute path to work.)
+  if (target.isContentEditable) return true;
+  const editableAttr = target.getAttribute('contenteditable');
+  if (editableAttr !== null && editableAttr !== 'false') return true;
+  if (target.getAttribute('role') === 'textbox') return true;
+  return false;
 }
 
 const FILE_KEYS: ReadonlyArray<string> = ['n', 'o', 's', 'i', 'e'];
@@ -166,6 +178,14 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
 ];
 
 export function handleEditShortcut(e: KeyboardEvent, ctx: EditCtx): boolean {
+  // Editable targets get a hard pass — typing in a text input must let
+  // Backspace delete characters, Cmd+A select the input's text, Cmd+Z
+  // undo the input's edit history, etc. Without this guard the global
+  // handlers eat Backspace (deletes the selected scene object) and
+  // Cmd+A (selects every scene object), making text dialogs and
+  // number inputs unusable. Mirrors the same check on
+  // handleTransformShortcut / handleViewShortcut.
+  if (isEditableTarget(e)) return false;
   for (const binding of EDIT_BINDINGS) {
     if (binding.match(e)) {
       e.preventDefault();
