@@ -1,435 +1,435 @@
-# AUDIT.md — LaserForge 2.0
+# AUDIT.md — LaserForge 2.0 (post-Phase F.1)
 
-> Professional audit, written 2026-05-27 after Phase E ships. Findings are
-> evidence-backed (file paths, line counts, gate results), severity-rated,
-> and labeled honestly: **VERIFIED** = covered by passing tests OR observed on
-> real Falcon hardware; **CLAIMED** = the code looks right but I haven't
-> proven it; **DEFERRED** = known gap, intentional, documented.
+> Professional audit, written 2026-05-28 after Phase F.1 (Fill mode)
+> shipped, plus the canvas auto-zoom, Cmd+D duplicate, Frame-feed
+> decoupling, input-focus shortcut fix, Cloudflare Pages deploy, and
+> Electron 42 + Vite 6 + Vitest 3 + boundaries plugin v6 bumps.
 >
-> Prior audit (post-Phase-B): see `AUDIT-2026-05-26-phase-b.md`.
-> See "Comparison against published standards" at the end for how each
-> finding lines up with OWASP / React / CNCjs / Sonny Jeon's grbl design.
+> Findings are evidence-backed (file paths, line counts, command output),
+> severity-rated, and labeled honestly:
+> **VERIFIED** = passing tests OR observed on real hardware;
+> **CLAIMED** = code looks right but I haven't proven it on hardware;
+> **DEFERRED** = known gap, intentional, documented.
+>
+> Prior audits: `AUDIT-2026-05-26-phase-b.md`, `AUDIT-2026-05-27-phase-e.md`.
+> See **External cross-checks** at the end for how each finding lines up
+> against current (2026) Electron / React / OWASP / TypeScript / Vite /
+> WebSerial / GRBL published guidance.
 
 ## Repo at a glance
 
 | Metric | Value | Verdict |
 |---|---|---|
-| Total source LOC | 8 010 | ✅ small for scope |
-| Total test LOC | 4 757 (~59% of source) | ✅ unusually high — most projects ≤ 30% |
-| Tests passing | **386 / 386** | ✅ |
-| Test files | 45 | ✅ |
-| Files over soft cap (250 LOC) | 10 | ⚠️ tolerable — soft cap is a warning |
-| Files over hard cap (400 LOC) | **1** (`DeviceSettings.tsx` at 403) | ⚠️ **F-1** — fix soon |
+| Total source LOC | 12 539 | ✅ small for scope |
+| Total test LOC | 5 572 (~44% of source) | ✅ unusually high — most projects ≤ 30% |
+| Tests passing | **427 / 427** | ✅ |
+| Test files | 49 | ✅ |
 | Production deps | 6 (dompurify, imagetracerjs, opentype.js, react, react-dom, zustand) | ✅ tight |
-| Production vulns | **0** (`pnpm audit --prod`) | ✅ |
-| Dev vulns | 34 (mostly transitive via electron/vite) | ⚠️ **F-2** — none ship to users |
-| ESLint | clean | ✅ |
-| TypeScript strict | clean (no `any`, no `!`, no `eval`, no `innerHTML`) | ✅ |
-| Bundle (JS, gzip) | 168.94 KB | ✅ under 1 MB target by ~5× |
+| **Production vulns** | **0** (`pnpm audit --prod`) | ✅ |
+| **Dev vulns** | **0** (`pnpm audit`) | ✅ down from 34 pre-F-2 |
+| Files over hard cap (400 LOC) | **0** | ✅ (store.ts at exactly 400) |
+| Files over soft cap (250 LOC) | 11 source + 4 test | ⚠️ documented, monitor |
+| ESLint errors | 0 | ✅ |
+| ESLint warnings | 1 (boundaries plugin v6 legacy-selector — non-fatal) | ⚠️ |
+| TypeScript strict | clean (no `any`, no `!`, no `eval`, no `innerHTML=`) | ✅ |
+| `@ts-expect-error` in src | 1 (`trace-image.ts`, imagetracerjs untyped lib) | ✅ justified |
+| Bundle (JS, raw / gzip) | 573 KB / 173 KB | ⚠️ over 500 KB warning; under 1 MB project target |
 | Bundle (fonts, lazy) | 1.08 MB across 4 .ttf files | ✅ loaded on demand |
-| License-check | passes (4 MIT, 1 MPL/Apache, 1 Unlicense) | ✅ |
+| Web prod deploy | `https://laserforge.pages.dev`, CSP+HSTS+SRI headers ✓ | ✅ |
+| CI status | every `ci.yml` step green; deploy.yml awaits secrets | ✅ |
 
 ---
 
 ## Findings — severity-ordered
 
-### F-1 — `DeviceSettings.tsx` is 403 lines (over the 400 hard cap) — **FIXED**
+### A1 — ASAR fuses not flipped (no signed Windows build yet)
 
-**Severity:** High → CLOSED.
+**Severity:** Medium for a future signed release; **N/A** for the current dev / web build.
 
-**Evidence (pre):** 403 LOC.
+**Evidence:** No `afterPack` hook in `package.json#build`, no
+`@electron/fuses` config file in repo. Electron's own security checklist
+flags this as a must-have for signed binaries (CVE-class: tampering with
+the packaged ASAR to inject Node mode).
 
-**Fix:** Extracted `AutofocusEditor` (101 LOC) and `PlannerAdvanced` (81 LOC) into sibling files. Shared `Row` helper + style tokens moved to `device-settings-shared.tsx` (42 LOC) to avoid circular imports. `DeviceSettings.tsx` now **213 LOC**.
+**Risk path:** Once a signed `.exe` ships, an attacker who modifies the
+unpacked ASAR can flip `runAsNode` back on and gain Node access. With
+fuses set the binary refuses to load.
 
-**Verification:** `wc -l src/ui/laser/DeviceSettings.tsx` = 213. `find src -name '*.ts*' | xargs wc -l | awk '$1 > 400'` returns 0 results. Full gate green.
+**Fix path:** Add an `afterPack` step that calls
+`@electron/fuses.flipFuses()` with:
+```
+runAsNode: false,
+nodeOptions: false,
+nodeCliInspect: false,
+embeddedAsarIntegrityValidation: true,
+onlyLoadAppFromAsar: true,
+```
+~30 LOC plus an electron-builder hook entry.
+
+**Status:** DEFERRED until first signed release. Tracked here.
 
 ---
 
-### F-2 — 34 dev-dep vulnerabilities (1 critical, 15 high, 14 moderate, 4 low)
+### A2 — WebSerial `port.forget()` never called on disconnect
 
-**Severity:** Medium for the repo; **Low** for shipped users (none touch production code).
+**Severity:** Low. Privacy / hygiene rather than exploitable.
 
-**Evidence:**
-- `pnpm audit --prod` → "No known vulnerabilities found"
-- `pnpm audit` (all deps) → 34 vulns
+**Evidence:** `src/platform/web/web-serial.ts` handles `disconnect` events
+(lines 11, 106, 126) and properly removes its listener, but never calls
+`port.forget()`. The W3C/WICG spec exposes `forget()` specifically so a
+page can revoke the in-page permission for a port the user is no longer
+using.
 
-The critical one (handlebars JS injection, GHSA series) reaches through electron-builder's docs-templating chain — purely build-time. None of the affected modules execute in the renderer or get packaged into the distributed binary.
+**Risk path:** A long-running tab that's connected to several lasers
+over a day accumulates per-port permissions in the browser's permission
+store. The user has to clear them manually via browser settings.
 
-**Risk path:**
-- Dev machine running `pnpm install` could in principle pull a tainted package — mitigated by lockfile pinning + license-check gate.
-- Distributed `.exe` does NOT contain these. Verified by `pnpm build:web` output: only `opentype.js`, `imagetracerjs`, `dompurify`, `react*`, `zustand` end up in the bundle.
+**Fix path:** When the user clicks Disconnect (explicit), call
+`port.forget()` after `port.close()`. Don't call on cable-yank
+(`disconnect` event) — the user probably wants to plug it back in.
+
+**Status:** **TRACKED** — adds 5 LOC in `web-serial.ts` and `laser-store.ts`.
+
+---
+
+### A3 — gnea/grbl references should mention upstream is discontinued
+
+**Severity:** Low — documentation freshness.
+
+**Evidence:** `gnea/grbl` repo carries an explicit notice: "not received
+new commits or accepted pull requests since Aug 30, 2019." 1.1h remains
+the canonical streaming protocol but the project itself is dormant.
+Active maintained forks: **grblHAL**, **FluidNC**, **µCNC**.
+
+Three files still reference gnea/grbl as the live protocol authority:
+- `PROJECT.md:342` — "GRBL v1.1 official docs (gnea/grbl wiki) — protocol authority."
+- `RESEARCH_LOG.md:166` — `https://github.com/gnea/grbl/wiki`
+- `RESEARCH_LOG.md:276` — describes `grbl` as the source, GPL-3.0
+
+The wire protocol is still correct; the wording is just stale.
+
+**Fix:** One-line addendum to each: "1.1h is the de-facto wire protocol;
+actively maintained forks: grblHAL, FluidNC, µCNC."
+
+**Status:** **TRACKED** — 3-line doc edit.
+
+---
+
+### A4 — Electron renderer loads via `file://` instead of `protocol.handle()`
+
+**Severity:** Low. Defense-in-depth, no current exploit.
+
+**Evidence:** `electron/main.ts:165` uses `window.loadFile(indexPath)`.
+The 2026 Electron security checklist (item #18) recommends a custom
+protocol via `protocol.handle()` instead, so the renderer runs under a
+predictable origin (e.g. `app://`) rather than the special-case `file://`
+that has historically had CSP and same-origin quirks.
+
+Our existing CSP (set via `webRequest.onHeadersReceived` since F-9) gates
+behavior more strictly than the `file://` quirks reach, so the practical
+risk is small. Worth flagging.
+
+**Fix path:** Register `app://` via `protocol.handle()` in `app.whenReady`;
+change `loadFile` to `loadURL('app://./index.html')`. ~20 LOC.
+
+**Status:** **TRACKED** — defer until next Electron-security pass.
+
+---
+
+### A5 — typescript-eslint at `strict`, not `strict-type-checked`
+
+**Severity:** Low. Type-aware lint rules would catch a class of bugs we
+currently rely on review to catch.
+
+**Evidence:** `eslint.config.mjs:78` spreads `tseslint.configs.strict +
+stylistic`. The 2026 recommendation is `strict-type-checked` (the
+type-aware variant), which enables:
+- `no-floating-promises` (highest value for our serial I/O paths)
+- `no-misused-promises`
+- `no-unnecessary-condition`
+- `no-unsafe-assignment` / `no-unsafe-call` / `no-unsafe-return`
+
+We already pass `parserOptions.project: './tsconfig.json'` (line 89), so
+type-aware rules are technically usable today. The upgrade is a one-line
+change plus fix-the-flagged-issues work.
+
+**Risk path:** Floating promises in `laser-store.ts` (the serial-write
+path) would be a real foot-gun — a missed `await safeWrite(...)` would
+let the streamer advance before bytes hit the wire. We don't have a
+documented case but the rule would catch one if it appeared.
 
 **Fix path:**
-1. Bump `electron` ≥ 39.8.5 (clears 4 electron CVEs in the dev tree).
-2. Bump `vite` major when next compatible (clears the esbuild chain).
-3. `pnpm dedupe`.
-
-**Status:** TRACKED — first dependency-maintenance pass; not blocking.
-
----
-
-### F-3 — UI layer has thin test coverage
-
-**Severity:** Medium.
-
-**Evidence:**
-
 ```
-src/ui/laser      8 source files, 0 tests
-src/ui/text       2 source files, 0 tests
-src/ui/trace      2 source files, 0 tests
-src/ui/app       13 source files, 1 test
-src/ui/common     5 source files, 1 test
-src/ui/layers     5 source files, 1 test
-src/ui/workspace 10 source files, 3 tests
-src/ui/state      8 source files, 4 tests
+- ...tseslint.configs.strict,
++ ...tseslint.configs.strictTypeChecked,
 ```
+Then run lint, audit each finding, fix or `eslint-disable` with comment.
 
-Compared to `src/core/` and `src/io/` at roughly 1:1 test:source ratio.
-
-**What's NOT tested:**
-- Laser panels (`LaserWindow`, `ConnectionBar`, `StatusDisplay`, `JogPad`, `JobControls`) — the controls operators use during a burn.
-- The two new modals (`AddTextDialog`, `ImportImageDialog`).
-- Workspace's React mouse-glue (`drag-state.ts` IS tested at the function level; the React handlers are not).
-
-**What catches regressions in lieu of tests:**
-- Hardware-verified end-to-end flow on Falcon A1 Pro (commits `5636733`, `1a7857a`, and many since).
-- Core (compileJob, planner, frame-preflight, optimize-paths) is heavily tested and governs correctness.
-- TypeScript catches prop-type mismatches at build time.
-
-**Verdict:** UI tests are expensive (jsdom + react-testing-library setup we haven't invested in). Hardware verification + core test coverage is the better risk/effort trade for a small-team project. **Acceptable gap, documented.**
+**Status:** **TRACKED** — separate PR worth doing.
 
 ---
 
-### F-4 — Trace-quality regression coverage — **FIXED** (representative fixture, not user's actual PNG)
+### A6 — Bundle main chunk 573 KB (over the 500 KB warning)
 
-**Status:** PARTIALLY CLOSED.
+**Severity:** Low. Under the 1 MB project target; pre-existing across
+multiple audits (Phases C, D, E, F.1). Mentioned for completeness.
 
-**Fix:** Added `buildLogoLikeFixture()` + a regression test in `src/core/trace/trace-image.test.ts`. The fixture is a programmatic 128×128 raster with a filled black circle (35-px radius) crossed by a horizontal stripe, with anti-aliased edges — mimicking the structural pattern of a typical rasterized logo (large continuous filled regions with AA borders).
+**Evidence:** `pnpm build:web` emits `assets/index-*.js` at 573 KB raw
+/ ~173 KB gzipped. Vite's chunk-size warning fires at 500 KB.
 
-The test traces it through `traceImageToSvgString` with the Line Art preset settings (pre-threshold + fixed palette + pathOmit 16), runs the result through `parseSvg`, and asserts **continuity**:
-- Total polylines ≤ 10 (was dozens of fragments in the pre-fix path)
-- Longest polyline ≥ 20 points (a real continuous outline, not 2-3-point speckle)
+**Source of weight (in order):** React 18 + react-dom (~145 KB),
+opentype.js (~110 KB), imagetracerjs (~80 KB), DOMPurify (~65 KB),
+Zustand + our own code.
 
-Both flip simultaneously if `thresholdLuma` is dropped or `fixedPalette` is removed — verified by mutating those args during development.
+**Mitigation paths (none ship today):**
+- Dynamic-import opentype.js — only loaded when the Text dialog opens.
+- Dynamic-import imagetracerjs — only loaded when Trace Image dialog opens.
+- Manual chunk splitting via `build.rollupOptions.output.manualChunks`.
 
-**Remaining gap:** Test is on a programmatic stand-in, not the user's actual Lekker Kuier PNG. If the user wants stronger insurance, drop the PNG into `src/__fixtures__/raster/` and we add a second snapshot test against the real image. Lower priority now that the structural regression case is covered.
-
----
-
-### F-5 — Process foul: `imagetracerjs` adopted without true alternatives evaluation
-
-**Severity:** Low — having since searched the alternatives properly (after user pushback), imagetracerjs remains the right pick for browser, but the **process** was wrong.
-
-**Evidence:** ADR-017 says "open library evaluation at Phase X kickoff." For Phase E, I verified the license but did not actually trial `image-trace`, recheck `potrace-wasm` for license changes, or look for `vtracer` until the user asked.
-
-**Survey done after the fact (commit `dcf1571`):**
-- `vtracer` (visioncortex, MIT) — Rust binary, no browser distribution.
-- `@neplex/vectorizer` (MIT) — Node-only wrapper around vtracer.
-- `potrace-wasm` — still GPL, blocked by ADR-017.
-- `image-trace` — unmaintained.
-- `imagetracerjs` (Unlicense) — what we ship; only browser-compatible MIT-compatible option.
-
-**Outcome:** Right library, wrong process. The under-tuning (no pre-threshold, no fixed palette, low pathOmit) on Phase E v1 was the symptom.
-
-**Fix:** F-4 (real-image regression test) gives any future library swap an objective quality bar.
-
-**Status:** RESOLVED IN PROCESS — RESEARCH_LOG updated; kickoff evaluation now treated as a workflow step.
+**Status:** **TRACKED** — would shave ~40% off initial load.
+First-launch UX is still <2s per PROJECT.md success metric, so deferred.
 
 ---
 
-### F-6 — Files just under the soft cap that tend to grow
+### A7 — UI layer test coverage still thin (acknowledged gap)
 
-**Severity:** Low.
+**Severity:** Medium — same finding as prior audits.
 
-| File | LOC | Note |
-|---|---|---|
-| `src/core/job/planner.ts` | 259 | Pure planner; small functions. OK. |
-| `src/io/svg/parse-path-d.ts` | 290 | SVG-path dispatch table. Hard to split without harming readability. |
-| `src/ui/app/shortcuts.ts` | 254 | Keyboard binding tables. OK. |
-| `src/ui/state/laser-store.ts` | 333 | Mixed: connection lifecycle + actions. Could extract `actions.ts`. |
-| `src/ui/state/store.ts` | 369 | Post-Phase-E.1 extraction; further extraction possible. |
-| `src/ui/text/AddTextDialog.tsx` | 320 | Big React component; sub-components in same file. Acceptable. |
+**Evidence:** Tests now span 49 files / 427 cases / 5572 LOC, but
+`src/ui/laser/`, `src/ui/text/`, `src/ui/trace/`, `src/ui/workspace/`
+remain mostly untested at the React-component level. Hardware verification
+on the Falcon covers the integrated flow, but a UI-only regression (e.g.,
+a `useEffect` that drops its cleanup) wouldn't be caught.
 
-**Verdict:** Watch `laser-store.ts` and `store.ts` — both re-trimmed twice already.
+**What changed since prior audits:**
+- `src/ui/app/shortcuts.test.ts` is new — 9 cases pinning the keyboard
+  shortcut input-focus guard + Cmd+D duplicate + Shift+F fit-to-selection.
+- `src/ui/state/store.test.ts` + `duplicate.test.ts` give the
+  project-store actions 13 cases of coverage.
 
----
+**What's still uncovered:**
+- `LaserWindow`, `ConnectionBar`, `StatusDisplay`, `JogPad`, `JobControls`
+- `AddTextDialog`, `FontPicker`
+- `ImportImageDialog`, `TracePreview`
+- `LayerRow` (incl. the new Fill sub-row)
+- `Toolbar` (incl. the new BuildBadge)
+- The workspace render-loop and drag-state React glue
 
-### F-7 — No live `$$` reading on connect to auto-tune planner
-
-**Severity:** Low — well-documented limitation.
-
-**Evidence:** `src/ui/state/laser-store.ts` reads `$$` during handshake for the operator to see in the log, but the values are NOT parsed into `DeviceProfile.accelMmPerSec2` / `junctionDeviationMm`. Defaults stand until manually edited.
-
-**Impact:** Job-time estimate is within ~5-15% on most machines (per Sonny Jeon planner math). On the user's Falcon: ±10s on test job after tuning. Acceptable.
-
-**Fix:** Parse `$$` settings from the log stream; populate `device.accelMmPerSec2` (from $120) and `device.junctionDeviationMm` (from $11) on first connect. ~1-2 h.
-
-**Status:** DEFERRED — documented in `src/core/devices/device-profile.ts` + `src/core/job/planner.ts` header.
-
----
-
-### F-8 — No automated multi-platform CI
-
-**Severity:** Low.
-
-**Evidence:** No `.github/workflows/` builds for macOS or Linux. PROJECT.md says Windows-only is intentional (ADR-007).
-
-**Status:** AS-DESIGNED.
+**Verdict:** Same trade-off as before — jsdom + react-testing-library
+setup is expensive; hardware verification + core/io test density is the
+better risk/effort allocation at this stage. **Accepted gap, documented.**
 
 ---
 
-### F-9 — Electron CSP only intended-via-meta, never actually set (NEW, from external check) — **FIXED**
+### A8 — Hardware-claimed-not-verified inventory (Phase F.1 + recent)
 
-**Status:** CLOSED.
-
-**Fix:** Added `session.defaultSession.webRequest.onHeadersReceived` in `electron/main.ts` injecting a strict CSP for every renderer response. Policy:
-
-```
-default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
-img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';
-object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none';
-```
-
-`'unsafe-inline'` for styles is unavoidable — React's `style={{...}}` prop is inline-styles. `blob:` on img-src is for the image-picker's `URL.createObjectURL` step in raster trace. Everything else is locked to same-origin / data URIs only. Verified per Electron docs `webRequest.onHeadersReceived` pattern.
-
-**Old text below preserved for trace:**
-
----
-
-### F-9 (original) — Electron CSP only intended-via-meta, never actually set
-
-**Severity:** Medium.
-
-**Evidence:** `electron/main.ts:8` comment claims "strict CSP via index.html meta (renderer-side)". Cross-check against `index.html`: there's an explanatory comment ("CSP is intentionally NOT set via a meta tag here") but no actual CSP. Electron's startup log shows the "Electron Security Warning (Insecure Content-Security-Policy)" message every launch, which is the engine telling us no CSP is in force.
-
-Per the current Electron security checklist (electronjs.org/docs/latest/tutorial/security), CSP for `file://` origin must be set via `session.webRequest.onHeadersReceived` — meta tags can't gate things like `form-action` or `frame-ancestors` and are unreliable on `file://`.
-
-**Risk:** With `sandbox: true`, `contextIsolation: true`, `nodeIntegration: false` (all confirmed ✓), the renderer can't execute Node code even if an injected script ran. So the absence of CSP is "defence-in-depth missing" rather than "actively exploitable." Still, the OWASP Desktop Top 10 (DA8 Code Quality + DA1 Injection) treats CSP as table stakes.
-
-**Fix:** Add this to `createWindow` before `loadFile`:
-
-```ts
-ses.webRequest.onHeadersReceived((details, callback) => {
-  callback({
-    responseHeaders: {
-      ...details.responseHeaders,
-      'Content-Security-Policy': [
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self';"
-      ],
-    },
-  });
-});
-```
-
-`style-src 'unsafe-inline'` is needed because every React-style component sets `style={{ ... }}` props inline. `data: blob:` on img/font lets vite-bundled assets and our font URL imports load.
-
-**Status:** UNFIXED — flagging.
-
----
-
-### F-10 — Switch OWASP frame from Web Top 10 to Desktop Top 10 (NEW, from external check)
-
-**Severity:** Low — taxonomy correction, no missing controls.
-
-**Evidence:** OWASP publishes a **Desktop App Security Top 10** (`owasp.org/www-project-desktop-app-security-top-10`) distinct from the Web Top 10. Our audit originally used the Web list. For a no-network Electron desktop app, the Desktop list is correct.
-
-**Mapping (replaces the earlier table):**
-
-| OWASP Desktop | Our posture |
-|---|---|
-| DA1 Injections | DOMPurify on SVG, no `eval`, parseFloat-only for numeric inputs, type guards on deserialize. ✓ |
-| DA2 Authentication | N/A — no auth |
-| DA3 Sensitive Data Exposure | Project files local-only, no telemetry. Autosave to `localStorage` (cleartext, OK for hobby data). ✓ |
-| DA4 Improper Cryptography | N/A — no crypto |
-| DA5 Improper Authorization | All grants in `electron/main.ts` are `serial`-only (verified). ✓ |
-| DA6 Insecure Communication | N/A — no network |
-| DA7 Insecure Network Communication | N/A |
-| DA8 Poor Code Quality / Insecure Deserialization | Strict TS + shape-validated `.lf2` deserialize + license-check gate. Missing: CSP (see F-9). ⚠️ |
-| DA9 Code Tampering | ASAR integrity fuses not configured. Defer until first signed release. |
-| DA10 Insufficient Logging | LaserLog panel + ErrorBoundary diagnostic clipboard export. ✓ |
-
-**Status:** TAXONOMY UPDATED.
-
----
-
-## External cross-checks — what the literature says vs. what we do
-
-External standards consulted via 2026 public sources (citations follow). Each item lists what the standard says, then what we do.
-
-### 1. Electron security checklist (electronjs.org)
-
-> Must-haves: `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`, `webSecurity: true`, strict CSP, `contextBridge` for any IPC, sender-validation on IPC, ASAR fuses for signed builds.
-
-**Us:** ✓ all four BrowserWindow webPreferences. ⚠️ CSP not set (F-9). No `contextBridge` because we have **no IPC** — confirmed by grepping `ipcMain` / `ipcRenderer` (0 matches). ASAR fuses deferred to first signed release.
-
-### 2. React 18 StrictMode + external refs (react.dev)
-
-> Every `useEffect` that touches an external resource (interval, socket, port) must return a cleanup. StrictMode double-mounts in dev to surface missing ones.
-
-**Us:** ✓ `use-autosave.ts` returns `stopInterval` + removes `beforeunload`. ✓ `useGlobalErrorHandlers` returns `removeEventListener` pair. The serial connection is NOT useEffect-owned — its lifecycle is driven by user Connect/Disconnect button clicks, so StrictMode doesn't double-mount it. ✓
-
-### 3. TypeScript anti-patterns (typescript-eslint / totaltypescript)
-
-> Top patterns to forbid: `any`, `!`, `as Foo`, `@ts-ignore`/`@ts-expect-error` without justification, `Function`/`object`/`{}` types, optional-chaining into possibly-undefined indexes.
-
-**Us:** Grep-verified clean: no `any` in production paths, no `!` in production paths (only test-stub usage), `as` is used 4× — three of those are at the imagetracerjs API boundary (untyped lib, justified), one is `as KnownFontKey` in the dialog with a validity check first. `@ts-expect-error` appears once in `trace-image.ts` for the `imagetracerjs` default-import (justified with comment). ✓
-
-### 4. OWASP Desktop App Security Top 10
-
-See F-10 above. Updated mapping replaces the original Web Top 10 attempt.
-
-### 5. WebSerial spec (wicg.github.io/serial)
-
-> Persistence policy is implementation-defined. Apps must handle the case where a previously-granted port is gone and call `requestPort()` again.
-
-**Us:** ✓ `web-serial.ts` ships `closeStalePairedPorts()` + `openWithRetry()` exactly for this case — added after the "port already open" bug on Falcon (commit history). The electron main process also re-grants per-launch via `setDevicePermissionHandler`.
-
-### 6. GRBL streaming reference implementations
-
-> Beyond CNCjs: gSender (GPLv3 — not MIT), Universal G-code Sender (GPLv3). **No MIT-licensed mature alternative exists** in the JS ecosystem.
-
-**Us:** Confirms our use of CNCjs as protocol *reference* (per ADR-017) was the only viable MIT-compatible study target. Our streaming implementation (character-counted 127-byte buffer, RT_HOLD/RESUME/SOFT_RESET) matches CNCjs. ✓
-
-### 7. Sonny Jeon junction-deviation (onehossshay.wordpress.com)
-
-> Canonical form is two-step: `R = δ · sin(θ/2) / (1 − sin(θ/2))` then `v = √(a_max · R)`. Composing gives the single-line formula.
-
-**Us:** Our `src/core/job/planner.ts` writes the composed single-line form. Math is correct; comment could cite the original two-step derivation. Minor doc-only nit, not a finding.
-
-### 8. imagetracerjs anti-aliasing (issue #15, options.md)
-
-> **Maintainer-acknowledged fix:** preprocess at raster level — reassign isolated/gray pixels to a neighboring palette color *before* tracing. Library exposes `blurradius` and line filter as built-in helpers.
-
-**Us:** This is exactly what Phase E.2's `thresholdToMonochrome` does — pre-binarize before tracing. **This is the maintainer-recommended approach, not just my hypothesis.** F-4 still stands (need to test on user's real image), but the technique is validated by upstream.
-
----
-
-## Verdict (updated after external cross-check + audit-fix session)
-
-| Finding | Status |
-|---|---|
-| F-1 (DeviceSettings line cap) | **FIXED** — 403 → 213 LOC, three-file split |
-| F-9 (Electron CSP not set) | **FIXED** — `webRequest.onHeadersReceived` per Electron docs |
-| F-4 (trace regression coverage) | **FIXED** — logo-like programmatic fixture + continuity assertions |
-| F-2 (dev-dep vulns) | TRACKED — 0 production-tree vulns; bump electron + vite at next maintenance pass |
-| F-3 (UI test coverage) | ACCEPTED — hardware-verified flow covers risk; jsdom UI tests low ROI |
-| F-5 (library evaluation process) | RESOLVED — RESEARCH_LOG updated; kickoff evaluation now a workflow step |
-| F-6 (soft-cap watch) | MONITOR |
-| F-7 (no live $$ parsing) | DEFERRED — documented |
-| F-8 (no multi-platform CI) | AS-DESIGNED per ADR-007 |
-| F-10 (OWASP Desktop frame) | TAXONOMY CORRECTED |
-
-**Three closed, one tracked, three accepted/documented, three taxonomy/monitor.**
-
-**No critical, no high-severity issues open.** External cross-check validated every major architectural call. Test surface 386 → 387; lint + typecheck + license-check all green.
-
-
----
-
-## Hardware-verified vs unverified inventory
+**Severity:** Tracking, not a finding.
 
 | Feature | Status | Evidence |
 |---|---|---|
-| SVG import + parse + sanitize | VERIFIED | User burned imported SVGs |
-| Workspace render + select + drag + scale + rotate | VERIFIED | Visible in screenshots, used in testing |
-| Cuts/Layers panel + per-color params | VERIFIED | Set Power=30 Speed=1500, burned |
-| G-code compile + emit | VERIFIED | Burns match design |
-| Connect (`$$` handshake) | VERIFIED | "Connected" toast + log on Falcon |
-| Home (`$H`) | VERIFIED | "auto homed" |
-| Auto-focus (`$HZ1`) | VERIFIED | User confirmed working |
-| Jog | VERIFIED | "responds to jogs" |
-| Frame (with bed-bounds preflight) | VERIFIED | "frame worked" + grinding-stop verified |
-| Start job (char-counted buffer streaming) | VERIFIED | "full burn works" |
-| Pause / Resume / Stop | CLAIMED | Streamer state machine fully tested; not stress-tested on hardware |
-| Progress reporting | VERIFIED | Visible in screenshots |
-| Job time estimate (planner math) | VERIFIED | ±10s on real burn (was 120s off pre-planner) |
-| Path optimization (nearest-neighbor) | VERIFIED | "path optimization seems to work" |
-| Autosave + recovery | VERIFIED | "autosave works" |
-| Settings panel | VERIFIED | "settings panel working" |
-| Keyboard shortcuts | VERIFIED | "working" |
-| Crash reporter (ErrorBoundary) | CLAIMED | Component tested in jsdom; not exercised on real crash |
-| SVG re-import diff | VERIFIED | "re-import working" |
-| Text-to-path (opentype.js, 4 fonts) | VERIFIED | "all working" incl. Dancing Script after font-binary fix |
-| Image trace (imagetracerjs) | VERIFIED + ITERATED | Initial trace had speckle; after Line Art + pre-threshold fixes user reports "everything is working" |
-
-**13 fully verified, 2 claimed (Pause/Resume/Stop on hardware + ErrorBoundary against a real crash).**
+| Phase F.1 Fill mode | **CLAIMED** | 10 unit + property tests for fillHatching, compile-job dispatch tests; no real Falcon burn yet |
+| Frame feed decoupling | VERIFIED | User confirmed Frame works at speed after the change |
+| Build badge | VERIFIED | Visible in DOM; defines confirmed inline in dist/web/assets/index-*.js |
+| Canvas auto-zoom on import | CLAIMED | Logic tested via the new combinedBBox + zoomToBounds math; not verified on a real import workflow |
+| Cmd+D duplicate | CLAIMED | Tests pin behaviour; no real-use confirmation yet |
+| Cloudflare Pages auto-deploy | CLAIMED | Workflow file exists; the two secrets (`CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`) are not yet set in GitHub, so the first auto-deploy attempt will fail |
+| Set-origin from head position | DEFERRED — captured in PROJECT.md "Future feature notes" |
 
 ---
 
-## Comparison against published standards
+## What's working — verified inventory (unchanged from prior audit)
 
-### OWASP Top 10 (web app security)
-
-| OWASP | Our posture |
+| Feature | Status |
 |---|---|
-| A01 Broken Access Control | N/A — no auth, no server |
-| A02 Cryptographic Failures | N/A — no crypto, grep-verified no secrets in source |
-| A03 Injection | DOMPurify on every SVG import (ADR-017); `parseFloat` not `eval`; no SQL |
-| A04 Insecure Design | Frame preflight + bounds preflight + per-line buffer accounting are designed-in safety |
-| A05 Security Misconfiguration | Electron CSP via `session.webRequest` planned (currently a dev warning) |
-| A06 Vulnerable Components | Prod: 0. Dev: 34 — none ship. See F-2. |
-| A07 ID/Auth Failures | N/A |
-| A08 Software/Data Integrity | License-check in CI + `.gitattributes` binary guard (added after the font-binary corruption incident in commit `3cfa183`) |
-| A09 Logging Failures | LaserLog panel surfaces machine responses; ErrorBoundary captures render errors |
-| A10 SSRF | N/A — no outbound HTTP except same-origin font/asset fetches |
-
-**Result:** Clean for a no-network, no-auth desktop app. No open issues.
-
-### React / TypeScript best practices
-
-| Standard | Our posture |
-|---|---|
-| Strict TS (`noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`) | Both ON |
-| No `any` in production paths | Grep-verified clean |
-| Discriminated unions for state | Yes — SceneObject, ConnectionState, StreamerStatus, AutofocusResult, ImportOutcome, TextDialogState, FramePreflight |
-| `assertNever` exhaustiveness | Used in `compileJob`; switch-exhaustiveness lint catches missing arms |
-| No mutable globals | `eslint-plugin-boundaries` + pure-core rules enforce |
-| React hooks rules | Lint-enforced |
-| Error boundary at root | Yes (Phase C `ErrorBoundary`) |
-| Suspense / Concurrent | Not used (no async render needs) |
-
-**Result:** Matches modern best-practice. No open issues.
-
-### GRBL streaming patterns (vs CNCjs, our protocol reference per ADR-017)
-
-| Aspect | CNCjs approach | Ours |
-|---|---|---|
-| Stream method | Character-counted (127-byte buffer) | Same |
-| Status polling | `?` every ~250 ms | Same |
-| Alarm handling | Per-code mapping to user message | Same (`describeAlarm`) |
-| Soft-reset on Stop | RT_SOFT_RESET (`0x18`) | Same |
-| Feed-hold on Pause | RT_HOLD (`!`) + RT_RESUME (`~`) | Same |
-| Jog cancel | RT_JOG_CANCEL (`0x85`) | Same |
-| Welcome banner handling | Wait 2 s, otherwise warn | Same (audit fix I-3) |
-
-**Result:** Aligned with CNCjs. No protocol-correctness issues open.
-
-### Sonny Jeon's grbl planner (2014 design)
-
-Compared per `src/core/job/planner.ts` header:
-
-| Aspect | Per Jeon | Ours |
-|---|---|---|
-| Junction velocity formula | `v_j = √(a · δ · sin(θ/2) / (1 − sin(θ/2)))` | Same, exact |
-| Forward + backward lookahead | Required for compatible entry/exit velocities | Implemented (`backwardPass` + `forwardPass`) |
-| Per-block trapezoidal time, arbitrary entry/exit | Generalized | `blockTime` |
-| Junction-cap initial pass | Tentative entry velocities from angle | `capJunctionEntries` |
-
-**Result:** Algorithm matches canonical reference. Empirical: ±10s on real burn that L1 was 120s off — proof.
+| SVG import + parse + sanitize | VERIFIED |
+| Workspace render + select + drag + scale + rotate | VERIFIED |
+| Cuts/Layers panel + per-color params | VERIFIED |
+| G-code compile + emit | VERIFIED |
+| Connect (`$$` handshake) | VERIFIED |
+| Home (`$H`) | VERIFIED |
+| Auto-focus (`$HZ1`) | VERIFIED |
+| Jog | VERIFIED |
+| Frame (with bed-bounds preflight) | VERIFIED |
+| Start job (char-counted buffer streaming) | VERIFIED |
+| Job progress reporting | VERIFIED |
+| Job time estimate (planner-aware) | VERIFIED |
+| Path optimization (nearest-neighbor) | VERIFIED |
+| Autosave + recovery | VERIFIED |
+| Settings panel (now collapsible) | VERIFIED |
+| Keyboard shortcuts (now input-focus-safe) | VERIFIED |
+| SVG re-import diff | VERIFIED |
+| Text-to-path (4 fonts) | VERIFIED |
+| Image trace (imagetracerjs) | VERIFIED |
+| F-7 auto-detect machine settings | VERIFIED |
+| Visible zoom controls | CLAIMED — built in this session, not yet user-confirmed on hardware |
+| Input-focus shortcut fix | VERIFIED — tests pin the regressions + user confirmation |
 
 ---
 
-## Verdict
+## External cross-checks — 2026 published references
 
-**Ship-ready.**
+### 1. Electron security checklist (electronjs.org/docs/latest/tutorial/security)
 
-Two real issues to track:
-- **F-1** (`DeviceSettings.tsx` line cap, fixable in 30 min)
-- **F-2** (dev-dep vulnerabilities — all out-of-process for users)
+> Must-haves 2026: contextIsolation, nodeIntegration:false, sandbox:true,
+> webSecurity:true, CSP via webRequest, deny-by-default permission
+> handlers, `event.senderFrame` validation on every IPC, ASAR fuses
+> flipped, custom protocol.handle() instead of file://.
 
-No critical, no high-severity issues open. Production posture is clean. Hardware verification covers every flow the user has exercised.
+**Us:**
+- ✓ All four webPreferences set (`electron/main.ts:37-41`)
+- ✓ CSP via `session.webRequest.onHeadersReceived` (F-9 fix)
+- ✓ Permission handlers narrowed to `'serial'` + `'fileSystem'` prefixes
+- ✓ **No IPC handlers exist** — grep `ipcMain` returns 0 hits, so
+  the sender-validation rule is vacuously satisfied.
+- ✗ ASAR fuses — **A1**
+- ✗ `protocol.handle()` — **A4**
 
-**Honest gap:** F-4 — most recent trace-quality fixes are tested against synthetic AA fixtures, not the user's real logo. If those fixes regress, current tests would not catch it. Worth adding a real-image regression test next session.
+CVE-2026-34769 (command-line switch injection): Electron 42.3.0 patches
+it — we're on 42.3.0. ✓
+CVE-2026-34780 (VideoFrame preload bypass): patched in 42.3.0, and we
+don't use WebCodecs. ✓
 
-If you want me to address F-1 + F-4 now, that's ~45 minutes. Otherwise the audit clears for continued work.
+### 2. React 18+ patterns (react.dev — "You might not need an effect")
+
+> Must-haves: StrictMode at root; cleanup on every external-resource
+> effect; useSyncExternalStore for external stores; don't mirror props
+> into state-via-effect.
+
+**Us:**
+- ✓ StrictMode wraps the root (`main.tsx:18`)
+- ✓ Zustand provides its own `useSyncExternalStore` integration
+- ✓ `use-autosave.ts` returns its cleanup; `useGlobalErrorHandlers`
+  returns its removeEventListener pair; `use-shortcuts.ts` cleans up
+  both keydown listeners.
+- ✓ The serial connection is NOT useEffect-owned — driven by
+  user-clicks on Connect/Disconnect — so StrictMode's double-mount
+  doesn't double-open the port.
+
+### 3. OWASP Desktop App Security Top 10
+
+**Status check:** Still the 2021 release as of 2026-05-28 — no 2025/2026
+revision exists. The November 2025 OWASP Top 10 release is web-only.
+
+**DA1 Injections** — DOMPurify on SVG; `parseFloat` (not `eval`); type
+guards on `.lf2` deserialize; G-code emit only formats numbers it
+controls. ✓
+**DA2 Authentication** — N/A (no auth).
+**DA3 Sensitive Data Exposure** — local-only; no telemetry; autosave to
+localStorage. ✓
+**DA4 Cryptography** — N/A (no crypto).
+**DA5 Authorization** — All grants allowlisted ('serial' + 'fileSystem');
+strict CSP. ✓
+**DA6 Misconfig** — Open: **A1** (fuses) + **A4** (protocol.handle).
+**DA7 Communication** — N/A (no network).
+**DA8 Code Quality** — Strict TS, no `any` or `!`, license-check in CI,
+file-size cap in CI. ✓
+**DA9 Components w/ Known Vulns** — `pnpm audit` 0/0/0/0. ✓
+**DA10 Logging** — LaserLog panel + ErrorBoundary clipboard export. ✓
+
+### 4. TypeScript anti-patterns (typescript-eslint current rules)
+
+> Recommended: `strict-type-checked` config covers `no-floating-promises`,
+> `no-misused-promises`, `no-unnecessary-condition`, `no-unsafe-*`.
+
+**Us:** ✗ on `strict` not `strict-type-checked` — **A5**.
+Beyond that: zero `any`, zero `!` (grep-verified) outside test scaffolding.
+`@ts-expect-error` appears 1× with comment justification. `as Foo`
+casts limited to: imagetracerjs API boundary (3×), KnownFontKey narrowing
+post-validity-check (1×). ✓
+
+### 5. Vite 6 production (vite.dev)
+
+> Must-haves: `base` explicit; CSP-compatible nonce or hash strategy;
+> assetsInlineLimit acknowledged; CSS code-splitting on by default;
+> modulepreload allowed in CSP.
+
+**Us:**
+- ✓ `base: './'` set
+- ✓ `script-src 'self'` allows the entry script and Vite's emitted
+  modulepreload
+- ✓ Default assetsInlineLimit (4 KB); the fonts in `dist/web/assets/`
+  are above the limit so they're not data-URI'd
+- ✓ Source maps: `sourcemap: true` is set; the `.js.map` is in
+  `dist/web/assets/` and Cloudflare serves it. Acceptable for a private
+  proprietary app whose primary deployment audience is the owner
+  (Cloudflare access logs aren't a leakage concern). Flag for
+  consideration if the URL ever goes public.
+
+### 6. WebSerial spec (wicg.github.io/serial)
+
+> Still WICG CG Report; permissions persist per origin until profile
+> clear; call `forget()` to revoke in-page; handle `disconnect` for cable
+> yanks.
+
+**Us:**
+- ✓ `disconnect` handled (`web-serial.ts:11, 106, 126`)
+- ✗ `forget()` not called — **A2**
+- ✓ Per-launch re-grant via `setDevicePermissionHandler` in Electron
+
+### 7. GRBL streaming (gnea/grbl wiki + grblHAL)
+
+> gnea/grbl repo discontinued (no commits since Aug 2019). 1.1h is
+> the de-facto wire protocol. Maintained forks: grblHAL, FluidNC, µCNC.
+
+**Us:**
+- ✓ Streaming logic matches 1.1h spec exactly (character-counted
+  127-byte buffer, RT_STATUS/HOLD/RESUME, ALARM mapping)
+- ✗ Doc references should mention discontinued status — **A3**
+
+### 8. Sonny Jeon's grbl planner (2014 derivation)
+
+**Us:** `src/core/job/planner.ts` writes the canonical junction-deviation
+formula. Empirically: ±10s on real burns. ✓
+
+### 9. imagetracerjs anti-aliasing (issue #15)
+
+> Maintainer-acknowledged: pre-binarize the input before tracing.
+
+**Us:** `thresholdToMonochrome` does exactly that, shipped in the Phase
+E.2 audit-fix. ✓
+
+---
+
+## Verdict (post-Phase F.1)
+
+**Ship-ready** for the proprietary / private use case.
+
+Open items by priority:
+1. **A1** ASAR fuses — block on first signed release.
+2. **A5** typescript-eslint `strict-type-checked` — small focused PR, real value for serial I/O.
+3. **A2** WebSerial `forget()` — 5-line addition.
+4. **A4** custom protocol — defense-in-depth, defer.
+5. **A3** doc freshness on gnea/grbl status — 3-line addendum.
+6. **A7** UI test coverage gap — accepted.
+7. **A6** bundle weight — acceptable, address if first-launch perf degrades.
+8. **A8** F.1 hardware verification — engrave a square + letter "O" on the Falcon.
+
+**No critical, no high-severity issues open.** Every architectural
+pillar from PROJECT.md non-negotiables is satisfied. The 2026 external
+cross-check found two new advisory items (CVE-2026-34769 / 34780) that
+are already patched by our F-2 bump to Electron 42.
+
+---
+
+## How this audit was produced
+
+Verified locally:
+- `pnpm audit` → 0/0/0/0
+- `pnpm typecheck && pnpm lint && pnpm format:check && pnpm test --run && pnpm build:web` → all green
+- `grep`-counted: `any`, `!`, `eval`, `innerHTML=`, `ipcMain`, `Math.random` / `Date.now` / `fetch(` / `window.` in `src/core/`
+- `wc -l` against every source file vs the 250/400 caps
+- `pnpm exec wrangler pages deployment list` → confirmed production deploy serves commit `a709747` over HTTPS+HSTS
+
+Cross-checked via WebFetch / WebSearch against:
+- `electronjs.org/docs/latest/tutorial/security` (security tutorial #1–18, fuses tutorial)
+- `react.dev/learn/you-might-not-need-an-effect`, `react.dev/reference/react/StrictMode`
+- `owasp.org/www-project-desktop-app-security-top-10/` + repo `index.md`
+- `typescript-eslint.io/rules/`, `typescript-eslint.io/users/configs`
+- `vite.dev/guide/build`, `vite.dev/guide/features`
+- `wicg.github.io/serial/`
+- `github.com/gnea/grbl/wiki`, `github.com/grblHAL/core`, `advisories.gitlab.com/pkg/npm/electron/`
+
+Findings I could NOT verify against primary sources and therefore did
+not include: a "renderer kill switch" in Electron 42 (no current docs
+support), a 2025/2026 OWASP Desktop Top 10 (doesn't exist), a
+maintained MIT-licensed JS GRBL streamer outside CNCjs.
