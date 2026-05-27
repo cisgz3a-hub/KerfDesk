@@ -5,6 +5,7 @@
 // an editable action.
 
 import { create } from 'zustand';
+import type { Bounds } from '../../core/scene';
 import type { TextAlignment } from '../../core/text';
 
 export const MIN_ZOOM = 0.1;
@@ -44,6 +45,13 @@ type UiState = {
   readonly resetView: () => void;
   readonly panBy: (dx: number, dy: number) => void;
   readonly setPan: (panX: number, panY: number) => void;
+  // Zoom + pan the viewport so `bounds` (scene-mm) lands centered in
+  // the canvas filling ~70% of either dimension. Used by auto-zoom-
+  // on-import (so a tiny SVG doesn't disappear on a big bed) and by
+  // Shift+F "fit to selection." Padding factor is fixed at 0.7 — wide
+  // enough to see context, tight enough that the object actually fills
+  // the view.
+  readonly zoomToBounds: (bounds: Bounds, bedWidth: number, bedHeight: number) => void;
   // F-A15 Space-held pan mode. Set by a global keyup/keydown listener so
   // multiple components (Workspace mouse handlers + cursor styling) can
   // read the same source of truth.
@@ -75,6 +83,11 @@ export const useUiStore = create<UiState>((set) => ({
   resetView: () => set({ zoomFactor: 1, panX: 0, panY: 0 }),
   panBy: (dx, dy) => set((s) => ({ panX: s.panX + dx, panY: s.panY + dy })),
   setPan: (panX, panY) => set({ panX, panY }),
+  zoomToBounds: (bounds, bedWidth, bedHeight) => {
+    const next = computeZoomToBounds(bounds, bedWidth, bedHeight);
+    if (next === null) return;
+    set({ zoomFactor: clampZoom(next.zoomFactor), panX: next.panX, panY: next.panY });
+  },
   spaceDown: false,
   setSpaceDown: (next) => set({ spaceDown: next }),
   textDialog: null,
@@ -92,4 +105,38 @@ function clamp01(n: number): number {
 function clampZoom(n: number): number {
   if (!Number.isFinite(n)) return 1;
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, n));
+}
+
+// Target fraction of the canvas the bounds should occupy after zoom.
+// 0.7 = 70% — wide enough to see surrounding bed context, tight enough
+// that a small object looks proper-sized. Inkscape uses ~0.7 for its
+// Zoom-to-Drawing default; LightBurn similar.
+const ZOOM_TO_BOUNDS_TARGET = 0.7;
+
+// Compute the (zoomFactor, panX, panY) that puts `bounds` centered in
+// the canvas filling ZOOM_TO_BOUNDS_TARGET of either dimension. Pure
+// helper kept outside the store factory so it's testable and so the
+// math is in one place. See view-transform.ts for the inverse pixel
+// math the canvas renderer applies.
+function computeZoomToBounds(
+  bounds: Bounds,
+  bedWidth: number,
+  bedHeight: number,
+): { zoomFactor: number; panX: number; panY: number } | null {
+  const boundsW = bounds.maxX - bounds.minX;
+  const boundsH = bounds.maxY - bounds.minY;
+  if (boundsW <= 0 || boundsH <= 0 || bedWidth <= 0 || bedHeight <= 0) return null;
+  // zoomFactor is multiplicative over fit-to-bed. bounds-pixel-width
+  // is boundsW * baseScale * zoomFactor; we want that to equal
+  // target * canvas width. Since canvas width ≈ bedWidth * baseScale,
+  // the cancellation gives zoomFactor = target * bedWidth / boundsW.
+  const zoomX = (ZOOM_TO_BOUNDS_TARGET * bedWidth) / boundsW;
+  const zoomY = (ZOOM_TO_BOUNDS_TARGET * bedHeight) / boundsH;
+  const zoomFactor = Math.min(zoomX, zoomY);
+  // Pan in scene-mm so the bounds' center maps to the bed's center
+  // (which is what computeView centers in the canvas). See the math
+  // derivation in computeView's offsetX formula.
+  const cx = (bounds.minX + bounds.maxX) / 2;
+  const cy = (bounds.minY + bounds.maxY) / 2;
+  return { zoomFactor, panX: bedWidth / 2 - cx, panY: bedHeight / 2 - cy };
 }

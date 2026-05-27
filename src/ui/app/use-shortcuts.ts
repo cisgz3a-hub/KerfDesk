@@ -94,14 +94,23 @@ function useTransformViewShortcuts(): void {
   const selectedObjectId = useStore((s) => s.selectedObjectId);
   const applyObjectTransform = useStore((s) => s.applyObjectTransform);
   const togglePreview = useStore((s) => s.togglePreview);
+  const fitToSelection = useStore((s) => s.fitToSelection);
   const resetView = useUiStore((s) => s.resetView);
   const zoomBy = useUiStore((s) => s.zoomBy);
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent): void => {
       if (handleTransformShortcut(e, { project, selectedObjectId, applyObjectTransform })) return;
-      handleViewShortcut(e, { togglePreview, resetView, zoomBy });
+      handleViewShortcut(e, { togglePreview, resetView, zoomBy, fitToSelection });
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [project, selectedObjectId, applyObjectTransform, togglePreview, resetView, zoomBy]);
+  }, [
+    project,
+    selectedObjectId,
+    applyObjectTransform,
+    togglePreview,
+    resetView,
+    zoomBy,
+    fitToSelection,
+  ]);
 }

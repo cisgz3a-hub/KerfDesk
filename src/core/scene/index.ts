@@ -22,7 +22,7 @@ export { IDENTITY_TRANSFORM, assertNever } from './scene-object';
 
 export { applyTransform } from './transform';
 export type { AABB } from './hit-test';
-export { hitTest, transformedBBox } from './hit-test';
+export { combinedBBox, hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
 
 export type { Scene } from './scene';

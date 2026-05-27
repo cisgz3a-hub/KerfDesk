@@ -59,6 +59,11 @@ export type ViewCtx = {
   readonly togglePreview: () => void;
   readonly resetView: () => void; // F (fit) and 0 (100%) both call this in Phase A
   readonly zoomBy: (factor: number) => void;
+  // Shift+F — zoom the viewport to the current selection's combined
+  // bounding box. No-op when nothing's selected (falls through to the
+  // default F behaviour at the call site? No — the binding skips so
+  // the bare F keypress still fires next).
+  readonly fitToSelection: () => void;
 };
 
 function hasMeta(e: KeyboardEvent): boolean {
@@ -252,9 +257,20 @@ export function handleTransformShortcut(e: KeyboardEvent, ctx: TransformCtx): bo
   return false;
 }
 
+// Shift+F = fit-to-selection. Pulled out of handleViewShortcut so
+// the parent function stays under the cyclomatic-complexity lint cap.
+function tryShiftFitToSelection(e: KeyboardEvent, ctx: ViewCtx): boolean {
+  if (!e.shiftKey || hasMeta(e)) return false;
+  if (e.key.toLowerCase() !== 'f') return false;
+  e.preventDefault();
+  ctx.fitToSelection();
+  return true;
+}
+
 export function handleViewShortcut(e: KeyboardEvent, ctx: ViewCtx): boolean {
-  if (hasMeta(e) || e.shiftKey) return false;
   if (isEditableTarget(e)) return false;
+  if (tryShiftFitToSelection(e, ctx)) return true;
+  if (hasMeta(e) || e.shiftKey) return false;
   const key = e.key.toLowerCase();
   // F-A15 View shortcuts. Phase A treats F (fit) and 0 (100%) identically
   // since the only "100%" state we model is fit-to-bed; if a Phase C ADR
