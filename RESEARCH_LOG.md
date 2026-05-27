@@ -283,6 +283,62 @@ Libraries that were evaluated and explicitly rejected. Keeping this list prevent
 
 ---
 
+## Phase F kickoff — scanline fill, dithering, image→G-code (2026-05-28)
+
+Per ADR-017, libraries are surveyed at phase kickoff. Phase F (raster
+engrave) splits into F.1 (Fill mode, in progress) and F.2 (Image mode,
+future). This entry covers F.1's library survey; F.2 will get its own
+entry at kickoff.
+
+### Scanline polygon fill (F.1)
+
+**Use case:** closed polyline + hatch angle + spacing → array of hatch
+line polylines. Pure algorithm, ~150 LOC.
+
+**Candidates evaluated:**
+- **`flatten-svg`** (npm, ISC) — already in our permitted-license set
+  per ADR-017. But it converts SVG curves to flat polylines; it does
+  NOT do hatching. Doesn't fit our use case. **Not adopted.**
+- **`polygon-clipping`** (npm, MIT) — boolean polygon ops (union,
+  intersection, difference). Could in principle hatch by intersecting
+  a polygon with parallel-line stripes, but that's 10× the work of a
+  scanline fill and pulls a ~50 KB dependency. **Not adopted.**
+- **No maintained MIT-licensed JS library** does "polygon + angle +
+  spacing → hatch lines" specifically. Every CAM tool we surveyed
+  (LightBurn, LaserGRBL, Inkscape's Hershey extension) self-implements
+  the scanline-fill core because it's small and the parameter
+  conventions vary per app.
+- **Self-implementation** (`src/core/job/fill-hatching.ts`) — ~150 LOC
+  of pure code, even-odd fill rule, half-open interval for vertex-on-
+  scanline cases, snake fill for travel optimization, snap-to-clean
+  values at multiples of 90°. 10 unit + property tests cover symmetry,
+  donut holes, open polylines, degenerate input, float-precision drift.
+- **Evaluated:** 2026-05-28
+- **Outcome:** self-implement. No dependency added. Algorithm is from
+  first principles + classical computer-graphics scanline-fill literature
+  (Foley, van Dam) — well-trodden, no IP encumbrance.
+- **Re-evaluate if:** a future need (concave-with-non-trivial-holes,
+  variable-density hatching, dotted-line hatching) outgrows the simple
+  scanline core.
+
+### Dithering + image → G-code (deferred to F.2)
+
+Two libraries are pre-noted here so the F.2 kickoff has a head start.
+Neither is adopted in F.1 (F.1 doesn't do raster anything).
+
+- **`floyd-steinberg`** (npm, MIT) — single-purpose Floyd-Steinberg
+  error-diffusion dither. Last published 8 years ago; tiny (~30 LOC of
+  algorithm under the hood). Maintenance: stale but the algorithm is
+  textbook so an unmaintained pin is fine.
+- **`img2gcode`** (npm, MIT) — image-to-G-code wrapper. Unmaintained
+  (last release > 4 years ago). Scope larger than ours (it owns
+  serial output too). **Likely not adopted at F.2 kickoff** —
+  self-implement the ~80 LOC raster emit and reuse our existing
+  streamer.
+- **Decision deferred:** to F.2 kickoff ADR-020.
+
+---
+
 ## Notes on style
 
 - Be concrete. "Used by many projects" is not a useful claim; "4,281 npm dependents as of 2026-05-26" is.

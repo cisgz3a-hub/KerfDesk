@@ -7,7 +7,7 @@
 // validation is a Phase B improvement.
 
 import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
-import { PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
+import { LAYER_DEFAULTS, PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
 import { DEFAULT_TEXT_LETTER_SPACING } from '../../core/text';
 import { migrateToCurrent } from './migrations';
 
@@ -78,6 +78,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
   const dev = (raw['device'] ?? {}) as Record<string, unknown>;
   const scene = (raw['scene'] ?? {}) as Record<string, unknown>;
   const objects = Array.isArray(scene['objects']) ? scene['objects'] : [];
+  const layers = Array.isArray(scene['layers']) ? scene['layers'] : [];
   const normalized = {
     ...raw,
     device: {
@@ -94,6 +95,7 @@ function normalizeProject(raw: Record<string, unknown>): Project {
     scene: {
       ...scene,
       objects: objects.map(normalizeSceneObject),
+      layers: layers.map(normalizeLayer),
     },
   };
   return normalized as unknown as Project;
@@ -108,6 +110,22 @@ function normalizeSceneObject(obj: unknown): unknown {
   if (obj['kind'] !== 'text') return obj;
   if (typeof obj['letterSpacing'] === 'number') return obj;
   return { ...obj, letterSpacing: DEFAULT_TEXT_LETTER_SPACING };
+}
+
+// Back-fill F.1 hatch fields on Layer. Pre-F.1 .lf2 files have no
+// hatchAngleDeg / hatchSpacingMm — fill with LAYER_DEFAULTS so the
+// compile path doesn't see NaN for mode='line' layers and so a future
+// flip to mode='fill' has sensible starting values.
+function normalizeLayer(layer: unknown): unknown {
+  if (!isObject(layer)) return layer;
+  const out: Record<string, unknown> = { ...layer };
+  if (typeof out['hatchAngleDeg'] !== 'number') {
+    out['hatchAngleDeg'] = LAYER_DEFAULTS.hatchAngleDeg;
+  }
+  if (typeof out['hatchSpacingMm'] !== 'number') {
+    out['hatchSpacingMm'] = LAYER_DEFAULTS.hatchSpacingMm;
+  }
+  return out;
 }
 
 function validateShape(raw: Record<string, unknown>): string | null {

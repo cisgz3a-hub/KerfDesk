@@ -652,3 +652,58 @@ Progress bar shows `completed / total` lines as a percentage with the count over
 - F-E2. Open trace dialog
 - F-E3. Adjust trace parameters with live preview
 - F-E4. Apply trace → produces Scene object
+
+---
+
+## Phase F flows
+
+### F-F1. Engrave a filled shape (F.1 Fill mode)
+
+**Entry**: a SceneObject already exists in the scene (SVG, text glyph,
+or traced image) with at least one closed polyline.
+
+**Success**:
+1. In the Cuts/Layers panel, find the row for the color you want to
+   engrave as fill.
+2. Click the **Mode** dropdown → choose **Fill**.
+3. The row expands: a sub-row appears underneath showing two new
+   inputs — **° angle** and **mm spacing**. Defaults are 0° (horizontal
+   hatching) and 0.2 mm (≈ 5 lines/mm).
+4. (Optional) Adjust the inputs. Both commit on the 300 ms F-A7 debounce.
+5. Compile + emit G-code as usual (Save G-code, or Start job in the
+   Laser panel). The CutGroup for that color now contains hatch lines
+   instead of the outline.
+
+**Error**:
+- *No closed polylines on this color* — the layer's mode is Fill, but
+  every matching polyline is open (e.g., a single line, not a region).
+  The compile step silently emits nothing for that layer (no error
+  toast; the empty result is itself the diagnostic). Switch back to
+  Line mode to engrave the outline instead.
+
+**Empty**:
+- *No SceneObjects yet* — the Mode dropdown still works, but no
+  geometry exists to fill. The Cuts/Layers panel shows its "Import a
+  design to populate layers" hint.
+
+**Edge cases**:
+- *Polygons with holes* (e.g., letter "O"): the even-odd fill rule
+  handles them automatically. Hatch lines stop at the inner contour and
+  resume on the other side — the hole stays unburned. No special UI;
+  no per-shape configuration.
+- *Self-intersecting polygons* (some script-font glyphs): even-odd rule
+  keeps the fill visually correct even when the underlying path crosses
+  itself. Result may differ from a non-zero fill convention but matches
+  what the SVG renderer in any browser would show.
+- *Tiny shapes* (cap height < ~2× hatchSpacing): produce only 1–2 hatch
+  lines, which engraves as a near-line. Acceptable; no minimum-size
+  guard. The user can lower `hatchSpacingMm` or switch to Line mode.
+- *Very small spacing* (≤ 0.05 mm): clamped to 0.05 mm at the algorithm
+  boundary so an accidental 0 doesn't generate millions of lines.
+
+### F-F2. Image-engrave a raster (Phase F.2 — not yet shipped)
+
+Stub. Will document on F.2 kickoff after the RasterImage SceneObject
+variant + emit-raster.ts strategy land. Per ADR-019, the F.2 emit path
+will run separately from the existing grbl-strategy and will switch
+to M4 dynamic spindle mode for image groups.

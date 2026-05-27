@@ -88,11 +88,17 @@ Type text on canvas in selectable bundled fonts; result flows through the existi
 
 Import a raster (JPG/PNG), trace to vectors via `imagetracer.js` (MIT — `potrace-wasm` rejected on GPL grounds). Traced paths become Scene objects that flow through the existing Line pipeline. See ADR-013.
 
-### Anything past Phase E
+### Phase F — v0.6 "Raster engrave" [In progress]
+
+Activates the dormant `LayerMode = 'line' | 'fill' | 'image'` arms from ADR-005. See ADR-019.
+
+- **F.1 — Fill** [In progress]. Scanline polygon fill: a closed Polyline (from any SceneObject) on a layer with `mode='fill'` is replaced at compile time with parallel hatch lines (angle + spacing configurable per layer). Output flows through the existing `grbl-strategy` emit path — no new G-code shape. Even-odd fill rule handles holes (letter "O"). Snake fill alternates row direction.
+- **F.2 — Image** [Planned, future kickoff]. True raster engrave: a new `RasterImage` SceneObject variant carries PNG bytes as a data URL; a new `emit-raster.ts` strategy emits per-pixel S-modulation G1 moves with overscan. M-mode flips to M4 (dynamic) for image groups per GRBL community convention. Dithering modes: threshold, Floyd-Steinberg, direct grayscale. Decisions deferred to F.2 kickoff (no committed code yet).
+
+### Anything past Phase F
 
 Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, not committed:
 
-- Phase F: raster engrave (Fill/Image modes).
 - Phase G: additional `OutputStrategy` implementations (Marlin et al). MIT references available (CNCjs has working Marlin/Smoothie code) — but ADR-006 still says one strategy ships per phase.
 - Phase H: macOS/Linux desktop builds. Free with electron-builder — but ADR-007 still says Windows-only for MVP.
 

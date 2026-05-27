@@ -7,7 +7,7 @@
 // this missing; do not repeat"). Visible / Output checkboxes commit
 // immediately since each click is a single discrete change.
 
-import type { Layer } from '../../core/scene';
+import type { Layer, LayerMode } from '../../core/scene';
 import { useStore } from '../state';
 import { useDebouncedCommit } from './use-debounced-commit';
 
@@ -17,32 +17,53 @@ const tdStyle: React.CSSProperties = { padding: '4px 4px', verticalAlign: 'middl
 const swatchStyle: React.CSSProperties = { display: 'inline-block', width: 12, height: 12 };
 const inputStyle: React.CSSProperties = { width: 64 };
 const unitStyle: React.CSSProperties = { fontSize: 11, color: '#666', marginLeft: 2 };
+// F.1 fill sub-row: visually grouped under the parent layer row.
+const subRowStyle: React.CSSProperties = { background: '#fafafa' };
+const subRowLabelStyle: React.CSSProperties = {
+  padding: '2px 4px 6px 4px',
+  display: 'flex',
+  alignItems: 'baseline',
+  gap: 8,
+};
+const subRowLabelTextStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: '#666',
+  width: 40,
+};
 
 export function LayerRow({ layer }: { readonly layer: Layer }): JSX.Element {
+  // When the layer is in Fill mode we render an extra sub-row underneath
+  // with the hatch angle + spacing inputs. Keeps the main row at its
+  // existing 7-column shape so non-fill layers (the common case) don't
+  // grow the panel width — and matches the LightBurn pattern of
+  // mode-conditional sub-controls.
   return (
-    <tr style={layer.output ? rowStyle : rowDimmedStyle}>
-      <td style={tdStyle}>
-        <ColorSwatch color={layer.color} visible={layer.visible} />
-      </td>
-      <td style={tdStyle}>
-        <ModeSelect mode={layer.mode} />
-      </td>
-      <td style={tdStyle}>
-        <PowerInput layer={layer} />
-      </td>
-      <td style={tdStyle}>
-        <SpeedInput layer={layer} />
-      </td>
-      <td style={tdStyle}>
-        <PassesInput layer={layer} />
-      </td>
-      <td style={tdStyle}>
-        <VisibleToggle layer={layer} />
-      </td>
-      <td style={tdStyle}>
-        <OutputToggle layer={layer} />
-      </td>
-    </tr>
+    <>
+      <tr style={layer.output ? rowStyle : rowDimmedStyle}>
+        <td style={tdStyle}>
+          <ColorSwatch color={layer.color} visible={layer.visible} />
+        </td>
+        <td style={tdStyle}>
+          <ModeSelect layer={layer} />
+        </td>
+        <td style={tdStyle}>
+          <PowerInput layer={layer} />
+        </td>
+        <td style={tdStyle}>
+          <SpeedInput layer={layer} />
+        </td>
+        <td style={tdStyle}>
+          <PassesInput layer={layer} />
+        </td>
+        <td style={tdStyle}>
+          <VisibleToggle layer={layer} />
+        </td>
+        <td style={tdStyle}>
+          <OutputToggle layer={layer} />
+        </td>
+      </tr>
+      {layer.mode === 'fill' && <FillSubRow layer={layer} />}
+    </>
   );
 }
 
@@ -59,17 +80,89 @@ function ColorSwatch(props: { readonly color: string; readonly visible: boolean 
   );
 }
 
-function ModeSelect({ mode }: { readonly mode: Layer['mode'] }): JSX.Element {
+function ModeSelect({ layer }: { readonly layer: Layer }): JSX.Element {
+  // F.1 enables 'fill'. 'image' stays disabled until F.2 lands (the
+  // RasterImage SceneObject + raster emit path don't exist yet).
+  const setLayerParam = useStore((s) => s.setLayerParam);
   return (
-    <select value={mode} disabled title="Fill / Image disabled in MVP">
+    <select
+      value={layer.mode}
+      onChange={(e) => setLayerParam(layer.id, { mode: e.target.value as LayerMode })}
+      title="Line cuts along the outline. Fill hatches the interior of closed shapes."
+      aria-label={`Mode for ${layer.color}`}
+    >
       <option value="line">Line</option>
-      <option value="fill" disabled>
-        Fill (Phase F)
-      </option>
+      <option value="fill">Fill</option>
       <option value="image" disabled>
-        Image (Phase F)
+        Image (F.2)
       </option>
     </select>
+  );
+}
+
+function FillSubRow({ layer }: { readonly layer: Layer }): JSX.Element {
+  // Sub-row spans the full table width (7 cols) and shows only when the
+  // layer is in Fill mode. Inputs commit on the same 300ms debounce as
+  // the main-row power/speed/passes (consistent UX per F-A7).
+  return (
+    <tr style={layer.output ? subRowStyle : { ...subRowStyle, ...rowDimmedStyle }}>
+      <td style={tdStyle} aria-hidden />
+      <td style={subRowLabelStyle} colSpan={6}>
+        <span style={subRowLabelTextStyle}>Hatch</span>
+        <HatchAngleInput layer={layer} />
+        <HatchSpacingInput layer={layer} />
+      </td>
+    </tr>
+  );
+}
+
+function HatchAngleInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.hatchAngleDeg,
+    commit: (hatchAngleDeg) => setLayerParam(layer.id, { hatchAngleDeg }),
+    parse: (s) => clamp(numericValue(s), 0, 180),
+  });
+  return (
+    <>
+      <input
+        type="number"
+        min={0}
+        max={180}
+        step={5}
+        value={debounced.displayValue}
+        onChange={debounced.onChange}
+        onBlur={debounced.onBlur}
+        style={inputStyle}
+        aria-label={`Hatch angle for ${layer.color}`}
+      />
+      <span style={unitStyle}>° angle</span>
+    </>
+  );
+}
+
+function HatchSpacingInput({ layer }: { readonly layer: Layer }): JSX.Element {
+  const setLayerParam = useStore((s) => s.setLayerParam);
+  const debounced = useDebouncedCommit<number>({
+    value: layer.hatchSpacingMm,
+    commit: (hatchSpacingMm) => setLayerParam(layer.id, { hatchSpacingMm }),
+    parse: (s) => clamp(numericValue(s), 0.05, 10),
+  });
+  return (
+    <>
+      <input
+        type="number"
+        min={0.05}
+        max={10}
+        step={0.05}
+        value={debounced.displayValue}
+        onChange={debounced.onChange}
+        onBlur={debounced.onBlur}
+        style={inputStyle}
+        aria-label={`Hatch spacing for ${layer.color}`}
+      />
+      <span style={unitStyle}>mm spacing</span>
+    </>
   );
 }
 

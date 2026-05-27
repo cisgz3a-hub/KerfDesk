@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createLayer, LAYER_DEFAULTS } from './layer';
 
 describe('createLayer', () => {
-  it('applies WORKFLOW.md F-A7 defaults (power 30, speed 1500, passes 1, visible+output on, mode line)', () => {
+  it('applies WORKFLOW.md F-A7 defaults (power 30, speed 1500, passes 1, visible+output on, mode line) plus F.1 hatch defaults', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     expect(layer).toEqual({
       id: 'L1',
@@ -13,6 +13,8 @@ describe('createLayer', () => {
       passes: 1,
       visible: true,
       output: true,
+      hatchAngleDeg: 0,
+      hatchSpacingMm: 0.2,
     });
   });
 

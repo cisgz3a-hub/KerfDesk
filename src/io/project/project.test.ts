@@ -112,6 +112,48 @@ describe('deserializeProject', () => {
     expect(result.kind).toBe('schema-too-old');
   });
 
+  it('back-fills missing hatchAngleDeg + hatchSpacingMm on layers from pre-F.1 .lf2 files', () => {
+    // F.1 added hatchAngleDeg + hatchSpacingMm to Layer. Older .lf2
+    // files predate them. Treating missing as the LAYER_DEFAULTS values
+    // keeps the schema additive without bumping schemaVersion.
+    const oldShape = JSON.stringify({
+      schemaVersion: PROJECT_SCHEMA_VERSION,
+      device: {
+        name: 'Default',
+        bedWidth: 300,
+        bedHeight: 300,
+        maxFeed: 3000,
+        maxPowerS: 1000,
+        origin: 'front-left',
+        homing: { enabled: false, direction: 'front-left' },
+        autofocusCommand: '',
+      },
+      workspace: { width: 300, height: 300, units: 'mm' },
+      scene: {
+        objects: [],
+        layers: [
+          {
+            id: 'L1',
+            color: '#ff0000',
+            mode: 'line',
+            power: 30,
+            speed: 1500,
+            passes: 1,
+            visible: true,
+            output: true,
+          },
+        ],
+      },
+    });
+    const r = deserializeProject(oldShape);
+    expect(r.kind).toBe('ok');
+    if (r.kind === 'ok') {
+      const layer = r.project.scene.layers[0];
+      expect(layer?.hatchAngleDeg).toBe(0);
+      expect(layer?.hatchSpacingMm).toBe(0.2);
+    }
+  });
+
   it('back-fills missing letterSpacing on text objects from pre-D.1 .lf2 files', () => {
     // D.1 added letterSpacing to TextObject. Files saved before D.1 are
     // missing the field; normalizeSceneObject must fill it with the

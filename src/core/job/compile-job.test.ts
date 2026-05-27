@@ -135,6 +135,74 @@ describe('compileJob', () => {
     ]);
   });
 
+  // F.1 — fill-mode dispatch.
+  it('layer.mode=fill replaces the outline with hatch lines from fillHatching', () => {
+    // A closed 10×10 square with mode='fill' + hatchSpacingMm=1.0 should
+    // emit hatch lines (one per scanline), not the outline's 5 corner
+    // points. We don't snapshot the exact coords (those depend on the
+    // half-open scanline rule + origin flip); we just assert:
+    //  - more than one segment (hatching produced multiple lines)
+    //  - every segment has exactly 2 points (open hatch lines, not the
+    //    original 5-point closed outline)
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      mode: 'fill' as const,
+      hatchSpacingMm: 1.0,
+      hatchAngleDeg: 0,
+    };
+    const sq: SceneObject = {
+      kind: 'imported-svg',
+      id: 'O1',
+      source: 'sq.svg',
+      bounds: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+      transform: IDENTITY_TRANSFORM,
+      paths: [
+        {
+          color: '#ff0000',
+          polylines: [
+            {
+              closed: true,
+              points: [
+                { x: 0, y: 0 },
+                { x: 10, y: 0 },
+                { x: 10, y: 10 },
+                { x: 0, y: 10 },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const job = compileJob({ objects: [sq], layers: [layer] }, dev);
+    const segs = job.groups[0]?.segments ?? [];
+    expect(segs.length).toBeGreaterThan(1);
+    for (const seg of segs) {
+      expect(seg.polyline).toHaveLength(2);
+      // Hatch lines emitted by fill mode are not "closed" — they're
+      // open horizontal slices, not loops.
+      expect(seg.closed).toBe(false);
+    }
+  });
+
+  it('layer.mode=fill on an open polyline emits nothing (no enclosed area)', () => {
+    const layer = {
+      ...createLayer({ id: 'L1', color: '#ff0000' }),
+      mode: 'fill' as const,
+    };
+    const open = svgObj({
+      id: 'O1',
+      color: '#ff0000',
+      points: [
+        { x: 0, y: 0 },
+        { x: 10, y: 0 },
+        { x: 10, y: 10 },
+      ],
+    });
+    // svgObj() returns closed: false. Fill ignores → group dropped
+    // entirely (empty segments → no group emitted).
+    expect(compileJob({ objects: [open], layers: [layer] }, dev).groups).toEqual([]);
+  });
+
   it('applies the device origin transform on top of the object transform', () => {
     const layer = createLayer({ id: 'L1', color: '#ff0000' });
     const obj = svgObj({
