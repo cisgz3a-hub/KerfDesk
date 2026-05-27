@@ -23,6 +23,7 @@ import {
   applyUpsertText,
   findReimportTarget,
   type ImportOutcome,
+  pruneOrphanLayers,
   pushUndo,
 } from './scene-mutations';
 
@@ -177,8 +178,15 @@ function sceneActions(
         // a deleted object can't linger as a ghost selection.
         const nextExtras = new Set(s.additionalSelectedIds);
         nextExtras.delete(id);
+        // Drop orphan layers — those whose color is no longer
+        // referenced by any remaining object. Without this the
+        // Cuts/Layers panel keeps a row (with its stale
+        // power/speed/passes) for the deleted object's color,
+        // which clutters the UI and confuses re-imports later.
+        const afterRemove = removeObject(s.project.scene, id);
+        const scene = pruneOrphanLayers(afterRemove);
         return {
-          project: { ...s.project, scene: removeObject(s.project.scene, id) },
+          project: { ...s.project, scene },
           selectedObjectId: s.selectedObjectId === id ? null : s.selectedObjectId,
           additionalSelectedIds: nextExtras,
           undoStack: pushUndo(s.project, s.undoStack),

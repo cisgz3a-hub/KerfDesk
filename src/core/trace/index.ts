@@ -5,4 +5,4 @@
 // emit pipeline.
 
 export type { RawImageData, TraceOptions } from './trace-image';
-export { DEFAULT_TRACE_OPTIONS, traceImageToSvgString } from './trace-image';
+export { DEFAULT_TRACE_OPTIONS, TRACE_PRESETS, traceImageToSvgString } from './trace-image';
