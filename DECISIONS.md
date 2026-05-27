@@ -475,10 +475,104 @@ Reversal requires a new ADR superseding this one.
 
 ---
 
+## ADR-019 — Phase F kickoff: Fill is a geometry decision in `compileJob`
+
+### Status | Date
+Accepted | 2026-05-28
+
+### Context
+
+PROJECT.md flagged Phase F (raster engrave) as needing a new revision +
+DECISIONS.md entry before code. Phase F has two sub-modes — Fill (hatch
+lines inside a closed contour) and Image (per-pixel S-modulation raster)
+— that share dispatch infrastructure but produce very different G-code
+shapes.
+
+The dormant `LayerMode = 'line' | 'fill' | 'image'` enum (added in ADR-005
+for forward compatibility) is the natural activation point. `compileJob`
+currently switches only on `SceneObject.kind` (`imported-svg`, `text`,
+`traced-image`) and ignores `layer.mode`. `grbl-strategy` hardcodes M3
+and emits one S-value per CutGroup.
+
+Phase F has been split into F.1 (Fill) and F.2 (Image). F.1 ships first
+per the surgical-changes principle: it adds no new G-code shape, only
+more polylines. F.2 will introduce the harder pieces (RasterImage scene
+object, M4 mode, dithering, overscan, streaming) in a follow-up kickoff.
+
+### Decision
+
+For **Fill (F.1)**: hatch-line generation happens at **compile time** in
+`compile-job.ts`, NOT at G-code emit time in `grbl-strategy.ts`. When a
+layer's mode is `'fill'`, `appendPathSegments` replaces the per-color
+polylines with the output of `fillHatching()` (scanline polygon fill,
+even-odd rule) BEFORE applying the object's transform. The resulting
+hatch lines flow through the existing CutSegment → grbl-strategy emit
+path unchanged.
+
+For **Image (F.2)**: separate emit path in `core/output/emit-raster.ts`
+(not yet written). The CutGroup's source object kind will discriminate
+between vector emit (line/fill, M3) and raster emit (image, M4).
+Decisions deferred to F.2 kickoff.
+
+Two new fields on `Layer`: `hatchAngleDeg: number` (0..180, default 0)
+and `hatchSpacingMm: number` (default 0.2 mm ≈ 5 lines/mm). Pre-F.1
+`.lf2` files back-fill defaults in `deserializeProject`'s
+`normalizeLayer` — additive-with-default, no `schemaVersion` bump
+(matches the D.1.a `letterSpacing` precedent).
+
+### Alternatives considered
+
+1. **Push Fill dispatch into `grbl-strategy`** — would require passing
+   `layer.mode` into the strategy + duplicating the scanline math in any
+   future OutputStrategy (Marlin etc.). Rejected: violates single
+   responsibility (G-code emit shouldn't do geometry decisions).
+2. **New SceneObject variant `FilledRegion`** — would require the user
+   to explicitly create fill objects rather than flipping a layer mode.
+   Rejected: every other CAM tool (LightBurn, LaserGRBL) keeps Fill as
+   a layer attribute on existing geometry. Mode-on-layer matches user
+   expectation and reuses the existing color-layer plumbing.
+3. **Adopt `polygon-fill` / `flatten-svg` for the scanline math** —
+   evaluated per ADR-017. `flatten-svg` doesn't do hatching. No
+   maintained MIT-licensed JS library covers exactly our use case
+   (closed polyline + hatch angle + spacing → hatch lines). Self-implement
+   in ~150 LOC; documented in RESEARCH_LOG.md Phase F entry.
+
+### Consequences
+
+- `compile-job.ts` grows by ~30 LOC (the mode branch + the fillHatching
+  invocation). Still well under file-size caps.
+- `fill-hatching.ts` is a new pure-core module (no new dependencies).
+- Existing G-code invariants (`findLaserOnTravelIssues`,
+  `findOutOfBoundsCoords`) keep working unchanged — hatch lines are
+  ordinary CutSegments.
+- `Layer` gains two fields, surfaced in the UI only when `mode === 'fill'`.
+  Older `.lf2` files load with defaults via the existing back-fill pattern.
+- F.2 sketches a separate emit path; this ADR explicitly does NOT commit
+  the image-engrave architecture. A future ADR-020 will cover it.
+
+### Verification
+
+- 10 unit + property tests for `fillHatching` cover: angle 0/90 symmetry,
+  donut holes (even-odd rule), open polylines (skipped), degenerate input,
+  spacing clamp, angle normalization, determinism.
+- `compile-job.test.ts` proves that `layer.mode='fill'` on a 10mm square
+  emits multiple 2-point segments (hatches) instead of the original 5-point
+  outline, and that open polylines emit nothing.
+- `project.test.ts` proves pre-F.1 `.lf2` files back-fill `hatchAngleDeg=0`
+  and `hatchSpacingMm=0.2`.
+- Hardware: F.1.f checklist on the Falcon (20mm square + 30mm letter "O").
+
+---
+
 ## Future ADRs (anticipated, not yet written)
 
-- ADR-019 — GRBL streaming state machine design (Phase B)
-- ADR-020 — Alarm code → user-message mapping (Phase B)
-- ADR-021 — Web-app deployment target (before first deploy)
-- ADR-022 — Update mechanism for Windows desktop (before first signed release)
-- ADR-023 — Image trace parameter defaults for Phase E
+- ADR-020 — Phase F.2 raster image engrave: emit path, M3/M4 selection,
+  dithering, overscan, streaming threshold.
+- ADR-021 — Web-app deployment target (covered ad-hoc in the current
+  Cloudflare Pages setup commits; promote to formal ADR if the deploy
+  config grows).
+- ADR-022 — Update mechanism for Windows desktop (before first signed
+  release).
+- (Earlier reservations for ADR-019..023 were stale — Phase B / E
+  shipped without formal ADRs at those slots. ADR-019 above is the
+  first slot used since then.)

@@ -14,18 +14,20 @@ import {
   applyTransform,
   assertNever,
   type ColoredPath,
+  type Layer,
   type Scene,
   type SceneObject,
   type Transform,
   type Vec2,
 } from '../scene';
+import { fillHatching } from './fill-hatching';
 import type { CutGroup, CutSegment, Job } from './job';
 
 export function compileJob(scene: Scene, device: DeviceProfile): Job {
   const groups: CutGroup[] = [];
   for (const layer of scene.layers) {
     if (!layer.output) continue;
-    const segments = collectSegmentsForLayer(scene.objects, layer.color, device);
+    const segments = collectSegmentsForLayer(scene.objects, layer, device);
     if (segments.length === 0) continue;
     groups.push({
       layerId: layer.id,
@@ -45,19 +47,19 @@ function clamp(n: number, lo: number, hi: number): number {
 
 function collectSegmentsForLayer(
   objects: ReadonlyArray<SceneObject>,
-  color: string,
+  layer: Layer,
   device: DeviceProfile,
 ): CutSegment[] {
   const out: CutSegment[] = [];
   for (const obj of objects) {
-    appendSegmentsFromObject(obj, color, device, out);
+    appendSegmentsFromObject(obj, layer, device, out);
   }
   return out;
 }
 
 function appendSegmentsFromObject(
   obj: SceneObject,
-  color: string,
+  layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
 ): void {
@@ -67,13 +69,13 @@ function appendSegmentsFromObject(
   // variant lands (per ADR-014).
   switch (obj.kind) {
     case 'imported-svg':
-      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      appendPathSegments(obj.paths, obj.transform, layer, device, out);
       return;
     case 'text':
-      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      appendPathSegments(obj.paths, obj.transform, layer, device, out);
       return;
     case 'traced-image':
-      appendPathSegments(obj.paths, obj.transform, color, device, out);
+      appendPathSegments(obj.paths, obj.transform, layer, device, out);
       return;
     default:
       assertNever(obj, 'SceneObject');
@@ -81,19 +83,35 @@ function appendSegmentsFromObject(
 }
 
 // Shared materializer for any SceneObject whose paths are already
-// available as ColoredPath polylines (ImportedSvg, TextObject). The
-// switch above stays one-arm-per-kind for exhaustiveness, but each
-// arm just delegates here — no duplicated coordinate-transform math.
+// available as ColoredPath polylines (ImportedSvg, TextObject,
+// TracedImage). The switch above stays one-arm-per-kind for
+// exhaustiveness, but each arm just delegates here — no duplicated
+// coordinate-transform math.
+//
+// F.1 — when the layer's mode is 'fill', replace the per-color polylines
+// with the output of fillHatching() BEFORE applying the object's
+// transform. Doing the scanline math in object-local coordinates lets
+// fillHatching work in a clean frame; the transform then moves the
+// hatch lines to scene coordinates exactly the same way it would move
+// the outline polylines.
 function appendPathSegments(
   paths: ReadonlyArray<ColoredPath>,
   transform: Transform,
-  color: string,
+  layer: Layer,
   device: DeviceProfile,
   out: CutSegment[],
 ): void {
   for (const path of paths) {
-    if (path.color !== color) continue;
-    for (const polyline of path.polylines) {
+    if (path.color !== layer.color) continue;
+    const polylines =
+      layer.mode === 'fill'
+        ? fillHatching({
+            polylines: path.polylines,
+            hatchAngleDeg: layer.hatchAngleDeg,
+            hatchSpacingMm: layer.hatchSpacingMm,
+          })
+        : path.polylines;
+    for (const polyline of polylines) {
       const points: Vec2[] = polyline.points.map((p) =>
         toMachineCoords(applyTransform(p, transform), device),
       );
