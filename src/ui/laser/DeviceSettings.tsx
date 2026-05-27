@@ -1,12 +1,15 @@
-// DeviceSettings — quick editor for the active DeviceProfile so users can
-// match the app's bed dimensions and power scale to their actual machine.
-// Phase A initial expected users to edit device-profile.json manually
-// (per WORKFLOW.md F-A1). This panel makes it a runtime operation, which is
-// essential once the workspace + Frame action depend on accurate bed values.
+// DeviceSettings — full editor for the active DeviceProfile. Every field
+// in DeviceProfile is editable here, including the two that originally
+// required hand-editing device-profile.json: origin corner (controls
+// Y-flip in toMachineCoords) and homing (controls whether $H is sent
+// on connect).
 //
-// Phase C will replace this with a full Settings page; for Phase B this is
-// the smallest editable surface that unblocks real laser work.
+// Phase C closure of "settings panel" — kept inline in the Laser rail
+// rather than a separate modal page. The fields are few enough that
+// a modal would add modality without adding clarity (CLAUDE.md
+// "simplicity first").
 
+import type { Origin } from '../../core/devices';
 import { useStore } from '../state';
 
 export function DeviceSettings(): JSX.Element {
@@ -46,6 +49,9 @@ export function DeviceSettings(): JSX.Element {
         />
         <span style={unitStyle}>mm</span>
       </Row>
+      <Row label="Origin">
+        <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
+      </Row>
       <Row label="Max feed">
         <input
           type="number"
@@ -71,11 +77,82 @@ export function DeviceSettings(): JSX.Element {
           aria-label="GRBL $30 max power S"
         />
       </Row>
+      <Row label="Homing">
+        <HomingEditor
+          enabled={device.homing.enabled}
+          direction={device.homing.direction}
+          onChange={(homing) => update({ homing })}
+        />
+      </Row>
       <AutofocusEditor
         value={device.autofocusCommand}
         onChange={(autofocusCommand) => update({ autofocusCommand })}
       />
     </div>
+  );
+}
+
+const ORIGIN_OPTIONS: ReadonlyArray<{ readonly value: Origin; readonly label: string }> = [
+  { value: 'front-left', label: 'Front left' },
+  { value: 'front-right', label: 'Front right' },
+  { value: 'rear-left', label: 'Rear left' },
+  { value: 'rear-right', label: 'Rear right' },
+  { value: 'center', label: 'Center' },
+];
+
+function OriginSelect(props: {
+  readonly value: Origin;
+  readonly onChange: (next: Origin) => void;
+}): JSX.Element {
+  return (
+    <select
+      value={props.value}
+      onChange={(e) => props.onChange(e.target.value as Origin)}
+      aria-label="Machine origin corner"
+      title="Where (0,0) sits on your machine. Match this to the corner your GRBL homes to — most Falcon / xTool diode lasers are front-left."
+    >
+      {ORIGIN_OPTIONS.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function HomingEditor(props: {
+  readonly enabled: boolean;
+  readonly direction: Origin;
+  readonly onChange: (next: { enabled: boolean; direction: Origin }) => void;
+}): JSX.Element {
+  return (
+    <>
+      <label style={inlineLabelStyle} title="If enabled, the Home button sends $H and waits for completion.">
+        <input
+          type="checkbox"
+          checked={props.enabled}
+          onChange={(e) => props.onChange({ enabled: e.target.checked, direction: props.direction })}
+          aria-label="Homing enabled"
+        />
+        <span>$H supported</span>
+      </label>
+      {props.enabled && (
+        <select
+          value={props.direction}
+          onChange={(e) =>
+            props.onChange({ enabled: props.enabled, direction: e.target.value as Origin })
+          }
+          aria-label="Homes to corner"
+          title="Which corner the controller homes to. Usually matches the machine origin."
+        >
+          {ORIGIN_OPTIONS.map((opt) => (
+            <option key={opt.value} value={opt.value}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
+      )}
+    </>
   );
 }
 
@@ -215,5 +292,12 @@ const presetsRowStyle: React.CSSProperties = { display: 'flex', flexWrap: 'wrap'
 const presetButtonStyle: React.CSSProperties = {
   fontSize: 10,
   padding: '2px 6px',
+  cursor: 'pointer',
+};
+const inlineLabelStyle: React.CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 4,
+  fontSize: 12,
   cursor: 'pointer',
 };

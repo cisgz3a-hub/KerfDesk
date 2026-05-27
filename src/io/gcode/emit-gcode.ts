@@ -4,7 +4,7 @@
 // based on `preflight.ok`.
 
 import { runPreflight, type PreflightResult } from '../../core/preflight';
-import { compileJob } from '../../core/job';
+import { compileJob, optimizePaths } from '../../core/job';
 import { grblStrategy } from '../../core/output';
 import type { Project } from '../../core/scene';
 
@@ -14,7 +14,11 @@ export type EmitGcodeResult = {
 };
 
 export function emitGcode(project: Project): EmitGcodeResult {
-  const job = compileJob(project.scene, project.device);
+  // compile → optimize → emit. The optimize step is pure path-order
+  // reduction (nearest-neighbor heuristic) — same cuts, same speeds,
+  // same passes, just shorter travel between them. Determinism
+  // preserved (PROJECT.md non-negotiable #5).
+  const job = optimizePaths(compileJob(project.scene, project.device));
   const gcode = grblStrategy.emit(job, project.device);
   const preflight = runPreflight(project, gcode);
   return { gcode, preflight };

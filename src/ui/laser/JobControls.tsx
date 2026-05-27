@@ -1,12 +1,16 @@
 // JobControls — Home + Start / Pause / Resume / Stop + progress bar.
 // F-B3 (Home), F-B6 (Start), F-B7 (Pause/Resume), F-B8 (Stop), F-B11 (Progress).
 
+import { useMemo } from 'react';
 import { progress } from '../../core/controllers/grbl';
 import {
   compileJob,
   computeJobBounds,
   describeFramePreflightFailure,
+  estimateJobDuration,
+  formatDuration,
   framePreflight,
+  optimizePaths,
 } from '../../core/job';
 import { useStore } from '../state';
 import { describeAutofocusResult, useLaserStore } from '../state/laser-store';
@@ -40,7 +44,9 @@ function SetupRow(props: {
   const onFrame = useFrameAction();
   const onAutofocus = useAutofocusAction();
   const autofocusCommand = useStore((s) => s.project.device.autofocusCommand);
+  const homingEnabled = useStore((s) => s.project.device.homing.enabled);
   const home = useLaserStore((s) => s.home);
+  const estimateLabel = useJobEstimateLabel();
   const busy = props.disabled || props.streaming;
   // Disabled when the command is empty — there's no portable autofocus
   // G-code (see DeviceProfile.autofocusCommand docs); shipping a default
@@ -49,7 +55,16 @@ function SetupRow(props: {
   const noAutofocus = autofocusCommand.trim() === '';
   return (
     <div style={rowStyle}>
-      <button type="button" onClick={() => void home()} disabled={props.disabled}>
+      <button
+        type="button"
+        onClick={() => void home()}
+        disabled={props.disabled || !homingEnabled}
+        title={
+          homingEnabled
+            ? 'Send $H — home all axes'
+            : 'Homing is disabled in Device settings. Enable "$H supported" first.'
+        }
+      >
         Home
       </button>
       <button
@@ -67,11 +82,37 @@ function SetupRow(props: {
       <button type="button" onClick={onFrame} disabled={busy}>
         Frame
       </button>
-      <button type="button" onClick={props.onStartJob} disabled={busy}>
+      <button
+        type="button"
+        onClick={props.onStartJob}
+        disabled={busy}
+        title={
+          estimateLabel === null
+            ? 'Enable Output on at least one layer to start a job'
+            : `Estimated burn time: ${estimateLabel} (excludes acceleration overhead)`
+        }
+      >
         Start job
       </button>
+      {estimateLabel !== null && <span style={estimateStyle}>≈ {estimateLabel}</span>}
     </div>
   );
+}
+
+// Live ETA for the current scene + device settings. Returns null when
+// there's nothing to burn (no output-enabled layer / empty scene) so the
+// caller can hide the readout instead of showing "0s". useMemo keeps the
+// estimate stable across re-renders that don't touch scene or device.
+function useJobEstimateLabel(): string | null {
+  const project = useStore((s) => s.project);
+  return useMemo(() => {
+    // Optimize before estimating so the ETA reflects the actual burn
+    // order (emitGcode runs the same compile→optimize chain).
+    const job = optimizePaths(compileJob(project.scene, project.device));
+    if (job.groups.length === 0) return null;
+    const r = estimateJobDuration(job, project.device);
+    return r.totalSeconds > 0 ? formatDuration(r.totalSeconds) : null;
+  }, [project.scene, project.device]);
 }
 
 function RunningControls(props: {
@@ -182,4 +223,10 @@ const progressLabelStyle: React.CSSProperties = {
   lineHeight: '18px',
   color: '#111',
   textShadow: '0 0 2px #fff',
+};
+const estimateStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: '#666',
+  alignSelf: 'center',
+  fontVariantNumeric: 'tabular-nums',
 };

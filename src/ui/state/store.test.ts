@@ -53,6 +53,11 @@ describe('useStore', () => {
     expect(s.selectedObjectId).toBeNull();
   });
 
+  it('importSvgObject returns { kind: "added" } for a fresh import', () => {
+    const outcome = useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    expect(outcome.kind).toBe('added');
+  });
+
   it('importSvgObject adds the object and auto-creates layers per unique color', () => {
     useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
     const { scene } = useStore.getState().project;
@@ -106,6 +111,84 @@ describe('useStore', () => {
     const s = useStore.getState();
     expect(s.project.scene.objects).toHaveLength(0);
     expect(s.selectedObjectId).toBeNull();
+  });
+});
+
+describe('useStore — SVG re-import (Phase C #7)', () => {
+  beforeEach(() => {
+    reset();
+  });
+
+  it('returns { kind: "replaced" } when an object with the same source already exists', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000', '#0000ff']));
+    const replacement: SceneObject = { ...svgObj('NEW-id', ['#ff0000']), source: 'O1.svg' };
+    const outcome = useStore.getState().importSvgObject(replacement);
+    expect(outcome.kind).toBe('replaced');
+    if (outcome.kind === 'replaced') {
+      expect(outcome.source).toBe('O1.svg');
+      expect(outcome.kept).toBe(1); // red survived
+      expect(outcome.removed).toBe(1); // blue dropped
+      expect(outcome.added).toBe(0); // nothing new
+    }
+  });
+
+  it('re-import preserves the existing object id (so selection / refs stay valid)', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const original = useStore.getState().project.scene.objects[0];
+    const replacement: SceneObject = { ...svgObj('different-id', ['#ff0000']), source: 'O1.svg' };
+    useStore.getState().importSvgObject(replacement);
+    const after = useStore.getState().project.scene.objects[0];
+    expect(after?.id).toBe(original?.id);
+    expect(useStore.getState().project.scene.objects).toHaveLength(1);
+  });
+
+  it('re-import preserves the existing object transform (user-chosen position survives)', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    // Simulate the user dragging the object to (123, 45):
+    const orig = useStore.getState().project.scene.objects[0];
+    if (orig === undefined) throw new Error('expected object');
+    useStore
+      .getState()
+      .setObjectTransform(orig.id, { ...orig.transform, x: 123, y: 45 });
+    const replacement: SceneObject = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
+    useStore.getState().importSvgObject(replacement);
+    const after = useStore.getState().project.scene.objects[0];
+    expect(after?.transform.x).toBe(123);
+    expect(after?.transform.y).toBe(45);
+  });
+
+  it('re-import preserves layer settings for surviving colors', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    useStore.getState().setLayerParam('#ff0000', { power: 85, speed: 1234, passes: 3 });
+    const replacement: SceneObject = { ...svgObj('new', ['#ff0000']), source: 'O1.svg' };
+    useStore.getState().importSvgObject(replacement);
+    const red = useStore.getState().project.scene.layers.find((l) => l.color === '#ff0000');
+    expect(red?.power).toBe(85);
+    expect(red?.speed).toBe(1234);
+    expect(red?.passes).toBe(3);
+  });
+
+  it('re-import adds layers for genuinely new colors', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const replacement: SceneObject = {
+      ...svgObj('new', ['#ff0000', '#00ff00']),
+      source: 'O1.svg',
+    };
+    const outcome = useStore.getState().importSvgObject(replacement);
+    expect(useStore.getState().project.scene.layers.map((l) => l.color)).toContain('#00ff00');
+    if (outcome.kind === 'replaced') {
+      expect(outcome.added).toBe(1);
+      expect(outcome.kept).toBe(1);
+    }
+  });
+
+  it('different sources still add as new (no false re-import)', () => {
+    useStore.getState().importSvgObject(svgObj('O1', ['#ff0000']));
+    const outcome = useStore
+      .getState()
+      .importSvgObject(svgObj('O2', ['#0000ff'])); // different source ('O2.svg')
+    expect(outcome.kind).toBe('added');
+    expect(useStore.getState().project.scene.objects).toHaveLength(2);
   });
 });
 
