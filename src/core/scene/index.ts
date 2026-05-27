@@ -14,6 +14,7 @@ export type {
   SceneObject,
   TextAlignment,
   TextObject,
+  TracedImage,
   Transform,
   Vec2,
 } from './scene-object';

@@ -95,6 +95,7 @@ function FileButtons(): JSX.Element {
         Import SVG…
       </button>
       <TextButton />
+      <ImageButton />
       <button
         type="button"
         title="Export G-code for the current scene (Ctrl+E)"
@@ -118,6 +119,20 @@ function TextButton(): JSX.Element {
       onClick={() => openTextDialog({ mode: 'add' })}
     >
       Text…
+    </button>
+  );
+}
+
+// Phase E — Trace Image opens the ImportImageDialog (PNG/JPG → vector).
+function ImageButton(): JSX.Element {
+  const openImageDialog = useUiStore((s) => s.openImageDialog);
+  return (
+    <button
+      type="button"
+      title="Trace a raster image (PNG/JPG) into vectors"
+      onClick={openImageDialog}
+    >
+      Trace Image…
     </button>
   );
 }

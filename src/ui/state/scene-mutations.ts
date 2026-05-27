@@ -100,7 +100,11 @@ export function applyFreshImport(
       ? fitted
       : { ...fitted, transform: { ...fitted.transform, x: fitted.transform.x + offset, y: fitted.transform.y + offset } };
   let scene = addObject(s.project.scene, positioned);
-  if (positioned.kind === 'imported-svg' || positioned.kind === 'text') {
+  if (
+    positioned.kind === 'imported-svg' ||
+    positioned.kind === 'text' ||
+    positioned.kind === 'traced-image'
+  ) {
     scene = ensureLayersForColors(scene, positioned.paths);
   }
   return {
