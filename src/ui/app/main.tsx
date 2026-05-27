@@ -5,6 +5,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { webAdapter } from '../../platform/web';
+import { ErrorBoundary } from '../common/ErrorBoundary';
 import { App } from './App';
 import { PlatformProvider } from './platform-context';
 
@@ -15,8 +16,10 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <PlatformProvider adapter={webAdapter}>
-      <App />
-    </PlatformProvider>
+    <ErrorBoundary>
+      <PlatformProvider adapter={webAdapter}>
+        <App />
+      </PlatformProvider>
+    </ErrorBoundary>
   </StrictMode>,
 );

@@ -22,7 +22,15 @@ export { hitTest, transformedBBox } from './hit-test';
 export { fitObjectToBed } from './fit-to-bed';
 
 export type { Scene } from './scene';
-export { EMPTY_SCENE, addLayer, addObject, removeLayer, removeObject, updateLayer } from './scene';
+export {
+  EMPTY_SCENE,
+  addLayer,
+  addObject,
+  removeLayer,
+  removeObject,
+  replaceObject,
+  updateLayer,
+} from './scene';
 
 export type { Project, Workspace } from './project';
 export { PROJECT_SCHEMA_VERSION, createProject } from './project';

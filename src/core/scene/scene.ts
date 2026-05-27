@@ -19,6 +19,17 @@ export function removeObject(scene: Scene, objectId: string): Scene {
   return { ...scene, objects: scene.objects.filter((o) => o.id !== objectId) };
 }
 
+// In-place replace by id — preserves array order so the object's
+// stacking position, undo history shape, and any callers iterating
+// scene.objects don't shift unexpectedly. Used by SVG re-import
+// (Phase C) to swap the parsed content while keeping id + transform.
+export function replaceObject(scene: Scene, objectId: string, replacement: SceneObject): Scene {
+  return {
+    ...scene,
+    objects: scene.objects.map((o) => (o.id === objectId ? replacement : o)),
+  };
+}
+
 export function addLayer(scene: Scene, layer: Layer): Scene {
   return { ...scene, layers: [...scene.layers, layer] };
 }

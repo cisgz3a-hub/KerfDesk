@@ -25,6 +25,24 @@ function confirmDiscard(action: string): boolean {
 }
 
 export function Toolbar(): JSX.Element {
+  return (
+    <header aria-label="Toolbar" style={barStyle}>
+      <span style={titleStyle}>LaserForge 2.0</span>
+      <span style={separatorStyle} />
+      <FileButtons />
+      <span style={separatorStyle} />
+      <span style={hintStyle} title={SHORTCUT_HINT}>
+        ⌨ shortcuts
+      </span>
+    </header>
+  );
+}
+
+// All Toolbar buttons grouped — extracted so the parent stays a thin
+// layout shell under the 80-line-per-function lint cap and so each
+// button keeps its full title-attribute hint inline (the hint *is*
+// the discoverability for users who don't read shortcut docs).
+function FileButtons(): JSX.Element {
   const platform = usePlatform();
   const project = useStore((s) => s.project);
   const importSvgObject = useStore((s) => s.importSvgObject);
@@ -35,13 +53,12 @@ export function Toolbar(): JSX.Element {
   const markSaved = useStore((s) => s.markSaved);
   const markLoaded = useStore((s) => s.markLoaded);
   const pushToast = useToastStore((s) => s.pushToast);
-
+  const saveCtx = { platform, project, savedName, lastSaveTarget, markSaved, pushToast };
   return (
-    <header aria-label="Toolbar" style={barStyle}>
-      <span style={titleStyle}>LaserForge 2.0</span>
-      <span style={separatorStyle} />
+    <>
       <button
         type="button"
+        title="New project (Ctrl+N)"
         onClick={() => {
           if (confirmDiscard('start a new project')) newProject();
         }}
@@ -50,6 +67,7 @@ export function Toolbar(): JSX.Element {
       </button>
       <button
         type="button"
+        title="Open .lf2 project (Ctrl+O)"
         onClick={() => {
           if (!confirmDiscard('open another project')) return;
           void handleOpenProject({ platform, setProject, markLoaded, pushToast });
@@ -57,48 +75,44 @@ export function Toolbar(): JSX.Element {
       >
         Open…
       </button>
-      <button
-        type="button"
-        onClick={() =>
-          void handleSaveProject({
-            platform,
-            project,
-            savedName,
-            lastSaveTarget,
-            markSaved,
-            pushToast,
-          })
-        }
-      >
+      <button type="button" title="Save project (Ctrl+S)" onClick={() => void handleSaveProject(saveCtx)}>
         Save
       </button>
       <button
         type="button"
-        onClick={() =>
-          void handleSaveProject(
-            { platform, project, savedName, lastSaveTarget, markSaved, pushToast },
-            true,
-          )
-        }
+        title="Save project as… (Ctrl+Shift+S)"
+        onClick={() => void handleSaveProject(saveCtx, true)}
       >
         Save As…
       </button>
       <span style={separatorStyle} />
       <button
         type="button"
+        title="Import SVG file (Ctrl+I) — you can also drag-drop"
         onClick={() => void handleImportSvg(platform, importSvgObject, pushToast)}
       >
         Import SVG…
       </button>
       <button
         type="button"
+        title="Export G-code for the current scene (Ctrl+E)"
         onClick={() => void handleSaveGcode({ platform, project, savedName, pushToast })}
       >
         Save G-code…
       </button>
-    </header>
+    </>
   );
 }
+
+// One-place shortcut reference — surfaces on hover of the small "⌨ shortcuts"
+// badge in the toolbar. Lists every binding the audit confirmed exists;
+// edit this when shortcuts.ts adds new ones.
+const SHORTCUT_HINT = [
+  'File: Ctrl+N new · Ctrl+O open · Ctrl+S save · Ctrl+Shift+S save as · Ctrl+I import · Ctrl+E export G-code',
+  'Edit: Ctrl+Z undo · Ctrl+Shift+Z redo · Ctrl+A select all · Delete/Backspace remove · Escape deselect',
+  'Transform: ←↑↓→ nudge 1mm · Shift+arrows 10mm · H flip horizontal · V flip vertical',
+  'View: F or 0 fit-to-bed · +/- zoom · P preview · Space+drag pan',
+].join('\n');
 
 const barStyle: React.CSSProperties = {
   display: 'flex',
@@ -118,4 +132,11 @@ const separatorStyle: React.CSSProperties = {
   height: 16,
   background: '#444',
   margin: '0 4px',
+};
+const hintStyle: React.CSSProperties = {
+  marginLeft: 'auto',
+  fontSize: 11,
+  color: '#999',
+  cursor: 'help',
+  userSelect: 'none',
 };

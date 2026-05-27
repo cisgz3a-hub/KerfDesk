@@ -7,12 +7,21 @@ import { CutsLayersPanel } from '../layers';
 import { StatusBar, Toasts, Toolbar } from '../common';
 import { LaserWindow } from '../laser';
 import { Workspace } from '../workspace';
+import { useAutosave, useAutosaveRecovery } from './use-autosave';
+import { useGlobalErrorHandlers } from './use-global-error-handlers';
 import { useImportDragDrop } from './use-import-drag-drop';
 import { useShortcuts } from './use-shortcuts';
 import { useSpacePan } from './use-space-pan';
 import { useWindowTitle } from './use-window-title';
 
 export function App(): JSX.Element {
+  // Recovery first — runs once on mount, prompts the user before any
+  // edits land. Then start the 30s autosave loop for the remainder of
+  // the session. Global error handlers catch what the ErrorBoundary
+  // can't (event-handler throws + unhandled promise rejections).
+  useAutosaveRecovery();
+  useAutosave();
+  useGlobalErrorHandlers();
   useImportDragDrop();
   useShortcuts();
   useSpacePan();

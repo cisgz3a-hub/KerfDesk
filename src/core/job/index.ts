@@ -5,5 +5,8 @@ export type { JobBounds } from './job-bounds';
 export { computeJobBounds } from './job-bounds';
 export type { FramePreflight } from './frame-preflight';
 export { describeFramePreflightFailure, framePreflight } from './frame-preflight';
+export type { JobDurationEstimate } from './estimate-duration';
+export { estimateJobDuration, formatDuration } from './estimate-duration';
+export { optimizePaths } from './optimize-paths';
 export type { SlicedToolpath, Toolpath, ToolpathStep } from './toolpath';
 export { buildToolpath, sliceToolpath } from './toolpath';

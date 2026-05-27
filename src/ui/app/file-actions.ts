@@ -9,12 +9,14 @@ import { emitGcode } from '../../io/gcode';
 import { deserializeProject, serializeProject } from '../../io/project';
 import { parseSvg } from '../../io/svg';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import { clearAutosave } from '../state/autosave';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
-import { describeImportError, describeImportResult } from './import-toasts';
+import { describeImportError, describeImportResult, describeReimportOutcome } from './import-toasts';
 
 export async function handleImportSvg(
   platform: PlatformAdapter,
-  importSvgObject: (obj: SceneObject, batchIdx?: number) => void,
+  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
   const files = await platform.pickFilesForOpen({ accept: ['.svg'], multiple: true });
@@ -25,8 +27,16 @@ export async function handleImportSvg(
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
-        importSvgObject(result.object, successIdx);
+        const outcome = importSvgObject(result.object, successIdx);
         successIdx += 1;
+        if (outcome.kind === 'replaced') {
+          // Phase C re-import: store recognised the source filename and
+          // swapped the existing object in place, keeping layer settings
+          // and transform. Toast the diff so the user sees what changed.
+          const t = describeReimportOutcome(outcome);
+          pushToast(t.message, t.variant);
+          continue; // skip the generic "imported" toast
+        }
       }
       for (const t of describeImportResult(file.name, result)) {
         pushToast(t.message, t.variant);
@@ -94,6 +104,9 @@ export async function handleSaveProject(
   try {
     await target.write(serializeProject(ctx.project));
     ctx.markSaved(target);
+    // Manual save succeeded → autosave slot is redundant. Drop it so
+    // the recovery prompt doesn't fire on the next boot.
+    clearAutosave();
     ctx.pushToast(reuseTarget ? 'Saved' : `Saved project to ${target.displayName}`, 'success');
   } catch (err) {
     ctx.pushToast(`Could not save project: ${errMsg(err)}`, 'error');
@@ -116,6 +129,8 @@ export async function handleOpenProject(ctx: OpenProjectCtx): Promise<void> {
   if (result.kind === 'ok') {
     ctx.setProject(result.project);
     ctx.markLoaded(file.name);
+    // Opening a real .lf2 makes any autosaved snapshot stale.
+    clearAutosave();
     if (result.migratedFrom !== undefined) {
       ctx.pushToast(
         `Opened ${file.name} — migrated from schema v${result.migratedFrom}`,

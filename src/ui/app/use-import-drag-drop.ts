@@ -12,9 +12,10 @@ import { useEffect, useRef } from 'react';
 import type { SceneObject } from '../../core/scene';
 import { parseSvg } from '../../io/svg';
 import { useStore } from '../state';
+import type { ImportOutcome } from '../state/store';
 import { useToastStore, type ToastVariant } from '../state/toast-store';
 import { useUiStore } from '../state/ui-store';
-import { describeImportError, describeImportResult } from './import-toasts';
+import { describeImportError, describeImportResult, describeReimportOutcome } from './import-toasts';
 
 export function useImportDragDrop(): void {
   const importSvgObject = useStore((s) => s.importSvgObject);
@@ -76,7 +77,7 @@ function pickSvgFiles(dt: DataTransfer): ReadonlyArray<File> {
 
 async function importMany(
   files: ReadonlyArray<File>,
-  importSvgObject: (obj: SceneObject, batchIdx?: number) => void,
+  importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome,
   pushToast: (message: string, variant?: ToastVariant) => void,
 ): Promise<void> {
   let successIdx = 0;
@@ -86,8 +87,13 @@ async function importMany(
       const id = crypto.randomUUID();
       const result = parseSvg({ svgText: text, id, source: file.name });
       if (result.object !== null) {
-        importSvgObject(result.object, successIdx);
+        const outcome = importSvgObject(result.object, successIdx);
         successIdx += 1;
+        if (outcome.kind === 'replaced') {
+          const t = describeReimportOutcome(outcome);
+          pushToast(t.message, t.variant);
+          continue;
+        }
       }
       for (const t of describeImportResult(file.name, result)) {
         pushToast(t.message, t.variant);

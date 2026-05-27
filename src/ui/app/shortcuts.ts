@@ -9,6 +9,7 @@
 
 import type { Project, SceneObject, Transform } from '../../core/scene';
 import type { PlatformAdapter, SaveTarget } from '../../platform/types';
+import type { ImportOutcome } from '../state/store';
 import type { ToastVariant } from '../state/toast-store';
 import {
   handleImportSvg,
@@ -23,7 +24,7 @@ const NUDGE_BIG_MM = 10;
 export type FileCtx = {
   readonly platform: PlatformAdapter;
   readonly project: Project;
-  readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => void;
+  readonly importSvgObject: (obj: SceneObject, batchIdx?: number) => ImportOutcome;
   readonly setProject: (p: Project) => void;
   readonly newProject: () => void;
   readonly savedName: string | null;

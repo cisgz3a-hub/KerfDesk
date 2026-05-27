@@ -11,9 +11,12 @@ import {
   createLayer,
   createProject,
   fitObjectToBed,
+  type ImportedSvg,
   type Layer,
   type Project,
   removeObject,
+  replaceObject,
+  type Scene,
   type SceneObject,
   type Transform,
   updateLayer,
@@ -22,6 +25,20 @@ import {
 import type { SaveTarget } from '../../platform/types';
 
 const HISTORY_DEPTH = 50;
+
+// Discriminated outcome of importSvgObject. `added` is a fresh import;
+// `replaced` is a re-import (Phase C) that swapped an existing object's
+// content while preserving its id + transform + the surviving color
+// layers' settings. Diff counts are colors-set comparisons.
+export type ImportOutcome =
+  | { readonly kind: 'added' }
+  | {
+      readonly kind: 'replaced';
+      readonly source: string;
+      readonly kept: number;
+      readonly added: number;
+      readonly removed: number;
+    };
 
 export type AppState = {
   readonly project: Project;
@@ -56,7 +73,12 @@ export type AppState = {
   // right and down (F-A3 multi-import). The first file in a batch passes 0,
   // the second passes 1, etc., so a 3-file drop produces a stagger instead
   // of fully-overlapping designs.
-  readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => void;
+  //
+  // Returns an ImportOutcome so callers can toast the diff (Phase C
+  // re-import). For a fresh add the outcome is `{ kind: 'added' }`;
+  // for a re-import (existing object with matching source filename
+  // found) it's `{ kind: 'replaced', kept, added, removed }`.
+  readonly importSvgObject: (object: SceneObject, batchOffsetIdx?: number) => ImportOutcome;
   readonly removeSceneObject: (id: string) => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
@@ -132,55 +154,115 @@ function projectActions(set: Setter): Pick<AppState, 'setProject' | 'newProject'
 
 const MULTI_IMPORT_OFFSET_MM = 10;
 
-function importSvgObjectAction(set: Setter): Pick<AppState, 'importSvgObject'> {
+// Find an existing imported-SVG object whose `source` filename matches
+// the about-to-be-imported one. Used by importSvgObject to decide
+// between fresh-add and replace-in-place semantics (Phase C re-import).
+function findReimportTarget(scene: Scene, object: SceneObject): ImportedSvg | null {
+  if (object.kind !== 'imported-svg') return null;
+  for (const existing of scene.objects) {
+    if (existing.kind === 'imported-svg' && existing.source === object.source) {
+      return existing;
+    }
+  }
+  return null;
+}
+
+function ensureLayersForColors(scene: Scene, paths: ImportedSvg['paths']): Scene {
+  let out = scene;
+  for (const path of paths) {
+    const exists = out.layers.some((l) => l.color === path.color);
+    if (!exists) {
+      out = addLayer(out, createLayer({ id: path.color, color: path.color }));
+    }
+  }
+  return out;
+}
+
+function applyFreshImport(
+  s: AppState,
+  object: SceneObject,
+  batchOffsetIdx: number,
+): Partial<AppState> {
+  // Auto-fit + center on the bed so a 1000 mm SVG dropped on a 400 mm
+  // bed doesn't disappear off the corner. Small designs stay at scale 1.
+  const fitted = fitObjectToBed(object, s.project.device.bedWidth, s.project.device.bedHeight);
+  // Multi-import stagger (F-A3): shift Nth file by 10 mm × N right+down.
+  const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
+  const positioned =
+    offset === 0
+      ? fitted
+      : { ...fitted, transform: { ...fitted.transform, x: fitted.transform.x + offset, y: fitted.transform.y + offset } };
+  let scene = addObject(s.project.scene, positioned);
+  if (positioned.kind === 'imported-svg') {
+    scene = ensureLayersForColors(scene, positioned.paths);
+  }
   return {
-    importSvgObject: (object, batchOffsetIdx = 0) =>
+    project: { ...s.project, scene },
+    // Auto-select the newly-imported object (F-A3 step 5).
+    selectedObjectId: positioned.id,
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
+function applyReimport(
+  s: AppState,
+  existing: ImportedSvg,
+  incoming: ImportedSvg,
+): { readonly state: Partial<AppState>; readonly outcome: ImportOutcome } {
+  // Swap content + bounds but keep id and transform so the user's
+  // chosen position/scale/rotation survives. Layer settings carry over
+  // for any color still present (layers are keyed by color, scene-wide).
+  const replaced: ImportedSvg = {
+    ...incoming,
+    id: existing.id,
+    transform: existing.transform,
+  };
+  let scene = replaceObject(s.project.scene, existing.id, replaced);
+  scene = ensureLayersForColors(scene, replaced.paths);
+  const oldColors = new Set(existing.paths.map((p) => p.color));
+  const newColors = new Set(replaced.paths.map((p) => p.color));
+  let kept = 0;
+  let added = 0;
+  let removed = 0;
+  for (const c of newColors) {
+    if (oldColors.has(c)) kept += 1;
+    else added += 1;
+  }
+  for (const c of oldColors) {
+    if (!newColors.has(c)) removed += 1;
+  }
+  return {
+    state: {
+      project: { ...s.project, scene },
+      selectedObjectId: existing.id,
+      undoStack: pushUndo(s.project, s.undoStack),
+      redoStack: [],
+      dirty: true,
+    },
+    outcome: { kind: 'replaced', source: replaced.source, kept, added, removed },
+  };
+}
+
+function importSvgObjectAction(
+  set: Setter,
+  get: () => AppState,
+): Pick<AppState, 'importSvgObject'> {
+  return {
+    importSvgObject: (object, batchOffsetIdx = 0): ImportOutcome => {
+      const existing = findReimportTarget(get().project.scene, object);
+      let outcome: ImportOutcome = { kind: 'added' };
       set((s) => {
-        // Auto-fit + center on the bed so a 1000 mm SVG dropped on a 400 mm
-        // bed doesn't disappear off the corner. Small designs are left at
-        // scale 1 (fitObjectToBed caps at scale 1).
-        const fitted = fitObjectToBed(
-          object,
-          s.project.device.bedWidth,
-          s.project.device.bedHeight,
-        );
-        // For multi-file batches, shift the Nth import 10mm × N right+down
-        // (F-A3) so the imports stagger instead of fully overlapping. First
-        // file (idx 0) lands centered as before — no behavior change for
-        // the common single-file case.
-        const offset = batchOffsetIdx * MULTI_IMPORT_OFFSET_MM;
-        const positioned =
-          offset === 0
-            ? fitted
-            : {
-                ...fitted,
-                transform: {
-                  ...fitted.transform,
-                  x: fitted.transform.x + offset,
-                  y: fitted.transform.y + offset,
-                },
-              };
-        let scene = addObject(s.project.scene, positioned);
-        if (positioned.kind === 'imported-svg') {
-          for (const path of positioned.paths) {
-            const exists = scene.layers.some((l) => l.color === path.color);
-            if (!exists) {
-              scene = addLayer(scene, createLayer({ id: path.color, color: path.color }));
-            }
-          }
+        if (existing !== null && object.kind === 'imported-svg') {
+          const next = applyReimport(s, existing, object);
+          outcome = next.outcome;
+          return next.state;
         }
-        return {
-          project: { ...s.project, scene },
-          // Auto-select the newly-imported object so resize handles appear
-          // immediately (F-A3 success step 5). In a multi-import batch each
-          // call selects its own object; the most recently dropped file
-          // ends up selected, which matches LightBurn / xTool behavior.
-          selectedObjectId: positioned.id,
-          undoStack: pushUndo(s.project, s.undoStack),
-          redoStack: [],
-          dirty: true,
-        };
-      }),
+        return applyFreshImport(s, object, batchOffsetIdx);
+      });
+      return outcome;
+    },
   };
 }
 
@@ -366,10 +448,10 @@ function saveTrackingActions(set: Setter): Pick<AppState, 'markSaved' | 'markLoa
   };
 }
 
-export const useStore = create<AppState>((set) => ({
+export const useStore = create<AppState>((set, get) => ({
   ...initialState(),
   ...projectActions(set),
-  ...importSvgObjectAction(set),
+  ...importSvgObjectAction(set, get),
   ...sceneActions(set),
   ...historyActions(set),
   ...viewActions(set),

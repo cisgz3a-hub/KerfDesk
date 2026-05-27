@@ -6,6 +6,7 @@
 // messaging — and so this logic is unit-testable without React.
 
 import type { ParseSvgResult } from '../../io/svg';
+import type { ImportOutcome } from '../state/store';
 
 export type ToastDescriptor = {
   readonly message: string;
@@ -58,6 +59,24 @@ export function describeImportError(filename: string, err: unknown): ToastDescri
   return {
     message: `Could not import ${filename}: ${reason}`,
     variant: 'error',
+  };
+}
+
+// Phase C re-import toast. Returned when importSvgObject detects an
+// existing object with the same source filename and replaces it in
+// place. Shows the kept/added/removed color counts so the user knows
+// their layer settings carried over.
+export function describeReimportOutcome(
+  outcome: Extract<ImportOutcome, { kind: 'replaced' }>,
+): ToastDescriptor {
+  const parts: string[] = [];
+  if (outcome.kept > 0) parts.push(`${outcome.kept} kept`);
+  if (outcome.added > 0) parts.push(`${outcome.added} new`);
+  if (outcome.removed > 0) parts.push(`${outcome.removed} removed`);
+  const detail = parts.length > 0 ? ` (${parts.join(', ')})` : '';
+  return {
+    message: `Re-imported ${outcome.source} — layer settings preserved${detail}`,
+    variant: 'success',
   };
 }
 
