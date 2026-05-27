@@ -115,6 +115,51 @@ describe('handleEditShortcut — Cmd+D duplicate', () => {
   });
 });
 
+describe('handleViewShortcut — Shift+F fit-to-selection', () => {
+  it('Shift+F outside an input dispatches fitToSelection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const fitToSelection = vi.fn();
+    const handled = handleViewShortcut(fakeKeydown({ key: 'f', shiftKey: true, target: div }), {
+      togglePreview: vi.fn(),
+      resetView: vi.fn(),
+      zoomBy: vi.fn(),
+      fitToSelection,
+    });
+    expect(handled).toBe(true);
+    expect(fitToSelection).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Shift+F inside an input does NOT fit (let the user type a capital F)', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const fitToSelection = vi.fn();
+    handleViewShortcut(fakeKeydown({ key: 'F', shiftKey: true, target: input }), {
+      togglePreview: vi.fn(),
+      resetView: vi.fn(),
+      zoomBy: vi.fn(),
+      fitToSelection,
+    });
+    expect(fitToSelection).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it('plain F still hits resetView (the no-modifier path is unchanged)', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const resetView = vi.fn();
+    handleViewShortcut(fakeKeydown({ key: 'f', target: div }), {
+      togglePreview: vi.fn(),
+      resetView,
+      zoomBy: vi.fn(),
+      fitToSelection: vi.fn(),
+    });
+    expect(resetView).toHaveBeenCalled();
+    div.remove();
+  });
+});
+
 describe('handleViewShortcut — input-focus guard (regression check)', () => {
   it('"+" inside an <input> does NOT zoom (so the user can type "+1")', () => {
     const input = document.createElement('input');
@@ -124,6 +169,7 @@ describe('handleViewShortcut — input-focus guard (regression check)', () => {
       togglePreview: vi.fn(),
       resetView: vi.fn(),
       zoomBy,
+      fitToSelection: vi.fn(),
     });
     expect(zoomBy).not.toHaveBeenCalled();
     input.remove();

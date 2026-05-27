@@ -5,6 +5,7 @@
 
 import type { Project } from '../../core/scene';
 import { transformedBBox } from '../../core/scene';
+import { useStore } from '../state';
 import { useUiStore } from '../state/ui-store';
 import { computeView } from './view-transform';
 
@@ -34,6 +35,7 @@ export function ZoomControls(): JSX.Element {
   const zoomFactor = useUiStore((s) => s.zoomFactor);
   const zoomBy = useUiStore((s) => s.zoomBy);
   const resetView = useUiStore((s) => s.resetView);
+  const fitToSelection = useStore((s) => s.fitToSelection);
   const percent = Math.round(zoomFactor * 100);
   return (
     <div style={zoomControlsStyle} role="group" aria-label="Zoom">
@@ -69,6 +71,15 @@ export function ZoomControls(): JSX.Element {
         style={zoomBtnStyle}
       >
         +
+      </button>
+      <button
+        type="button"
+        onClick={() => fitToSelection()}
+        title="Fit to selection (Shift+F)"
+        aria-label="Fit to selection"
+        style={zoomBtnStyle}
+      >
+        ⊙
       </button>
       <button
         type="button"

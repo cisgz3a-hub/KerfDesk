@@ -104,6 +104,34 @@ Requires a new `PROJECT.md` revision and a `DECISIONS.md` entry. Anticipated, no
 
 **MIT-availability does not collapse the phase plan.** ADR-005, ADR-006, ADR-007 are discipline choices, not technical-impossibility choices. See ADR-017 for the policy.
 
+### Future feature notes (uncommitted; capture-only)
+
+These are user-requested or product-research items. Not yet scoped into a
+phase; tracked here so they don't get lost.
+
+- **Work-origin from current head position.** User-facing flow: operator
+  manually jogs (or hand-drags, motors-off) the head to a corner of the
+  workpiece, presses a "Set origin here" button in the Laser panel, then
+  the next compiled job emits coordinates relative to that physical point
+  rather than the machine 0,0. Standard CAM convention; LightBurn calls
+  it "Set Job Origin to Current Position."
+  - GRBL mechanics: `G92 X0 Y0` (transient — cleared by alarm / reset
+    / G92.1) is the LightBurn / LaserGRBL convention; `G10 L20 P1 X0 Y0`
+    sets the same on the G54 coordinate system persistently. Probably
+    expose both as a toggle ("session-only" vs "persistent").
+  - Surface: a new section in the Laser panel sitting next to Home /
+    Frame, plus a status-bar readout for "Origin: machine 0,0" vs
+    "Origin: WPos X.X Y.Y (custom)." Reset button to clear (G92.1 +
+    G10 L20 P1 reset to machine zero).
+  - Head-position source: existing `?` status poll already fetches
+    `WPos` / `MPos` from GRBL — `laser-store.statusReport` has it.
+  - MIT references (study-only, no code copy): CNCjs (MIT) implements
+    the same flow. LaserGRBL (GPLv3) and gSender (GPLv3) cannot be
+    referenced for code per ADR-017, but their UX choices are public.
+  - Pre-research: GRBL wiki "Work coordinate system" + Sonny Jeon's
+    `$10` reporting flags note.
+  - Needs its own ADR + WORKFLOW.md F-X entry at kickoff.
+
 ---
 
 ## Non-negotiables

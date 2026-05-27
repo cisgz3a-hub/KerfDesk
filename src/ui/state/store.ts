@@ -17,6 +17,7 @@ import {
   type Vec2,
 } from '../../core/scene';
 import type { SaveTarget } from '../../platform/types';
+import { fitAllObjects, fitToSelection } from './viewport-actions';
 import {
   applyDuplicate,
   applyFreshImport,
@@ -81,6 +82,11 @@ export type AppState = {
   // 10 mm offset (matches the F-A3 multi-import stagger). Becomes the
   // new selection. No-op when nothing is selected.
   readonly duplicateSelection: () => void;
+  // Zoom the viewport to the bounds of the current selection (primary
+  // + extras). Falls back to fitting all objects when nothing's
+  // selected, and to bed fit when the scene is empty. Driven by the
+  // Shift+F shortcut and the "fit to selection" zoom button.
+  readonly fitToSelection: () => void;
   readonly setLayerParam: (layerId: string, patch: Partial<Omit<Layer, 'id' | 'color'>>) => void;
   readonly updateDeviceProfile: (patch: Partial<DeviceProfile>) => void;
 
@@ -165,6 +171,8 @@ function importSvgObjectAction(
         }
         return applyFreshImport(s, object, batchOffsetIdx);
       });
+      // Auto-zoom to fit all objects — see viewport-actions.fitAllObjects.
+      fitAllObjects(get);
       return outcome;
     },
     upsertTextObject: (text) => {
@@ -239,6 +247,12 @@ function duplicateAction(set: Setter): Pick<AppState, 'duplicateSelection'> {
         if (result === null) return s;
         return result;
       }),
+  };
+}
+
+function fitToSelectionAction(get: () => AppState): Pick<AppState, 'fitToSelection'> {
+  return {
+    fitToSelection: () => fitToSelection(get),
   };
 }
 
@@ -378,6 +392,7 @@ export const useStore = create<AppState>((set, get) => ({
   ...importSvgObjectAction(set, get),
   ...sceneActions(set),
   ...duplicateAction(set),
+  ...fitToSelectionAction(get),
   ...historyActions(set),
   ...viewActions(set),
   ...interactionActions(set),

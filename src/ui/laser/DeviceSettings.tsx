@@ -21,28 +21,36 @@ import { PlannerAdvanced } from './PlannerAdvanced';
 export function DeviceSettings(): JSX.Element {
   const device = useStore((s) => s.project.device);
   const update = useStore((s) => s.updateDeviceProfile);
+  // Whole panel collapses to one row by default. <details> gives us the
+  // disclosure widget without any React state — the user's last-chosen
+  // open/closed status persists for the session (browser DOM owns it).
+  // Open by default the first time you see the app, then your choice
+  // sticks. PlannerAdvanced has its own nested <details> for the
+  // power-user knobs — that nesting is intentional, not accidental.
   return (
-    <div style={panelStyle}>
-      <h3 style={headingStyle}>Device</h3>
-      <BasicRows device={device} update={update} />
-      <Row label="Homing">
-        <HomingEditor
-          enabled={device.homing.enabled}
-          direction={device.homing.direction}
-          onChange={(homing) => update({ homing })}
+    <details style={panelStyle} open>
+      <summary style={summaryStyle}>Device</summary>
+      <div style={bodyStyle}>
+        <BasicRows device={device} update={update} />
+        <Row label="Homing">
+          <HomingEditor
+            enabled={device.homing.enabled}
+            direction={device.homing.direction}
+            onChange={(homing) => update({ homing })}
+          />
+        </Row>
+        <AutofocusEditor
+          value={device.autofocusCommand}
+          onChange={(autofocusCommand) => update({ autofocusCommand })}
         />
-      </Row>
-      <AutofocusEditor
-        value={device.autofocusCommand}
-        onChange={(autofocusCommand) => update({ autofocusCommand })}
-      />
-      <PlannerAdvanced
-        accel={device.accelMmPerSec2}
-        jd={device.junctionDeviationMm}
-        onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
-        onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
-      />
-    </div>
+        <PlannerAdvanced
+          accel={device.accelMmPerSec2}
+          jd={device.junctionDeviationMm}
+          onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
+          onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
+        />
+      </div>
+    </details>
   );
 }
 
@@ -228,11 +236,19 @@ const panelStyle: React.CSSProperties = {
   borderRadius: 4,
   padding: 6,
   background: '#fff',
+};
+const summaryStyle: React.CSSProperties = {
+  fontSize: 12,
+  fontWeight: 600,
+  cursor: 'pointer',
+  userSelect: 'none',
+};
+const bodyStyle: React.CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   gap: 4,
+  marginTop: 6,
 };
-const headingStyle: React.CSSProperties = { fontSize: 12, fontWeight: 600, margin: 0 };
 const textInputStyle: React.CSSProperties = { width: 140 };
 const timesStyle: React.CSSProperties = { fontSize: 12, color: '#666' };
 const inlineLabelStyle: React.CSSProperties = {

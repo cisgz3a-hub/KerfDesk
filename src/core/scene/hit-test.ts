@@ -46,6 +46,28 @@ export function transformedBBox(obj: SceneObject): AABB {
   return aabbOfCorners(corners, obj.transform);
 }
 
+// Combined bounding box of every object's transformed AABB. Used by
+// the auto-zoom-on-import and fit-to-selection viewport actions —
+// "give me the smallest rectangle that contains all of these." Returns
+// null for an empty input so the caller can decide whether to keep the
+// current view (no objects → no sensible target).
+export function combinedBBox(objects: ReadonlyArray<SceneObject>): AABB | null {
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+  let any = false;
+  for (const obj of objects) {
+    const b = transformedBBox(obj);
+    if (b.minX < minX) minX = b.minX;
+    if (b.minY < minY) minY = b.minY;
+    if (b.maxX > maxX) maxX = b.maxX;
+    if (b.maxY > maxY) maxY = b.maxY;
+    any = true;
+  }
+  return any ? { minX, minY, maxX, maxY } : null;
+}
+
 function aabbOfCorners(corners: ReadonlyArray<Vec2>, transform: Transform): AABB {
   let minX = Number.POSITIVE_INFINITY;
   let minY = Number.POSITIVE_INFINITY;
