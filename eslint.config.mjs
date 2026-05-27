@@ -111,7 +111,7 @@ export default tseslint.config(
       complexity: ['error', COMPLEXITY_LIMIT],
 
       // Module isolation (CLAUDE.md "Imports — boundaries enforced")
-      'boundaries/element-types': ['error', { default: 'disallow', rules: boundaryRules }],
+      'boundaries/dependencies': ['error', { default: 'disallow', rules: boundaryRules }],
       'boundaries/no-unknown': 'error',
       'boundaries/no-unknown-files': 'error',
 
@@ -178,7 +178,7 @@ export default tseslint.config(
     rules: {
       'max-lines-per-function': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
-      'boundaries/element-types': 'off',
+      'boundaries/dependencies': 'off',
     },
   },
   // Place prettier LAST so it disables conflicting style rules.

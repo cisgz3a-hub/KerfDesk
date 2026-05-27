@@ -5,3 +5,18 @@ allowBuilds:
   electron-builder: true
   app-builder-lib: true
   '@electron/get': true
+  # Pulled in transitively by electron-builder for the Squirrel.Windows
+  # installer format. We build with NSIS via `electron-builder --win
+  # --x64` so this post-install never runs. False keeps the warning
+  # quiet without granting unused build privilege.
+  electron-winstaller: false
+minimumReleaseAgeExclude:
+  - electron@42.3.0
+  - tmp@0.2.6
+# Force newer transitive `tmp` to clear CVE GHSA-ph9p-34f9-6g65 (path
+# traversal). The vulnerable copy is pulled in by
+# @malept/flatpak-bundler (Linux Flatpak builder), which is dead code
+# for our Windows NSIS target — but the override is the clean way to
+# get a green audit anyway. Safe: tmp@0.2.x patches are ABI-stable.
+overrides:
+  tmp@<0.2.6: ^0.2.6
