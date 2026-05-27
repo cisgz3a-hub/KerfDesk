@@ -1,15 +1,18 @@
 // LaserForge 2.0 Electron main process.
 //
-// Security posture per PROJECT.md:
+// Security posture per PROJECT.md + audit fix F-9:
 //   * contextIsolation: true
 //   * nodeIntegration: false
 //   * sandbox: true
+//   * webSecurity: true
 //   * setPermissionRequestHandler returns false except for `serial` (Phase B)
-//   * strict CSP via index.html meta (renderer-side)
+//   * CSP set via session.webRequest.onHeadersReceived (not meta tag —
+//     per Electron docs, meta CSP is unreliable on file:// origin and
+//     can't gate things like form-action / frame-ancestors)
 //
 // Renderer source:
 //   * If env LASERFORGE_DEV_URL is set (e.g. http://localhost:5173), load that
-//     URL — Vite dev server with HMR.
+//     URL — Vite dev server with HMR. CSP is loosened in that mode for HMR.
 //   * Otherwise load dist/web/index.html via file://. This is what
 //     `pnpm dev:desktop` and the packaged build both do.
 
@@ -36,6 +39,49 @@ async function createWindow(): Promise<void> {
       sandbox: true,
       webSecurity: true,
     },
+  });
+
+  // F-9 audit fix: set Content-Security-Policy via webRequest headers
+  // rather than a <meta> tag. Per Electron docs, meta CSP is unreliable
+  // on file:// origin and can't gate form-action / frame-ancestors.
+  //
+  // Policy rationale (each directive):
+  //   default-src 'self'           — same-origin baseline; reject everything else.
+  //   script-src 'self'            — bundled Vite scripts only; no inline JS, no eval.
+  //   style-src 'self' 'unsafe-inline'
+  //                                — React's `style={{ ... }}` prop emits inline styles
+  //                                  on every element. 'unsafe-inline' is required.
+  //                                  No third-party stylesheets are allowed.
+  //   img-src 'self' data: blob:   — Vite-bundled images + blob URLs for
+  //                                  image-loader.ts (raster image picker
+  //                                  creates blobs from File objects).
+  //   font-src 'self' data:        — Vite-bundled .ttf files via ?url import.
+  //   connect-src 'self'           — same-origin fetch only (font assets); no
+  //                                  outbound HTTP. Reinforces PROJECT.md
+  //                                  "External services: None."
+  //   object-src 'none'            — block <embed>/<object>/<applet> entirely.
+  //   base-uri 'self'              — pin <base> tag to same-origin.
+  //   form-action 'none'           — no form submissions anywhere.
+  //   frame-ancestors 'none'       — refuse to be embedded.
+  const CSP_POLICY = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'none'",
+    "frame-ancestors 'none'",
+  ].join('; ');
+  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [CSP_POLICY],
+      },
+    });
   });
 
   // Permission gate: deny everything by default, allow `serial` (Phase B).
