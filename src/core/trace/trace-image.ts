@@ -59,6 +59,13 @@ export type TraceOptions = {
   // output is two layers (background + ink) with no banding from
   // imagetracer's clustering. Hex strings, parsed at the boundary.
   readonly fixedPalette?: ReadonlyArray<string>;
+  // Pre-threshold the input to pure 1-bit before tracing. Pixels
+  // with luminance ≥ this value become white, the rest black. The
+  // most important quality lever for line-art input: it eliminates
+  // anti-aliased edges that otherwise become borderline-classified
+  // speckle in the trace output. 0..255 range; undefined = skip
+  // pre-threshold and feed raw pixels.
+  readonly thresholdLuma?: number;
 };
 
 // Sensible defaults for engraving — 2 colors (mono), light blur to
@@ -82,12 +89,15 @@ export const DEFAULT_TRACE_OPTIONS: TraceOptions = {
 // (vector-like logos, line drawings, monochrome signs).
 export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   'Line Art': {
-    // For clean black-on-white logos / line drawings. The fixed
-    // palette is the key knob: it forces a pure 2-color (white +
-    // black) output instead of letting imagetracer's clustering
-    // invent gray bands that fragment fine strokes. pathOmit 16
-    // drops the small disconnected dots that otherwise litter the
-    // result on noisy scans.
+    // For clean black-on-white logos / line drawings. Two key
+    // knobs (and the lesson from Phase E.1 → E.2):
+    //   * thresholdLuma 128 — pre-converts the input to pure 1-bit
+    //     so anti-aliased edges become hard pixels. Without this,
+    //     borderline-gray AA pixels become speckle in the trace.
+    //   * fixedPalette [white, black] — guarantees a 2-layer output
+    //     even if the input has stray non-monochrome pixels.
+    //   * pathOmit 16 — drops any sub-16-point speckle that slipped
+    //     through the threshold (single-pixel JPEG artifacts etc.).
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 1,
@@ -96,6 +106,7 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurDelta: 0,
     lineFilter: true,
     fixedPalette: ['#ffffff', '#000000'],
+    thresholdLuma: 128,
   },
   Smooth: {
     // For slightly noisy / hand-drawn line art. Adds blur to
@@ -110,8 +121,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
   },
   Sharp: {
     // For pixel-art / blueprint inputs where every notch matters.
-    // No blur, low tolerances, but pathOmit still 16 to drop
-    // single-pixel speckle.
+    // Same threshold + palette as Line Art (kills AA speckle) but
+    // skips lineFilter so corners stay crisp.
     numberOfColors: 2,
     pathOmit: 16,
     lineTolerance: 0.5,
@@ -119,6 +130,8 @@ export const TRACE_PRESETS: Readonly<Record<string, TraceOptions>> = {
     blurRadius: 0,
     blurDelta: 0,
     lineFilter: false,
+    fixedPalette: ['#ffffff', '#000000'],
+    thresholdLuma: 128,
   },
   Detailed: {
     // For line drawings with some shading — 4 colors keeps
@@ -158,6 +171,14 @@ export function traceImageToSvgString(
   options: TraceOptions = DEFAULT_TRACE_OPTIONS,
 ): string {
   const tracer = ImageTracer as unknown as ImageTracerModule;
+  // Pre-threshold to 1-bit if requested. Done before handing the
+  // pixels to imagetracer so anti-aliased edges get binarized
+  // away — without this step, even with a fixed palette, AA
+  // pixels survive as borderline-classified speckle.
+  const prepared =
+    options.thresholdLuma !== undefined
+      ? thresholdToMonochrome(image, options.thresholdLuma)
+      : image;
   const baseOpts: Record<string, unknown> = {
     numberofcolors: options.numberOfColors,
     pathomit: options.pathOmit,
@@ -178,7 +199,34 @@ export function traceImageToSvgString(
   if (options.fixedPalette !== undefined && options.fixedPalette.length > 0) {
     baseOpts['pal'] = options.fixedPalette.map(hexToRgba);
   }
-  return tracer.imagedataToSVG(image, baseOpts);
+  return tracer.imagedataToSVG(prepared, baseOpts);
+}
+
+// Convert an RGBA buffer to pure 1-bit black/white. Each output
+// pixel is either (255, 255, 255, 255) or (0, 0, 0, 255) based on
+// the luminance (ITU-R BT.601: 0.299·R + 0.587·G + 0.114·B). Used
+// before tracing to kill anti-aliased edge speckle.
+//
+// Allocates a fresh Uint8ClampedArray rather than mutating in place
+// so callers don't see their input change. Pure function.
+export function thresholdToMonochrome(
+  image: RawImageData,
+  threshold: number,
+): RawImageData {
+  const data = new Uint8ClampedArray(image.data.length);
+  const cutoff = Math.max(0, Math.min(255, threshold));
+  for (let i = 0; i < image.data.length; i += 4) {
+    const r = image.data[i] ?? 0;
+    const g = image.data[i + 1] ?? 0;
+    const b = image.data[i + 2] ?? 0;
+    const luma = 0.299 * r + 0.587 * g + 0.114 * b;
+    const v = luma >= cutoff ? 255 : 0;
+    data[i] = v;
+    data[i + 1] = v;
+    data[i + 2] = v;
+    data[i + 3] = 255;
+  }
+  return { width: image.width, height: image.height, data };
 }
 
 // Convert '#rrggbb' (or '#rgb') to {r, g, b, a} as imagetracerjs

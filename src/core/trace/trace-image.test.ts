@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_TRACE_OPTIONS, traceImageToSvgString } from './trace-image';
+import {
+  DEFAULT_TRACE_OPTIONS,
+  thresholdToMonochrome,
+  traceImageToSvgString,
+} from './trace-image';
 
 // Build a tiny synthetic raster: a black square (8×8) centered in a
 // white 16×16 image. RGBA uint8 layout matches what canvas.getImageData
@@ -106,6 +110,74 @@ describe('traceImageToSvgString', () => {
       );
       expect(anyPolyline).toBe(true);
     }
+  });
+
+  it('thresholdToMonochrome turns AA grays into pure black or white', () => {
+    // 4×1 image with luminance values: 0 (black), 100 (dark gray),
+    // 180 (light gray), 255 (white). With threshold 128, the first
+    // two become black, the last two become white.
+    const data = new Uint8ClampedArray([
+      0, 0, 0, 255, // black
+      100, 100, 100, 255, // dark gray — below threshold
+      180, 180, 180, 255, // light gray — above threshold
+      255, 255, 255, 255, // white
+    ]);
+    const result = thresholdToMonochrome({ width: 4, height: 1, data }, 128);
+    expect(Array.from(result.data)).toEqual([
+      0, 0, 0, 255,
+      0, 0, 0, 255,
+      255, 255, 255, 255,
+      255, 255, 255, 255,
+    ]);
+  });
+
+  it('thresholdToMonochrome is pure — does not mutate the input', () => {
+    const data = new Uint8ClampedArray([100, 100, 100, 255]);
+    const original = new Uint8ClampedArray(data);
+    thresholdToMonochrome({ width: 1, height: 1, data }, 128);
+    expect(Array.from(data)).toEqual(Array.from(original));
+  });
+
+  it('Line Art preset: traces an AA-heavy fixture without spurious dots', () => {
+    // Build a 32×32 fixture: a 12×12 black square at (10,10) with
+    // gradient-shaded AA borders 1 pixel wide. Without pre-threshold
+    // these borders produce edge speckle in the trace; with the
+    // Line Art preset they should collapse to a single solid square
+    // outline (one or two contours, no dot clusters).
+    const W = 32;
+    const H = 32;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y += 1) {
+      for (let x = 0; x < W; x += 1) {
+        const dx = x - 16;
+        const dy = y - 16;
+        const distToCenter = Math.max(Math.abs(dx), Math.abs(dy));
+        let v: number;
+        if (distToCenter < 5) v = 0; // pure black square center
+        else if (distToCenter > 8) v = 255; // pure white outside
+        else v = 128; // AA gray on the border ring
+        const i = (y * W + x) * 4;
+        data[i] = v;
+        data[i + 1] = v;
+        data[i + 2] = v;
+        data[i + 3] = 255;
+      }
+    }
+    const svg = traceImageToSvgString(
+      { width: W, height: H, data },
+      {
+        ...DEFAULT_TRACE_OPTIONS,
+        fixedPalette: ['#ffffff', '#000000'],
+        thresholdLuma: 128,
+        pathOmit: 16,
+      },
+    );
+    // Without pre-threshold + pathOmit, that AA ring would produce
+    // dozens of tiny disconnected paths. With both on, count of
+    // <path> elements should be small (≤ 4: one or two solid
+    // contours + maybe background).
+    const pathCount = (svg.match(/<path/g) ?? []).length;
+    expect(pathCount).toBeLessThanOrEqual(4);
   });
 
   it('handles a fully-uniform image without throwing', () => {
