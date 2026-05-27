@@ -12,6 +12,7 @@ function editCtx(overrides: Partial<Parameters<typeof handleEditShortcut>[1]> = 
     removeSceneObject: vi.fn(),
     selectObject: vi.fn(),
     selectAllObjects: vi.fn(),
+    duplicateSelection: vi.fn(),
     ...overrides,
   };
 }
@@ -84,6 +85,34 @@ describe('handleEditShortcut — input-focus guard (regression)', () => {
     handleEditShortcut(fakeKeydown({ key: 'Backspace', target: div }), ctx);
     expect(ctx.removeSceneObject).not.toHaveBeenCalled();
     div.remove();
+  });
+});
+
+describe('handleEditShortcut — Cmd+D duplicate', () => {
+  it('Cmd+D on the canvas triggers duplicateSelection', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(
+      fakeKeydown({ key: 'd', metaKey: true, target: div }),
+      ctx,
+    );
+    expect(handled).toBe(true);
+    expect(ctx.duplicateSelection).toHaveBeenCalled();
+    div.remove();
+  });
+
+  it('Cmd+D inside an <input> does NOT duplicate (browser keeps Bookmark)', () => {
+    const input = document.createElement('input');
+    document.body.appendChild(input);
+    const ctx = editCtx();
+    const handled = handleEditShortcut(
+      fakeKeydown({ key: 'd', metaKey: true, target: input }),
+      ctx,
+    );
+    expect(handled).toBe(false);
+    expect(ctx.duplicateSelection).not.toHaveBeenCalled();
+    input.remove();
   });
 });
 

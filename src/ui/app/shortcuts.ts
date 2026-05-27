@@ -46,6 +46,7 @@ export type EditCtx = {
   readonly removeSceneObject: (id: string) => void;
   readonly selectObject: (id: string | null) => void;
   readonly selectAllObjects: () => void;
+  readonly duplicateSelection: () => void;
 };
 
 export type TransformCtx = {
@@ -157,6 +158,15 @@ const EDIT_BINDINGS: ReadonlyArray<EditBinding> = [
   {
     match: (e) => hasMeta(e) && e.key.toLowerCase() === 'a' && !e.shiftKey,
     invoke: (c) => c.selectAllObjects(),
+  },
+  {
+    // Cmd/Ctrl+D — Duplicate selection. Matches Figma / Inkscape /
+    // LightBurn. Skipped inside editable targets (the input-focus
+    // guard at the top of handleEditShortcut handles that) so the
+    // browser's bookmark-this-page default still fires when the user
+    // is typing in a field rather than working with canvas objects.
+    match: (e) => hasMeta(e) && e.key.toLowerCase() === 'd' && !e.shiftKey,
+    invoke: (c) => c.duplicateSelection(),
   },
   {
     match: (e) => !hasMeta(e) && (e.key === 'Delete' || e.key === 'Backspace'),

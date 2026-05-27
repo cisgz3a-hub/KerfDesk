@@ -85,6 +85,52 @@ export function ensureLayersForColors(
   return out;
 }
 
+// Clone every selected SceneObject with a fresh id and a 10 mm offset.
+// Returns the new selection (first clone as primary, rest as extras)
+// plus the new scene + undo push. Matches the F-A3 multi-import
+// stagger so duplicate-of-multi feels consistent.
+//
+// Empty selection → no-op; the caller's `set((s) => ...)` should fall
+// through without changing state (the undefined return signals that).
+export function applyDuplicate(
+  s: StateSlice & { readonly selectedObjectId: string | null; readonly additionalSelectedIds: ReadonlySet<string> },
+  newIdFor: (oldId: string) => string,
+): (MutationResult & { readonly additionalSelectedIds: ReadonlySet<string> }) | null {
+  const ids: string[] = [
+    ...(s.selectedObjectId !== null ? [s.selectedObjectId] : []),
+    ...s.additionalSelectedIds,
+  ];
+  if (ids.length === 0) return null;
+  const offset = MULTI_IMPORT_OFFSET_MM;
+  let scene = s.project.scene;
+  const newIds: string[] = [];
+  for (const oldId of ids) {
+    const original = scene.objects.find((o) => o.id === oldId);
+    if (original === undefined) continue;
+    const clone = {
+      ...original,
+      id: newIdFor(oldId),
+      transform: {
+        ...original.transform,
+        x: original.transform.x + offset,
+        y: original.transform.y + offset,
+      },
+    } as SceneObject;
+    scene = addObject(scene, clone);
+    newIds.push(clone.id);
+  }
+  if (newIds.length === 0) return null;
+  const [first, ...rest] = newIds;
+  return {
+    project: { ...s.project, scene },
+    selectedObjectId: first ?? '',
+    additionalSelectedIds: new Set(rest),
+    undoStack: pushUndo(s.project, s.undoStack),
+    redoStack: [],
+    dirty: true,
+  };
+}
+
 // Drop layers whose color isn't referenced by any remaining object.
 // Called after removeSceneObject so the Cuts/Layers panel doesn't
 // stay polluted with stale per-color settings. Only object kinds
