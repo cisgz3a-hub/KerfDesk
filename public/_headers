@@ -1,0 +1,30 @@
+# Cloudflare Pages — response headers per path.
+#
+# Mirrors the Electron-side CSP in electron/main.ts (F-9 audit fix) and
+# adds the standard transport-layer hardening Pages doesn't set by
+# default. Vite copies this file from `public/` verbatim into the
+# build output, and Cloudflare Pages applies it to every response that
+# matches the leading path glob.
+#
+# Note: when editing the CSP, also update electron/main.ts so both
+# deployment surfaces stay aligned.
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  # serial=(self) keeps WebSerial available to the top-level document
+  # (the laser controls panel) and blocks any iframe from using it.
+  Permissions-Policy: serial=(self), usb=(), geolocation=(), camera=(), microphone=(), interest-cohort=()
+  # HSTS — Cloudflare proxies all Pages traffic over HTTPS; tell browsers
+  # to refuse any future http:// for this origin. Preload list opt-in
+  # via the Cloudflare dashboard once you're confident the domain is
+  # HTTPS-only.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+# Long-cache the hashed asset chunks. Vite gives every chunk a content
+# hash, so changing a file invalidates by emitting a new filename —
+# safe to cache aggressively.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

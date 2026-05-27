@@ -1,0 +1,11 @@
+# Cloudflare Pages — fallback rewrites.
+#
+# LaserForge is a single-page app with no client-side router (everything
+# lives at "/"), so this file is mostly defensive: it ensures that any
+# deep link or refresh on a non-existent path still loads index.html
+# instead of returning Cloudflare's default 404.
+#
+# `200` (not `301`/`302`) is a rewrite, not a redirect — the URL stays
+# put and the SPA hydrates from index.html.
+
+/*  /index.html  200

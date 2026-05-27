@@ -10,9 +10,18 @@ allowBuilds:
   # --x64` so this post-install never runs. False keeps the warning
   # quiet without granting unused build privilege.
   electron-winstaller: false
+  # Pulled in transitively by wrangler (Cloudflare Pages deploy CLI).
+  # `sharp` is a native image lib used for asset optimization at deploy
+  # time; `workerd` is the Cloudflare runtime used by `wrangler dev`.
+  # Both need post-install build steps to function. Granting them is
+  # standard for any project that uses wrangler.
+  sharp: true
+  workerd: true
 minimumReleaseAgeExclude:
   - electron@42.3.0
   - tmp@0.2.6
+  - miniflare@4.20260526.0
+  - wrangler@4.95.0
 # Force newer transitive `tmp` to clear CVE GHSA-ph9p-34f9-6g65 (path
 # traversal). The vulnerable copy is pulled in by
 # @malept/flatpak-bundler (Linux Flatpak builder), which is dead code
