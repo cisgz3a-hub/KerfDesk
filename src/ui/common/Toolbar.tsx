@@ -29,6 +29,7 @@ export function Toolbar(): JSX.Element {
   return (
     <header aria-label="Toolbar" style={barStyle}>
       <span style={titleStyle}>LaserForge 2.0</span>
+      <BuildBadge />
       <span style={separatorStyle} />
       <FileButtons />
       <span style={separatorStyle} />
@@ -36,6 +37,26 @@ export function Toolbar(): JSX.Element {
         ⌨ shortcuts
       </span>
     </header>
+  );
+}
+
+// Build identification — surfaces version + git SHA + build date so a
+// user can confirm which deploy they're looking at after pushing.
+// All three values are injected by Vite's `define` at build time
+// (see vite.config.ts); by the time JS runs in the browser they're
+// already inline literals. Hover shows the full ISO timestamp.
+function BuildBadge(): JSX.Element {
+  const sha = __GIT_SHA__;
+  const version = __APP_VERSION__;
+  const builtAt = __BUILD_TIME__;
+  // Trim the ISO time to a YYYY-MM-DD HH:MM (UTC) form for the inline
+  // display — the full ISO with seconds + Z lives in the title attr.
+  const shortDate = builtAt.slice(0, 16).replace('T', ' ');
+  const title = `Built ${builtAt}\nCommit ${sha}\nVersion ${version}`;
+  return (
+    <span style={buildBadgeStyle} title={title} aria-label="Build version">
+      v{version} · {sha} · {shortDate} UTC
+    </span>
   );
 }
 
@@ -163,6 +184,13 @@ const barStyle: React.CSSProperties = {
   borderBottom: '1px solid #111',
 };
 const titleStyle: React.CSSProperties = { fontWeight: 600 };
+const buildBadgeStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: '#888',
+  fontFamily: 'ui-monospace, Menlo, monospace',
+  cursor: 'help',
+  userSelect: 'none',
+};
 const separatorStyle: React.CSSProperties = {
   display: 'inline-block',
   width: 1,

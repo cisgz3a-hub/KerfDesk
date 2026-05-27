@@ -5,6 +5,13 @@ declare module '*.svg?raw' {
   export default content;
 }
 
+// Build-time constants injected by Vite's `define` (see vite.config.ts).
+// String at compile time — by the time JS runs in the browser these are
+// already inlined literals.
+declare const __BUILD_TIME__: string;
+declare const __GIT_SHA__: string;
+declare const __APP_VERSION__: string;
+
 // File System Access API — not yet in lib.dom.d.ts (as of TypeScript 5.9).
 // PROJECT.md "Delivery targets" requires Chromium, where these are stable.
 // Minimal declarations covering only what webAdapter uses.
