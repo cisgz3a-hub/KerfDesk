@@ -6,6 +6,7 @@
 // validation in Phase A is "trust the file was ours" — Zod-style schema
 // validation is a Phase B improvement.
 
+import { DEFAULT_DEVICE_PROFILE } from '../../core/devices';
 import { PROJECT_SCHEMA_VERSION, type Project } from '../../core/scene';
 import { migrateToCurrent } from './migrations';
 
@@ -60,10 +61,35 @@ export function deserializeProject(jsonText: string): DeserializeResult {
   const shapeError = validateShape(workingRaw);
   if (shapeError !== null) return { kind: 'invalid', reason: shapeError };
 
+  // Normalize additive DeviceProfile fields. Older .lf2 files predate
+  // the planner-aware estimator's accelMmPerSec2 / junctionDeviationMm
+  // fields. Filling defaults here keeps the type honest and avoids
+  // a schemaVersion bump (additive-with-default = no migration needed).
+  const project = normalizeProject(workingRaw);
+
   if (migratedFrom !== undefined) {
-    return { kind: 'ok', project: workingRaw as Project, migratedFrom };
+    return { kind: 'ok', project, migratedFrom };
   }
-  return { kind: 'ok', project: workingRaw as Project };
+  return { kind: 'ok', project };
+}
+
+function normalizeProject(raw: Record<string, unknown>): Project {
+  const dev = (raw['device'] ?? {}) as Record<string, unknown>;
+  const normalized = {
+    ...raw,
+    device: {
+      ...dev,
+      accelMmPerSec2:
+        typeof dev['accelMmPerSec2'] === 'number'
+          ? dev['accelMmPerSec2']
+          : DEFAULT_DEVICE_PROFILE.accelMmPerSec2,
+      junctionDeviationMm:
+        typeof dev['junctionDeviationMm'] === 'number'
+          ? dev['junctionDeviationMm']
+          : DEFAULT_DEVICE_PROFILE.junctionDeviationMm,
+    },
+  };
+  return normalized as unknown as Project;
 }
 
 function validateShape(raw: Record<string, unknown>): string | null {

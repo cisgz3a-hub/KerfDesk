@@ -42,4 +42,13 @@ describe('DEFAULT_DEVICE_PROFILE', () => {
     expect(DEFAULT_DEVICE_PROFILE.bedHeight).toBeGreaterThanOrEqual(100);
     expect(DEFAULT_DEVICE_PROFILE.bedHeight).toBeLessThanOrEqual(1500);
   });
+
+  it('planner defaults are present and sit in the GRBL-typical range', () => {
+    // Accel: real machines run roughly 100-2500 mm/s². Junction
+    // deviation: grbl ships 0.010, common range 0.001-0.05.
+    expect(DEFAULT_DEVICE_PROFILE.accelMmPerSec2).toBeGreaterThanOrEqual(100);
+    expect(DEFAULT_DEVICE_PROFILE.accelMmPerSec2).toBeLessThanOrEqual(5000);
+    expect(DEFAULT_DEVICE_PROFILE.junctionDeviationMm).toBeGreaterThan(0);
+    expect(DEFAULT_DEVICE_PROFILE.junctionDeviationMm).toBeLessThan(0.1);
+  });
 });

@@ -121,3 +121,18 @@ describe('startAutosaveLoop', () => {
     expect(readAutosave()).toBeNull();
   });
 });
+
+describe('writeAutosave called synchronously (beforeunload path)', () => {
+  // The hook test path lives in use-autosave; here we just verify
+  // writeAutosave is itself synchronous — the beforeunload handler
+  // can call it inline without awaiting, which is the whole point
+  // (browsers/Electron may not honor async work during unload).
+  it('completes before the next statement (no Promise)', () => {
+    const project = createProject();
+    const before = readAutosave();
+    writeAutosave(project);
+    const after = readAutosave();
+    expect(before).toBeNull();
+    expect(after).not.toBeNull();
+  });
+});

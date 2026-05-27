@@ -18,65 +18,7 @@ export function DeviceSettings(): JSX.Element {
   return (
     <div style={panelStyle}>
       <h3 style={headingStyle}>Device</h3>
-      <Row label="Name">
-        <input
-          type="text"
-          value={device.name}
-          onChange={(e) => update({ name: e.target.value })}
-          style={textInputStyle}
-          aria-label="Device name"
-        />
-      </Row>
-      <Row label="Bed">
-        <input
-          type="number"
-          min={10}
-          step={1}
-          value={device.bedWidth}
-          onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
-          style={numInputStyle}
-          aria-label="Bed width (mm)"
-        />
-        <span style={timesStyle}>×</span>
-        <input
-          type="number"
-          min={10}
-          step={1}
-          value={device.bedHeight}
-          onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
-          style={numInputStyle}
-          aria-label="Bed height (mm)"
-        />
-        <span style={unitStyle}>mm</span>
-      </Row>
-      <Row label="Origin">
-        <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
-      </Row>
-      <Row label="Max feed">
-        <input
-          type="number"
-          min={1}
-          step={100}
-          value={device.maxFeed}
-          onChange={(e) => update({ maxFeed: Math.max(1, Number(e.target.value) || 0) })}
-          style={numInputStyle}
-          aria-label="Max feed (mm/min)"
-        />
-        <span style={unitStyle}>mm/min</span>
-      </Row>
-      <Row label="$30 (max S)">
-        <input
-          type="number"
-          min={1}
-          step={1}
-          value={device.maxPowerS}
-          onChange={(e) =>
-            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
-          }
-          style={numInputStyle}
-          aria-label="GRBL $30 max power S"
-        />
-      </Row>
+      <BasicRows device={device} update={update} />
       <Row label="Homing">
         <HomingEditor
           enabled={device.homing.enabled}
@@ -87,6 +29,12 @@ export function DeviceSettings(): JSX.Element {
       <AutofocusEditor
         value={device.autofocusCommand}
         onChange={(autofocusCommand) => update({ autofocusCommand })}
+      />
+      <PlannerAdvanced
+        accel={device.accelMmPerSec2}
+        jd={device.junctionDeviationMm}
+        onAccelChange={(accelMmPerSec2) => update({ accelMmPerSec2 })}
+        onJdChange={(junctionDeviationMm) => update({ junctionDeviationMm })}
       />
     </div>
   );
@@ -153,6 +101,135 @@ function HomingEditor(props: {
         </select>
       )}
     </>
+  );
+}
+
+// The five always-visible numeric fields: Name, Bed (W×H), Origin,
+// Max feed, $30 max power. Extracted to keep DeviceSettings itself
+// under the 80-line function cap and to keep this UI as a single
+// scannable list.
+function BasicRows(props: {
+  readonly device: ReturnType<typeof useStore.getState>['project']['device'];
+  readonly update: ReturnType<typeof useStore.getState>['updateDeviceProfile'];
+}): JSX.Element {
+  const { device, update } = props;
+  return (
+    <>
+      <Row label="Name">
+        <input
+          type="text"
+          value={device.name}
+          onChange={(e) => update({ name: e.target.value })}
+          style={textInputStyle}
+          aria-label="Device name"
+        />
+      </Row>
+      <Row label="Bed">
+        <input
+          type="number"
+          min={10}
+          step={1}
+          value={device.bedWidth}
+          onChange={(e) => update({ bedWidth: Math.max(10, Number(e.target.value) || 0) })}
+          style={numInputStyle}
+          aria-label="Bed width (mm)"
+        />
+        <span style={timesStyle}>×</span>
+        <input
+          type="number"
+          min={10}
+          step={1}
+          value={device.bedHeight}
+          onChange={(e) => update({ bedHeight: Math.max(10, Number(e.target.value) || 0) })}
+          style={numInputStyle}
+          aria-label="Bed height (mm)"
+        />
+        <span style={unitStyle}>mm</span>
+      </Row>
+      <Row label="Origin">
+        <OriginSelect value={device.origin} onChange={(origin) => update({ origin })} />
+      </Row>
+      <Row label="Max feed">
+        <input
+          type="number"
+          min={1}
+          step={100}
+          value={device.maxFeed}
+          onChange={(e) => update({ maxFeed: Math.max(1, Number(e.target.value) || 0) })}
+          style={numInputStyle}
+          aria-label="Max feed (mm/min)"
+        />
+        <span style={unitStyle}>mm/min</span>
+      </Row>
+      <Row label="$30 (max S)">
+        <input
+          type="number"
+          min={1}
+          step={1}
+          value={device.maxPowerS}
+          onChange={(e) =>
+            update({ maxPowerS: Math.max(1, Math.floor(Number(e.target.value) || 0)) })
+          }
+          style={numInputStyle}
+          aria-label="GRBL $30 max power S"
+        />
+      </Row>
+    </>
+  );
+}
+
+// Hidden-by-default editor for the planner's GRBL settings. Most
+// users never touch these; they only matter when the job-time
+// estimate is systematically off and the user wants to dial it in
+// to their machine. <details> gives us native expand/collapse with
+// no state management.
+function PlannerAdvanced(props: {
+  readonly accel: number;
+  readonly jd: number;
+  readonly onAccelChange: (next: number) => void;
+  readonly onJdChange: (next: number) => void;
+}): JSX.Element {
+  return (
+    <details style={advancedDetailsStyle}>
+      <summary style={advancedSummaryStyle}>Advanced: estimator tuning</summary>
+      <div style={advancedBodyStyle}>
+        <Row label="$120 accel">
+          <input
+            type="number"
+            min={1}
+            step={50}
+            value={props.accel}
+            onChange={(e) =>
+              props.onAccelChange(Math.max(1, Number(e.target.value) || 0))
+            }
+            style={numInputStyle}
+            aria-label="Acceleration (mm/s²)"
+            title="GRBL $120/$121. Higher = faster cornering and shorter estimates. Typical 100-2500 mm/s²."
+          />
+          <span style={unitStyle}>mm/s²</span>
+        </Row>
+        <Row label="$11 junction">
+          <input
+            type="number"
+            min={0.001}
+            step={0.001}
+            value={props.jd}
+            onChange={(e) =>
+              props.onJdChange(Math.max(0, Number(e.target.value) || 0))
+            }
+            style={numInputStyle}
+            aria-label="Junction deviation (mm)"
+            title="GRBL $11. Higher = faster corners but more shake. Grbl default is 0.010 mm."
+          />
+          <span style={unitStyle}>mm</span>
+        </Row>
+        <p style={advancedHintStyle}>
+          Tune these to match your machine&apos;s <code style={inlineCodeStyle}>$$</code> output
+          when burn times consistently differ from the estimate. Defaults match the GRBL
+          shipping standard.
+        </p>
+      </div>
+    </details>
   );
 }
 
@@ -300,4 +377,27 @@ const inlineLabelStyle: React.CSSProperties = {
   gap: 4,
   fontSize: 12,
   cursor: 'pointer',
+};
+const advancedDetailsStyle: React.CSSProperties = {
+  marginTop: 4,
+  borderTop: '1px solid #eee',
+  paddingTop: 4,
+};
+const advancedSummaryStyle: React.CSSProperties = {
+  fontSize: 11,
+  color: '#666',
+  cursor: 'pointer',
+  userSelect: 'none',
+};
+const advancedBodyStyle: React.CSSProperties = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 4,
+  marginTop: 6,
+};
+const advancedHintStyle: React.CSSProperties = {
+  fontSize: 10,
+  color: '#777',
+  margin: '4px 0 0 0',
+  fontStyle: 'italic',
 };
