@@ -12,7 +12,7 @@
 // lookup; we just split on '\n' for line breaks.
 
 import { useState } from 'react';
-import { DEFAULT_FONT_KEY, FONT_REGISTRY, textToPolylines } from '../../core/text';
+import { DEFAULT_FONT_KEY, FONT_REGISTRY, type KnownFontKey, textToPolylines } from '../../core/text';
 import {
   DEFAULT_TEXT_ALIGNMENT,
   DEFAULT_TEXT_COLOR,
@@ -227,11 +227,11 @@ function DialogActions(props: {
 }
 
 // Narrow a stored fontKey string back to KnownFontKey for the
-// loader. Unknown keys fall back to the default with a warn (so
-// .lf2 files from a future build that referenced an unbundled
-// font still render in something rather than crash).
-function asKnownFontKey(key: string): 'roboto-regular' | 'inconsolata-regular' | 'pacifico-regular' {
-  if (FONT_REGISTRY.some((f) => f.key === key)) return key as 'roboto-regular';
+// loader. Unknown keys fall back to the default (so .lf2 files from
+// a future build that referenced an unbundled font still render in
+// something rather than crash).
+function asKnownFontKey(key: string): KnownFontKey {
+  if (FONT_REGISTRY.some((f) => f.key === key)) return key as KnownFontKey;
   return DEFAULT_FONT_KEY;
 }
 
